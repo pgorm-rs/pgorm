@@ -8129,6 +8129,13 @@ children (
                         kind @note
                         text "Migrator::status (pgorm-migration/src/migrator.rs:368, doc \"Check the status of all migrations\") and the get_* accessors (:159, :175, :231, :241) all call Self::install first (:317), which runs CREATE TABLE, conditionally ALTER TABLE ADD COLUMN, and adopt_legacy_ledger (:295), whose DO block takes pg_advisory_xact_lock and issues ALTER TABLE \"seaql_migrations\" RENAME (:302). A caller reaching for a read-only health check — a readiness probe, a CI gate — mutates the schema on every call, and needs DDL privileges to ask a question. Fix: split a genuinely read-only status/get path (absent ledger reported as pending-everything) from the self-provisioning path that up/down legitimately use."
                     }
+
+                    {
+                        at 2026-09-21T15:33:18.017985Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

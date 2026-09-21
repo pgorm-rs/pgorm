@@ -1,7 +1,7 @@
 use pgorm::entity::prelude::*;
 
-// [spec:pgorm:def:migration.runner+2]    ledger schema and default name
-// [spec:pgorm:req:migration.checksum]    the nullable third column
+// [spec:pgorm:def:migration.runner+3]    ledger schema and default name
+// [spec:pgorm:req:migration.checksum+1]    the nullable third column
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 // One should override the name of migration table via `MigratorTrait::migration_table_name` method
 #[pgorm(table_name = "pgorm_migrations")]

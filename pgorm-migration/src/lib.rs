@@ -19,7 +19,7 @@ pub trait MigrationName {
 }
 
 /// The migration definition
-// [spec:pgorm:def:migration.runner+2]    author-facing half
+// [spec:pgorm:def:migration.runner+3]    author-facing half
 // [spec:pgorm:req:migration.up-only]    `up` is the only direction
 #[async_trait::async_trait]
 pub trait MigrationTrait: MigrationName + Send + Sync {
@@ -36,7 +36,7 @@ pub trait MigrationTrait: MigrationName + Send + Sync {
     /// make a reformatted comment look like a schema change. Overriding this
     /// with a value the author controls — a hash of the DDL text, a version
     /// string bumped by hand — is what turns the check on.
-    // [spec:pgorm:req:migration.checksum]    opt-in by override, `None` by default
+    // [spec:pgorm:req:migration.checksum+1]    opt-in by override, `None` by default
     fn checksum(&self) -> Option<String> {
         None
     }

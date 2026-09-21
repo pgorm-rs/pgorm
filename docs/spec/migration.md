@@ -12,7 +12,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## The runner and its ledger
 
-> [spec:pgorm:def:migration.runner+2]
+> [spec:pgorm:def:migration.runner+3]
 > A migration is a `MigrationTrait` implementor: `MigrationName + Send + Sync`
 > plus a single `async fn up(&self, tx: &DatabaseTransaction<'_>)`, and an
 > optional `fn checksum(&self) -> Option<String>` defaulting to `None`. A
@@ -39,11 +39,11 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > `applied_at BIGINT NOT NULL`, and a nullable `checksum TEXT` — mirrored by the
 > `ledger::Model` entity, whose `checksum` field is `Option<String>`. `install`
 > creates it with `IF NOT EXISTS` under `migration_table_name()`, so an
-> overridden name is honoured on creation as well as on read and write; every
-> accessor reaches `install` before reading, making the ledger
-> self-provisioning. Results are reported as `Migration` values exposing
-> `name()` and `status()`, where `MigrationStatus` is `Pending` or `Applied` and
-> `Display`s as those words.
+> overridden name is honoured on creation as well as on read and write. It is
+> the only method that provisions anything, and `up` is the only method that
+> calls it — the accessors read instead, per `migration.read-only`. Results are
+> reported as `Migration` values exposing `name()` and `status()`, where
+> `MigrationStatus` is `Pending` or `Applied` and `Display`s as those words.
 >
 > The ledger's default physical name is `pgorm_migrations`, exposed as
 > `DEFAULT_LEDGER_TABLE`, and the Rust module holding its entity is `ledger`.
@@ -151,7 +151,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## Detecting an edited migration
 
-> [spec:pgorm:req:migration.checksum]
+> [spec:pgorm:req:migration.checksum+1]
 > The ledger matches on name alone, so editing a migration that has already run
 > is invisible: the name still matches, the row still says `Applied`, and a
 > database built from scratch afterwards diverges from the one built before
@@ -182,9 +182,8 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > that predates it. It consults `information_schema.columns` first and issues
 > the `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` only when the column is
 > missing, because `ADD COLUMN IF NOT EXISTS` takes an `ACCESS EXCLUSIVE` lock
-> even in the case where it does nothing, and `install` runs ahead of every
-> read — including, inside `up`, a read that would then hold that lock for the
-> length of the migration batch.
+> even in the case where it does nothing, and inside `up` that lock would then
+> be held for the length of the migration batch.
 >
 > The widening step sits after legacy-name adoption in `install`, and is the
 > only widening step there is. A ledger adopted from the old name is by
@@ -192,10 +191,21 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > the widening already does; making adoption a separate provisioning path would
 > mean two ways to reach a three-column ledger and two chances to disagree about
 > its shape.
+>
+> Widening is therefore not a precondition of reading. A read reaching a ledger
+> that predates the column MUST answer from it rather than widen it
+> (`migration.read-only`), so it MUST NOT name a column that is not there: it
+> projects a bound text `NULL` under the `checksum` alias and leaves the column
+> list otherwise unchanged, which decodes into the same `Option<String>` the
+> widened shape would have yielded. That substitution is exactly faithful
+> because widening adds the column `NULL`-filled — a pre-checksum ledger's rows
+> are unverifiable both before and after — so the three-valued check
+> grandfathers them either way and the reported status does not depend on
+> whether the widening has happened yet.
 
 ## Adopting a ledger left under the inherited name
 
-> [spec:pgorm:req:migration.ledger-upgrade]
+> [spec:pgorm:req:migration.ledger-upgrade+1]
 > Renaming the default ledger table cannot be done by changing the default. A
 > deployment upgraded to the renamed crate would look at `pgorm_migrations`,
 > find nothing, and read its entire applied history as pending — then re-run
@@ -230,9 +240,9 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > ledger, the rename is issued as one `DO` block that re-tests the condition
 > server-side under `pg_advisory_xact_lock(lock_key())`. A `DO` block is a
 > single statement and so a single implicit transaction, which is exactly the
-> extent a transaction-scoped lock needs; `install` is reached from autocommit
-> accessors as readily as from inside `up`'s transaction, and a caller already
-> holding the lock takes it re-entrantly.
+> extent a transaction-scoped lock needs; `install` is reachable in autocommit,
+> as a caller invoking it directly does, as readily as from inside `up`'s
+> transaction, and a caller already holding the lock takes it re-entrantly.
 >
 > The lock orders adopters but does not settle the guard, and the block MUST
 > also catch `undefined_table` and `duplicate_table` from the rename itself.
@@ -244,3 +254,57 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > in our favour, so they are caught and the block does nothing; the handler's
 > subtransaction is what keeps them off the caller's transaction, which inside
 > `up` is carrying the whole migration batch. Anything else propagates.
+>
+> Adoption is `install`'s alone, so a read never performs it — but a read MUST
+> still answer honestly on a database that has not yet been adopted. A ledger
+> found only under `LEGACY_LEDGER_TABLE` MUST therefore be *read where it
+> stands*: reporting it as absent would reproduce, in the read path, the exact
+> failure this requirement exists to prevent — an upgraded deployment's entire
+> applied history read as pending — and would do so on the very call an operator
+> makes to decide whether the upgrade is safe. The read is gated on the same
+> first condition as the rename: `migration_table_name()` MUST be the default,
+> so a caller who named their own ledger is never answered from a table that is
+> not theirs. Nor does the read need the second condition, because it resolves
+> the two names in order — the ledger in use still wins, and a legacy table
+> beside it is still neither read nor touched. The consequence is that `status`
+> gives the same answer before and after adoption, and only `up` moves the
+> table.
+
+## Asking is not changing
+
+> [spec:pgorm:req:migration.read-only]
+> Checking migration status MUST write nothing. `status`,
+> `get_migration_models`, `get_migration_with_status`, `get_pending_migrations`
+> and `get_applied_migrations` are named for reads and are exactly what a
+> readiness probe, a deploy gate, or an operator at a prompt reaches for; if
+> they provision, then asking the question requires the privileges to change
+> the schema, and every such call takes an `ACCESS EXCLUSIVE` lock on the
+> ledger and can rename a table. `install` is the one method that provisions,
+> and `up` — through `exec_up`, which calls it explicitly under the advisory
+> lock — is the one method that calls it. A caller who wants the ledger created
+> without applying anything still has `install` itself.
+>
+> A read therefore *locates* the ledger instead of creating it, from catalogue
+> reads alone: `migration_table_name()` if that table exists, else
+> `LEGACY_LEDGER_TABLE` under the gate `migration.ledger-upgrade` sets, else
+> nothing. Resolution is one `to_regclass` over both candidate names, which
+> takes no relation lock, and the names are passed through `quote_ident` so the
+> lookup agrees with the quoted form the crate renders everywhere else rather
+> than case-folding a mixed-case ledger away. Where the located table lacks the
+> checksum column, the projection substitutes a bound `NULL` per
+> `migration.checksum`.
+>
+> No ledger is not an error and not an empty answer about a missing table: it
+> means nothing has been applied, so `get_migration_models` yields no rows and
+> every migration reads as `Pending`. That is the same answer the old
+> install-then-read path produced on a fresh database, arrived at without the
+> `CREATE TABLE` — which is the point: the observable status is unchanged, only
+> the side effect is gone.
+>
+> The split is not merely in `install`'s call sites. `ReadableLedger` is the
+> read path's own type, carrying the located name and whether it has the
+> checksum column, and it is private: the read path is a smaller surface than
+> the write path rather than a second public way to provision one. A migrator
+> overriding `adopt_legacy_ledger` changes what `install` adopts, not what a
+> read resolves; the two answer the same question by the same three gates, and
+> a migrator that needs them to diverge overrides `get_migration_models`.

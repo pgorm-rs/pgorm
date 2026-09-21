@@ -6,7 +6,9 @@ use std::time::SystemTime;
 use tracing::info;
 
 use super::{MigrationTrait, ledger};
-use pgorm::pgorm_query::{ColumnDef, IntoName, Order, Query, SelectStatement, SqlName, Table};
+use pgorm::pgorm_query::{
+    ColumnDef, Expr, IntoName, Order, Query, SelectStatement, SqlName, Table,
+};
 use pgorm::{
     ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, Error, FromQueryResult,
     Insert, Iterable, Name, TransactionTrait, set,
@@ -16,18 +18,18 @@ use pgorm::{
 const CHECKSUM_COLUMN: &str = "checksum";
 
 /// The table `migration_table_name()` resolves to unless a migrator overrides it.
-// [spec:pgorm:def:migration.runner+2]    the ledger's default physical name
+// [spec:pgorm:def:migration.runner+3]    the ledger's default physical name
 pub const DEFAULT_LEDGER_TABLE: &str = "pgorm_migrations";
 
 /// The name this crate inherited from SeaORM and no longer creates. A database
 /// last migrated by SeaORM, or by pgorm before the rename, keeps its ledger
 /// here; `install` adopts it rather than leaving it to read as unmigrated.
-// [spec:pgorm:req:migration.ledger-upgrade]    the name that is looked for
+// [spec:pgorm:req:migration.ledger-upgrade+1]    the name that is looked for
 pub const LEGACY_LEDGER_TABLE: &str = "seaql_migrations";
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 /// Status of migration
-// [spec:pgorm:def:migration.runner+2]    reported status vocabulary
+// [spec:pgorm:def:migration.runner+3]    reported status vocabulary
 pub enum MigrationStatus {
     /// Not yet applied
     Pending,
@@ -63,7 +65,7 @@ impl Migration {
 }
 
 /// Performing migrations on a database
-// [spec:pgorm:def:migration.runner+2]    runner surface
+// [spec:pgorm:def:migration.runner+3]    runner surface
 // [spec:pgorm:req:migration.up-only]    no down/fresh/refresh/reset
 #[async_trait::async_trait]
 pub trait MigratorTrait: Send {
@@ -75,7 +77,7 @@ pub trait MigratorTrait: Send {
     /// Overriding this takes the ledger out of the crate's hands: legacy-name
     /// adoption applies to the default name alone, so a custom-named ledger is
     /// never renamed and never adopted from.
-    // [spec:pgorm:req:migration.ledger-upgrade]    an override opts out of adoption
+    // [spec:pgorm:req:migration.ledger-upgrade+1]    an override opts out of adoption
     fn migration_table_name() -> Name {
         ledger::Entity.into_name()
     }
@@ -155,16 +157,39 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
-    /// Get list of applied migrations from database
+    /// Get list of applied migrations from database.
+    ///
+    /// Reads and nothing else: the ledger is located in the catalogue rather
+    /// than provisioned, so a database that has never been migrated answers
+    /// with an empty list instead of gaining a table. A ledger still sitting
+    /// under the legacy name is read where it stands, and one predating the
+    /// checksum column is read without it.
+    // [spec:pgorm:req:migration.read-only]    a read locates the ledger, never creates it
     async fn get_migration_models(
         db: &(impl ConnectionTrait),
     ) -> Result<Vec<ledger::Model>, Error> {
-        Self::install(db).await?;
-        let stmt = Query::select()
-            .table_name(Self::migration_table_name())
-            .columns(ledger::Column::iter().map(IntoName::into_name))
-            .order_by(ledger::Column::Version, Order::Asc)
-            .to_owned();
+        let Some(ledger) = ReadableLedger::locate(db, Self::migration_table_name()).await? else {
+            return Ok(Vec::new());
+        };
+
+        let mut stmt = Query::select().table_name(ledger.name);
+        stmt.order_by(ledger::Column::Version, Order::Asc);
+        if ledger.has_checksum {
+            stmt.columns(ledger::Column::iter().map(IntoName::into_name));
+        } else {
+            // The column is absent rather than empty, so it cannot be named;
+            // a bound text NULL stands in, which is the same answer every row
+            // of a widened ledger would have given and the same answer the
+            // three-valued checksum check grandfathers.
+            // [spec:pgorm:req:migration.checksum+1]
+            stmt.column(ledger::Column::Version.into_name())
+                .column(ledger::Column::AppliedAt.into_name())
+                .expr_as(
+                    Expr::val(Option::<String>::None),
+                    ledger::Column::Checksum.into_name(),
+                );
+        }
+
         let (stmt, values) = stmt.build();
         ledger::Model::find_by_statement(stmt, values.0)
             .all(db)
@@ -173,12 +198,12 @@ pub trait MigratorTrait: Send {
 
     /// Get list of migrations with status
     // [spec:pgorm:sem:migration.up+2]    pending set difference + missing-file detection
-    // [spec:pgorm:req:migration.checksum]    recorded digests are checked on every read
+    // [spec:pgorm:req:migration.checksum+1]    recorded digests are checked on every read
+    // [spec:pgorm:req:migration.read-only]    status is computed from a read alone
     async fn get_migration_with_status(
         db: &(impl ConnectionTrait),
     ) -> Result<Vec<Migration>, Error> {
         let mut migration_files = Self::get_migration_files()?;
-        Self::install(db).await?;
         let migration_models = Self::get_migration_models(db).await?;
 
         let applied_checksums: HashMap<String, Option<String>> = migration_models
@@ -227,7 +252,11 @@ pub trait MigratorTrait: Send {
         }
     }
 
-    /// Get list of pending migrations
+    /// Get list of pending migrations.
+    ///
+    /// A read, like every accessor here: against a database with no ledger at
+    /// all, every migration is pending and nothing is installed to say so.
+    // [spec:pgorm:req:migration.read-only]
     async fn get_pending_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, Error> {
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -236,7 +265,10 @@ pub trait MigratorTrait: Send {
             .collect())
     }
 
-    /// Get list of applied migrations
+    /// Get list of applied migrations.
+    ///
+    /// A read, like every accessor here.
+    // [spec:pgorm:req:migration.read-only]
     async fn get_applied_migrations(db: &(impl ConnectionTrait)) -> Result<Vec<Migration>, Error> {
         Ok(Self::get_migration_with_status(db)
             .await?
@@ -254,7 +286,7 @@ pub trait MigratorTrait: Send {
     /// caller's own, and is left exactly where they put it — and only when the
     /// new name is absent, so a database that already has both keeps both and
     /// the legacy table is not touched.
-    // [spec:pgorm:req:migration.ledger-upgrade]    detect, then rename in place
+    // [spec:pgorm:req:migration.ledger-upgrade+1]    detect, then rename in place
     async fn adopt_legacy_ledger(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         if SqlName::to_string(&*Self::migration_table_name()) != DEFAULT_LEDGER_TABLE {
             return Ok(());
@@ -312,10 +344,17 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
-    /// Create migration table `pgorm_migrations` in the database
-    // [spec:pgorm:def:migration.runner+2]    self-provisioning ledger under migration_table_name()
-    // [spec:pgorm:req:migration.checksum]    a ledger predating the column is widened in place
-    // [spec:pgorm:req:migration.ledger-upgrade]    adoption precedes creation, widening follows it
+    /// Create migration table `pgorm_migrations` in the database.
+    ///
+    /// The one provisioning entry point, and the only method here that issues
+    /// DDL: it adopts a legacy-named ledger, creates the table if it is absent,
+    /// and widens one that predates the checksum column. `up` calls it; no read
+    /// does, so asking a question never needs the privileges to answer it by
+    /// changing the schema.
+    // [spec:pgorm:def:migration.runner+3]    self-provisioning ledger under migration_table_name()
+    // [spec:pgorm:req:migration.checksum+1]    a ledger predating the column is widened in place
+    // [spec:pgorm:req:migration.ledger-upgrade+1]    adoption precedes creation, widening follows it
+    // [spec:pgorm:req:migration.read-only]    the write path a read is split away from
     async fn install(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         // Ahead of the create, or the create would answer a legacy database
         // with an empty ledger beside the populated one.
@@ -343,17 +382,9 @@ pub trait MigratorTrait: Send {
         // adopted table is widened by the same step, rather than needing one of
         // its own. The catalog is consulted first because `ADD COLUMN IF NOT
         // EXISTS` takes an ACCESS EXCLUSIVE lock even when it goes on to do
-        // nothing, and `install` runs on every read.
+        // nothing, and this is the provisioning path a caller may reach often.
         let table_name = SqlName::to_string(&*Self::migration_table_name());
-        let has_checksum: bool = db
-            .query_one(
-                "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
-                 WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2)",
-                &[&table_name, &CHECKSUM_COLUMN],
-            )
-            .await?
-            .get(0);
-        if !has_checksum {
+        if !has_checksum_column(db, &table_name).await? {
             let stmt = Table::alter(Self::migration_table_name())
                 .add_column_if_not_exists(ColumnDef::new(ledger::Column::Checksum).text().null());
             db.execute(&stmt.to_string(), &[]).await?;
@@ -364,7 +395,12 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
-    /// Check the status of all migrations
+    /// Check the status of all migrations.
+    ///
+    /// A read: it logs what it found and leaves the database exactly as it was,
+    /// so a readiness probe or a CI gate can call it against a connection with
+    /// no DDL privileges at all.
+    // [spec:pgorm:req:migration.read-only]
     async fn status(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         info!("Checking migration status");
 
@@ -384,6 +420,95 @@ pub trait MigratorTrait: Send {
             Box::pin(async move { exec_up::<Self>(manager, steps).await })
         })
         .await
+    }
+}
+
+/// Whether `table` already carries the ledger's nullable digest column.
+///
+/// Both halves of the crate need the answer and neither may guess it: `install`
+/// widens a table that predates the column, and a read has to know whether the
+/// column can be named at all.
+// [spec:pgorm:req:migration.checksum+1]    the catalogue is what says the column exists
+async fn has_checksum_column(db: &impl ConnectionTrait, table: &str) -> Result<bool, Error> {
+    Ok(db
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
+             WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2)",
+            &[&table, &CHECKSUM_COLUMN],
+        )
+        .await?
+        .get(0))
+}
+
+/// A ledger a read may use, as the catalogue reports it — never as a read would
+/// like it to be.
+///
+/// This is the read path's counterpart to `install`: it answers what is there,
+/// where `install` makes what should be there. The two facts a read needs are
+/// which table holds the rows and whether that table has the checksum column,
+/// because a ledger older than the column cannot have it projected by name.
+// [spec:pgorm:req:migration.read-only]    reads resolve the ledger, they do not provision it
+struct ReadableLedger {
+    /// The table to select from: `migration_table_name()`, or the legacy name
+    /// when a ledger is still sitting there unadopted.
+    name: Name,
+    /// Whether `name` has the `checksum` column yet.
+    has_checksum: bool,
+}
+
+impl ReadableLedger {
+    /// Locate the ledger for `configured` using catalogue reads alone.
+    ///
+    /// `None` means no ledger exists under either name, which a caller reads as
+    /// nothing applied — the honest answer for a database that has never been
+    /// migrated, and one that costs it no table.
+    ///
+    /// A ledger still under `LEGACY_LEDGER_TABLE` is read where it stands
+    /// rather than reported as absent. Reporting it absent would recreate, in
+    /// the read path, exactly the failure `migration.ledger-upgrade` exists to
+    /// prevent: an upgraded deployment's entire applied history read as
+    /// pending. Adoption stays `install`'s job, so the answer is the same
+    /// before and after the rename and only `up` moves the table.
+    ///
+    /// The legacy name is consulted under adoption's own first gate — the
+    /// configured name is the default — so a caller who named their own ledger
+    /// is never silently answered from someone else's.
+    // [spec:pgorm:req:migration.read-only]
+    // [spec:pgorm:req:migration.ledger-upgrade+1]    an unadopted ledger is read, not renamed
+    async fn locate(
+        db: &impl ConnectionTrait,
+        configured: Name,
+    ) -> Result<Option<ReadableLedger>, Error> {
+        let configured_text = SqlName::to_string(&*configured);
+        let legacy = (configured_text == DEFAULT_LEDGER_TABLE).then_some(LEGACY_LEDGER_TABLE);
+
+        // One catalogue read settles both names, and `to_regclass` takes no
+        // relation lock to answer. `quote_ident` is what makes the lookup agree
+        // with how the name is rendered everywhere else in the crate: a
+        // mixed-case ledger is `"MyLedger"`, not the `myledger` a bare
+        // identifier would fold to. A `NULL` second name — a caller's own
+        // ledger, which is never adopted from — resolves to `NULL` and so
+        // never matches.
+        let found: Option<String> = db
+            .query_one(
+                "SELECT CASE WHEN to_regclass(quote_ident($1)) IS NOT NULL THEN $1 \
+                 WHEN to_regclass(quote_ident($2)) IS NOT NULL THEN $2 END",
+                &[&configured_text, &legacy],
+            )
+            .await?
+            .get(0);
+
+        let Some(found) = found else {
+            return Ok(None);
+        };
+        let has_checksum = has_checksum_column(db, &found).await?;
+        let name = if found == configured_text {
+            configured
+        } else {
+            Name::runtime(found)
+        };
+
+        Ok(Some(ReadableLedger { name, has_checksum }))
     }
 }
 
@@ -418,7 +543,7 @@ where
     // nothing left to do. Taking the lock first also puts the legacy-name
     // adoption inside `install` under it, so a batch cannot begin against a
     // ledger another runner is in the middle of renaming.
-    // [spec:pgorm:req:migration.ledger-upgrade]
+    // [spec:pgorm:req:migration.ledger-upgrade+1]
     M::lock(db).await?;
     M::install(db).await?;
 

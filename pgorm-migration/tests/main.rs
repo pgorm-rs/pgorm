@@ -8,11 +8,12 @@ use pgorm_migration::prelude::*;
 
 /// A fresh database has nothing applied; `up` installs the tracking table and
 /// runs every pending migration in order.
-// [spec:pgorm:def:migration.runner+2/test]
+// [spec:pgorm:def:migration.runner+3/test]
 // [spec:pgorm:sem:migration.up+2/test]
 // [spec:pgorm:sem:migration.name+3/test]    asserted names are file stems
-// [spec:pgorm:req:migration.ledger-upgrade/test]    the fresh-install half: the legacy name is never created
+// [spec:pgorm:req:migration.ledger-upgrade+1/test]    the fresh-install half: the legacy name is never created
 // [spec:pgorm:def:macros.derive+2/test]    `DeriveMigrationName` names each migration after the file stem
+// [spec:pgorm:req:migration.read-only/test]    the accessors leave a fresh database fresh
 #[tokio::test]
 async fn fresh_install_applies_all_pending() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_fresh").await;
@@ -25,6 +26,8 @@ async fn fresh_install_applies_all_pending() -> Result<(), Error> {
     assert_eq!(pending.len(), 5);
     assert_eq!(pending[0].name(), "m20220118_000001_create_cake_table");
     assert_eq!(pending[0].status(), MigrationStatus::Pending);
+    // Asking did not answer by building the thing it asked about.
+    assert!(!has_table(db, "pgorm_migrations").await?);
 
     common::migrator::default::Migrator::up(db.clone(), None).await?;
 
@@ -84,7 +87,7 @@ async fn repeated_up_is_idempotent() -> Result<(), Error> {
 
 /// `steps` bounds how many pending migrations are applied, and `status` reports
 /// the split without altering it.
-// [spec:pgorm:def:migration.runner+2/test]
+// [spec:pgorm:def:migration.runner+3/test]
 // [spec:pgorm:sem:migration.up+2/test]
 #[tokio::test]
 async fn stepped_up_reports_status() -> Result<(), Error> {
@@ -120,7 +123,7 @@ async fn stepped_up_reports_status() -> Result<(), Error> {
 }
 
 /// `migration_table_name` is honoured everywhere, including by `install`.
-// [spec:pgorm:def:migration.runner+2/test]
+// [spec:pgorm:def:migration.runner+3/test]
 #[tokio::test]
 async fn migration_table_name_is_overridable() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_table_name").await;
@@ -239,7 +242,7 @@ async fn concurrent_runners_queue_on_the_advisory_lock() -> Result<(), Error> {
 
 /// A migration edited after it was applied reports a different checksum than
 /// the ledger recorded, and every entry point says so.
-// [spec:pgorm:req:migration.checksum/test]
+// [spec:pgorm:req:migration.checksum+1/test]
 #[tokio::test]
 async fn editing_an_applied_migration_is_detected() -> Result<(), Error> {
     use common::migrator::pinned::{Checksummed, Edited, REPEATED};
@@ -279,7 +282,7 @@ async fn editing_an_applied_migration_is_detected() -> Result<(), Error> {
 
 /// A checksum that either side is missing is unverifiable, not drift: a row
 /// recorded without one, and a migration that no longer reports one, both pass.
-// [spec:pgorm:req:migration.checksum/test]
+// [spec:pgorm:req:migration.checksum+1/test]
 #[tokio::test]
 async fn an_unverifiable_checksum_is_not_drift() -> Result<(), Error> {
     use common::migrator::pinned::{Checksummed, Unchecked};
@@ -310,8 +313,8 @@ async fn an_unverifiable_checksum_is_not_drift() -> Result<(), Error> {
 /// A database last migrated under the inherited `seaql_migrations` name is
 /// adopted rather than re-run: the ledger answers to the new name, keeps every
 /// row it had, and gains the checksum column on the way through.
-// [spec:pgorm:req:migration.ledger-upgrade/test]    the upgrade half
-// [spec:pgorm:req:migration.checksum/test]    an adopted ledger is widened by the same install
+// [spec:pgorm:req:migration.ledger-upgrade+1/test]    the upgrade half
+// [spec:pgorm:req:migration.checksum+1/test]    an adopted ledger is widened by the same install
 #[tokio::test]
 async fn a_legacy_ledger_is_adopted_not_rerun() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_legacy_adopt").await;
@@ -332,21 +335,35 @@ async fn a_legacy_ledger_is_adopted_not_rerun() -> Result<(), Error> {
     assert!(!has_table(db, "pgorm_migrations").await?);
     assert_eq!(count_rows(db, "seaql_migrations").await?, 2);
 
-    // Reading the status is enough to adopt: without it these two would read
-    // as pending and be applied a second time.
+    // A read answers from the unadopted ledger rather than calling its history
+    // pending — the same answer it will give after the rename — and it renames
+    // nothing to do so.
     let pending = common::migrator::default::Migrator::get_pending_migrations(&conn).await?;
     assert_eq!(pending.len(), 3);
     assert_eq!(pending[0].name(), "m20220118_000003_seed_cake_table");
 
-    assert!(has_table(db, "pgorm_migrations").await?);
-    assert!(!has_table(db, "seaql_migrations").await?);
-    assert!(has_column(db, "pgorm_migrations", "checksum").await?);
-
-    // Every row survived the move, and each is grandfathered as unverifiable.
     let applied = common::migrator::default::Migrator::get_applied_migrations(&conn).await?;
     assert_eq!(applied.len(), 2);
     assert_eq!(applied[0].name(), "m20220118_000001_create_cake_table");
     assert_eq!(applied[1].name(), "m20220118_000002_create_fruit_table");
+
+    assert!(!has_table(db, "pgorm_migrations").await?);
+    assert!(has_table(db, "seaql_migrations").await?);
+    assert!(!has_column(db, "seaql_migrations", "checksum").await?);
+
+    // `install` is what adopts, and the run picks up where the legacy ledger
+    // left off. Every row survived the move, and each is grandfathered as
+    // unverifiable.
+    drop(conn);
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
+
+    assert!(has_table(db, "pgorm_migrations").await?);
+    assert!(!has_table(db, "seaql_migrations").await?);
+    assert!(has_column(db, "pgorm_migrations", "checksum").await?);
+    assert_eq!(count_rows(db, "pgorm_migrations").await?, 5);
+    assert_eq!(count_rows(db, "cake").await?, 2);
+
+    let conn = db.get().await?;
     let unverifiable: i64 = conn
         .query_one(
             "SELECT COUNT(*) FROM \"pgorm_migrations\" WHERE checksum IS NULL",
@@ -354,13 +371,8 @@ async fn a_legacy_ledger_is_adopted_not_rerun() -> Result<(), Error> {
         )
         .await?
         .get(0);
-    assert_eq!(unverifiable, 2);
+    assert_eq!(unverifiable, 5);
     drop(conn);
-
-    // The run picks up where the legacy ledger left off.
-    common::migrator::default::Migrator::up(db.clone(), None).await?;
-    assert_eq!(count_rows(db, "pgorm_migrations").await?, 5);
-    assert_eq!(count_rows(db, "cake").await?, 2);
 
     ctx.delete().await;
     Ok(())
@@ -369,7 +381,7 @@ async fn a_legacy_ledger_is_adopted_not_rerun() -> Result<(), Error> {
 /// Adoption happens once. A later run has nothing to rename, and a legacy table
 /// that reappears beside an existing ledger is left where it stands rather than
 /// overwriting the ledger in use.
-// [spec:pgorm:req:migration.ledger-upgrade/test]    idempotent, and never clobbering
+// [spec:pgorm:req:migration.ledger-upgrade+1/test]    idempotent, and never clobbering
 #[tokio::test]
 async fn legacy_adoption_is_idempotent() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_legacy_idempotent").await;
@@ -414,7 +426,7 @@ async fn legacy_adoption_is_idempotent() -> Result<(), Error> {
 /// Adoption is reached from autocommit accessors as well as from `up`, so the
 /// rename is guarded on the server too: racing installers all succeed and
 /// exactly one of them renames the table.
-// [spec:pgorm:req:migration.ledger-upgrade/test]    concurrent adoption
+// [spec:pgorm:req:migration.ledger-upgrade+1/test]    concurrent adoption
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_installers_adopt_a_legacy_ledger_once() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_legacy_concurrent").await;
@@ -454,7 +466,8 @@ async fn concurrent_installers_adopt_a_legacy_ledger_once() -> Result<(), Error>
 
 /// A ledger the caller named is the caller's: a legacy table sitting beside it
 /// is neither adopted from nor touched.
-// [spec:pgorm:req:migration.ledger-upgrade/test]    an override opts out of adoption
+// [spec:pgorm:req:migration.ledger-upgrade+1/test]    an override opts out of adoption
+// [spec:pgorm:req:migration.read-only/test]    and out of being read from
 #[tokio::test]
 async fn a_custom_ledger_name_is_not_adopted() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_legacy_custom").await;
@@ -473,6 +486,14 @@ async fn a_custom_ledger_name_is_not_adopted() -> Result<(), Error> {
         &[],
     )
     .await?;
+    // A read is gated the same way the rename is: the legacy table is not this
+    // migrator's ledger, so it is not read from either.
+    assert!(
+        common::migrator::override_migration_table_name::Migrator::get_applied_migrations(&conn)
+            .await?
+            .is_empty()
+    );
+    assert!(!has_table(db, "override_migration_table_name").await?);
     drop(conn);
 
     common::migrator::override_migration_table_name::Migrator::up(db.clone(), None).await?;
@@ -490,7 +511,7 @@ async fn a_custom_ledger_name_is_not_adopted() -> Result<(), Error> {
 
 /// A ledger deployed before the checksum column existed is widened in place,
 /// keeping the rows it already had.
-// [spec:pgorm:req:migration.checksum/test]
+// [spec:pgorm:req:migration.checksum+1/test]
 #[tokio::test]
 async fn install_widens_a_pre_checksum_ledger() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_checksum_widen").await;
@@ -525,6 +546,98 @@ async fn install_widens_a_pre_checksum_ledger() -> Result<(), Error> {
     );
 
     drop(conn);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A read-named method is a read. Against a database with no ledger at all
+/// every accessor answers "nothing applied", and none of them leaves a table
+/// behind — so a readiness probe or a CI gate needs no DDL privilege to ask.
+/// After `up` has done the provisioning the same calls agree with it.
+// [spec:pgorm:req:migration.read-only/test]    the regression: a read that provisioned
+#[tokio::test]
+async fn reading_status_provisions_nothing() -> Result<(), Error> {
+    let ctx = TestContext::new("pgorm_migration_read_only").await;
+    let db = &ctx.db;
+    let conn = db.get().await?;
+
+    common::migrator::default::Migrator::status(&conn).await?;
+    assert!(
+        common::migrator::default::Migrator::get_applied_migrations(&conn)
+            .await?
+            .is_empty()
+    );
+    let pending = common::migrator::default::Migrator::get_pending_migrations(&conn).await?;
+    assert_eq!(pending.len(), 5);
+    assert!(
+        pending
+            .iter()
+            .all(|file| file.status() == MigrationStatus::Pending)
+    );
+
+    // The whole point: nothing was created to answer with.
+    assert!(!has_table(db, "pgorm_migrations").await?);
+    assert!(!has_table(db, "seaql_migrations").await?);
+    drop(conn);
+
+    common::migrator::default::Migrator::up(db.clone(), None).await?;
+
+    let conn = db.get().await?;
+    common::migrator::default::Migrator::status(&conn).await?;
+    assert_eq!(
+        common::migrator::default::Migrator::get_applied_migrations(&conn)
+            .await?
+            .len(),
+        5
+    );
+    assert!(
+        common::migrator::default::Migrator::get_pending_migrations(&conn)
+            .await?
+            .is_empty()
+    );
+    drop(conn);
+
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A ledger deployed before the checksum column is read as it stands rather
+/// than widened to suit the reader. The stored digest is absent, so the
+/// three-valued check grandfathers the row exactly as it would once the column
+/// existed — the answer does not depend on whether the widening has happened.
+// [spec:pgorm:req:migration.read-only/test]    no ALTER on the way to an answer
+// [spec:pgorm:req:migration.checksum+1/test]    the read path's NULL stand-in
+#[tokio::test]
+async fn a_read_never_widens_a_pre_checksum_ledger() -> Result<(), Error> {
+    use common::migrator::pinned::{Checksummed, REPEATED};
+
+    let ctx = TestContext::new("pgorm_migration_read_pre_checksum").await;
+    let db = &ctx.db;
+
+    let conn = db.get().await?;
+    conn.execute(
+        "CREATE TABLE \"pgorm_migrations\" (\
+         version TEXT NOT NULL PRIMARY KEY, applied_at BIGINT NOT NULL)",
+        &[],
+    )
+    .await?;
+    conn.execute(
+        "INSERT INTO \"pgorm_migrations\" (version, applied_at) VALUES ($1, 0)",
+        &[&REPEATED],
+    )
+    .await?;
+    assert!(!has_column(db, "pgorm_migrations", "checksum").await?);
+
+    // The migrator reports a digest; the ledger cannot have recorded one.
+    Checksummed::status(&conn).await?;
+    let applied = Checksummed::get_applied_migrations(&conn).await?;
+    assert_eq!(applied.len(), 1);
+    assert_eq!(applied[0].name(), REPEATED);
+    assert!(Checksummed::get_pending_migrations(&conn).await?.is_empty());
+
+    assert!(!has_column(db, "pgorm_migrations", "checksum").await?);
+    drop(conn);
+
     ctx.delete().await;
     Ok(())
 }
