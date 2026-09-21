@@ -8238,6 +8238,7 @@ children (
                 id codegen-quotes-custom-type
                 title "Codegen splices a custom column type through quote, not format"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:26.365133Z
@@ -8251,6 +8252,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T17:30:13.044528Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
