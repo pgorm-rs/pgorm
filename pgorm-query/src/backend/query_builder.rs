@@ -1432,7 +1432,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+4]
+    // [spec:pgorm:req:sql.ddl.column-def+5]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1629,6 +1629,15 @@ impl QueryBuilder {
                             }
                             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
                             ColumnSpec::Generated { .. } => {}
+                            // `ALTER TABLE` spells identity as an action on the
+                            // column, not as a clause of it.
+                            // [spec:pgorm:req:sql.ddl.column-def+5]
+                            ColumnSpec::Identity(generation) => {
+                                write!(sql, "ALTER COLUMN ").unwrap();
+                                column_def.name.prepare(sql.as_writer());
+                                write!(sql, " ADD GENERATED {} AS IDENTITY", generation.keyword())
+                                    .unwrap();
+                            }
                             ColumnSpec::RawSuffix(sql_text) => write!(sql, "{sql_text}").unwrap(),
                             ColumnSpec::Comment(_) => {}
                         }
@@ -1757,6 +1766,10 @@ impl QueryBuilder {
             ColumnSpec::PrimaryKey => write!(sql, "PRIMARY KEY").unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr } => self.prepare_generated_column(expr, sql),
+            // [spec:pgorm:req:sql.ddl.column-def+5]
+            ColumnSpec::Identity(generation) => {
+                write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap()
+            }
             ColumnSpec::RawSuffix(sql_text) => write!(sql, "{sql_text}").unwrap(),
             ColumnSpec::Comment(_) => {}
         }
@@ -1852,8 +1865,8 @@ impl QueryBuilder {
     ///
     /// Always `STORED`: `VIRTUAL` is a syntax error on every PostgreSQL before
     /// 18, so there is no non-stored generated column to render
-    /// (`[spec:pgorm:req:sql.ddl.column-def+4]`).
-    // [spec:pgorm:req:sql.ddl.column-def+4]
+    /// (`[spec:pgorm:req:sql.ddl.column-def+5]`).
+    // [spec:pgorm:req:sql.ddl.column-def+5]
     pub(crate) fn prepare_generated_column(&self, gen_: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
         self.prepare_simple_expr(gen_, sql);

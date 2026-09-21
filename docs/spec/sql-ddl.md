@@ -116,19 +116,22 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+4]
+> [spec:pgorm:req:sql.ddl.column-def+5]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr }`,
-> `Extra(String)`, `Comment(String)`), populated by the fluent typed setters
+> `Identity(IdentityGeneration)`, `RawSuffix(&'static str)`, `Comment(String)`),
+> populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
-> `not_null()`, `default(v)`, `check(expr)`, `extra(s)`, etc.).
+> `not_null()`, `default(v)`, `check(expr)`, `identity()`,
+> `identity_by_default()`, `raw_suffix(s)`, etc.).
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
 > `UNIQUE`, `PRIMARY KEY`, `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
-> STORED`, and `Extra` verbatim. A generated column is always stored and
+> STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`, and `RawSuffix`
+> verbatim. A generated column is always stored and
 > `generated(expr)` takes no flag saying otherwise: `VIRTUAL` is a syntax
 > error on every PostgreSQL before 18, the builder cannot know which release
 > it is writing for, and rendering is infallible — there is no error channel
@@ -149,13 +152,46 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > the name rather than swapping in a placeholder identifier, so no empty
 > identifier exists to leak into a rendered column.
 >
-> `Extra` is deliberately verbatim and is the one DDL render that interpolates
-> a caller string unquoted. It exists as the escape hatch for column SQL the
-> `ColumnType`/`ColumnSpec` vocabulary cannot spell, so quoting or escaping it
-> would defeat its only purpose: whatever a caller puts there is emitted as
-> written, and the caller owns its trustworthiness — including whether it
-> parses at all. Anything expressible through the typed setters MUST use them
-> instead.
+> `Identity` is the standard-SQL form PostgreSQL has recommended since 10, and
+> the one `auto_increment` is the legacy spelling of: `identity()` sets
+> `IdentityGeneration::Always`, `identity_by_default()` sets `ByDefault`, and
+> `IdentityGeneration::keyword` gives the `ALWAYS` / `BY DEFAULT` words —
+> the same two `information_schema.columns.identity_generation` reports. Which
+> form a column uses MUST be that closed pair rather than a flag: there is no
+> third state and no both-at-once, so the choice is typed rather than checked
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `auto_increment` stays,
+> because it is what the entity derive's `auto_increment` attribute means and
+> retiring it is a separate migration; its documentation MUST point at
+> `identity` as the recommended form. In `ALTER TABLE`, `Identity` is the one
+> spec that spells an action rather than a clause: on `ADD COLUMN` it renders as
+> the column clause above, on `MODIFY` it renders
+> `ALTER COLUMN "c" ADD GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`.
+>
+> Two boundaries are deliberate. The sequence options — `START WITH`,
+> `INCREMENT BY`, `CACHE`, and the rest of the `( ... )` tail — have no
+> spelling: they are a sequence definition wearing a column clause, and the
+> column vocabulary is the wrong shape to grow one; `raw_suffix` carries them
+> verbatim until a typed sequence builder exists to take them properly. And
+> identity's exclusivity with `Default`, `Generated` and `AutoIncrement` is
+> documented rather than typed. Those are four *separate explicit calls* a
+> caller has to write, not a flag the API offers — unlike the `stored: false`
+> that `Generated` used to advertise, nothing here presents the invalid
+> combination as a choice — and collapsing them into one slot would move
+> `DEFAULT` out of the insertion-ordered spec list this same rule fixes, which
+> is a contract every interleaved render depends on. The combinations therefore
+> render, the grammar accepts them, and the server refuses each by name; the
+> live suite holds those refusals so the boundary is checked rather than
+> asserted. Revisiting it means reshaping the spec list, and that reshaping is
+> the work, not this clause.
+>
+> `RawSuffix` is deliberately verbatim and is the one DDL render that
+> interpolates a caller string unquoted. It exists as the escape hatch for
+> column SQL the `ColumnType`/`ColumnSpec` vocabulary cannot spell, so quoting
+> or escaping it would defeat its only purpose: whatever a caller puts there is
+> emitted as written, and the caller owns its trustworthiness — including
+> whether it parses at all. Its `&'static str` bound is the contract that only
+> program text reaches that position. Anything expressible through the typed
+> setters MUST use them instead.
 
 > [spec:pgorm:req:sql.ddl.column-types+4]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name

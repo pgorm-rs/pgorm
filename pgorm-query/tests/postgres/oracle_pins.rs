@@ -280,7 +280,7 @@ fn extension_drop_takes_one_behaviour() {
 // `sql.ddl.column-def`, so it keeps its pin.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:sem:sql.render.ddl.extension+3/test]
-// [spec:pgorm:req:sql.ddl.column-def+4/test]
+// [spec:pgorm:req:sql.ddl.column-def+5/test]
 #[test]
 fn oracle_pins_extra_interpolated_raw() {
     let version = Extension::create(Name::runtime("ltree"))

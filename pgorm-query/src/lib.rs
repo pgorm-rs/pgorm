@@ -720,10 +720,10 @@ pub use index::{
     IntoIndexColumn, StandaloneIndexKind, TableIndex,
 };
 pub use table::{
-    AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IntervalPrecision,
-    IntervalSpec, IntoColumnDef, PendingTableAlter, PgInterval, StringLen, Table, TableAlterOption,
-    TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement,
-    TableRenameStatement, TableTruncateStatement,
+    AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,
+    IntervalPrecision, IntervalSpec, IntoColumnDef, PendingTableAlter, PgInterval, StringLen,
+    Table, TableAlterOption, TableAlterStatement, TableCreateStatement, TableDropOpt,
+    TableDropStatement, TableRenameStatement, TableTruncateStatement,
 };
 
 // Rendering: the sink a statement is written into, and the two entry points

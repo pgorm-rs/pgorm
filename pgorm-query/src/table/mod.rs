@@ -15,6 +15,7 @@ mod alter;
 mod column;
 mod create;
 mod drop;
+mod interval;
 mod rename;
 mod truncate;
 
@@ -22,6 +23,7 @@ pub use alter::*;
 pub use column::*;
 pub use create::*;
 pub use drop::*;
+pub use interval::*;
 pub use rename::*;
 pub use truncate::*;
 

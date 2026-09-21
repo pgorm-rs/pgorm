@@ -8017,6 +8017,13 @@ children (
                         kind @note
                         text "AutoIncrement renders the legacy serial family only (backend/query_builder.rs:1430-1434); GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY — PostgreSQL's recommended replacement since 10 — is inexpressible, and codegen consequently cannot round-trip a modern schema faithfully. Deliberately blocked on query-name-vocabulary: that rename moves pgorm's key-column Identity type to Key, freeing the word so the type that expresses GENERATED AS IDENTITY can be called what PostgreSQL calls it without colliding with an unrelated concept in the same workspace."
                     }
+
+                    {
+                        at 2026-09-21T11:48:41.961788Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
         )
