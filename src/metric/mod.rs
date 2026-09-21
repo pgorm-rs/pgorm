@@ -65,7 +65,7 @@ macro_rules! open_transaction {
 }
 
 /// Trait for collecting database metrics
-// [spec:pgorm:def:metric.layer.collector+1]
+// [spec:pgorm:def:metric.layer.collector+2]
 #[async_trait]
 pub trait MetricsCollector: Clone + Send + Sync + 'static {
     /// Record a successful database operation
@@ -88,10 +88,33 @@ pub trait MetricsCollector: Clone + Send + Sync + 'static {
     /// Record transaction begin
     async fn record_transaction_begin(&self, duration: Duration);
 
-    /// Record transaction commit
+    /// Record that a transaction committed.
+    ///
+    /// Success only: a `COMMIT` that returned an error did not commit, and is
+    /// reported through [`record_transaction_rollback`] and
+    /// [`record_query_error`] instead.
+    ///
+    /// [`record_transaction_rollback`]: MetricsCollector::record_transaction_rollback
+    /// [`record_query_error`]: MetricsCollector::record_query_error
     async fn record_transaction_commit(&self, duration: Duration);
 
-    /// Record transaction rollback
+    /// Record that a transaction ended without committing.
+    ///
+    /// Not only an explicit `rollback()`. PostgreSQL aborts a transaction whose
+    /// `COMMIT` fails, so a failed commit ends the transaction exactly as a
+    /// rollback does and is reported here too — an implementor counting this
+    /// hook is counting transactions that did not take effect, which is the
+    /// number worth counting, not the number of times `rollback()` was called.
+    /// A failed commit additionally reports the error itself through
+    /// [`record_query_error`] under the operation `"commit"`, as a failed
+    /// rollback does under `"rollback"`, so the cause is never only implied by
+    /// a counter.
+    ///
+    /// Dropping a transaction handle records nothing at all, here or anywhere:
+    /// every hook is `async` and `Drop::drop` is not.
+    ///
+    /// [`record_query_error`]: MetricsCollector::record_query_error
+    // [spec:pgorm:sem:metric.layer.tx+3]    the semantic an implementor reads at the trait
     async fn record_transaction_rollback(&self, duration: Duration);
 }
 
@@ -126,7 +149,7 @@ impl MetricsCollector for NoOpMetrics {
 #[derive(Clone, Debug)]
 pub struct LoggingMetrics;
 
-// [spec:pgorm:def:metric.layer.collector+1]    LoggingMetrics tracing levels
+// [spec:pgorm:def:metric.layer.collector+2]    LoggingMetrics tracing levels
 #[async_trait]
 impl MetricsCollector for LoggingMetrics {
     async fn record_query_success(
@@ -271,7 +294,7 @@ impl<M: MetricsCollector> InstrumentedConnection<M> {
     /// [`InstrumentedTransaction`] sharing a clone of the collector, so
     /// statements issued inside the transaction stay instrumented without the
     /// caller wrapping the handle by hand.
-    // [spec:pgorm:sem:metric.layer.tx+2]    instrumented begin
+    // [spec:pgorm:sem:metric.layer.tx+3]    instrumented begin
     pub async fn begin_instrumented(&mut self) -> Result<InstrumentedTransaction<'_, M>, Error> {
         let metrics = self.metrics.clone();
         let query = QueryContext::new("begin", None);
@@ -369,7 +392,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedConnection<M> {
 }
 
 /// A transaction wrapper that instruments transaction operations
-// [spec:pgorm:sem:metric.layer.tx+2]    commit + rollback reporting, no-op drop
+// [spec:pgorm:sem:metric.layer.tx+3]    commit + rollback reporting, no-op drop
 #[derive(Debug)]
 pub struct InstrumentedTransaction<'a, M: MetricsCollector> {
     transaction: Option<DatabaseTransaction<'a>>,
@@ -385,8 +408,20 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
         }
     }
 
-    /// Commit the transaction
+    /// Commit the transaction, reporting the outcome to the collector.
+    ///
+    /// A successful commit reports `record_transaction_commit`. A failed one
+    /// reports the error through `record_query_error` under the operation
+    /// `"commit"` and then `record_transaction_rollback`, in that order and as
+    /// that pair — the same two hooks a failed [`rollback`] reports, because
+    /// PostgreSQL has aborted the transaction either way. The rollback hook's
+    /// own documentation is where that meaning is defined, so an implementor
+    /// meets it at the trait rather than here.
+    ///
+    /// [`rollback`]: InstrumentedTransaction::rollback
+    // [spec:pgorm:sem:metric.layer.tx+3]    a failed commit reaches an error hook
     pub async fn commit(mut self) -> Result<(), Error> {
+        let query = QueryContext::new("commit", None);
         let start = Instant::now();
         let metrics = self.metrics.clone();
 
@@ -398,7 +433,8 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
                 Ok(_) => {
                     metrics.record_transaction_commit(elapsed).await;
                 }
-                Err(_) => {
+                Err(error) => {
+                    metrics.record_query_error(query, elapsed, error).await;
                     metrics.record_transaction_rollback(elapsed).await;
                 }
             }
@@ -411,9 +447,17 @@ impl<'a, M: MetricsCollector> InstrumentedTransaction<'a, M> {
 
     /// Roll the transaction back, reporting the rollback to the collector.
     ///
+    /// Reports `record_transaction_rollback` on either outcome — the
+    /// transaction is discarded whether or not the `ROLLBACK` round trip
+    /// succeeded — and a failed round trip additionally through
+    /// `record_query_error` under the operation `"rollback"`.
+    ///
     /// Dropping the handle instead rolls back on the connection but records
-    /// nothing; this is the only path that reports a rollback the caller asked
-    /// for rather than one Postgres forced by a failed commit.
+    /// nothing. This is the path that reports a rollback the caller asked for;
+    /// a commit Postgres refused reports the same pair through [`commit`].
+    ///
+    /// [`commit`]: InstrumentedTransaction::commit
+    // [spec:pgorm:sem:metric.layer.tx+3]
     pub async fn rollback(mut self) -> Result<(), Error> {
         let query = QueryContext::new("rollback", None);
         let start = Instant::now();
@@ -521,7 +565,7 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx+2]    timed begin, uninstrumented handle
+// [spec:pgorm:sem:metric.layer.tx+3]    timed begin, uninstrumented handle
 #[async_trait]
 impl<M: MetricsCollector> TransactionTrait for InstrumentedConnection<M> {
     async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {

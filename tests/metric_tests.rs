@@ -128,7 +128,7 @@ impl MetricsCollector for RecordingMetrics {
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + explicit rollback
+// [spec:pgorm:sem:metric.layer.tx+3/test]    begin_instrumented + explicit rollback
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_rollback_metrictx").await;
@@ -166,7 +166,7 @@ pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+2/test]    begin_instrumented + commit
+// [spec:pgorm:sem:metric.layer.tx+3/test]    begin_instrumented + commit
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_commit_metrictx").await;
@@ -186,7 +186,76 @@ pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
 
     assert_eq!(metrics.count("transaction_begin"), 1);
     assert_eq!(metrics.count("transaction_commit"), 1);
+    // A commit that worked is not an ending-without-committing, and not an
+    // error: the two hooks a failed commit reports are both silent here.
     assert_eq!(metrics.count("transaction_rollback"), 0);
+    assert_eq!(metrics.count("query_error"), 0);
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+/// A `COMMIT` the server refuses ends the transaction without committing, so
+/// it reports the rollback hook — and reports the error itself too, under the
+/// operation `"commit"`, rather than leaving a counter to imply it.
+// [spec:pgorm:sem:metric.layer.tx+3/test]    a failed commit reaches an error hook
+// [spec:pgorm:def:metric.layer.collector+2/test]    what the rollback hook counts
+#[pgorm_macros::test]
+pub async fn a_failed_commit_reports_error_and_rollback() -> Result<(), Error> {
+    let ctx = TestContext::new("metric_layer_commit_fails_metrictx").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let mut conn = pool.get().await?;
+    // Deferring the constraint moves its check to `COMMIT`, so what fails is
+    // the commit rather than a statement inside the transaction.
+    conn.execute(
+        "CREATE TABLE widget (id int, CONSTRAINT widget_id_unique UNIQUE (id) \
+         DEFERRABLE INITIALLY DEFERRED)",
+        &[],
+    )
+    .await?;
+
+    let txn = conn.begin_instrumented().await?;
+    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+        .await?;
+    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+        .await?;
+    txn.commit()
+        .await
+        .expect_err("the deferred unique constraint must fail the commit");
+
+    // Nothing took effect, which is what the rollback hook is reporting.
+    assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 0);
+
+    assert_eq!(metrics.count("transaction_commit"), 0);
+    assert_eq!(metrics.count("transaction_rollback"), 1);
+    assert_eq!(metrics.count("query_error:commit"), 1);
+
+    // Both hooks, error first, as a failed `rollback` reports them.
+    let events = metrics.events();
+    let error_at = events
+        .iter()
+        .position(|event| event == "query_error:commit");
+    let rollback_at = events
+        .iter()
+        .position(|event| event == "transaction_rollback");
+    assert!(
+        error_at < rollback_at && error_at.is_some(),
+        "expected query_error:commit before transaction_rollback: {events:?}"
+    );
+
+    // The context names the round trip and carries no statement text, because
+    // none was sent — so it has no fingerprint either.
+    let reported = metrics
+        .queries()
+        .into_iter()
+        .find(|query| query.operation == "commit")
+        .expect("the commit failure must reach a query hook");
+    assert_eq!(reported.sql, None);
+    assert_eq!(reported.fingerprint, None);
 
     drop(conn);
     ctx.delete().await;
@@ -336,7 +405,7 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+2/test]    dropping an instrumented transaction records nothing
+// [spec:pgorm:sem:metric.layer.tx+3/test]    dropping an instrumented transaction records nothing
 #[pgorm_macros::test]
 pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_drop_metrictx").await;
@@ -413,7 +482,7 @@ async fn drive_all_hooks<M: MetricsCollector>(metrics: &M) {
     metrics.record_transaction_rollback(elapsed).await;
 }
 
-// [spec:pgorm:def:metric.layer.collector+1/test]    seven hook points, all required of an implementor
+// [spec:pgorm:def:metric.layer.collector+2/test]    seven hook points, all required of an implementor
 #[pgorm_macros::test]
 pub async fn collector_defines_seven_async_hooks() {
     let metrics = RecordingMetrics::default();
@@ -434,7 +503,7 @@ pub async fn collector_defines_seven_async_hooks() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector+1/test]    NoOpMetrics observes nothing at all
+// [spec:pgorm:def:metric.layer.collector+2/test]    NoOpMetrics observes nothing at all
 #[pgorm_macros::test]
 pub async fn noop_metrics_hooks_do_nothing() {
     let captured = CapturedEvents::default();
@@ -453,7 +522,7 @@ pub async fn noop_metrics_hooks_do_nothing() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector+1/test]    LoggingMetrics' tracing levels per hook
+// [spec:pgorm:def:metric.layer.collector+2/test]    LoggingMetrics' tracing levels per hook
 #[pgorm_macros::test]
 pub async fn logging_metrics_emits_expected_levels() {
     let captured = CapturedEvents::default();
@@ -576,7 +645,7 @@ pub async fn sql_text_answers_with_the_statement_text() {
     assert_statement_bound::<String>();
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    the hooks see the statement they report on
+// [spec:pgorm:req:metric.fingerprint+1/test]    the hooks see the statement they report on
 #[pgorm_macros::test]
 pub async fn query_context_carries_statement_text() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_context_metricctx").await;
@@ -624,7 +693,7 @@ pub async fn query_context_carries_statement_text() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    libpg_query's canonical hex rendering
+// [spec:pgorm:req:metric.fingerprint+1/test]    libpg_query's canonical hex rendering
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn fingerprint_renders_libpg_query_hex() {
@@ -654,7 +723,7 @@ pub async fn fingerprint_renders_libpg_query_hex() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    constants are normalized away
+// [spec:pgorm:req:metric.fingerprint+1/test]    constants are normalized away
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn fingerprint_ignores_literal_values() {
@@ -675,7 +744,7 @@ pub async fn fingerprint_ignores_literal_values() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    different shapes stay apart
+// [spec:pgorm:req:metric.fingerprint+1/test]    different shapes stay apart
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn distinct_shapes_get_distinct_fingerprints() {
@@ -700,7 +769,7 @@ pub async fn distinct_shapes_get_distinct_fingerprints() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    unidentifiable is not an error
+// [spec:pgorm:req:metric.fingerprint+1/test]    unidentifiable is not an error
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn unparseable_sql_has_no_fingerprint() {
@@ -729,7 +798,7 @@ pub async fn unparseable_sql_has_no_fingerprint() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint/test]    fingerprints reach the collector through the wrappers
+// [spec:pgorm:req:metric.fingerprint+1/test]    fingerprints reach the collector through the wrappers
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn instrumented_wrapper_reports_fingerprints() -> Result<(), Error> {

@@ -80,6 +80,13 @@ pub trait MetricsCollector: Clone + Send + Sync + 'static {
 }
 ```
 
+Two of the hooks mean slightly less than their names suggest, and the difference decides what a counter built on them measures:
+
+- `record_transaction_commit` is **success only**.
+- `record_transaction_rollback` means **the transaction ended without committing** — by an explicit `rollback()` *or* by a failed `commit()`, since PostgreSQL aborts a transaction whose `COMMIT` fails. A counter on this hook counts transactions that did not take effect, which is the number worth having; it is not a count of `rollback()` calls.
+
+A failed transaction round trip never gets a hook of its own. `begin`, `commit` and `rollback` each report their failure through `record_query_error` under their own operation name, so the error reaches a collector in all three cases. Seven hooks with no defaults is a hard contract — adding an eighth would break every implementor to say what the existing one already says.
+
 Two implementations ship in-tree:
 
 - `NoOpMetrics` — every hook is an empty body.
@@ -119,7 +126,7 @@ Without the feature pgorm pulls in no parser and `fingerprint()` is always `None
 `fingerprint()` returns an `Option` and never fails a query. `None` means one of three things, and does not say which:
 
 - the feature is off;
-- there is no statement to parse — the hook is reporting a transaction verb, `begin` or `rollback`, rather than a query;
+- there is no statement to parse — the hook is reporting a transaction verb, `begin`, `commit` or `rollback`, rather than a query;
 - libpg_query would not parse the text. Raw SQL your server accepts can still be text this parser rejects. The statement executes and is reported as usual; only its identity is missing.
 
 Fingerprints are computed when you ask, not when the context is built, so a collector that ignores them costs nothing. Because computing one is a parse, answers are memoized process-wide by statement text — rejections included — in an `RwLock<HashMap>` capped at 1024 distinct texts. Past the cap the memo stops admitting new entries rather than evicting, so a query whose text is rebuilt per call (an `IN` list sized by its input, a generated migration script) is re-parsed rather than retained forever. Statement *shapes* are a fixed set well under the cap; per-call text is the thing worth not keeping.
@@ -186,7 +193,7 @@ tx.commit().await?;                                 // record_transaction_commit
 
 Two behaviours to plan around:
 
-- A failed `commit` is reported as `record_transaction_rollback` — PostgreSQL aborts the transaction when a commit fails — not through an error hook.
+- A failed `commit` reports **both** `record_query_error` (with `operation() == "commit"` and `sql() == None`) and `record_transaction_rollback`, in that order — PostgreSQL aborts the transaction when a commit fails, so it ended without committing, and the error itself still reaches an error hook. A failed `rollback` reports the same pair under `"rollback"`. A successful `commit` reports neither.
 - `InstrumentedTransaction`'s `Drop` impl records nothing. Dropping an uncommitted transaction still rolls back and still emits the inner `DatabaseTransaction`'s `tracing::warn!("Transaction dropped without committing!")`, but no rollback metric is produced. If you need rollbacks counted, call `record_transaction_rollback` yourself on the error path.
 
 `InstrumentedTransaction` does not implement `TransactionTrait`, and `inner()` yields only a shared reference, so nested transactions (savepoints) are not reachable through the instrumented wrapper.
@@ -244,7 +251,7 @@ impl MetricsCollector for PrometheusMetrics {
 let instrumented = InstrumentedPool::new(pool, PrometheusMetrics::new());
 ```
 
-`query.operation()` is the natural label dimension: it partitions the seven `ConnectionTrait` methods (plus `"begin"` and `"rollback"` on a failed transaction round trip) without any extra plumbing. Label by `query.fingerprint()` only where the backend tolerates the cardinality — one series per query shape is far more than one per method, and a statement with no fingerprint has to fall into a bucket of its own.
+`query.operation()` is the natural label dimension: it partitions the seven `ConnectionTrait` methods (plus `"begin"`, `"commit"` and `"rollback"` on a failed transaction round trip) without any extra plumbing. Label by `query.fingerprint()` only where the backend tolerates the cardinality — one series per query shape is far more than one per method, and a statement with no fingerprint has to fall into a bucket of its own.
 
 ### Cost
 

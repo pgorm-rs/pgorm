@@ -8258,6 +8258,13 @@ children (
                         kind @note
                         text "InstrumentedTransaction::commit records record_transaction_rollback on its Err arm and never calls record_query_error (src/metric/mod.rs:401-403), so an implementor's rollbacks_total counts failed commits and the error itself is dropped. rollback() records both hooks (:429), so the two exit paths also disagree with each other. The caveat lives only in rollback's own doc (:415-418) — not on commit, and not on the trait method an implementor actually reads (:94, \"Record transaction rollback\"). A failed COMMIT does abort the transaction server-side, so the semantic is defensible — but it must be stated at the trait, and the commit error must reach an error hook. Fix: either a distinct record_commit_failure hook or trait-level docs defining rollback as \"transaction ended without committing\", plus the missing error recording."
                     }
+
+                    {
+                        at 2026-09-21T15:50:30.588801Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 
