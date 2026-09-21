@@ -8136,6 +8136,7 @@ children (
                 id update-nothing-distinct
                 title "An update with nothing to set is distinguishable from matching nothing"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:22.776899Z
@@ -8149,6 +8150,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T14:57:13.616578Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
