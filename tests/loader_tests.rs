@@ -10,6 +10,11 @@ use pgorm::{DatabaseConnection, Error, RuntimeError, Schema, entity::*, query::*
 // [spec:pgorm:req:query.loader+1/test]    `load_one` over a `Vec<M>`, taking a
 // bare entity through `EntityOrSelect`, returning `Vec<Option<R::Model>>`
 // positionally aligned with the input, and rejecting a `HasMany` relation
+// [spec:pgorm:sem:query.loader.regroup+5/test]    the belongs-to direction is
+// where the join repeats one target row per matching input row: two bakers of
+// one bakery put that bakery in its key's bucket twice, and counting by the
+// target's own primary key is what collapses the repeat instead of reading it
+// as a second row
 #[pgorm_macros::test]
 async fn loader_load_one() -> Result<(), Error> {
     let ctx = TestContext::new("loader_test_load_one").await;
@@ -56,7 +61,7 @@ async fn loader_load_one() -> Result<(), Error> {
 // [spec:pgorm:req:query.loader+1/test]    `load_many` returning `Vec<Vec<..>>`
 // aligned with the input, driven from both a bare entity and a pre-filtered
 // `Select<R>`
-// [spec:pgorm:sem:query.loader.regroup+4/test]    a bucket per input key in
+// [spec:pgorm:sem:query.loader.regroup+5/test]    a bucket per input key in
 // result order, an empty `Vec` for an input nothing matched, and a clone of
 // the same model for two inputs sharing a key
 #[pgorm_macros::test]
@@ -670,7 +675,7 @@ async fn loader_empty_input_skips_the_query() -> Result<(), Error> {
 // `Select`, so a user filter composes with it. The rule's note that duplicate
 // keys are repeated rather than deduplicated concerns the emitted SQL text,
 // which is not observable through this API.
-// [spec:pgorm:sem:query.loader.regroup+4/test]    two inputs sharing a key each
+// [spec:pgorm:sem:query.loader.regroup+5/test]    two inputs sharing a key each
 // receive their own clone of that key's bucket
 #[pgorm_macros::test]
 async fn loader_batches_composite_keys_as_tuples() -> Result<(), Error> {
@@ -738,15 +743,16 @@ async fn loader_batches_composite_keys_as_tuples() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+4/test]    `load_one` yields the last
-// element of its key's bucket, so when a relation declared `HasOne` matches
-// several rows for one key the last row of the caller's ordering wins, an
-// unmatched input gets `None`, and inputs sharing a key each get a clone
+// [spec:pgorm:sem:query.loader.regroup+5/test]    `load_one` yields the one row
+// its key's bucket holds, `None` where nothing matched, and a clone each to
+// inputs sharing a key — and when a relation declared `HasOne` matches two
+// distinct rows for one key it aborts with an `Err` naming how many rows, the
+// target table, the key and the key's column list, rather than discarding a row
 // [spec:pgorm:req:query.loader.table-ref-limitation+3/test]    the supported
 // `TableName::SchemaTable` target: it names the root and the load runs
 #[pgorm_macros::test]
-async fn loader_load_one_keeps_the_last_row() -> Result<(), Error> {
-    let ctx = TestContext::new("loader_test_last_row_wins").await;
+async fn loader_load_one_refuses_a_second_row() -> Result<(), Error> {
+    let ctx = TestContext::new("loader_test_one_refuses_many").await;
     create_tables(&ctx.db).await?;
     let conn = ctx.db.get().await?;
     let db = &conn;
@@ -756,15 +762,35 @@ async fn loader_load_one_keeps_the_last_row() -> Result<(), Error> {
     let bakery_2 = insert_bakery(db, "Offshore Bakery").await?;
 
     let first = insert_ledger(db, bakery_1.id, "first").await?;
+
+    // One row per key is what the relation declares, and here what it gets.
+    let bakeries = vec![bakery_1.clone(), bakery_2, bakery_1.clone()];
+    assert_eq!(
+        bakeries.load_one(ledger::Entity, db).await?,
+        [Some(first.clone()), None, Some(first.clone())]
+    );
+
+    // A second row under that key is the missing UNIQUE the relation's `HasOne`
+    // assumes away, so the load reports it instead of resolving it — the
+    // caller's own ordering does not make the discard any less arbitrary.
     let second = insert_ledger(db, bakery_1.id, "second").await?;
     assert!(first.id < second.id);
 
-    let bakeries = vec![bakery_1.clone(), bakery_2, bakery_1];
-    let ledgers = bakeries
-        .load_one(ledger::Entity::find().order_by_asc(ledger::Column::Id), db)
-        .await?;
-
-    assert_eq!(ledgers, [Some(second.clone()), None, Some(second)]);
+    let message = internal_message(
+        bakeries
+            .load_one(ledger::Entity::find().order_by_asc(ledger::Column::Id), db)
+            .await,
+        "two rows under one HasOne key must abort the load",
+    );
+    assert!(
+        message.starts_with(&format!(
+            "load_one matched 2 distinct `ledger` rows against the key \
+             ValueTuple([Int(Some({}))]) read from `id`, but the relation declares HasOne",
+            bakery_1.id
+        )),
+        "{message}"
+    );
+    assert!(message.contains("UNIQUE constraint"), "{message}");
 
     drop(conn);
     ctx.delete().await;
@@ -839,7 +865,7 @@ async fn loader_errors_on_unknown_relation_column() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+4/test]    the key is read back from the
+// [spec:pgorm:sem:query.loader.regroup+5/test]    the key is read back from the
 // input entity's own row rather than re-derived from the target, so a target
 // whose `char(3)` column pads the key back out regroups instead of aborting
 #[pgorm_macros::test]
@@ -871,7 +897,7 @@ async fn loader_regroups_across_a_padded_target() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+4/test]    a returned row whose key is
+// [spec:pgorm:sem:query.loader.regroup+5/test]    a returned row whose key is
 // absent from the seeded buckets — here an input model spelling a `char(3)` key
 // the way the caller wrote it rather than the way the column stores it — is an
 // `Err` naming the unmatched key, a sample input key and the key's column list,
@@ -1012,7 +1038,7 @@ async fn loader_load_one_applies_relation_predicate() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.regroup+4/test]    under an `Any` composition a
+// [spec:pgorm:sem:query.loader.regroup+5/test]    under an `Any` composition a
 // target satisfying the relation's predicate belongs to every input, not only
 // to the one its key names — which is why the bucket is keyed on the input row
 // the read carries back rather than on the target's own columns

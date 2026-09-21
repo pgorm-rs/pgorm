@@ -8100,6 +8100,13 @@ children (
                         kind @note
                         text "load_one (src/query/loader.rs:125) runs the same batched read as load_many, then .map(|bucket| bucket.into_iter().next_back()) (:149) — if the database returns n rows for a key, n-1 vanish with no error and no warning. The only cardinality checks are on the declared RelationType (:135-140), never on the data, so a missing UNIQUE constraint on the FK column turns a schema mistake into silent row loss at read time. Fix: a bucket of length > 1 is an Error naming the key, consistent with the fork's existing rule that load_one errors on an unmatched key instead of yielding None silently."
                     }
+
+                    {
+                        at 2026-09-21T14:14:52.982725Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

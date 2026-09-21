@@ -575,7 +575,7 @@ what makes it total over partially-set models.
 > `[spec:pgorm:sem:query.loader.many-to-many+3]` already pays, for the same
 > reason.
 
-> [spec:pgorm:sem:query.loader.regroup+4]
+> [spec:pgorm:sem:query.loader.regroup+5]
 > Results are regrouped to input order by hashing on the from-side key extracted
 > from the input model each returned row carries back beside its target, not on
 > a key re-derived from the target. Reading the key off the side the input came
@@ -586,13 +586,24 @@ what makes it total over partially-set models.
 > returned target onto its key's bucket in result order, and yields a clone of
 > the bucket per input key, so inputs sharing a key each receive the same list
 > and unmatched inputs receive an empty `Vec`. `load_many` and `load_many_via`
-> yield the bucket; `load_one` yields its last element, so where several rows
-> land under one key the last row wins, and `None` where the bucket is empty.
+> yield the bucket.
+>
+> `load_one` yields `None` for an empty bucket and the one target row a
+> non-empty one holds — counted by the target entity's own primary key, not by
+> the bucket's length, because the read joins the input entity's table back and
+> so repeats a target once per matching input-entity row
+> (`[spec:pgorm:sem:query.loader.batching+7]`): a repeat is the join's doing and
+> MUST collapse. Two or more *distinct* target rows under one key contradict the
+> `HasOne` the relation declares — a missing `UNIQUE` on the target's key
+> columns, typically — and MUST be reported as `Err(Error::Query)` naming how
+> many distinct rows matched, the target table, the key in `Debug` form and the
+> key's column list. A loader MUST NOT resolve that case by discarding rows:
+> which row a discard keeps is the join's order, which the next paragraph leaves
+> unspecified, so discarding would make the silent answer the arbitrary one.
 >
 > Because the targets are read by one query rather than reassembled from a key
 > map, an `order_by` on the caller's `Select` orders every bucket. Without one
-> the order within a bucket is the join's, hence unspecified — and so, therefore,
-> is which row `load_one` calls the last.
+> the order within a bucket is the join's, hence unspecified.
 >
 > A returned row whose key is absent from the seeded buckets means the stored
 > input row and the input model matched in SQL but not as Rust values —
@@ -644,7 +655,7 @@ what makes it total over partially-set models.
 > absent from the join and so is dropped from the list, and a shared target is
 > cloned into every referencing input. A returned key absent from the seeded
 > buckets is reported as `Err(Error::Query)` on the same terms as
-> `[spec:pgorm:sem:query.loader.regroup+4]`.
+> `[spec:pgorm:sem:query.loader.regroup+5]`.
 >
 > Because the targets are read by one query rather than reassembled from a
 > key map, an `order_by` on the caller's `Select` orders every bucket. Without

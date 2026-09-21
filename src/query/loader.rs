@@ -1,13 +1,18 @@
 use crate::{
-    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Key, ModelTrait, QueryFilter,
-    QueryTrait, Related, RelationDef, RelationType, Req, Select, SelectGraph, error::*,
+    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Iterable, Key, ModelTrait,
+    PrimaryKeyToColumn, QueryFilter, QueryTrait, Related, RelationDef, RelationType, Req, Select,
+    SelectGraph, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{
     AliasName, ColumnRef, Expr, FromItem, IntoColumnRef, Name, NamedTable, SimpleExpr, TableName,
     ValueTuple, alias,
 };
-use std::{collections::HashMap, marker::PhantomData, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    str::FromStr,
+};
 
 /// Entity, or a `Select<Entity>`; to be used as parameters in [`LoaderTrait`]
 pub trait EntityOrSelect<E: EntityTrait>: Send {
@@ -22,7 +27,12 @@ pub trait LoaderTrait {
     /// Source model
     type Model: ModelTrait;
 
-    /// Used to eager load has_one relations
+    /// Used to eager load has_one relations.
+    ///
+    /// A key the relation matches to more than one target row contradicts the
+    /// `HasOne` it declares — a missing `UNIQUE` on the target's key columns,
+    /// typically — and is reported as [`Error::Query`] rather than resolved by
+    /// discarding rows.
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -121,7 +131,7 @@ where
     type Model = M;
 
     // [spec:pgorm:sem:query.loader.batching+7]
-    // [spec:pgorm:sem:query.loader.regroup+4]
+    // [spec:pgorm:sem:query.loader.regroup+5]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -143,15 +153,17 @@ where
             return Ok(Vec::new());
         }
 
-        Ok(load_related(self, stmt.into_select(), rel_def, db)
-            .await?
-            .into_iter()
-            .map(|bucket| bucket.into_iter().next_back())
-            .collect())
+        let from_col = rel_def.columns.from_key();
+        let (keys, buckets) = load_related(self, stmt.into_select(), rel_def, db).await?;
+
+        keys.iter()
+            .zip(buckets)
+            .map(|(key, bucket)| single_target::<R>(bucket, key, &from_col))
+            .collect()
     }
 
     // [spec:pgorm:sem:query.loader.batching+7]
-    // [spec:pgorm:sem:query.loader.regroup+4]
+    // [spec:pgorm:sem:query.loader.regroup+5]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -174,7 +186,7 @@ where
             return Ok(Vec::new());
         }
 
-        load_related(self, stmt.into_select(), rel_def, db).await
+        Ok(load_related(self, stmt.into_select(), rel_def, db).await?.1)
     }
 
     // [spec:pgorm:sem:query.loader.many-to-many+3]
@@ -221,7 +233,7 @@ where
             via_rel,
         );
 
-        collect_buckets(graph, keys, &via_from_col, db).await
+        collect_buckets(graph, &keys, &via_from_col, db).await
     }
 }
 
@@ -261,10 +273,10 @@ where
 /// target is filed under is read back from the source side rather than
 /// re-derived from the target — which is what lets a relation whose
 /// `condition_type` is `Any` file one target under several keys.
-// [spec:pgorm:sem:query.loader.regroup+4]
+// [spec:pgorm:sem:query.loader.regroup+5]
 async fn collect_buckets<R, F, C>(
     graph: SelectGraph<R, (Req<F>,)>,
-    keys: Vec<ValueTuple>,
+    keys: &[ValueTuple],
     from_col: &Key,
     db: &C,
 ) -> Result<Vec<Vec<R::Model>>, Error>
@@ -275,7 +287,7 @@ where
     F: EntityTrait,
 {
     let src_tbl = FromItem::from(TableName::Table(source_alias()));
-    let condition = prepare_condition(&src_tbl, from_col, &keys)?;
+    let condition = prepare_condition(&src_tbl, from_col, keys)?;
     let graph = QueryFilter::filter(graph, condition);
 
     let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
@@ -287,7 +299,7 @@ where
         let key = extract_key(from_col, &source)?;
         let bucket = buckets
             .get_mut(&key)
-            .ok_or_else(|| unmatched_key_err(&key, &keys, from_col))?;
+            .ok_or_else(|| unmatched_key_err(&key, keys, from_col))?;
         bucket.push(target);
     }
 
@@ -300,13 +312,18 @@ where
 /// The whole of a direct load: the relation's target checked against what the
 /// graph can qualify, the keys read off the input models in input order, and
 /// the one graph read regrouped into a bucket per input.
+///
+/// The keys are handed back beside the buckets they filed rows under — the two
+/// lists are the same length and the same order as the input models — so a
+/// caller reporting on a bucket can name the key it was collected for without
+/// reading the input models a second time.
 // [spec:pgorm:sem:query.loader.batching+7]
 async fn load_related<M, R, C>(
     models: &[M],
     select: Select<R>,
     rel_def: RelationDef,
     db: &C,
-) -> Result<Vec<Vec<R::Model>>, Error>
+) -> Result<(Vec<ValueTuple>, Vec<Vec<R::Model>>), Error>
 where
     C: ConnectionTrait,
     M: ModelTrait,
@@ -323,7 +340,51 @@ where
 
     let graph = join_source::<R, <M as ModelTrait>::Entity>(root_graph::<R>(select), rel_def);
 
-    collect_buckets(graph, keys, &from_col, db).await
+    let buckets = collect_buckets(graph, &keys, &from_col, db).await?;
+    Ok((keys, buckets))
+}
+
+/// The one target a has-one bucket is allowed to hold.
+///
+/// A bucket repeats a target once per input-entity row whose key matched it —
+/// the join multiplicity [`load_related`] pays for reading the relation whole —
+/// so the rows are counted by the target's own primary key rather than by
+/// length: repeats of one row collapse, and two genuinely different rows under
+/// one key are what contradicts the `HasOne` the relation declares. Reported
+/// rather than resolved, because the row a discard would keep is the join's
+/// choice, not the caller's.
+// [spec:pgorm:sem:query.loader.regroup+5]
+fn single_target<R>(
+    bucket: Vec<R::Model>,
+    key: &ValueTuple,
+    from_col: &Key,
+) -> Result<Option<R::Model>, Error>
+where
+    R: EntityTrait,
+{
+    let distinct: HashSet<ValueTuple> = bucket
+        .iter()
+        .map(|target| {
+            <R::PrimaryKey as Iterable>::iter()
+                .map(|pk| target.get(pk.into_column()))
+                .collect::<ValueTuple>()
+        })
+        .collect();
+
+    if distinct.len() > 1 {
+        let entity = <R as Default>::default();
+        return Err(query_err(format!(
+            "load_one matched {rows} distinct `{table}` rows against the key {key:?} read from \
+             `{from}`, but the relation declares HasOne: at most one row may match a key. Check \
+             for a missing UNIQUE constraint on the target's key columns, or load the relation \
+             with load_many.",
+            rows = distinct.len(),
+            table = entity.table_name(),
+            from = key_columns(from_col),
+        )));
+    }
+
+    Ok(bucket.into_iter().next_back())
 }
 
 /// Re-root the caller's target selector as a graph.
@@ -358,7 +419,7 @@ fn key_columns(identity: &Key) -> String {
         .join(", ")
 }
 
-// [spec:pgorm:sem:query.loader.regroup+4]
+// [spec:pgorm:sem:query.loader.regroup+5]
 fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Key) -> Error {
     let sample = match input_keys.first() {
         Some(sample) => format!("{sample:?}"),
