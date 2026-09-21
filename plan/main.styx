@@ -7905,6 +7905,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-09-21T14:10:41.104927Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Closed by disposition rather than by decomposition: `[spec:pgorm:req:sql.scope]` (docs/spec/sql-ast.md) now holds every checklist item with a verdict, and the rule requires that a deferral state what closing it would take — so the list is a work queue rather than a list of absences. Eleven of the twenty-six were small enough to build in the same pass: IS [NOT] DISTINCT FROM, BETWEEN [NOT] SYMMETRIC, AT TIME ZONE, INTERSECT ALL, EXCEPT ALL, OVERRIDING SYSTEM/USER VALUE, FrameType::Groups, and DEFERRABLE foreign keys in all three states. The filed list was wrong in one direction only — everything it named as missing was still missing, with the line numbers drifted (select.rs:102-107 is now 96-118, window.rs:44-57 is now 30-53, extension.rs:478-487 is now 490-507). Two findings worth keeping. First, the renderer classifies BinOper variants, not lexemes: `Oper::is_between` is what unwraps the AND binary a BETWEEN's bounds are encoded as, so a symmetric form spelled through BinOper::Raw renders `x BETWEEN SYMMETRIC (a AND b)` — valid SQL meaning something else. That is why these got variants and why sql.render.parens+3 now states the rule as a general one. Second, ON CONFLICT ON CONSTRAINT looked like a fourth arbiter form and is not: the constraint arbiter takes no column list and no WHERE, both of which live inside ConflictTarget today, so a ConflictElement variant would make two invalid states constructible and the honest fix is splitting the arbiter into inference-or-constraint with its own small typestate. Deferred with that design recorded. Simple-form CASE resisted for the same reason (the arms would have two incompatible shapes) and array subscripts for a different one (a new SimpleExpr variant, whose match is exhaustive crate-wide). The five new Expr methods live in expr_keyword_operators.rs rather than expr.rs: the function-density ratchet refused the addition, and the crate already had the pattern in expr_json.rs and expr_membership.rs."
+                        after_done true
+                    }
                 )
             }
 
