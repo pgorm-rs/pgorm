@@ -62,11 +62,24 @@ use super::PoolConfig;
 #[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     /// Initialize the configuration by parsing the URL first.
-    /// **Note**: All the other options override settings defined
-    /// by the URL except for the `host` and `hosts` options which
-    /// are additive!
+    ///
+    /// Most of the other options then override what the URL set, because
+    /// their `tokio_postgres::Config` setters replace. Four do not: `host`,
+    /// `hosts`, `hostaddr`, `hostaddrs`, `port` and `ports` all reach setters
+    /// that *push*, so they are added to whatever the URL already supplied.
+    /// That is the point for hosts — a multi-host configuration is written by
+    /// adding to it — but it means a URL that already names a port plus an
+    /// explicit `port` yields two ports for one host, which tokio-postgres
+    /// refuses at connect time with *invalid number of ports* rather than
+    /// choosing between them. Write the port in the URL or in `port`, not in
+    /// both.
     pub url: Option<String>,
     /// See [`tokio_postgres::Config::user`].
+    ///
+    /// Left unset — here and in `url` — the connection falls back to the
+    /// `USER` environment variable, so the user a connection authenticates as
+    /// can come from the process environment rather than from this struct.
+    /// See [`Config::get_pg_config`].
     pub user: Option<String>,
     /// See [`tokio_postgres::Config::password`].
     pub password: Option<String>,
@@ -295,6 +308,20 @@ impl Config {
     /// never saw, which for `target_session_attrs` and `channel_binding` means
     /// silently connecting to a standby or without the binding that was asked
     /// for.
+    ///
+    /// Two things this reads are not fields of this struct, and both are
+    /// inherited behaviour that callers may be relying on. When neither
+    /// [`user`](Self::user) nor `url` supplies a non-empty user, the `USER`
+    /// environment variable is read and used — so the connecting user can
+    /// come from the process environment, and a deployment that expects one
+    /// user gets another by changing nothing but the environment. When the
+    /// configuration names no host at all, Unix targets add the three
+    /// conventional socket directories (`/run/postgresql`,
+    /// `/var/run/postgresql`, `/tmp`) and others add `127.0.0.1`.
+    ///
+    /// How `url` and the individual fields combine is documented on
+    /// [`url`](Self::url): most fields replace what the URL set, but the host,
+    /// hostaddr and port families are added to it.
     // [spec:pgorm:req:conn.pool.config-forwarding]
     #[allow(unused_results)]
     pub fn get_pg_config(&self) -> Result<tokio_postgres::Config, ConfigError> {

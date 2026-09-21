@@ -354,8 +354,10 @@ mod tests {
 /// body. The grammar is a reading, not a property of the value: what either
 /// constructor hands back is the same resolved sequence.
 ///
-/// In expression position a template is reached through [`Expr::template`],
-/// [`Expr::template_with_expr`] and [`Expr::template_with_exprs`]; in relation
+/// In expression position a template is reached through
+/// [`Expr::template`](crate::Expr::template),
+/// [`Expr::template_with_expr`](crate::Expr::template_with_expr) and
+/// [`Expr::template_with_exprs`](crate::Expr::template_with_exprs); in relation
 /// position it is the payload of
 /// [`FromItem::Template`](crate::FromItem::Template).
 // [spec:pgorm:req:sql.render.custom-expr+3]

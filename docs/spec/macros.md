@@ -506,7 +506,7 @@ known limitations.
 
 ## Compile-time SQL validation
 
-> [spec:pgorm:def:macros.sql+2]
+> [spec:pgorm:def:macros.sql+3]
 > `pgorm-sql-macro` is a proc-macro crate exporting exactly two function-like macros:
 > `sql!`, specified here, and `prql!` (`[spec:pgorm:def:macros.prql]`). `sql!` takes one
 > string literal and nothing else. While the calling crate is being compiled, the
@@ -525,9 +525,22 @@ known limitations.
 > of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+5]` parses raw statements at
 > runtime) and prqlc is a plain dependency by the same permanence posture
 > (`[spec:pgorm:def:pipeline.adapter+2]`) — and a gate that guards nothing is surface
-> without a state. The call sites are the escape hatches that take SQL as text —
-> `SelectorRaw::from_statement`, `ConnectionTrait::query_raw` / `execute_raw` /
-> `batch_execute`, and migration bodies.
+> without a state.
+>
+> The call sites are the escape hatches that take SQL as text, and documentation
+> of them MUST be a rule that finds them rather than a list that goes stale — the
+> list this rule used to carry named four of them while ten existed, which is
+> worse than no list, because an auditor who trusts it audits a quarter of the
+> surface. On a connection the rule is the `SqlText` bound
+> (`[spec:pgorm:def:conn.sql-text+2]`): every `ConnectionTrait` method taking
+> `&T where T: SqlText` — `execute`, `execute_raw`, `query_one`, `query_opt`,
+> `query_all`, `query_raw` — plus `batch_execute`, which takes its `&str`
+> directly because it runs a script through the simple-query protocol. Away from
+> a connection a raw statement is SQL text paired with its values, and the entry
+> points are `Select::from_raw_sql`, the three `SelectorRaw` constructors and the
+> three `DecodeRaw` methods on a `(sql, values)` pair
+> (`[spec:pgorm:sem:exec.crud.selector-entry+2]`), and
+> `FromQueryResult::find_by_statement`. Migration bodies are the last of them.
 
 > [spec:pgorm:req:macros.sql.reject]
 > `sql!` MUST refuse, at compile time, both an input that is not a single string literal

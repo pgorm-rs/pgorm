@@ -130,7 +130,8 @@ pub struct AddColumnOption {
 /// All available table alter options
 ///
 /// `RENAME` is absent: PostgreSQL takes it only as the sole action of a
-/// statement, so it lives in [`ColumnRenameStatement`] where it cannot be
+/// statement, so it lives in [`ColumnRenameStatement`](crate::ColumnRenameStatement)
+/// where it cannot be
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]

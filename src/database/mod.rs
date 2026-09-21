@@ -100,6 +100,15 @@ where
 
 /// Method to create a [DatabasePool] on a database
 ///
+/// Nothing is connected to here. This builds a pool and returns it; the pool
+/// opens connections lazily, so a wrong host, a wrong password or a database
+/// that does not exist is not reported by this call but by the first
+/// [`DatabasePool::get`] that has to open a connection — and by every later
+/// one, since nothing has been proven in between. Treat a returned
+/// `DatabasePool` as a configuration that has not been tested yet: a caller
+/// that wants to fail at startup rather than at first use should `get()` a
+/// connection there and drop it.
+///
 /// # Panics
 ///
 /// Panics if pgorm's own default pool configuration is rejected by the builder.

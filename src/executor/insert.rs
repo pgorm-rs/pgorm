@@ -120,6 +120,11 @@ where
     /// An insert to which no model was added writes nothing and reports `0`; a
     /// model that leaves every column `NotSet` asks for a row of database
     /// defaults and still writes one.
+    ///
+    /// A batch whose models do not all set the same columns contributes no row
+    /// for the ones that disagree ([`Insert::add`]), and that is reported here
+    /// as an error rather than as a smaller count — so a `0` means nothing was
+    /// asked for, never that something was asked for and dropped.
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     // [spec:pgorm:sem:query.build.insert+4]
     // [spec:pgorm:req:query.build.insert.uniform-columns+3]
@@ -137,7 +142,9 @@ where
     /// Execute the insert and return the inserted row's primary key.
     ///
     /// An insert to which no model was added has no row to report a key for and
-    /// fails with [`Error::RecordNotInserted`].
+    /// fails with [`Error::RecordNotInserted`]. A batch whose models do not all
+    /// set the same columns ([`Insert::add`]) fails here too, before anything
+    /// is written.
     // [spec:pgorm:sem:exec.crud.insert+5]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     // [spec:pgorm:sem:query.build.insert+4]
@@ -163,7 +170,9 @@ where
     /// Execute the insert and return the inserted row as a model.
     ///
     /// An insert to which no model was added has no row to return and fails
-    /// with [`Error::RecordNotFound`].
+    /// with [`Error::RecordNotFound`]. A batch whose models do not all set the
+    /// same columns ([`Insert::add`]) fails here too, before anything is
+    /// written.
     // [spec:pgorm:sem:exec.crud.insert-returning+2]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     // [spec:pgorm:sem:query.build.insert+4]

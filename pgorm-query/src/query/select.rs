@@ -1488,7 +1488,8 @@ impl SelectStatement {
         self
     }
 
-    /// Having condition, expressed with [`any!`](crate::any) and [`all!`](crate::all).
+    /// Having condition, expressed with [`Condition::all`] and
+    /// [`Condition::any`].
     ///
     /// # Examples
     ///

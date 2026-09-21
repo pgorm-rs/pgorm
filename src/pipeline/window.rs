@@ -44,7 +44,7 @@ const WRITTEN: [(&str, &str, &[usize], bool); 8] = [
     ("row_number", "ROW_NUMBER", &[], false),
 ];
 
-/// What a [`window`](Pipeline::window) computes its columns over:
+/// What a [`window`](crate::pipeline::Pipeline::window) computes its columns over:
 /// partitioning, ordering and frame.
 ///
 /// Built by [`by`] (partition), [`sort_by`] (ordering) or [`over`] (neither),

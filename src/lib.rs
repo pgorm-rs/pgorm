@@ -39,7 +39,10 @@ pub mod error;
 mod executor;
 /// Holds types and methods to perform metric collection
 pub mod metric;
-/// A PRQL-shaped pipeline query API, compiled through prqlc
+// The module documents itself. A second doc comment here would not merely
+// duplicate the first line of it: an outer attribute on the `mod` item makes
+// rustdoc resolve the whole merged doc in *this* scope, where none of the
+// module's own types are, so every intra-doc link inside it breaks.
 pub mod pipeline;
 /// Holds types and methods to perform queries
 pub mod query;
@@ -80,21 +83,49 @@ pub use tokio_postgres::row::RowIndex;
 /// const BY_ID: &str = sql!(r#"SELECT "id", "name" FROM "cake" WHERE "id" = $1"#);
 /// ```
 ///
-/// The escape hatches that take SQL as text are its call sites:
-/// [`SelectorRaw::from_statement`](crate::SelectorRaw::from_statement),
-/// [`ConnectionTrait::query_raw`](crate::ConnectionTrait::query_raw),
-/// [`ConnectionTrait::execute_raw`](crate::ConnectionTrait::execute_raw), and
-/// [`ConnectionTrait::batch_execute`](crate::ConnectionTrait::batch_execute).
-// [spec:pgorm:def:macros.sql+2]
+/// The escape hatches that take SQL as text are its call sites, and they are
+/// findable rather than listed: on a connection, the rule is the
+/// [`SqlText`] bound — every [`ConnectionTrait`] method taking
+/// `&T where T: SqlText`, which is [`execute`], [`execute_raw`],
+/// [`query_one`], [`query_opt`], [`query_all`] and [`query_raw`] — plus
+/// [`batch_execute`], which takes its `&str` directly because it runs a whole
+/// script through the simple-query protocol. Away from a connection a raw
+/// statement travels as SQL text paired with its values, and the entry points
+/// are [`Select::from_raw_sql`], the [`SelectorRaw`] constructors
+/// ([`from_statement`], [`into_tuple`], [`with_columns`]), the [`DecodeRaw`]
+/// impl on a `(sql, values)` pair ([`into_model`], [`DecodeRaw::into_tuple`],
+/// [`into_values`]), and [`FromQueryResult::find_by_statement`]. Migration
+/// bodies are the last of them.
+///
+/// [`SqlText`]: crate::SqlText
+/// [`ConnectionTrait`]: crate::ConnectionTrait
+/// [`execute`]: crate::ConnectionTrait::execute
+/// [`execute_raw`]: crate::ConnectionTrait::execute_raw
+/// [`query_one`]: crate::ConnectionTrait::query_one
+/// [`query_opt`]: crate::ConnectionTrait::query_opt
+/// [`query_all`]: crate::ConnectionTrait::query_all
+/// [`query_raw`]: crate::ConnectionTrait::query_raw
+/// [`batch_execute`]: crate::ConnectionTrait::batch_execute
+/// [`Select::from_raw_sql`]: crate::Select::from_raw_sql
+/// [`SelectorRaw`]: crate::SelectorRaw
+/// [`from_statement`]: crate::SelectorRaw::from_statement
+/// [`into_tuple`]: crate::SelectorRaw::into_tuple
+/// [`with_columns`]: crate::SelectorRaw::with_columns
+/// [`DecodeRaw`]: crate::DecodeRaw
+/// [`into_model`]: crate::DecodeRaw::into_model
+/// [`DecodeRaw::into_tuple`]: crate::DecodeRaw::into_tuple
+/// [`into_values`]: crate::DecodeRaw::into_values
+/// [`FromQueryResult::find_by_statement`]: crate::FromQueryResult::find_by_statement
+// [spec:pgorm:def:macros.sql+3]
 pub use pgorm_sql_macro::sql;
 
 /// Compile a PRQL string literal to PostgreSQL SQL at build time, expanding
 /// to `(&'static str, Values)` for the raw-SQL entry points.
 ///
-/// The text sibling of [`pipeline`](crate::pipeline): the same prqlc
+/// The text sibling of [`pipeline`]: the same prqlc
 /// compiler, the same libpg_query oracle over what it emits, but for
 /// queries known whole at compile time. The arguments after the literal are
-/// converted via `Into<`[`Value`](crate::Value)`>` in placeholder order,
+/// converted via `Into<`[`Value`]`>` in placeholder order,
 /// and the macro refuses at compile time any PRQL prqlc rejects, any
 /// emitted SQL the PostgreSQL grammar rejects, an argument count that does
 /// not match the `$N` placeholders, or a gap in their numbering.

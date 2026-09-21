@@ -752,7 +752,8 @@ impl Pipeline {
     }
 
     /// Derive columns over a window: what to compute, and what to compute it
-    /// over ([`by`], [`sort_by`], [`over`]).
+    /// over ([`by`](crate::pipeline::by), [`sort_by`](crate::pipeline::sort_by),
+    /// [`over`](crate::pipeline::over)).
     ///
     /// With a partition this compiles to `PARTITION BY` under a `group`
     /// stage; without one the window spans the whole relation.

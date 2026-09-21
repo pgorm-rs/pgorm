@@ -53,7 +53,7 @@ use syn::{LitStr, parse_macro_input};
 /// The check is syntax only. libpg_query carries no catalog, so a well-formed
 /// statement against tables and columns that do not exist passes happily — this
 /// rules out typos in SQL, not mistakes about the schema.
-// [spec:pgorm:def:macros.sql+2]
+// [spec:pgorm:def:macros.sql+3]
 // [spec:pgorm:req:macros.sql.reject]    non-literal input is `syn`'s own refusal
 #[proc_macro]
 pub fn sql(input: TokenStream) -> TokenStream {
