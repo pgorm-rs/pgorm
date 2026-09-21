@@ -8251,6 +8251,7 @@ children (
                 id metrics-rollback-honest
                 title "A failed commit is not recorded as a rollback"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:28.345442Z
@@ -8264,6 +8265,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T16:05:51.114928Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
