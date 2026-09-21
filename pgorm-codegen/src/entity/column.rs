@@ -4,7 +4,7 @@ use crate::{
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, StringLen};
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 use std::fmt::Write as FmtWrite;
 
@@ -21,7 +21,7 @@ impl Column {
     /// Reject anything the writer could not render: a type outside the mapping
     /// table, and a DB name whose case-converted forms are not Rust
     /// identifiers.
-    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("column `{}`", self.name);
@@ -49,7 +49,7 @@ impl Column {
 
     // [spec:pgorm:sem:codegen.entity.types+3]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
-    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
     pub fn get_rs_type(&self) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType) -> String {
             #[allow(unreachable_patterns)]
@@ -91,7 +91,21 @@ impl Column {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+2]
+    /// The `column_type = "..."` part of the compact `#[pgorm(..)]` attribute,
+    /// whose string the derive re-parses as tokens and splices after
+    /// `ColumnType::`.
+    ///
+    /// Every arm but `Named` is fixed program text — the `Decimal` precision
+    /// and scale are `u32`s, not text — so the one arm carrying a name from
+    /// the described schema is the one whose argument is rendered as a token:
+    /// `Literal::string` is the escaper `quote!` itself reaches for when it
+    /// interpolates a `&str`, so the quoting is the tokenizer's rather than
+    /// two quote characters written into a `format!`. A name holding a `"`
+    /// therefore comes back out of the derive as the name it went in as,
+    /// instead of ending the literal early and respelling the rest of the
+    /// attribute as tokens. `validate_col_type` has already refused any
+    /// `Named` shape this one-name spelling could not carry.
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+3]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -100,14 +114,17 @@ impl Column {
             ColumnType::Money => Some("Money".to_owned()),
             ColumnType::Text => Some("Text".to_owned()),
             ColumnType::JsonBinary => Some("JsonBinary".to_owned()),
-            ColumnType::Named(type_name) => Some(format!("named(\"{}\")", type_name.raw_text())),
+            ColumnType::Named(type_name) => {
+                let name = Literal::string(&type_name.raw_text());
+                Some(format!("named({name})"))
+            }
             ColumnType::Bytea => Some("Bytea".to_owned()),
             _ => None,
         };
         col_type.map(|ty| quote! { column_type = #ty })
     }
 
-    // [spec:pgorm:req:codegen.entity.types.unsupported+1]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
     pub fn get_def(&self) -> TokenStream {
         fn write_col_def(col_type: &ColumnType) -> TokenStream {
             match col_type {
@@ -234,14 +251,14 @@ impl Column {
 }
 
 /// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
-/// through `Array` element types and over the enum names they will emit.
-// [spec:pgorm:req:codegen.entity.types.unsupported+1]
+/// through `Array` element types, over the enum names they will emit, and over
+/// the named types they will respell.
+// [spec:pgorm:req:codegen.entity.types.unsupported+2]
 fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> {
     match col_type {
         ColumnType::Char(_)
         | ColumnType::String(_)
         | ColumnType::Text
-        | ColumnType::Named(_)
         | ColumnType::SmallInteger
         | ColumnType::Integer
         | ColumnType::BigInteger
@@ -260,6 +277,25 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
         | ColumnType::Boolean => Ok(()),
         ColumnType::Enum { name, .. } => {
             safe_ident(context, &name.to_string().to_upper_camel_case())?;
+            Ok(())
+        }
+        // Both writers respell a named type as `ColumnType::named("<name>")`,
+        // whose argument rebuilds one unqualified, non-array, quoted name. The
+        // characters of that name are unconstrained — it becomes a string
+        // literal, never a Rust identifier, and `citext`, `CamelType` and
+        // `my type` are all type names Postgres accepts — but a `TypeName`
+        // carrying anything the one-name spelling cannot hold would be
+        // generated as a different type than the one described, so it is
+        // refused here rather than silently respelled.
+        ColumnType::Named(type_name) => {
+            if type_name.verbatim || type_name.schema.is_some() || type_name.array {
+                return Err(Error::TransformError(format!(
+                    "{context}: named column type `{}` is not supported by codegen; \
+                     only a bare type name survives the generated \
+                     `ColumnType::named(\"..\")`",
+                    type_name.to_sql_string()
+                )));
+            }
             Ok(())
         }
         ColumnType::Array(inner_col_type) => validate_col_type(context, inner_col_type),

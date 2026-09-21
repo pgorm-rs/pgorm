@@ -55,7 +55,7 @@ fn compact_model_attribute_and_empty_relation_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+2/test]    the `#[pgorm(..)]` field
+// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    the `#[pgorm(..)]` field
 // attribute assembles its parts in one fixed order
 #[test]
 fn compact_field_attribute_parts_assembled_in_fixed_order() {
@@ -90,7 +90,7 @@ fn compact_field_attribute_parts_assembled_in_fixed_order() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+2/test]    `column_type` is emitted
+// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    `column_type` is emitted
 // for exactly the types whose default mapping is ambiguous
 #[test]
 fn compact_column_type_attribute_covers_ambiguous_types() {
@@ -130,7 +130,7 @@ fn compact_column_type_attribute_covers_ambiguous_types() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+2/test]    a field needing none of
+// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    a field needing none of
 // the parts carries no `#[pgorm]` attribute, and `nullable` never appears
 // without a `column_type`
 #[test]

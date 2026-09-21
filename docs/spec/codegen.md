@@ -287,7 +287,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+2]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+3]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
@@ -299,6 +299,22 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > alongside a `column_type`) when the column is nullable; and `unique` when
 > the column is unique. Fields needing none of these carry no `#[pgorm]`
 > attribute.
+>
+> The `column_type` part's string is re-parsed as tokens by
+> `DeriveEntityModel` and spliced after `ColumnType::`
+> (`macros.derive.entity-model.column-def`), so it is generated *program
+> text*. Every part of it but the named type's name is fixed by this rule —
+> `Decimal`'s precision and scale are integers — and the name, which comes
+> from the described schema, MUST be written by rendering it as a string
+> literal rather than by placing it between two quote characters. A type name
+> is data: Postgres accepts names that Rust source does not, and a name
+> holding a `"` pasted into the attribute either fails to parse in the
+> generated file or, given a comment opener, names a *different* type with
+> nothing reporting the difference. Rendered as a literal it round-trips
+> whole, so `named("...")` here and `ColumnType::named("...")` in the
+> expanded writer (`codegen.entity.types`) spell one name the same way. The
+> shapes that spelling cannot carry are refused before the writer runs
+> (`codegen.entity.types.unsupported`).
 
 > [spec:pgorm:sem:codegen.entity.compact.model+1]
 > `gen_compact_model_struct` emits the compact `Model` as one block: the
@@ -411,7 +427,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+1]
+> [spec:pgorm:req:codegen.entity.types.unsupported+2]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -421,6 +437,23 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > form; outside `transform` the message names the column alone. `Array`
 > element types are checked recursively, so an array of an unsupported
 > element type is itself unsupported.
+>
+> A type inside the table can still be beyond the writer, in which case the
+> same gate refuses it with its own message. `Enum { name, .. }` is refused
+> when `name` has no Rust identifier form, because the writer emits it as one
+> (`codegen.entity.keywords`). `Named(type_name)` is refused when `type_name`
+> is schema-qualified, is an array, or is a verbatim type expression, with
+> ``TransformError("... named column type `<name>` is not supported by
+> codegen; only a bare type name survives the generated
+> `ColumnType::named(\"..\")`")`` where `<name>` is the type name's SQL
+> spelling: both writers respell a named type as a single-argument
+> `ColumnType::named("...")`, which rebuilds one unqualified, non-array,
+> quoted name, so a `TypeName` carrying more than that would be generated as
+> a type other than the one described. The *characters* of a bare name are
+> not constrained — it becomes a string literal, never an identifier, and
+> `citext`, `CamelType` and `my type` are all names Postgres accepts — so it
+> is the name's shape that is checked here and its spelling that
+> `codegen.entity.compact.attrs` makes safe.
 >
 > Codegen MUST NOT be expected to degrade gracefully on such a type: no
 > placeholder code is emitted and no file is generated, the whole run fails.

@@ -8245,6 +8245,13 @@ children (
                         kind @note
                         text "pgorm-codegen/src/entity/column.rs:103 builds the derive attribute with format!(\"custom(\\\"{}\\\")\", iden.to_string()) — unescaped string interpolation into what pgorm-macros later re-parses with syn::parse_str::<TokenStream> (derives/entity_model.rs:60) and splices after ColumnType:: (derives/sql_type_match.rs:75). The expanded path 44 lines down does the same job correctly with quote! { ColumnType::custom(#s) } (column.rs:147). Compounding: validate_col_type checks ColumnType::Enum's name via safe_ident but waves ColumnType::Custom through unchecked (:244 vs :261-263). Reachable via the public TryFrom<ColumnDef> (:272) with a hostile catalog type name; a quote character most likely yields a confusing compile error in generated code rather than execution, but generated-code injection is not worth reasoning about — use quote! on both paths and validate Custom like Enum."
                     }
+
+                    {
+                        at 2026-09-21T17:08:09.404011Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

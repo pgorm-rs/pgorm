@@ -5,7 +5,9 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{Column, EntityTransformer, Error};
-use pgorm_query::{ColumnDef, ColumnType, Name, StringLen, Table};
+use pgorm_query::{ColumnDef, ColumnType, Name, StringLen, Table, TypeName};
+use proc_macro2::{TokenStream, TokenTree};
+use quote::quote;
 use std::sync::Arc;
 
 // [spec:pgorm:sem:codegen.entity.types+3/test]    `Column::get_rs_type` follows
@@ -178,7 +180,199 @@ fn date_time_columns_map_to_prelude_aliases() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+1/test]    a type outside the
+/// A type name Postgres accepts and Rust source does not: it holds a double
+/// quote and a space, so pasting it between two quote characters ends the
+/// attribute's literal in the middle of the name.
+const HOSTILE_NAME: &str = "ev\"il type";
+
+/// The compact attribute codegen emits for [`HOSTILE_NAME`], exactly as it
+/// appears in the generated file. `hostile_entity` below carries this same
+/// text through the real derive, so the two halves of the round trip are
+/// pinned to one spelling.
+const HOSTILE_ATTR: &str = r#"#[pgorm(column_type = "named(\"ev\\\"il type\")")]"#;
+
+/// A generated entity written out by hand, carrying [`HOSTILE_ATTR`] verbatim.
+/// That it compiles at all is half the claim; `Column::Odd`'s definition is the
+/// other half.
+mod hostile_entity {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[pgorm(table_name = "sample")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(column_type = "named(\"ev\\\"il type\")")]
+        pub odd: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The value of the sole string literal in an attribute — the `LitStr` the
+/// derive reads out of `column_type = "..."` before parsing it as tokens.
+fn attribute_string_value(attr: &str) -> String {
+    let mut literal = None;
+    fn walk(stream: TokenStream, found: &mut Option<String>) {
+        for tree in stream {
+            match tree {
+                TokenTree::Group(group) => walk(group.stream(), found),
+                TokenTree::Literal(lit) => *found = Some(lit.to_string()),
+                _ => {}
+            }
+        }
+    }
+    walk(
+        attr.parse().expect("the attribute should lex as Rust"),
+        &mut literal,
+    );
+    let literal = literal.expect("the attribute should carry a literal");
+    syn::parse_str::<syn::LitStr>(&literal)
+        .expect("the literal should be a string")
+        .value()
+}
+
+// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    the compact attribute
+// carries a named type's name as a rendered string literal, so a name holding a
+// quote arrives at the derive as the name that was described rather than as
+// tokens that escaped the literal
+#[test]
+fn hostile_named_type_survives_the_compact_attribute() {
+    let generated = generate(
+        vec![table_with(
+            "sample",
+            vec![
+                serial_pk("id"),
+                typed("odd", ColumnType::named(HOSTILE_NAME)),
+            ],
+        )],
+        Opts::default(),
+    );
+
+    assert_contains(
+        generated.file("sample.rs"),
+        &format!("{HOSTILE_ATTR} pub odd: String,"),
+    );
+
+    // The derive's own read of that attribute, step for step: the `LitStr`'s
+    // value, parsed as tokens, spliced after `ColumnType::`.
+    let spliced: TokenStream = syn::parse_str(&attribute_string_value(HOSTILE_ATTR))
+        .expect("the attribute value should parse as tokens");
+    let expected = quote!(pgorm::prelude::ColumnType::named("ev\"il type")).to_string();
+    assert_eq!(
+        quote!(pgorm::prelude::ColumnType::#spliced).to_string(),
+        expected,
+    );
+
+    // The control the rest of this test rests on: pasting the same name
+    // between two quote characters, as `format!` would, does not produce the
+    // same program. It fails in one of two ways, and both are here because
+    // only one of them is loud.
+    //
+    // This name ends the literal at its own quote and leaves a trailing `")`
+    // that never closes, so the derive cannot parse the attribute at all — a
+    // compile error inside generated source, pointing at an attribute nobody
+    // wrote by hand.
+    assert!(
+        syn::parse_str::<TokenStream>(&format!("named(\"{HOSTILE_NAME}\")")).is_err(),
+        "the pasted spelling of {HOSTILE_NAME:?} should not parse",
+    );
+    // A name carrying a comment opener parses perfectly well, and names a
+    // different type than the one described — the tail of the name is
+    // commented out, and nothing anywhere reports it.
+    let truncating = "x\") //";
+    let pasted: TokenStream = syn::parse_str(&format!("named(\"{truncating}\")"))
+        .expect("the pasted spelling of a comment-bearing name parses");
+    assert_eq!(
+        quote!(pgorm::prelude::ColumnType::#pasted).to_string(),
+        quote!(pgorm::prelude::ColumnType::named("x")).to_string(),
+        "the pasted spelling should silently lose the rest of the name",
+    );
+    // Rendered as a literal, that same name survives whole.
+    let rendered: TokenStream = syn::parse_str(&format!(
+        "named({})",
+        proc_macro2::Literal::string(truncating)
+    ))
+    .expect("the rendered spelling parses");
+    assert_eq!(
+        quote!(pgorm::prelude::ColumnType::#rendered).to_string(),
+        quote!(pgorm::prelude::ColumnType::named("x\") //")).to_string(),
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    and the entity the
+// derive builds from it names the type that was described, character for
+// character
+#[test]
+fn derived_entity_names_the_hostile_type_exactly() {
+    use pgorm::entity::prelude::ColumnTrait;
+
+    assert_eq!(
+        hostile_entity::Column::Odd.def().get_column_type(),
+        &ColumnType::named(HOSTILE_NAME),
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.types+3/test]    the expanded writer spells the
+// same name the same way, so the two emission paths agree on a hostile name as
+// they do on a benign one
+#[test]
+fn hostile_named_type_survives_the_expanded_column_def() {
+    let generated = generate(
+        vec![table_with(
+            "sample",
+            vec![
+                serial_pk("id"),
+                typed("odd", ColumnType::named(HOSTILE_NAME)),
+            ],
+        )],
+        expanded(),
+    );
+
+    assert_contains(
+        generated.file("sample.rs"),
+        r#"ColumnType::named("ev\"il type").def()"#,
+    );
+}
+
+// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    a named type the
+// generated `ColumnType::named("..")` could not rebuild — schema-qualified, an
+// array, or a type expression — is refused by name rather than respelled as a
+// different type
+#[test]
+fn column_conversion_rejects_an_unrespellable_named_type() {
+    for (col_type, spelled) in [
+        (
+            ColumnType::Named(TypeName::new(Name::runtime("status")).schema(Name::runtime("app"))),
+            "app.status",
+        ),
+        (
+            ColumnType::Named(TypeName::new(Name::runtime("citext")).array()),
+            "citext[]",
+        ),
+        (
+            ColumnType::Named(TypeName::raw("numeric(12, 2)")),
+            "numeric(12, 2)",
+        ),
+    ] {
+        let col_def = ColumnDef::new_with_type(Name::runtime("odd"), col_type).to_owned();
+        match Column::try_from(&col_def) {
+            Err(Error::TransformError(msg)) => assert_eq!(
+                msg,
+                format!(
+                    "column `odd`: named column type `{spelled}` is not supported by codegen; \
+                     only a bare type name survives the generated `ColumnType::named(\"..\")`"
+                )
+            ),
+            other => panic!("expected a TransformError, got {other:?}"),
+        }
+    }
+}
+
+// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    a type outside the
 // mapping fails the whole run with a `TransformError` naming table, column and
 // type — no placeholder code, and no panic
 #[test]
@@ -197,7 +391,7 @@ fn transform_rejects_column_type_outside_mapping() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+1/test]    the check sits at
+// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    the check sits at
 // `Column` construction, so the writer never meets an unmapped type; `Array`
 // element types are checked through
 #[test]
