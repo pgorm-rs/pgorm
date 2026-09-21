@@ -8122,6 +8122,7 @@ children (
                 id migration-status-reads
                 title "Checking migration status writes nothing"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:21.561024Z
@@ -8135,6 +8136,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T15:50:04.184942Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

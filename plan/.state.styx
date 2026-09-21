@@ -843,7 +843,7 @@ assertions (
     {id loader-one-refuses-many, kind @complete, author "brendan@necessary.nu", at 2026-09-21T14:37:26.498014Z}
     {id update-nothing-distinct, kind @complete, author "brendan@necessary.nu", at 2026-09-21T14:57:13.616578Z}
     {id active-model-unknown-column, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:28:21.192315Z}
-    {id migration-status-reads, kind @doing, author "brendan@necessary.nu", at 2026-09-21T15:33:18.017985Z}
+    {id migration-status-reads, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:50:04.184942Z}
 )
 
 impl_evidence (
