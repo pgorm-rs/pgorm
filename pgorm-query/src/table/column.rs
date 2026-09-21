@@ -202,7 +202,7 @@ pub enum ColumnSpec {
     /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments)
     /// — and for consumers reading it back off `get_column_spec` — to turn
     /// into the `COMMENT ON COLUMN` statement it really is.
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    // [spec:pgorm:req:sql.ddl.comment+5]
     Comment(String),
 }
 
@@ -794,7 +794,7 @@ impl ColumnDef {
     /// create statement this column goes into, with
     /// [`TableCreateStatement::comments`](crate::TableCreateStatement::comments),
     /// or build it directly with [`Comment::on_column`](crate::Comment::on_column).
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    // [spec:pgorm:req:sql.ddl.comment+5]
     pub fn comment<T>(&mut self, string: T) -> &mut Self
     where
         T: Into<String>,

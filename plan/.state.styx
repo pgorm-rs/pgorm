@@ -848,6 +848,7 @@ assertions (
     {id paginator-advances, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:41:21.340145Z}
     {id pool-savepoint-quoted, kind @complete, author "brendan@necessary.nu", at 2026-09-21T17:04:49.769326Z}
     {id codegen-quotes-custom-type, kind @complete, author "brendan@necessary.nu", at 2026-09-21T17:30:13.044528Z}
+    {id api-doc-honesty, kind @doing, author "brendan@necessary.nu", at 2026-09-21T17:30:36.297921Z}
 )
 
 impl_evidence (

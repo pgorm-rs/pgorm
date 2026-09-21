@@ -1798,7 +1798,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`CommentStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    // [spec:pgorm:req:sql.ddl.comment+5]
     pub(crate) fn prepare_comment_statement(
         &self,
         statement: &CommentStatement,
@@ -1821,10 +1821,34 @@ impl QueryBuilder {
         self.prepare_comment_text(&statement.comment, sql);
     }
 
-    /// Write comment text as a standard-conforming string literal.
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    /// Write comment text as a string literal: single quotes around it, every
+    /// embedded single quote doubled — and, when the text holds a backslash,
+    /// every backslash doubled and the literal written as an `E'...'`.
+    ///
+    /// Comment text has no bind form to fall back on — a DDL statement yields
+    /// SQL alone — so this quoting is the whole injection boundary for it, and
+    /// it must not depend on a server setting. Doubling alone does: under
+    /// `standard_conforming_strings = off` a backslash escapes the character
+    /// after it, so text ending `\'` would be written `\''`, read as an
+    /// escaped quote followed by a *closing* one, and everything after it read
+    /// as SQL. The `E'...'` says what the backslashes are under either
+    /// setting, which is why it is reached for when, and only when, there is a
+    /// backslash to say something about: text without one renders exactly as
+    /// it always has.
+    ///
+    /// The doubling is deliberately not
+    /// [`escape_string`](QueryBuilder::escape_string), which maps control
+    /// characters to their `E''` spellings as well. Comment text is prose and
+    /// a newline in it is a newline; this rewrites what the grammar forces and
+    /// nothing else.
+    // [spec:pgorm:req:sql.ddl.comment+5]
     fn prepare_comment_text(&self, comment: &str, sql: &mut dyn SqlWriter) {
-        write!(sql, "'{}'", comment.replace('\'', "''")).unwrap();
+        let quoted = comment.replace('\'', "''");
+        if comment.contains('\\') {
+            write!(sql, "E'{}'", quoted.replace('\\', "\\\\")).unwrap();
+        } else {
+            write!(sql, "'{}'", quoted).unwrap();
+        }
     }
 
     /// Translate [`TableDropStatement`] into SQL statement.

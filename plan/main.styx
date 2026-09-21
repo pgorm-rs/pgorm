@@ -8332,6 +8332,13 @@ children (
                         kind @note
                         text "The collected doc-vs-code falsehoods, each small, together corrosive. src/lib.rs:83-87 lists four escape hatches taking SQL as text; six more exist (ConnectionTrait::execute/query_one/query_opt/query_all at database/connection.rs:77-112, Select::from_raw_sql at executor/select.rs:142, FromQueryResult::find_by_statement at entity/model.rs:175) — an auditor trusting the list misses the majority of the surface. pgorm::connect does no I/O (database/mod.rs:112, pool construction only), so bad credentials surface at pool.get(); the doc should say so. pgorm-pool Config::url's doc says other options override the URL (config.rs:66-69) but port and hostaddr append via tokio-postgres's push semantics (:356-363) — url plus port yields two ports. get_pg_config silently falls back to env::var(\"USER\") (:300-312), undocumented environment participation in a getter. prepare_comment_text is a second string escaper ('' doubling only, query_builder.rs:1815-1819) correct solely under standard_conforming_strings=on — document the assumption or unify with escape_string. Insert::add's model-dropping paths are documented at insert.rs:244-248 but nothing in the return type hints at it; cross-reference from the exec methods. Each item: fix the doc, or fix the code and keep the doc — decided per item, not blanket."
                     }
+
+                    {
+                        at 2026-09-21T17:30:36.297921Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
         )

@@ -117,7 +117,7 @@ impl TableCreateStatement {
     /// carried rather than written into this statement's SQL: render it with
     /// [`comments()`](Self::comments), which yields the `COMMENT ON`
     /// statements to execute after the create.
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    // [spec:pgorm:req:sql.ddl.comment+5]
     pub fn comment<T>(&mut self, comment: T) -> &mut Self
     where
         T: Into<String>,
@@ -244,7 +244,7 @@ impl TableCreateStatement {
     ///     ]
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.comment+4]
+    // [spec:pgorm:req:sql.ddl.comment+5]
     pub fn comments(&self) -> Vec<CommentStatement> {
         let mut statements = Vec::new();
         if let Some(comment) = &self.comment {

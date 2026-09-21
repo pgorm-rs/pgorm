@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.comment+4/test]    both targets render, at every level of qualification
+// [spec:pgorm:req:sql.ddl.comment+5/test]    both targets render, at every level of qualification
 #[test]
 fn comment_statements_render_their_targets() {
     assert_eq!(
@@ -38,8 +38,9 @@ fn comment_statements_render_their_targets() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.comment+4/test]    comment text is a standard-conforming string literal:
-// only the single quote is escaped, by doubling
+// [spec:pgorm:req:sql.ddl.comment+5/test]    comment text is a string literal whose reading does
+// not depend on a server setting: quotes doubled, and an E-string with doubled
+// backslashes as soon as there is a backslash to read
 #[test]
 fn comment_text_is_a_quoted_literal() {
     assert_eq!(
@@ -47,16 +48,36 @@ fn comment_text_is_a_quoted_literal() {
         r#"COMMENT ON TABLE "glyph" IS 'it''s a ''quoted'' word'"#
     );
 
-    // Backslashes are literal in a standard-conforming string, so they pass through.
+    // A backslash is what the two readings of a literal disagree about, so text
+    // holding one is written as an E-string saying what it is.
     assert_eq!(
         Comment::on_table(Glyph::Table, r"C:\glyphs\ or \n").to_string(),
-        r#"COMMENT ON TABLE "glyph" IS 'C:\glyphs\ or \n'"#
+        r#"COMMENT ON TABLE "glyph" IS E'C:\\glyphs\\ or \\n'"#
     );
 
     // A statement-terminating attempt stays inside the literal.
     assert_eq!(
         Comment::on_table(Glyph::Table, "'; DROP TABLE glyph; --").to_string(),
         r#"COMMENT ON TABLE "glyph" IS '''; DROP TABLE glyph; --'"#
+    );
+
+    // The same attempt led by a backslash is what doubling alone cannot hold:
+    // under `standard_conforming_strings = off` the `\` would escape the first
+    // of the doubled quotes, leaving the second to close the literal and the
+    // rest to be read as SQL. The E-string spells the backslash out, so both
+    // readings agree the quote is content.
+    let rendered = Comment::on_table(Glyph::Table, r"\'; DROP TABLE glyph; --").to_string();
+    assert_eq!(
+        rendered,
+        r#"COMMENT ON TABLE "glyph" IS E'\\''; DROP TABLE glyph; --'"#
+    );
+    let body = rendered
+        .split_once("IS E'")
+        .and_then(|(_, rest)| rest.strip_suffix('\''))
+        .expect("the literal should be an E-string");
+    assert!(
+        !body.replace(r"\\", "").contains('\\'),
+        "every backslash must itself be escaped, or one could escape a quote: {rendered}"
     );
 
     assert_eq!(
@@ -76,7 +97,7 @@ fn comment_text_is_a_quoted_literal() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.comment+4/test]    one `TableName` value serves a comment target and a
+// [spec:pgorm:req:sql.ddl.comment+5/test]    one `TableName` value serves a comment target and a
 // DDL target, so a comment cannot name a table the DDL beside it could not
 #[test]
 fn comment_and_ddl_share_one_table_name() {
@@ -97,7 +118,7 @@ fn comment_and_ddl_share_one_table_name() {
     assert_eq!(name.table().to_string(), "glyph");
 }
 
-// [spec:pgorm:req:sql.ddl.comment+4/test]    a create statement renders the comments it carries,
+// [spec:pgorm:req:sql.ddl.comment+5/test]    a create statement renders the comments it carries,
 // table first then columns in order, each on the statement's own table
 #[test]
 fn create_statement_renders_the_comments_it_carries() {

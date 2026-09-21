@@ -289,7 +289,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Comments
 
-> [spec:pgorm:req:sql.ddl.comment+4]
+> [spec:pgorm:req:sql.ddl.comment+5]
 > A comment is a statement of its own on Postgres, not a clause of `CREATE
 > TABLE`, so `CommentStatement` is built separately from the DDL creating the
 > object it describes. `Comment::on_table(table, text)` and
@@ -301,16 +301,30 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > iden or a `(schema, table)` tuple — so a comment can only name a table the
 > DDL beside it could also name, and there is no conversion to fail.
 >
-> Rendering MUST emit `COMMENT ON TABLE <table> IS '<text>'` or
-> `COMMENT ON COLUMN <table>.<column> IS '<text>'`, where the table, schema
+> Rendering MUST emit `COMMENT ON TABLE <table> IS <text>` or
+> `COMMENT ON COLUMN <table>.<column> IS <text>`, where the table, schema
 > and column names render through `SqlName::prepare` (double-quoted,
-> embedded quotes doubled) and the text renders as a standard-conforming
-> string literal: wrapped in single quotes with every embedded single quote
-> doubled and nothing else altered — backslashes are literal, so no `E''`
-> prefix is used and the escaping of
-> `[spec:pgorm:req:sql.render.string-escape+1]` does not apply here. The text is
-> never a bind parameter (a DDL statement yields SQL alone), so this
-> quoting is the whole injection boundary for comment text.
+> embedded quotes doubled) and the text renders as a string literal: every
+> embedded single quote doubled, and nothing else altered *unless the text
+> holds a backslash*, in which case every backslash is doubled too and the
+> literal is written `E'<text>'`.
+>
+> The text is never a bind parameter (a DDL statement yields SQL alone), so
+> this quoting is the whole injection boundary for comment text — and a
+> boundary MUST NOT depend on a session setting. Doubling alone does.
+> `standard_conforming_strings` decides whether a backslash escapes the
+> character after it, so under `off` the text `\'` renders as `\''` and reads
+> as an escaped quote followed by a *closing* one, with everything after it
+> read as SQL. The setting is not hypothetical: `pgorm_pool::Config::options`
+> hands a caller's `-c` flags to the connection, so the session that executes
+> this DDL is reachable configuration rather than an assumption about the
+> server. Writing the backslashes out under an `E''` says what they are under
+> either reading; text with no backslash has nothing to disambiguate and MUST
+> keep the plain form, so the common rendering is unchanged.
+>
+> This is NOT `[spec:pgorm:req:sql.render.string-escape+1]`, which additionally
+> maps control characters to their `E''` spellings. Comment text is prose and a
+> newline in it is a newline; only what the grammar forces is rewritten.
 >
 > The comment text a `TableCreateStatement` carries — its own
 > (`[spec:pgorm:req:sql.ddl.create-table+8]`) and each `ColumnSpec::Comment`
