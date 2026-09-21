@@ -8207,6 +8207,7 @@ children (
                 id active-model-unknown-column
                 title "take and get refuse an unknown column the way set already does"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:27.346685Z
@@ -8220,6 +8221,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T15:28:21.192315Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
