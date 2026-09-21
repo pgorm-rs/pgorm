@@ -8209,6 +8209,7 @@ children (
                 id pool-savepoint-quoted
                 title "A savepoint name cannot smuggle SQL"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:25.119681Z
@@ -8222,6 +8223,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T17:04:49.769326Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
