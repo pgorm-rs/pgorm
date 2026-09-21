@@ -8010,6 +8010,7 @@ children (
                 title "Identity columns are what the word Identity means"
                 kind @feat
                 deps (query-name-vocabulary)
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:12:35.006019Z
@@ -8023,6 +8024,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T12:28:06.756925Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Delivered: ColumnSpec::Identity(IdentityGeneration { Always, ByDefault }) with IdentityGeneration::keyword() giving the ALWAYS / BY DEFAULT words information_schema.columns.identity_generation reports; ColumnDef::identity() and identity_by_default() beside auto_increment(), whose doc now names identity as the recommended form. Renders as a column clause in CREATE TABLE and ADD COLUMN, and as ALTER COLUMN \"c\" ADD GENERATED .. AS IDENTITY on modify. Exclusivity verdict: typed where it is local (which form is a closed pair, not a bool), documented where it is not. Identity vs Default/Generated/AutoIncrement are four separate explicit calls rather than a flag the API offers — unlike the stored: false that Generated used to advertise, nothing presents the combination as a choice — and collapsing them into one slot would move DEFAULT out of the insertion-ordered spec list the rule itself fixes, breaking every interleaved render. So the combinations render, the grammar takes them, the server refuses each by name, and tests/identity_column_tests.rs holds those three refusals so the boundary is checked rather than asserted. Sequence options ((START WITH ..) and the rest) boundary-noted in the rule: a sequence definition wearing a column clause, left to raw_suffix until a typed sequence builder exists. Derive/codegen scope NOT taken and now recorded: pgorm-codegen has no identity introspection at all — it refuses an identity clause by name (\"unsupported DDL: an identity clause on column ..\", sql_schema_tests.rs:293) — so there is no round-trip to complete, and #[pgorm(identity)] would need an entity-model concept beside auto_increment plus a PrimaryKeyTrait change, which is the auto_increment migration this node deliberately does not start. Incidental: the commit's function-density gate on column.rs (58 cap, at its pre-image) forced room, so the interval field/precision vocabulary moved to table/interval.rs, re-exported, no path change. sql.ddl.column-def +4 -> +5, 11 sites repinned; the bump also retired the stale Extra/extra wording left by query-raw-template-words."
+                    }
+
+                    {
+                        at 2026-09-21T12:28:09.876693Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
