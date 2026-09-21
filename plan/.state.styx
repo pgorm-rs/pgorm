@@ -1805,6 +1805,11 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id query-second-tier, covered_rules (
+        sql.scope
+    ), covered_claims (
+        {impl_name main, rule sql.scope}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

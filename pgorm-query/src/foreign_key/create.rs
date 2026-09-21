@@ -1,4 +1,4 @@
-use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
+use crate::{Deferrability, ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 
 /// Create a foreign key constraint for an existing table
 ///
@@ -98,7 +98,7 @@ use crate::{ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+4]
+// [spec:pgorm:req:sql.ddl.foreign-key+5]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
@@ -148,6 +148,33 @@ impl ForeignKeyCreateStatement {
     /// Set on update action
     pub fn on_update(&mut self, action: ForeignKeyAction) -> &mut Self {
         self.foreign_key.on_update(action);
+        self
+    }
+
+    /// Set when this key's check runs, and whether a transaction may move it
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
+    ///     .name(Name::runtime("FK_character_font"))
+    ///     .deferrability(Deferrability::DeferrableInitiallyDeferred)
+    ///     .to_string();
+    ///
+    /// assert_eq!(
+    ///     foreign_key,
+    ///     [
+    ///         r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_font""#,
+    ///         r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
+    ///         r#"DEFERRABLE INITIALLY DEFERRED"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    pub fn deferrability(&mut self, deferrability: Deferrability) -> &mut Self {
+        self.foreign_key.deferrability(deferrability);
         self
     }
 

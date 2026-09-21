@@ -13,7 +13,7 @@ use crate::types::*;
 /// referencing and referenced sides cannot disagree in length — a mismatch the
 /// grammar accepts and parse analysis rejects, and so one no parser oracle can
 /// catch. Further pairs are appended with [`TableForeignKey::col`].
-// [spec:pgorm:req:sql.ddl.foreign-key+4]
+// [spec:pgorm:req:sql.ddl.foreign-key+5]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<Name>,
@@ -23,6 +23,7 @@ pub struct TableForeignKey {
     pub(crate) rest: Vec<(Name, Name)>,
     pub(crate) on_delete: Option<ForeignKeyAction>,
     pub(crate) on_update: Option<ForeignKeyAction>,
+    pub(crate) deferrability: Option<Deferrability>,
 }
 
 /// Foreign key on update & on delete actions
@@ -33,6 +34,29 @@ pub enum ForeignKeyAction {
     SetNull,
     NoAction,
     SetDefault,
+}
+
+/// When a constraint's check runs, and whether a transaction may move it.
+///
+/// The three variants are PostgreSQL's three reachable states, not two
+/// independent flags: `INITIALLY DEFERRED` is only grammatical on a
+/// `DEFERRABLE` constraint, so the pair that would name a constraint both
+/// undeferrable and initially deferred does not construct
+/// (`[dec:pgorm:invalid-states-unrepresentable]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Deferrability {
+    /// `NOT DEFERRABLE` — checked at the end of every statement, and no
+    /// transaction can postpone it. This is the server's default, so it
+    /// renders only because a caller said it.
+    NotDeferrable,
+    /// `DEFERRABLE INITIALLY IMMEDIATE` — checked per statement like the
+    /// default, but `SET CONSTRAINTS ... DEFERRED` can move it to commit time
+    /// for the rest of a transaction.
+    DeferrableInitiallyImmediate,
+    /// `DEFERRABLE INITIALLY DEFERRED` — checked once, at commit. This is what
+    /// lets two tables reference each other, and what lets a batch reorder
+    /// rows through a state no single statement could hold.
+    DeferrableInitiallyDeferred,
 }
 
 impl TableForeignKey {
@@ -53,6 +77,7 @@ impl TableForeignKey {
             rest: Vec::new(),
             on_delete: None,
             on_update: None,
+            deferrability: None,
         }
     }
 
@@ -85,6 +110,12 @@ impl TableForeignKey {
     /// Set on update action
     pub fn on_update(&mut self, action: ForeignKeyAction) -> &mut Self {
         self.on_update = Some(action);
+        self
+    }
+
+    /// Set when this key's check runs
+    pub fn deferrability(&mut self, deferrability: Deferrability) -> &mut Self {
+        self.deferrability = Some(deferrability);
         self
     }
 

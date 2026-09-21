@@ -15,7 +15,7 @@ use pgorm_query::extension::{Extension, Type};
 // between the bound value and the keyword, so the offset reads as an offset
 // rather than as trailing junk after a numeric literal.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window+3/test]
+// [spec:pgorm:req:sql.render.window+4/test]
 #[test]
 fn window_frame_offset_renders_spaced() {
     let sql = Query::select()
@@ -39,8 +39,8 @@ fn window_frame_offset_renders_spaced() {
 // rejection it used to be pinned to is proved by the `compile_fail` doctest on
 // `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.ast.window-statement+3/test]
-// [spec:pgorm:req:sql.render.window+3/test]
+// [spec:pgorm:def:sql.ast.window-statement+4/test]
+// [spec:pgorm:req:sql.render.window+4/test]
 #[test]
 fn over_attaches_only_to_function_calls() {
     let sql = Query::select()
@@ -327,8 +327,8 @@ fn alias_identifiers_are_never_empty() {
 // for `SimpleExpr::LikePattern`, the one place the grammar admits it, so it can
 // no longer be applied to two arbitrary operands.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.render.operators+4/test]
-// [spec:pgorm:def:sql.types.opers+3/test]
+// [spec:pgorm:def:sql.render.operators+5/test]
+// [spec:pgorm:def:sql.types.opers+4/test]
 #[test]
 fn escape_renders_only_inside_like() {
     let sql = Query::select()
@@ -415,7 +415,7 @@ fn create_table_with_no_columns_is_valid() {
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 // [spec:pgorm:req:sql.ddl.alter-table+4/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+4/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+5/test]
 #[test]
 fn ddl_targets_are_taken_by_construction() {
     let rendered = [
@@ -473,7 +473,7 @@ fn index_name_and_drop_table_stay_optional() {
 // `compile_fail` doctests on `ForeignKeyCreateStatement` prove the constructor
 // refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+4/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+5/test]
 // [spec:pgorm:req:sql.ddl.create-table+8/test]
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {

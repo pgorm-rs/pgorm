@@ -15,7 +15,7 @@
 
 pub mod common;
 pub use common::{TestContext, setup::*};
-use pgorm::pgorm_query::{ColumnDef, Expr, Name, Table};
+use pgorm::pgorm_query::{ColumnDef, Expr, Name, Overriding, Query, Table};
 use pgorm::{ConnectionTrait, entity::prelude::*};
 
 #[pgorm_macros::test]
@@ -138,13 +138,16 @@ async fn always_refuses_an_explicit_value(db: &DatabaseConnection) -> Result<(),
     );
 
     // And the documented escape hatch still works, which is what makes the
-    // refusal a policy rather than an impossibility. This crate has no spelling
-    // for `OVERRIDING SYSTEM VALUE`; it is reachable as raw SQL.
-    db.execute(
-        "INSERT INTO id_always (id, label) OVERRIDING SYSTEM VALUE VALUES (99, 'c')",
-        &[],
-    )
-    .await?;
+    // refusal a policy rather than an impossibility — now spelled by the
+    // builder rather than by the raw SQL this test needed before
+    // `[spec:pgorm:def:sql.ast.insert+3]`.
+    let sql = Query::insert()
+        .into_table(Name::runtime("id_always"))
+        .columns([Name::runtime("id"), Name::runtime("label")])
+        .overriding(Overriding::SystemValue)
+        .values_panic([99.into(), "c".into()])
+        .to_string();
+    db.execute(&sql, &[]).await?;
     let row = db
         .query_one("SELECT count(*) FROM id_always WHERE id = 99", &[])
         .await?;

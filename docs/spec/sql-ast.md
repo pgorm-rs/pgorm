@@ -98,6 +98,131 @@ today, including panicking edges and deliberate failsafes.
 > a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+3]`) is
 > lost.
 
+## Scope
+
+> [spec:pgorm:req:sql.scope]
+> pgorm-query models the PostgreSQL a data-access layer writes, not the whole
+> of PostgreSQL, and the boundary MUST be written down rather than discovered.
+> A construct outside the builder is still reachable — `Expr::raw` and
+> `SqlTemplate` in expression position, `FromItem`'s raw relation in relation
+> position, and `ConnectionTrait::execute` / `batch_execute` for a whole
+> statement — so what follows records a decision about the *typed* surface,
+> never about what a caller can send. Each entry MUST carry a verdict and the
+> reason for it; "deferred" MUST additionally say what closing it would take,
+> because a deferral whose cost is unrecorded is indistinguishable from an
+> oversight. An entry graduates by being implemented and deleted from this
+> list, and a construct absent from both this list and the builder is a defect
+> in this rule, not a silent no.
+>
+> Three tests decide which verdict an entry gets. *Does the ORM need it to do
+> its job?* — the builder exists to render the statements an entity layer
+> issues, so a construct no ORM path emits is out of scope however ordinary it
+> is in SQL. *Does the typed form add anything over the raw one?* — a
+> construct with no options, no identifiers to quote and no values to bind is
+> a string, and wrapping a string in a builder buys nothing. *Is it a
+> statement or a vocabulary?* — a whole statement kind costs a new AST node, a
+> new renderer and a new `SubQueryStatement` arm; a clause on an existing
+> statement costs a field.
+>
+> **Deferred** — worth building, not built:
+>
+> - **`MERGE`.** A fifth statement kind: its own AST node, renderer, and
+>   `WHEN MATCHED` / `WHEN NOT MATCHED [BY SOURCE]` action list, plus a source
+>   relation that is already `FromItem`. `ON CONFLICT` covers the upsert that
+>   an ORM actually emits, which is why this ranks below its size.
+> - **`GROUPING SETS` / `ROLLUP` / `CUBE`.** `SelectStatement.groups` is a flat
+>   `Vec<SimpleExpr>`; these need a grouping-element tree (a set of sets, with
+>   the two shorthands as its constructors) and a renderer for it. The
+>   `GROUPING()` function that reads the result belongs with them.
+> - **Simple-form `CASE expr WHEN value`.** `CaseStatement` is searched-only:
+>   its arms hold a `Condition`. The operand form compares an expression
+>   against arm *values*, so the two arm shapes must not mix — closing this
+>   means either a second statement type or an arm enum, not a nullable
+>   operand field beside the existing arms.
+> - **Array subscripts and slices (`a[i]`, `a[i:j]`).** A new `SimpleExpr`
+>   variant with an index or a pair of optional bounds, plus an arm in the
+>   renderer's exhaustive match and a place in the atom list of
+>   `sql.render.precedence`. Arrays otherwise have their operators (`@>`,
+>   `<@`, `&&`, `||`) and their quantifiers (`ANY`, `ALL`).
+> - **Range and multirange types.** Absent end to end: no `Value` variant, no
+>   `ColumnType` variant, no `CREATE TYPE ... AS RANGE`. A range is a value
+>   with a discriminated subtype and two bound inclusivities, so it needs a
+>   `Value` variant that round-trips through tokio-postgres before any of the
+>   rest is useful; the operators it would be read with (`@>`, `<@`, `&&`)
+>   already exist. This is the largest deferred entry and the one that would
+>   most change `sql.value`.
+> - **`ON CONFLICT ON CONSTRAINT <name>`.** The arbiter today is index
+>   inference — a column or expression list with an optional `WHERE`
+>   (`sql.ast.on-conflict`) — and a named constraint takes neither. Closing it
+>   means splitting the arbiter into inference-or-constraint and giving the
+>   constraint form its own small typestate, so `and_column` and `and_where`
+>   stay unreachable from it; a variant inside `ConflictElement` would make
+>   both invalid states constructible.
+> - **Window frame `EXCLUDE` and expression offsets.** `Frame`'s offsets are
+>   `u32`, so `RANGE '1 day' PRECEDING` has no spelling; widening them to
+>   `SimpleExpr` is the honest fix and is a breaking change to a public enum.
+>   `EXCLUDE { CURRENT ROW | GROUP | TIES | NO OTHERS }` is a fourth field on
+>   `FrameClause`, but it is grammatical only inside a frame, so it needs a
+>   builder shape that cannot set it without one — the three existing
+>   positional `frame*` methods do not admit a fourth argument cleanly.
+> - **`COLLATE`.** Postfix, and its right operand is a collation *name*, not an
+>   expression, so it is a dedicated `SimpleExpr` variant holding a `Name` —
+>   the shape `AsEnum` uses — rather than a `BinOper`, which would admit
+>   `a COLLATE b` for arbitrary `b`. Wanted in three positions (expression,
+>   `ORDER BY`, column definition), and `pgorm-codegen` already refuses to read
+>   a column carrying one, so closing this is two changes in two crates.
+> - **Deferrability on constraints other than foreign keys.** `UNIQUE`,
+>   `PRIMARY KEY` and `CHECK` take the same clause, and reach the renderer
+>   through `ColumnSpec` and the index statements rather than through
+>   `TableForeignKey`. The foreign-key case is the one with a use an ORM meets
+>   — mutually referencing rows — which is why it is built and these are not.
+> - **`CREATE TYPE ... AS (composite)`.** Mechanical: a list of
+>   `(Name, ColumnType)` pairs and a render arm reusing the column-type
+>   renderer, beside the `AS ENUM` form that already exists. It waits on a
+>   consumer: nothing in the ORM decodes a composite value, so the DDL would
+>   create a type no entity could name.
+> - **Sequences.** `CREATE`/`ALTER`/`DROP SEQUENCE`, and the `START WITH` /
+>   `INCREMENT BY` / `CACHE` tail that `sql.ddl.column-def` currently routes
+>   through `raw_suffix`. One typed sequence builder closes both, and that
+>   rule already names this as where those options should land.
+>
+> **Out of scope** — not the builder's job:
+>
+> - **Partitioning DDL** (`PARTITION BY`, `PARTITION OF`, `ATTACH`/`DETACH`).
+>   A physical-layout decision made once per table by whoever owns the schema,
+>   with a large option surface and no values to bind. Migrations write it as
+>   raw SQL.
+> - **`EXCLUDE` constraints.** An operator-class-per-column constraint whose
+>   typed form would be most of an index builder again, for a constraint an
+>   entity layer never generates.
+> - **Views and materialized views.** A view is a stored query, so `CREATE
+>   VIEW` is one keyword wrapped around a `SelectStatement` a caller already
+>   has; the refresh and storage options on matviews are schema-ownership
+>   decisions like partitioning. What pgorm needs is to *read* views, which it
+>   does — an entity maps to a view as readily as to a table.
+> - **Table and column storage options** (`WITH (fillfactor = …)`,
+>   `TABLESPACE`, `SET STORAGE`). Physical tuning with no effect on any
+>   statement the ORM issues, and no identifier or value that needs quoting.
+> - **`GRANT` / `REVOKE`, and roles.** Privileges are an operational concern,
+>   granted by whoever administers the database rather than by the process
+>   reading from it; a library that can widen its own privileges is a hazard
+>   and not a feature.
+> - **Triggers and `CREATE FUNCTION`.** Both carry a body in another language
+>   (`plpgsql`, `sql`, C), which no expression AST can model — the body is an
+>   opaque string however it is delivered, so a builder around it is quoting
+>   with extra steps.
+> - **Row-level security policies.** Same shape as privileges, and a policy
+>   that the application can rewrite is not a security boundary.
+> - **`COPY`.** Protocol-level: `COPY ... FROM STDIN` is a distinct message
+>   flow, not a statement a renderer emits, so it belongs to the driver
+>   surface rather than to the query builder.
+> - **Procedural `DO` blocks.** A string of another language, as triggers are.
+> - **`CREATE DATABASE` / `CREATE SCHEMA` / `CREATE EXTENSION`'s neighbours.**
+>   Cluster-level administration, run once by an operator and outside any
+>   transaction. `CREATE EXTENSION` itself is the exception that proves the
+>   rule and is built (`sql.ddl.extension`), because an extension is what makes
+>   a *column type* available and so is reachable from an entity.
+
 ## SELECT statements
 
 > [spec:pgorm:def:sql.ast.select+2]
@@ -183,14 +308,22 @@ today, including panicking edges and deliberate failsafes.
 > `ConditionHolder`, so multi-part conditions built with `Condition::all`/`any`
 > render as chained `AND`/`OR` in the ON clause.
 
-> [spec:pgorm:sem:sql.ast.select.union]
+> [spec:pgorm:sem:sql.ast.select.union+1]
 > `union(UnionType, query)` appends one compound-query arm and `unions(iter)`
 > extends with many; arms accumulate in call order and are never merged or
-> deduplicated. `UnionType::All` renders `UNION ALL`, `UnionType::Distinct`
-> renders plain `UNION`, and `Intersect`/`Except` render the corresponding set
-> operators; each appended arm is rendered as a parenthesised SELECT after the
-> operator. The AST does not verify that the arms project the same columns —
-> that is left to PostgreSQL.
+> deduplicated. `UnionType` names all six of PostgreSQL's set operations —
+> each of the three operators in its duplicate-eliminating and its
+> duplicate-keeping form: `Distinct` renders `UNION` and `All` renders
+> `UNION ALL`, `Intersect`/`IntersectAll` render `INTERSECT`/`INTERSECT ALL`,
+> and `Except`/`ExceptAll` render `EXCEPT`/`EXCEPT ALL`. Each appended arm is
+> rendered as a parenthesised SELECT after the operator. The AST does not
+> verify that the arms project the same columns — that is left to PostgreSQL.
+>
+> The two UNION spellings are the inherited ones and MUST be documented on the
+> enum itself, because `All` beside `IntersectAll` reads as a modifier and is
+> not one: the four original names say which row set the operation yields,
+> where the two new ones name the operator. Renaming them to `Union`/`UnionAll`
+> is the fix that clause anticipates, not a defect it records.
 
 ## Ordering
 
@@ -288,19 +421,32 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
-> [spec:pgorm:req:sql.ast.expr.operators+2]
+> [spec:pgorm:req:sql.ast.expr.operators+3]
 > `Expr` and `SimpleExpr` MUST provide combinators that produce `Binary`/`Unary`
 > nodes: comparisons `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, plus
 > `equals`/`not_equals` for column-to-column comparison; arithmetic `add`,
 > `sub`, `mul`, `div`, `modulo`; bit shifts `left_shift`, `right_shift`;
-> `between`/`not_between`; `is_null`, `is_not_null`, `is`, `is_not`; logical
+> `between`/`not_between` and the bound-sorting
+> `between_symmetric`/`not_between_symmetric`; `is_null`, `is_not_null`, `is`,
+> `is_not`, and the null-safe `is_distinct_from`/`is_not_distinct_from`;
+> logical
 > `and`, `or`, and `not` (prefix `NOT`); string/pattern operators `like`,
 > `not_like`, `ilike`, `not_ilike` — a `LikeExpr` with an escape character MUST
 > render an `ESCAPE` clause whose character is an inline constant — and
 > `concat` (`||`).
 >
+> The null-safe pair is not a verbose spelling of `eq`/`ne`: under three-valued
+> logic `a <> b` is NULL whenever either side is, so a nullable column passes
+> neither the comparison nor its negation, and `IS DISTINCT FROM` is the only
+> form that answers true or false for every pair. `between_symmetric` likewise
+> exists for the failure it removes rather than for brevity — `BETWEEN` with
+> its bounds written in the wrong order matches nothing and reports no error.
+>
 > PostgreSQL-specific operators MUST be available: full-text `matches` (`@@`)
-> and containment `contains` (`@>`) / `contained` (`<@`). Containment and
+> and containment `contains` (`@>`) / `contained` (`<@`), and temporal
+> `at_time_zone`, whose right operand is an ordinary expression — a bound zone
+> name or a column of them — and whose direction follows the left operand's
+> type, as the server's operator does. Containment and
 > `concat` are type-general rather than string-specific — PostgreSQL defines
 > one `@>`, one `<@` and one `||` across arrays, ranges, `tsquery` and `jsonb`
 > alike — so these three combinators MUST also serve as the JSON containment
@@ -431,14 +577,15 @@ today, including panicking edges and deliberate failsafes.
 
 ## INSERT statements
 
-> [spec:pgorm:def:sql.ast.insert+2]
+> [spec:pgorm:def:sql.ast.insert+3]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
 > taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
 > column list (`columns`, which replaces any previous list), a value source, an
-> optional `OnConflict`, an optional `ReturningClause`, an optional WITH clause
+> optional `Overriding`, an optional `OnConflict`, an optional
+> `ReturningClause`, an optional WITH clause
 > attached by `with(..)` (`query.build.with`), and an optional
 > default-values row count. The value source (`InsertValueSource`) is either
 > `Values(Vec<Vec<SimpleExpr>>)` — multi-row VALUES accumulated one row per
@@ -450,6 +597,18 @@ today, including panicking edges and deliberate failsafes.
 > only when no columns and no values were supplied, rendering
 > `VALUES (DEFAULT)` repeated `n` times; when columns and values are present
 > the fallback is ignored.
+>
+> `overriding(Overriding)` sets the statement-scoped exemption an identity
+> column's generation clause is otherwise absolute about: `SystemValue`
+> accepts a supplied value for a `GENERATED ALWAYS AS IDENTITY` column that
+> would otherwise raise `428C9`, and `UserValue` discards one supplied to a
+> `BY DEFAULT` column. The two are the whole of PostgreSQL's
+> `OVERRIDING { SYSTEM | USER } VALUE`, so the slot is a closed pair rather
+> than a flag, and the last call wins. It belongs to the *statement* and not to
+> the column definition, which is why the exemption can exist at all without
+> weakening what `identity()` declares
+> (`[spec:pgorm:req:sql.ddl.column-def+5]`): the declaration still refuses every
+> insert that does not say this word.
 
 > [spec:pgorm:req:sql.ast.insert.arity]
 > `values(row)` MUST verify that the row length equals the declared column
@@ -624,15 +783,25 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+3]
+> [spec:pgorm:def:sql.ast.window-statement+4]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, and the `OverStatement` trait's
 > `partition_by_columns`), ORDER BY expressions (shared
 > `OrderedStatement` trait), and an optional `FrameClause` — a `FrameType`
-> (`Range` or `Rows`) with a start `Frame` and optional end `Frame`
+> with a start `Frame` and optional end `Frame`
 > (`UnboundedPreceding`, `Preceding(n)`, `CurrentRow`, `Following(n)`,
 > `UnboundedFollowing`), set via `frame_start` (single bound) or
 > `frame_between` (`BETWEEN .. AND ..`).
+>
+> `FrameType` is all three of PostgreSQL's frame modes — `Range`, `Rows`,
+> `Groups` — because the offset means something different under each and none
+> of the three is expressible through the others: `Rows` counts rows, `Range`
+> counts a distance in the ordering column's own values, and `Groups` counts
+> whole peer groups, so `GROUPS 1 PRECEDING` reaches back past every row tied
+> with the one before. Offsets are `u32` and bind as parameters, which is the
+> boundary this type keeps: an interval or expression offset
+> (`RANGE '1 day' PRECEDING`) and the `EXCLUDE` tail are both outside it
+> (`[spec:pgorm:req:sql.scope]`).
 >
 > A select projection references a window in one of two ways
 > (`WindowSelectType`): `Query` embeds the window inline (`expr_window`,

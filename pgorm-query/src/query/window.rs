@@ -37,11 +37,18 @@ pub enum Frame {
     UnboundedFollowing,
 }
 
-/// Frame type
+/// The unit a frame's offsets are counted in — PostgreSQL's three frame modes.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameType {
+    /// Offsets are values, compared against the ordering column: every peer of
+    /// a row is inside the frame with it.
     Range,
+    /// Offsets are row counts, so peers are split wherever the count falls.
     Rows,
+    /// Offsets are counts of *peer groups*: `GROUPS 1 PRECEDING` reaches back
+    /// one whole group of ties rather than one row, which `Rows` cannot say
+    /// and `Range` can only say for a value distance.
+    Groups,
 }
 
 /// Frame clause
@@ -57,7 +64,7 @@ pub struct FrameClause {
 /// # Reference
 ///
 /// <https://www.postgresql.org/docs/current/tutorial-window.html>
-// [spec:pgorm:def:sql.ast.window-statement+3]
+// [spec:pgorm:def:sql.ast.window-statement+4]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,

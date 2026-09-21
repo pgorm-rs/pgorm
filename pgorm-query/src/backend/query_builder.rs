@@ -79,7 +79,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`InsertStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.insert+1]
+    // [spec:pgorm:req:sql.render.insert+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_insert_statement(
         &self,
@@ -97,12 +97,22 @@ impl QueryBuilder {
             self.prepare_named_table(table, sql);
         }
 
+        // Grammatical in both source shapes, and written once so neither can
+        // drop it silently.
+        let overriding = insert.overriding.map(|overriding| match overriding {
+            Overriding::SystemValue => "OVERRIDING SYSTEM VALUE",
+            Overriding::UserValue => "OVERRIDING USER VALUE",
+        });
+
         if let (Some(num_rows), true, true) = (
             insert.default_values,
             insert.columns.is_empty(),
             insert.source.is_none(),
         ) {
             write!(sql, " ").unwrap();
+            if let Some(overriding) = overriding {
+                write!(sql, "{overriding} ").unwrap();
+            }
             self.insert_default_values(num_rows, sql);
         } else {
             write!(sql, " ").unwrap();
@@ -115,6 +125,10 @@ impl QueryBuilder {
                 false
             });
             write!(sql, ")").unwrap();
+
+            if let Some(overriding) = overriding {
+                write!(sql, " {overriding}").unwrap();
+            }
 
             if let Some(source) = &insert.source {
                 write!(sql, " ").unwrap();
@@ -156,10 +170,12 @@ impl QueryBuilder {
         sql: &mut dyn SqlWriter,
     ) {
         match union_type {
-            UnionType::Intersect => write!(sql, " INTERSECT (").unwrap(),
             UnionType::Distinct => write!(sql, " UNION (").unwrap(),
-            UnionType::Except => write!(sql, " EXCEPT (").unwrap(),
             UnionType::All => write!(sql, " UNION ALL (").unwrap(),
+            UnionType::Intersect => write!(sql, " INTERSECT (").unwrap(),
+            UnionType::IntersectAll => write!(sql, " INTERSECT ALL (").unwrap(),
+            UnionType::Except => write!(sql, " EXCEPT (").unwrap(),
+            UnionType::ExceptAll => write!(sql, " EXCEPT ALL (").unwrap(),
         }
         self.prepare_select_statement(select_statement, sql);
         write!(sql, ")").unwrap();
@@ -465,7 +481,7 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+4]
+    // [spec:pgorm:def:sql.render.operators+5]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
         if let Some(escape) = like.escape {
@@ -528,7 +544,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+3] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+4] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -641,7 +657,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+4] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+5] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -653,7 +669,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+4]
+    // [spec:pgorm:def:sql.render.operators+5]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -665,10 +681,14 @@ impl QueryBuilder {
                 BinOper::NotLike => "NOT LIKE",
                 BinOper::Is => "IS",
                 BinOper::IsNot => "IS NOT",
+                BinOper::IsDistinctFrom => "IS DISTINCT FROM",
+                BinOper::IsNotDistinctFrom => "IS NOT DISTINCT FROM",
                 BinOper::In => "IN",
                 BinOper::NotIn => "NOT IN",
                 BinOper::Between => "BETWEEN",
                 BinOper::NotBetween => "NOT BETWEEN",
+                BinOper::BetweenSymmetric => "BETWEEN SYMMETRIC",
+                BinOper::NotBetweenSymmetric => "NOT BETWEEN SYMMETRIC",
                 BinOper::Equal => "=",
                 BinOper::NotEqual => "<>",
                 BinOper::SmallerThan => "<",
@@ -706,6 +726,7 @@ impl QueryBuilder {
                 BinOper::HasAllJsonKeys => "?&",
                 BinOper::Regex => "~",
                 BinOper::RegexCaseInsensitive => "~*",
+                BinOper::AtTimeZone => "AT TIME ZONE",
                 BinOper::EuclideanDistance => "<->",
                 BinOper::NegativeInnerProduct => "<#>",
                 BinOper::CosineDistance => "<=>",
@@ -1259,7 +1280,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`Frame`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+3] (frame bounds)
+    // [spec:pgorm:req:sql.render.window+4] (frame bounds)
     fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
         match *frame {
             Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
@@ -1278,7 +1299,7 @@ impl QueryBuilder {
 
     /// Translate a [`WindowStatement`] into the parenthesized window
     /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
-    // [spec:pgorm:req:sql.render.window+3]
+    // [spec:pgorm:req:sql.render.window+4]
     fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         write!(sql, "( ").unwrap();
         self.prepare_window_statement(window, sql);
@@ -1286,7 +1307,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+3]
+    // [spec:pgorm:req:sql.render.window+4]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();
@@ -1314,6 +1335,7 @@ impl QueryBuilder {
             match frame.r#type {
                 FrameType::Range => write!(sql, " RANGE ").unwrap(),
                 FrameType::Rows => write!(sql, " ROWS ").unwrap(),
+                FrameType::Groups => write!(sql, " GROUPS ").unwrap(),
             };
             if let Some(end) = &frame.end {
                 write!(sql, "BETWEEN ").unwrap();
@@ -1327,7 +1349,7 @@ impl QueryBuilder {
     }
 
     /// Translate a binary expr to SQL.
-    // [spec:pgorm:req:sql.render.parens+2]
+    // [spec:pgorm:req:sql.render.parens+3]
     fn binary_expr(
         &self,
         left: &SimpleExpr,
@@ -2057,7 +2079,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+4]
+    // [spec:pgorm:req:sql.ddl.foreign-key+5]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -2069,7 +2091,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+4]
+    // [spec:pgorm:req:sql.ddl.foreign-key+5]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2124,6 +2146,20 @@ impl QueryBuilder {
         if let Some(foreign_key_action) = &create.foreign_key.on_update {
             write!(sql, " ON UPDATE ").unwrap();
             self.prepare_foreign_key_action(foreign_key_action, sql);
+        }
+
+        if let Some(deferrability) = &create.foreign_key.deferrability {
+            write!(
+                sql,
+                "{}",
+                match deferrability {
+                    Deferrability::NotDeferrable => " NOT DEFERRABLE",
+                    Deferrability::DeferrableInitiallyImmediate =>
+                        " DEFERRABLE INITIALLY IMMEDIATE",
+                    Deferrability::DeferrableInitiallyDeferred => " DEFERRABLE INITIALLY DEFERRED",
+                }
+            )
+            .unwrap();
         }
     }
 
@@ -2430,7 +2466,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+2]
+    // [spec:pgorm:def:sql.render.precedence+3]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2472,7 +2508,7 @@ impl QueryBuilder {
 
     /// The operators whose repetition renders flat: `a AND b AND c`,
     /// `a || b || c`.
-    // [spec:pgorm:req:sql.render.parens+2]
+    // [spec:pgorm:req:sql.render.parens+3]
     fn well_known_left_associative(&self, op: &BinOper) -> bool {
         matches!(
             op,
@@ -2492,7 +2528,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+2]
+// [spec:pgorm:def:sql.render.precedence+3]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

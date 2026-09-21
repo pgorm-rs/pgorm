@@ -479,14 +479,14 @@ pub trait IntoFromItem {
 }
 
 /// Unary operator
-// [spec:pgorm:def:sql.types.opers+3]
+// [spec:pgorm:def:sql.types.opers+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
-// [spec:pgorm:def:sql.types.opers+3]
+// [spec:pgorm:def:sql.types.opers+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -495,10 +495,23 @@ pub enum BinOper {
     NotLike,
     Is,
     IsNot,
+    /// `IS DISTINCT FROM`. Inequality that reads NULL as a value rather than
+    /// as unknown: two NULLs are not distinct, a NULL and a non-NULL are, and
+    /// the answer is never NULL.
+    IsDistinctFrom,
+    /// `IS NOT DISTINCT FROM`. The complement of
+    /// [`BinOper::IsDistinctFrom`], and so null-safe equality.
+    IsNotDistinctFrom,
     In,
     NotIn,
     Between,
     NotBetween,
+    /// `BETWEEN SYMMETRIC`. `BETWEEN` with its bounds sorted first, so the
+    /// range holds whichever order the two are given in.
+    BetweenSymmetric,
+    /// `NOT BETWEEN SYMMETRIC`. The complement of
+    /// [`BinOper::BetweenSymmetric`].
+    NotBetweenSymmetric,
     Equal,
     NotEqual,
     SmallerThan,
@@ -544,6 +557,10 @@ pub enum BinOper {
     Regex,
     /// `~*`. Regex operator with case insensitive matching.
     RegexCaseInsensitive,
+    /// `AT TIME ZONE`. Reinterprets a timestamp in the zone its right operand
+    /// names, converting between `timestamp` and `timestamptz` in whichever
+    /// direction the left operand's type calls for.
+    AtTimeZone,
     EuclideanDistance,
     NegativeInnerProduct,
     CosineDistance,

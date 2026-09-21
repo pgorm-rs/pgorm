@@ -551,7 +551,7 @@ explicit limitations.
 > Both conversions are total and MUST stay so: a `ColumnPairs` is non-empty and
 > balanced by construction and a foreign key is built from exactly that, so the
 > first pair goes to the constructor and the rest are appended
-> (`[spec:pgorm:req:sql.ddl.foreign-key+4]`). There is no unpaired or empty
+> (`[spec:pgorm:req:sql.ddl.foreign-key+5]`). There is no unpaired or empty
 > column set on either side of the conversion for it to fail on.
 
 ## Prelude

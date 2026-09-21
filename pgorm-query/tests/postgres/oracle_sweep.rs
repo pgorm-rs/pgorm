@@ -66,7 +66,7 @@ fn sweep_select_clause_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    expression rendering, including the parenthesis
 // elision of `sql.render.precedence`
-// [spec:pgorm:req:sql.render.parens+2/test]
+// [spec:pgorm:req:sql.render.parens+3/test]
 #[test]
 fn sweep_expression_shapes() {
     let exprs: Vec<SimpleExpr> = vec![
@@ -213,7 +213,9 @@ fn sweep_union_and_locking_shapes() {
         UnionType::Distinct,
         UnionType::All,
         UnionType::Intersect,
+        UnionType::IntersectAll,
         UnionType::Except,
+        UnionType::ExceptAll,
     ];
 
     let mut statements: Vec<String> = unions
@@ -281,7 +283,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window+3/test]
+// [spec:pgorm:req:sql.render.window+4/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {
@@ -330,7 +332,7 @@ fn sweep_window_function_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    INSERT, including ON CONFLICT and RETURNING
-// [spec:pgorm:req:sql.render.insert+1/test]
+// [spec:pgorm:req:sql.render.insert+2/test]
 // [spec:pgorm:req:sql.render.on-conflict+1/test]
 // [spec:pgorm:req:sql.render.returning+1/test]
 #[test]
@@ -597,7 +599,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+4/test]
+// [spec:pgorm:def:sql.render.operators+5/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [

@@ -261,10 +261,12 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+4]
+> [spec:pgorm:def:sql.render.operators+5]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
-> `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`, `IN`,
-> `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `AS`. Comparison: `=`, `<>`,
+> `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`,
+> `IS DISTINCT FROM`, `IS NOT DISTINCT FROM`, `IN`,
+> `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `BETWEEN SYMMETRIC`,
+> `NOT BETWEEN SYMMETRIC`, `AS`. Comparison: `=`, `<>`,
 > `<`, `>`, `<=`, `>=`. Arithmetic: `+`, `-`, `*`, `/`, `%`. Shift: `<<`,
 > `>>`. PostgreSQL-specific: `@@` (Matches), `@>` (Contains), `<@`
 > (Contained), `||` (Concatenate), `&&` (Overlap), `%` (Similarity), `<%`
@@ -273,7 +275,8 @@ an ideal Postgres renderer would emit.
 > (StrictWordSimilarityDistance), `->` (GetJsonField), `->>` (CastJsonField),
 > `#>` (GetJsonPath), `#>>` (CastJsonPath), `?` (HasJsonKey), `?|`
 > (HasAnyJsonKeys), `?&` (HasAllJsonKeys), `~` (Regex), `~*`
-> (RegexCaseInsensitive), and pgvector's `<->` (EuclideanDistance), `<#>`
+> (RegexCaseInsensitive), `AT TIME ZONE` (AtTimeZone), and pgvector's `<->`
+> (EuclideanDistance), `<#>`
 > (NegativeInnerProduct), `<=>` (CosineDistance).
 > `BinOper::Raw(op)` emits its operator text verbatim. Note the deliberate
 > lexeme collisions: `%` serves both Mod and Similarity, `<->` both
@@ -290,7 +293,7 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+2]
+> [spec:pgorm:def:sql.render.precedence+3]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -303,7 +306,12 @@ an ideal Postgres renderer would emit.
 > is an arithmetic (`* / % + -`) or shift (`<< >>`) binary and the outer
 > operator is a comparison, BETWEEN, IN, LIKE, or logical operator; or the
 > inner expression is a comparison, IN, LIKE, or IS binary and the outer
-> operator is logical (`AND`/`OR`/`NOT`). The Postgres-specific extension also
+> operator is logical (`AND`/`OR`/`NOT`). Each of those families is the whole
+> family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
+> `SYMMETRIC` forms, and IS is `IS`, `IS NOT`, `IS DISTINCT FROM` and
+> `IS NOT DISTINCT FROM` — a new operator added to one of these lexemes but
+> not to its `Oper` predicate is the failure mode this clause exists to name.
+> The Postgres-specific extension also
 > treats an inner `@>`, `<@`, `%` (similarity), `<%`, `<<%`, `@@`, `?`, `?|`,
 > or `?&` comparison as higher precedence than a logical outer operator — the
 > membership of that set is "returns boolean", which is why the JSON existence
@@ -311,7 +319,7 @@ an ideal Postgres renderer would emit.
 > return JSON or text) do not. All other combinations are considered unknown
 > and keep their parentheses.
 
-> [spec:pgorm:req:sql.render.parens+2]
+> [spec:pgorm:req:sql.render.parens+3]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by
 > default, dropping parentheses only in these cases. Left operand: dropped when
 > `sql.render.precedence` says the left is higher-precedence, or when the left
@@ -319,8 +327,13 @@ an ideal Postgres renderer would emit.
 > well-known left-associative (`AND`, `OR`, `+`, `-`, `*`, `%`, plus `||` for
 > Postgres) — so `a AND b AND c` and `a || b || c` render flat. Right operand:
 > dropped when higher-precedence, or under the one structural hack left for a
-> ternary construct encoded as nested binaries: the outer operator is
-> BETWEEN/NOT BETWEEN and the right is an `AND` binary (`x BETWEEN a AND b`).
+> ternary construct encoded as nested binaries: the outer operator is in the
+> BETWEEN family — `BETWEEN`, `NOT BETWEEN`, and the two `SYMMETRIC` forms —
+> and the right is an `AND` binary (`x BETWEEN a AND b`). The hack keys on
+> `Oper::is_between`, so membership of that predicate, not the lexeme, is what
+> decides: an operator whose text begins `BETWEEN` but which the predicate
+> does not name renders `x BETWEEN … (a AND b)`, which parses as a comparison
+> against a boolean rather than as a range test.
 > A unary `NOT` likewise wraps its operand
 > in parentheses unless the operand is higher-precedence per
 > `sql.render.precedence`.
@@ -399,7 +412,7 @@ an ideal Postgres renderer would emit.
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
 
-> [spec:pgorm:req:sql.render.window+3]
+> [spec:pgorm:req:sql.render.window+4]
 > A window specification is never emitted bare: `prepare_window_spec` wraps it
 > in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
 > way a specification reaches the sink. Both spelling sites therefore agree —
@@ -418,7 +431,8 @@ an ideal Postgres renderer would emit.
 > would be dead code standing in for a type.
 >
 > Within the parentheses a specification renders `PARTITION BY expr, …`, then
-> ` ORDER BY ` order-exprs, then the frame clause: ` RANGE ` or ` ROWS `,
+> ` ORDER BY ` order-exprs, then the frame clause: ` RANGE `, ` ROWS ` or
+> ` GROUPS `,
 > followed by either `BETWEEN start AND end` when an end bound exists or the
 > start bound alone. Frame bounds render `UNBOUNDED PRECEDING`,
 > `CURRENT ROW`, `UNBOUNDED FOLLOWING`; bounded offsets render the value —
@@ -505,7 +519,7 @@ an ideal Postgres renderer would emit.
 
 ## INSERT / UPDATE / DELETE
 
-> [spec:pgorm:req:sql.render.insert+1]
+> [spec:pgorm:req:sql.render.insert+2]
 > `prepare_insert_statement` MUST render: the statement's carried WITH clause
 > when it has one (`sql.render.cte`), then `INSERT` (or `REPLACE` when the
 > statement's replace flag is set — kept from the MySQL-era API even though
@@ -518,6 +532,14 @@ an ideal Postgres renderer would emit.
 > value row, or, for insert-from-select, the rendered SELECT statement. ON
 > CONFLICT (`sql.render.on-conflict`) and RETURNING (`sql.render.returning`)
 > follow.
+>
+> An `Overriding` renders `OVERRIDING SYSTEM VALUE` or `OVERRIDING USER VALUE`
+> immediately before the source, in *both* forms — PostgreSQL's grammar admits
+> the clause ahead of `DEFAULT VALUES` as readily as ahead of `VALUES` or a
+> query. The keyword MUST therefore be derived once, above the branch that
+> picks the form, rather than emitted inside one of them: the failure the
+> single derivation exists to prevent is the clause being silently dropped on
+> whichever path forgot it.
 
 > [spec:pgorm:req:sql.render.on-conflict+1]
 > When present, the conflict clause MUST render ` ON CONFLICT`, then its shape.

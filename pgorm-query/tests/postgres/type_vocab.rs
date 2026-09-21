@@ -238,7 +238,7 @@ fn named_from_item_forms_render() {
 
 // [spec:pgorm:def:sql.types.table-ref+4/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
-// [spec:pgorm:def:sql.ast.insert+2/test]
+// [spec:pgorm:def:sql.ast.insert+3/test]
 // [spec:pgorm:req:sql.ast.update+5/test]
 // [spec:pgorm:def:sql.ast.delete+4/test]
 #[test]
@@ -421,7 +421,7 @@ fn template_from_sql_reads_real_sql() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+3/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+4/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -432,7 +432,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+3/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+4/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -451,10 +451,14 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::NotILike, "NOT ILIKE"),
         (BinOper::Is, "IS"),
         (BinOper::IsNot, "IS NOT"),
+        (BinOper::IsDistinctFrom, "IS DISTINCT FROM"),
+        (BinOper::IsNotDistinctFrom, "IS NOT DISTINCT FROM"),
         (BinOper::In, "IN"),
         (BinOper::NotIn, "NOT IN"),
         (BinOper::Between, "BETWEEN"),
         (BinOper::NotBetween, "NOT BETWEEN"),
+        (BinOper::BetweenSymmetric, "BETWEEN SYMMETRIC"),
+        (BinOper::NotBetweenSymmetric, "NOT BETWEEN SYMMETRIC"),
         (BinOper::As, "AS"),
         (BinOper::Equal, "="),
         (BinOper::NotEqual, "<>"),
@@ -489,6 +493,7 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::HasAllJsonKeys, "?&"),
         (BinOper::Regex, "~"),
         (BinOper::RegexCaseInsensitive, "~*"),
+        (BinOper::AtTimeZone, "AT TIME ZONE"),
         (BinOper::EuclideanDistance, "<->"),
         (BinOper::NegativeInnerProduct, "<#>"),
         (BinOper::CosineDistance, "<=>"),
@@ -500,6 +505,67 @@ fn the_binary_operator_vocabulary_is_complete() {
             "unexpected rendering for {op:?}"
         );
     }
+}
+
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]    the null-safe comparisons join the IS family,
+// so they render bare under a logical operator rather than parenthesised
+#[test]
+fn null_safe_comparisons_bind_like_the_is_family() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).is_distinct_from(1))
+            .and_where(Expr::col(Glyph::Image).is_not_distinct_from("a"))
+            .to_string(),
+        [
+            r#"SELECT "id" FROM "glyph""#,
+            r#"WHERE "aspect" IS DISTINCT FROM 1 AND "image" IS NOT DISTINCT FROM 'a'"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]    SYMMETRIC is part of the operator, so the
+// ternary's `AND` still unwraps and the bounds render bare
+#[test]
+fn symmetric_between_keeps_its_bounds_unparenthesised() {
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).between_symmetric(10, 1))
+            .to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" BETWEEN SYMMETRIC 10 AND 1"#
+    );
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Glyph::Table)
+            .and_where(Expr::col(Glyph::Aspect).not_between_symmetric(10, 1))
+            .to_string(),
+        r#"SELECT "id" FROM "glyph" WHERE "aspect" NOT BETWEEN SYMMETRIC 10 AND 1"#
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]    AT TIME ZONE takes an ordinary expression on
+// the right, so a bound zone name and a column both reach it
+#[test]
+fn at_time_zone_takes_any_zone_expression() {
+    assert_eq!(
+        Query::select()
+            .expr(Expr::col(Glyph::Aspect).at_time_zone("UTC"))
+            .from(Glyph::Table)
+            .to_string(),
+        r#"SELECT "aspect" AT TIME ZONE 'UTC' FROM "glyph""#
+    );
+    assert_eq!(
+        Query::select()
+            .expr(Expr::col(Glyph::Aspect).at_time_zone(Expr::col(Glyph::Image)))
+            .from(Glyph::Table)
+            .to_string(),
+        r#"SELECT "aspect" AT TIME ZONE "image" FROM "glyph""#
+    );
 }
 
 // [spec:pgorm:def:sql.types.column-type+7/test]    `StringLen` parameterises varchar and the

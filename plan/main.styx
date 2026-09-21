@@ -7888,12 +7888,22 @@ children (
                 id query-second-tier
                 title "The long tail of PostgreSQL constructs is expressible or explicitly ruled out"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.scope])
+                }
                 log (
                     {
                         at 2026-09-19T23:12:37.402102Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "The remainder of the 2026-09-20 sufficiency checklist, tracked so each item is either made expressible or ruled out in a documented out-of-scope list rather than silently absent: MERGE; GROUPING SETS/ROLLUP/CUBE; IS DISTINCT FROM; simple-form CASE (query/case.rs:71 is searched-only); array subscripts and slices; range types (no Value or ColumnType variant — Custom only); ON CONFLICT ON CONSTRAINT; INTERSECT ALL / EXCEPT ALL (select.rs:102-107); window frame GROUPS mode, EXCLUDE clause, and expression offsets like RANGE '1 day' PRECEDING (query/window.rs:44-57); COLLATE; AT TIME ZONE; BETWEEN SYMMETRIC; OVERRIDING SYSTEM VALUE; deferrable constraints (foreign_key/create.rs:143-150); partitioning DDL; EXCLUDE constraints; views and materialized views; sequences; CREATE TYPE composite/range (stubs commented out at extension.rs:478-487); table/column storage options. Already ruled reasonably out of scope: GRANT/REVOKE, triggers, RLS policies, COPY (protocol-level), procedural DO blocks, CREATE DATABASE/SCHEMA. This node is the decomposition point — seal it once each item has its own child or its line in the out-of-scope doc."
+                    }
+
+                    {
+                        at 2026-09-21T12:56:06.33885Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

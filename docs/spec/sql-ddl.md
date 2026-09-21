@@ -437,12 +437,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+4]
+> [spec:pgorm:req:sql.ddl.foreign-key+5]
 > `TableForeignKey` holds the owning and referenced table names, a non-empty
 > list of `(column, referenced column)` pairs, an optional constraint name, and
 > optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
 > `Cascade`→`CASCADE`, `SetNull`→`SET NULL`, `NoAction`→`NO ACTION`,
-> `SetDefault`→`SET DEFAULT`). `TableForeignKey::new(table, column, ref_table,
+> `SetDefault`→`SET DEFAULT`), and an optional `Deferrability` saying when the
+> check runs. `TableForeignKey::new(table, column, ref_table,
 > ref_column)` — reached from a statement as `ForeignKey::create(..)` — takes
 > both tables and the first pair, and `col(column, ref_column)` appends further
 > pairs; there is no setter for either table and no constructor taking a column
@@ -457,9 +458,20 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > them would be a promise the name does not keep
 > (`[spec:pgorm:req:sql.ast+1]`). A second copy is `.to_owned()`.
 >
+> `Deferrability` is `NotDeferrable`, `DeferrableInitiallyImmediate` or
+> `DeferrableInitiallyDeferred` — PostgreSQL's three reachable states as one
+> closed choice rather than two independent flags, because `INITIALLY
+> DEFERRED` is grammatical only on a `DEFERRABLE` constraint and the pair
+> naming a key both undeferrable and initially deferred must not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Unset, the clause renders
+> nothing: `NOT DEFERRABLE` is the server's default, so a builder that emitted
+> it would be asserting a choice the caller did not make. The three differ only
+> in *when* the check runs, which no rendered text shows, so the distinction
+> belongs to the live suite rather than to a render assertion.
+>
 > The standalone statement MUST render `ALTER TABLE <from> ADD [CONSTRAINT
 > "name" ]FOREIGN KEY (cols) REFERENCES <to> (ref-cols)[ ON DELETE <action>]
-> [ ON UPDATE <action>]`; inside `CREATE TABLE` the same clause renders
+> [ ON UPDATE <action>][ <deferrability>]`; inside `CREATE TABLE` the same clause renders
 > without the `ALTER TABLE`/`ADD` prefix, and inside `ALTER TABLE` options
 > only the `ALTER TABLE` prefix is dropped. On the `CREATE TABLE` path the key
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`, as

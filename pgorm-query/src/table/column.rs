@@ -332,9 +332,11 @@ impl ColumnDef {
     ///
     /// The server refuses an explicit value for the column, which is what makes
     /// this the safe default: a row cannot silently claim a key the sequence
-    /// does not know it handed out. `OVERRIDING SYSTEM VALUE` is the deliberate
-    /// override, and this crate has no spelling for it
-    /// (`[spec:pgorm:req:sql.ddl.column-def+5]`).
+    /// does not know it handed out. The deliberate override is spelled on the
+    /// statement rather than here — [`crate::InsertStatement::overriding`]
+    /// with [`crate::Overriding::SystemValue`] — so one insert is exempted, not
+    /// the column's declaration that is weakened
+    /// (`[spec:pgorm:def:sql.ast.insert+3]`).
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};

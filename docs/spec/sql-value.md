@@ -380,11 +380,14 @@ including panic semantics and quirks inherited from sea-query.
 > position is a type error for the same reason
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
-> [spec:pgorm:def:sql.types.opers+3]
+> [spec:pgorm:def:sql.types.opers+4]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
 > operator vocabulary: logical `And`/`Or`; pattern `Like`/`NotLike` plus
-> Postgres `ILike`/`NotILike`; `Is`/`IsNot`; `In`/`NotIn`;
-> `Between`/`NotBetween`; comparisons `Equal`, `NotEqual`, `SmallerThan`,
+> Postgres `ILike`/`NotILike`; the IS family `Is`/`IsNot` and the null-safe
+> `IsDistinctFrom`/`IsNotDistinctFrom`; `In`/`NotIn`;
+> `Between`/`NotBetween` and their bound-sorting
+> `BetweenSymmetric`/`NotBetweenSymmetric`; comparisons `Equal`, `NotEqual`,
+> `SmallerThan`,
 > `GreaterThan`, `SmallerThanOrEqual`, `GreaterThanOrEqual`; arithmetic
 > `Add`/`Sub`/`Mul`/`Div`/`Mod`; shifts `LShift`/`RShift`; `As`;
 > full-text/containment `Matches`, `Contains`, `Contained`; `Concatenate`,
@@ -393,7 +396,8 @@ including panic semantics and quirks inherited from sea-query.
 > `GetJsonField` (`->`), `CastJsonField` (`->>`), `GetJsonPath` (`#>`) and
 > `CastJsonPath` (`#>>`); JSON key existence `HasJsonKey` (`?`),
 > `HasAnyJsonKeys` (`?|`) and `HasAllJsonKeys` (`?&`); regex `Regex` (`~`) and
-> `RegexCaseInsensitive` (`~*`); pgvector distances `EuclideanDistance`,
+> `RegexCaseInsensitive` (`~*`); temporal `AtTimeZone`; pgvector distances
+> `EuclideanDistance`,
 > `NegativeInnerProduct`, `CosineDistance`; and an escape hatch
 > `Raw(&'static str)`. There is no `Escape` operator: `ESCAPE` is
 > grammatical only as the tail of a `LIKE` pattern, so it belongs to
@@ -404,6 +408,18 @@ including panic semantics and quirks inherited from sea-query.
 > `Contained` and `Concatenate` already render `@>`, `<@` and `||`, which are
 > the operators PostgreSQL defines for `jsonb` as well as for arrays and
 > ranges (`sql.ast.expr.operators`).
+>
+> `BetweenSymmetric` and `NotBetweenSymmetric` are variants rather than
+> `Raw("BETWEEN SYMMETRIC")` because the renderer classifies the *variant*,
+> not the lexeme: `Oper::is_between` is what unwraps the `AND` binary a
+> BETWEEN's two bounds are encoded as (`sql.render.parens`), so a symmetric
+> form written through `Raw` renders `x BETWEEN SYMMETRIC (a AND b)` — a
+> statement the grammar accepts and reads as a boolean comparison. The same
+> argument applies to `IsDistinctFrom`/`IsNotDistinctFrom` and `Oper::is_is`,
+> though there the cost of missing the family is only parentheses. It is the
+> general rule for this enum: an operator whose parenthesisation differs from
+> the default MUST have a variant, and `Raw` is for operators the renderer has
+> no reason to look at.
 
 ## Column type vocabulary
 

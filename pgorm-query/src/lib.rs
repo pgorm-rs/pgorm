@@ -642,6 +642,14 @@
 // [spec:pgorm:req:sql.surface/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
+//
+// What this list does NOT name is a decision as much as what it does, and the
+// constructs outside it are enumerated with their reasons rather than left to
+// be discovered — each either deferred with its cost or ruled out with its
+// argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
+// hatches that keep every one of them reachable, so the boundary is about
+// which SQL gets a type here, never about which SQL a caller can send.
+// [spec:pgorm:req:sql.scope]
 mod backend;
 mod comment;
 pub mod error;
@@ -698,10 +706,10 @@ pub use value::{
 pub use query::{
     AnyWithClause, CaseStatement, CommonTableExpression, Condition, ConditionExpression,
     ConditionType, ConditionalStatement, Cycle, DeleteStatement, Frame, FrameClause, FrameType,
-    InsertStatement, IntoCondition, LockBehavior, LockType, OrderedStatement, OverStatement, Query,
-    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, Search, SearchOrder,
-    SelectExpr, SelectStatement, SubQueryStatement, UnionType, UpdateStatement, WindowSelectType,
-    WindowStatement, WithClause,
+    InsertStatement, IntoCondition, LockBehavior, LockType, OrderedStatement, OverStatement,
+    Overriding, Query, QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause,
+    Search, SearchOrder, SelectExpr, SelectStatement, SubQueryStatement, UnionType,
+    UpdateStatement, WindowSelectType, WindowStatement, WithClause,
 };
 pub use query::{
     ConflictAction, ConflictAssignment, ConflictAssignments, ConflictElement, ConflictTarget,
@@ -712,8 +720,8 @@ pub use types::{NullOrdering, Order, OrderExpr};
 // Schema statements: the DDL builders and the column vocabulary they share.
 pub use comment::{Comment, CommentStatement, CommentTarget};
 pub use foreign_key::{
-    ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, ForeignKeyDropStatement,
-    TableForeignKey,
+    Deferrability, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement,
+    ForeignKeyDropStatement, TableForeignKey,
 };
 pub use index::{
     Index, IndexColumn, IndexColumnTarget, IndexCreateStatement, IndexDropStatement, IndexKind,

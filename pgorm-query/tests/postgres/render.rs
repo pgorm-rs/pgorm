@@ -260,6 +260,79 @@ fn a_display_only_ddl_statement_inlines_its_values() {
     );
 }
 
+// [spec:pgorm:sem:query.build.union+1/test]    each of PostgreSQL's three set operators renders in
+// both its duplicate-eliminating and its duplicate-keeping spelling
+#[test]
+fn every_set_operation_renders_in_both_spellings() {
+    for (union, keyword) in [
+        (UnionType::Distinct, "UNION"),
+        (UnionType::All, "UNION ALL"),
+        (UnionType::Intersect, "INTERSECT"),
+        (UnionType::IntersectAll, "INTERSECT ALL"),
+        (UnionType::Except, "EXCEPT"),
+        (UnionType::ExceptAll, "EXCEPT ALL"),
+    ] {
+        assert_eq!(
+            Query::select()
+                .column(Glyph::Id)
+                .from(Glyph::Table)
+                .union(
+                    union,
+                    Query::select().column(Glyph::Id).from(Glyph::Table).take()
+                )
+                .to_string(),
+            format!(r#"SELECT "id" FROM "glyph" {keyword} (SELECT "id" FROM "glyph")"#)
+        );
+    }
+}
+
+// [spec:pgorm:req:sql.render.insert+2/test]    OVERRIDING sits between the column list and the
+// source, and reaches the DEFAULT VALUES shape as well as the two that carry columns
+#[test]
+fn overriding_renders_before_whichever_source_follows_it() {
+    let inserted = |overriding| {
+        Query::insert()
+            .into_table(Glyph::Table)
+            .columns([Glyph::Id, Glyph::Aspect])
+            .overriding(overriding)
+            .values_panic([7.into(), 1.into()])
+            .to_string()
+    };
+
+    assert_eq!(
+        inserted(Overriding::SystemValue),
+        r#"INSERT INTO "glyph" ("id", "aspect") OVERRIDING SYSTEM VALUE VALUES (7, 1)"#
+    );
+    assert_eq!(
+        inserted(Overriding::UserValue),
+        r#"INSERT INTO "glyph" ("id", "aspect") OVERRIDING USER VALUE VALUES (7, 1)"#
+    );
+
+    assert_eq!(
+        Query::insert()
+            .into_table(Glyph::Table)
+            .columns([Glyph::Id])
+            .overriding(Overriding::SystemValue)
+            .select_from(Query::select().column(Glyph::Id).from(Glyph::Table).take())
+            .unwrap()
+            .to_string(),
+        [
+            r#"INSERT INTO "glyph" ("id") OVERRIDING SYSTEM VALUE"#,
+            r#"SELECT "id" FROM "glyph""#,
+        ]
+        .join(" ")
+    );
+
+    assert_eq!(
+        Query::insert()
+            .into_table(Glyph::Table)
+            .overriding(Overriding::SystemValue)
+            .or_default_values()
+            .to_string(),
+        r#"INSERT INTO "glyph" OVERRIDING SYSTEM VALUE VALUES (DEFAULT)"#
+    );
+}
+
 // [spec:pgorm:def:sql.render.writer+2/test]    `String` is the inline-rendering sink: `push_param`
 // appends the value as a literal, and it takes the default `push_param_source_typed`
 #[test]

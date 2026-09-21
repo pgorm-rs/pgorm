@@ -93,13 +93,28 @@ pub(crate) struct LockClause {
     pub(crate) behavior: Option<LockBehavior>,
 }
 
-/// List of union types that can be used in union clause
+/// The set operation joining two SELECTs.
+///
+/// PostgreSQL gives each of its three set operators a duplicate-eliminating
+/// form and a duplicate-keeping `ALL` form, and all six are here. Read the two
+/// UNION spellings carefully: `Distinct` is `UNION` and `All` is `UNION ALL` —
+/// the inherited names say which *row set* the operation yields rather than
+/// naming the operator, so `All` is UNION's `ALL` form and not a modifier that
+/// applies to the others.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnionType {
-    Intersect,
+    /// `UNION`
     Distinct,
-    Except,
+    /// `UNION ALL`
     All,
+    /// `INTERSECT`
+    Intersect,
+    /// `INTERSECT ALL`
+    IntersectAll,
+    /// `EXCEPT`
+    Except,
+    /// `EXCEPT ALL`
+    ExceptAll,
 }
 
 impl SelectStatement {
@@ -558,7 +573,7 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+3]
+    // [spec:pgorm:def:sql.ast.window-statement+4]
     pub fn expr_window(&mut self, func: FunctionCall, window: WindowStatement) -> &mut Self {
         self.expr(SelectExpr {
             expr: func.into(),
@@ -589,7 +604,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+3]
+    // [spec:pgorm:def:sql.ast.window-statement+4]
     pub fn expr_window_as<A>(
         &mut self,
         func: FunctionCall,
@@ -628,7 +643,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+3]
+    // [spec:pgorm:def:sql.ast.window-statement+4]
     pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
     where
         W: IntoName,
@@ -659,7 +674,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+3]
+    // [spec:pgorm:def:sql.ast.window-statement+4]
     pub fn expr_window_name_as<W, A>(
         &mut self,
         func: FunctionCall,
@@ -1792,7 +1807,7 @@ impl SelectStatement {
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4)"#
     /// );
     /// ```
-    // [spec:pgorm:sem:sql.ast.select.union]
+    // [spec:pgorm:sem:sql.ast.select.union+1]
     pub fn union(&mut self, union_type: UnionType, query: SelectStatement) -> &mut Self {
         self.unions.push((union_type, query));
         self

@@ -124,7 +124,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > names a referenced table, so that read cannot fail and the
 > ``TransformError("... referenced table should not be empty")`` that stood in
 > for the tableless case is gone with the state it guarded
-> (`[spec:pgorm:req:sql.ddl.foreign-key+4]`), and MUST NOT come back: the
+> (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and MUST NOT come back: the
 > conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
 >
 > The reference and collision checks run over the tables as read, before
@@ -783,7 +783,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > its columns, referenced table and referenced columns, and both forms keep the
 > constraint name. A foreign key whose two column lists differ in length is a
 > named rejection rather than a truncated key — the pairs are what the bridged
-> statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key+4]`), and
+> statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and
 > Postgres itself rejects the mismatch at parse analysis.
 > Referential actions map `RESTRICT`, `CASCADE`, `SET NULL` and
 > `SET DEFAULT` onto `ForeignKeyAction`. `NO ACTION` reads as no action

@@ -32,10 +32,17 @@ impl Oper {
         )
     }
 
+    /// The BETWEEN family, symmetric forms included. Membership is what makes
+    /// `x BETWEEN a AND b` render its bounds bare rather than parenthesised
+    /// (`[spec:pgorm:req:sql.render.parens+3]`), so a form left out of this
+    /// list renders as the wrong statement, not merely a noisy one.
     pub(crate) fn is_between(&self) -> bool {
         matches!(
             self,
-            Oper::BinOper(BinOper::Between) | Oper::BinOper(BinOper::NotBetween)
+            Oper::BinOper(BinOper::Between)
+                | Oper::BinOper(BinOper::NotBetween)
+                | Oper::BinOper(BinOper::BetweenSymmetric)
+                | Oper::BinOper(BinOper::NotBetweenSymmetric)
         )
     }
 
@@ -53,10 +60,15 @@ impl Oper {
         )
     }
 
+    /// The IS family: predicates that read NULL as a value rather than as
+    /// unknown, and so always answer true or false.
     pub(crate) fn is_is(&self) -> bool {
         matches!(
             self,
-            Oper::BinOper(BinOper::Is) | Oper::BinOper(BinOper::IsNot)
+            Oper::BinOper(BinOper::Is)
+                | Oper::BinOper(BinOper::IsNot)
+                | Oper::BinOper(BinOper::IsDistinctFrom)
+                | Oper::BinOper(BinOper::IsNotDistinctFrom)
         )
     }
 

@@ -1081,7 +1081,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+2/test]
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1124,8 +1124,8 @@ fn select_62() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.insert+2/test]
-// [spec:pgorm:req:sql.render.insert+1/test]
+// [spec:pgorm:def:sql.ast.insert+3/test]
+// [spec:pgorm:req:sql.render.insert+2/test]
 // [spec:pgorm:def:sql.render.value-literals+4/test]
 #[test]
 #[allow(clippy::approx_constant)]
@@ -1827,7 +1827,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+4/test]
+// [spec:pgorm:def:sql.render.operators+5/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -1916,7 +1916,7 @@ fn select_custom_operator() {
     );
 }
 
-// [spec:pgorm:sem:sql.ast.select.union/test]
+// [spec:pgorm:sem:sql.ast.select.union+1/test]
 #[test]
 fn union_1() {
     assert_eq!(
@@ -1989,7 +1989,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+2/test]
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2083,7 +2083,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+2/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+3/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2140,7 +2140,7 @@ fn empty_json_key_list_is_typed_array() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+2/test]    `@>`, `<@` and `||` are one
+// [spec:pgorm:req:sql.ast.expr.operators+3/test]    `@>`, `<@` and `||` are one
 // operator each across every type that has them, so the JSON family names no
 // duplicate: these are already the JSON containment and merge tests
 #[test]
@@ -2202,7 +2202,7 @@ fn regex_case_insensitive_bin_oper() {
 }
 
 #[test]
-// [spec:pgorm:req:sql.render.parens+2/test]
+// [spec:pgorm:req:sql.render.parens+3/test]
 fn test_issue_674_nested_logical() {
     let t = SimpleExpr::Value(true.into());
     let f = SimpleExpr::Value(false.into());
@@ -2223,7 +2223,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+2/test]
+// [spec:pgorm:def:sql.render.precedence+3/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());

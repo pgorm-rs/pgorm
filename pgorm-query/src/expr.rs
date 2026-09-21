@@ -8,6 +8,8 @@ use crate::{error::Result, func::*, query::*, template::SqlTemplate, types::*, v
 
 #[path = "expr_json.rs"]
 mod json;
+#[path = "expr_keyword_operators.rs"]
+mod keyword_operators;
 #[path = "expr_membership.rs"]
 mod membership;
 
@@ -850,7 +852,7 @@ impl Expr {
     where
         V: Into<SimpleExpr>,
     {
-        self.between_or_not_between(BinOper::Between, a, b)
+        self.between_bounds(BinOper::Between, a, b)
     }
 
     /// Express a `NOT BETWEEN` expression.
@@ -875,10 +877,13 @@ impl Expr {
     where
         V: Into<SimpleExpr>,
     {
-        self.between_or_not_between(BinOper::NotBetween, a, b)
+        self.between_bounds(BinOper::NotBetween, a, b)
     }
 
-    fn between_or_not_between<V>(self, op: BinOper, a: V, b: V) -> SimpleExpr
+    /// The shared shape of the BETWEEN family: a ternary construct encoded as
+    /// a binary whose right operand is an `AND` binary, which the renderer
+    /// unwraps for any operator its `is_between` predicate recognises.
+    fn between_bounds<V>(self, op: BinOper, a: V, b: V) -> SimpleExpr
     where
         V: Into<SimpleExpr>,
     {
@@ -1048,7 +1053,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+2]
+    // [spec:pgorm:req:sql.ast.expr.operators+3]
     pub fn binary<O, T>(self, op: O, right: T) -> SimpleExpr
     where
         O: Into<BinOper>,
@@ -1949,7 +1954,7 @@ impl SimpleExpr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+2]
+    // [spec:pgorm:req:sql.ast.expr.operators+3]
     pub fn binary<O, T>(self, op: O, right: T) -> Self
     where
         O: Into<BinOper>,
