@@ -210,7 +210,7 @@ chapter is stated twice anywhere else.
 > `PinBoxSendStream<'db, Result<Item, Error>>` with lazy per-item decode
 > (`[spec:pgorm:sem:exec.stream.decode+1]`). Pagination and `count` reach
 > the graph through `PaginatorTrait` over the same selector
-> (`[spec:pgorm:def:exec.paginator+2]`); page boundaries fall between
+> (`[spec:pgorm:def:exec.paginator+3]`); page boundaries fall between
 > *rows*, not between root models, so a root with several matching slot
 > rows spans pages exactly as the underlying SQL does — the grouped read
 > (`[spec:pgorm:sem:query.graph.grouped+1]`) is deliberately not paginable,

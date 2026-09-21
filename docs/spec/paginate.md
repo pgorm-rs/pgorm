@@ -358,20 +358,29 @@ bound parameter is held to.
 
 ## Offset pagination (`exec.paginator`)
 
-> [spec:pgorm:def:exec.paginator+2]
-> `Paginator<'db, C, S>` holds either the `SelectStatement` to page over
-> or the report explaining why the source could not be turned into one,
-> plus a zero-based current `page`, a `page_size`, a borrowed connection,
-> and a phantom selector. Carrying the failure rather than a stand-in
-> statement is what lets `paginate` — whose signature returns no `Result`
-> — accept a source it cannot page over without panicking and without
-> inventing SQL to send in its place.
+> [spec:pgorm:def:exec.paginator+3]
+> `Paginator<'db, C, S>` holds the `SelectStatement` to page over, a
+> zero-based current `page`, a `page_size`, a borrowed connection, and a
+> phantom selector. It MUST NOT hold a failure in place of that
+> statement: a paginator that exists is one that pages, and every reason
+> a source could not be turned into a statement is settled before one is
+> constructed.
 > `ItemsAndPagesNumber` carries `number_of_items` and `number_of_pages`.
-> `PaginatorTrait::paginate(db, page_size)` constructs a paginator and is
-> implemented for `Selector<S>`, `SelectorRaw<S>`, `Select<E>` (via
-> `into_model`), and `SelectGraph<E, S>` (via its own selector,
-> `[spec:pgorm:sem:query.graph.terminals+1]`). The trait also provides
-> `count`, defined as `paginate(db, 1).num_items()`.
+> `PaginatorTrait::paginate(db, page_size)` constructs a paginator
+> infallibly and is implemented for exactly the sources whose statement
+> the builder produced and which therefore cannot fail to page:
+> `Selector<S>`, `Select<E>` (via `into_model`), and `SelectGraph<E, S>`
+> (via its own selector, `[spec:pgorm:sem:query.graph.terminals+1]`). The
+> trait also provides `count`, defined as `paginate(db, 1).num_items()`.
+>
+> `SelectorRaw<S>` — whose statement is the caller's own text — MUST NOT
+> implement the trait, and paginates instead through its own inherent
+> `paginate(db, page_size) -> Result<Paginator, Error>` and
+> `count(db) -> Result<u64, Error>`
+> (`[spec:pgorm:sem:exec.paginator.raw+5]`). The distinction is carried by
+> the type rather than by a `Result` on every call site: a builder-backed
+> caller has no failure to handle and is not made to write one, and a raw
+> caller cannot reach a page without having handled theirs.
 > `PinBoxStream` is the pinned boxed stream alias returned by
 > `into_stream`.
 
@@ -385,7 +394,7 @@ bound parameter is held to.
 > by construction, and `PaginatorTrait::count` names its page size of
 > one as `NonZeroU64::MIN` rather than a literal the type would refuse.
 
-> [spec:pgorm:sem:exec.paginator.fetch+2]
+> [spec:pgorm:sem:exec.paginator.fetch+3]
 > `fetch_page(page)` executes a clone of the query with
 > `LIMIT page_size OFFSET page_size * page`; pages are zero-indexed and
 > the paginator's own cursor is not consulted or advanced. The offset is
@@ -393,9 +402,14 @@ bound parameter is held to.
 > fit a `u64` is an `Error::Query`, not a debug-build panic and not a
 > release-build wrap to a small offset that would silently serve the
 > wrong rows. Rows are decoded through the selector, aborting on the
-> first decode error. `fetch()` is `fetch_page(cur_page())`; `next()`
-> increments the page counter without fetching; `cur_page()` reports it,
-> starting at 0.
+> first decode error. `fetch()` is `fetch_page(cur_page())`; `cur_page()`
+> reports the counter, starting at 0.
+>
+> The step that moves the counter without fetching MUST be called
+> `advance()`, not `next()`. It performs no I/O, returns nothing, and is
+> not `Iterator::next`; sitting beside `fetch_and_next`
+> (`[spec:pgorm:sem:exec.paginator.iterate]`), which is the call that
+> does read, a `next()` reads at a call site as the fetch it is not.
 
 > [spec:pgorm:sem:exec.paginator.count]
 > `num_items` counts by wrapping the paginator's query — with limit,
@@ -418,7 +432,7 @@ bound parameter is held to.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw+4]
+> [spec:pgorm:sem:exec.paginator.raw+5]
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` 6.2.0 the render oracle and `sql!` use
@@ -485,8 +499,20 @@ bound parameter is held to.
 >
 > Everything else — text the grammar rejects, a `;`-separated script, an
 > `INSERT`/`UPDATE`/`DELETE`/DDL statement, a `SELECT ... INTO` — is
-> neither a panic nor mangled SQL sent to the server. `paginate` records
-> the reason, and every reader that can report it (`fetch_page`, and
-> `num_items` with the page counts derived from it) returns it as a
-> `Error::Query` naming what the statement actually parsed as, using
-> PostgreSQL's own node name for anything it has no SQL keyword for.
+> neither a panic nor mangled SQL sent to the server.
+>
+> Every one of these refusals MUST be returned by `paginate` itself, as an
+> `Error::Query` naming what the statement actually parsed as — using
+> PostgreSQL's own node name for anything it has no SQL keyword for — and
+> MUST NOT be recorded in the constructed paginator for a later reader to
+> replay. `SelectorRaw`'s `paginate` therefore returns
+> `Result<Paginator, Error>` and its `count` returns `Result<u64, Error>`,
+> which is why `SelectorRaw` does not implement `PaginatorTrait`
+> (`[spec:pgorm:def:exec.paginator+3]`). The failure belongs to the caller
+> who supplied the statement, at the call that supplied it: a paginator
+> handed back to that caller has already been proven to page, so
+> `fetch_page`, `fetch`, `num_items`, `num_pages` and `into_stream`
+> report only what the *database* answered, and a statement that was never
+> pageable cannot reach any of them. Deferring it instead would make a
+> `paginate` that returns no `Result` a claim the type could not keep,
+> and would report one authoring mistake once per reader rather than once.

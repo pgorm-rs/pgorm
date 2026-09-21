@@ -8187,6 +8187,13 @@ children (
                         kind @note
                         text "Two defects on one type. Paginator::next (src/executor/paginator.rs:228) is pub fn next(&mut self) { self.page += 1; } — no I/O, no return value, not Iterator::next — sitting beside fetch_and_next (:262), which is what actually fetches; tests/paginator_tests.rs:83 already shows the bare paginator.next(); statement reading like a fetch. Rename to advance. Second: PaginatorTrait::paginate for SelectorRaw is infallible-typed but stores wrap_raw_select's Result into the pub(crate) field (:371-373, :34), so an unparseable statement or a $N above the bind count produces a born-failed Paginator whose error surfaces only at the first fetch/num_items (:145-150). Surface the failure at construction."
                     }
+
+                    {
+                        at 2026-09-21T16:08:10.174607Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

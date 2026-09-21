@@ -845,6 +845,7 @@ assertions (
     {id active-model-unknown-column, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:28:21.192315Z}
     {id migration-status-reads, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:50:04.184942Z}
     {id metrics-rollback-honest, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:05:51.114928Z}
+    {id paginator-advances, kind @doing, author "brendan@necessary.nu", at 2026-09-21T16:08:10.174607Z}
 )
 
 impl_evidence (

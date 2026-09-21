@@ -45,10 +45,11 @@ fn page_size(size: u64) -> NonZeroU64 {
 
 const RAW_ALL: &str = r#"SELECT "id", "name", "profit_margin" FROM "bakery" ORDER BY "id" ASC"#;
 
-// [spec:pgorm:def:exec.paginator+2/test]    paginate is reachable from every
-// selector shape, and `count` pages at `NonZeroU64::MIN`
-// [spec:pgorm:sem:exec.paginator.fetch+2/test]    zero-indexed pages, an
-// independent page cursor, and `next` advancing without fetching
+// [spec:pgorm:def:exec.paginator+3/test]    `PaginatorTrait::paginate` is
+// reachable from every builder-backed selector shape and returns no `Result`
+// on any of them, and `count` pages at `NonZeroU64::MIN`
+// [spec:pgorm:sem:exec.paginator.fetch+3/test]    zero-indexed pages, an
+// independent page cursor, and `advance` moving it without fetching
 #[pgorm_macros::test]
 async fn paginator_fetch_page() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_fetch_page").await;
@@ -79,15 +80,16 @@ async fn paginator_fetch_page() -> Result<(), Error> {
         names(&paginator.fetch_page(0).await?)
     );
 
-    // `next` increments without fetching; `fetch` then reads the new page.
-    paginator.next();
+    // `advance` moves the counter without fetching; `fetch` then reads the new
+    // page. The name is the point: nothing here reads the database.
+    paginator.advance();
     assert_eq!(paginator.cur_page(), 1);
     assert_eq!(
         names(&paginator.fetch().await?),
         ["Delta Bakery", "Echo Bakery", "Foxtrot Bakery"]
     );
-    paginator.next();
-    paginator.next();
+    paginator.advance();
+    paginator.advance();
     assert_eq!(paginator.cur_page(), 3);
     assert!(paginator.fetch().await?.is_empty());
 
@@ -264,7 +266,7 @@ async fn paginator_iterate() -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.crud+1/test]    `Select::from_raw_sql` builds a
 // `SelectorRaw` from a raw statement plus `Values`
-// [spec:pgorm:sem:exec.paginator.raw+4/test]    a parsed single `SELECT` is
+// [spec:pgorm:sem:exec.paginator.raw+5/test]    a parsed single `SELECT` is
 // wrapped whole as a subquery, so its own clauses survive paging
 #[pgorm_macros::test]
 async fn paginator_raw() -> Result<(), Error> {
@@ -276,7 +278,7 @@ async fn paginator_raw() -> Result<(), Error> {
     // No bind values.
     let mut paginator = Bakery::find()
         .from_raw_sql(RAW_ALL.to_owned(), Values(Vec::new()))
-        .paginate(&db, page_size(3));
+        .paginate(&db, page_size(3))?;
 
     assert_eq!(
         names(&paginator.fetch_page(0).await?),
@@ -294,7 +296,7 @@ async fn paginator_raw() -> Result<(), Error> {
                 .to_owned(),
             Values(vec![Value::Double(Some(4.0))]),
         )
-        .paginate(&db, page_size(2));
+        .paginate(&db, page_size(2))?;
 
     assert_eq!(filtered.num_items().await?, 3);
     assert_eq!(
@@ -311,7 +313,7 @@ async fn paginator_raw() -> Result<(), Error> {
             format!(r#"WITH t AS ({RAW_ALL}) SELECT * FROM t ORDER BY "id" ASC"#),
             Values(Vec::new()),
         )
-        .paginate(&db, page_size(3));
+        .paginate(&db, page_size(3))?;
     assert_eq!(cte.num_items().await?, 7);
     assert_eq!(cte.num_pages().await?, 3);
     assert_eq!(
@@ -324,7 +326,7 @@ async fn paginator_raw() -> Result<(), Error> {
     // whitespace, a leading comment and a terminating `;` all page fine.
     let decorated = Bakery::find()
         .from_raw_sql(format!("  -- the lot\n  {RAW_ALL} ; "), Values(Vec::new()))
-        .paginate(&db, page_size(3));
+        .paginate(&db, page_size(3))?;
     assert_eq!(decorated.num_items().await?, 7);
     assert_eq!(names(&decorated.fetch_page(2).await?), ["Golf Bakery"]);
 
@@ -332,7 +334,7 @@ async fn paginator_raw() -> Result<(), Error> {
     // of colliding with them, so a statement that already limits still pages.
     let capped = Bakery::find()
         .from_raw_sql(format!(r#"{RAW_ALL} LIMIT 4"#), Values(Vec::new()))
-        .paginate(&db, page_size(3));
+        .paginate(&db, page_size(3))?;
     assert_eq!(capped.num_items().await?, 4);
     assert_eq!(names(&capped.fetch_page(1).await?), ["Delta Bakery"]);
 
@@ -342,7 +344,7 @@ async fn paginator_raw() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+4/test]    markers the caller did not
+// [spec:pgorm:sem:exec.paginator.raw+5/test]    markers the caller did not
 // number in first-reference order still read the values the caller meant,
 // because the wrapper renumbers them into its own parameter space instead of
 // requiring the caller's numbering to be usable where the fragment lands
@@ -360,7 +362,7 @@ async fn paginator_raw_renumbers_markers() -> Result<(), Error> {
 
     let paginator = Bakery::find()
         .from_raw_sql(swapped.to_owned(), bounds.clone())
-        .paginate(&db, page_size(2));
+        .paginate(&db, page_size(2))?;
 
     assert_eq!(paginator.num_items().await?, 3);
     assert_eq!(paginator.num_pages().await?, 2);
@@ -388,7 +390,7 @@ async fn paginator_raw_renumbers_markers() -> Result<(), Error> {
 
     let repeated = Bakery::find()
         .from_raw_sql(twice.to_owned(), floor.clone())
-        .paginate(&db, page_size(2));
+        .paginate(&db, page_size(2))?;
 
     assert_eq!(repeated.num_items().await?, 3);
     assert_eq!(
@@ -406,28 +408,24 @@ async fn paginator_raw_renumbers_markers() -> Result<(), Error> {
         ["Bravo Bakery", "Charlie Bakery", "Delta Bakery"]
     );
 
-    // A value the statement never reads is refused at `paginate`, naming it,
-    // rather than discovered by the server once per page.
+    // A value the statement never reads is refused by `paginate` itself,
+    // naming it: there is no paginator to ask, rather than a paginator that
+    // would have reported it once per reader.
     let spare = Bakery::find()
         .from_raw_sql(RAW_ALL.to_owned(), Values(vec![Value::Double(Some(1.0))]))
-        .paginate(&db, page_size(3));
+        .paginate(&db, page_size(3))
+        .expect_err("an unread bind value was not refused");
 
-    for reported in [
-        spare.fetch_page(0).await.err(),
-        spare.num_items().await.err(),
-    ] {
-        let reported = reported.expect("an unread bind value was not refused");
-        assert!(
-            matches!(reported, Error::Query(_)),
-            "unexpected error: {reported:?}"
-        );
-        assert!(
-            reported
-                .to_string()
-                .contains("given 1 bind values when nothing in it reads $1"),
-            "{reported} does not name the unread value"
-        );
-    }
+    assert!(
+        matches!(spare, Error::Query(_)),
+        "unexpected error: {spare:?}"
+    );
+    assert!(
+        spare
+            .to_string()
+            .contains("given 1 bind values when nothing in it reads $1"),
+        "{spare} does not name the unread value"
+    );
 
     drop(db);
     ctx.delete().await;
@@ -435,8 +433,11 @@ async fn paginator_raw_renumbers_markers() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+4/test]    anything that is not one
-// row-returning `SELECT` is an `Error::Query` naming what it parsed as
+// [spec:pgorm:sem:exec.paginator.raw+5/test]    anything that is not one
+// row-returning `SELECT` is an `Error::Query` from `paginate` itself, naming
+// what it parsed as — so no paginator over it is ever handed back
+// [spec:pgorm:def:exec.paginator+3/test]    `SelectorRaw::paginate` is the
+// fallible one; `count` on the same source reports the same refusal
 #[pgorm_macros::test]
 async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_raw_rejects").await;
@@ -462,14 +463,13 @@ async fn paginator_raw_rejects_non_select() -> Result<(), Error> {
     ];
 
     for (stmt, expected) in cases {
-        let paginator = Bakery::find()
-            .from_raw_sql(stmt.to_owned(), Values(Vec::new()))
-            .paginate(&db, page_size(3));
+        let raw = || Bakery::find().from_raw_sql(stmt.to_owned(), Values(Vec::new()));
 
+        // Both entry points on the raw selector refuse it, and both refuse it
+        // at the call the caller made rather than at some later read.
         for reported in [
-            paginator.fetch_page(0).await.err(),
-            paginator.num_items().await.err(),
-            paginator.num_pages().await.err(),
+            raw().paginate(&db, page_size(3)).err(),
+            raw().count(&db).await.err(),
         ] {
             let reported = reported.unwrap_or_else(|| panic!("{stmt:?} was not refused"));
             assert!(
@@ -528,7 +528,7 @@ fn token_forms() -> Vec<(&'static str, Values)> {
     ]
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+4/test]    the caller's statement is sent
+// [spec:pgorm:sem:exec.paginator.raw+5/test]    the caller's statement is sent
 // whole, so comments, dollar quotes, string literals and subscripts read the
 // same paginated as they do direct, and the markers keep their values
 #[pgorm_macros::test]
@@ -545,7 +545,7 @@ async fn paginator_raw_token_forms() -> Result<(), Error> {
 
         let paginator = (sql, values.clone())
             .into_tuple::<String>()
-            .paginate(&db, page_size(10));
+            .paginate(&db, page_size(10))?;
 
         assert_eq!(
             paginator.fetch_page(0).await?,
@@ -568,7 +568,7 @@ async fn paginator_raw_token_forms() -> Result<(), Error> {
         commented
             .clone()
             .into_tuple::<i32>()
-            .paginate(&db, page_size(10))
+            .paginate(&db, page_size(10))?
             .fetch_page(0)
             .await?,
         vec![commented.into_tuple::<i32>().one(&db).await?]
@@ -582,7 +582,7 @@ async fn paginator_raw_token_forms() -> Result<(), Error> {
         quoted
             .clone()
             .into_tuple::<(i32, String)>()
-            .paginate(&db, page_size(10))
+            .paginate(&db, page_size(10))?
             .fetch_page(0)
             .await?,
         vec![quoted.into_tuple::<(i32, String)>().one(&db).await?]
@@ -594,9 +594,10 @@ async fn paginator_raw_token_forms() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+4/test]    a marker with no value behind
-// it is an `Error::Query` naming it, on every reader, rather than an index past
-// the end of the values
+// [spec:pgorm:sem:exec.paginator.raw+5/test]    a marker with no value behind
+// it is an `Error::Query` naming it, returned by `paginate` rather than an
+// index past the end of the values — and rather than a paginator that exists
+// but cannot page
 #[pgorm_macros::test]
 async fn paginator_raw_rejects_unbound_marker() -> Result<(), Error> {
     let ctx = TestContext::new("paginator_tests_raw_unbound").await;
@@ -605,17 +606,17 @@ async fn paginator_raw_rejects_unbound_marker() -> Result<(), Error> {
     seed(&db).await?;
 
     // Here the `$99` really is a marker: it is not inside a comment.
-    let paginator = (
-        "SELECT $1::int4 AS n, $99::int4 AS m",
-        Values(vec![Value::Int(Some(7))]),
-    )
-        .into_tuple::<(i32, i32)>()
-        .paginate(&db, page_size(10));
+    let unbound = || {
+        (
+            "SELECT $1::int4 AS n, $99::int4 AS m",
+            Values(vec![Value::Int(Some(7))]),
+        )
+            .into_tuple::<(i32, i32)>()
+    };
 
     for reported in [
-        paginator.fetch_page(0).await.err(),
-        paginator.num_items().await.err(),
-        paginator.num_pages().await.err(),
+        unbound().paginate(&db, page_size(10)).err(),
+        unbound().count(&db).await.err(),
     ] {
         let reported = reported.expect("an unbound marker was not refused");
         assert!(
