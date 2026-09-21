@@ -7852,6 +7852,7 @@ children (
                 id query-index-forms
                 title "Partial and expression indexes are expressible"
                 kind @feat
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:12:36.11618Z
@@ -7865,6 +7866,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T12:54:13.516849Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Delivered all four priorities plus opclass. Partial: IndexCreateStatement carries a ConditionHolder and impls ConditionalStatement, so and_where/and_where_option/cond_where are the crate's usual currency and conjoin the same way; WHERE renders last, after INCLUDE and NULLS NOT DISTINCT, which is the grammar's order. Expression columns: IndexColumn became { target: IndexColumnTarget::{Name(Name), Expr(SimpleExpr)}, operator_class: Option<Name>, order: Option<IndexOrder> } with IndexColumn::name/expr constructors and consuming operator_class/order setters; the (iden, IndexOrder) tuple stays as shorthand. Note the coherence constraint that shaped this: IntoIndexColumn already has a blanket impl over IntoName, so impl IntoIndexColumn for SimpleExpr was not on the table — going through IndexColumn::expr (IndexColumn already impls IntoIndexColumn) is why the surface looks the way it does, not an aesthetic choice. Render is ((LOWER(\"image\")) DESC) — the outer parens are the column list, the inner the expression, and the grammar oracle accepts it. INCLUDE verdict: TAKEN, both standalone and embedded (a UNIQUE/PRIMARY KEY table constraint takes INCLUDE too), append-on-repeat. Opclass verdict: TAKEN — it is the same value type, one field and one method, and once IndexColumn had constructors it cost nothing, so boundary-noting it would have meant building the value type twice. CONCURRENTLY: refused, with the reason in the rule — an execution-mode constraint (PostgreSQL rejects it in a transaction block, where pgorm runs DDL), so a builder able to spell it would only emit statements the runtime cannot run. Two things left documented rather than typed, both inherited from the embedded path's existing design: a table constraint takes neither a predicate nor an expression entry, and the embedded renderer narrows nothing because it restamps a statement built for the standalone position — the same reason a Plain embedded kind already renders a constraint Postgres rejects. Typing it means splitting IndexCreateStatement into standalone and embedded types, which changes what index()/primary_key() accept; that is a node, not a clause. TableIndex::get_column_names now reports named entries only; its sole caller reads primary-key columns, where PostgreSQL permits no expression. Live tests/index_form_tests.rs checks behaviour, not echoes: partial unique refuses a second active row and accepts three inactive ones, EXPLAIN shows the planner choosing doc_name_lower for a lower() lookup over 1900 rows, pg_index reports indnatts 2 / indnkeyatts 1 for the INCLUDE, and the quoted \"text_pattern_ops\" resolves. sql.ddl.index-create +7 -> +8 and sql.ddl.create-table +7 -> +8, all sites repinned across docs/spec/{sql-ddl,codegen,schema-gen}.md and the test suite."
+                    }
+
+                    {
+                        at 2026-09-21T12:54:17.313695Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
