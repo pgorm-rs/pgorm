@@ -8325,6 +8325,7 @@ children (
                 id api-doc-honesty
                 title "The docs state what the code does, everywhere they state anything"
                 kind @docs
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:29.441625Z
@@ -8338,6 +8339,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T18:16:04.02923Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
