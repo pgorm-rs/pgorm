@@ -849,6 +849,9 @@ assertions (
     {id pool-savepoint-quoted, kind @complete, author "brendan@necessary.nu", at 2026-09-21T17:04:49.769326Z}
     {id codegen-quotes-custom-type, kind @complete, author "brendan@necessary.nu", at 2026-09-21T17:30:13.044528Z}
     {id api-doc-honesty, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:16:04.02923Z}
+    {id pipeline-identifier-quoting-own, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:06.162426Z}
+    {id prqlc-pin-incomplete, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:22.817775Z}
+    {id supply-chain-unscanned, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:29.034891Z}
 )
 
 impl_evidence (

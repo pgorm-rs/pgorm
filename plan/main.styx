@@ -7436,12 +7436,20 @@ children (
         id prqlc-pin-incomplete
         title "Every detached workspace resolves the pinned prqlc, discovered not listed"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-17T13:28:34.570857Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Three manifests pin the prqlc fork; twelve are eligible. The eight that do not — security/sqlmap/adapter, security/generative/replay, pgorm-python/tests/application-binding, pgorm-python/tests/codegen-entities, and the five security/generative/findings reproducers — each declare their own [workspace], depend on pgorm by path, and so resolve prqlc 0.13.14 from crates.io. Verified in their committed lockfiles: source = \"registry+https://github.com/rust-lang/crates.io-index\", checksum 43a839cc.\n\nThe defect is in the guard I wrote, not only in the manifests. tests/prqlc_pin_tests.rs line 70 is `const DETACHED: [&str; 2] = [\"pgorm-python\", \"security/generative/bridge\"]` — a hand-written list of the two cases I already knew about. It reads like a guard against the class and is an assertion about two instances, so every detached workspace added since has been unprotected by construction and the test stayed green throughout. The fix is to discover the set rather than list it: walk the tree for Cargo.toml files declaring [workspace] that depend on pgorm or pgorm-codegen by path, and require the patch table of each. Then the next detached crate is covered on the day it is created.\n\nTwo of the eight matter beyond hygiene. security/sqlmap/adapter is the subject of the SQL-injection campaign, so the binary that campaign scans is not the binary that ships; the fork carries 9023adad, which changes how identifiers are quoted, and identifier handling is the one surface where injection in an ORM can actually live. security/generative/replay reproduces campaign findings while the bridge that generates them is pinned, so the generator and the replayer are two different compilers and a replay can diverge from its finding for reasons that have nothing to do with the defect.\n\nOn severity, stated carefully because I overstated it first. 9023adad is not a quote breakout in its main case. sqlparser's escape_quoted_string passes an already-doubled delimiter through and doubles a lone one, so `a\"b` and `a\"\"b` both render `\"a\"\"b\"`: the mapping is not injective and a name silently loses a character. That is a correctness defect, not an escape — a caller cannot leave the quoted context that way. The backslash case is the one worth testing rather than asserting, since escape_quoted_string also passes through a delimiter preceded by a backslash and PostgreSQL gives backslash no meaning inside a quoted identifier. Reaching any of it needs pipeline::named_runtime, the deliberate runtime-name entry point; the ordinary alias path is AliasName(&'static str) and cannot carry runtime data at all."
+            }
+
+            {
+                at 2026-09-21T18:22:22.817775Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -7450,12 +7458,20 @@ children (
         id supply-chain-unscanned
         title "The dependency tree is scanned for advisories on a schedule"
         kind @ci
+        sealed true
         log (
             {
                 at 2026-09-17T16:12:48.147713Z
                 author "brendan@necessary.nu"
                 kind @decision
                 text "The repository had no way to learn that a dependency had acquired a published advisory. No cargo-deny or cargo-audit config, no Dependabot, no SBOM, and no CI job running any of them; a grep for OWASP, ASVS, CWE, CVE and \"threat model\" returns nothing anywhere in the tree. The first notice of a vulnerability would have been someone happening to read a mailing list.\n\nMeasured before writing policy. cargo-deny was already installed, and over the tree as it stands: advisories ok, bans ok, sources ok. So there is nothing live to fix — the gap was never knowing, and never being able to know tomorrow.\n\nThe license allowlist in deny.toml is derived from `cargo deny list` rather than copied from a template, so every entry is a license already present and read. r-efi is the only crate offering a copyleft option and is licensed MIT OR Apache-2.0 OR LGPL-2.1-or-later, so omitting LGPL selects a permissive alternative rather than excluding the crate. The prqlc fork is named under sources.allow-git, which is what makes it a reviewed exception instead of an unremarked git dependency: a second fork now has to be a deliberate edit to that file.\n\nThe schedule is the substance of the CI workflow, not the pull-request trigger. A tree does not have to change to become vulnerable, so a check that only ran on PRs would stay green through exactly the case it exists to catch. The run uploads the resolved lockfile because the root Cargo.lock is untracked; without it a green run reports on a tree nobody can reconstruct afterwards, which is how the campaign lost its baseline.\n\nOne finding is deliberately reported rather than fixed. cargo-deny flags four wildcard dependencies — pgorm-pool and three siblings referred to by path with no version. My first read was that intra-workspace paths are exempt and this was a false positive; allow-wildcard-paths does not cover them, because none of pgorm, pgorm-pool, pgorm-query, pgorm-macros or pgorm-sql-macro sets publish = false and crates.io rejects a path dependency carrying no version. So `cargo publish` would fail on these today. That is real, but it is a defect in releasing rather than in supply chain, and the two fixes — a version alongside each path, or an explicit publish = false — are opposite claims about whether this fork is distributed. Settling that by config edit would bury the question, so wildcards is set to warn and the choice stays with the operator."
+            }
+
+            {
+                at 2026-09-21T18:22:29.034891Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -7478,6 +7494,7 @@ children (
         id pipeline-identifier-quoting-own
         title "pgorm quotes its own pipeline identifiers instead of trusting a patched dependency"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-18T16:56:06.326904Z
@@ -7491,6 +7508,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Gated at `Pipeline::into_sql` rather than at the four constructors, on the `ReservedAlias` pattern already there. The choke point is the whole argument: `adapter::compile` has exactly one call site (terminal.rs:53), so every identifier the pipeline can hand prqlc passes the screen, including ones a stage written after this change introduces. Validating `col`, `from_schema`, `named_runtime` and `as_runtime` would have covered today's four and nothing else.\n\nThe predicate is `name.contains('\"') || name.contains('\\0')` and nothing more. Escaping was rejected on the evidence rather than on taste: the pinned fork's `quoted_ident` (9023ada, prqlc/prqlc/src/sql/gen_expr.rs:1004) already doubles every delimiter before handing it to sqlparser, so a pgorm that pre-doubled would emit a name doubled twice under the fork and correctly once under the registry crate — the same version-dependence, relocated. Refusing is the only answer that reads the same under both. No length bound was added: an identifier past 63 bytes is a collision-after-truncation question, not a representability one, and conflating them would have made this rule answer two things badly.\n\nThe walker is the substance. `collect_aliases` saw alias positions only, and it was also the walker that forgot `SString` — so an alias inside an expression `window::written_aggregates` assembled was never screened for reserved names either. Both now go through one immutable `walk` beside `walk_mut`, which additionally visits a call's `name` (a rewrite must not repoint a stage's verb; a screen must see every name that leaves) and covers `FString` alongside `SString` so a constructor added later is screened before it is written. What the walk cannot reach is accounted for: `Piece::Text` inside an assembled expression is SQL pgorm wrote itself, and the `let table_N` / `main` / `Project` names in `adapter::stmt` are minted internally and never carry caller text.\n\nEight tests, including the live-verified payload `x\\\" , (SELECT password FROM secret) AS \"leak` through each of the four constructors. `identifier_refusal_precedes_the_prqlc_call` is the one that pins the property a single build cannot demonstrate by linking both compilers: it carries the payload on a pipeline whose `append` also mismatches its column counts — which every prqlc rejects as `Compile` — so the identifier error coming back at all is only possible if the screen returned before the compiler ran. `a_backslash_without_a_quote_still_renders` pins the other edge, that a backslash alone is not refused.\n\nOne consequence for a neighbouring node: the generative finding at security/generative/findings/pipeline-quoted-output is the same injectivity loss seen from the output side — an authored `derived24\"\"` returning as `derived24\"`. That name is now refused at `into_sql`, so the discrepancy it records is no longer reachable through the pipeline. Its replay command still exits 1, but for a different reason than the one the README describes, and the finding wants revisiting rather than closing on this commit's word."
+            }
+
+            {
+                at 2026-09-21T18:22:06.162426Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
