@@ -846,6 +846,7 @@ assertions (
     {id migration-status-reads, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:50:04.184942Z}
     {id metrics-rollback-honest, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:05:51.114928Z}
     {id paginator-advances, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:41:21.340145Z}
+    {id pool-savepoint-quoted, kind @doing, author "brendan@necessary.nu", at 2026-09-21T16:41:43.867593Z}
 )
 
 impl_evidence (

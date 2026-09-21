@@ -425,6 +425,47 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > per-connection `StatementCache` (`conn.pool.statement-cache`) and nested
 > transactions go through the wrapper's savepoint logic.
 
+> [spec:pgorm:req:conn.pool.savepoint-name]
+> `pgorm_pool::Transaction::savepoint(name)` MUST quote `name` as a
+> PostgreSQL identifier — every `"` in it doubled, the whole wrapped in
+> `"` — before handing it to `tokio_postgres`.
+>
+> `SAVEPOINT` takes no parameters, so unlike every other value pgorm
+> sends (`conn.pool.conn-trait`) the name can only travel as SQL text.
+> `tokio_postgres` interpolates it into `SAVEPOINT {name}` and runs that
+> through `batch_execute` — the simple query protocol, which accepts
+> several statements in one message — so an unquoted runtime name is
+> executable SQL: `x"; DROP TABLE t; --` would be a statement, not a
+> savepoint. It also *stores* the name and reuses it for `RELEASE {name}`
+> and `ROLLBACK TO {name}`, so quoting once before delegation is what
+> covers all three.
+>
+> The quoting MUST be total, because the signature has no refusal to
+> return that pgorm can build: its error type is `tokio_postgres::Error`,
+> which has no public constructor. Totality is available: doubling is
+> PostgreSQL's own spelling for an embedded delimiter, and the delimiter
+> is the only character a quoted identifier gives meaning to. Bounding
+> the parameter to `&'static str` instead would answer the injection but
+> would also delete the runtime-name capability this inherited
+> deadpool-postgres API has, which callers may be using legitimately.
+>
+> Two consequences are deliberate. A name keeps its case and its
+> punctuation rather than folding to lower case — that is what quoting an
+> identifier means, and within one handle it is invisible, since the
+> release and the rollback quote it identically. And a name holding a NUL
+> byte is an `Err`: PostgreSQL carries no identifier containing one under
+> any quoting at all — the same closed judgment
+> `[spec:pgorm:req:pipeline.errors+3]` makes one layer up — and the wire
+> encoder refuses an embedded NUL in the query message before a byte is
+> sent, so the failure arrives client-side with the transaction
+> untouched. It is refused, never stripped: a name silently altered to be
+> sendable is a savepoint the caller did not ask for.
+>
+> Nested transactions opened through `Transaction::transaction` and
+> `GenericClient::transaction` (`conn.pool.generic-client`) are unaffected
+> — `tokio_postgres` names those itself, `sp_{depth}`, from no caller
+> input.
+
 ## Transactions
 
 > [spec:pgorm:req:conn.tx+2]

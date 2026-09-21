@@ -688,6 +688,136 @@ async fn savepoint_shares_client_statement_cache() {
     );
 }
 
+/// Savepoint names carrying every character that could end the identifier and
+/// start a statement of its own. Each is used as a savepoint name and must
+/// come back as nothing but a name.
+const HOSTILE_SAVEPOINT_NAMES: &[&str] = &[
+    r#"x"; DROP TABLE savepoint_injection_probe; --"#,
+    r#"x"; DROP TABLE savepoint_injection_probe; /*"#,
+    "x; DROP TABLE savepoint_injection_probe",
+    // A bare delimiter, which doubling is the whole answer to.
+    r#"""#,
+    // Case and whitespace a folded identifier would not preserve.
+    "Mixed Case Point",
+];
+
+// [spec:pgorm:req:conn.pool.savepoint-name/test]    a savepoint name is an
+// identifier, not SQL: a name holding a statement terminator names a savepoint
+// that releases and rolls back normally, and the table it tried to drop lives
+#[tokio::test]
+async fn savepoint_name_cannot_smuggle_sql() {
+    let pool = create_pool();
+    let mut client = pool.get().await.unwrap();
+
+    client
+        .batch_execute(
+            "DROP TABLE IF EXISTS savepoint_injection_probe;
+             CREATE TABLE savepoint_injection_probe (id int)",
+        )
+        .await
+        .unwrap();
+
+    {
+        let mut txn = client.transaction().await.unwrap();
+
+        for name in HOSTILE_SAVEPOINT_NAMES {
+            // Released: the savepoint's own work survives into the outer
+            // transaction, so the name round-tripped through SAVEPOINT and
+            // RELEASE as one identifier.
+            {
+                let released = txn.savepoint(*name).await.unwrap();
+                let _ = released
+                    .execute("INSERT INTO savepoint_injection_probe VALUES (1)", &[])
+                    .await
+                    .unwrap();
+                released.commit().await.unwrap();
+            }
+
+            // Rolled back: ROLLBACK TO reaches the same savepoint, so only
+            // this insert is undone.
+            {
+                let rolled_back = txn.savepoint(*name).await.unwrap();
+                let _ = rolled_back
+                    .execute("INSERT INTO savepoint_injection_probe VALUES (2)", &[])
+                    .await
+                    .unwrap();
+                rolled_back.rollback().await.unwrap();
+            }
+
+            // The table the name tried to drop is still there, and holds
+            // exactly the released insert.
+            let ones: i64 = txn
+                .query_one(
+                    "SELECT count(*) FROM savepoint_injection_probe WHERE id = 1",
+                    &[],
+                )
+                .await
+                .unwrap()
+                .get(0);
+            assert_eq!(ones, 1, "{name:?} did not round-trip as one savepoint");
+
+            let twos: i64 = txn
+                .query_one(
+                    "SELECT count(*) FROM savepoint_injection_probe WHERE id = 2",
+                    &[],
+                )
+                .await
+                .unwrap()
+                .get(0);
+            assert_eq!(twos, 0, "{name:?} left a rolled-back row behind");
+
+            let _ = txn
+                .execute("DELETE FROM savepoint_injection_probe", &[])
+                .await
+                .unwrap();
+        }
+
+        txn.commit().await.unwrap();
+    }
+
+    // Outside the transaction too: nothing any of those names said was ever
+    // executed as a statement.
+    let surviving: i64 = client
+        .query_one("SELECT count(*) FROM savepoint_injection_probe", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(surviving, 0);
+
+    client
+        .batch_execute("DROP TABLE savepoint_injection_probe")
+        .await
+        .unwrap();
+}
+
+// [spec:pgorm:req:conn.pool.savepoint-name/test]    a NUL byte is refused
+// client-side, and the transaction it was asked of is still usable
+#[tokio::test]
+async fn savepoint_name_with_a_nul_is_refused() {
+    let pool = create_pool();
+    let mut client = pool.get().await.unwrap();
+    let mut txn = client.transaction().await.unwrap();
+
+    let refused = txn.savepoint("point\0name").await;
+    assert!(
+        refused.is_err(),
+        "a NUL byte in a savepoint name was not refused"
+    );
+    drop(refused);
+
+    // Refused before anything was sent, so the transaction is untouched.
+    let answer: i32 = txn.query_one("SELECT 1", &[]).await.unwrap().get(0);
+    assert_eq!(answer, 1);
+
+    {
+        let nested = txn.savepoint("point_name").await.unwrap();
+        let answer: i32 = nested.query_one("SELECT 2", &[]).await.unwrap().get(0);
+        assert_eq!(answer, 2);
+    }
+
+    txn.commit().await.unwrap();
+}
+
 /// Exercises the whole `GenericClient` surface that delegates to
 /// `tokio_postgres`, so it can be run against both implementors.
 async fn exercise_generic_client<C>(client: &C)

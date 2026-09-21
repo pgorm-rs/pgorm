@@ -8216,6 +8216,13 @@ children (
                         kind @note
                         text "Transaction::savepoint (pgorm-pool/src/lib.rs:617) takes I: Into<String> and hands the name to tokio-postgres, which does format!(\"SAVEPOINT {}\", name) and runs it through batch_execute — the simple protocol, multi-statement, no quoting, no parameters (tokio-postgres transaction.rs:319-320). A runtime string interpolated into executable SQL, with nothing in pgorm's wrapper name or doc saying so — the same defect class as the pipeline identifier hole fixed in f48c6425, one layer down. Inherited from deadpool-postgres; one in-repo test call site. Fix: quote the name as an identifier (double and wrap, the fork's own rule) or bound it &'static str."
                     }
+
+                    {
+                        at 2026-09-21T16:41:43.867593Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

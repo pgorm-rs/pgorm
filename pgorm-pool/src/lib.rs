@@ -612,17 +612,58 @@ impl Transaction<'_> {
     }
 
     /// Like [`tokio_postgres::Transaction::savepoint()`], but returns a wrapped
-    /// [`Transaction`] with a [`StatementCache`].
+    /// [`Transaction`] with a [`StatementCache`], and quotes `name` as an
+    /// identifier.
+    ///
+    /// `SAVEPOINT` takes no parameters, so the name is the one part of the
+    /// statement that can only travel as SQL text. `tokio_postgres` writes it
+    /// into `SAVEPOINT {name}` — and, from the handle returned here, into
+    /// `RELEASE {name}` and `ROLLBACK TO {name}` — through the simple query
+    /// protocol, which accepts several statements at once. A name is therefore
+    /// quoted before it is handed over: any `"` in it is doubled and the whole
+    /// is wrapped in `"`, which is total over every name PostgreSQL can carry,
+    /// so `x"; DROP TABLE t; --` names a savepoint and nothing else.
+    ///
+    /// Two consequences worth knowing. The name keeps its case and its
+    /// punctuation rather than being folded to lower case, because that is
+    /// what quoting an identifier means; within this handle that is invisible,
+    /// since the release and the rollback quote it the same way. And a name
+    /// holding a NUL byte is refused — PostgreSQL carries no identifier
+    /// containing one under any quoting at all, and the protocol encoder
+    /// rejects it before a byte reaches the server, so the `Err` arrives with
+    /// the transaction untouched.
+    // [spec:pgorm:req:conn.pool.savepoint-name]
     #[allow(unused_lifetimes)] // false positive
     pub async fn savepoint<I>(&mut self, name: I) -> Result<Transaction<'_>, Error>
     where
         I: Into<String>,
     {
         Ok(Transaction {
-            txn: PgTransaction::savepoint(&mut self.txn, name).await?,
+            txn: PgTransaction::savepoint(&mut self.txn, quote_identifier(&name.into())).await?,
             statement_cache: self.statement_cache.clone(),
         })
     }
+}
+
+/// `name` as a PostgreSQL quoted identifier: every `"` doubled, the whole
+/// wrapped in `"`.
+///
+/// Total by construction. The delimiter is the only character a quoted
+/// identifier gives special meaning to, and doubling is how PostgreSQL spells
+/// an escaped one, so there is no name this can fail on and no name it can
+/// turn into something other than an identifier.
+// [spec:pgorm:req:conn.pool.savepoint-name]
+fn quote_identifier(name: &str) -> String {
+    let mut quoted = String::with_capacity(name.len() + 2);
+    quoted.push('"');
+    for character in name.chars() {
+        if character == '"' {
+            quoted.push('"');
+        }
+        quoted.push(character);
+    }
+    quoted.push('"');
+    quoted
 }
 
 impl fmt::Debug for Transaction<'_> {
