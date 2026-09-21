@@ -8180,6 +8180,7 @@ children (
                 id paginator-advances
                 title "The paginator's page step is named for what it does and fails where it fails"
                 kind @refactor
+                sealed true
                 log (
                     {
                         at 2026-09-19T23:13:23.984582Z
@@ -8193,6 +8194,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-21T16:41:21.340145Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
