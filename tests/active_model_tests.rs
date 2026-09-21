@@ -163,18 +163,19 @@ mod serde_renamed {
 // ActiveModelTrait: per-column state access
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.active-model+3/test]    the per-column state surface —
+// [spec:pgorm:req:entity.active-model+4/test]    the per-column state surface —
 // `default()` leaves every column `NotSet`, `set` stores a `Value` as `Set`,
 // `get` reads without consuming, `take` removes and leaves `NotSet` behind,
 // `not_set` clears, `is_not_set` reports, and `reset` / `reset_all` promote
-// `Unchanged` to `Set` while leaving `NotSet` alone
+// `Unchanged` to `Set` while leaving `NotSet` alone. `get` and `take` are
+// fallible for the reason `set` is, so each read here is an `Ok`
 #[test]
 fn active_model_column_state_access() {
     // `default()` is every column `NotSet`.
     let mut am = <row::ActiveModel as ActiveModelTrait>::default();
     for col in row::Column::iter() {
         assert!(am.is_not_set(col), "{col:?} should start NotSet");
-        assert_eq!(am.get(col), ActiveValue::NotSet);
+        assert_eq!(am.get(col), Ok(ActiveValue::NotSet));
     }
     assert!(!am.is_changed());
 
@@ -187,12 +188,12 @@ fn active_model_column_state_access() {
     assert!(!am.is_not_set(row::Column::Name));
     assert_eq!(
         am.get(row::Column::Name),
-        set(Value::String(Some(Box::new("Apple".to_owned()))))
+        Ok(set(Value::String(Some(Box::new("Apple".to_owned())))))
     );
     // Reading twice yields the same thing: `get` did not consume.
     assert_eq!(
         am.get(row::Column::Name),
-        set(Value::String(Some(Box::new("Apple".to_owned()))))
+        Ok(set(Value::String(Some(Box::new("Apple".to_owned())))))
     );
     assert!(am.is_changed());
 
@@ -200,7 +201,7 @@ fn active_model_column_state_access() {
     let taken = am.take(row::Column::Name);
     assert_eq!(
         taken,
-        set(Value::String(Some(Box::new("Apple".to_owned()))))
+        Ok(set(Value::String(Some(Box::new("Apple".to_owned())))))
     );
     assert!(am.is_not_set(row::Column::Name));
 
@@ -254,7 +255,7 @@ fn active_model_column_state_access() {
     assert!(all.is_changed());
 }
 
-// [spec:pgorm:req:entity.active-model+3/test]    `get_primary_key_value` reads
+// [spec:pgorm:req:entity.active-model+4/test]    `get_primary_key_value` reads
 // `PrimaryKeyArity::ARITY` values into one `ValueTuple`, whatever the arity, and
 // returns `None` when any key component is `NotSet`
 #[test]

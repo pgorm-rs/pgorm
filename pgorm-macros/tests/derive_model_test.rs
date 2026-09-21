@@ -203,7 +203,7 @@ fn derive_model_from_query_result_and_entity_override() {
     assert_eq!(alt.get(overrides::InnerColumn::Id), Value::Int(Some(3)));
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    the generated struct and its conversions
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    the generated struct and its conversions
 #[test]
 fn derive_active_model_struct_default_and_from_model() {
     // One `pub field: ActiveValue<T>` per *non-ignored* field: the struct
@@ -234,7 +234,12 @@ fn derive_active_model_struct_default_and_from_model() {
     assert_eq!(model.into_active_model(), converted);
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    ActiveModelTrait accessors
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    ActiveModelTrait
+// accessors, including the one answer `take`, `get` and `set` share: a column
+// this ActiveModel does not carry is `Error::Type`, in those same words
+// [spec:pgorm:req:entity.active-model+4/test]    that refusal is the trait's
+// rule, not the derive's convenience: an unknown column is never answered with
+// `NotSet`, which is what a column holding no value reads as
 #[test]
 fn derive_active_model_trait_accessors() {
     let mut active = cake::ActiveModel {
@@ -245,21 +250,29 @@ fn derive_active_model_trait_accessors() {
     // `get` clones into a wrapped value.
     assert_eq!(
         ActiveModelTrait::get(&active, cake::Column::Id),
-        ActiveValue::Set(Value::Int(Some(1)))
+        Ok(ActiveValue::Set(Value::Int(Some(1))))
     );
-    // ...and unmatched columns yield `not_set` rather than panicking.
+    // ...and an unmatched column is reported, not answered with `NotSet`: the
+    // column does not exist here, which is not the same as holding no value.
     assert_eq!(
         ActiveModelTrait::get(&active, cake::Column::Table),
-        ActiveValue::NotSet
+        Err(Error::Type(
+            "This ActiveModel does not have this field".to_owned()
+        ))
     );
 
     // `take` swaps the field out, leaving it `NotSet`.
     assert_eq!(
         active.take(cake::Column::Id),
-        ActiveValue::Set(Value::Int(Some(1)))
+        Ok(ActiveValue::Set(Value::Int(Some(1))))
     );
     assert_eq!(active.id, ActiveValue::NotSet);
-    assert_eq!(active.take(cake::Column::Table), ActiveValue::NotSet);
+    assert_eq!(
+        active.take(cake::Column::Table),
+        Err(Error::Type(
+            "This ActiveModel does not have this field".to_owned()
+        ))
+    );
 
     // `set` converts the value into the field type before assigning `Set`.
     active
@@ -285,7 +298,7 @@ fn derive_active_model_trait_accessors() {
     assert_eq!(active.name, ActiveValue::Set("chiffon".to_owned()));
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    set errors on an unmatched column
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    set errors on an unmatched column
 #[test]
 fn active_model_set_errs_on_unmatched_column() {
     let mut active = <cake::ActiveModel as Default>::default();
@@ -297,7 +310,7 @@ fn active_model_set_errs_on_unmatched_column() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    is_not_set panics on an unmatched column
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    is_not_set panics on an unmatched column
 #[test]
 #[should_panic(expected = "This ActiveModel does not have this field")]
 fn active_model_is_not_set_panics_on_unmatched() {
@@ -305,7 +318,7 @@ fn active_model_is_not_set_panics_on_unmatched() {
     let _ = active.is_not_set(cake::Column::Table);
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    reset panics on an unmatched column
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    reset panics on an unmatched column
 #[test]
 #[should_panic(expected = "This ActiveModel does not have this field")]
 fn active_model_reset_panics_on_unmatched_column() {
@@ -313,7 +326,7 @@ fn active_model_reset_panics_on_unmatched_column() {
     active.reset(cake::Column::Table);
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    TryFrom<ActiveModel> / TryIntoModel
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    TryFrom<ActiveModel> / TryIntoModel
 #[test]
 fn derive_active_model_try_into_model() {
     // A non-ignored field left `NotSet` fails with `AttrNotSet(field)`.
@@ -346,7 +359,7 @@ fn derive_active_model_try_into_model() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.active-model+2/test]    DeriveActiveModelBehavior + DeriveIntoActiveModel
+// [spec:pgorm:sem:macros.derive.active-model+3/test]    DeriveActiveModelBehavior + DeriveIntoActiveModel
 #[test]
 fn behavior_and_into_active_model_derives() {
     // `DeriveActiveModelBehavior` was applied to `NothingLikeAnActiveModel`, yet

@@ -8214,6 +8214,13 @@ children (
                         kind @note
                         text "The derive gives take and get a catch-all _ => ActiveValue::not_set() arm (pgorm-macros/src/derives/active_model.rs:121, :129), so asking for a column the model doesn't carry is indistinguishable from a field that is merely unset — while set, three lines later in the same trait, reports exactly that case as Err(Error::Type) and documents it (:132-141). Same trait, same failure, opposite handling. Also the doc bugs: ActiveModelTrait::take says \"Get a mutable ActiveValue\" but returns an owned value and mem::swaps NotSet into the field — it removes it (src/entity/active_model.rs:143; same wording on ActiveValue::take :650, and into_value's doc \"Check if a Value exists or not\" for a consuming getter :671). Fix: take/get return Result like set; docs say remove/consume."
                     }
+
+                    {
+                        at 2026-09-21T14:57:37.361796Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

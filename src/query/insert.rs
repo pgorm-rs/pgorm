@@ -258,7 +258,11 @@ where
         let mut values = Vec::new();
         let mut present = Vec::new();
         for col in <A::Entity as EntityTrait>::Column::iter() {
-            let av = am.take(col);
+            // A column this model does not carry contributes no value, exactly
+            // as a `NotSet` one does; where the other models of the batch do
+            // carry it, that is the disagreement `ensure_uniform_columns`
+            // reports.
+            let av = am.take(col).unwrap_or_else(|_| ActiveValue::not_set());
             present.push(av.is_set() || av.is_unchanged());
             match av {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {

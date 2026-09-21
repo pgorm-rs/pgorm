@@ -206,7 +206,7 @@ where
     }
 
     fn get(&self, name: &str) -> Result<ActiveValue<Value>, Error> {
-        Ok(self.value.get(column::<E>(name)?))
+        self.value.get(column::<E>(name)?)
     }
 
     fn set(&self, name: &str, value: Value) -> Result<Active, Error> {

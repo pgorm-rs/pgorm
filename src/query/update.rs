@@ -74,7 +74,7 @@ impl Update {
                 .to_owned(),
             model,
         };
-        Ok(one.prepare_filters()?.prepare_values())
+        one.prepare_filters()?.prepare_values()
     }
 
     /// Update many ActiveModel
@@ -110,7 +110,7 @@ where
     fn prepare_filters(mut self) -> Result<Self, Error> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            match self.model.get(col) {
+            match self.model.get(col)? {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }
@@ -120,12 +120,12 @@ where
         Ok(self)
     }
 
-    fn prepare_values(mut self) -> Self {
+    fn prepare_values(mut self) -> Result<Self, Error> {
         for col in <A::Entity as EntityTrait>::Column::iter() {
             if <A::Entity as EntityTrait>::PrimaryKey::from_column(col).is_some() {
                 continue;
             }
-            match self.model.get(col) {
+            match self.model.get(col)? {
                 ActiveValue::Set(value) => {
                     let expr = col.save_as(Expr::val(value));
                     self.query.value(col, expr);
@@ -133,7 +133,7 @@ where
                 ActiveValue::Unchanged(_) | ActiveValue::NotSet => {}
             }
         }
-        self
+        Ok(self)
     }
 }
 
@@ -203,17 +203,19 @@ where
     E: EntityTrait,
 {
     /// Add the models to update to Self
+    ///
+    /// Only `Set` columns are written: `Unchanged` and `NotSet` ones contribute
+    /// nothing, and so does a column this model does not carry at all — the
+    /// `Error::Type` [`ActiveModelTrait::get`] reports for one is a statement
+    /// about the model, not a value to write.
     pub fn set<A>(mut self, model: A) -> Self
     where
         A: ActiveModelTrait<Entity = E>,
     {
         for col in E::Column::iter() {
-            match model.get(col) {
-                ActiveValue::Set(value) => {
-                    let expr = col.save_as(Expr::val(value));
-                    self.query.value(col, expr);
-                }
-                ActiveValue::Unchanged(_) | ActiveValue::NotSet => {}
+            if let Ok(ActiveValue::Set(value)) = model.get(col) {
+                let expr = col.save_as(Expr::val(value));
+                self.query.value(col, expr);
             }
         }
         self

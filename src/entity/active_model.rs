@@ -131,7 +131,7 @@ impl From<&[u8]> for ActiveValue<Vec<u8>> {
 /// [`ActiveModelBehavior`] for what the hooks can and cannot undo.
 ///
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:req:entity.active-model+3]
+// [spec:pgorm:req:entity.active-model+4]
 // [spec:pgorm:req:entity.active-model.save+1]
 // [spec:pgorm:req:entity.active-model.hooks+1]
 #[async_trait]
@@ -139,11 +139,21 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// The Entity this ActiveModel belongs to
     type Entity: EntityTrait;
 
-    /// Get a mutable [ActiveValue] from an ActiveModel
-    fn take(&mut self, c: <Self::Entity as EntityTrait>::Column) -> ActiveValue<Value>;
+    /// Remove the [ActiveValue] from an ActiveModel, leaving [`NotSet`] in its
+    /// place and returning what was there.
+    ///
+    /// A column this model does not carry is [`Error::Type`], on the same terms
+    /// as [`Self::set`]: asking for a column that does not exist is a different
+    /// answer from a column that is merely [`NotSet`], and the two MUST NOT
+    /// arrive spelled the same way.
+    fn take(
+        &mut self,
+        c: <Self::Entity as EntityTrait>::Column,
+    ) -> Result<ActiveValue<Value>, Error>;
 
-    /// Get a immutable [ActiveValue] from an ActiveModel
-    fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> ActiveValue<Value>;
+    /// Read a copy of the [ActiveValue] an ActiveModel holds, reporting a column
+    /// this model does not carry as [`Error::Type`].
+    fn get(&self, c: <Self::Entity as EntityTrait>::Column) -> Result<ActiveValue<Value>, Error>;
 
     /// Set the Value into an ActiveModel, reporting a column this model does not
     /// carry, or a value of the wrong type for it, as [`Error::Type`].
@@ -172,12 +182,16 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Get the primary key of the ActiveModel
+    ///
+    /// `None` when any key column is [`NotSet`] — and likewise when a
+    /// hand-written implementation does not carry one of its entity's key
+    /// columns at all, since either way there is no whole key to return.
     fn get_primary_key_value(&self) -> Option<ValueTuple> {
         let arity = <<<Self::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY;
         let mut cols = <Self::Entity as EntityTrait>::PrimaryKey::iter();
         let mut values = Vec::with_capacity(arity);
         for _ in 0..arity {
-            values.push(self.get(cols.next()?.into_column()).into_value()?);
+            values.push(self.get(cols.next()?.into_column()).ok()?.into_value()?);
         }
         Some(ValueTuple::from(values))
     }
@@ -329,7 +343,7 @@ pub trait ActiveModelTrait: Clone + Debug {
         // Carry this model's primary key over to the replacement
         for pk in <<Self::Entity as EntityTrait>::PrimaryKey>::iter() {
             let col = pk.into_column();
-            match self.get(col) {
+            match self.get(col)? {
                 ActiveValue::Unchanged(v) | ActiveValue::Set(v) => incoming.set(col, v)?,
                 NotSet => incoming.not_set(col),
             }
@@ -368,7 +382,7 @@ pub trait ActiveModelTrait: Clone + Debug {
 
         // Transform attribute that exists in JSON object into ActiveValue::Set, otherwise ActiveValue::NotSet
         for (col, json_key_exists) in json_keys {
-            match (json_key_exists, am.get(col)) {
+            match (json_key_exists, am.get(col)?) {
                 (true, ActiveValue::Set(value) | ActiveValue::Unchanged(value)) => {
                     am.set(col, value)?;
                 }
@@ -382,9 +396,15 @@ pub trait ActiveModelTrait: Clone + Debug {
     }
 
     /// Return `true` if any attribute of `ActiveModel` is `Set`
+    ///
+    /// A column the model does not carry holds no value and so changes
+    /// nothing, which is the answer an [`Error::Type`] from [`Self::get`]
+    /// counts as here.
     fn is_changed(&self) -> bool {
-        <Self::Entity as EntityTrait>::Column::iter()
-            .any(|col| self.get(col).is_set() && !self.get(col).is_unchanged())
+        <Self::Entity as EntityTrait>::Column::iter().any(|col| {
+            self.get(col)
+                .is_ok_and(|value| value.is_set() && !value.is_unchanged())
+        })
     }
 }
 
@@ -647,8 +667,9 @@ where
         matches!(self, Self::NotSet)
     }
 
-    /// Get the mutable value an [ActiveValue]
-    /// also setting itself to [ActiveValue::NotSet]
+    /// Remove the value this [ActiveValue] holds, leaving
+    /// [ActiveValue::NotSet] in its place, and return it — `None` when there
+    /// was none to remove.
     pub fn take(&mut self) -> Option<V> {
         match std::mem::take(self) {
             ActiveValue::Set(value) | ActiveValue::Unchanged(value) => Some(value),
@@ -668,7 +689,8 @@ where
         }
     }
 
-    /// Check if a [Value] exists or not
+    /// Consume the [ActiveValue] and return the [Value] it held, or `None` for
+    /// [ActiveValue::NotSet].
     pub fn into_value(self) -> Option<Value> {
         match self {
             ActiveValue::Set(value) | ActiveValue::Unchanged(value) => Some(value.into()),

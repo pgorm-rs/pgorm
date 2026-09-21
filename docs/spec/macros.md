@@ -256,16 +256,17 @@ known limitations.
 > same text as `Error::Type`. The
 > target entity defaults to `Entity`, overridable via `#[pgorm(entity = Ident)]`.
 
-> [spec:pgorm:sem:macros.derive.active-model+2]
+> [spec:pgorm:sem:macros.derive.active-model+3]
 > `DeriveActiveModel` (named-field structs only) generates a
 > `pub struct ActiveModel` — name and entity are hard-coded as `ActiveModel`/`Entity` —
 > with one `pub field: ActiveValue<T>` per non-ignored field, plus: `Default`
 > delegating to `ActiveModelBehavior::new()`; `From<Model>` mapping every field through
 > `ActiveValue::unchanged`; an `IntoActiveModel` impl for `Model`; and
-> `ActiveModelTrait` with `take`/`get` (unmatched columns yield `not_set`),
-> `set` (`Error::Type("This ActiveModel does not have this field")` on an unmatched
-> column, and `Error::Type("value does not match the type of ActiveModel field
-> {field}")` when the value is of another type),
+> `ActiveModelTrait` with `take`, `get` and `set`, which share one answer for an
+> unmatched column — `Error::Type("This ActiveModel does not have this field")`,
+> generated from a single spelling of that message so the three cannot drift
+> apart — plus, for `set` alone, `Error::Type("value does not match the type of
+> ActiveModel field {field}")` when the value is of another type.
 > `not_set` (silently ignores unmatched), `is_not_set` (panics on unmatched),
 > `default` (all fields `not_set`), and `reset`. It also generates
 > `TryFrom<ActiveModel> for Model` and `TryIntoModel`: each non-ignored field is

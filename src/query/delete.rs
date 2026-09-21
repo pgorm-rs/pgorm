@@ -129,7 +129,7 @@ where
     fn prepare_filters(mut self) -> Result<Self, Error> {
         for key in <A::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            match self.model.get(col) {
+            match self.model.get(col)? {
                 ActiveValue::Set(value) | ActiveValue::Unchanged(value) => {
                     self = self.filter(col.eq(value));
                 }

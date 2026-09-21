@@ -217,15 +217,35 @@ explicit limitations.
 
 ## Active model
 
-> [spec:pgorm:req:entity.active-model+3]
+> [spec:pgorm:req:entity.active-model+4]
 > `ActiveModelTrait: Clone + Debug` (`src/entity/active_model.rs`) is the write-side
 > row representation whose fields are `ActiveValue`s. Implementations MUST provide
-> per-column state access: `get` (immutable), `take` (removes and returns, leaving
-> `NotSet`), `set` (stores a `Value` as `Set`, returning `Result<(), Error>` so an
-> unmatched column or a value of the wrong type for the field comes back as
-> `Error::Type` instead of unwinding), `not_set` (clears to `NotSet`),
-> `is_not_set`, `reset` (per-column `Unchanged` → `Set`), and `default()` (all columns
-> `NotSet`). `reset_all` applies `reset` to every column. `get_primary_key_value`
+> per-column state access: `get` (a non-consuming read), `take` (removes and returns,
+> leaving `NotSet`), `set` (stores a `Value` as `Set`), `not_set` (clears to
+> `NotSet`), `is_not_set`, `reset` (per-column `Unchanged` → `Set`), and `default()`
+> (all columns `NotSet`). `reset_all` applies `reset` to every column.
+>
+> The three accessors that name a column and a value — `get`, `take` and `set` —
+> are fallible in the same way and for the same reason: a column the model does
+> not carry MUST come back as `Error::Type` rather than as a value. `get` and
+> `take` therefore return `Result<ActiveValue<Value>, Error>` and `set` returns
+> `Result<(), Error>` (which also reports a value of the wrong type for the
+> field). Answering an unknown column with `NotSet` is specifically forbidden:
+> "this model has no such column" and "this column holds no value" are different
+> facts about different things, and a caller that cannot tell them apart cannot
+> detect the first at all.
+>
+> The error is unreachable through a derived ActiveModel, whose fields are its
+> entity's columns by construction (`[spec:pgorm:sem:macros.derive.active-model+3]`);
+> it exists for hand-written implementations, which can disagree with their
+> `Entity`. pgorm's own callers, all of which iterate the entity's own columns,
+> therefore either propagate it (`Update::one`'s filter and value preparation,
+> `DeleteOne`'s filters, `set_from_json`, `from_json`) or treat the column as
+> carrying nothing, exactly as `NotSet` does (`Insert::add`, `UpdateMany::set`,
+> `is_changed`, `get_primary_key_value`) — the latter where the method's own
+> signature admits no error, and never where the caller could act on one.
+>
+> `get_primary_key_value`
 > reads `PrimaryKeyArity::ARITY` values, in primary-key iteration order, into one
 > `ValueTuple` (`[spec:pgorm:def:sql.value.tuple+3]`) whatever the arity, and
 > MUST return `None` if any key component is `NotSet`.
@@ -252,10 +272,13 @@ explicit limitations.
 > [spec:pgorm:sem:entity.active-model.active-value.ops]
 > `ActiveValue` accessors (`src/entity/active_model.rs`): the constructors `set`,
 > `unchanged`, `not_set` and the predicates `is_set`, `is_unchanged`, `is_not_set`
-> mirror the three variants. `take(&mut self)` returns `Some(value)` for `Set` or
-> `Unchanged` and leaves `NotSet` behind. `unwrap(self)` and `as_ref(&self)` return
+> mirror the three variants. `take(&mut self)` removes the value — returning
+> `Some(value)` for `Set` or `Unchanged`, `None` for `NotSet` — and leaves
+> `NotSet` behind; its documentation MUST say so rather than describe it as a
+> mutable read, which is what it is not. `unwrap(self)` and `as_ref(&self)` return
 > the inner value and panic on `NotSet`; `try_as_ref` is the non-panicking form
-> returning `Option<&V>`. `into_value` yields `Option<Value>`; `into_wrapped_value`
+> returning `Option<&V>`. `into_value` consumes the `ActiveValue` and yields the
+> `Value` it held as `Option<Value>`; `into_wrapped_value`
 > converts to `ActiveValue<Value>` preserving the variant. `reset` promotes
 > `Unchanged` to `Set` and leaves `NotSet` untouched. `set_if_not_equals(value)`
 > assigns `Set(value)` unless the current state is `Unchanged` with an equal payload,

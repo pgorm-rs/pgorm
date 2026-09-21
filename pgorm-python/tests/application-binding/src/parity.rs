@@ -88,7 +88,10 @@ fn assert_active(native: &Bound<'_, PyAny>, rust: &account::ActiveModel) -> PyRe
         let native = native.call_method1("get", (column.as_str(),))?;
         let state = native.getattr("state")?.extract::<ActiveState>()?;
         let value = native.getattr("value")?;
-        let expected = match rust.get(column) {
+        let expected = match rust
+            .get(column)
+            .expect("account carries every column of its entity")
+        {
             ActiveValue::NotSet => {
                 assert_eq!(state, ActiveState::NotSet);
                 assert!(value.is_none());
