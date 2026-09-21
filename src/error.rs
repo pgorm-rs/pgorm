@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+7]
+// [spec:pgorm:def:error.model+8]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -49,6 +49,10 @@ pub enum Error {
     /// that probably means all of them conflict with existing records in the table
     #[error("None of the records are inserted")]
     RecordNotInserted,
+    /// The update names no column to set, so there is no statement to send.
+    /// Distinct from an update whose `WHERE` matched no row, which is `Ok(0)`
+    #[error("The update has no columns to set")]
+    NothingToSet,
     /// A decode target does not match the statement it would decode
     #[error("Verification Error: {0}")]
     Verify(#[from] VerifyError),
@@ -121,7 +125,7 @@ pub enum VerifyError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+7]    crate-root Result alias
+// [spec:pgorm:def:error.model+8]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -133,7 +137,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+7]    Display-string equality
+// [spec:pgorm:def:error.model+8]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

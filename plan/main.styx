@@ -8143,6 +8143,13 @@ children (
                         kind @note
                         text "UpdateMany::exec returns Ok(0) without sending any statement when the value list is empty (src/executor/update.rs:61-67), and exec_returning_models returns Ok(vec![]) the same way (:85-87); neither doc mentions it. Ok(0) therefore conflates \"the WHERE matched nothing\" with \"you gave me nothing to SET\" — and the input is easy to produce, since UpdateMany::set skips Unchanged/NotSet fields (src/query/update.rs:216), so an ActiveModel round-tripped from the database yields exactly this. The asymmetry proves the design intent: singular exec_returning_model handles the same case by issuing a SELECT and returning the row (:33-35), and DeleteMany has no short-circuit at all (src/executor/delete.rs:29). Fix: make the empty-set case an Err, or align with the singular path's semantics."
                     }
+
+                    {
+                        at 2026-09-21T14:37:52.993742Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 

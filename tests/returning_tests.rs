@@ -65,8 +65,9 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+6/test]    `UpdateMany::exec_returning_models`
-// returns every updated model, and an empty `Vec` on the no-op path
+// [spec:pgorm:sem:exec.crud.update+7/test]    `UpdateMany::exec_returning_models`
+// returns every updated model, and refuses an update with no column to set
+// rather than passing an empty `Vec` off as the rows it updated
 #[pgorm_macros::test]
 async fn update_many() {
     pub use common::{TestContext, features::*};
@@ -160,13 +161,14 @@ async fn update_many() {
             ]
         );
 
-        // No-op
+        // Nothing to set: the rows the filter matches are not the rows this
+        // update changed, so there is no `Vec` to hand back.
         assert_eq!(
             Update::many(Entity)
                 .filter(Column::Action.eq("before_save"))
                 .exec_returning_models(&db)
-                .await?,
-            []
+                .await,
+            Err(Error::NothingToSet)
         );
 
         drop(db);
@@ -393,8 +395,13 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op short-circuit of
-// `UpdateMany::exec` and `UpdateOne::exec_returning_model`
+// [spec:pgorm:sem:exec.crud.update+7/test]    the empty-SET refusal of both
+// `UpdateMany` terminals — including through the reachable input, a model read
+// back from the database and handed straight to `set` — against the `Ok(0)` of
+// a `WHERE` that matched nothing, and the no-op read of
+// `UpdateOne::exec_returning_model`
+// [spec:pgorm:def:error.model+8/test]    `Error::NothingToSet` has a
+// construction site, and it is this one
 #[pgorm_macros::test]
 async fn update_noop_and_record_check() -> Result<(), Error> {
     use pgorm::ActiveValue::Unchanged;
@@ -407,14 +414,39 @@ async fn update_noop_and_record_check() -> Result<(), Error> {
         .exec_returning_model(&db)
         .await?;
 
-    // `UpdateMany::exec` short-circuits when there is nothing to SET: the filter
-    // matches an existing row, yet no rows are reported affected and the row
-    // is untouched.
-    let noop = Update::many(Bakery)
-        .filter(bakery::Column::Id.eq(seaside.id))
-        .exec(&db)
-        .await?;
-    assert_eq!(noop, 0);
+    // Nothing to SET is refused rather than reported as a count: the filter
+    // matches an existing row, so `Ok(0)` would be a lie about the WHERE.
+    assert_eq!(
+        Update::many(Bakery)
+            .filter(bakery::Column::Id.eq(seaside.id))
+            .exec(&db)
+            .await,
+        Err(Error::NothingToSet)
+    );
+
+    // The reachable spelling of the same input: a model read back from the
+    // database is all `Unchanged`, and `set` skips those fields.
+    let round_tripped = Bakery::find_by_id(seaside.id).one(&db).await?.into_active();
+    assert_eq!(
+        Update::many(Bakery)
+            .set(round_tripped.clone())
+            .filter(bakery::Column::Id.eq(seaside.id))
+            .exec(&db)
+            .await,
+        Err(Error::NothingToSet)
+    );
+
+    // Both terminals answer it the same way.
+    assert_eq!(
+        Update::many(Bakery)
+            .set(round_tripped)
+            .filter(bakery::Column::Id.eq(seaside.id))
+            .exec_returning_models(&db)
+            .await,
+        Err(Error::NothingToSet)
+    );
+
+    // Nothing was written by any of the three.
     assert_eq!(Bakery::find_by_id(seaside.id).one(&db).await?, seaside);
 
     // With something to SET the same call reports the rows it changed.
@@ -458,7 +490,7 @@ async fn update_noop_and_record_check() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op read runs under the
+// [spec:pgorm:sem:exec.crud.update+7/test]    the no-op read runs under the
 // statement's complete `WHERE`, so a caller-added guard predicate excludes an
 // unchanged row exactly as it would a changed one
 #[pgorm_macros::test]
@@ -548,10 +580,13 @@ async fn exec_terminals_name_their_shape<C: ConnectionTrait>(db: &C) -> Result<(
         .exec_returning_model(db)
         .await?;
 
-    let _update_rows: u64 = Update::many(bakery::Entity).exec(db).await?;
-    let _updated_many: Vec<bakery::Model> = Update::many(bakery::Entity)
-        .exec_returning_models(db)
-        .await?;
+    // Both many-row terminals need a column to set: with none they report
+    // `Error::NothingToSet` rather than a shape.
+    let update_many =
+        || Update::many(bakery::Entity).col_expr(bakery::Column::Name, "Shape".into());
+
+    let _update_rows: u64 = update_many().exec(db).await?;
+    let _updated_many: Vec<bakery::Model> = update_many().exec_returning_models(db).await?;
 
     // Deletes have no returning form at all: the count is the whole answer.
     let _delete_one_rows: u64 = Delete::one(bakery_model("Shape", 3.0))?.exec(db).await?;

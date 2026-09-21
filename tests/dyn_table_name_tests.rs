@@ -21,7 +21,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+6/test]    `UpdateMany::exec` returns the
+// [spec:pgorm:sem:exec.crud.update+7/test]    `UpdateMany::exec` returns the
 // rows-affected count
 // [spec:pgorm:sem:exec.crud.delete+1/test]    `DeleteMany::exec` returns the
 // rows-affected count

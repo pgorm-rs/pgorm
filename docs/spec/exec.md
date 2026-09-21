@@ -479,16 +479,43 @@ These rules capture what the code does today, including known gaps.
 > respectively. Success becomes `TryInsertResult::Inserted(..)`; every
 > other error propagates.
 
-> [spec:pgorm:sem:exec.crud.update+6]
-> `UpdateMany::exec` short-circuits when the update statement carries no SET
-> values, returning `0` without a database round-trip; otherwise it
-> executes and returns the rows-affected count as `u64`.
+> [spec:pgorm:sem:exec.crud.update+7]
+> `UpdateMany::exec` executes the statement and returns the rows-affected
+> count as `u64`.
 >
 > An update whose `WHERE` matches nothing is `Ok(0)`, never an error. There
 > is no `Updater` and no `check_record_exists`: the count is the whole
 > answer and the caller decides what zero means. `Error::RecordNotUpdated`
 > is deleted with them — it had no other producer, and an error variant no
 > code path can raise is a promise the error model cannot keep.
+>
+> That answer is what an update carrying no SET values MUST NOT borrow. Such
+> a statement is never sent, so no `WHERE` was ever evaluated and there is no
+> matched-row count to report; returning `0` would spend the one signal
+> `Ok(0)` already carries on a second, incompatible meaning. Both many-row
+> terminals therefore refuse it with `Error::NothingToSet`
+> (`[spec:pgorm:def:error.model+8]`) — `exec` and `exec_returning_models`
+> alike, so the choice of terminal cannot change whether the statement was
+> sent. The input is ordinary rather than exotic: `UpdateMany::set` skips
+> `Unchanged` and `NotSet` fields (`[spec:pgorm:sem:query.build.update+4]`),
+> so a model read back from the database and handed straight to `set`
+> produces exactly it.
+>
+> The singular terminal is not held to that refusal, and the asymmetry is the
+> point: `UpdateOne::exec_returning_model` promises the model, names one row
+> by its primary key, and so has a row to read when there is nothing to
+> write. `UpdateMany` has no such row, and a `SELECT` standing in for the
+> refusal would change what the method costs without changing what it is
+> called.
+>
+> A `TryUpdate` escape valve — the `TryInsertResult::Empty`
+> (`[spec:pgorm:sem:exec.crud.try-insert+3]`) of updates, letting a caller
+> take "nothing to set" as an outcome rather than an error — is deliberately
+> NOT provided. `TryInsert` exists because a conflict clause makes "no row
+> written" a routine result of a statement that was sent; nothing to set is
+> a property of the statement the caller built, testable before executing it
+> through `QueryTrait::as_query().get_values()`, so the valve would wrap a
+> question the caller can already ask.
 >
 > `UpdateOne::exec_returning_model` returns the updated model: it appends a
 > `RETURNING` clause of all entity columns and decodes through
@@ -509,8 +536,7 @@ These rules capture what the code does today, including known gaps.
 > predicates rather than reconstructing a key through `sql.value.tuple`, so
 > a mistyped `PrimaryKey::ValueType` is never consulted here.
 > `UpdateMany::exec_returning_models` appends the
-> same full-column `RETURNING` and returns `Vec<Model>` via `all`; its
-> no-op path returns an empty `Vec`.
+> same full-column `RETURNING` and returns `Vec<Model>` via `all`.
 
 > [spec:pgorm:sem:exec.crud.delete+1]
 > `DeleteOne::exec` and `DeleteMany::exec` both build

@@ -16,7 +16,13 @@ where
     /// `UpdateOne` has no bare `exec`: updating a single model by primary key
     /// always reads the row back. Use [`Update::many`](crate::Update::many)
     /// filtered to the key when a rows-affected count is all that is wanted.
-    // [spec:pgorm:sem:exec.crud.update+6]
+    ///
+    /// Nothing to set is not an error here: this terminal promises the model,
+    /// the statement names one row by its primary key, and so the model can
+    /// still be read under the statement's own `WHERE`. The many-row terminals
+    /// have no such row to fall back to and report
+    /// [`Error::NothingToSet`](crate::Error::NothingToSet) instead.
+    // [spec:pgorm:sem:exec.crud.update+7]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     pub async fn exec_returning_model<C>(
         mut self,
@@ -56,14 +62,22 @@ where
     ///
     /// No `RETURNING` clause is emitted. See [`Self::exec_returning_models`] for
     /// the updated rows.
-    // [spec:pgorm:sem:exec.crud.update+6]
+    ///
+    /// An update naming no column to set is [`Error::NothingToSet`], not
+    /// `Ok(0)`: a zero count is the answer to "how many rows did the `WHERE`
+    /// match", and an update that was never sent has no such answer. The case
+    /// is easy to reach —
+    /// [`UpdateMany::set`](crate::UpdateMany::set) skips `Unchanged` and
+    /// `NotSet` fields, so a model read back from the database and handed
+    /// straight to `set` contributes nothing.
+    // [spec:pgorm:sem:exec.crud.update+7]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
     {
         if self.query.get_values().is_empty() {
-            return Ok(0);
+            return Err(Error::NothingToSet);
         }
         let (stmt, values) = self.query.build();
         let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
@@ -76,14 +90,19 @@ where
     }
 
     /// Execute the update and return every updated row as a model.
-    // [spec:pgorm:sem:exec.crud.update+6]
+    ///
+    /// An update naming no column to set is [`Error::NothingToSet`], on the
+    /// same terms as [`Self::exec`]: the two terminals of one builder answer
+    /// that input identically, so which terminal you reach for cannot change
+    /// whether the statement was sent.
+    // [spec:pgorm:sem:exec.crud.update+7]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary]
     pub async fn exec_returning_models<C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
     where
         C: ConnectionTrait,
     {
         if self.query.get_values().is_empty() {
-            return Ok(vec![]);
+            return Err(Error::NothingToSet);
         }
 
         let returning = Query::returning()
@@ -102,7 +121,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.crud.update+6]
+// [spec:pgorm:sem:exec.crud.update+7]
 async fn find_unchanged_model<A, C>(
     query: &UpdateStatement,
     db: &C,

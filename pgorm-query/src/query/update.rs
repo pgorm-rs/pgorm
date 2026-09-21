@@ -348,7 +348,7 @@ impl UpdateStatement {
 
     /// The accumulated `WHERE` condition, when at least one predicate was
     /// added.
-    // [spec:pgorm:sem:exec.crud.update+6]
+    // [spec:pgorm:sem:exec.crud.update+7]
     pub fn where_condition(&self) -> Option<&Condition> {
         self.r#where
             .contents

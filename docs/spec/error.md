@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+7]
+> [spec:pgorm:def:error.model+8]
 > `Error` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -22,12 +22,18 @@ it.
 > are constructed by pgorm itself: `Conversion { from, into, source }`,
 > `Query(RuntimeError)`, `ConvertFromU64(&'static str)`, `UnpackInsertId`,
 > `PrimaryKeyNotSet`, `AttrNotSet(String)`, `Type(String)`,
-> `Json(String)`, `RecordNotFound`, `RecordNotInserted`,
+> `Json(String)`, `RecordNotFound`, `RecordNotInserted`, `NothingToSet`
 > and `Custom(String)`. Every variant MUST have at least one construction
 > site: variants that no code can produce are removed rather than kept as
 > documentation. `RecordNotUpdated` was removed under that rule when
 > `exec.crud.update` deleted `Updater::check_record_exists`, its only
 > producer.
+>
+> `NothingToSet` is the counter-case: it exists because
+> `[spec:pgorm:sem:exec.crud.update+7]` raises it, and it names the statement
+> that could not be sent rather than a row that was not found — an update
+> with no column to set, which is not the `Ok(0)` of a `WHERE` that matched
+> nothing.
 >
 > `Error` implements `PartialEq`/`Eq` by comparing `Display` strings, so two
 > errors with distinct payloads but identical rendered messages compare

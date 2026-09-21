@@ -626,7 +626,7 @@ fn primary_key_value_type_errs_on_arity() {
 // reconstruct from, so the `Error::Type` the reconstruction used to raise is not
 // reachable here. Only `exec_returning_pk` decodes the key, so only it can fail
 // this way; plain `exec` asks for no key and reports the row it wrote.
-// [spec:pgorm:sem:exec.crud.update+6/test]    the no-op read reuses the
+// [spec:pgorm:sem:exec.crud.update+7/test]    the no-op read reuses the
 // statement's own `WHERE` and never consults `ValueType`, so even a mistyped
 // key declaration re-reads the model successfully
 // [spec:pgorm:req:exec.crud.exec-vocabulary/test]    the two insert terminals
@@ -664,7 +664,7 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.update+6/test]    a composite key's no-op read
+// [spec:pgorm:sem:exec.crud.update+7/test]    a composite key's no-op read
 // carries every key predicate and the caller's guard together
 #[pgorm_macros::test]
 async fn composite_key_noop_update_keeps_filters() -> Result<(), Error> {

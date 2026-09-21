@@ -239,7 +239,7 @@ fn anvil() -> tenant_a::item::Model {
 // qualifies the generated DDL and every CRUD statement: create, insert with
 // RETURNING, a guarded no-op update, a TryInsert conflict, and delete all
 // land on tenant_a.item
-// [spec:pgorm:sem:exec.crud.update+6/test]
+// [spec:pgorm:sem:exec.crud.update+7/test]
 #[pgorm_macros::test]
 async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_crud").await;
