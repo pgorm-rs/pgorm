@@ -1695,7 +1695,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+7]
+    // [spec:pgorm:req:sql.ddl.create-table+8]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1911,9 +1911,22 @@ impl QueryBuilder {
         }
 
         self.prepare_index_columns(&create.index.columns, sql);
+
+        // [spec:pgorm:req:sql.ddl.index-create+8]
+        if !create.include.is_empty() {
+            write!(sql, " INCLUDE (").unwrap();
+            create.include.iter().fold(true, |first, name| {
+                if !first {
+                    write!(sql, ", ").unwrap();
+                }
+                name.prepare(sql.as_writer());
+                false
+            });
+            write!(sql, ")").unwrap();
+        }
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+7]
+    // [spec:pgorm:req:sql.ddl.index-create+8]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -1943,9 +1956,27 @@ impl QueryBuilder {
         write!(sql, " ").unwrap();
         self.prepare_index_columns(&create.index.columns, sql);
 
+        // [spec:pgorm:req:sql.ddl.index-create+8]
+        if !create.include.is_empty() {
+            write!(sql, " INCLUDE (").unwrap();
+            create.include.iter().fold(true, |first, name| {
+                if !first {
+                    write!(sql, ", ").unwrap();
+                }
+                name.prepare(sql.as_writer());
+                false
+            });
+            write!(sql, ")").unwrap();
+        }
+
         if create.nulls_not_distinct && kind == Some(StandaloneIndexKind::Unique) {
             write!(sql, " NULLS NOT DISTINCT").unwrap();
         }
+
+        // The predicate closes the statement, after every clause that describes
+        // the index itself.
+        // [spec:pgorm:req:sql.ddl.index-create+8]
+        self.prepare_condition(&create.r#where, "WHERE", sql);
     }
 
     // [spec:pgorm:req:sql.ddl.index-drop+3]
@@ -1988,14 +2019,30 @@ impl QueryBuilder {
         }
     }
 
-    /// Write an index's column list.
+    /// Write an index's column list: each entry's target, then its operator
+    /// class, then its order — PostgreSQL's order for the three, and the reason
+    /// an expression entry composes with a direction the way a named one does.
+    // [spec:pgorm:req:sql.ddl.index-create+8]
     fn prepare_index_columns(&self, columns: &[IndexColumn], sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
         columns.iter().fold(true, |first, col| {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            col.name.prepare(sql.as_writer());
+            match &col.target {
+                IndexColumnTarget::Name(name) => name.prepare(sql.as_writer()),
+                // The parentheses are the grammar's, not decoration: without
+                // them PostgreSQL reads the expression as a column name.
+                IndexColumnTarget::Expr(expr) => {
+                    write!(sql, "(").unwrap();
+                    self.prepare_simple_expr(expr, sql);
+                    write!(sql, ")").unwrap();
+                }
+            }
+            if let Some(class) = &col.operator_class {
+                write!(sql, " ").unwrap();
+                class.prepare(sql.as_writer());
+            }
             if let Some(order) = &col.order {
                 match order {
                     IndexOrder::Asc => write!(sql, " ASC").unwrap(),

@@ -63,7 +63,7 @@ fn over_attaches_only_to_function_calls() {
 // to come from: nothing but the caller's own `extra` string can follow the
 // closing parenthesis. Deletion-proof, so there is no rejection left to pin.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
 #[test]
 fn create_table_renders_no_trailing_options() {
     let sql = Table::create(Glyph::Table)
@@ -370,7 +370,7 @@ fn oracle_records_parse_valid_defects() {
 // them.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.alter-table+4/test]
-// [spec:pgorm:req:sql.ddl.index-create+7/test]
+// [spec:pgorm:req:sql.ddl.index-create+8/test]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]
 #[test]
 fn empty_ddl_collections_do_not_construct() {
@@ -395,7 +395,7 @@ fn empty_ddl_collections_do_not_construct() {
 // with no attributes is a real table — so a column-less create statement stays
 // buildable and is documented by `sql.ddl.create-table` instead.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
 #[test]
 fn create_table_with_no_columns_is_valid() {
     let sql = Table::create(Glyph::Table).to_string();
@@ -410,8 +410,8 @@ fn create_table_with_no_columns_is_valid() {
 // PostgreSQL rejects at the token after it has nowhere to come from. The
 // `compile_fail` doctests on each statement type prove the constructors refuse.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
-// [spec:pgorm:req:sql.ddl.index-create+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
+// [spec:pgorm:req:sql.ddl.index-create+8/test]
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 // [spec:pgorm:req:sql.ddl.alter-table+4/test]
@@ -451,7 +451,7 @@ fn ddl_targets_are_taken_by_construction() {
 // and `DROP INDEX` names a schema-scoped index rather than a table, so both stay
 // optional where the rest of the family moved into the constructor.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.index-create+7/test]
+// [spec:pgorm:req:sql.ddl.index-create+8/test]
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 #[test]
 fn index_name_and_drop_table_stay_optional() {
@@ -474,7 +474,7 @@ fn index_name_and_drop_table_stay_optional() {
 // refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle/test]
 // [spec:pgorm:req:sql.ddl.foreign-key+4/test]
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {
     let standalone = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)

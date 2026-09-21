@@ -1,4 +1,11 @@
-use crate::{QueryBuilder, types::*};
+use inherent::inherent;
+
+use crate::{
+    QueryBuilder,
+    expr::SimpleExpr,
+    query::{ConditionHolder, ConditionalStatement, IntoCondition},
+    types::*,
+};
 
 use super::common::*;
 
@@ -103,9 +110,9 @@ use super::common::*;
 ///
 /// Table::create(Glyph::Table).index(Index::create(Glyph::Table, Glyph::Aspect).unique());
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+7]
+// [spec:pgorm:req:sql.ddl.index-create+8]
 // [spec:pgorm:req:sql.ast+1]
-// [spec:pgorm:req:sql.ddl.create-table+7]
+// [spec:pgorm:req:sql.ddl.create-table+8]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -114,6 +121,8 @@ pub struct IndexCreateStatement {
     pub(crate) nulls_not_distinct: bool,
     pub(crate) index_type: Option<IndexType>,
     pub(crate) if_not_exists: bool,
+    pub(crate) include: Vec<Name>,
+    pub(crate) r#where: ConditionHolder,
 }
 
 /// What an index constrains: nothing, uniqueness, or the table's primary key.
@@ -126,7 +135,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+7]
+// [spec:pgorm:req:sql.ddl.index-create+8]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -139,7 +148,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+7]
+// [spec:pgorm:req:sql.ddl.index-create+8]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -185,6 +194,8 @@ impl IndexCreateStatement {
             nulls_not_distinct: false,
             index_type: None,
             if_not_exists: false,
+            include: Vec::new(),
+            r#where: ConditionHolder::new(),
         }
     }
 
@@ -251,6 +262,37 @@ impl IndexCreateStatement {
         self
     }
 
+    /// Carry further columns in the index's leaves without indexing them —
+    /// PostgreSQL's `INCLUDE`. Repeated calls append.
+    ///
+    /// An included column is not part of the key: it cannot be searched or
+    /// ordered by, and exists so a query reading only these columns can be
+    /// answered from the index alone. PostgreSQL allows it on plain, unique and
+    /// primary-key indexes alike, and on a unique index the included columns
+    /// take no part in the uniqueness.
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// assert_eq!(
+    ///     Index::create(Glyph::Table, Glyph::Aspect)
+    ///         .name(Name::runtime("idx-glyph-aspect"))
+    ///         .include([Glyph::Image])
+    ///         .to_string(),
+    ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect") INCLUDE ("image")"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.index-create+8]
+    pub fn include<N, I>(&mut self, columns: I) -> &mut Self
+    where
+        N: IntoName,
+        I: IntoIterator<Item = N>,
+    {
+        self.include
+            .extend(columns.into_iter().map(IntoName::into_name));
+        self
+    }
+
     pub fn kind(&self) -> IndexKind {
         self.kind
     }
@@ -274,6 +316,46 @@ impl IndexCreateStatement {
     pub fn get_table_name(&self) -> &TableName {
         &self.table
     }
+}
+
+/// Restrict the index to the rows a predicate accepts — PostgreSQL's partial
+/// index. Repeated calls conjoin, as they do on every other statement that
+/// carries a `WHERE`.
+///
+/// A partial unique index is the reason to reach for this: uniqueness holds
+/// among the matching rows and nowhere else, which is how "one active row per
+/// owner" is spelled without a constraint over the whole table. The predicate
+/// may only read the indexed table's own columns.
+///
+/// ```
+/// use pgorm_query::{*, tests_cfg::*};
+///
+/// assert_eq!(
+///     Index::create(Glyph::Table, Glyph::Aspect)
+///         .name(Name::runtime("idx-glyph-aspect-live"))
+///         .unique()
+///         .and_where(Expr::col(Glyph::Image).is_not_null())
+///         .to_string(),
+///     [
+///         r#"CREATE UNIQUE INDEX "idx-glyph-aspect-live" ON "glyph" ("aspect")"#,
+///         r#"WHERE "image" IS NOT NULL"#,
+///     ]
+///     .join(" ")
+/// );
+/// ```
+// [spec:pgorm:req:sql.ddl.index-create+8]
+#[inherent]
+impl ConditionalStatement for IndexCreateStatement {
+    pub fn cond_where<C>(&mut self, condition: C) -> &mut Self
+    where
+        C: IntoCondition,
+    {
+        self.r#where.add_condition(condition.into_condition());
+        self
+    }
+
+    pub fn and_where_option(&mut self, other: Option<SimpleExpr>) -> &mut Self;
+    pub fn and_where(&mut self, other: SimpleExpr) -> &mut Self;
 }
 
 /// Renders the statement with every value inlined as an escaped SQL literal.

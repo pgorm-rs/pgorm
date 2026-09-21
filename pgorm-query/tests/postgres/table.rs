@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
 // [spec:pgorm:req:sql.ddl.column-def+5/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+5/test]
@@ -570,7 +570,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+7/test]
+// [spec:pgorm:req:sql.ddl.create-table+8/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: IndexCreateStatement| {

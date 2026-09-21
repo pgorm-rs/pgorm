@@ -48,7 +48,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > a name, so the read cannot fail and the
 > `TransformError("Table name should not be empty")` that stood in for the
 > nameless case is gone with the state it guarded
-> (`[spec:pgorm:req:sql.ddl.create-table+7]`), and MUST NOT come back.
+> (`[spec:pgorm:req:sql.ddl.create-table+8]`), and MUST NOT come back.
 >
 > Identity is what every lookup keys on: the entity map, the per-target
 > counters behind `num_suffix`, the `self_referencing` test, and the inverse

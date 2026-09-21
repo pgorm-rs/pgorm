@@ -716,8 +716,8 @@ pub use foreign_key::{
     TableForeignKey,
 };
 pub use index::{
-    Index, IndexColumn, IndexCreateStatement, IndexDropStatement, IndexKind, IndexOrder, IndexType,
-    IntoIndexColumn, StandaloneIndexKind, TableIndex,
+    Index, IndexColumn, IndexColumnTarget, IndexCreateStatement, IndexDropStatement, IndexKind,
+    IndexOrder, IndexType, IntoIndexColumn, StandaloneIndexKind, TableIndex,
 };
 pub use table::{
     AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,

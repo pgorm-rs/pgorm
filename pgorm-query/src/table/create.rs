@@ -74,7 +74,7 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+7]
+// [spec:pgorm:req:sql.ddl.create-table+8]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,

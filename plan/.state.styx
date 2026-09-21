@@ -838,6 +838,7 @@ assertions (
     {id query-update-from, kind @complete, author "brendan@necessary.nu", at 2026-09-20T18:32:14.763023Z}
     {id query-aggregate-modifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-20T19:04:53.640837Z}
     {id query-identity-columns, kind @complete, author "brendan@necessary.nu", at 2026-09-21T12:28:09.876693Z}
+    {id query-index-forms, kind @doing, author "brendan@necessary.nu", at 2026-09-21T12:28:28.118325Z}
 )
 
 impl_evidence (

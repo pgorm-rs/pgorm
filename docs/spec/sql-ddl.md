@@ -62,7 +62,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+7]
+> [spec:pgorm:req:sql.ddl.create-table+8]
 > `TableCreateStatement` composes a table name, ordered `ColumnDef`s (`col()`,
 > which stamps the table ref onto each column), table-level indexes (`index()`
 > and `primary_key()` — the latter takes an `IndexCreateStatement` and forces
@@ -86,9 +86,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > expressions, then foreign-key clauses (in `Mode::Creation`, i.e. without
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
-> ][NULLS NOT DISTINCT ](cols)`, the keyword chosen by the statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+7]`) and `NULLS NOT
-> DISTINCT` emitted only for `Unique`. A `Plain` kind — reachable only through
+> ][NULLS NOT DISTINCT ](cols)[ INCLUDE (names)]`, the keyword chosen by the
+> statement's
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+8]`) and `NULLS NOT
+> DISTINCT` emitted only for `Unique`. A table constraint takes `INCLUDE`, so it
+> renders here too; it takes neither the predicate nor an expression entry that
+> the same statement can carry, and those go unrendered rather than producing a
+> clause PostgreSQL has no place for. A `Plain` kind — reachable only through
 > `index()`, since `primary_key()` sets the kind — contributes no keyword and
 > so renders a constraint Postgres rejects. After the closing parenthesis only
 > the `extra` string follows (e.g. `USING columnar`). There are no table
@@ -236,7 +240,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > takes `Into<TableForeignKey>` by value, as `add_column` takes
 > `IntoColumnDef`: an embedder consumes what it embeds, and a borrow that
 > silently cloned would be the third reuse-outcome
-> `[spec:pgorm:req:sql.ddl.create-table+7]` rules out.
+> `[spec:pgorm:req:sql.ddl.create-table+8]` rules out.
 >
 > Rendering MUST emit a single `ALTER TABLE <table> ` prefix
 > with the options comma-separated: `ADD COLUMN [IF NOT EXISTS ]<column-def>`
@@ -277,7 +281,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > All three take their targets in the constructor, because PostgreSQL rejects
 > every one of these statements with the name left out: `Table::drop(table)`
 > seeds the list and `table()` appends the rest, in the pattern
-> `[spec:pgorm:req:sql.ddl.index-create+7]` uses for index columns, so the
+> `[spec:pgorm:req:sql.ddl.index-create+8]` uses for index columns, so the
 > empty `DROP TABLE ` cannot be built; `Table::rename(from, to)` and
 > `Table::truncate(table)` take theirs whole and expose no setter. `take()` on
 > a drop copies the target list rather than moving it, so no target-less husk
@@ -309,7 +313,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > quoting is the whole injection boundary for comment text.
 >
 > The comment text a `TableCreateStatement` carries — its own
-> (`[spec:pgorm:req:sql.ddl.create-table+7]`) and each `ColumnSpec::Comment`
+> (`[spec:pgorm:req:sql.ddl.create-table+8]`) and each `ColumnSpec::Comment`
 > (`[spec:pgorm:req:sql.ddl.column-def+4]`) — MUST be reachable as those
 > statements: `TableCreateStatement::comments()` returns one
 > `CommentStatement` per carried comment, the table's first and then one per
@@ -323,9 +327,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+7]
+> [spec:pgorm:req:sql.ddl.index-create+8]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
-> ordered `IndexColumn`s), an `IndexKind`, and `nulls_not_distinct`,
+> ordered `IndexColumn`s), an `IndexKind`, an `include` list of non-key column
+> names, a `where` predicate, and `nulls_not_distinct`,
 > `index_type` and `if_not_exists` flags. Its target table and its column list
 > MUST both be non-empty by construction: `Index::create(table, col)` and
 > `IndexCreateStatement::new(table, col)` take the table and the first column
@@ -337,13 +342,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
 > column list in every position this statement reaches — standalone
 > `CREATE INDEX ... ()` and the embedded `PRIMARY KEY ()` and `UNIQUE ()` of
-> `[spec:pgorm:req:sql.ddl.create-table+7]` alike — and rejects
+> `[spec:pgorm:req:sql.ddl.create-table+8]` alike — and rejects
 > `CREATE INDEX "n" ON  (...)` at the parenthesis, so both states are
 > unreachable rather than checked
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The index *name* is the one
 > part that stays optional: PostgreSQL derives a name when `CREATE INDEX`
 > omits it, so `CREATE INDEX  ON "t" ("c")` parses and is left buildable. In
-> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+7]` the table
+> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+8]` the table
 > is not rendered at all and the owning statement restamps it, so the
 > constructor argument there names the table the index already belongs to
 > rather than a second one. `IndexKind`
@@ -352,10 +357,25 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > never a combination: `primary()` and `unique()` each set the kind outright,
 > replacing whatever was set before, and an index is never both a primary key
 > and a unique key. `is_primary_key()`, `is_unique_key()` and `kind()` read it
-> back. `IntoIndexColumn` accepts an iden or an `(iden, IndexOrder)` pair,
-> and nothing else: the MySQL prefix-length forms `(iden, u32)` and
-> `(iden, u32, IndexOrder)` are gone with the `IndexColumn::prefix` field they
-> fed, and MUST NOT return.
+> back. `IntoIndexColumn` accepts an iden, an `(iden, IndexOrder)` pair, or an
+> `IndexColumn` built outright, and nothing else: the MySQL prefix-length forms
+> `(iden, u32)` and `(iden, u32, IndexOrder)` are gone with the
+> `IndexColumn::prefix` field they fed, and MUST NOT return.
+>
+> An `IndexColumn` is one entry of the index: an `IndexColumnTarget`, an
+> optional operator class, and an optional order. The target is the closed pair
+> `Name(Name) | Expr(SimpleExpr)`, because PostgreSQL renders the two
+> differently — a column bare, an expression parenthesised — and which one an
+> entry holds MUST be a state of the type rather than a shape the renderer
+> infers from an expression
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `IndexColumn::name(n)` and
+> `IndexColumn::expr(e)` construct them, and `operator_class(c)` and `order(o)`
+> each set their slot outright, replacing whatever was there; the
+> `(iden, IndexOrder)` tuple stays as the shorthand for the common case. The
+> operator class is an identifier and MUST render quoted like every other name,
+> never as SQL. `TableIndex::get_column_names` reports the named entries only:
+> an expression entry has no name, and its sole caller reads a primary key's
+> columns back, where PostgreSQL permits no expression, so nothing is dropped.
 >
 > Postgres spells `PRIMARY KEY` only as an inline table constraint, so
 > `IndexKind::PrimaryKey` has no standalone spelling and the standalone
@@ -365,24 +385,44 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+7]`.
+> `[spec:pgorm:req:sql.ddl.create-table+8]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
-> ]"name" ON <table>[ USING <type>] (cols)[ NULLS NOT DISTINCT]`, where
+> ]"name" ON <table>[ USING <type>] (cols)[ INCLUDE (names)][ NULLS NOT
+> DISTINCT][ WHERE <predicate>]` — the grammar's own order for those clauses —
+> where
 > `<type>` is `BTREE`, `GIN` (the `IndexType::Gin` variant, also set by the
 > `gin()` shorthand — the access method is named for what PostgreSQL calls it,
 > not for the full-text use it serves), `HASH`, or a custom identifier, and
-> each column renders as
-> `"name"[ ASC|DESC]`. There is no prefix length: `"name" (128)` is MySQL's
+> each entry renders as `"name"|(<expr>)[ "opclass"][ ASC|DESC]`. There is no
+> prefix length: `"name" (128)` is MySQL's
 > syntax for indexing a leading substring, PostgreSQL rejects it outright, and
 > an index the server cannot accept MUST NOT be constructible — the expression
 > index is the legitimate occupant of that syntactic position. Postgres defines
 > `NULLS NOT DISTINCT` for unique indexes alone, so the flag MUST render only
 > when the kind is `Unique`; on any other kind it is carried but not spelled.
 >
-> There is no support for partial indexes (`WHERE`), `INCLUDE` columns,
-> expression columns or operator classes in the current builder. The index
-> target is a `TableName`, so both of its forms render and no other shape is
+> The predicate is a `ConditionHolder` reached through `ConditionalStatement`,
+> so `and_where`/`cond_where` conjoin here exactly as they do on a query
+> (`[spec:pgorm:req:sql.render.condition-chain]`) and an absent predicate spells
+> no keyword. `include(cols)` appends rather than replaces, matching every other
+> accumulating builder on this statement. Both clauses also render in the
+> embedded position of `[spec:pgorm:req:sql.ddl.create-table+8]` as far as
+> PostgreSQL allows: a table constraint takes `INCLUDE` and MUST render it, and
+> takes neither a predicate nor an expression entry. Those last two are
+> constructible-but-invalid there for the same reason a `Plain` embedded kind
+> is — the embedded path narrows nothing, it restamps a statement built for the
+> standalone one — and are documented rather than typed, because splitting
+> `IndexCreateStatement` into standalone and embedded types is a change to what
+> `index()` and `primary_key()` accept, not a clause.
+>
+> `CONCURRENTLY` MUST NOT be offered. It is not a property of the index but of
+> how the statement runs: PostgreSQL refuses it inside a transaction block, and
+> pgorm executes DDL through connections whose migrations and test fixtures are
+> transactional, so a builder that could spell it would produce a statement the
+> runtime cannot run. A caller who needs it runs the SQL themselves, outside a
+> transaction, where the constraint is visible. The index target is a
+> `TableName`, so both of its forms render and no other shape is
 > constructible.
 
 > [spec:pgorm:req:sql.ddl.index-drop+3]
@@ -429,7 +469,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
-> (`[spec:pgorm:req:sql.ddl.create-table+7]`). `ForeignKeyDropStatement` MUST
+> (`[spec:pgorm:req:sql.ddl.create-table+8]`). `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`; both halves are taken by
 > `ForeignKey::drop(table, name)` and neither has a setter, for the same reason.
 > It holds the constraint name

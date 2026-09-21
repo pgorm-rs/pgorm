@@ -7859,6 +7859,13 @@ children (
                         kind @note
                         text "IndexCreateStatement's fields (index/create.rs:103-111) have no partial-index WHERE, no expression columns (IndexColumn is name-only, index/common.rs:11-15), no INCLUDE, no operator class, no CONCURRENTLY. NULLS NOT DISTINCT is already supported (create.rs:227), so the type is half-modernized. Partial and expression indexes are the priority — the 2026-09-20 sufficiency review classed them as baseline modern schema work — with INCLUDE and opclass behind them. Expression columns also supply the honest replacement for the deleted MySQL prefix tuple (query-index-prefix-retired)."
                     }
+
+                    {
+                        at 2026-09-21T12:28:28.118325Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 
