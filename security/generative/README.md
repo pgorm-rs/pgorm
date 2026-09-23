@@ -277,12 +277,14 @@ refuses one rather than escaping it (`pipeline.errors+3`); a valid program
 carrying one could never pass.
 Runtime-model inserts use unaliased tables, as required by that public API.
 Sequences reuse observed results, actually reach both conflict actions and close
-nested commit/rollback scopes. Read-only transactions and ordered stream prefixes
+nested commit/rollback scopes; their inserts sometimes leave nullable columns to
+the table's default, which the final fixture comparison then has to agree on. Read-only transactions and ordered stream prefixes
 are generated separately. The invalid-mode rejection family labels each
 deliberate rejection with its exact expected cause: a SQLSTATE for a database
 rejection, or the binding's documented refusal text for one pgorm makes before
 anything is sent — a quoted pipeline identifier among them, so the refusal the
-valid grammar steers around is itself checked. `refusals.py` holds that text
+valid grammar steers around is itself checked, and an insert batch with no rows,
+which the binding refuses rather than sending, whichever terminal asked for it. `refusals.py` holds that text
 once; the independent reference reaches the same refusal from its own model of
 the rule. Unexpected valid-program failures remain failures.
 

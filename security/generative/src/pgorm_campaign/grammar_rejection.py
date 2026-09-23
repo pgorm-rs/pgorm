@@ -8,9 +8,10 @@ reach the same rejection from its own model of the rule. A valid-mode failure
 is never relabelled as one of these.
 """
 
+from . import baseline
 from .grammar_pipeline import Pipeline
 from .grammar_sequence import account_row, accounts, tenant_guard
-from .refusals import UNQUOTABLE
+from .refusals import EMPTY_INSERT, UNQUOTABLE
 
 
 def _database(sqlstate):
@@ -71,11 +72,34 @@ def _unquotable(state):
     )
 
 
+def _empty_batch(state):
+    """An insert given columns and no rows writes nothing, by refusing.
+
+    The binding documents the empty batch as an error rather than a zero:
+    compilation refuses an insert with no rows and no explicit
+    `default_values()`, so no statement reaches the server. The final fixture
+    comparison is the evidence that nothing was written, whichever terminal —
+    a counted execute or a RETURNING fetch — was asked for.
+    """
+    table = accounts(state)
+    names = [item["name"] for item in baseline.default()["tables"][0]["columns"]]
+    columns = [name for name in names if state.choices.take((False, True))]
+    query = state.node("insert", {"table": table}, {"columns": columns or names})
+    error = {"class": "ConstructionError", "cause": EMPTY_INSERT}
+    if state.choices.take((False, True)):
+        returning = state.node("expr.column", {"table": table}, {"name": "id"})
+        query = state.node("write.returning", {"query": query, "columns": [returning]})
+        state.fetch(query, error=error)
+    else:
+        state.author.effect("execute", {"query": query}, error=error)
+
+
 RULES = {
     "division": _division,
     "not-null": _not_null,
     "duplicate": _duplicate,
     "unquotable-identifier": _unquotable,
+    "empty-batch": _empty_batch,
 }
 
 

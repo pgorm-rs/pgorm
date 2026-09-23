@@ -94,13 +94,14 @@ class FamilyVariationTest(unittest.TestCase):
     """Family cells are discharged by construction evidence, like every token."""
 
     def tokens(self, family, index=0):
-        program = grammar.generate(20260913, index, family=family).program
+        mode = "invalid" if family == "rejection" else "valid"
+        program = grammar.generate(20260913, index, family=family, mode=mode).program
         return campaign_coverage.observed(program.data(), executed(program))
 
     # [spec:pgorm:req:generative.matrix/test]
     def test_declared_families_are_reachable_from_generated_programs(self):
         reached = set()
-        for family in grammar.FAMILIES:
+        for family in (*grammar.FAMILIES, "rejection"):
             for index in range(60):
                 reached |= self.tokens(family, index)
         declared = {
@@ -112,17 +113,67 @@ class FamilyVariationTest(unittest.TestCase):
         # (a decoded graph row, a stream's ending), so those are excluded here
         # and covered by the runtime campaign instead.
         observed_only = {
+            "entities.hooks",
             "graph.absent-source",
             "graph.model-decode",
             "sequences.stream-cancel",
             "sequences.stream-complete",
             "sequences.stream-early-close",
         }
-        outstanding = declared - reached - observed_only
-        self.assertEqual(
-            outstanding,
-            {"crud.empty-batch", "crud.omitted-write", "entities.hooks"},
-        )
+        self.assertEqual(declared - reached - observed_only, set())
+
+    def hooked(self, suffix):
+        """An Account insert whose observed name is its declared name + suffix."""
+        for index in range(60):
+            program = grammar.generate(20260913, index, family="active").program
+            data = program.data()
+            step = data["steps"][0]
+            if step["op"] != "active.write" or step["data"]["method"] != "insert":
+                continue
+            nodes = {node["id"]: node for node in data["nodes"]}
+            node = nodes[step["inputs"]["model"]]
+            while node["op"] == "active.set" and node["data"]["column"] != "name":
+                node = nodes[node["inputs"]["model"]]
+            if node["op"] != "active.set":
+                continue
+            declared = nodes[node["inputs"]["value"]]["data"]["value"]["data"]
+            report = executed(program)
+            report["subject"]["steps"][0]["observation"] = {
+                "kind": "rows",
+                "rows": [
+                    {
+                        "kind": "record",
+                        "fields": [
+                            {
+                                "name": "name",
+                                "value": wire.scalar("text", declared + suffix),
+                            }
+                        ],
+                    }
+                ],
+            }
+            return campaign_coverage.observed(data, report)
+        self.fail("the active family never inserted a named Account")
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_an_empty_batch_omits_no_write(self):
+        seen = 0
+        for index in range(80):
+            generated = grammar.generate(20260913, index, mode="invalid")
+            if generated.recipe()["rejection_case"] != "empty-batch":
+                continue
+            program = generated.program
+            tokens = campaign_coverage.observed(program.data(), executed(program))
+            self.assertIn("crud.empty-batch", tokens)
+            self.assertNotIn("crud.omitted-write", tokens)
+            seen += 1
+        self.assertTrue(seen)
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_observed_hook_rewrite_is_attributed(self):
+        self.assertIn("entities.hooks", self.hooked("|hook"))
+        self.assertNotIn("entities.hooks", self.hooked(""))
+        self.assertNotIn("entities.hooks", self.hooked("|other"))
 
     # [spec:pgorm:req:generative.verdict/test]
     def test_an_unrun_program_attributes_no_variation(self):
