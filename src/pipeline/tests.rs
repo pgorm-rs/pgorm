@@ -1665,6 +1665,84 @@ fn select_sources_named_self_join_qualifies_by_name() {
     );
 }
 
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the widest list the
+// terminal takes — six sources — projects the i-th listed source's columns
+// under s{i}_, qualified by that source's own name, and types one
+// Option<Model> per position in listing order
+#[test]
+fn select_sources_projects_six_sources_in_listing_order() {
+    use crate::tests_cfg::{cake_filling, filling, vendor};
+    use core::marker::PhantomData;
+
+    /// One `Option<Model>` per listed source, in listing order.
+    type SixRow = (
+        Option<cake::Model>,
+        Option<cake_filling::Model>,
+        Option<filling::Model>,
+        Option<vendor::Model>,
+        Option<fruit::Model>,
+        Option<fruit::Model>,
+    );
+
+    /// The row type a selection decodes into, read off at compile time.
+    fn row_of<T: SourceList>(_: &SelectedSources<T>) -> PhantomData<T::Row> {
+        PhantomData
+    }
+
+    let rival = alias("rival");
+    let selected = Pipeline::from(cake::Entity)
+        .join(
+            JoinSide::Inner,
+            cake_filling::Entity,
+            cake::Column::Id.eq(cake_filling::Column::CakeId),
+        )
+        .join(
+            JoinSide::Inner,
+            filling::Entity,
+            cake_filling::Column::FillingId.eq(filling::Column::Id),
+        )
+        .join(
+            JoinSide::Left,
+            vendor::Entity,
+            filling::Column::VendorId.eq(vendor::Column::Id),
+        )
+        .join(
+            JoinSide::Left,
+            fruit::Entity,
+            cake::Column::Id.eq(fruit::Column::CakeId),
+        )
+        .join(
+            JoinSide::Left,
+            fruit::Entity.named(rival),
+            fruit::Column::Name.eq(col(rival, alias("name"))),
+        )
+        .select_sources((
+            cake::Entity,
+            cake_filling::Entity,
+            filling::Entity,
+            vendor::Entity,
+            fruit::Entity,
+            fruit::Entity.named(rival),
+        ));
+
+    let _: PhantomData<SixRow> = row_of(&selected);
+
+    let built = sources_sql_of(selected);
+    let (projection, _) = built.split_once(" FROM ").expect("a FROM clause");
+    assert_eq!(
+        projection,
+        [
+            "SELECT cake.id AS s0_id, cake.name AS s0_name",
+            "cake_filling.cake_id AS s1_cake_id, cake_filling.filling_id AS s1_filling_id",
+            "filling.id AS s2_id, filling.name AS s2_name, filling.vendor_id AS s2_vendor_id",
+            "vendor.id AS s3_id, vendor.name AS s3_name",
+            "fruit.id AS s4_id, fruit.name AS s4_name, fruit.cake_id AS s4_cake_id",
+            "rival.id AS s5_id, rival.name AS s5_name, rival.cake_id AS s5_cake_id",
+        ]
+        .join(", ")
+    );
+}
+
 // [spec:pgorm:sem:pipeline.select-sources+3/test]    the writer's cast
 // discipline reaches the PRQL side: an enum column reads back as text
 // [spec:pgorm:sem:query.graph.writer+4/test]
