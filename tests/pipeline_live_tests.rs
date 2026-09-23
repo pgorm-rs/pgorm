@@ -21,7 +21,7 @@ use pgorm::pipeline::{
     AliasName, Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, by, col, count, count_rows,
     first, last, named_runtime, row_number, sort_by, sum,
 };
-use pgorm::{ConnectionTrait, Schema, entity::*, set};
+use pgorm::{ConnectionTrait, Schema, entity::prelude::Uuid, entity::*, set};
 use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
 
@@ -41,6 +41,8 @@ const NAME: AliasName = alias("name");
 const BODY: AliasName = alias("body");
 const MANAGED: AliasName = alias("managed");
 const EVERYONE: AliasName = alias("everyone");
+const OTHER_LINE: AliasName = alias("other_line");
+const ORDER_ID: AliasName = alias("order_id");
 
 /// A table that refers to itself: every employee but the founder reports to
 /// another row of this same table.
@@ -1245,6 +1247,155 @@ async fn select_sources_one_takes_one() {
         .await
         .unwrap();
     assert!(nobody.is_none());
+
+    ctx.delete().await;
+}
+
+// [spec:pgorm:sem:pipeline.select-sources+3/test]    the widest list the
+// terminal takes, decoded live: six sources, each position read back from
+// its own s{i}_ prefix into its own model — two of them the same table under
+// two names, so a crossed prefix decodes cleanly into the wrong row — and a
+// left join's unmatched side decoding None in the middle of the list
+#[pgorm_macros::test]
+async fn select_sources_decodes_six_sources_by_position() {
+    let ctx = TestContext::new("pipeline_select_sources_six").await;
+    create_tables(&ctx.db).await.unwrap();
+    let db = ctx.db.get().await.unwrap();
+
+    // Every row's ids and text are its own, so a position that read a
+    // neighbour's prefix would come back holding the neighbour's row. The
+    // expected models are what each insert returned: a reading that never
+    // passes through the sources projection.
+    let bakery = bakery::ActiveModel {
+        id: set(501),
+        name: set("Harbour Bakery"),
+        profit_margin: set(12.5),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let customer = customer::ActiveModel {
+        id: set(301),
+        name: set("Cleo"),
+        notes: set(Some("collects at noon".to_owned())),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let order = order::ActiveModel {
+        id: set(201),
+        total: set(rust_dec(17.25)),
+        bakery_id: set(bakery.id),
+        customer_id: set(customer.id),
+        placed_at: set(Offset::UTC.to_datetime(Timestamp::now())),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let tart = cake::ActiveModel {
+        id: set(401),
+        name: set("Lemon Tart"),
+        price: set(rust_dec(6.25)),
+        bakery_id: set(bakery.id),
+        gluten_free: set(true),
+        serial: set(Uuid::new_v4()),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    // A cake no bakery claims: the left join to `bakery` has nothing to match.
+    let loaf = cake::ActiveModel {
+        id: set(402),
+        name: set("Market Loaf"),
+        price: set(rust_dec(4.75)),
+        bakery_id: set(None::<i32>),
+        gluten_free: set(false),
+        serial: set(Uuid::new_v4()),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let tart_line = lineitem::ActiveModel {
+        id: set(101),
+        price: set(rust_dec(6.25)),
+        quantity: set(2),
+        order_id: set(order.id),
+        cake_id: set(tart.id),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+    let loaf_line = lineitem::ActiveModel {
+        id: set(102),
+        price: set(rust_dec(4.75)),
+        quantity: set(1),
+        order_id: set(order.id),
+        cake_id: set(loaf.id),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+
+    let rows = Pipeline::from(order::Entity)
+        .join(JoinSide::Inner, customer::Entity, O::CustomerId.eq(C::Id))
+        .join(
+            JoinSide::Inner,
+            lineitem::Entity,
+            O::Id.eq(lineitem::Column::OrderId),
+        )
+        .join(
+            JoinSide::Inner,
+            cake::Entity,
+            lineitem::Column::CakeId.eq(cake::Column::Id),
+        )
+        .join(
+            JoinSide::Left,
+            bakery::Entity,
+            cake::Column::BakeryId.eq(bakery::Column::Id),
+        )
+        // Each line of the order beside the order's other line: the same
+        // table, read a second time under a name.
+        .join(
+            JoinSide::Inner,
+            lineitem::Entity.named(OTHER_LINE),
+            col(OTHER_LINE, ORDER_ID)
+                .eq(O::Id)
+                .and(col(OTHER_LINE, ID).ne(lineitem::Column::Id)),
+        )
+        .sort(lineitem::Column::Id)
+        .select_sources((
+            order::Entity,
+            customer::Entity,
+            lineitem::Entity,
+            cake::Entity,
+            bakery::Entity,
+            lineitem::Entity.named(OTHER_LINE),
+        ))
+        .all(&db)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        rows,
+        vec![
+            (
+                Some(order.clone()),
+                Some(customer.clone()),
+                Some(tart_line.clone()),
+                Some(tart),
+                Some(bakery),
+                Some(loaf_line.clone()),
+            ),
+            (
+                Some(order),
+                Some(customer),
+                Some(loaf_line),
+                Some(loaf),
+                None,
+                Some(tart_line),
+            ),
+        ]
+    );
 
     ctx.delete().await;
 }
