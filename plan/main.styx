@@ -8419,4 +8419,32 @@ children (
             }
         )
     }
+
+    {
+        id prqlc-literal-ordinal
+        title "A constant key in GROUP BY or ORDER BY is never read as a column position"
+        kind @fix
+        log (
+            {
+                at 2026-09-23T22:42:20.48433Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found 2026-09-24 by the agent fixing prqlc-group-by-wildcard in the fork. PostgreSQL reads a bare integer literal in GROUP BY as an output-column position, not a constant, so `from cake | select {id, name} | derive {x = 5} | group this (aggregate …)` compiles to `GROUP BY id, name, 5` and fails at execution with 42P10 \"GROUP BY position 5 is not in select list\". Verified against the live PostgreSQL 16 server. PostgreSQL gives ORDER BY the same positional reading, so a sort key that lowers to an integer literal is the likely sibling; DISTINCT ON's key list is to be checked too. Reachable from pgorm through the prql! macro, which compiles raw PRQL text through the fork. The fix belongs in the fork on branch pgorm/deterministic-star-expansion and lands in pgorm through the same re-pin that carries prqlc-group-by-wildcard's fix (dd9a0fee), so pgorm re-pins once."
+            }
+        )
+    }
+
+    {
+        id select-sources-wide-decode
+        title "select_sources decodes three to six sources against a live database"
+        kind @test
+        log (
+            {
+                at 2026-09-23T22:42:20.569212Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Gap found while re-stamping pipeline-sources (dd40a896). [spec:pgorm:sem:pipeline.select-sources+3] promises a single source or a tuple of up to six, each decoding positionally through its s{i}_ prefix. The macro-generated impls for three to six sources had never run in any test: all existing tests list one or two sources, and planting a wrong index in the six-source impl (position 4 reading S5.3) left every existing test green. dd40a896's select_sources_projects_six_sources_in_listing_order now pins the projection half. The decode half — each position reading its own prefix back into its own Option<Model> — can only be observed against a live database, and no live test lists more than two sources. Acceptance: a live test in tests/pipeline_live_tests.rs that lists at least three and up to six sources with distinct row data per source, asserts every position decodes its own source's values (including a position whose join leaves it None), and fails under the same planted index fault."
+            }
+        )
+    }
 )
