@@ -31,6 +31,15 @@ SELECT json_build_object(
 );
 """
 
+# The server-wide deadlines above are the programs' budget: a generated
+# statement that runs away is cut off at two seconds. A reset is the
+# controller's own work, bounded instead by the `docker exec` deadline in
+# `_sql`, and it takes its own limits for the length of its one session.
+# Inheriting the programs' two seconds let one TRUNCATE on a loaded host
+# deactivate every worker's fixture and turn the rest of a run into
+# incompletes, which is a statement about the host rather than about pgorm.
+RESET_DEADLINES = "SET statement_timeout = '25s';\nSET lock_timeout = '10s';\n"
+
 
 class FixtureFailure(RuntimeError):
     pass
@@ -257,7 +266,9 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
     async def reset(self, worker, definition, *, rebuild=False):
         """Reset both databases; callers close pooled clients before a DDL rebuild."""
         pair = self.pair(worker)
-        sql = baseline.render(definition) if rebuild else baseline.restore(definition)
+        sql = RESET_DEADLINES + (
+            baseline.render(definition) if rebuild else baseline.restore(definition)
+        )
         async with self._locks[worker]:
             # A failed side never leaves a usable pair for the next program.
             try:

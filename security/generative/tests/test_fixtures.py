@@ -3,7 +3,14 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from pgorm_campaign.fixtures import CleanupFailure, Fixture, FixtureFailure, Pair
+from pgorm_campaign import baseline
+from pgorm_campaign.fixtures import (
+    RESET_DEADLINES,
+    CleanupFailure,
+    Fixture,
+    FixtureFailure,
+    Pair,
+)
 from pgorm_campaign.process import Output
 
 
@@ -61,6 +68,23 @@ class FixtureTests(unittest.IsolatedAsyncioTestCase):
                 await fixture.start()
             self.assertTrue(any("rm" in call for call in calls))
             self.assertFalse(fixture.report["passed"])
+
+    async def test_a_reset_runs_under_its_own_deadline(self):
+        scripts = []
+
+        async def command(*args, **kwargs):
+            scripts.append(kwargs.get("input"))
+            return Output(0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Fixture(directory, run=command)
+            fixture._active = True
+            fixture._pairs = [Pair(0, "s", "r", ("subject", "reference"))]
+            await fixture.reset(0, baseline.default())
+        self.assertEqual(len(scripts), 2)
+        for script in scripts:
+            self.assertTrue(script.startswith(RESET_DEADLINES))
+            self.assertIn("TRUNCATE", script)
 
 
 if __name__ == "__main__":
