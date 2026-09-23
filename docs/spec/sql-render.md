@@ -629,7 +629,7 @@ an ideal Postgres renderer would emit.
 > the reading `[spec:pgorm:sem:sql.render.inject+3]` already does, and it is
 > PostgreSQL's own, since the tokenizer reads comments as space and
 > dollar-quoted and `E'…'` bodies as quoted
-> (`[spec:pgorm:sem:sql.token.limits+2]`). `MalformedPlaceholder` is
+> (`[spec:pgorm:sem:sql.token.limits+3]`). `MalformedPlaceholder` is
 > therefore unreachable from this constructor. Its values are `Value`s, not
 > arbitrary expressions: a `$N` in real SQL is a bind marker, and admitting
 > an expression there would turn a parameterised statement into a spliced

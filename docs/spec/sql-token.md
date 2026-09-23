@@ -56,19 +56,41 @@ of keywords, statements, or expressions.
 > exactly what makes `$1` scan as punctuation `$` + word `1` for placeholder
 > detection.
 
-> [spec:pgorm:req:sql.token.quoted+2]
+> [spec:pgorm:req:sql.token.quoted+3]
 > A `Quoted` token MUST begin with one of PostgreSQL's two string delimiters,
 > `'` (a literal) or `"` (a delimited identifier) — or spell one of the two
 > further PostgreSQL forms of `sql.token.limits`: a dollar-quoted body
-> `$tag$…$tag$`, or an escape string `E'…'` — and otherwise runs under this
-> state machine: the closing character is the delimiter itself. A backslash
-> escapes the immediately following character (`escape` toggles, so `\\` does
-> not escape the character after it). On reaching an unescaped closing
-> delimiter, the tokenizer peeks one character: if it is the delimiter again,
-> both characters are consumed and scanning continues inside the token — so
-> `'a''b'` and `"a""b"` are each a single token. The token text includes the
-> delimiters and all interior characters verbatim. An unterminated quote
-> consumes to end of input without error.
+> `$tag$…$tag$`, or an escape string `E'…'` (`e'…'` alike) — and otherwise
+> runs under this state machine: the closing character is the delimiter
+> itself. On reaching a closing delimiter, the tokenizer peeks one
+> character: if it is the delimiter again, both characters are consumed and
+> scanning continues inside the token — so `'a''b'` and `"a""b"` are each a
+> single token. The token text includes the delimiters and all interior
+> characters verbatim. An unterminated quote consumes to end of input without
+> error. A dollar-quote tag MAY hold any alphabetic character, multi-byte
+> ones included, and the body between the opening and closing tag is carried
+> whole.
+>
+> A backslash MUST be an escape inside an escape string and nowhere else.
+> Inside `E'…'` it escapes the immediately following character, the closing
+> quote included, and consumes it — so `\\` does not escape the character
+> after it. Inside `'…'` and `"…"` a backslash is an ordinary character, as
+> PostgreSQL reads them with `standard_conforming_strings` on, its default
+> since 9.1: `'C:\'` is a complete literal, and `'a\'b'` is the literal
+> `'a\'` followed by the word `b`. Honouring the backslash there was a
+> defect of the same shape as the wider delimiter set below: `'C:\'` read as
+> still open, so a `$N` after it was taken into the body and never seen as a
+> placeholder (`[spec:pgorm:sem:sql.render.inject+3]`).
+>
+> An escape string also runs on through each continuation segment: a `'`
+> reached across whitespace that holds at least one newline, where a `--`
+> comment counts as whitespace and a `/* */` comment does not. PostgreSQL
+> scans a continuation in the state of the string it continues, so the
+> backslash keeps its meaning there, and the continued string — segments
+> and the gaps between them — is ONE `Quoted` token. Lexing the segment as
+> a plain literal would end it at a `\'` the server reads as part of the
+> body. A plain literal's continuation is itself plain, so it lexes as a
+> token of its own.
 >
 > The delimiter set MUST NOT be wider than PostgreSQL's. The backtick and
 > `[bracket]` forms it used to carry are MySQL and SQL Server identifier
@@ -81,12 +103,16 @@ of keywords, statements, or expressions.
 
 ## Unquoting
 
-> [spec:pgorm:sem:sql.token.unquote]
-> `Token::unquote` returns `Some(text)` only for `Quoted` tokens (else
-> `None`). It re-runs the quote state machine over the token text, dropping
-> the outer delimiters and collapsing each doubled delimiter to a single
-> occurrence (`"a""bc"` → `a"bc`), while leaving backslash escape sequences
-> intact rather than decoding them (`"a\"bc"` → `a\"bc`, `'a\nb'` → `a\nb`).
+> [spec:pgorm:sem:sql.token.unquote+1]
+> `Token::unquote` returns `Some(body)` only for `Quoted` tokens (else
+> `None`). The body is read by the same scan that lexes the token
+> (`sql.token.quoted`), so where a form ends and what its body holds cannot
+> disagree. The outer delimiters are dropped — an escape string's `E'` and
+> `'`, a dollar body's opening and closing tags — each doubled delimiter
+> collapses to a single occurrence (`"a""bc"` → `a"bc`), an escape string's
+> continuation gaps contribute nothing, and backslash sequences are left as
+> written rather than decoded (`E'a\'b'` → `a\'b`, `'a\nb'` → `a\nb`). A
+> backslash is ordinary outside an escape string, so `'C:\'` → `C:\`.
 
 ## Properties and limitations
 
@@ -97,21 +123,25 @@ of keywords, statements, or expressions.
 > stores its source text verbatim; the module's unit tests assert it for each
 > case.
 
-> [spec:pgorm:sem:sql.token.limits+2]
+> [spec:pgorm:sem:sql.token.limits+3]
 > The tokenizer understands PostgreSQL's non-plain lexical regions: `--`
 > line comments (through the newline they end at) and nested `/* */` block
 > comments each lex as ONE `Space` token — a comment separates tokens
 > exactly as whitespace does — while `$$…$$` / `$tag$…$tag$` dollar-quoted
-> bodies and `E'…'` escape strings (backslash escapes honoured) each lex as
-> ONE `Quoted` token. A `$` followed by a digit is a placeholder spelling,
-> never a dollar-quote tag, and an unclosed dollar body runs to the end of
-> the input verbatim. `Tokenizer::new_without_dollar_quoting` disables only
-> the dollar-quote form, for input whose `$` spellings carry their own
-> grammar — the placeholder template's `$$` escape
-> (`sql.render.custom-expr`). The delimiter set is PostgreSQL's own and no
-> wider (`[spec:pgorm:req:sql.token.quoted+2]`). Remaining limitations: there
-> is no `U&'…'` awareness, and a backslash is honoured as an escape inside
-> every quoted form rather than inside `E'…'` alone, so a standard-conforming
-> `'C:\'` is read as an unterminated body. Consumers relying on the tokenizer
-> to skip quoted regions (see `sql.render.inject`) inherit exactly this
-> contract.
+> bodies and `E'…'` escape strings (backslash escapes honoured, continuation
+> segments included) each lex as ONE `Quoted` token. A `$` followed by a
+> digit is a placeholder spelling, never a dollar-quote tag, and an unclosed
+> dollar body runs to the end of the input verbatim.
+> `Tokenizer::new_without_dollar_quoting` disables only the dollar-quote
+> form, for input whose `$` spellings carry their own grammar — the
+> placeholder template's `$$` escape (`sql.render.custom-expr`). The
+> delimiter set is PostgreSQL's own and no wider, and a backslash escapes
+> inside `E'…'` alone (`[spec:pgorm:req:sql.token.quoted+3]`). Remaining
+> limitations: there is no `U&'…'` awareness — it lexes as the word `U`,
+> the punctuation `&` and a plain literal, whose body stays opaque because
+> PostgreSQL quotes a `U&` body by the standard-string rules — and the
+> reading is the `standard_conforming_strings = on` one unconditionally, so
+> a server running with it off, which reads every plain literal as an
+> escape string, is not what the tokenizer models. Consumers relying on the
+> tokenizer to skip quoted regions (see `sql.render.inject`) inherit exactly
+> this contract.

@@ -190,6 +190,16 @@ mod tests_postgres {
         );
     }
 
+    // Under standard-conforming strings `'C:\'` is a whole literal; reading
+    // its backslash as an escape would leave it open and swallow the marker.
+    #[test]
+    fn a_marker_after_a_backslash_literal_substitutes() {
+        assert_eq!(
+            inject_parameters(r"WHERE a = 'C:\' AND b = $1", ["D".into()]).unwrap(),
+            r"WHERE a = 'C:\' AND b = 'D'"
+        );
+    }
+
     #[test]
     fn an_out_of_range_reference_is_refused() {
         assert_eq!(
@@ -236,6 +246,26 @@ mod tests_postgres {
             (r#"$1 = $t$ $9 $t$ AND $1"#, r#"'X' = $t$ $9 $t$ AND 'X'"#),
             // escape string, whose backslash may not end the body early
             (r#"$1 = E'a\'b $9' AND $1"#, r#"'X' = E'a\'b $9' AND 'X'"#),
+            (r#"$1 = E'C:\\' AND $1"#, r#"'X' = E'C:\\' AND 'X'"#),
+            (r#"$1 = E'\'' AND $1"#, r#"'X' = E'\'' AND 'X'"#),
+            // and a continuation of one is scanned the same way
+            (
+                "$1 = E'a'\n'\\' $1 ' AND $1",
+                "'X' = E'a'\n'\\' $1 ' AND 'X'",
+            ),
+            // a plain literal gives a backslash no meaning, so `\'` is a
+            // backslash and then the closing quote — the literal may not
+            // run on past it
+            (r#"$1 = 'C:\' AND $1"#, r#"'X' = 'C:\' AND 'X'"#),
+            (r#"'\' || $1 || '\'"#, r#"'\' || 'X' || '\'"#),
+            // nor in a delimited identifier
+            (r#"$1 = "a\" AND $1"#, r#"'X' = "a\" AND 'X'"#),
+            // a dollar body's backslashes are text like the rest of it
+            (r#"$1 = $$C:\$$ AND $1"#, r#"'X' = $$C:\$$ AND 'X'"#),
+            (
+                r#"$1 = $t$ \' $9 $t$ AND $1"#,
+                r#"'X' = $t$ \' $9 $t$ AND 'X'"#,
+            ),
             // comments are lexical regions too
             ("$1 -- $9\nAND $1", "'X' -- $9\nAND 'X'"),
             ("$1 /* $9 */ AND $1", "'X' /* $9 */ AND 'X'"),

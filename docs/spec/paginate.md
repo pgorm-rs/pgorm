@@ -483,7 +483,7 @@ bound parameter is held to.
 > Which `$N` are markers is settled by the `sql.token` tokenizer, which
 > reads `--` and nested `/* */` comments as one `Space` token and
 > dollar-quoted bodies (tagged and untagged) and `E'…'` strings as one
-> `Quoted` token (`[spec:pgorm:sem:sql.token.limits+2]`) — the same
+> `Quoted` token (`[spec:pgorm:sem:sql.token.limits+3]`) — the same
 > opacity PostgreSQL's own scanner has, and the reason a second scan of
 > the text is no longer needed. Comment bodies, dollar-quoted strings,
 > single-quoted and E-string literals, and bracketed subscripts therefore

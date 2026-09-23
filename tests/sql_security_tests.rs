@@ -47,6 +47,50 @@ async fn inline_parameters_preserve_dollar_quoted_bodies() {
     assert_eq!(actual, expected, "a value became executable SQL: {sql}");
 }
 
+/// Under `standard_conforming_strings`, the server default, a backslash means
+/// nothing in a plain literal: `'C:\'` is complete, and the marker after it is
+/// a marker. The inlined statement must read the way the server reads the
+/// bound one.
+#[tokio::test]
+async fn inline_parameters_preserve_standard_backslash_literals() {
+    let ctx = TestContext::new("security_inline_backslash").await;
+    let db = ctx.db.get().await.unwrap();
+    let source = r"SELECT 'C:\' AS path, $1::text AS value, E'C:\\' AS escaped";
+    let payload = r"' || current_user || '\";
+    let bound = db.query_one(source, &[&payload]).await.unwrap();
+    let expected: (String, String, String) = (bound.get(0), bound.get(1), bound.get(2));
+    let sql = inject_parameters(source, [payload.into()]).unwrap();
+    let inline = db.query_one(&sql, &[]).await.unwrap();
+    let actual: (String, String, String) = (inline.get(0), inline.get(1), inline.get(2));
+    drop(db);
+    ctx.delete().await;
+    assert_eq!(
+        expected,
+        (r"C:\".to_owned(), payload.to_owned(), r"C:\".to_owned())
+    );
+    assert_eq!(actual, expected, "a value became executable SQL: {sql}");
+}
+
+/// A continuation of an `E'…'` string is scanned in the escape string's own
+/// state, so a `\'` inside it does not end the literal and the `$1` after it
+/// is text.
+#[tokio::test]
+async fn inline_parameters_preserve_escape_string_continuations() {
+    let ctx = TestContext::new("security_inline_continuation").await;
+    let db = ctx.db.get().await.unwrap();
+    let source = "SELECT E'a'\n'\\' $1 ' AS body, $1::text AS value";
+    let payload = "' || 12345::text || '";
+    let bound = db.query_one(source, &[&payload]).await.unwrap();
+    let expected: (String, String) = (bound.get(0), bound.get(1));
+    let sql = inject_parameters(source, [payload.into()]).unwrap();
+    let inline = db.query_one(&sql, &[]).await.unwrap();
+    let actual: (String, String) = (inline.get(0), inline.get(1));
+    drop(db);
+    ctx.delete().await;
+    assert_eq!(expected, ("a' $1 ".to_owned(), payload.to_owned()));
+    assert_eq!(actual, expected, "a value became executable SQL: {sql}");
+}
+
 #[tokio::test]
 async fn custom_function_identifier_is_not_sql() {
     let ctx = TestContext::new("security_function_identifier").await;

@@ -60,7 +60,7 @@ fn token_classes_carry_their_source_text_verbatim() {
     assert!(tokens[4].is_punctuation());
 }
 
-// [spec:pgorm:sem:sql.token.limits+2/test]    a line comment is one space
+// [spec:pgorm:sem:sql.token.limits+3/test]    a line comment is one space
 // token, ending at the newline it includes
 #[test]
 fn line_comments_lex_as_one_space_token() {
@@ -76,7 +76,7 @@ fn line_comments_lex_as_one_space_token() {
     );
 }
 
-// [spec:pgorm:sem:sql.token.limits+2/test]    a block comment is one space
+// [spec:pgorm:sem:sql.token.limits+3/test]    a block comment is one space
 // token, and a quote character inside a comment stays inside it
 #[test]
 fn block_comments_lex_as_one_space_token() {
@@ -93,7 +93,7 @@ fn block_comments_lex_as_one_space_token() {
     );
 }
 
-// [spec:pgorm:sem:sql.token.limits+2/test]    a dollar-quoted body — bare or
+// [spec:pgorm:sem:sql.token.limits+3/test]    a dollar-quoted body — bare or
 // tagged — is one quoted token
 #[test]
 fn dollar_quoting_lexes_as_one_quoted_token() {
@@ -104,7 +104,7 @@ fn dollar_quoting_lexes_as_one_quoted_token() {
     assert_eq!(tokens, vec![Token::Quoted("$tag$body$tag$".to_owned())]);
 }
 
-// [spec:pgorm:sem:sql.token.limits+2/test]    an E-string is one quoted token,
+// [spec:pgorm:sem:sql.token.limits+3/test]    an E-string is one quoted token,
 // its backslash escapes honoured
 #[test]
 fn e_strings_lex_as_one_quoted_token() {
@@ -112,7 +112,7 @@ fn e_strings_lex_as_one_quoted_token() {
     assert_eq!(tokens, vec![Token::Quoted(r#"E'a\nb'"#.to_owned())]);
 }
 
-// [spec:pgorm:req:sql.token.quoted+2/test]    the delimiter set is PostgreSQL's
+// [spec:pgorm:req:sql.token.quoted+3/test]    the delimiter set is PostgreSQL's
 // own: backtick and bracket are punctuation, so text after one is still read
 #[test]
 fn only_postgresql_delimiters_open_a_string() {
