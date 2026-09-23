@@ -4,9 +4,9 @@ import re
 
 from . import wire
 from .comparison import InvalidOracle
-from .reference import Driver, Rejection, Resolution
+from .reference import Driver, Resolution
 from .reference_pipeline import Relation
-from .reference_sql import SQL, Query
+from .reference_sql import SQL, Query, Rejection
 from .reference_template import Raw, template
 
 

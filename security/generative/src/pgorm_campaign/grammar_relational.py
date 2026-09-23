@@ -46,7 +46,7 @@ def _group(query):
         {"arguments": [] if function == "count_rows" else [argument_expr]},
         {"name": function},
     )
-    name = state.name("aggregate")
+    name = state.name("aggregate", quote=False)
     value = state.node("pipeline.named", {"value": value}, {"name": name})
     query.stage("pipeline.aggregate", {"columns": [value]})
     kind = (
@@ -87,7 +87,7 @@ def _window(query):
     value = state.node(
         "pipeline.function", {"arguments": arguments}, {"name": function}
     )
-    name = state.name("window")
+    name = state.name("window", quote=False)
     value = state.node("pipeline.named", {"value": value}, {"name": name})
     key = next(column for column in query.columns if column.name == "p_id")
     order = state.node(
@@ -164,7 +164,7 @@ def sets(state):
 
 def sources(state):
     arity = state.choices.integer(1, 6)
-    aliases = [state.name("source" + str(index)) for index in range(arity)]
+    aliases = [state.name("source" + str(index), quote=False) for index in range(arity)]
     entity = state.node("entity", data={"name": "campaign.Account"})
     source = state.node("pipeline.source", {"source": entity}, {"alias": aliases[0]})
     query = state.node("pipeline.from", {"source": source})

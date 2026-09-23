@@ -7,7 +7,8 @@ from .corpus import encoded
 from .grammar_pipeline import pipeline
 from .grammar_models import active, cursor, entity, graph, model
 from .grammar_select import select
-from .grammar_sequence import rejection, sequence
+from .grammar_rejection import rejection
+from .grammar_sequence import sequence
 from .grammar_state import State, VERSION, structure
 from .grammar_types import types
 from .grammar_schema import schema

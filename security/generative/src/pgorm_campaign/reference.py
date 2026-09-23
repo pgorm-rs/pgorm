@@ -13,20 +13,9 @@ from .reference_expr import scalar_node
 from .reference_models import model_node, reshape
 from .reference_pipeline import Relation, pipeline_node
 from .reference_schema import DDL, ENUM_HELPER, schema_node
-from .reference_sql import SQL, Query, query_node
+from .reference_sql import SQL, Query, Rejection, query_node
 from .reference_template import Raw, validate_types
 from .reference_values import install, qualified, quote
-
-
-class Rejection(Exception):
-    def __init__(self, category, cause, sqlstate=None):
-        self.observation = {
-            "kind": "error",
-            "class": category,
-            "cause": cause,
-            "sqlstate": sqlstate,
-        }
-        super().__init__(cause)
 
 
 class Resolution:

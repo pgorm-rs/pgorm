@@ -6,6 +6,24 @@ from .comparison import InvalidOracle
 from .reference_values import argument, qualified, quote, sql_type
 
 
+class Rejection(Exception):
+    """A refusal the independent model predicts, recorded as an observation.
+
+    The server's own rejections arrive this way from the driver; so do the
+    refusals the binding documents before any statement is sent, which the
+    reference reproduces from its own reading of the rule.
+    """
+
+    def __init__(self, category, cause, sqlstate=None):
+        self.observation = {
+            "kind": "error",
+            "class": category,
+            "cause": cause,
+            "sqlstate": sqlstate,
+        }
+        super().__init__(cause)
+
+
 @dataclass(frozen=True)
 class Parameter:
     value: dict
