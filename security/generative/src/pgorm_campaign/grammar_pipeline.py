@@ -13,9 +13,9 @@ class Column:
 
 # [spec:pgorm:req:generative.grammar]
 class Pipeline:
-    def __init__(self, state):
+    def __init__(self, state, alias=None):
         self.state = state
-        self.alias = state.name("origin")
+        self.alias = alias or state.name("origin", quote=False)
         table = state.node("table", data={"schema": "fixture", "name": "accounts"})
         source = state.node("pipeline.source", {"source": table}, {"alias": self.alias})
         self.query = state.node("pipeline.from", {"source": source})
@@ -158,7 +158,7 @@ class Pipeline:
             {"operator": state.choices.take(("add", "sub"))},
             scope=scope,
         )
-        name = state.name("derived" + str(len(state.author.nodes)))
+        name = state.name("derived" + str(len(state.author.nodes)), quote=False)
         value = state.node(
             "pipeline.named", {"value": value}, {"name": name}, scope=scope
         )
@@ -167,7 +167,7 @@ class Pipeline:
 
     def nest(self):
         state = self.state
-        alias = state.name("nested" + str(len(state.author.nodes)))
+        alias = state.name("nested" + str(len(state.author.nodes)), quote=False)
         source = state.node("pipeline.source", {"source": self.query}, {"alias": alias})
         self.query = state.node("pipeline.from", {"source": source})
         self.columns = [replace(column, source=alias) for column in self.columns]
@@ -196,7 +196,7 @@ class Pipeline:
         if not integers:
             self.nest()
             return
-        alias = state.name("joined" + str(len(state.author.nodes)))
+        alias = state.name("joined" + str(len(state.author.nodes)), quote=False)
         table = state.node("table", data={"schema": "fixture", "name": "notes"})
         source = state.node("pipeline.source", {"source": table}, {"alias": alias})
         nested = state.node("pipeline.from", {"source": source})

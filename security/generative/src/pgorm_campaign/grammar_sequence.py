@@ -34,7 +34,7 @@ def account_row(state, identity):
     return list(values), nodes
 
 
-def _table(state):
+def accounts(state):
     return state.node("table", data={"schema": "fixture", "name": "accounts"})
 
 
@@ -42,7 +42,7 @@ def _column(state, table, name):
     return state.node("expr.column", {"table": table}, {"name": name})
 
 
-def _guard(state, table, identity):
+def tenant_guard(state, table, identity):
     tenant = state.node(
         "expr.binary",
         {"left": _column(state, table, "tenant"), "right": state.value("i32", 1)},
@@ -101,7 +101,9 @@ def _update(state, table, result, scope):
     query = state.node(
         "update.set", {"query": query, "value": result["name"]}, {"column": "name"}
     )
-    guard = _guard(state, table, state.value("i32", state.choices.take((1, 2, 4))))
+    guard = tenant_guard(
+        state, table, state.value("i32", state.choices.take((1, 2, 4)))
+    )
     query = state.node("write.filter", {"query": query, "predicate": guard})
     if state.choices.take((False, True)):
         query = state.node(
@@ -121,14 +123,14 @@ def _read(state, table, result, scope):
     query = state.node("select.from", {"query": query, "table": table})
     query = state.node(
         "select.filter",
-        {"query": query, "predicate": _guard(state, table, result["id"])},
+        {"query": query, "predicate": tenant_guard(state, table, result["id"])},
     )
     state.fetch(query, scope=scope)
 
 
 # [spec:pgorm:req:generative.grammar]
 def sequence(state):
-    table, scope = _table(state), "root"
+    table, scope = accounts(state), "root"
     transaction = state.choices.take((False, True))
     if transaction:
         state.author.effect(
@@ -159,50 +161,8 @@ def sequence(state):
         query = state.node("delete", {"table": table})
         query = state.node(
             "write.filter",
-            {"query": query, "predicate": _guard(state, table, result["id"])},
+            {"query": query, "predicate": tenant_guard(state, table, result["id"])},
         )
         state.author.effect("execute", {"query": query}, scope=scope)
     if transaction:
         state.author.effect(state.choices.take(("commit", "rollback")), scope="tx")
-
-
-def rejection(state):
-    """An intentional database rejection; never relabel a valid-mode failure."""
-    rule = state.choices.take(("division", "not-null", "duplicate"))
-    if rule == "division":
-        left = state.constant("i32", state.choices.integer(1, 100))
-        right = state.constant("i32", 0)
-        expression = state.binary(left, right, "div")
-        query = state.node(
-            "select",
-            {"columns": [expression.node, state.constant("i64", state.index).node]},
-        )
-        state.fetch(query, error={"class": "DatabaseError", "cause": "sqlstate:22012"})
-    elif rule == "not-null":
-        table = _table(state)
-        query = state.node("update", {"table": table})
-        query = state.node(
-            "update.set",
-            {"query": query, "value": state.value("text", None, sql_null=True)},
-            {"column": "name"},
-        )
-        query = state.node(
-            "write.filter",
-            {"query": query, "predicate": _guard(state, table, state.value("i32", 1))},
-        )
-        state.author.effect(
-            "execute",
-            {"query": query},
-            error={"class": "DatabaseError", "cause": "sqlstate:23502"},
-        )
-    else:
-        table = _table(state)
-        columns, values = account_row(state, 1)
-        query = state.node("insert", {"table": table}, {"columns": columns})
-        query = state.node("insert.row", {"query": query, "values": values})
-        state.author.effect(
-            "execute",
-            {"query": query},
-            error={"class": "DatabaseError", "cause": "sqlstate:23505"},
-        )
-    return rule

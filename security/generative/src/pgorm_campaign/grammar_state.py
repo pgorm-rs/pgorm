@@ -91,6 +91,22 @@ def input_pool(inputs):
     return tuple(texts), tuple(names)
 
 
+@lru_cache(maxsize=4)
+def name_pools(names):
+    """Identifier inputs split on the one character the pipeline refuses.
+
+    `Pipeline::into_sql` refuses an identifier carrying a double quote rather
+    than escaping it (`pipeline.errors+3`), so a valid pipeline program can only
+    draw from the names without one. The names that do carry one are what the
+    rejection family draws to check that refusal.
+    """
+    return {
+        False: tuple(item for item in names if '"' not in item.value()["data"]),
+        True: tuple(item for item in names if '"' in item.value()["data"]),
+        None: names,
+    }
+
+
 # [spec:pgorm:req:generative.grammar]
 class State:
     def __init__(self, seed, index, *, limits=None, corpus=()):
@@ -126,8 +142,9 @@ class State:
         self.used_inputs.add(item.data()["id"])
         return item.value()["data"]
 
-    def name(self, prefix):
-        item = self.choices.take(self.names)
+    def name(self, prefix, *, quote=None):
+        """A prefixed identifier input; `quote` selects names with or without `"`."""
+        item = self.choices.take(name_pools(self.names)[quote])
         self.used_inputs.add(item.data()["id"])
         return prefix + item.value()["data"]
 

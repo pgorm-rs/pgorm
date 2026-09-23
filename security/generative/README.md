@@ -272,11 +272,19 @@ There is no HTTP transport or scanner in this path.
 Recursive expressions carry schema types and nullability. Pipeline transitions
 track available projections, source aliases and binder ownership. PRQL grouping
 and partitioned windows remove their keys from the inner expression scope.
+Pipeline identifiers are drawn without a double quote, because `into_sql`
+refuses one rather than escaping it (`pipeline.errors+3`); a valid program
+carrying one could never pass.
 Runtime-model inserts use unaliased tables, as required by that public API.
 Sequences reuse observed results, actually reach both conflict actions and close
 nested commit/rollback scopes. Read-only transactions and ordered stream prefixes
-are generated separately. Recipes label deliberate database rejections with
-exact expected SQLSTATEs; unexpected valid-program failures remain failures.
+are generated separately. The invalid-mode rejection family labels each
+deliberate rejection with its exact expected cause: a SQLSTATE for a database
+rejection, or the binding's documented refusal text for one pgorm makes before
+anything is sent — a quoted pipeline identifier among them, so the refusal the
+valid grammar steers around is itself checked. `refusals.py` holds that text
+once; the independent reference reaches the same refusal from its own model of
+the rule. Unexpected valid-program failures remain failures.
 
 Recursive text uses NUL-free corpus entries up to 4 KiB and identifiers have a
 smaller byte budget. The type family separately draws exact built-in and random

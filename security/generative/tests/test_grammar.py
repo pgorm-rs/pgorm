@@ -5,6 +5,7 @@ from pgorm_campaign import wire
 from pgorm_campaign.catalog import EFFECTS, OPERATIONS
 from pgorm_campaign.grammar import FAMILIES, generate
 from pgorm_campaign.grammar_pipeline import Column, Pipeline
+from pgorm_campaign.grammar_rejection import RULES
 from pgorm_campaign.grammar_state import Limits, State
 from pgorm_campaign.program import Program
 
@@ -111,6 +112,21 @@ class GrammarTests(unittest.TestCase):
                 self.assertFalse(output.recipe()["expected_rejections"])
                 self.assertLessEqual(len(output.program.data()["nodes"]), 256)
 
+    def test_valid_pipelines_never_draw_refused_identifiers(self):
+        # pipeline.errors+3: a `"` in a pipeline identifier is refused at
+        # into_sql, so a valid program carrying one could never pass.
+        for family in ("pipeline", "relational", "sets", "sources"):
+            for index in range(120):
+                program = generate(20260913, index, family=family).program.data()
+                for node in program["nodes"]:
+                    if not node["op"].startswith("pipeline."):
+                        continue
+                    for value in node["data"].values():
+                        names = value if isinstance(value, list) else [value]
+                        for name in names:
+                            if isinstance(name, str):
+                                self.assertNotIn('"', name, (family, index))
+
     def test_budget_changes_still_produce_valid_programs(self):
         for index in range(300):
             output = generate(
@@ -125,18 +141,26 @@ class GrammarTests(unittest.TestCase):
                 Limits(**limits)
 
     def test_rejection_profiles_require_exact_declared_errors(self):
+        causes = {
+            "division": "sqlstate:22012",
+            "not-null": "sqlstate:23502",
+            "duplicate": "sqlstate:23505",
+        }
         cases = set()
-        for index in range(60):
+        for index in range(80):
             result = generate(17, index, mode="invalid")
             recipe = result.recipe()
-            cases.add(recipe["rejection_case"])
+            case = recipe["rejection_case"]
+            cases.add(case)
             self.assertEqual(recipe["mode"], "invalid")
             self.assertEqual(len(recipe["expected_rejections"]), 1)
-            self.assertIn(
-                recipe["expected_rejections"][0]["error"]["cause"],
-                {"sqlstate:22012", "sqlstate:23502", "sqlstate:23505"},
-            )
-        self.assertEqual(cases, {"division", "not-null", "duplicate"})
+            error = recipe["expected_rejections"][0]["error"]
+            if case == "unquotable-identifier":
+                self.assertEqual(error["class"], "ConstructionError")
+                self.assertRegex(error["cause"], r'^identifier `origin[^`]*"[^`]*` ')
+            else:
+                self.assertEqual(error["cause"], causes[case])
+        self.assertEqual(cases, set(RULES))
         for options in (
             {"mode": "unknown"},
             {"mode": "invalid", "family": "select"},

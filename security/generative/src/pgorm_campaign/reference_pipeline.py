@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass, field, replace
 
+from .catalog import OPERATIONS
 from .comparison import InvalidOracle
 from .reference_models import Model, registered
 from . import reference_order as order
 from .reference_pexpr import Expression, window
-from .reference_sql import SQL, Table, join
+from .reference_sql import SQL, Rejection, Table, join
 from .reference_values import qualified, quote
+from .refusals import UNQUOTABLE, unquotable
 
 
 @dataclass(frozen=True)
@@ -220,7 +222,40 @@ def selected_sources(query, data):
     )
 
 
+def identifiers(name, i, d):
+    """Every identifier one pipeline instruction hands the compiler.
+
+    The declared fields the catalog types as identifiers — aliases, source
+    qualifiers, column segments — plus the schema and name of a table or entity
+    it reads from, which is the set pgorm's screen walks.
+    """
+    names = []
+    for key, declared in OPERATIONS[name].data.items():
+        value = d.get(key)
+        if isinstance(declared, str) and declared.startswith("identifier"):
+            names.extend(value if isinstance(value, list) else [value])
+    source = i.get("source")
+    table = source.table if isinstance(source, Model) else source
+    if isinstance(table, Table):
+        names.extend((table.schema, table.name))
+    return [item for item in names if item is not None]
+
+
+def screen(name, i, d):
+    """Refuse an identifier no quoted PostgreSQL identifier can carry.
+
+    `pipeline.errors+3` makes this a refusal rather than an escape: prqlc does
+    the quoting, and which prqlc a consumer links decides what an embedded `"`
+    becomes, so pgorm refuses the name before compiling. The reference applies
+    the same closed rule — a double quote or NUL — to what it resolves.
+    """
+    for identifier in identifiers(name, i, d):
+        if unquotable(identifier):
+            raise Rejection("ConstructionError", UNQUOTABLE.format(identifier))
+
+
 def pipeline_node(name, i, d, fixture):
+    screen(name, i, d)
     operation = name.removeprefix("pipeline.")
     if operation in (
         "column",
