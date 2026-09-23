@@ -292,9 +292,12 @@ Recursive text uses NUL-free corpus entries up to 4 KiB and identifiers have a
 smaller byte budget. The type family separately draws exact built-in and random
 numeric, float, Decimal, JSON, array, enum and temporal boundaries, through bound
 and literal paths with explicit PostgreSQL types. It pins the local-time worker
-to UTC. Construction/rejection coverage for unsigned64 and uninstalled pgvector,
-and complete observation-based coverage of every matrix context, remain full
-profile obligations; these samples do not establish those obligations.
+to UTC. It does not draw u64 or vector values, which have no installed
+PostgreSQL type to round-trip through; their cells are the rejection family's,
+which carries what fits int8 and checks the refusal of what does not, and has
+every vector shape refused at the missing type (see `PROGRAMS.md`).
+Observation-based coverage of every matrix context remains a full-profile
+obligation; these samples do not establish it.
 
 Fast tests check structural diversity after removing literal payloads, stable
 generation, all catalog operations/effects across 2,250 generated programs under

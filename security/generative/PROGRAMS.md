@@ -99,7 +99,12 @@ example, nested pipeline sources provide runtime query nesting, while the
 public Python `Select` does not expose `from_subquery`. Fresh entity derives,
 generic graph shapes and Rust ownership rejection belong to the bounded compile
 suite. Native value construction and explicit wire/decode rejection are tracked
-separately for values without a supported PostgreSQL representation.
+separately for values without a supported PostgreSQL representation: the
+rejection family's `unsigned-overflow` rule carries a u64 that fits int8 and
+checks it against the reference, then has one past `i64::MAX` refused — by the
+binding while encoding a bound parameter, by the server's int8 cast when
+inlined — and `missing-vector-type` casts every vector shape to the `vector`
+type the pinned image does not install, which the server refuses (42704).
 
 The format and matrix define the contract for generation, execution, shrinking
 and replay. Passing their validation tests alone does not establish a completed

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 import json
+import math
+import struct
 
 from . import wire
 from .comparison import InvalidOracle
@@ -36,6 +38,9 @@ TYPES = {
     "i32": "integer",
     "i64": "bigint",
     "u32": "oid",
+    # PostgreSQL has no unsigned 64-bit type: pgorm writes a u64 as int8 and
+    # refuses one past i64::MAX before sending it (`reference_sql.refuse`).
+    "u64": "bigint",
     "f32": "real",
     "f64": "double precision",
     "text": "text",
@@ -50,6 +55,10 @@ TYPES = {
     "datetime_utc": "timestamp with time zone",
     "ipnetwork": "inet",
     "mac_address": "macaddr",
+    # pgvector's own type, named as pgorm names it: unqualified, resolved on
+    # the search path. The pinned image does not install it, so any statement
+    # naming it is refused by the server before a value is examined.
+    "vector": "vector",
 }
 
 
@@ -82,9 +91,29 @@ def argument(value):
         return ":".join(f"{byte:02x}" for byte in data)
     if kind.startswith("datetime"):
         return wire.temporal_text(data)
+    if kind == "vector":
+        return vector_text(value)
     if kind == "array":
         raise InvalidOracle("reference arrays require explicit element parameters")
     return data
+
+
+def vector_text(value):
+    """pgvector's text input for a vector: each f32 at its shortest exact spelling."""
+    items = []
+    for bits in value["data"]:
+        number = struct.unpack(">f", bytes.fromhex(bits))[0]
+        if not math.isfinite(number):
+            raise InvalidOracle("pgvector admits only finite elements")
+        spellings = (format(number, f".{digits}g") for digits in range(1, 10))
+        items.append(
+            next(
+                text
+                for text in spellings
+                if struct.pack(">f", float(text)).hex() == bits
+            )
+        )
+    return "[" + ",".join(items) + "]"
 
 
 def install(connection):

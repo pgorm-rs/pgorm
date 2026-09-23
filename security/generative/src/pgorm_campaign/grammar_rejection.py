@@ -8,10 +8,14 @@ reach the same rejection from its own model of the rule. A valid-mode failure
 is never relabelled as one of these.
 """
 
-from . import baseline
+import math
+import struct
+
+from . import baseline, wire
 from .grammar_pipeline import Pipeline
 from .grammar_sequence import account_row, accounts, tenant_guard
-from .refusals import EMPTY_INSERT, UNQUOTABLE
+from .grammar_state import DEFAULT_INPUTS
+from .refusals import CARRIED_UNSIGNED, EMPTY_INSERT, UNQUOTABLE, UNSERIALIZABLE
 
 
 def _database(sqlstate):
@@ -94,12 +98,117 @@ def _empty_batch(state):
         state.author.effect("execute", {"query": query}, error=error)
 
 
+def _drawn(state, kind, admits):
+    """A corpus value of `kind` the rule admits, recorded as a drawn input."""
+    item = state.choices.take(
+        tuple(
+            item
+            for item in DEFAULT_INPUTS
+            if item.value()["type"]["kind"] == kind
+            and not item.value()["sql_null"]
+            and admits(item.value())
+        )
+    )
+    state.used_inputs.add(item.data()["id"])
+    return item.value()
+
+
+def _select(state, value, mode, cast, *, error=None):
+    """Fetch one cast value beside a literal nonce, declaring any rejection.
+
+    The nonce is inlined, so the value is the statement's only bound
+    parameter and a refusal naming a parameter position can only name it.
+    """
+    expression = state.node(
+        "expr.value",
+        {"value": state.node("value", data={"value": value})},
+        {"mode": mode},
+    )
+    array = value["type"]["kind"] == "array"
+    expression = state.node(
+        "expr.cast", {"value": expression}, {**cast, "array": array}
+    )
+    columns = [
+        state.node("expr.alias", {"value": expression}, {"name": "value"}),
+        state.constant("i64", state.index, mode="literal").node,
+    ]
+    state.fetch(state.node("select", {"columns": columns}), error=error)
+
+
+def _unsigned(state):
+    """A u64 past i64::MAX has no int8 to travel as, and is refused.
+
+    PostgreSQL has no unsigned 64-bit type. pgorm writes a u64 as int8 when it
+    fits and refuses one past i64::MAX while encoding the bind message
+    (`exec.cursor.binding-coerce+2`); inlined as a literal, the same digits
+    reach the server as numeric and the int8 cast refuses them (22003). What
+    does fit — a NULL, an empty or NULL array, small values beside a NULL
+    element — is carried, and is checked against the reference first, so the
+    program shows both halves of `construction-or-rejection`.
+    """
+    mode = state.choices.take(("bound", "literal"))
+    fits = _drawn(state, "u64", lambda value: int(value["data"]) <= CARRIED_UNSIGNED)
+    past = _drawn(state, "u64", lambda value: int(value["data"]) > CARRIED_UNSIGNED)
+    null = wire.scalar("u64", None, sql_null=True)
+    array = {"kind": "array", "element": {"kind": "u64"}}
+    carried, refused = state.choices.take(
+        (
+            (null, past),
+            (fits, past),
+            (wire.scalar(array, []), wire.scalar(array, [past])),
+            (wire.scalar(array, None, sql_null=True), wire.scalar(array, [null, past])),
+            (wire.scalar(array, [fits, null]), wire.scalar(array, [past, null])),
+        )
+    )
+    int8 = {"name": "int8", "schema": "pg_catalog"}
+    _select(state, carried, mode, int8)
+    error = (
+        {"class": "ConstructionError", "cause": UNSERIALIZABLE.format(0)}
+        if mode == "bound"
+        else _database("22003")
+    )
+    _select(state, refused, mode, int8, error=error)
+
+
+def _finite(value):
+    return all(
+        math.isfinite(struct.unpack(">f", bytes.fromhex(item))[0])
+        for item in value["data"]
+    )
+
+
+def _vector(state):
+    """The pinned image installs no pgvector, so the vector type is missing.
+
+    pgorm casts a vector to the type named `vector`, unqualified, and the
+    server refuses the statement at the type lookup (42704) before any value
+    is examined — bound or literal, scalar or array, NULL or not. Elements are
+    finite so the reference can still spell the value pgvector would read.
+    """
+    mode = state.choices.take(("bound", "literal"))
+    present = _drawn(state, "vector", _finite)
+    null = wire.scalar("vector", None, sql_null=True)
+    array = {"kind": "array", "element": {"kind": "vector"}}
+    value = state.choices.take(
+        (
+            present,
+            null,
+            wire.scalar(array, []),
+            wire.scalar(array, None, sql_null=True),
+            wire.scalar(array, [present, null]),
+        )
+    )
+    _select(state, value, mode, {"name": "vector"}, error=_database("42704"))
+
+
 RULES = {
     "division": _division,
     "not-null": _not_null,
     "duplicate": _duplicate,
     "unquotable-identifier": _unquotable,
     "empty-batch": _empty_batch,
+    "unsigned-overflow": _unsigned,
+    "missing-vector-type": _vector,
 }
 
 

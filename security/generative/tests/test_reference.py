@@ -120,9 +120,39 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(raised.exception.observation["class"], declared["class"])
         self.assertEqual(raised.exception.observation["cause"], declared["cause"])
 
-    def test_unsupported_semantics_cannot_become_a_pass(self):
+    def test_unsigned_overflow_is_refused_by_position(self):
+        from pgorm_campaign.reference_sql import Rejection
+
+        past = wire.scalar("u64", "9223372036854775808")
+        fits = wire.scalar("u64", "9223372036854775807")
+        text, values = bound(fits).command()
+        self.assertEqual((text, values), ("%s::bigint", ["9223372036854775807"]))
+        array = {"kind": "array", "element": {"kind": "u64"}}
+        null = wire.scalar("u64", None, sql_null=True)
+        for statement, position in (
+            (bound(past), 0),
+            (bound(fits) + ", " + bound(wire.scalar(array, [null, past])), 1),
+            (literal(fits) + ", " + bound(past), 0),
+        ):
+            with self.assertRaises(Rejection) as raised:
+                statement.command()
+            self.assertEqual(
+                raised.exception.observation["cause"],
+                "error serializing parameter " + str(position),
+            )
+        # Inlined digits are the server's to refuse, never the binding's.
+        self.assertEqual(literal(past).command()[1], ["9223372036854775808"])
+
+    def test_vectors_spell_their_exact_elements(self):
+        from pgorm_campaign.reference_values import vector_text
+
+        value = wire.scalar("vector", ["00000000", "80000000", "3dcccccd"])
+        self.assertEqual(vector_text(value), "[0,-0,0.1]")
+        self.assertEqual(bound(value).command(), ("%s::vector", ["[0,-0,0.1]"]))
         with self.assertRaises(comparison.InvalidOracle):
-            bound(wire.scalar("u64", "18446744073709551615"))
+            vector_text(wire.scalar("vector", ["7fc00000"]))
+
+    def test_unsupported_semantics_cannot_become_a_pass(self):
         with self.assertRaises(comparison.InvalidOracle):
             literal(wire.scalar("f64", "7ff0000000000000"))
         program = select_case().data()
