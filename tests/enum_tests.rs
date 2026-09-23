@@ -323,6 +323,97 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
     );
 }
 
+// [spec:pgorm:req:sql.ast.cast-shape/test]    the entity layer's casts — the
+// enum defaults on read and write, `ActiveEnum::as_enum`, and a derived
+// `select_as` / `save_as` override — are each the one `AsEnum` node, with the
+// quoted-or-verbatim choice carried in its `TypeName`
+#[test]
+fn entity_layer_casts_build_the_one_cast_node() {
+    let tea = || SimpleExpr::from(Expr::col(casts::Column::Tea));
+    let teas = || SimpleExpr::from(Expr::col(casts::Column::Teas));
+    let name = || SimpleExpr::from(Expr::col(collection::Column::Name));
+    let value = || SimpleExpr::from(Expr::val("EverydayTea"));
+    let array = || SimpleExpr::from(Expr::val(Value::array(["EverydayTea".to_owned()])));
+
+    // (spelling, the expression it built, the operand it was handed, the
+    // type's text, whether that text is the caller's verbatim SQL)
+    let spellings = [
+        (
+            "select_enum_as",
+            casts::Column::Tea.select_enum_as(Expr::expr(tea())),
+            tea(),
+            "text",
+            false,
+        ),
+        (
+            "select_enum_as over an enum array",
+            casts::Column::Teas.select_enum_as(Expr::expr(teas())),
+            teas(),
+            "text[]",
+            false,
+        ),
+        (
+            "save_enum_as",
+            casts::Column::Tea.save_enum_as(Expr::expr(value())),
+            value(),
+            "tea",
+            false,
+        ),
+        (
+            "save_enum_array_as",
+            casts::Column::Tea.save_enum_array_as(Expr::expr(array())),
+            array(),
+            "tea[]",
+            false,
+        ),
+        (
+            "ActiveEnum::as_enum",
+            Tea::EverydayTea.as_enum(),
+            value(),
+            "tea",
+            false,
+        ),
+        (
+            "derived select_as",
+            collection::Column::Name.select_as(Expr::expr(name())),
+            name(),
+            "text",
+            true,
+        ),
+        (
+            "derived save_as",
+            collection::Column::Name.save_as(Expr::expr(value())),
+            value(),
+            "citext",
+            true,
+        ),
+        (
+            "derived save_array_as",
+            collection::Column::Name.save_array_as(Expr::expr(array())),
+            array(),
+            "citext[]",
+            true,
+        ),
+    ];
+
+    for (spelling, cast, operand, type_text, verbatim) in spellings {
+        match cast {
+            SimpleExpr::AsEnum(type_name, cast_operand) => {
+                assert_eq!(
+                    *cast_operand, operand,
+                    "{spelling}: the operand rides untouched"
+                );
+                assert_eq!(
+                    (type_name.raw_text().as_str(), type_name.verbatim),
+                    (type_text, verbatim),
+                    "{spelling}: the type, and how it renders, live in the `TypeName`"
+                );
+            }
+            other => panic!("{spelling} built a cast that is not an `AsEnum`: {other:?}"),
+        }
+    }
+}
+
 // [spec:pgorm:sem:entity.traits.column.enum-cast+4/test]    the special case:
 // under `with-json` + `postgres-array`, saving into a `Json` / `JsonBinary`
 // column flattens a `Value::Array` of JSON values into a single `Value::Json`
