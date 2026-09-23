@@ -6,6 +6,7 @@ from pgorm_campaign.catalog import EFFECTS, OPERATIONS
 from pgorm_campaign.grammar import FAMILIES, generate
 from pgorm_campaign.grammar_pipeline import Column, Pipeline
 from pgorm_campaign.grammar_rejection import RULES
+from pgorm_campaign.refusals import EMPTY_INSERT
 from pgorm_campaign.grammar_state import Limits, State
 from pgorm_campaign.program import Program
 
@@ -145,6 +146,7 @@ class GrammarTests(unittest.TestCase):
             "division": "sqlstate:22012",
             "not-null": "sqlstate:23502",
             "duplicate": "sqlstate:23505",
+            "empty-batch": EMPTY_INSERT,
         }
         cases = set()
         for index in range(80):

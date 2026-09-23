@@ -58,6 +58,16 @@ def tenant_guard(state, table, identity):
 
 def _insert(state, table, scope):
     columns, values = account_row(state, 100 + state.index)
+    # A nullable column left out of the insert is written by the table's own
+    # default. Both sides have to agree on what that wrote, which the final
+    # fixture comparison checks; `tags` stays because it is NOT NULL.
+    omitted = state.choices.take(((), ("note",), ("score",), ("note", "score")))
+    kept = [
+        (column, value)
+        for column, value in zip(columns, values, strict=True)
+        if column not in omitted
+    ]
+    columns, values = [column for column, _ in kept], [value for _, value in kept]
     query = state.node(
         "insert",
         {"table": table},

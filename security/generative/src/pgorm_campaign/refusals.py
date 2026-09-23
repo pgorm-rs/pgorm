@@ -13,10 +13,15 @@ UNQUOTABLE = (
     "PostgreSQL identifier can carry; rename it"
 )
 
+# pgorm-python STATEMENTS.md: "An insert with no rows raises an error;
+# `default_values()` explicitly requests one default row." An empty batch is
+# refused at compilation, before any statement reaches the server.
+EMPTY_INSERT = "insert requires rows or explicit default_values"
+
 
 def unquotable(name):
     """Whether the pipeline refuses this identifier outright."""
     return '"' in name or "\0" in name
 
 
-__all__ = ["UNQUOTABLE", "unquotable"]
+__all__ = ["EMPTY_INSERT", "UNQUOTABLE", "unquotable"]

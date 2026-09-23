@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, replace
 
 from .comparison import InvalidOracle
 from .reference_values import argument, qualified, quote, sql_type
+from .refusals import EMPTY_INSERT
 
 
 class Rejection(Exception):
@@ -187,7 +188,7 @@ class Query:
                 ]
             )
         else:
-            raise InvalidOracle("empty insert needs explicit default semantics")
+            raise Rejection("ConstructionError", EMPTY_INSERT)
         if self.conflict:
             result += (
                 " ON CONFLICT ("

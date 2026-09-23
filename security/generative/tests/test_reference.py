@@ -104,6 +104,22 @@ class ReferenceTests(unittest.TestCase):
         with self.assertRaises(comparison.InvalidOracle):
             codec.value(9001, raw + b"x")
 
+    def test_empty_insert_refused_like_the_binding(self):
+        from pgorm_campaign.grammar import generate
+        from pgorm_campaign.reference_sql import Rejection
+
+        for index in range(60):
+            generated = generate(11, index, mode="invalid")
+            if generated.recipe()["rejection_case"] == "empty-batch":
+                break
+        program = generated.program.data()
+        step = program["steps"][0]
+        with self.assertRaises(Rejection) as raised:
+            Resolution(program).get(step["inputs"]["query"]).sql()
+        declared = program["observations"][0]["error"]
+        self.assertEqual(raised.exception.observation["class"], declared["class"])
+        self.assertEqual(raised.exception.observation["cause"], declared["cause"])
+
     def test_unsupported_semantics_cannot_become_a_pass(self):
         with self.assertRaises(comparison.InvalidOracle):
             bound(wire.scalar("u64", "18446744073709551615"))

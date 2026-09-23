@@ -33,6 +33,12 @@ WRITE_CHAIN = ("update.set", "write.filter", "write.returning", "write.all")
 
 TEMPORAL = frozenset({"date", "time", "datetime", "datetime_utc"})
 
+# What the registered Account's native `before_save` appends to the name an
+# insert sets (bridge/src/account.rs). Note keeps the default behaviour, so a
+# write whose stored name differs from its declared one by exactly this is the
+# hook's own work, visible in the effect's observation.
+HOOK_SUFFIX = "|hook"
+
 
 def quoted(name):
     """Whether this identifier can only be spelled with quotes."""
@@ -157,7 +163,9 @@ def _crud(e):
             tokens.add("empty-batch")
         declared = e.table_of(node)
         columns = node["data"].get("columns") or []
-        if declared is not None and columns:
+        # An omitted write needs a row to omit a column from: an empty batch
+        # names columns too, but writes nothing for any of them.
+        if declared is not None and columns and e.reaches(node, {"insert.row"}):
             if {item["name"] for item in declared["columns"]} - set(columns):
                 tokens.add("omitted-write")
     if e.present("update.set"):
@@ -294,11 +302,49 @@ def _entities(e):
         tokens.add({"set": "set", "reset": "unchanged", "not_set": "not-set"}[state])
     for step in e.dispatched("active.write"):
         tokens.add("active-" + step["data"]["method"])
+        if _hooked(e, step):
+            tokens.add("hooks")
     for node in e.each("entity.predicate"):
         value = e.payload(e.refs(node, "value")[0]) if e.refs(node, "value") else None
         if value is not None and value["type"]["kind"] == "enum":
             tokens.add("typed-enum-predicate")
     return tokens
+
+
+def _declared_name(e, reference):
+    """The `name` an active-model chain last set, when it set a text value."""
+    node = e.nodes.get(reference)
+    while node is not None and node["op"] == "active.set":
+        if node["data"]["column"] == "name":
+            value = e.payload(node["inputs"].get("value"))
+            if node["data"]["state"] != "set" or value is None or value["sql_null"]:
+                return None
+            return value["data"]
+        node = e.input(node, "model")
+    return None
+
+
+def _hooked(e, step):
+    """Whether an insert's own observation carries the behaviour hook's rewrite.
+
+    The declared name alone proves nothing and neither does the stored one;
+    the stored name being the declared name plus the hook's suffix is what an
+    active write could only produce by running `before_save`.
+    """
+    if step["data"]["method"] != "insert":
+        return False
+    declared = _declared_name(e, step["inputs"]["model"])
+    if declared is None:
+        return False
+    for row in _rows(step.get("observation")):
+        for field in row.get("fields") or ():
+            value = field.get("value") or {}
+            if (
+                field.get("name") == "name"
+                and value.get("data") == declared + HOOK_SUFFIX
+            ):
+                return True
+    return False
 
 
 def _graph(e):
