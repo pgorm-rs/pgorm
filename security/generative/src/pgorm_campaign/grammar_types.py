@@ -6,7 +6,7 @@ import struct
 
 from . import matrix, wire
 from .corpus_builtin import ENUM
-from .emit_rust_models import RESULT_READS
+from .emit_rust_models import readable
 from .corpus_random import sample
 from .grammar_state import DEFAULT_INPUTS
 
@@ -88,7 +88,7 @@ def decode(state, step, column, kind):
     arriving.
     """
     tag = result_tag(kind)
-    if tag is None or tag["kind"] not in RESULT_READS:
+    if tag is None or not readable(tag):
         # A decoded kind with no lossless standalone-Rust read would generate
         # programs the replay emitter cannot render, so the two surfaces are
         # held to the same set rather than letting Python run ahead.

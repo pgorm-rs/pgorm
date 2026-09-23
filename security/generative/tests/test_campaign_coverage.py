@@ -81,6 +81,19 @@ class ObservedCoverageTest(unittest.TestCase):
         self.assertTrue(contexts)
         self.assertTrue(contexts <= {"literal", "bound", "typed-null", "result-decode"})
 
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_every_decode_cell_is_generated(self):
+        tokens = set()
+        for index in range(400):
+            program = grammar.generate(20260913, index, family="types").program
+            tokens |= campaign_coverage.observed(program.data(), executed(program))
+        declared = {
+            token
+            for token in matrix.obligations()
+            if token.startswith("value.") and token.endswith(".result-decode")
+        }
+        self.assertEqual(declared - tokens, set())
+
     # [spec:pgorm:req:generative.verdict/test]
     def test_registration_evidence_is_attributed(self):
         program = grammar.generate(20260913, 3, family="entity").program
