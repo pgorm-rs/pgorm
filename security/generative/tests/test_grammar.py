@@ -6,7 +6,7 @@ from pgorm_campaign.catalog import EFFECTS, OPERATIONS
 from pgorm_campaign.grammar import FAMILIES, generate
 from pgorm_campaign.grammar_pipeline import Column, Pipeline
 from pgorm_campaign.grammar_rejection import RULES
-from pgorm_campaign.refusals import EMPTY_INSERT
+from pgorm_campaign.refusals import EMPTY_INSERT, UNSERIALIZABLE
 from pgorm_campaign.grammar_state import Limits, State
 from pgorm_campaign.program import Program
 
@@ -147,9 +147,10 @@ class GrammarTests(unittest.TestCase):
             "not-null": "sqlstate:23502",
             "duplicate": "sqlstate:23505",
             "empty-batch": EMPTY_INSERT,
+            "missing-vector-type": "sqlstate:42704",
         }
         cases = set()
-        for index in range(80):
+        for index in range(120):
             result = generate(17, index, mode="invalid")
             recipe = result.recipe()
             case = recipe["rejection_case"]
@@ -160,6 +161,17 @@ class GrammarTests(unittest.TestCase):
             if case == "unquotable-identifier":
                 self.assertEqual(error["class"], "ConstructionError")
                 self.assertRegex(error["cause"], r'^identifier `origin[^`]*"[^`]*` ')
+            elif case == "unsigned-overflow":
+                self.assertIn(
+                    error,
+                    (
+                        {
+                            "class": "ConstructionError",
+                            "cause": UNSERIALIZABLE.format(0),
+                        },
+                        {"class": "DatabaseError", "cause": "sqlstate:22003"},
+                    ),
+                )
             else:
                 self.assertEqual(error["cause"], causes[case])
         self.assertEqual(cases, set(RULES))

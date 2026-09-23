@@ -71,13 +71,11 @@ def textual(value):
         text = value.strftime("%Y-%m-%d %H:%M:%S") + fraction(value)
         offset = value.strftime("%z")
         return f"{text} {offset[:-2]}:{offset[-2:]}"
-    if kind == "vector":
-        raise InvalidOracle("vector literal needs an installed pgvector oracle")
     return argument(value)
 
 
 def literal(value, *, pipeline=False):
-    from .reference_sql import SQL, Parameter, bound, join
+    from .reference_sql import SQL, Parameter, join, typed
 
     tag, kind = value["type"], value["type"]["kind"]
     if pipeline and (
@@ -89,7 +87,7 @@ def literal(value, *, pipeline=False):
     if value["sql_null"]:
         return SQL((Parameter(wire.scalar("text", None, sql_null=True)),))
     if kind == "bool":
-        return bound(value)
+        return typed(value)
     if kind == "array":
         result = "ARRAY[" + join([literal(item) for item in value["data"]]) + "]"
         if not value["data"] and tag["element"]["kind"] not in ("json", "vector"):
@@ -108,5 +106,5 @@ def literal(value, *, pipeline=False):
         return SQL((Parameter(wire.scalar("text", text)), "::" + number_type(text)))
     if kind == "enum":
         # The public Value enum tag ascribes the constant's PostgreSQL type.
-        return bound(value)
+        return typed(value)
     return SQL((Parameter(wire.scalar("text", textual(value))),))

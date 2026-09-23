@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 from .comparison import InvalidOracle
 from .reference_values import argument, qualified, quote, sql_type
-from .refusals import EMPTY_INSERT
+from .refusals import EMPTY_INSERT, UNSERIALIZABLE, unsigned_overflow
 
 
 class Rejection(Exception):
@@ -31,6 +31,30 @@ class Parameter:
 
 
 @dataclass(frozen=True)
+class Slot:
+    """Where one value the subject sends as a single parameter begins.
+
+    The reference binds an array element by element, so its own parameters do
+    not line up with the subject's; a slot marks each value pgorm binds whole,
+    which is what a refusal naming a parameter position counts.
+    """
+
+    value: dict
+
+
+def refuse(value, position):
+    """Refuse, as the binding does, a value no carrier can hold.
+
+    `exec.cursor.binding-coerce+2`: PostgreSQL has no unsigned 64-bit type, so
+    pgorm writes a u64 as int8 and refuses one past `i64::MAX` while encoding
+    the bind message, before anything reaches the server. An array carrying
+    such an element is one parameter and is refused whole.
+    """
+    if unsigned_overflow(value):
+        raise Rejection("ConstructionError", UNSERIALIZABLE.format(position))
+
+
+@dataclass(frozen=True)
 class SQL:
     parts: tuple = ()
 
@@ -41,9 +65,12 @@ class SQL:
         return SQL((other,)) + self
 
     def command(self):
-        text, parameters = [], []
+        text, parameters, slots = [], [], 0
         for part in self.parts:
-            if isinstance(part, Parameter):
+            if isinstance(part, Slot):
+                refuse(part.value, slots)
+                slots += 1
+            elif isinstance(part, Parameter):
                 text.append("%s")
                 parameters.append(argument(part.value))
             elif isinstance(part, str):
@@ -61,16 +88,22 @@ def join(items, separator=", "):
     return result
 
 
-def bound(value):
+def typed(value):
+    """A value spelled with its own type, as the reference binds it."""
     tag = value["type"]
     if tag["kind"] == "array" and not value["sql_null"]:
         return (
             "ARRAY["
-            + join([bound(item) for item in value["data"]])
+            + join([typed(item) for item in value["data"]])
             + "]::"
             + sql_type(tag)
         )
     return SQL((Parameter(value), "::" + sql_type(tag)))
+
+
+def bound(value):
+    """A value the subject binds as one parameter."""
+    return SQL((Slot(value),)) + typed(value)
 
 
 def expression(value):
