@@ -10,21 +10,32 @@
 //! `Time::midnight().checked_add(..)`, which fails rather than wrapping, so
 //! PostgreSQL's `24:00:00` is refused by the decoder itself and every value it
 //! does accept re-encodes to the bytes it was read from.
+//!
+//! The wrappers are public because a generated reproducer reads an earlier
+//! row's column the same way the observation decoder does. Reading `numeric`,
+//! `jsonb`, an enum, `inet` or `macaddr` as its bare Rust type would take the
+//! driver's lossy path and hand the next statement a value the Python run never
+//! bound, so a result reference goes through the checked codec or not at all.
 
 use std::{collections::BTreeMap, error::Error};
 
 use bytes::BytesMut;
 use fallible_iterator::FallibleIterator;
 use pgorm::pgorm_query::{IpNetwork, MacAddress};
+
+use crate::FormatError;
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, value::RawValue};
-use tokio_postgres::types::{FromSql, Kind, ToSql, Type};
+use tokio_postgres::{
+    Row,
+    types::{FromSql, Kind, ToSql, Type},
+};
 
 type CodecError = Box<dyn Error + Send + Sync>;
 
 /// The upstream Decimal decoder can round. Accept only exact values and scale.
 #[derive(Debug)]
-pub(crate) struct ExactDecimal(pub Decimal);
+pub struct ExactDecimal(pub Decimal);
 
 impl<'a> FromSql<'a> for ExactDecimal {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
@@ -91,7 +102,7 @@ impl Numeric {
 
 /// Rust Value arrays cannot preserve extra dimensions or non-default bounds.
 #[derive(Debug)]
-pub(crate) struct CheckedArray<T>(pub Vec<Option<T>>);
+pub struct CheckedArray<T>(pub Vec<Option<T>>);
 
 impl<'a, T: FromSql<'a>> FromSql<'a> for CheckedArray<T> {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
@@ -111,8 +122,9 @@ impl<'a, T: FromSql<'a>> FromSql<'a> for CheckedArray<T> {
     }
 }
 
+/// An enum label, accepted only when it is one of its column type's labels.
 #[derive(Debug)]
-pub(crate) struct EnumLabel(pub String);
+pub struct EnumLabel(pub String);
 
 impl<'a> FromSql<'a> for EnumLabel {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
@@ -128,9 +140,41 @@ impl<'a> FromSql<'a> for EnumLabel {
     }
 }
 
-/// These types lack FromSql; delegate to the same protocol codecs as TryGetable.
+/// A named column's enum label, once the column is of the declared enum type.
+///
+/// [`EnumLabel`] proves the label belongs to whatever enum the column has. A
+/// program's tag names one enum by name and schema, and a same-spelled label of
+/// a different enum must not pass for it, so the column's own type identity is
+/// checked first — the way the Python binding compares the decoded tag.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Format`] when the column is missing or of another
+/// type, and [`crate::Error::Database`] when the label cannot be decoded.
+pub fn declared_enum(
+    row: &Row,
+    column: &str,
+    name: &str,
+    schema: &str,
+) -> Result<String, crate::Error> {
+    let declared = row
+        .columns()
+        .iter()
+        .position(|item| item.name() == column)
+        .filter(|index| {
+            let ty = row.columns()[*index].type_();
+            ty.name() == name && ty.schema() == schema
+        })
+        .ok_or_else(|| {
+            FormatError::new("result reference type differs from the declared value tag")
+        })?;
+    Ok(row.try_get::<_, EnumLabel>(declared)?.0)
+}
+
+/// An `inet` or `cidr`; these types lack FromSql, so delegate to the same
+/// protocol codecs as TryGetable.
 #[derive(Debug)]
-pub(crate) struct Inet(pub IpNetwork);
+pub struct Inet(pub IpNetwork);
 
 impl<'a> FromSql<'a> for Inet {
     fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
@@ -143,8 +187,9 @@ impl<'a> FromSql<'a> for Inet {
     }
 }
 
+/// A `macaddr`, through the same protocol codec `TryGetable` uses.
 #[derive(Debug)]
-pub(crate) struct Mac(pub MacAddress);
+pub struct Mac(pub MacAddress);
 
 impl<'a> FromSql<'a> for Mac {
     fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
@@ -160,7 +205,7 @@ impl<'a> FromSql<'a> for Mac {
 
 /// Validate numeric fidelity around serde_json's PostgreSQL FromSql decoder.
 #[derive(Debug)]
-pub(crate) struct ExactJson(pub Json);
+pub struct ExactJson(pub Json);
 
 impl<'a> FromSql<'a> for ExactJson {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {

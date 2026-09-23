@@ -40,10 +40,7 @@ SOURCE_SHAPES = {
 # Query shapes whose rows decode into compiled models rather than result rows.
 TYPED_ROWS = ("entity_query", "graph_query", "cursor", "sources")
 # The Rust type each result column is read as, for kinds with one lossless
-# `FromSql` counterpart reachable from the entity prelude. Kinds needing a
-# checked codec to survive the round trip (decimal, json, enum, inet, macaddr)
-# stay out: the replay crate keeps those wrappers private, and reading them as
-# their bare Rust type would silently change the value.
+# `FromSql` counterpart reachable from the entity prelude.
 RESULT_READS = {
     "bool": "bool",
     "i8": "i8",
@@ -61,10 +58,32 @@ RESULT_READS = {
     "datetime": f"{PRELUDE}::DateTime",
     "datetime_utc": f"{PRELUDE}::DateTimeWithTimeZone",
 }
+# Kinds whose driver decoder is only nearly lossless: `numeric` can round,
+# JSON numbers can change spelling, and inet/macaddr have no `FromSql` at all.
+# Reading them as their bare Rust type would hand the next statement a value
+# the Python run never bound, so they go through the replay crate's checked
+# codecs — the same ones its observation decoder uses — and all of them box.
+CHECKED_READS = {
+    "decimal": f"{REPLAY}::codecs::ExactDecimal",
+    "json": f"{REPLAY}::codecs::ExactJson",
+    "ipnetwork": f"{REPLAY}::codecs::Inet",
+    "mac_address": f"{REPLAY}::codecs::Mac",
+}
 # Variants whose payload is boxed in `pgorm_query::Value`.
 BOXED_READS = frozenset(
     {"text", "bytes", "uuid", "date", "time", "datetime", "datetime_utc"}
+    | CHECKED_READS.keys()
 )
+
+
+def readable(tag):
+    """Whether a decoded tag has a lossless standalone-Rust result read.
+
+    An enum is read as a label only after its column's type identity matches
+    the declared name and schema, which the replay crate's `declared_enum`
+    checks; every other kind needs a bare or checked `FromSql` read.
+    """
+    return tag["kind"] == "enum" or tag["kind"] in RESULT_READS.keys() | CHECKED_READS
 
 
 # [spec:pgorm:req:generative.replay]
@@ -524,17 +543,24 @@ class ModelEmitter:
                 raise UnsupportedInstruction(
                     "result.value reads one row's column; a " + kind + " row is a tuple"
                 )
-        if tag["kind"] not in VARIANTS or tag["kind"] in ("enum", "json"):
-            raise UnsupportedInstruction(
-                "result.value has no typed Rust read for " + tag["kind"]
-            )
-        native = RESULT_READS.get(tag["kind"])
-        if native is None:
+        if tag["kind"] not in VARIANTS or not readable(tag):
             raise UnsupportedInstruction(
                 "result.value has no typed Rust read for " + tag["kind"]
             )
         rows = "r_" + d["step"]
-        payload = f"{rows}[{d['row']}].try_get::<_, {native}>({literal(d['column'])})?"
+        column = literal(d["column"])
+        if tag["kind"] == "enum":
+            payload = (
+                f"{REPLAY}::codecs::declared_enum(&{rows}[{d['row']}], {column}, "
+                f"{literal(tag['name'])}, {literal(tag['schema'])})?"
+            )
+            return f"{Q}::Value::String(Some(Box::new({payload})))"
+        if tag["kind"] in CHECKED_READS:
+            codec = CHECKED_READS[tag["kind"]]
+            payload = f"{rows}[{d['row']}].try_get::<_, {codec}>({column})?.0"
+        else:
+            native = RESULT_READS[tag["kind"]]
+            payload = f"{rows}[{d['row']}].try_get::<_, {native}>({column})?"
         if tag["kind"] in BOXED_READS:
             return f"{Q}::Value::{VARIANTS[tag['kind']]}(Some(Box::new({payload})))"
         return f"{Q}::Value::{VARIANTS[tag['kind']]}(Some({payload}))"

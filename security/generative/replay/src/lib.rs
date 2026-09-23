@@ -22,7 +22,7 @@
 //! subject would make the binary's behaviour a property of the binding under
 //! test, which is the thing a standalone replay exists to avoid.
 
-mod codecs;
+pub mod codecs;
 mod decode;
 pub mod entities;
 pub mod observe;

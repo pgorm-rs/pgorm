@@ -193,6 +193,33 @@ class EmitRustTests(unittest.TestCase):
         self.assertTrue(reads)
         self.assertLess(first, min(reads))
 
+    def test_checked_kinds_read_through_replay_codecs(self):
+        # A bare numeric/JSON/inet/macaddr read would take the driver's lossy
+        # path; an enum label is only taken once its column type is the one
+        # the program declared.
+        reads = {
+            "decimal": "codecs::ExactDecimal>(",
+            "json": "codecs::ExactJson>(",
+            "ipnetwork": "codecs::Inet>(",
+            "mac_address": "codecs::Mac>(",
+            "enum": "codecs::declared_enum(&r_",
+        }
+        seen = set()
+        for index in range(200):
+            program = generate(20260913, index, family="types").program
+            kinds = {
+                node["data"]["type"]["kind"]
+                for node in program.data()["nodes"]
+                if node["op"] == "result.value"
+            }
+            for kind in kinds & reads.keys():
+                source = emit_rust.render(program)
+                self.assertIn(reads[kind], source)
+                if kind == "enum":
+                    self.assertIn(emit_rust.literal('State" 雪'), source)
+                seen.add(kind)
+        self.assertEqual(seen, set(reads))
+
     def test_emitted_source_reaches_only_public_crates(self):
         for family in FAMILIES:
             program = supported(family)

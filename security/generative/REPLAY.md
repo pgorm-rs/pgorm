@@ -65,6 +65,12 @@ where a literal would lose information:
 - every string reaching source — identifier or payload — goes through one Rust
   string-literal escaper, so quotes, backslashes, NUL and non-ASCII in a
   hostile fixture name cannot terminate the literal
+- a `result.value` read of a column whose driver codec is only nearly
+  lossless — `numeric`, `jsonb`, `inet`, `macaddr` — goes through the harness's
+  public checked codecs (`codecs::ExactDecimal`, `ExactJson`, `Inet`, `Mac`),
+  the same ones the observation decoder uses, never the bare Rust type; an enum
+  read goes through `codecs::declared_enum`, which takes the label only once
+  the column's type is the name and schema the program declared
 
 Builder operations are emitted as builder calls. Captured SQL is never
 substituted for them; a program that cannot be expressed through the named API
