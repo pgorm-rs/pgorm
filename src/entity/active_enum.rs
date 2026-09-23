@@ -136,6 +136,7 @@ pub trait ActiveEnum: Sized + Iterable {
     }
 
     /// Construct a enum expression with casting
+    // [spec:pgorm:req:sql.ast.cast-shape]
     fn as_enum(&self) -> SimpleExpr {
         Expr::val(Self::to_value(self)).as_enum(Self::name())
     }
