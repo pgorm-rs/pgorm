@@ -4644,6 +4644,7 @@ children (
                 id pipeline-append-distinct
                 title "Deduplicating an appended pipeline compiles instead of failing on column counts"
                 kind @fix
+                sealed true
                 log (
                     {
                         at 2026-09-10T19:42:17.160554Z
@@ -4664,6 +4665,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-23T21:59:13.454435Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-verified 2026-09-23 against HEAD 2af59925 (prqlc fork d6f2fa97): the retained reproducer security/generative/findings/distinct-append exits 0 — baseline, distinct, and the formerly failing distinct-then-append all compile (WITH table_0 AS (SELECT DISTINCT id ...) SELECT id FROM table_0 UNION ALL SELECT DISTINCT id ...). Its README already records the fix. The node sat in Doing only because completion was never asserted after the fix landed."
+                    }
+
+                    {
+                        at 2026-09-23T21:59:17.384305Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -6570,6 +6585,7 @@ children (
         id pipeline-join-distinct-order
         title "A joined, deduplicated pipeline compiles to one projection order"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-11T14:55:36.854441Z
@@ -6597,6 +6613,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-23T21:59:13.521228Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-verified 2026-09-23 against HEAD 2af59925 (prqlc fork d6f2fa97, carrying b2baa230's total star-expansion order): the retained reproducer security/generative/findings/pipeline-join-distinct-order exits 0 with one rendering across its repeated compilations (SELECT DISTINCT p_id, p_rank, j_id, j_account_id FROM table_1). Its README already records the fix. The node sat in Doing only because completion was never asserted."
+            }
+
+            {
+                at 2026-09-23T21:59:17.451895Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
