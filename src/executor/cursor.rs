@@ -725,6 +725,35 @@ mod tests {
         );
     }
 
+    // [spec:pgorm:sem:query.graph.cursor+2/test]    ordered on a root column
+    // that is not its key, the root's own primary key is installed between
+    // the order columns and the slots' keys; ordered on that key as well, the
+    // restated entry is dropped rather than installed twice
+    #[test]
+    fn non_key_order_tiebreaks_on_the_root_key() {
+        let graph =
+            || cake::Entity::graph().join_maybe::<fruit::Entity>(cake::Relation::Fruit.def());
+        let keyset = [
+            r#""cake"."name" ASC"#,
+            r#""cake"."id" ASC"#,
+            r#""fruit"."id" ASC"#,
+        ]
+        .join(", ");
+
+        let mut by_name = graph().cursor_by(cake::Column::Name);
+        assert_eq!(order_by(&mut by_name), keyset);
+
+        // The whole key is three wide, and its middle position is the root's.
+        let sql = composed(by_name.after_with(("Cheesecake", 1, 10)));
+        assert!(
+            sql.contains(r#""cake"."name" = 'Cheesecake' AND "cake"."id" > 1"#),
+            "the root's key breaks a tie on the order column: {sql}"
+        );
+
+        let mut by_name_and_id = graph().cursor_by((cake::Column::Name, cake::Column::Id));
+        assert_eq!(order_by(&mut by_name_and_id), keyset);
+    }
+
     #[test]
     fn a_slotless_graph_has_no_tiebreak() {
         let mut cursor = cake::Entity::graph().cursor_by(cake::Column::Id);
