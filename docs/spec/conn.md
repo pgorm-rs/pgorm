@@ -455,7 +455,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > release and the rollback quote it identically. And a name holding a NUL
 > byte is an `Err`: PostgreSQL carries no identifier containing one under
 > any quoting at all — the same closed judgment
-> `[spec:pgorm:req:pipeline.errors+3]` makes one layer up — and the wire
+> `[spec:pgorm:req:pipeline.errors+4]` makes one layer up — and the wire
 > encoder refuses an embedded NUL in the query message before a byte is
 > sent, so the failure arrives client-side with the transaction
 > untouched. It is refused, never stripped: a name silently altered to be

@@ -244,10 +244,11 @@ def identifiers(name, i, d):
 def screen(name, i, d):
     """Refuse an identifier no quoted PostgreSQL identifier can carry.
 
-    `pipeline.errors+3` makes this a refusal rather than an escape: prqlc does
+    `pipeline.errors+4` makes this a refusal rather than an escape: prqlc does
     the quoting, and which prqlc a consumer links decides what an embedded `"`
     becomes, so pgorm refuses the name before compiling. The reference applies
-    the same closed rule — a double quote or NUL — to what it resolves.
+    the same closed rule — a double quote or NUL anywhere, a leading `$`, or a
+    lone `*` — to what it resolves.
     """
     for identifier in identifiers(name, i, d):
         if unquotable(identifier):

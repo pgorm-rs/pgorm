@@ -203,11 +203,10 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         ),
         (
             "qualified",
-            Pipeline::from_schema(Name::runtime("schema \"β\""), Name::runtime("items \"β\""))
-                .select(
-                    pl::col(Name::runtime("items \"β\""), Name::runtime("id \"β\""))
-                        .as_runtime(Name::runtime("out \"β\"")),
-                ),
+            Pipeline::from_schema(Name::runtime("schema β"), Name::runtime("items β")).select(
+                pl::col(Name::runtime("items β"), Name::runtime("id β"))
+                    .as_runtime(Name::runtime("out β")),
+            ),
         ),
     ])
 }

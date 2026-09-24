@@ -106,7 +106,7 @@ async fn catalogue_count(db: &DatabaseConnection, sql: &str, name: &str) -> i64 
 /// `InsertStmt` target columns and `ColumnRef.fields`: a schema, a table and a
 /// column all named with the hostile name, created, written and read through
 /// the builders.
-// [spec:pgorm:req:security.ident-oracle/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
 #[tokio::test]
 async fn live_relation_schema_and_column_names() {
     let (ctx, db) = open("ident_oracle_live_relation").await;
@@ -153,7 +153,7 @@ async fn live_relation_schema_and_column_names() {
 /// `ResTarget.name`, `RangeVar.alias.aliasname`, `RangeSubselect.alias` and
 /// `CommonTableExpr.ctename`: every alias kind, read back as the server
 /// labels it.
-// [spec:pgorm:req:security.ident-oracle/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
 #[tokio::test]
 async fn live_alias_names() {
     let (ctx, db) = open("ident_oracle_live_alias").await;
@@ -207,7 +207,7 @@ async fn live_alias_names() {
 
 /// `FuncCall.funcname` and `TypeCast.type_name`: a function and a domain
 /// created under the hostile name, called and cast to through the builders.
-// [spec:pgorm:req:security.ident-oracle/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
 #[tokio::test]
 async fn live_function_and_type_names() {
     let (ctx, db) = open("ident_oracle_live_function_type").await;
@@ -238,7 +238,7 @@ async fn live_function_and_type_names() {
 
 /// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
 /// the hostile name.
-// [spec:pgorm:req:security.ident-oracle/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
 #[tokio::test]
 async fn live_window_names() {
     let (ctx, db) = open("ident_oracle_live_window").await;
@@ -265,7 +265,7 @@ async fn live_window_names() {
 
 /// `IndexStmt.idxname`, `Constraint.conname`, `CreateEnumStmt` type names and
 /// labels, and `COMMENT ON` targets: DDL-only names, checked in the catalogue.
-// [spec:pgorm:req:security.ident-oracle/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
 #[tokio::test]
 async fn live_ddl_object_names_and_labels() {
     let (ctx, db) = open("ident_oracle_live_ddl").await;
@@ -349,7 +349,7 @@ async fn live_ddl_object_names_and_labels() {
 /// with its NUL byte, and sending the statement fails in the client's
 /// protocol encoder — no statement reaches the server, the connection stays
 /// usable, and no table exists afterwards.
-// [spec:pgorm:req:security.ident-oracle.nul/test]
+// [spec:pgorm:req:security.ident-oracle.nul+2/test]
 #[tokio::test]
 async fn live_nul_name_never_reaches_the_server() {
     let (ctx, db) = open("ident_oracle_live_nul").await;

@@ -8741,6 +8741,7 @@ children (
         id pipeline-bare-dollar-names
         title "Pipeline names beginning with $, and a lone *, reach SQL bare through prqlc"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-24T20:13:35.735754Z
@@ -8754,6 +8755,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Correction to the blocker note: the pin count is 68, not 72 — 17 pipeline sites × the four names `$1`, `$$`, `$tag$`, `*`. The 18th pipeline site, `pgorm/pipeline.select-sources.read-cast`, fails on those names too, but there the cause is pipeline-read-cast-verbatim and the pairs are pinned to that node."
+            }
+
+            {
+                at 2026-09-24T21:15:53.049375Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-24T21:45:40.062525Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

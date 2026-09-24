@@ -85,9 +85,9 @@ pub enum Policy {
     Literal,
     /// A qualified pipeline identifier (a column under its relation, a schema
     /// or the table after it): refused with `UnquotableIdentifier` when it
-    /// carries `"` or NUL; otherwise written by prqlc — bare when its
-    /// `valid_ident` accepts the name and it is not a keyword, quoted with
-    /// `"` doubled when not.
+    /// carries `"` or NUL, begins with `$`, or is `*`; otherwise written by
+    /// prqlc — bare when its `valid_ident` accepts the name and it is not a
+    /// keyword, quoted with `"` doubled when not.
     Pipeline,
     /// An unqualified pipeline identifier — a relation, or a column reference
     /// standing alone: refused like [`Pipeline`](Self::Pipeline), and also by
@@ -118,7 +118,7 @@ impl Policy {
     fn refusal(self, name: &str) -> Option<&'static str> {
         match self {
             Self::Pipeline | Self::PipelineBare | Self::PipelineAlias
-                if name.contains(['"', '\0']) =>
+                if name.contains(['"', '\0']) || name.starts_with('$') || name == "*" =>
             {
                 Some("UnquotableIdentifier")
             }

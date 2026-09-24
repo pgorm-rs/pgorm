@@ -117,6 +117,33 @@ class PipelineConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             base.select(pl.literal(1).as_("sum")).inspect()
 
+    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:pipeline.errors+4/test]
+    def test_names_the_screen_refuses_fail_at_compile(self):
+        # The binding delegates to the Rust screen at `into_sql`, so it refuses
+        # exactly the names Rust refuses, at the same boundary: a name that
+        # begins with `$` or is `*` constructs and is refused when compiled.
+        base = pl.from_(p.Table("items"))
+        for name in ("$1", "$$", "$tag$", "*", 'a"b'):
+            cause = (
+                f"identifier `{name}` cannot be written as a pipeline name: it "
+                "contains a double quote or NUL byte, begins with `$`, or is `*`; "
+                "rename it"
+            )
+            for query in (
+                base.select(pl.col("items", name)),
+                pl.from_(p.Table(name)),
+                base.group(pl.col("items", name)).aggregate(pl.count_rows()),
+                base.derive(pl.col("items", "id").as_(name)),
+            ):
+                with self.subTest(name=name):
+                    with self.assertRaises(p.ConstructionError) as refused:
+                        query.inspect()
+                    self.assertEqual(str(refused.exception), cause)
+        inner = base.select(pl.col("items", "a$1")).inspect()
+        self.assertEqual(inner.sql, "SELECT a$1 FROM items")
+        self.assertEqual(inner.params, [])
+
 
 class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

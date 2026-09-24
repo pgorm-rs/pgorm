@@ -108,7 +108,7 @@ of the crate, compiled in every build. Rules are grouped under
 > introduced, and the name exists in the program exactly once. The token
 > carries no evidence that it was ever attached: a reference to a name no
 > stage introduced compiles, and the server answers for it
-> (`[spec:pgorm:req:pipeline.errors+3]`).
+> (`[spec:pgorm:req:pipeline.errors+4]`).
 >
 > `ExprOps`'s comparison names are also `ColumnTrait`'s. Both traits can be
 > in scope: the pipeline's methods take `self` by value and `ColumnTrait`'s
@@ -177,7 +177,7 @@ of the crate, compiled in every build. Rules are grouped under
 > census that cannot be trusted (unscannable text, an out-of-range number;
 > neither reachable from the builder's own output) passes the statement
 > through unchanged for the server to judge, keeping `into_sql` panic-free
-> (`[spec:pgorm:req:pipeline.errors+3]`).
+> (`[spec:pgorm:req:pipeline.errors+4]`).
 >
 > The binder and the expressions it returns are branded with a
 > higher-ranked, invariant closure lifetime; an expression containing a
@@ -308,7 +308,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Naming a relation replaces the name it had, exactly as SQL's `AS` does:
 > after `employee::Entity.named(manager)` the reference `employee.name` no
 > longer resolves, and prqlc refuses it by name
-> ([spec:pgorm:req:pipeline.errors+3]). The ordinary shape therefore names
+> ([spec:pgorm:req:pipeline.errors+4]). The ordinary shape therefore names
 > only the second occurrence and leaves the reading pipeline
 > entity-qualified. The name then reaches every stage after the join —
 > `filter`, `sort`, `select` — which is what distinguishes it from `this` /
@@ -397,12 +397,12 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Failure model
 
-> [spec:pgorm:req:pipeline.errors+3]
+> [spec:pgorm:req:pipeline.errors+4]
 > Pipeline construction is infallible; `into_sql()` is the fallible
 > boundary, returning `PipelineError` and never panicking, per
 > `[dec:pgorm:no-panic]`. Four variants: `UnquotableIdentifier(name)` — an
-> identifier carries a `"` or a NUL byte, refused rather than escaped (see
-> below); `ReservedAlias(name)` — a name
+> identifier carries a `"` or a NUL byte, begins with `$`, or is `*`,
+> refused rather than escaped (see below); `ReservedAlias(name)` — a name
 > given to `as_` collides with the closed reserved set (the top-level
 > bindings of prqlc 0.13's `std` module, its submodule names `math` /
 > `text` / `date`, and the PRQL keywords), screened before compilation so
@@ -421,11 +421,34 @@ of the crate, compiled in every build. Rules are grouped under
 > name the pipeline would hand prqlc — each alias and each segment of each
 > identifier reference, so a schema, a table, a binding, a column and an
 > alias are all covered, whichever of `col`, `from_schema`, `named_runtime`
-> or `as_runtime` minted it. The refused set is two characters and closed:
-> `"`, the delimiter itself, and NUL, which no PostgreSQL identifier can
-> carry under any quoting. Length is not screened here — an identifier past
-> the 63-byte limit is a separate question, about what it collides with
-> after the server truncates it.
+> or `as_runtime` minted it. The refused set is closed and decided by pgorm
+> alone, never by asking the compiler:
+>
+> - a `"` anywhere — the delimiter itself;
+> - a NUL anywhere, which no PostgreSQL identifier can carry under any
+>   quoting;
+> - a leading `$`. prqlc writes a name bare whenever it matches
+>   `[a-z_$][a-z0-9_$]*` and is not a keyword — a pattern older than PRQL's
+>   own `$name` parameter token, which reaches the SQL by a different path —
+>   and PostgreSQL's lexer reads a bare `$1` as a bound parameter and a bare
+>   `$$` or `$tag$` as a dollar-quote delimiter, so two such names would
+>   swallow everything between them, a filter included, as one string
+>   constant. The refusal is also what keeps the parameter census sound
+>   (`[spec:pgorm:req:pipeline.params+4]`): with no name able to lex as
+>   `PARAM`, every `$N` in the emitted text is one the binder minted. A `$`
+>   after the first character is not refused: `a$b` is one identifier to
+>   PostgreSQL, bare or quoted;
+> - the name `*`, which prqlc resolves as its wildcard before any quoting is
+>   decided, so no spelling of it reaches the SQL as a column.
+>
+> Every other name renders: a space, a capital or a keyword is an ordinary
+> name, which the compiler quotes where the grammar would not read it bare
+> as that name. Length is not screened here — an identifier
+> past the 63-byte limit is a separate question, about what it collides
+> with after the server truncates it. The refusal costs names PostgreSQL
+> itself would accept quoted (`"$1"`, `"*"`); a table or column so named is
+> still reachable through the ORM's builders, which quote every name
+> themselves (`[spec:pgorm:req:sql.render.ident-quoting]`).
 >
 > Refusing rather than escaping is the point, and it is a property of the
 > dependency graph rather than of taste. pgorm hands identifiers to prqlc
@@ -433,7 +456,9 @@ of the crate, compiled in every build. Rules are grouped under
 > decided by whichever prqlc the build resolved: the pinned fork doubles
 > it, while registry `prqlc 0.13.14` escapes through sqlparser, which
 > leaves a `"` preceded by a backslash alone — closing the identifier early
-> and handing the remainder to the server as SQL. pgorm depends on the fork
+> and handing the remainder to the server as SQL. A leading `$` is left
+> bare by both, and teaching the fork to quote it would still leave it bare
+> under the registry crate. pgorm depends on the fork
 > directly, but that is not a choice it can hold for a consumer: the
 > consumer's own `patch` table can redirect the dependency, and a crates.io
 > release, which cannot carry a git dependency, would have to name the
@@ -553,7 +578,7 @@ of the crate, compiled in every build. Rules are grouped under
 > `take` / `take_range`, `join`, `window` and `append` (whose left-side
 > naming survives) leave every source addressable and compose freely ahead
 > of the terminal; construction itself stays infallible per
-> `[spec:pgorm:req:pipeline.errors+3]`.
+> `[spec:pgorm:req:pipeline.errors+4]`.
 >
 > `distinct` composes ahead of the terminal except where it settles the
 > pipeline into a binding, which is the one thing a per-source projection

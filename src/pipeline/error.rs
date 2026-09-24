@@ -5,7 +5,7 @@
 /// Construction itself is infallible; everything that can go wrong is
 /// reported here, at the [`into_sql`](super::Pipeline::into_sql) boundary,
 /// never as a panic.
-// [spec:pgorm:req:pipeline.errors+3]
+// [spec:pgorm:req:pipeline.errors+4]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PipelineError {
@@ -19,35 +19,46 @@ pub enum PipelineError {
     /// resolution failure.
     #[error("alias `{0}` collides with a PRQL built-in name; choose another alias")]
     ReservedAlias(String),
-    /// An identifier carries a character no quoted PostgreSQL identifier can
-    /// carry: a double quote, or a NUL byte.
+    /// An identifier the pipeline cannot guarantee to write as a name: it
+    /// carries a double quote or a NUL byte, begins with `$`, or is `*`.
     ///
     /// Quoting is the compiler's rather than pgorm's — a table, schema
     /// segment, column or alias travels to prqlc as plain text and is
-    /// rendered there — so what an embedded `"` becomes is decided by
-    /// whichever prqlc the build resolved. The pinned fork doubles it; the
-    /// registry crate's escaper leaves a `"` that follows a backslash alone,
-    /// which closes the quoted identifier early and hands the rest of the
-    /// name to the server as SQL. pgorm depends on the fork, but a
-    /// consumer's own `patch` table can redirect that dependency and a
-    /// crates.io release could not carry it at all, so pgorm cannot decide
-    /// which of those a consumer links, and a name whose meaning depends on
-    /// that has no rendering worth choosing. Doubling the quote here instead
-    /// would only move the ambiguity: the fork would double it a second time.
+    /// rendered there — so what reaches the SQL is decided by whichever
+    /// prqlc the build resolved. pgorm depends on its fork, but a consumer's
+    /// own `patch` table can redirect that dependency and a crates.io release
+    /// could not carry it at all, so pgorm cannot decide which compiler a
+    /// consumer links, and a name whose meaning depends on that has no
+    /// rendering worth choosing. Each refused shape is one where the answer
+    /// does depend on it, or is wrong under both:
+    ///
+    /// - An embedded `"`. The fork doubles it; the registry crate's escaper
+    ///   leaves a `"` that follows a backslash alone, which closes the quoted
+    ///   identifier early and hands the rest of the name to the server as
+    ///   SQL. Doubling it here would only move the ambiguity: the fork would
+    ///   double it a second time.
+    /// - NUL, which PostgreSQL carries in no identifier under any quoting.
+    /// - A leading `$`. Both compilers write a name bare whenever it matches
+    ///   `[a-z_$][a-z0-9_$]*` and is not a keyword, a pattern that predates
+    ///   PRQL's own `$name` parameter token; PostgreSQL's lexer reads a bare
+    ///   `$1` as a bound parameter and a bare `$$` or `$tag$` as a
+    ///   dollar-quote delimiter, so two such names swallow the SQL between
+    ///   them as a string constant.
+    /// - A lone `*`, which the compiler resolves as its wildcard before any
+    ///   quoting is decided, so no spelling of it reaches the SQL as a name.
     ///
     /// So the name is refused rather than escaped, at
     /// [`into_sql`](super::Pipeline::into_sql) and before prqlc is called, by
     /// pgorm's own code — which is what makes the outcome the same under
-    /// either compiler. NUL is refused beside the quote because PostgreSQL
-    /// carries no identifier containing one under any quoting at all.
+    /// either compiler.
     ///
     /// Length is deliberately not part of this: an identifier past
     /// PostgreSQL's 63-byte limit is truncated server-side and may then
     /// collide with another, which is a correctness question with a different
     /// answer.
     #[error(
-        "identifier `{0}` contains a double quote or NUL byte, which no quoted PostgreSQL \
-         identifier can carry; rename it"
+        "identifier `{0}` cannot be written as a pipeline name: it contains a double quote or \
+         NUL byte, begins with `$`, or is `*`; rename it"
     )]
     UnquotableIdentifier(String),
     /// prqlc rejected the pipeline during lowering.
@@ -85,7 +96,7 @@ pub enum PipelineError {
     ReshapedSources(&'static str),
 }
 
-// [spec:pgorm:req:pipeline.errors+3]
+// [spec:pgorm:req:pipeline.errors+4]
 impl From<PipelineError> for crate::Error {
     fn from(err: PipelineError) -> Self {
         crate::Error::Query(crate::error::RuntimeError::Internal(err.to_string()))
@@ -95,26 +106,24 @@ impl From<PipelineError> for crate::Error {
 /// Whether `name` is a name pgorm refuses to render rather than quote, as
 /// [`PipelineError::UnquotableIdentifier`].
 ///
-/// The set is two characters and closed. A double quote is the delimiter
-/// itself, and how an embedded one is escaped is decided by whichever prqlc
-/// the build resolved rather than by anything pgorm can pin for a consumer —
-/// so the name's meaning would be a property of the dependency graph. NUL is
-/// refused beside it because PostgreSQL carries no identifier containing one
-/// under any quoting at all.
-///
-/// Nothing else is: a name that merely *needs* quoting — a space, a capital,
-/// a keyword — is an ordinary name and renders, and a name past the 63-byte
-/// identifier limit is a different question, about what it may collide with
-/// once the server truncates it.
-// [spec:pgorm:req:pipeline.errors+3]
-// [spec:pgorm:req:security.ident-oracle.nul] (the pipeline's refusal class)
+/// The set is closed and decided by pgorm alone, never by asking the
+/// compiler: a name carrying `"` or NUL, a name beginning with `$`, and the
+/// name `*` (the variant's documentation says why each). Every other name is
+/// one both compilers either quote or write bare as an identifier the lexer
+/// reads back as that name: a space, a capital, a keyword, or a `$` after the
+/// first character (`a$b` is one identifier to PostgreSQL) is an ordinary
+/// name and renders, and a name past the 63-byte identifier limit is a
+/// different question, about what it may collide with once the server
+/// truncates it.
+// [spec:pgorm:req:pipeline.errors+4]
+// [spec:pgorm:req:security.ident-oracle.nul+2] (the pipeline's refusal class)
 pub(super) fn unquotable(name: &str) -> bool {
-    name.contains('"') || name.contains('\0')
+    name.contains(['"', '\0']) || name.starts_with('$') || name == "*"
 }
 
 /// The closed set of names an alias must not take: every top-level binding of
 /// prqlc 0.13's `std` module, its submodule names, and the PRQL keywords.
-// [spec:pgorm:req:pipeline.errors+3]
+// [spec:pgorm:req:pipeline.errors+4]
 pub(super) const RESERVED: &[&str] = &[
     "_append_by_name",
     "_eq",

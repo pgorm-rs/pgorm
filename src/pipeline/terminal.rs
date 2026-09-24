@@ -27,13 +27,14 @@ impl Pipeline {
     /// The identifier screen is first and is the reason this boundary, rather
     /// than the four constructors that mint identifiers, is where names are
     /// judged: every table, schema segment, column and alias the pipeline
-    /// carries passes through here on its way to prqlc, so a name that cannot
-    /// be quoted is caught whichever stage introduced it — including stages
-    /// written after the screen was. Because the refusal is pgorm's own and
+    /// carries passes through here on its way to prqlc, so a name the
+    /// compiler cannot be trusted to write as a name — one carrying `"` or
+    /// NUL, one beginning with `$`, or `*` — is caught whichever stage
+    /// introduced it, including stages written after the screen was. Because the refusal is pgorm's own and
     /// returns before the compiler is called at all, it does not depend on
     /// which prqlc the build resolved, which no dependency pgorm declares can
     /// guarantee for a downstream consumer that patches it.
-    // [spec:pgorm:req:pipeline.errors+3]
+    // [spec:pgorm:req:pipeline.errors+4]
     // [spec:pgorm:req:pipeline.params+4]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         let (mut identifiers, mut aliases) = (Vec::new(), Vec::new());

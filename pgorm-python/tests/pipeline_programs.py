@@ -69,7 +69,7 @@ def programs(n):
         "cast_unary": base.select(
             (-amount).cast("bigint").as_("negative"), (~key.is_null()).as_("present")
         ),
-        "qualified": n.Pipeline(n.Table('items "β"', schema='schema "β"')).select(
-            col('items "β"', 'id "β"').as_('out "β"')
+        "qualified": n.Pipeline(n.Table('items β', schema='schema β')).select(
+            col('items β', 'id β').as_('out β')
         ),
     }

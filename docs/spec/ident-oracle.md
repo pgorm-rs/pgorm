@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle]
+> [spec:pgorm:req:security.ident-oracle+2]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -109,13 +109,17 @@ the modules under `tests/identifier_oracle/`.
 > `tests/identifier_oracle/pins.rs` and names the plan node that fixes the
 > defect. A test asserts on every run that each pinned site × name pair still
 > fails, so the defect is reported until its fix lands and the pin cannot
-> outlive it. Three defects are pinned:
+> outlive it. Two defects are pinned:
 >
 > | Node | Defect |
 > | --- | --- |
 > | `type-part-keyword-names` | `prepare_part` writes keywords bare. `Func::named("not")` renders `not(1)`, a boolean NOT rather than a call, and reserved words at type, function, schema and access-method positions are syntax errors. |
-> | `pipeline-bare-dollar-names` | prqlc writes a leading-`$` name or a lone `*` bare. `$1` becomes a bound parameter, and two `$$` names swallow the SQL between them as a string constant. |
 > | `pipeline-read-cast-verbatim` | `select_sources` writes a column's read-cast type verbatim. |
+>
+> A fixed defect's pairs are held by the main property from then on. The
+> pipeline's leading-`$` and lone-`*` names (`pipeline-bare-dollar-names`),
+> which prqlc wrote bare as a parameter, a dollar quote or the wildcard, are
+> now refusals (`security.ident-oracle.nul`).
 >
 > The live leg checks the parser against the server, because the structural
 > oracle trusts a single parser. For one representative site per parse-node
@@ -172,13 +176,16 @@ the modules under `tests/identifier_oracle/`.
 
 ## Refusals and NUL
 
-> [spec:pgorm:req:security.ident-oracle.nul]
+> [spec:pgorm:req:security.ident-oracle.nul+2]
 > Where an API refuses a name, the oracle MUST see the refusal and never
 > rendered SQL. The pipeline refuses in three ways, all at `into_sql` and
 > never at construction:
 >
 > - `PipelineError::UnquotableIdentifier`, for any identifier carrying `"` or
->   NUL. This is pgorm's screen, which runs before prqlc is called.
+>   NUL, beginning with `$`, or equal to `*`. This is pgorm's screen, which
+>   runs before prqlc is called (`[spec:pgorm:req:pipeline.errors+4]`). The
+>   corpus hits it with every quote-bearing name, `$1`, `$$`, `$tag$` and
+>   `*`.
 > - `PipelineError::ReservedAlias`, for an alias PRQL reserves. The corpus
 >   hits this with `select`, `from` and `not`.
 > - `PipelineError::Compile`, for an unqualified identifier that PRQL's `std`

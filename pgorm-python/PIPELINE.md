@@ -99,7 +99,10 @@ means unbounded. Aggregate functions include `sum`, `min`, `max`, `average`,
 projections on both sides. Rust's compiler rejects unsupported wildcard shapes.
 `distinct`, `take(count)` and inclusive `take_range(start, end)` use native stage
 semantics. Compiler errors, including reserved alias names, surface as
-`ConstructionError`.
+`ConstructionError`. So does Rust's identifier screen, when the pipeline is
+compiled: a name containing a double quote or NUL, a name beginning with `$`,
+and the name `*` are refused rather than quoted, whatever stage introduced them.
+A `$` after the first character is an ordinary name character.
 
 ## Results and registered models
 

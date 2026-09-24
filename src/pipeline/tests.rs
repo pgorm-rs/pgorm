@@ -17,7 +17,7 @@ fn total<'brand>() -> Expr<'brand> {
 
 /// Golden output plus the pg_query oracle: the emitted SQL must be a string
 /// the real PostgreSQL grammar accepts.
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 fn sql_of(pipeline: Pipeline) -> String {
     let (sql, _) = pipeline.into_sql().expect("pipeline compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -748,7 +748,7 @@ fn scopes_compose_as_pipeline_functions() {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn reserved_alias_is_a_typed_error() {
     let err = Pipeline::from(INVOICE)
@@ -758,7 +758,7 @@ fn reserved_alias_is_a_typed_error() {
     assert_eq!(err, PipelineError::ReservedAlias("sum".to_owned()));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn stdlib_name_reference_is_a_compile_error() {
     let err = Pipeline::from(INVOICE)
@@ -768,7 +768,7 @@ fn stdlib_name_reference_is_a_compile_error() {
     assert!(matches!(err, PipelineError::Compile(_)));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]    an unattached token is not a
+// [spec:pgorm:req:pipeline.errors+4/test]    an unattached token is not a
 // compile-time error; the server answers for it
 #[test]
 fn unattached_alias_token_compiles_to_a_column_reference() {
@@ -789,7 +789,7 @@ const EXFILTRATING: &str = r#"x\" , (SELECT password FROM secret) AS "leak"#;
 
 /// Every identifier the pipeline can be given at runtime reaches
 /// `collect_identifiers`, whichever constructor minted it.
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 fn refuses(pipeline: Pipeline) {
     let err = pipeline
         .into_sql()
@@ -800,13 +800,13 @@ fn refuses(pipeline: Pipeline) {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn exfiltrating_column_name_is_refused() {
     refuses(Pipeline::from(INVOICE).select(col(INVOICE, Name::runtime(EXFILTRATING))));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn exfiltrating_runtime_source_name_is_refused() {
     refuses(Pipeline::from(named_runtime(
@@ -815,19 +815,19 @@ fn exfiltrating_runtime_source_name_is_refused() {
     )));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn exfiltrating_schema_name_is_refused() {
     refuses(Pipeline::from_schema(Name::runtime(EXFILTRATING), INVOICE));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn exfiltrating_runtime_alias_is_refused() {
     refuses(Pipeline::from(INVOICE).derive(total().as_runtime(Name::runtime(EXFILTRATING))));
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]    the backslash is what defeats
+// [spec:pgorm:req:pipeline.errors+4/test]    the backslash is what defeats
 // one escaper; a bare quote is the same representability problem and is
 // refused on its own
 #[test]
@@ -842,7 +842,7 @@ fn a_bare_quote_in_an_identifier_is_refused() {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]
+// [spec:pgorm:req:pipeline.errors+4/test]
 #[test]
 fn a_nul_byte_in_an_identifier_is_refused() {
     let err = Pipeline::from(INVOICE)
@@ -855,7 +855,7 @@ fn a_nul_byte_in_an_identifier_is_refused() {
     );
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]    only the quote and the NUL are
+// [spec:pgorm:req:pipeline.errors+4/test]    only the quote and the NUL are
 // refused: a backslash alone means nothing inside a quoted identifier, and
 // both compilers render it the same way
 #[test]
@@ -865,7 +865,72 @@ fn a_backslash_without_a_quote_still_renders() {
     assert_eq!(built, r#"SELECT "a\b" FROM share"#);
 }
 
-// [spec:pgorm:req:pipeline.errors+3/test]    the refusal is pgorm's own and
+/// Names prqlc writes bare that PostgreSQL's lexer does not read back as a
+/// name: a parameter, two dollar-quote delimiters, and the wildcard.
+const LEXED_AS_SOMETHING_ELSE: [&str; 4] = ["$1", "$$", "$tag$", "*"];
+
+// [spec:pgorm:req:pipeline.errors+4/test]    a leading `$` would be written
+// bare and lexed as a parameter or a dollar quote, and `*` is the compiler's
+// wildcard, so each is refused at every kind of position: a column, a
+// relation, a schema, a join relation and an alias
+#[test]
+fn a_leading_dollar_or_star_is_refused() {
+    for name in LEXED_AS_SOMETHING_ELSE {
+        let runtime = || Name::runtime(name);
+        let pipelines = [
+            Pipeline::from(INVOICE).select(col(INVOICE, runtime())),
+            Pipeline::from(runtime()),
+            Pipeline::from_schema(runtime(), INVOICE),
+            Pipeline::from(INVOICE).join(JoinSide::Inner, runtime(), this(ID).eq(that(ID))),
+            Pipeline::from(INVOICE)
+                .group(runtime())
+                .aggregate(count_rows()),
+            Pipeline::from(INVOICE).derive(total().as_runtime(runtime())),
+        ];
+        for pipeline in pipelines {
+            assert_eq!(
+                pipeline.into_sql(),
+                Err(PipelineError::UnquotableIdentifier(name.to_owned())),
+                "`{name}` must be refused"
+            );
+        }
+    }
+}
+
+// [spec:pgorm:req:pipeline.errors+4/test]    `$` is refused only where it
+// leads: after the first character it is an identifier character to
+// PostgreSQL, so `a$1` reads back as one column and the census still counts
+// only the binder's placeholder
+#[test]
+fn an_inner_dollar_still_renders_as_a_name() {
+    let (sql, values) = Pipeline::from(INVOICE)
+        .filter_with(|binder| col(INVOICE, Name::runtime("a$1")).eq(binder.bind(7_i32)))
+        .select(col(INVOICE, Name::runtime("b$$c")))
+        .into_sql()
+        .expect("an inner `$` is an ordinary name");
+    assert_eq!(sql, "SELECT b$$c FROM invoice WHERE a$1 = $1");
+    let select = parsed_select(&sql);
+    let column = |node: &pg_query::protobuf::Node| match node.node.as_ref() {
+        Some(pg_query::NodeEnum::ColumnRef(column)) => match column.fields[0].node.as_ref() {
+            Some(pg_query::NodeEnum::String(name)) => name.sval.clone(),
+            other => panic!("expected a column name, got {other:?}"),
+        },
+        other => panic!("expected a column reference, got {other:?}"),
+    };
+    let target = match select.target_list[0].node.as_ref() {
+        Some(pg_query::NodeEnum::ResTarget(target)) => target.val.as_deref().map(column),
+        other => panic!("expected a projection, got {other:?}"),
+    };
+    assert_eq!(target.as_deref(), Some("b$$c"));
+    let condition = match select.where_clause.as_deref().and_then(|w| w.node.as_ref()) {
+        Some(pg_query::NodeEnum::AExpr(expr)) => expr.lexpr.as_deref().map(column),
+        other => panic!("expected a comparison, got {other:?}"),
+    };
+    assert_eq!(condition.as_deref(), Some("a$1"));
+    assert_eq!(values.0.len(), 1);
+}
+
+// [spec:pgorm:req:pipeline.errors+4/test]    the refusal is pgorm's own and
 // happens before `adapter::compile`, so it cannot depend on which prqlc the
 // build resolved — and only one can be linked, so the property is asserted
 // structurally rather than by compiling twice. This pipeline also mismatches

@@ -55,8 +55,9 @@ pub fn sites() -> Vec<Site> {
 }
 
 // ---------------------------------------------------------------------------
-// pgorm: the pipeline. Every identifier is screened at `into_sql` (`"` and NUL
-// refused) and then quoted — or not — by prqlc.
+// pgorm: the pipeline. Every identifier is screened at `into_sql` (`"` or NUL
+// anywhere, a leading `$` and a lone `*` refused) and then quoted — or not —
+// by prqlc.
 // ---------------------------------------------------------------------------
 
 fn pipeline_sites() -> Vec<Site> {

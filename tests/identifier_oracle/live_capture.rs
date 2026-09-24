@@ -415,8 +415,8 @@ fn judge_sequence(
 
 /// Every live-only site holds every corpus name, statement by statement, and
 /// keeps a NUL-bearing name out of the server.
-// [spec:pgorm:req:security.ident-oracle/test]
-// [spec:pgorm:req:security.ident-oracle.nul/test]
+// [spec:pgorm:req:security.ident-oracle+2/test]
+// [spec:pgorm:req:security.ident-oracle.nul+2/test]
 #[tokio::test]
 async fn live_sites_hold_every_hostile_name() {
     let (ctx, db) = open("ident_oracle_live_capture").await;
