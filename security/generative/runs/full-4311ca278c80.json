@@ -1,0 +1,78 @@
+{
+  "counts": {
+    "compile_suite_invocations": {
+      "oracle_decided": false,
+      "reached_database": false,
+      "recorded": 1,
+      "scheduled": 1,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 1
+      }
+    },
+    "construction_only_programs_constructed": {
+      "oracle_decided": false,
+      "reached_database": false,
+      "recorded": 20000,
+      "scheduled": 20000,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 20000
+      }
+    },
+    "control_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 22,
+      "scheduled": 22,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 22
+      }
+    },
+    "invalid_input_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 500,
+      "scheduled": 500,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 500,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 0
+      }
+    },
+    "live_database_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 5000,
+      "scheduled": 5000,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 5000
+      }
+    },
+    "note": "run classes are counted separately and are never summed"
+  },
+  "coverage_outstanding": [],
+  "dirty": false,
+  "fault_kinds": [],
+  "findings": [],
+  "output": "target/generative-campaign/full-4311ca278c80",
+  "passed": true,
+  "profile": "full",
+  "revision": "2377cb16463bcb63c017589069b190cdf601f881"
+}

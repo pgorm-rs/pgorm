@@ -7467,12 +7467,27 @@ children (
         id coverage-remaining-gaps
         title "The last twenty-two obligations are reached or retired"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-17T13:15:14.501679Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "What survives the attribution fix, all of it a genuine generator gap rather than a reporting one, and in three groups that want different work. Five decode cells for decimal, json, enum, ipnetwork and mac address need a checked codec to survive the round trip, and the replay crate keeps those codecs private; reading them as their bare Rust type would silently change the value, which is exactly the class of defect this campaign exists to catch, so they are deliberately excluded rather than closed cheaply. Closing them means exporting the codecs. Fourteen cells for unsigned sixty-four bit and vector values and their arrays are constructible, which was verified against the type layer rather than assumed, but the grammar filters them out, and the obvious route is closed for a reason worth recording: construction-only programs contribute no coverage tokens at all, and the inspection oracle explicitly refuses a program holding an explicit unsigned value with an uncovered-semantics error. The remaining route is the rejection family, which matches the matrix policy's own construction-or-rejection wording. Three family cells are simply ungenerated: an empty insert batch, whose documented behaviour of reporting zero rather than writing is untested by the campaign despite being a stated contract; an omitted write; and entity hooks, since no active-model behaviour hook is exercised anywhere in the corpus. The empty batch is the one worth doing first, because the contract is written down and a campaign that never exercises it cannot notice the contract breaking."
+            }
+
+            {
+                at 2026-09-24T15:04:46.787283Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Closed on merged main, 2026-09-24. The authoritative full run full-4311ca278c80 at 2377cb16 (clean tree, after the prqlc re-pin to fork 2ce6a242, the tokenizer backslash fix and the six coverage commits shipped from this node's worktree) passed outright: 20000/20000 construction, 5000/5000 live, 500/500 invalid expected-rejection, 22/22 controls, compile suite pass (72 cases), coverage 448/448 declared with 0 outstanding, zero findings. The 22 obligations closed rather than retired: the five result-decode cells through replay codecs made public and read as checked codecs (f8d122ed); the fourteen u64/vector value and array cells through the rejection family — u64 beyond i64 refused at serialisation, vector refused as a missing type (3513cce2); the empty batch as a rejection rule (Python's Insert refuses an empty row set; Rust's Insert::many(empty) is not reachable from the Python surface), the omitted write through sequence inserts, and entities.hooks by attribution only, the before_save hook having been exercised all along (6a7a7fb2). The baseline run on this branch also surfaced that pgorm's deliberate UnquotableIdentifier refusal (f48c6425) was unmodelled by the reference; the campaign now checks the refusal instead of tripping on it (c72c3a9e). One correction to this node's own commit history: 84bb4dcf and 2377cb16 attribute the fixture-admin timeouts they fix to a loaded host, but the operator's laptop was sleeping during those runs, which pauses the Docker VM and jumps the wall clock past a two-second statement limit — the likelier cause. The fixes stand regardless, since they bound only administrative sessions and leave generated programs under their two-second limit; this run, on an awake and otherwise idle machine, had no timeout of either kind."
+            }
+
+            {
+                at 2026-09-24T15:04:46.850667Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
