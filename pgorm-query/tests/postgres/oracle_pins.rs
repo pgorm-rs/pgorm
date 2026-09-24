@@ -307,7 +307,7 @@ fn oracle_pins_extra_interpolated_raw() {
 // placeholder inside `ColumnDef::take`, which now clones the name, so the empty
 // identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.ident-quoting+5/test]
+// [spec:pgorm:req:sql.render.ident-quoting+6/test]
 // [spec:pgorm:def:sql.ast.keywords+5/test]
 #[test]
 fn alias_identifiers_are_never_empty() {

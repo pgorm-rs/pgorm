@@ -148,7 +148,7 @@ impl ColumnType {
     /// A type *expression* — `numeric(12, 2)` — is grammar rather than a
     /// name and belongs in
     /// [`Expr::cast_as_raw`](crate::Expr::cast_as_raw).
-    // [spec:pgorm:req:sql.render.ident-quoting+5]
+    // [spec:pgorm:req:sql.render.ident-quoting+6]
     pub fn named<T>(ty: T) -> ColumnType
     where
         T: Into<String>,
@@ -605,7 +605,7 @@ impl ColumnDef {
     /// Takes anything a [`TypeName`] is built from — a bare name, or a
     /// `TypeName` carrying a schema qualifier or an array suffix — and every
     /// part renders quoted-or-safe-bare, never as SQL.
-    // [spec:pgorm:req:sql.render.ident-quoting+5]
+    // [spec:pgorm:req:sql.render.ident-quoting+6]
     pub fn named<T>(&mut self, name: T) -> &mut Self
     where
         T: Into<TypeName>,

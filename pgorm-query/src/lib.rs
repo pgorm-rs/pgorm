@@ -659,6 +659,7 @@ mod foreign_key;
 mod func;
 mod index;
 mod key;
+mod keywords;
 mod prepare;
 mod query;
 mod schema;

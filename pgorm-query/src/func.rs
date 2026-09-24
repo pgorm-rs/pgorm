@@ -255,10 +255,14 @@ impl Func {
     /// Call a function this vocabulary has no spelling for, by name.
     ///
     /// The name is an identifier, not SQL text: it is spelled bare only when
-    /// it is already a safe lowercase name, and quoted otherwise. So a name
-    /// carrying anything else — an upper-case letter, a space, a payload —
-    /// reaches PostgreSQL as a function it can look up and fail to find,
-    /// never as syntax it executes.
+    /// it is a lowercase name that is no keyword PostgreSQL restricts, and
+    /// quoted otherwise. So a name carrying anything else — an upper-case
+    /// letter, a space, a payload, a keyword such as `not` — reaches
+    /// PostgreSQL as a function it can look up and fail to find, never as
+    /// syntax it executes. The exceptions are `coalesce`, `greatest`,
+    /// `least` and `nullif`, which are written bare because the grammar
+    /// builds them itself and they are not functions to look up
+    /// (`sql.types.type-name`).
     ///
     /// # Examples
     ///
@@ -296,6 +300,20 @@ impl Func {
     ///     query.to_string(),
     ///     r#"SELECT "MyFunction"('hello')"#
     /// );
+    /// ```
+    ///
+    /// So is a keyword, which bare would be read as the grammar's own syntax
+    /// — `not(1)` is a boolean NOT — except the four call forms:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .expr(Func::named(Name::runtime("not")).arg(1))
+    ///     .expr(Func::named(Name::runtime("coalesce")).arg(1).arg(2))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(query.to_string(), r#"SELECT "not"(1), coalesce(1, 2)"#);
     /// ```
     pub fn named<T>(func: T) -> FunctionCall
     where

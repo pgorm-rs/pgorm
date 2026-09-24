@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+3]
+> [spec:pgorm:req:security.ident-oracle+4]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -56,7 +56,8 @@ the modules under `tests/identifier_oracle/`.
 > - whitespace, including newlines and tabs;
 > - a combining mark, a right-to-left override, full-width and typographic
 >   quotes, and a zero-width joiner;
-> - the keywords `select`, `from`, `user`, `not`, `integer` and `left`;
+> - the keywords `select`, `from`, `user`, `not`, `integer`, `left`,
+>   `coalesce`, `row`, `distinct` and `only`;
 > - `*`, a dotted name, and the pipeline's own binding spelling `table_0`;
 > - the empty name;
 > - names of exactly 63 and 64 bytes, one of them splitting a two-byte
@@ -97,11 +98,19 @@ the modules under `tests/identifier_oracle/`.
 >   creates the truncated table, then binds the full name as a `name` value
 >   in a catalogue lookup, and the server refuses that value with `42622`
 >   (*identifier too long*). The live leg expects that stop.
-> - **Type keywords.** A site under `TypeName::prepare_part` writes a safe
->   lowercase name bare (`[spec:pgorm:def:sql.types.type-name]`). When the
->   grammar spells such a name as a type keyword (`integer`), the name
->   resolves to that type. The parse may then differ from the benign one, but
->   only inside the `TypeName` node that holds the name.
+> - **Type spellings.** A type position under `TypeName`'s part policy
+>   writes the grammar's own type spellings bare
+>   (`[spec:pgorm:def:sql.types.type-name]`), and the name then resolves to
+>   that type (`integer` → `int4`). The oracle accepts this only for the
+>   nineteen keywords the rule lists, each named in the oracle, and only
+>   when the parse differs from the benign one inside the `TypeName` node
+>   that holds the name and nowhere else.
+> - **Call forms.** A function position under the same policy writes
+>   `coalesce`, `greatest`, `least` and `nullif` bare, as the expressions
+>   the grammar builds for them. The oracle accepts this only for those four
+>   keywords, each with the node it must become (`CoalesceExpr`,
+>   `MinMaxExpr`, `MinMaxExpr`, `AExpr`), and only when the call node
+>   holding the name became that node and nothing outside it differs.
 > - **Refusals**, for the sites that refuse names
 >   (`security.ident-oracle.nul`).
 >
@@ -109,22 +118,29 @@ the modules under `tests/identifier_oracle/`.
 > `tests/identifier_oracle/pins.rs` and names the plan node that fixes the
 > defect. A test asserts on every run that each pinned site × name pair still
 > fails, so the defect is reported until its fix lands and the pin cannot
-> outlive it. One defect is pinned:
->
-> | Node | Defect |
-> | --- | --- |
-> | `type-part-keyword-names` | `prepare_part` writes keywords bare. `Func::named("not")` renders `not(1)`, a boolean NOT rather than a call, and reserved words at type, function, schema and access-method positions are syntax errors. |
->
-> A fixed defect's pairs are held by the main property from then on:
+> outlive it. No defect is pinned now. A fixed defect's pairs are held by
+> the main property from then on:
 >
 > - The pipeline's leading-`$` and lone-`*` names
 >   (`pipeline-bare-dollar-names`), which prqlc wrote bare as a parameter, a
 >   dollar quote or the wildcard, are now refusals
 >   (`security.ident-oracle.nul`).
 > - `select_sources`'s read cast (`pipeline-read-cast-verbatim`), whose type
->   prqlc wrote verbatim, is now written through `TypeName`'s part policy.
->   The site is held to that policy, so its keyword names are pinned with
->   the other `prepare_part` sites.
+>   prqlc wrote verbatim, is now written through `TypeName`'s part policy,
+>   and the site is held to that policy.
+> - `TypeName`'s part policy wrote keywords bare
+>   (`type-part-keyword-names`): `Func::named("not")` rendered `not(1)`, a
+>   boolean NOT rather than a call, and reserved words at type, function,
+>   schema and access-method positions were syntax errors. It now quotes
+>   every keyword PostgreSQL restricts except the listed type spellings and
+>   call forms.
+>
+> Because that policy turns on a keyword list, its sites are also held to
+> every keyword the linked scanner knows, not only the corpus's ten. The
+> list is read off libpg_query's token table and each word scanned back, so
+> it is independent of the list pgorm-query embeds. At every site under the
+> policy, each keyword MUST round-trip as a name or be one of the listed
+> type spellings or call forms, accepted as above.
 >
 > The live leg checks the parser against the server, because the structural
 > oracle trusts a single parser. For one representative site per parse-node

@@ -3,7 +3,7 @@ use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+1/test]
 // [spec:pgorm:def:sql.ast.select+2/test]
-// [spec:pgorm:req:sql.render.ident-quoting+5/test]
+// [spec:pgorm:req:sql.render.ident-quoting+6/test]
 #[test]
 fn select_1() {
     assert_eq!(

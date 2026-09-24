@@ -45,8 +45,45 @@ const VALUE_WRAPPERS: [&str; 3] = ["String", "Sval", "sval"];
 /// Corpus names PRQL binds for itself: `pipeline::error::RESERVED` lists
 /// them, so the alias screen refuses them, and prqlc's name resolution reads
 /// them as its own `std` items wherever they stand unqualified. `user`,
-/// `integer` and `left` are not among them.
-const PRQL_RESERVED_IN_CORPUS: [&str; 3] = ["select", "from", "not"];
+/// `integer`, `left`, `row`, `distinct` and `only` are not among them.
+const PRQL_RESERVED_IN_CORPUS: [&str; 4] = ["select", "from", "not", "coalesce"];
+
+/// The keywords `sql.types.type-name` writes bare in an unqualified type
+/// position because the grammar reads each as one of its own type spellings,
+/// resolving to a catalogue type (`integer` → `int4`). Listed per keyword,
+/// as the rule lists them: nothing else may read as a type keyword.
+pub const TYPE_SPELLINGS: [&str; 19] = [
+    "bigint",
+    "bit",
+    "boolean",
+    "char",
+    "character",
+    "dec",
+    "decimal",
+    "float",
+    "int",
+    "integer",
+    "interval",
+    "json",
+    "nchar",
+    "numeric",
+    "real",
+    "smallint",
+    "time",
+    "timestamp",
+    "varchar",
+];
+
+/// The keywords `sql.types.type-name` writes bare at a function position
+/// because the grammar reads each call as an expression of its own rather
+/// than a function in `pg_proc`, each with the node the parser builds in
+/// place of the call. Listed per keyword, as the rule lists them.
+pub const CALL_FORMS: [(&str, &str); 4] = [
+    ("coalesce", "CoalesceExpr"),
+    ("greatest", "MinMaxExpr"),
+    ("least", "MinMaxExpr"),
+    ("nullif", "AExpr"),
+];
 
 /// What a site did with a name.
 #[derive(Debug)]
@@ -76,9 +113,16 @@ impl Rendered {
 pub enum Policy {
     /// `SqlName::prepare`: always double-quoted, embedded `"` doubled.
     Quoted,
-    /// `TypeName::prepare_part`: bare when the name matches
-    /// `^[a-z_][a-z0-9_]*$`, quoted like [`Quoted`](Self::Quoted) otherwise.
+    /// `TypeName`'s part policy (`sql.types.type-name`) at a type position,
+    /// or an index access method: bare when the name matches
+    /// `^[a-z_][a-z0-9_]*$` and is no keyword PostgreSQL restricts, or is
+    /// one of [`TYPE_SPELLINGS`] in an unqualified type; quoted like
+    /// [`Quoted`](Self::Quoted) otherwise.
     TypePart,
+    /// The same policy at a function position (`Func::named`), where the
+    /// keywords written bare are [`CALL_FORMS`] instead, and the unreserved
+    /// `operator` is quoted because `operator(` opens `OPERATOR(schema.op)`.
+    FunctionName,
     /// A string literal rather than an identifier: enum labels, which are
     /// values. Inline rendering escapes them (`E'…'` when a backslash or a
     /// control character is present).
@@ -130,7 +174,7 @@ impl Policy {
 
     pub fn nul(self) -> NulBehaviour {
         match self {
-            Self::Quoted | Self::TypePart => NulBehaviour::Encoder,
+            Self::Quoted | Self::TypePart | Self::FunctionName => NulBehaviour::Encoder,
             Self::Literal => NulBehaviour::Escaped,
             Self::Pipeline | Self::PipelineBare | Self::PipelineAlias => NulBehaviour::Refused,
         }
@@ -191,11 +235,18 @@ pub enum Verdict {
     /// The empty name: rendered as `""`, which the grammar itself refuses as a
     /// zero-length delimited identifier, so no statement exists to run.
     EmptyRejected,
-    /// A bare-safe name at a [`TypePart`](Policy::TypePart) site that the
-    /// grammar spells as a type keyword (`integer`), resolving to that type
-    /// as `sql.types.type-name` intends: the parse differs from the benign
-    /// one inside the type's own `TypeName` node and nowhere else.
+    /// One of [`TYPE_SPELLINGS`] at a [`TypePart`](Policy::TypePart) site,
+    /// which the grammar reads as its own type spelling (`integer`),
+    /// resolving to that type as `sql.types.type-name` intends: the parse
+    /// differs from the benign one inside the type's own `TypeName` node and
+    /// nowhere else.
     TypeKeyword,
+    /// One of [`CALL_FORMS`] at a [`FunctionName`](Policy::FunctionName)
+    /// site, which the grammar reads as its own expression
+    /// (`coalesce(1)` is a `CoalesceExpr`) as `sql.types.type-name` intends:
+    /// the call node became that form's node and nothing outside it differs
+    /// from the benign tree.
+    CallForm,
 }
 
 /// A step in a path through a parse tree.
@@ -325,6 +376,9 @@ pub fn judge_against(
     if !walk.diffs.is_empty() && type_keyword(site, name, positions, benign, &tree) {
         return Ok(Verdict::TypeKeyword);
     }
+    if !walk.diffs.is_empty() && call_form(site, name, positions, benign, &tree) {
+        return Ok(Verdict::CallForm);
+    }
 
     if !walk.diffs.is_empty() {
         let shown = walk
@@ -386,9 +440,10 @@ pub fn reference_rendered(site: &Site, benign: Rendered) -> Result<Reference, St
     })
 }
 
-/// Whether a bare-safe name at a [`TypePart`](Policy::TypePart) site read as
-/// a type keyword and nothing more: the trees agree everywhere outside the
-/// `TypeName` node holding each position, and that node is still a type name.
+/// Whether one of [`TYPE_SPELLINGS`] at a [`TypePart`](Policy::TypePart)
+/// site read as a type keyword and nothing more: the trees agree everywhere
+/// outside the `TypeName` node holding each position, and that node is still
+/// a type name.
 fn type_keyword(
     site: &Site,
     name: &str,
@@ -396,7 +451,7 @@ fn type_keyword(
     benign: &Json,
     tree: &Json,
 ) -> bool {
-    if site.policy != Policy::TypePart || !bare_safe(name) {
+    if site.policy != Policy::TypePart || !TYPE_SPELLINGS.contains(&name) {
         return false;
     }
     let mut regions = Vec::new();
@@ -423,11 +478,40 @@ fn type_keyword(
     walk.diffs.is_empty()
 }
 
-/// Whether `TypeName::prepare_part` writes `name` bare.
-fn bare_safe(name: &str) -> bool {
-    let mut chars = name.chars();
-    matches!(chars.next(), Some('a'..='z' | '_'))
-        && chars.all(|c| matches!(c, 'a'..='z' | '0'..='9' | '_'))
+/// Whether one of [`CALL_FORMS`] at a [`FunctionName`](Policy::FunctionName)
+/// site read as the grammar's own expression and nothing more: at each
+/// position the call node holding the name became the form's node, and the
+/// trees agree everywhere outside it.
+fn call_form(site: &Site, name: &str, positions: &[Vec<Seg>], benign: &Json, tree: &Json) -> bool {
+    let Some((_, form)) = CALL_FORMS.iter().find(|(keyword, _)| *keyword == name) else {
+        return false;
+    };
+    if site.policy != Policy::FunctionName {
+        return false;
+    }
+    let mut regions = Vec::new();
+    for position in positions {
+        let Some(end) = position
+            .iter()
+            .rposition(|seg| matches!(seg, Seg::Key(key) if key == "FuncCall"))
+        else {
+            return false;
+        };
+        let region = position[..end].to_vec();
+        if !at(tree, &region).is_some_and(|node| node.get(*form).is_some()) {
+            return false;
+        }
+        regions.push(region);
+    }
+    let mut walk = Walk {
+        name,
+        policy: site.policy,
+        path: Vec::new(),
+        skip: regions,
+        diffs: Vec::new(),
+    };
+    walk.compare(benign, tree);
+    walk.diffs.is_empty()
 }
 
 /// The node at `path` in `tree`.

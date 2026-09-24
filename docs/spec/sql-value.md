@@ -423,26 +423,81 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+5]
+> [spec:pgorm:def:sql.types.type-name+6]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<Name>`,
 > `name: Name`, `array: bool`, `verbatim: bool`. Rendering
-> (`to_sql_string`) joins the
-> parts with `.` and appends a structural `[]` for arrays; a part that is a
-> safe lowercase identifier (`^[a-z_][a-z0-9_]*$`) renders bare — unquoted
-> names fold to lowercase, so bare and quoted are the same name there, and
-> grammar-sugar spellings (`integer`) only resolve bare — while every other
-> part renders as a quoted identifier, case preserved. A name is therefore
-> a name: text that is not an identifier becomes a quoted identifier
-> PostgreSQL refuses, never SQL it executes. `raw_text` gives the unquoted
-> dotted spelling, which is a description and not SQL: codegen respells a
-> named type from it, and no writer puts it into a statement. The
+> (`to_sql_string`) joins the parts with `.` and appends a structural `[]`
+> for arrays. Each part is written bare or quoted by one policy
+> (`pgorm-query/src/keywords.rs`), which knows where the part stands.
+>
+> A part renders bare when it is a lowercase identifier
+> (`^[a-z_][a-z0-9_]*$`) and not a keyword PostgreSQL restricts. Unquoted
+> names fold to lowercase, so bare and quoted are the same name there.
+> Every other part renders as a quoted identifier, case preserved. The
+> restricted keywords are PostgreSQL's `COL_NAME`, `TYPE_FUNC_NAME` and
+> `RESERVED` categories — the set PostgreSQL's own `quote_ident()` quotes —
+> embedded from the `kwlist.h` of the release the linked libpg_query
+> carries, 17.7. A test pins the embedded list against that scanner in both
+> directions, and fails when the linked parser moves; the restricted set is
+> unchanged in PostgreSQL 18 and 19, and PostgreSQL 16 differs only in
+> leaving `json` unrestricted. A restricted keyword written bare is not a
+> name. In a type position `select` is a syntax error, and in a function
+> position the shape of the statement changes: `not(1)` is a boolean NOT,
+> `row(1)` a row constructor, `distinct(1)` first in a projection a
+> `SELECT DISTINCT`, and `only` before a `FROM` function an inheritance
+> marker. Quoted, each is an identifier naming what the bare word would
+> have named had it not been a keyword.
+>
+> The policy writes bare, where `quote_ident()` would quote, exactly two
+> kinds of keyword. Each is a keyword the caller means as the grammar's own
+> form rather than as a name, and each is listed per keyword:
+>
+> - **Type spellings**, in an unqualified type position — a cast target, a
+>   column type or an enum type, array or not. `bigint`, `bit`, `boolean`,
+>   `char`, `character`, `dec`, `decimal`, `float`, `int`, `integer`,
+>   `interval`, `json`, `nchar`, `numeric`, `real`, `smallint`, `time`,
+>   `timestamp` and `varchar` render bare, and each resolves to its
+>   catalogue type (`integer` → `int4`). Quoted, most would name no type at
+>   all, and `"char"` names a different one, the single-byte catalogue
+>   type, which this spelling cannot reach. The words `national` and
+>   `precision` are halves of two-word spellings and are quoted. A
+>   two-word spelling (`double precision`, `character varying`,
+>   `timestamp with time zone`) is a type expression rather than a name:
+>   write it with `TypeName::raw`. No part of a schema-qualified type is a
+>   spelling — `integer.ty` is a syntax error, and `s.integer` names a type
+>   called `integer` in `s` — so such a part is quoted like any other
+>   keyword.
+> - **Call forms**, in a function position — `Func::named`, in an
+>   expression or a `FROM` list. `coalesce`, `greatest`, `least` and
+>   `nullif` render bare, as the expressions the parser builds for them.
+>   They are not functions in `pg_proc`, so quoting them would name a
+>   function that does not exist.
+>
+> Every other restricted keyword is quoted at every position, including a
+> type's schema, the name after it, and an index access method
+> (`IndexType::Named`). Where the grammar would have read a
+> `TYPE_FUNC_NAME` keyword bare as the same name anyway (`left` as a
+> function), the quoted spelling names the same object. One `UNRESERVED`
+> keyword is quoted too, at a function position only: `operator(` in an
+> expression opens the grammar's qualified-operator syntax
+> (`OPERATOR(schema.op)`), so a bare `operator(1, 2)` is a syntax error. The
+> identifier oracle holds every keyword the linked scanner knows at every
+> position under this policy (`[spec:pgorm:req:security.ident-oracle]`),
+> which is how that one was found.
+>
+> A name is therefore a name: text that is not an identifier, and an
+> identifier that is a keyword, becomes a quoted identifier PostgreSQL
+> refuses or resolves as a name, never SQL it executes. `raw_text` gives
+> the unquoted dotted spelling, which is a description and not SQL:
+> codegen respells a named type from it, and no writer puts it into a
+> statement. The
 > pipeline's `select_sources` read cast renders through `to_sql_string`
 > like every other cast (`[spec:pgorm:sem:pipeline.select-sources+4]`).
-> `Function::Named` names render under the same part policy, and
-> so does `IndexType::Named`'s access method, which reaches
-> `prepare_part` directly because it is a single name rather than a
-> `TypeName` — one policy, not a per-site escape.
+> `Function::Named` names render under the same policy at their own
+> position, and so does `IndexType::Named`'s access method. Both reach
+> `prepare_part` directly because each is a single name rather than a
+> `TypeName`: one policy, not a per-site escape.
 >
 > Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names, and they
 > are the one exception: `TypeName::raw` sets `verbatim`, which makes

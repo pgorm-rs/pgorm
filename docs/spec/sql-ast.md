@@ -843,7 +843,7 @@ today, including panicking edges and deliberate failsafes.
 > entity layer's enum casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
-> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+5]`), never by choosing
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+6]`), never by choosing
 > a different node.
 >
 > What this forbids is the second, `FunctionCall`-shaped cast whose type rode

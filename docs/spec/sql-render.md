@@ -170,7 +170,7 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+5]
+> [spec:pgorm:req:sql.render.ident-quoting+6]
 > The quote is the double quote, and it is the only one: PostgreSQL has a
 > single identifier quote, so it is written at the render sites rather than
 > carried in a parameter that could hold another character. Every identifier
@@ -186,7 +186,9 @@ an ideal Postgres renderer would emit.
 > says so: a position that renders a *name* takes an identifier type or a
 > `TypeName`, and every such position renders through `SqlName::prepare` or
 > through `TypeName`'s part policy (`sql.types.type-name`), which quotes
-> anything that is not already a safe lowercase identifier. In particular
+> anything that is not a lowercase identifier and every keyword the
+> position's grammar would not read bare as that name, save the type
+> spellings and call forms that rule lists per keyword. In particular
 > `ColumnType::Named` carries a `TypeName` and renders through
 > `to_sql_string`, `IndexType::Named`'s access method renders through
 > `TypeName::prepare_part`, `Function::Named` function names render under
@@ -710,8 +712,9 @@ an ideal Postgres renderer would emit.
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
 > `vector(n)`/`vector`; Cidr → `cidr`; Inet → `inet`; MacAddr → `macaddr`;
 > LTree → `ltree`; Named/Enum → the type name through `TypeName`'s part
-> policy (`sql.types.type-name`), a safe lowercase name bare and anything
-> else quoted, never the identifier's raw string. The mapping is
+> policy (`sql.types.type-name`), a lowercase name that is no restricted
+> keyword bare and anything else quoted, never the identifier's raw
+> string. The mapping is
 > total — no variant is unsupported and none panics. An auto-increment column
 > instead renders `smallserial`, `serial`, or `bigserial` by integer width;
 > auto-increment on any other type renders that type's own spelling. Table
@@ -730,8 +733,9 @@ an ideal Postgres renderer would emit.
 > `TypeRef`'s quoted, dot-joined parts, so a schema-qualified type renders
 > `"schema"."name"`. In cast and column-type position an
 > enum type renders through `TypeName`'s part policy
-> (`sql.types.type-name`): a safe lowercase part bare, anything else a
-> quoted identifier — so an enum name is a name there, never SQL, and
+> (`sql.types.type-name`): a lowercase part that is no restricted keyword
+> bare, anything else a quoted identifier — so an enum name is a name
+> there, never SQL, and
 > `enumeration(Name::runtime("text, injected integer"))` yields a type
 > PostgreSQL refuses rather than an extra column.
 >

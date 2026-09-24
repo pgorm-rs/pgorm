@@ -1,5 +1,6 @@
 //! Base types used throughout pgorm-query.
 
+use crate::keywords::{self, Position};
 use crate::{FunctionCall, ValueTuple, Values, expr::*, query::*, template::SqlTemplate};
 use std::{any::Any, fmt, ops, sync::Arc};
 
@@ -12,8 +13,8 @@ use std::{any::Any, fmt, ops, sync::Arc};
 pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
-    // [spec:pgorm:req:sql.render.ident-quoting+5]
-    // [spec:pgorm:req:security.ident-oracle+3] (the quoting every registered
+    // [spec:pgorm:req:sql.render.ident-quoting+6]
+    // [spec:pgorm:req:security.ident-oracle+4] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
@@ -21,7 +22,7 @@ pub trait SqlName: Any + Send + Sync {
 
     /// The identifier's text with embedded double quotes doubled, ready to sit
     /// between the quotes [`prepare`](Self::prepare) writes.
-    // [spec:pgorm:req:sql.render.ident-quoting+5]
+    // [spec:pgorm:req:sql.render.ident-quoting+6]
     fn quoted(&self) -> String {
         self.to_string().replace('"', "\"\"")
     }
@@ -196,13 +197,15 @@ pub trait IntoColumnRef {
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 /// A type name in cast or column-type position: optionally
-/// schema-qualified, optionally an array. Every part renders as a QUOTED
-/// identifier — `"tenant_a"."status"[]` — so a name is a name, never SQL.
+/// schema-qualified, optionally an array. Each part renders bare or quoted
+/// under the policy [`to_sql_string`](Self::to_sql_string) documents —
+/// `tenant_a.status[]`, `"Tenant"."select"[]` — so a name is a name, never
+/// SQL.
 ///
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+5]
+// [spec:pgorm:def:sql.types.type-name+6]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
@@ -264,45 +267,55 @@ impl TypeName {
     }
 
     /// The SQL spelling: parts dot-joined, a structural `[]` suffix for
-    /// arrays. A part that is a safe lowercase identifier
-    /// (`^[a-z_][a-z0-9_]*$`) renders bare — PostgreSQL folds unquoted names
-    /// to lowercase, so the bare and quoted spellings are the same name
-    /// there, and grammar-sugar type names (`integer`) only resolve bare.
-    /// Every other part renders as a QUOTED identifier, case preserved — so
-    /// a name is a name, and text that is not one (`int4) + 100 --`) becomes
-    /// an identifier PostgreSQL refuses rather than SQL it executes. A
-    /// [`raw`](Self::raw) type expression is the one exception and
-    /// renders as written.
+    /// arrays.
+    ///
+    /// A part renders bare when it is a lowercase identifier
+    /// (`^[a-z_][a-z0-9_]*$`) and not a keyword PostgreSQL restricts —
+    /// PostgreSQL folds unquoted names to lowercase, so the bare and quoted
+    /// spellings are the same name there. Every other part renders as a
+    /// QUOTED identifier, case preserved — so a name is a name, and neither
+    /// text that is not one (`int4) + 100 --`) nor a keyword (`select`)
+    /// becomes SQL. The one bare keyword is the grammar's own type spelling
+    /// in an unqualified type (`integer`, which resolves to `int4`), because
+    /// that is what a caller naming it means. A [`raw`](Self::raw) type
+    /// expression is the one exception to all of this and renders as
+    /// written.
+    // [spec:pgorm:def:sql.types.type-name+6]
     pub fn to_sql_string(&self) -> String {
         if self.verbatim {
             return self.raw_text();
         }
         let mut out = String::new();
-        if let Some(schema) = &self.schema {
-            Self::prepare_part(schema, &mut out);
-            out.push('.');
-        }
-        Self::prepare_part(&self.name, &mut out);
+        let name = match &self.schema {
+            Some(schema) => {
+                Self::prepare_part(schema, Position::QualifiedType, &mut out);
+                out.push('.');
+                Position::QualifiedType
+            }
+            None => Position::Type,
+        };
+        Self::prepare_part(&self.name, name, &mut out);
         if self.array {
             out.push_str("[]");
         }
         out
     }
 
-    /// Write one name part under the policy [`to_sql_string`](Self::to_sql_string)
-    /// documents: a safe lowercase identifier bare, everything else quoted.
+    /// Write one name part at `position` under the policy
+    /// [`to_sql_string`](Self::to_sql_string) documents: bare when
+    /// [`keywords::bare`] allows it there, quoted otherwise.
     ///
     /// Shared with the render sites that emit a single caller-supplied name
-    /// which is not a `TypeName` — the index access method of
-    /// [`IndexType::Named`](crate::IndexType::Named) — so one policy covers
-    /// every name-shaped position rather than each site inventing its own.
-    // [spec:pgorm:req:sql.render.ident-quoting+5]
-    pub(crate) fn prepare_part(part: &Name, out: &mut String) {
+    /// which is not a type — a function's name
+    /// ([`Func::named`](crate::Func::named)) and an index access method
+    /// ([`IndexType::Named`](crate::IndexType::Named)) — so one policy covers
+    /// every name-shaped position, each position saying only which of the
+    /// grammar's own forms it reads.
+    // [spec:pgorm:req:sql.render.ident-quoting+6]
+    // [spec:pgorm:def:sql.types.type-name+6]
+    pub(crate) fn prepare_part(part: &Name, position: Position, out: &mut String) {
         let text = part.to_string();
-        let mut chars = text.chars();
-        let safe = matches!(chars.next(), Some('a'..='z' | '_'))
-            && chars.all(|c| matches!(c, 'a'..='z' | '0'..='9' | '_'));
-        if safe {
+        if keywords::bare(&text, position) {
             out.push_str(&text);
         } else {
             part.prepare(out);

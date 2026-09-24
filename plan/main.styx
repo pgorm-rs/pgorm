@@ -8727,12 +8727,27 @@ children (
         id type-part-keyword-names
         title "A keyword passed as a name renders bare where TypeName's part policy applies"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-24T19:51:27.708282Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found by the identifier render oracle (tests/identifier_oracle_tests.rs, node identifier-render-oracle). `TypeName::prepare_part` (pgorm-query/src/types.rs) writes a part bare whenever it matches `^[a-z_][a-z0-9_]*$`, and that pattern admits SQL keywords, which are not identifiers. Every site under that policy — `Func::named` (in a projection and as a FROM function), `Expr::cast_as` / `cast_as_type` (bare, schema-qualified, array), `Expr::as_enum`, `ColumnType::named`, `ColumnDef::named` with a schema, `ColumnDef::array`, `ColumnDef::enumeration`, `IndexType::Named` — therefore hands a keyword name to the grammar as a keyword. One case changes the statement's shape: `Query::select().expr(Func::named(Name::runtime(\"not\")).arg(1))` renders `SELECT not(1)`, which libpg_query parses as a BoolExpr NOT over 1 rather than a FuncCall of a function named `not` (the same class reaches `row(..)` → RowExpr, `coalesce`/`nullif`/`greatest`/`least`, `exists`/`array` over a subquery, and `only(\"t\")` in FROM-function position → `FROM ONLY t`, per the pgorm-query audit). The rest are refusals by the grammar: `select`, `from`, `user`, `not` at every type position (`SELECT CAST(1 AS select)`), `integer` as a function name (`SELECT integer(1)`) or schema qualifier (`CAST(1 AS integer.ty)`), `left` as an index access method (`USING left`) — so a function, type or access method genuinely named with a keyword cannot be referenced through these APIs at all. This contradicts [spec:pgorm:def:sql.types.type-name] (\"A name is therefore a name: text that is not an identifier becomes a quoted identifier PostgreSQL refuses, never SQL it executes\") and [spec:pgorm:req:sql.render.ident-quoting]. The type-sugar reading the rule intends (`integer` as a type resolving to pg_catalog.int4) is not part of the defect; the oracle accepts it as its own verdict. Direction, not prescription: quote any part PostgreSQL's keyword list does not classify as unreserved, except where the position's grammar needs the bare keyword (type sugar); a fixed list pinned against libpg_query's keyword table would keep the policy total. Pinned in tests/identifier_oracle/pins.rs (49 site × name pairs); retire the pins with the fix."
+            }
+
+            {
+                at 2026-09-24T22:20:41.546117Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-24T22:48:03.368721Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

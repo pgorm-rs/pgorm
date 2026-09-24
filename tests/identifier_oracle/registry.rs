@@ -35,7 +35,7 @@ use pgorm::pgorm_query::{
 };
 
 use super::oracle::{
-    Policy::{Quoted, TypePart},
+    Policy::{FunctionName, Quoted, TypePart},
     Rendered, Site,
 };
 
@@ -207,11 +207,11 @@ fn query_sites() -> Vec<Site> {
             id: "query/select.from-function.name",
             api: "SelectStatement::from_function(Func::named(Name), alias)",
             kinds: &["FuncCall.funcname[0]"],
-            policy: TypePart,
+            policy: FunctionName,
             render: |n| {
                 sql(Query::select()
                     .column(Asterisk)
-                    .from_function(Func::named(n_(n)).arg(1), fixed("f")))
+                    .from_function(Func::named(n_(n)).arg(1).arg(2), fixed("f")))
             },
         },
         Site {
@@ -381,8 +381,8 @@ fn query_sites() -> Vec<Site> {
             id: "query/expr.func.named",
             api: "Func::named(Name)",
             kinds: &["FuncCall.funcname[0]"],
-            policy: TypePart,
-            render: |n| sql(Query::select().expr(Func::named(n_(n)).arg(1))),
+            policy: FunctionName,
+            render: |n| sql(Query::select().expr(Func::named(n_(n)).arg(1).arg(2))),
         },
         Site {
             id: "query/expr.cast.type",
@@ -399,6 +399,16 @@ fn query_sites() -> Vec<Site> {
             render: |n| {
                 sql(Query::select()
                     .expr(Expr::val(1).cast_as_type(TypeName::new(fixed("ty")).schema(n_(n)))))
+            },
+        },
+        Site {
+            id: "query/expr.cast.qualified-type",
+            api: "Expr::cast_as_type(TypeName::new(Name).schema(schema))",
+            kinds: &["TypeCast.type_name.names[1]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Expr::val(1).cast_as_type(TypeName::new(n_(n)).schema(fixed("s")))))
             },
         },
         Site {

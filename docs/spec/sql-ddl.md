@@ -216,8 +216,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `JsonBinary`→`jsonb`; `Uuid`→`uuid`; `Array(t)`→ recursive element spelling
 > plus `[]`; `Vector(Some(n))`→`vector(n)`, `Vector(None)`→`vector`;
 > `Named(type_name)` and `Enum { name, .. }`→ the type name through
-> `TypeName`'s part policy (`sql.types.type-name`), a safe lowercase name
-> bare and anything else quoted; `Cidr`→`cidr`; `Inet`→`inet`; `MacAddr`→`macaddr`;
+> `TypeName`'s part policy (`sql.types.type-name`), a lowercase name that
+> is no restricted keyword bare and anything else quoted; `Cidr`→`cidr`;
+> `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
 > [spec:pgorm:req:sql.ddl.alter-table+4]

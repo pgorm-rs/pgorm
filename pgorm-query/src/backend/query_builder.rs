@@ -1,3 +1,4 @@
+use crate::keywords::Position;
 use crate::{
     extension::{
         ExtensionCreateStatement, ExtensionDropOpt, ExtensionDropStatement, TypeAlterAddOpt,
@@ -753,7 +754,10 @@ impl QueryBuilder {
     /// Translate [`Function`] into SQL statement.
     fn prepare_function_name(&self, function: &Function, sql: &mut dyn SqlWriter) {
         if let Function::Named(iden) = function {
-            write!(sql, "{}", TypeName::new(Name::clone(iden)).to_sql_string()).unwrap();
+            // [spec:pgorm:req:sql.render.ident-quoting+6]
+            let mut name = String::new();
+            TypeName::prepare_part(iden, Position::Function, &mut name);
+            write!(sql, "{name}").unwrap();
         } else {
             write!(
                 sql,
@@ -1549,7 +1553,7 @@ impl QueryBuilder {
                     Some(size) => format!("vector({size})"),
                     None => "vector".into(),
                 },
-                // [spec:pgorm:req:sql.render.ident-quoting+5]
+                // [spec:pgorm:req:sql.render.ident-quoting+6]
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. } => {
                     let mut type_name = TypeName::new(Name::clone(name));
@@ -2053,10 +2057,10 @@ impl QueryBuilder {
                     IndexType::BTree => "BTREE".to_owned(),
                     IndexType::Gin => "GIN".to_owned(),
                     IndexType::Hash => "HASH".to_owned(),
-                    // [spec:pgorm:req:sql.render.ident-quoting+5]
+                    // [spec:pgorm:req:sql.render.ident-quoting+6]
                     IndexType::Named(method) => {
                         let mut part = String::new();
-                        TypeName::prepare_part(method, &mut part);
+                        TypeName::prepare_part(method, Position::AccessMethod, &mut part);
                         part
                     }
                 }

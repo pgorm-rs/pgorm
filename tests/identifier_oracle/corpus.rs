@@ -89,6 +89,14 @@ pub fn corpus() -> Vec<Hostile> {
         entry("keyword-not", "not"),
         entry("keyword-integer", "integer"),
         entry("keyword-left", "left"),
+        // Keywords whose bare call is the grammar's own expression: a
+        // COALESCE (a call form the type-name policy keeps bare), a row
+        // constructor, a `SELECT DISTINCT` when first in the projection, and
+        // an inheritance marker before a FROM function (all three quoted).
+        entry("keyword-coalesce", "coalesce"),
+        entry("keyword-row", "row"),
+        entry("keyword-distinct", "distinct"),
+        entry("keyword-only", "only"),
         // The empty name.
         entry("empty", ""),
         // The identifier-length boundary (NAMEDATALEN - 1 = 63 bytes), and a
@@ -97,4 +105,37 @@ pub fn corpus() -> Vec<Hostile> {
         entry("64-bytes", "n".repeat(64)),
         entry("64-bytes-split-char", format!("{}\u{00E9}", "n".repeat(62))),
     ]
+}
+
+/// Every keyword the linked libpg_query scanner knows, in every category,
+/// for the sweep that holds `TypeName`'s part policy to the whole keyword
+/// list rather than to the corpus's handful.
+///
+/// Read off the scanner rather than copied from `kwlist.h`, so the sweep and
+/// the list pgorm-query embeds are independent: each keyword token's name,
+/// lowercased and stripped of the `_P` suffix the grammar uses to dodge C
+/// names, is scanned back, and kept when the scanner reads it as a keyword.
+pub fn scanner_keywords() -> Vec<Hostile> {
+    use pg_query::protobuf::{KeywordKind, Token};
+
+    let mut words = std::collections::BTreeSet::new();
+    for value in 0..4096 {
+        let Ok(token) = Token::try_from(value) else {
+            continue;
+        };
+        let name = token.as_str_name().to_ascii_lowercase();
+        let word = name.strip_suffix("_p").unwrap_or(&name);
+        let Ok(scanned) = pg_query::scan(word) else {
+            continue;
+        };
+        if let [only] = scanned.tokens.as_slice()
+            && only.keyword_kind != KeywordKind::NoKeyword as i32
+        {
+            words.insert(word.to_owned());
+        }
+    }
+    words
+        .into_iter()
+        .map(|word| entry("scanner-keyword", word))
+        .collect()
 }

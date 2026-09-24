@@ -125,7 +125,8 @@ explicit limitations.
 > value to the enum's database type name, carried as the structured
 > `TypeName` (`sql.types.type-name`): schema qualification and the array
 > flag ride the structure, and the parts render bare only when they are
-> safe lowercase identifiers — never as raw SQL text. As a special
+> lowercase identifiers that are no restricted keyword — never as raw SQL
+> text. As a special
 > case under the `with-json` + `postgres-array` features, saving into a `Json` /
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.
