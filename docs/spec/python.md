@@ -33,13 +33,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > The companion crate is its own Cargo workspace, which is what keeps Python
 > configuration out of ordinary Rust builds. Cargo reads a `patch` table from
 > the workspace root and nowhere else, so that separation MUST NOT be allowed
-> to change which dependency revisions the extension links: the companion
-> crate MUST repeat every dependency patch the pgorm workspace pins, and its
-> lockfile MUST resolve them to the pinned revisions. A divergence is silent
-> — the extension resolves the unpatched crate and behaves differently from
-> the library every pgorm test exercises, which for a compiler dependency
-> means the bindings emit SQL the Rust API does not — so it MUST be a build
-> failure rather than a difference discovered downstream.
+> to change which dependency revisions the extension links: a revision pgorm
+> pins MUST reach the companion crate through pgorm's own dependency
+> declarations, which travel with pgorm into every workspace that depends on
+> it, rather than through a `patch` table, which does not; and the companion
+> crate's lockfile MUST resolve it to the pinned revision. A divergence is
+> silent — the extension resolves the unpinned crate and behaves differently
+> from the library every pgorm test exercises, which for a compiler
+> dependency means the bindings emit SQL the Rust API does not — so it MUST
+> fail a check in this repository rather than be discovered downstream.
 
 > [spec:pgorm:req:python.package]
 > The package MUST declare its Rust crate, Python distribution, import module,

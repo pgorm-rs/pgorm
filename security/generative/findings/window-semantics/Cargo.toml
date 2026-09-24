@@ -12,11 +12,3 @@ path = "native.rs"
 
 [dependencies]
 pgorm = { path = "../../../.." }
-
-# The workspace above is this crate's own, so it resolves [patch.crates-io]
-# here and never from the root. Both halves of this finding were fixed in
-# pgorm's own window rendering rather than in prqlc, so the reproducer now
-# asserts the fixed behaviour — and it should assert it of the compiler pgorm
-# ships, which is the one the root pins.
-[patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19" }

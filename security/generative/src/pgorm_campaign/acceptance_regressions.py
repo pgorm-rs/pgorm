@@ -20,9 +20,9 @@ VERSION = 1
 
 # How the fix is taken back out for the counterfactual. `revert-paths` restores
 # the production files as they were immediately before the fix landed, which is
-# exact when nothing has touched them since; `drop-tail` truncates a manifest at
-# a section, which is how a dependency patch is removed without disturbing the
-# rest of the file.
+# exact when nothing has touched them since; `swap-dependency` rewrites one
+# dependency's declaration in each named manifest and leaves every other line
+# alone, which is how a fix that is a dependency revision is taken out.
 REMOVALS = {
     "deduplicated_relations_still_combine": {
         "kind": "revert-paths",
@@ -31,10 +31,11 @@ REMOVALS = {
         "detail": "restore src/pipeline/builder.rs from before the fix commit",
     },
     "a_joined_deduplicated_relation_compiles_once": {
-        "kind": "drop-tail",
-        "path": "Cargo.toml",
-        "marker": "[patch.crates-io]",
-        "detail": "remove the pinned prqlc fork from the workspace manifest",
+        "kind": "swap-dependency",
+        "paths": ["Cargo.toml", "pgorm-sql-macro/Cargo.toml"],
+        "dependency": "prqlc",
+        "declaration": '{ version = "=0.13.14", default-features = false }',
+        "detail": "depend on registry prqlc 0.13.14 in place of the pinned fork",
     },
 }
 
@@ -81,16 +82,22 @@ async def _remove(worktree, removal):
             timeout=120,
         )
         return
-    manifest = worktree / removal["path"]
-    lines = manifest.read_text().splitlines(keepends=True)
-    kept = []
-    for line in lines:
-        if line.strip() == removal["marker"]:
-            break
-        kept.append(line)
-    if len(kept) == len(lines):
-        raise RuntimeError("counterfactual marker not found: " + removal["marker"])
-    manifest.write_text("".join(kept))
+    key = removal["dependency"] + " = "
+    for path in removal["paths"]:
+        manifest = worktree / path
+        lines = manifest.read_text().splitlines(keepends=True)
+        swapped = [
+            key + removal["declaration"] + "\n" if line.startswith(key) else line
+            for line in lines
+        ]
+        if swapped == lines:
+            raise RuntimeError(
+                "counterfactual dependency not found: "
+                + removal["dependency"]
+                + " in "
+                + path
+            )
+        manifest.write_text("".join(swapped))
 
 
 # [spec:pgorm:req:generative.acceptance]
@@ -118,8 +125,8 @@ async def counterfactual(entry, *, root, scratch, target, timeout):
     try:
         shutil.copyfile(Path(root) / "Cargo.lock", worktree / "Cargo.lock")
         await _remove(worktree, removal)
-        # Removing the dependency patch changes resolution, so that one has to
-        # be allowed to reach the network; reverting a source file does not.
+        # Swapping a dependency changes resolution, so that one has to be
+        # allowed to reach the network; reverting a source file does not.
         outcome = await _test(
             entry["module"],
             cwd=worktree,

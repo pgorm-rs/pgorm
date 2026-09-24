@@ -31,8 +31,8 @@ impl Pipeline {
     /// be quoted is caught whichever stage introduced it — including stages
     /// written after the screen was. Because the refusal is pgorm's own and
     /// returns before the compiler is called at all, it does not depend on
-    /// which prqlc the build resolved, which a `[patch.crates-io]` table could
-    /// never guarantee for a downstream consumer.
+    /// which prqlc the build resolved, which no dependency pgorm declares can
+    /// guarantee for a downstream consumer that patches it.
     // [spec:pgorm:req:pipeline.errors+3]
     // [spec:pgorm:req:pipeline.params+4]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {

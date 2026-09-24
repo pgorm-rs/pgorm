@@ -56,8 +56,40 @@ pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro" }
 # The PRQL compiler behind pgorm::pipeline. Pure Rust but a heavyweight
 # compile; a permanent dependency by decision, like pg_query above. The pin
 # is exact: the PL AST is not a stable API, and the adapter module is
-# written against this one version.
-prqlc = { version = "=0.13.14", default-features = false }
+# written against this one revision.
+#
+# It is a git dependency on the fork's pgorm/deterministic-star-expansion
+# branch — 0.13.14 plus fixes to its SQL generation that upstream has not
+# taken:
+#   - star expansion is ordered totally, so one pipeline compiles to one
+#     projection, the tuple layout a positional decode reads (reproducer: the
+#     pipeline-join-distinct-order finding);
+#   - the sort a `take` carries is tracked through anchoring, and a relation's
+#     interior columns map to the ones its reader exposes, so an inherited
+#     ORDER BY names a column and a relation that exist;
+#   - a quoted identifier doubles every delimiter, so distinct names stay
+#     distinct;
+#   - a wildcard used as a key keeps its table prefix, and grouping by one
+#     writes a whole-row key with every named column the query reads written
+#     beside it, and is refused at compile time where the star itself is read
+#     outside an aggregation;
+#   - literal keys are left out of GROUP BY and DISTINCT ON, where PostgreSQL
+#     would read an integer as a column position;
+#   - DISTINCT ON orders by a key's expression when the projection drops it.
+# A dependency rather than a `[patch.crates-io]` entry, because a dependency
+# travels with pgorm and a patch does not: cargo reads patches from the root
+# of the workspace being built and nowhere else, so every detached workspace,
+# every compile-suite crate the campaign generates and every downstream
+# consumer would resolve stock prqlc from crates.io unless it repeated the
+# table.
+#
+# The cost is publication: `cargo publish` refuses a git dependency with no
+# registry version, and giving it one would hand every crates.io consumer the
+# stock compiler this exists to avoid, so pgorm is not publishable to
+# crates.io while this stands. pgorm-sql-macro names the same revision, and
+# tests/prqlc_pin_tests.rs holds every declaration and every committed
+# lockfile to it.
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19", default-features = false }
 pgorm-query.workspace = true
 strum = { version = "0.28", default-features = false }
 serde_json = { version = "1.0.151", default-features = false, optional = true }
@@ -79,6 +111,7 @@ dotenvy = "0.15.7"
 ipnetwork = "0.21.1"
 mac_address = "1.1.8"
 pgvector = { version = "~0.4.2", default-features = false }
+toml = "1.1"
 
 [features]
 debug-print = []
@@ -103,25 +136,3 @@ postgres-array = []
 pgorm-internal = []
 runtime-tokio = []
 tests-cfg = []
-
-# prqlc is pinned to the fork's pgorm/deterministic-star-expansion branch,
-# which carries fixes to 0.13.14's SQL generation that upstream has not taken:
-#   - star expansion is ordered totally, so one pipeline compiles to one
-#     projection, the tuple layout a positional decode reads (reproducer: the
-#     pipeline-join-distinct-order finding);
-#   - the sort a `take` carries is tracked through anchoring, and a relation's
-#     interior columns map to the ones its reader exposes, so an inherited
-#     ORDER BY names a column and a relation that exist;
-#   - a quoted identifier doubles every delimiter, so distinct names stay
-#     distinct;
-#   - a wildcard used as a key keeps its table prefix, and grouping by one
-#     writes a whole-row key with every named column the query reads written
-#     beside it, and is refused at compile time where the star itself is read
-#     outside an aggregation;
-#   - literal keys are left out of GROUP BY and DISTINCT ON, where PostgreSQL
-#     would read an integer as a column position;
-#   - DISTINCT ON orders by a key's expression when the projection drops it.
-# Every detached workspace that links prqlc repeats this entry, and
-# tests/prqlc_pin_tests.rs holds each one and its lockfile to it.
-[patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19" }

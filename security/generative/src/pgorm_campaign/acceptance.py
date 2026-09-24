@@ -51,7 +51,7 @@ FINDINGS = {
                 "fix": "d1ba69a1",
                 "fix_subject": "fix: Pin a prqlc whose star expansion orders columns totally",
                 "without_the_fix": (
-                    "dropping the prqlc patch in the workspace manifest "
+                    "depending on registry prqlc in place of the fork "
                     "restores the hash-ordered star expansion and the same "
                     "pipeline compiles to two different projection orders"
                 ),

@@ -1,158 +1,280 @@
-//! Every crate that links prqlc has to link the one the workspace pins.
+//! pgorm links one prqlc: the fork its own manifest names, at one revision.
 //!
-//! Several crates here declare their own `[workspace]` — `pgorm-python` so
-//! that Python configuration stays out of ordinary Rust builds
-//! ([spec:pgorm:req:python.optional]), the campaign's bridge, replay harness,
-//! sqlmap adapter and standalone reproducers so that their dependencies stay
-//! out of an ordinary pgorm build. A `[patch.crates-io]` table is read from a
-//! workspace root and nowhere else, so each of those separations silently
-//! drops the root's prqlc patch unless the manifest repeats it, and the crate
-//! then compiles a different SQL generator from the one every pgorm test
-//! exercises.
+//! The root crate depends on the necessary-nu fork of prqlc through a git
+//! dependency, and a dependency travels with pgorm into every crate that
+//! depends on it — the crates here that declare their own `[workspace]`
+//! (`pgorm-python`, so that Python configuration stays out of ordinary Rust
+//! builds ([spec:pgorm:req:python.optional]), and the campaign's bridge,
+//! replay harness, sqlmap adapter and standalone reproducers, so that their
+//! dependencies stay out of an ordinary pgorm build), the compile-suite
+//! crates the campaign generates at run time, and downstream consumers.
 //!
-//! That is not hypothetical. It hid three fork commits from every campaign
-//! run of 2026-09-15, so a full profile reported defects that were already
-//! fixed and a fix under test was neither confirmed nor refuted.
+//! The fork used to be applied by a `[patch.crates-io]` table instead, and
+//! cargo reads a patch from the root of the workspace being built and nowhere
+//! else. Every detached workspace therefore had to repeat the table, and one
+//! that did not silently linked stock prqlc and compiled different SQL from
+//! the one every pgorm test exercises. That hid three fork commits from every
+//! campaign run of 2026-09-15; it then turned out eight more detached
+//! workspaces had never repeated the table, under a version of this file that
+//! listed the two it knew about; and finally the compile suite's generated
+//! crates, which no committed manifest describes, linked stock prqlc on every
+//! run. Each fix covered the instances it could see. Making the fork the
+//! dependency removes the class: nothing has to be repeated, so nothing can be
+//! forgotten.
 //!
-//! The first version of this file listed the two detached workspaces that
-//! existed when it was written, which made it a check on two instances
-//! wearing the shape of a check on the class. Eight more detached workspaces
-//! were added afterwards, not one of them repeated the patch, and these tests
-//! stayed green throughout. So the set is discovered here instead: every
-//! manifest in the checkout that declares a workspace and reaches prqlc
-//! through its dependencies. A crate deliberately left on stock prqlc has to
-//! name itself in `EXEMPT` below, so an exemption is a decision someone can
-//! read rather than an omission nobody can see.
+//! These tests hold the invariant from both ends. The root declares the fork
+//! at a full commit, every other declaration names the same one, and nothing
+//! in the checkout patches prqlc — a patch would be a second source of truth,
+//! and the one that reaches some builds and not others. And every lockfile in
+//! the checkout that resolves prqlc resolves it from the fork at that
+//! revision, which is what a `--locked` build reads. The generated compile
+//! crates are held to the same thing by the campaign's own suite
+//! (`security/generative/tests/test_compile_lockfile.py`), because they exist
+//! only while the campaign runs.
 //!
 //! No database: every check reads version-controlled files.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-/// A detached crate deliberately left on stock prqlc.
-///
-/// Empty, and the empty case is the healthy one: every crate that resolves
-/// its own patch table repeats the root's pin. The slot exists because one
-/// crate legitimately wanted the opposite — `pipeline-join-distinct-order`
-/// reproduces a prqlc defect the fork fixes, so pinning it would have made
-/// the reproducer pass and destroyed the evidence. That stopped being true
-/// when pgorm started binding a deduplicated join into a CTE: the reproducer
-/// no longer distinguishes the two compilers, measured over five runs of
-/// forty compilations on each, so it is pinned with the rest. Should another
-/// reproducer need stock prqlc, it belongs here with its reason, and
-/// `an_exempt_crate_stays_detached_and_unpatched` will hold the entry to it.
-const EXEMPT: [&str; 0] = [];
+use toml::{Table, Value};
+
+/// The fork every declaration of prqlc has to name. Moving to another
+/// repository is a decision, so it is written here rather than read back from
+/// the manifest under test.
+const FORK: &str = "https://github.com/necessary-nu/prql.git";
+
+/// The crates the fork's repository provides. Only `prqlc` is declared
+/// anywhere today; `prqlc-parser` comes with it, and is held to the same
+/// source so that declaring it directly cannot split the compiler in two.
+const FORK_CRATES: [&str; 2] = ["prqlc", "prqlc-parser"];
 
 fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    std::fs::canonicalize(&root).unwrap_or(root)
 }
 
-fn read(path: &Path) -> String {
-    match std::fs::read_to_string(path) {
+fn parse(path: &Path) -> Table {
+    let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) => panic!("{} must be readable: {error}", path.display()),
+    };
+    match text.parse() {
+        Ok(table) => table,
+        Err(error) => panic!("{} must be TOML: {error}", path.display()),
     }
 }
 
-/// The text between the first pair of double quotes after `key =` in `line`.
-fn quoted_after(line: &str, key: &str) -> Option<String> {
-    let rest = line.split_once(key)?.1;
-    let rest = rest.split_once('"')?.1;
-    let (value, _) = rest.split_once('"')?;
-    Some(value.to_owned())
+/// The files in the checkout that decide which prqlc a build resolves.
+struct Checkout {
+    root: PathBuf,
+    /// Every `Cargo.toml`.
+    manifests: BTreeMap<PathBuf, Table>,
+    /// Every `.cargo/config.toml` and legacy `.cargo/config`, which can carry
+    /// a `[patch]` table of their own.
+    configs: BTreeMap<PathBuf, Table>,
+    /// Every `Cargo.lock`.
+    lockfiles: BTreeMap<PathBuf, Table>,
 }
 
-/// The `prqlc` entry of a manifest's crates-io patch table, as the git URL
-/// and revision it names.
-///
-/// The header is matched as a whole line, so prose naming the table is not
-/// mistaken for it.
-fn patched_prqlc(manifest: &str) -> Option<(String, String)> {
-    let line = manifest
-        .lines()
-        .skip_while(|line| line.trim() != "[patch.crates-io]")
-        .skip(1)
-        .take_while(|line| !line.trim_start().starts_with('['))
-        .find(|line| line.trim_start().starts_with("prqlc"))?;
-    Some((quoted_after(line, "git")?, quoted_after(line, "rev")?))
-}
+impl Checkout {
+    /// Walk the checkout.
+    ///
+    /// `target/` holds an unpacked manifest for every registry dependency and
+    /// is a build output besides, so it is skipped rather than walked; so is
+    /// any dotted directory, `.git` above all, except that a `.cargo`
+    /// directory is read for its configuration.
+    fn read() -> Self {
+        let root = repository_root();
+        let mut checkout = Self {
+            root: root.clone(),
+            manifests: BTreeMap::new(),
+            configs: BTreeMap::new(),
+            lockfiles: BTreeMap::new(),
+        };
+        let mut pending = vec![root];
+        while let Some(directory) = pending.pop() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if path.is_dir() {
+                    if name == ".cargo" {
+                        for config in ["config.toml", "config"] {
+                            let file = path.join(config);
+                            if file.is_file() {
+                                checkout.configs.insert(file.clone(), parse(&file));
+                            }
+                        }
+                    } else if name != "target" && !name.starts_with('.') {
+                        pending.push(path);
+                    }
+                } else if name == "Cargo.toml" {
+                    checkout.manifests.insert(path.clone(), parse(&path));
+                } else if name == "Cargo.lock" {
+                    checkout.lockfiles.insert(path.clone(), parse(&path));
+                }
+            }
+        }
+        checkout
+    }
 
-/// The `source` a lockfile resolved `name` from, or `None` when the package
-/// is absent or vendored by path.
-fn locked_source(lock: &str, name: &str) -> Option<String> {
-    lock.split("[[package]]")
-        .find(|block| {
-            block
-                .lines()
-                .any(|line| line.trim() == format!("name = \"{name}\""))
-        })?
-        .lines()
-        .find(|line| line.trim_start().starts_with("source = "))
-        .and_then(|line| quoted_after(line, "source"))
+    fn relative(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    fn root_manifest(&self) -> &Table {
+        match self.manifests.get(&self.root.join("Cargo.toml")) {
+            Some(manifest) => manifest,
+            None => panic!("the checkout root has a Cargo.toml"),
+        }
+    }
 }
 
 /// One dependency edge as a manifest declares it.
-#[derive(Debug)]
-struct Dependency {
-    name: String,
-    /// The directory a path dependency names, relative to the manifest.
-    path: Option<String>,
+struct Dependency<'a> {
+    /// The table the edge is declared in, for messages.
+    table: String,
+    /// The key it is declared under.
+    key: &'a str,
+    /// The crate it resolves to: the key, or the `package` it renames.
+    crate_name: &'a str,
+    spec: &'a Value,
     /// Development dependencies are linked by the declaring crate's own
     /// tests, and by nothing that depends on it.
     development: bool,
 }
 
-/// Whether a section header names a dependency table, and whether that table
-/// is the development one.
-///
-/// `[dependencies]`, `[build-dependencies]`, `[workspace.dependencies]` and
-/// the platform-conditional `[target.'cfg(..)'.dependencies]` forms all
-/// declare one dependency per line. The `[dependencies.name]` form declares
-/// one across several, and is not read here — `no_manifest_hides_a_dependency`
-/// holds the checkout to the form this reads.
-fn dependency_table(header: &str) -> Option<bool> {
-    let table = header.rsplit('.').next().unwrap_or(header);
-    match table {
-        "dependencies" | "build-dependencies" => Some(false),
-        "dev-dependencies" => Some(true),
-        _ => None,
+impl Dependency<'_> {
+    fn field(&self, name: &str) -> Option<&str> {
+        self.spec.get(name).and_then(Value::as_str)
     }
 }
 
-/// Every dependency a manifest declares, in the one-per-line form.
-fn declared_dependencies(manifest: &str) -> Vec<Dependency> {
-    let mut development = None;
-    let mut declared = Vec::new();
-    for line in manifest.lines() {
-        let line = line.trim();
-        if let Some(header) = line
-            .strip_prefix('[')
-            .and_then(|rest| rest.strip_suffix(']'))
-        {
-            development = dependency_table(header);
-            continue;
+/// The dependency tables a manifest section holds, named for messages.
+fn dependency_tables<'a>(
+    prefix: &str,
+    holder: &'a Table,
+    into: &mut Vec<(String, &'a Table, bool)>,
+) {
+    for (key, development) in [
+        ("dependencies", false),
+        ("build-dependencies", false),
+        ("build_dependencies", false),
+        ("dev-dependencies", true),
+        ("dev_dependencies", true),
+    ] {
+        if let Some(Value::Table(table)) = holder.get(key) {
+            into.push((format!("{prefix}{key}"), table, development));
         }
-        let Some(development) = development else {
-            continue;
-        };
-        if line.starts_with('#') {
-            continue;
-        }
-        let Some((name, value)) = line.split_once('=') else {
-            continue;
-        };
-        let name = name.trim().trim_matches('"');
-        let (name, _) = name.split_once('.').unwrap_or((name, ""));
-        if name.is_empty() {
-            continue;
-        }
-        declared.push(Dependency {
-            name: name.to_owned(),
-            path: quoted_after(value, "path"),
-            development,
-        });
     }
-    declared
+}
+
+/// Every dependency a manifest declares, in whichever form it is written:
+/// TOML is parsed rather than read line by line, so the `[dependencies.name]`
+/// table form, a `package` rename and a platform-conditional table are all
+/// seen.
+fn declared_dependencies(manifest: &Table) -> Vec<Dependency<'_>> {
+    let mut tables = Vec::new();
+    dependency_tables("", manifest, &mut tables);
+    if let Some(Value::Table(targets)) = manifest.get("target") {
+        for (platform, holder) in targets {
+            if let Value::Table(holder) = holder {
+                dependency_tables(&format!("target.{platform}."), holder, &mut tables);
+            }
+        }
+    }
+    if let Some(Value::Table(workspace)) = manifest.get("workspace") {
+        dependency_tables("workspace.", workspace, &mut tables);
+    }
+    tables
+        .into_iter()
+        .flat_map(|(table, entries, development)| {
+            entries.iter().map(move |(key, spec)| Dependency {
+                table: table.clone(),
+                key,
+                crate_name: spec.get("package").and_then(Value::as_str).unwrap_or(key),
+                spec,
+                development,
+            })
+        })
+        .collect()
+}
+
+/// The git URL and revision the root's own `prqlc` dependency names.
+///
+/// A full commit and nothing else: a branch or tag moves under the lockfile,
+/// and a `version` beside the `git` key is what `cargo publish` would keep —
+/// it would hand every crates.io consumer stock prqlc while this checkout
+/// kept building the fork, which is the split this file exists to prevent.
+fn pinned(checkout: &Checkout) -> (String, String) {
+    let manifest = checkout.root_manifest();
+    let declared: Vec<_> = declared_dependencies(manifest)
+        .into_iter()
+        .filter(|dependency| dependency.table == "dependencies" && dependency.crate_name == "prqlc")
+        .collect();
+    assert_eq!(
+        declared.len(),
+        1,
+        "the root crate declares prqlc exactly once in [dependencies]"
+    );
+    let dependency = &declared[0];
+    let git = dependency
+        .field("git")
+        .unwrap_or_else(|| panic!("the root's prqlc dependency is a git dependency"));
+    let rev = dependency
+        .field("rev")
+        .unwrap_or_else(|| panic!("the root's prqlc dependency names a revision"));
+    assert_eq!(git, FORK, "the root depends on prqlc from the fork");
+    assert!(
+        rev.len() == 40 && rev.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "the root's prqlc revision is a full commit, not {rev}"
+    );
+    for key in ["version", "branch", "tag", "path", "registry"] {
+        assert!(
+            dependency.spec.get(key).is_none(),
+            "the root's prqlc dependency carries `{key}` beside its revision"
+        );
+    }
+    (git.to_owned(), rev.to_owned())
+}
+
+/// The lockfile `source` a dependency on the fork at `rev` resolves to.
+fn locked_source(git: &str, rev: &str) -> String {
+    format!("git+{git}?rev={rev}#{rev}")
+}
+
+/// Every patch or replacement a manifest or cargo configuration applies to a
+/// crate from the fork, spelled for messages.
+fn fork_patches(config: &Table) -> Vec<String> {
+    let mut found = Vec::new();
+    if let Some(Value::Table(patch)) = config.get("patch") {
+        for (source, entries) in patch {
+            let Value::Table(entries) = entries else {
+                continue;
+            };
+            for (key, spec) in entries {
+                let name = spec.get("package").and_then(Value::as_str).unwrap_or(key);
+                if FORK_CRATES.contains(&name) {
+                    found.push(format!("[patch.{source}] {key}"));
+                }
+            }
+        }
+    }
+    if let Some(Value::Table(replace)) = config.get("replace") {
+        for key in replace.keys() {
+            let name = key.split(':').next().unwrap_or(key);
+            if FORK_CRATES.contains(&name) {
+                found.push(format!("[replace] {key}"));
+            }
+        }
+    }
+    found
 }
 
 /// Whether one manifest's dependencies reach prqlc.
@@ -162,7 +284,7 @@ fn declared_dependencies(manifest: &str) -> Vec<Dependency> {
 /// links its development dependencies too.
 fn reaches_prqlc(
     manifest_path: &Path,
-    manifest: &str,
+    manifest: &Table,
     carriers: &BTreeSet<PathBuf>,
     own: bool,
 ) -> bool {
@@ -171,10 +293,10 @@ fn reaches_prqlc(
         if dependency.development && !own {
             return false;
         }
-        if dependency.name == "prqlc" {
+        if FORK_CRATES.contains(&dependency.crate_name) {
             return true;
         }
-        dependency.path.as_ref().is_some_and(|relative| {
+        dependency.field("path").is_some_and(|relative| {
             let target = directory.join(relative).join("Cargo.toml");
             std::fs::canonicalize(target).is_ok_and(|resolved| carriers.contains(&resolved))
         })
@@ -189,7 +311,7 @@ fn reaches_prqlc(
 /// `security/generative/compile` out: it depends on `pgorm-codegen`, whose
 /// only edge to `pgorm` is a development dependency, and a development
 /// dependency is linked by its declarer's tests and by nothing downstream.
-fn linking_prqlc(manifests: &BTreeMap<PathBuf, String>) -> BTreeSet<PathBuf> {
+fn linking_prqlc(manifests: &BTreeMap<PathBuf, Table>) -> BTreeSet<PathBuf> {
     let mut carriers = BTreeSet::new();
     let mut growing = true;
     while growing {
@@ -208,111 +330,170 @@ fn linking_prqlc(manifests: &BTreeMap<PathBuf, String>) -> BTreeSet<PathBuf> {
         .collect()
 }
 
-/// Every `Cargo.toml` in the checkout.
-///
-/// `target/` holds an unpacked manifest for every registry dependency and is
-/// a build output besides, so it is skipped rather than walked; so is any
-/// dotted directory, `.git` above all.
-fn manifests(root: &Path) -> BTreeMap<PathBuf, String> {
-    let mut found = BTreeMap::new();
-    let mut pending = vec![root.to_owned()];
-    while let Some(directory) = pending.pop() {
-        let Ok(entries) = std::fs::read_dir(&directory) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if path.is_dir() {
-                if name != "target" && !name.starts_with('.') {
-                    pending.push(path);
-                }
-            } else if name == "Cargo.toml" {
-                let canonical = std::fs::canonicalize(&path).unwrap_or(path);
-                let text = read(&canonical);
-                found.insert(canonical, text);
-            }
-        }
-    }
-    found
-}
-
-/// The crates that resolve `[patch.crates-io]` from their own manifest and
-/// link prqlc, as paths relative to the checkout root.
+/// The crates that declare their own workspace and link prqlc, as paths
+/// relative to the checkout root.
 ///
 /// Discovered rather than listed: a list covers the cases its author had
 /// already noticed, which is how eight unpatched workspaces accumulated
 /// under a test that claimed to cover them.
-fn detached_crates_linking_prqlc(root: &Path) -> Vec<String> {
-    let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_owned());
-    let manifests = manifests(&root);
-    let linking = linking_prqlc(&manifests);
-    let root_manifest = root.join("Cargo.toml");
-    manifests
+fn detached_crates_linking_prqlc(checkout: &Checkout) -> Vec<String> {
+    let linking = linking_prqlc(&checkout.manifests);
+    let root_manifest = checkout.root.join("Cargo.toml");
+    checkout
+        .manifests
         .iter()
         .filter(|(path, manifest)| {
-            **path != root_manifest
-                && linking.contains(*path)
-                && manifest.lines().any(|line| line.trim() == "[workspace]")
+            **path != root_manifest && linking.contains(*path) && manifest.contains_key("workspace")
         })
-        .filter_map(|(path, _)| path.parent()?.strip_prefix(&root).ok())
-        .map(|relative| relative.to_string_lossy().into_owned())
+        .filter_map(|(path, _)| Some(checkout.relative(path.parent()?)))
         .collect()
 }
 
-// [spec:pgorm:req:python.optional/test]    a separate workspace carries the
-// root's dependency patches rather than resolving past them
+/// Every other check here reads the revision from this declaration, so its
+/// own shape is asserted by `pinned` itself.
 #[test]
-fn every_detached_workspace_repeats_the_patch() {
-    let root = repository_root();
-    let workspace = read(&root.join("Cargo.toml"));
-    let pinned = patched_prqlc(&workspace).expect("the workspace manifest patches prqlc");
-    for crate_dir in detached_crates_linking_prqlc(&root) {
-        if EXEMPT.contains(&crate_dir.as_str()) {
+fn the_root_depends_on_the_pinned_fork() {
+    pinned(&Checkout::read());
+}
+
+/// A second declaration at another revision would compile a second prqlc
+/// beside the first — `pgorm-sql-macro`'s `prql!` emitting through one
+/// compiler and `pgorm::pipeline` through another.
+#[test]
+fn every_declaration_names_the_roots_revision() {
+    let checkout = Checkout::read();
+    let (git, rev) = pinned(&checkout);
+    let mut declaring = BTreeSet::new();
+    for (path, manifest) in &checkout.manifests {
+        let at = checkout.relative(path);
+        for dependency in declared_dependencies(manifest) {
+            if !FORK_CRATES.contains(&dependency.crate_name) {
+                continue;
+            }
+            declaring.insert(at.clone());
+            // An inherited declaration is the `[workspace.dependencies]`
+            // entry, which is itself one of the declarations checked here.
+            if dependency.spec.get("workspace").and_then(Value::as_bool) == Some(true) {
+                continue;
+            }
+            let (table, key) = (&dependency.table, dependency.key);
+            assert_eq!(
+                (dependency.field("git"), dependency.field("rev")),
+                (Some(git.as_str()), Some(rev.as_str())),
+                "{at} declares {key} in [{table}] from somewhere other than the \
+                 fork at the root's revision, so it would link a second compiler"
+            );
+            for field in ["version", "branch", "tag", "path", "registry"] {
+                assert!(
+                    dependency.spec.get(field).is_none(),
+                    "{at} declares {key} in [{table}] with `{field}` beside its revision"
+                );
+            }
+        }
+    }
+    assert!(
+        declaring.contains("Cargo.toml") && declaring.contains("pgorm-sql-macro/Cargo.toml"),
+        "the runtime pipeline and the `prql!` macro both declare prqlc; found {declaring:?}"
+    );
+}
+
+// [spec:pgorm:req:python.optional/test]    a separate workspace receives the
+// pinned revision through pgorm's own dependency, never through a patch
+/// A patch is read only by the workspace that declares it, so one anywhere in
+/// the checkout would decide prqlc for some builds and not others: a second
+/// source of truth, which is the thing the git dependency replaced.
+#[test]
+fn nothing_in_the_checkout_patches_prqlc() {
+    let checkout = Checkout::read();
+    let mut patched = Vec::new();
+    for (path, config) in checkout.manifests.iter().chain(&checkout.configs) {
+        for entry in fork_patches(config) {
+            patched.push(format!("{}: {entry}", checkout.relative(path)));
+        }
+    }
+    assert!(
+        patched.is_empty(),
+        "prqlc reaches every crate through pgorm's own git dependency; a patch \
+         for it is a second source of truth that only its own workspace reads, \
+         so delete it (or move the root's dependency, which every crate \
+         follows): {patched:?}"
+    );
+}
+
+// [spec:pgorm:req:python.optional/test]    and every lockfile resolves the
+// pinned revision, which is what a `--locked` build reads
+#[test]
+fn every_lockfile_resolves_prqlc_from_the_fork() {
+    let checkout = Checkout::read();
+    let (git, rev) = pinned(&checkout);
+    let expected = locked_source(&git, &rev);
+    let mut resolving = 0;
+    for (path, lock) in &checkout.lockfiles {
+        let at = checkout.relative(path);
+        let Some(Value::Array(packages)) = lock.get("package") else {
+            continue;
+        };
+        // Every package of the name, not the first: a stock copy resolved
+        // beside the fork is the failure, and it would hide behind it.
+        let fork: Vec<_> = packages
+            .iter()
+            .filter(|package| {
+                package
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|name| FORK_CRATES.contains(&name))
+            })
+            .collect();
+        if fork.is_empty() {
             continue;
         }
-        let manifest = read(&root.join(&crate_dir).join("Cargo.toml"));
-        assert_eq!(
-            patched_prqlc(&manifest),
-            Some(pinned.clone()),
-            "{crate_dir} is its own workspace, so it resolves [patch.crates-io] \
-             from its own manifest; without the same prqlc entry it links \
-             upstream prqlc and compiles different SQL"
+        resolving += 1;
+        for package in fork {
+            let name = package.get("name").and_then(Value::as_str).unwrap_or("?");
+            let source = package.get("source").and_then(Value::as_str);
+            assert_eq!(
+                source,
+                Some(expected.as_str()),
+                "{at} resolves {name} from {source:?}, not from the fork at the root's revision"
+            );
+        }
+    }
+    assert!(
+        resolving > 0,
+        "no lockfile in the checkout resolves prqlc, so this checked nothing"
+    );
+}
+
+// [spec:pgorm:req:python.optional/test]    a detached workspace linking prqlc
+// commits the lockfile its `--locked` builds read
+#[test]
+fn every_detached_crate_linking_prqlc_commits_its_lockfile() {
+    let checkout = Checkout::read();
+    for crate_dir in detached_crates_linking_prqlc(&checkout) {
+        let lock = checkout
+            .lockfiles
+            .get(&checkout.root.join(&crate_dir).join("Cargo.lock"))
+            .unwrap_or_else(|| panic!("{crate_dir} links prqlc, so it commits a lockfile"));
+        let resolves = lock
+            .get("package")
+            .and_then(Value::as_array)
+            .is_some_and(|packages| {
+                packages
+                    .iter()
+                    .any(|package| package.get("name").and_then(Value::as_str) == Some("prqlc"))
+            });
+        assert!(
+            resolves,
+            "{crate_dir} links prqlc, so its lockfile resolves it"
         );
     }
 }
 
-// [spec:pgorm:req:python.optional/test]    and its lockfile resolves the
-// patched revision, which is what a `--locked` build reads
-#[test]
-fn every_detached_lockfile_resolves_the_pinned_prqlc() {
-    let root = repository_root();
-    let workspace = read(&root.join("Cargo.toml"));
-    let (url, revision) = patched_prqlc(&workspace).expect("the workspace manifest patches prqlc");
-    let stripped = url.strip_suffix(".git").unwrap_or(&url);
-    for crate_dir in detached_crates_linking_prqlc(&root) {
-        if EXEMPT.contains(&crate_dir.as_str()) {
-            continue;
-        }
-        let lock = read(&root.join(&crate_dir).join("Cargo.lock"));
-        let source = locked_source(&lock, "prqlc")
-            .unwrap_or_else(|| panic!("{crate_dir} links prqlc, so its lockfile resolves it"));
-        assert!(
-            source.starts_with("git+") && source.contains(stripped),
-            "{crate_dir}/Cargo.lock resolves prqlc from {source}, not from {url}"
-        );
-        assert!(
-            source.contains(&revision),
-            "{crate_dir}/Cargo.lock resolves prqlc at {source}, not at {revision}"
-        );
-    }
-}
-
-/// The discovery has to reach past the two crates the listed version knew
-/// about, or it is the same test with more machinery.
+/// The discovery has to reach past the two crates the first listed version
+/// knew about, or it is the same test with more machinery.
 #[test]
 fn discovery_finds_the_crates_a_list_missed() {
-    let found = detached_crates_linking_prqlc(&repository_root());
+    let found = detached_crates_linking_prqlc(&Checkout::read());
     for crate_dir in [
         "pgorm-python",
         "security/generative/bridge",
@@ -333,58 +514,6 @@ fn discovery_finds_the_crates_a_list_missed() {
             .iter()
             .any(|entry| entry == "security/generative/compile"),
         "security/generative/compile reaches pgorm only through pgorm-codegen's \
-         development dependency, so it compiles no prqlc to patch"
+         development dependency, so it compiles no prqlc"
     );
-}
-
-/// An exemption is a decision, so it has to keep describing a real crate:
-/// one that still resolves its own patch table, still links prqlc, and is
-/// still unpatched. Pinning an exempt crate without removing it from `EXEMPT`
-/// would otherwise leave a reason behind that no longer explains anything.
-#[test]
-fn an_exempt_crate_stays_detached_and_unpatched() {
-    let root = repository_root();
-    let detached = detached_crates_linking_prqlc(&root);
-    for crate_dir in EXEMPT {
-        assert!(
-            detached.iter().any(|entry| entry == crate_dir),
-            "{crate_dir} is exempted from the prqlc pin but is not a detached \
-             workspace linking prqlc, so the exemption has nothing to except"
-        );
-        let manifest = read(&root.join(crate_dir).join("Cargo.toml"));
-        assert_eq!(
-            patched_prqlc(&manifest),
-            None,
-            "{crate_dir} carries the prqlc patch and is also listed as exempt \
-             from it; drop the EXEMPT entry, or the patch"
-        );
-    }
-}
-
-/// The dependency reader takes one dependency per line, which is how every
-/// manifest here spells them. The `[dependencies.name]` table form would be
-/// invisible to it, and a dependency the reader cannot see is a crate the
-/// discovery above cannot reach.
-#[test]
-fn no_manifest_hides_a_dependency() {
-    for (path, manifest) in manifests(&repository_root()) {
-        for line in manifest.lines().map(str::trim) {
-            let Some(header) = line
-                .strip_prefix('[')
-                .and_then(|rest| rest.strip_suffix(']'))
-            else {
-                continue;
-            };
-            let sections: Vec<_> = header.split('.').collect();
-            let tail = sections.split_last().map(|(_, rest)| rest).unwrap_or(&[]);
-            assert!(
-                !tail
-                    .iter()
-                    .any(|section| dependency_table(section).is_some()),
-                "{} declares {line} as its own table; tests/prqlc_pin_tests.rs reads \
-                 one dependency per line and would not see it",
-                path.display()
-            );
-        }
-    }
 }

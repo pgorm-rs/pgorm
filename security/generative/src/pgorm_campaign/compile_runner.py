@@ -116,10 +116,16 @@ def _verdict(case, diagnostics):
     }
 
 
-async def build_batch(batch, directory, *, root, target, generated=None, timeout=1800):
-    """Render, lock and build one batch; return its raw compiler report."""
-    emitted = write(batch, directory, root=root, generated=generated)
-    manifest = emitted["manifest"]
+# [spec:pgorm:req:generative.compile-suite]
+async def lock(manifest, *, timeout=1800):
+    """Resolve a rendered batch's lockfile, which its build then reads locked.
+
+    Offline: the batch depends on the checkout under test by path, and every
+    other crate it reaches has to be the one already fetched for that
+    checkout. prqlc arrives through pgorm's own git dependency — a batch is
+    its own workspace, so a patch table in any other manifest would not reach
+    it.
+    """
     await process.run(
         "cargo",
         "generate-lockfile",
@@ -128,6 +134,13 @@ async def build_batch(batch, directory, *, root, target, generated=None, timeout
         manifest,
         timeout=timeout,
     )
+
+
+async def build_batch(batch, directory, *, root, target, generated=None, timeout=1800):
+    """Render, lock and build one batch; return its raw compiler report."""
+    emitted = write(batch, directory, root=root, generated=generated)
+    manifest = emitted["manifest"]
+    await lock(manifest, timeout=timeout)
     started = time.monotonic()
     result = await process.run(
         "cargo",
@@ -207,4 +220,4 @@ async def run(
     return scored
 
 
-__all__ = ["OUTPUT_LIMIT", "RunnerError", "build_batch", "run", "score"]
+__all__ = ["OUTPUT_LIMIT", "RunnerError", "build_batch", "lock", "run", "score"]

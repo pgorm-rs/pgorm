@@ -28,11 +28,12 @@ pub enum PipelineError {
     /// whichever prqlc the build resolved. The pinned fork doubles it; the
     /// registry crate's escaper leaves a `"` that follows a backslash alone,
     /// which closes the quoted identifier early and hands the rest of the
-    /// name to the server as SQL. A `[patch.crates-io]` table is honoured
-    /// only in the workspace that declares it, so pgorm cannot decide which
-    /// of those a consumer links, and a name whose meaning depends on that
-    /// has no rendering worth choosing. Doubling the quote here instead would
-    /// only move the ambiguity: the fork would double it a second time.
+    /// name to the server as SQL. pgorm depends on the fork, but a
+    /// consumer's own `patch` table can redirect that dependency and a
+    /// crates.io release could not carry it at all, so pgorm cannot decide
+    /// which of those a consumer links, and a name whose meaning depends on
+    /// that has no rendering worth choosing. Doubling the quote here instead
+    /// would only move the ambiguity: the fork would double it a second time.
     ///
     /// So the name is refused rather than escaped, at
     /// [`into_sql`](super::Pipeline::into_sql) and before prqlc is called, by

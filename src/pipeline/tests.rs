@@ -782,9 +782,9 @@ fn unattached_alias_token_compiles_to_a_column_reference() {
 /// as SQL. Rendered into an alias position — where the leading name need not
 /// resolve — `SELECT 'alice' AS "x\" , (SELECT password FROM secret) AS
 /// "leak"` returns the secret beside the row against a live server. The
-/// workspace's patched prqlc doubles the quote instead, which is the whole
-/// point: a `[patch.crates-io]` table is not inherited, so the outcome would
-/// otherwise be a property of the consumer's dependency graph.
+/// fork pgorm depends on doubles the quote instead, which is the whole point:
+/// a consumer can patch that dependency away, so the outcome would otherwise
+/// be a property of the consumer's dependency graph.
 const EXFILTRATING: &str = r#"x\" , (SELECT password FROM secret) AS "leak"#;
 
 /// Every identifier the pipeline can be given at runtime reaches

@@ -8587,12 +8587,20 @@ children (
         id prqlc-git-dependency
         title "pgorm depends on the prqlc fork directly, so no crate that reaches it can link stock prqlc"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-24T18:44:29.412539Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The generative campaign's CI job has failed on both scheduled runs (2026-09-15, 2026-09-22), and the 09-22 run shows why in its artifact: `compile_suite_invocations: 1/1 [incomplete 1]`, `compile: 0 cases`, the item recorded `ProcessFailure: cargo exited with status 101` after 0.66s. The compile suite generates batch crates at run time (security/generative/src/pgorm_campaign/compile_crate.py) that declare their own `[workspace]` and depend on pgorm by path with no `[patch.crates-io]` table — the prqlc-pin-incomplete defect class, missed because tests/prqlc_pin_tests.rs discovers only committed manifests. So `cargo generate-lockfile --offline` resolves stock registry prqlc: in CI nothing fetched it (the workflow fetches only the bridge's lockfile, which pins the fork), so it fails at once; locally it succeeds silently from the cargo cache, so the local compile suite — including the passing full-4311ca278c80 — has been compiling against a prqlc pgorm does not ship (its batch-00 Cargo.lock reads `source = \"registry+https://github.com/rust-lang/crates.io-index\"`). Decided by the operator 2026-09-24: stop patching and make the fork pgorm's real dependency. The root's `prqlc = { version = \"=0.13.14\", … }` becomes `prqlc = { git = \"https://github.com/necessary-nu/prql.git\", rev = \"2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19\", default-features = false }`, which travels with pgorm into every crate that depends on it — detached workspaces, generated compile crates and downstream consumers alike — so all twelve `[patch.crates-io]` prqlc tables and pgorm-python/build.rs's patch-drift check are deleted. The repo is necessary-nu/prql (public, a GitHub fork of PRQL/prql); it already exists and needs no creating. Consequence recorded: crates.io refuses git dependencies, so pgorm is not publishable there while this stands. Acceptance: no manifest in the tree patches prqlc; the pin test is rewritten to assert the single git dependency and that every committed lockfile resolves `git+https://github.com/necessary-nu/prql.git?rev=2ce6a242…`; a test proves a freshly generated compile crate's lockfile resolves the fork; the local compile suite reports its 72 cases against the fork; and a CI run of the generative workflow reports the compile suite passing."
+            }
+
+            {
+                at 2026-09-24T19:21:11.801942Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

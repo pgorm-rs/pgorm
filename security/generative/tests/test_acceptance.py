@@ -1,9 +1,13 @@
 """Acceptance must not read as complete when a component or obligation is missing."""
 
+from pathlib import Path
+import tempfile
 import unittest
 import unittest.mock
 
-from pgorm_campaign import acceptance
+from pgorm_campaign import acceptance, acceptance_regressions
+
+ROOT = Path(__file__).resolve().parents[3]
 
 RUNTIME = {
     "passed": True,
@@ -202,6 +206,55 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("deduplicated_relations_still_combine", text)
         self.assertIn("src/pipeline/tests.rs", text)
         self.assertIn("## Open findings", text)
+
+
+# [spec:pgorm:req:generative.acceptance/test]
+class RemovalTests(unittest.IsolatedAsyncioTestCase):
+    """A counterfactual has to find its fix in the manifests as they are now.
+
+    The removal for the prqlc fork once truncated the root manifest at a
+    `[patch.crates-io]` header. When the fork became a dependency that header
+    went away, and the removal would have reported its marker missing on
+    every acceptance run rather than taking the fork out. So each dependency
+    swap is applied here to copies of the checkout's own manifests.
+    """
+
+    async def test_each_dependency_swap_rewrites_only_its_declaration(self):
+        swaps = {
+            test: removal
+            for test, removal in acceptance_regressions.REMOVALS.items()
+            if removal["kind"] == "swap-dependency"
+        }
+        self.assertTrue(swaps, "the prqlc fork's counterfactual is a swap")
+        for test, removal in swaps.items():
+            with tempfile.TemporaryDirectory() as scratch:
+                scratch = Path(scratch)
+                before = {}
+                for path in removal["paths"]:
+                    (scratch / path).parent.mkdir(parents=True, exist_ok=True)
+                    before[path] = (ROOT / path).read_text()
+                    (scratch / path).write_text(before[path])
+                await acceptance_regressions._remove(scratch, removal)
+                key = removal["dependency"] + " = "
+                for path in removal["paths"]:
+                    old = before[path].splitlines()
+                    new = (scratch / path).read_text().splitlines()
+                    changed = [
+                        (was, now)
+                        for was, now in zip(old, new, strict=True)
+                        if was != now
+                    ]
+                    self.assertEqual(
+                        changed,
+                        [
+                            (was, key + removal["declaration"])
+                            for was in old
+                            if was.startswith(key)
+                        ],
+                        f"{test}: {path}",
+                    )
+                    self.assertEqual(len(changed), 1, f"{test}: {path}")
+                    self.assertIn("git = ", changed[0][0], f"{test}: {path}")
 
 
 if __name__ == "__main__":

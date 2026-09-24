@@ -51,13 +51,3 @@ missing_debug_implementations = "deny"
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
-
-# The separate workspace above keeps Python configuration out of ordinary Rust
-# builds, and a crates-io patch table is read from the workspace root and
-# nowhere else — so this crate resolves its own patches and the root
-# manifest's are invisible here. Every entry the root pins has to be repeated,
-# verbatim: without the prqlc fork the extension links upstream prqlc and
-# compiles different SQL from the one every pgorm test exercises. `build.rs`
-# fails the build when the two tables drift apart.
-[patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19" }

@@ -433,14 +433,16 @@ of the crate, compiled in every build. Rules are grouped under
 > decided by whichever prqlc the build resolved: the pinned fork doubles
 > it, while registry `prqlc 0.13.14` escapes through sqlparser, which
 > leaves a `"` preceded by a backslash alone — closing the identifier early
-> and handing the remainder to the server as SQL. `[patch.crates-io]` is
-> honoured only in the workspace that declares it, so a consumer taking
-> pgorm as a dependency resolves the registry crate, and pgorm cannot pin
-> which renderer stands between a caller's string and the emitted
-> identifier. Pre-doubling in pgorm would not settle it either — the fork
-> would double it a second time. So the screen runs in pgorm's own code and
-> returns before `adapter::compile`, which is what makes the answer the
-> same under either compiler.
+> and handing the remainder to the server as SQL. pgorm depends on the fork
+> directly, but that is not a choice it can hold for a consumer: the
+> consumer's own `patch` table can redirect the dependency, and a crates.io
+> release, which cannot carry a git dependency, would have to name the
+> registry crate. So which renderer stands between a caller's string and
+> the emitted identifier is not pgorm's to decide. Pre-doubling in pgorm
+> would not settle it either — the fork would double it a second time. So
+> the screen runs in pgorm's own code and returns before
+> `adapter::compile`, which is what makes the answer the same under either
+> compiler.
 >
 > Compilation has no catalog, and this is the honest ceiling of the alias
 > token: a token whose name no stage introduced still compiles, resolving as
