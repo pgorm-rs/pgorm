@@ -1,0 +1,9 @@
+error: PRQL rejected this query:
+       Error: The dialect PostgresDialect does not support grouping by all columns of a relation whose columns are unknown while using its columns outside an aggregation
+       ↳ Hint: `invoice.*` is used outside an aggregation.
+       ↳ Hint: providing more column information will allow the query to group by each column.
+
+ --> tests/compile-fail/prql_group_star_selected.rs:8:19
+  |
+8 |     let _ = prql!("from invoice | group this (aggregate {n = count this})");
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -3,7 +3,8 @@
 //! The `compile-fail` fixtures are the refusals, each paired with a `.stderr`
 //! snapshot trybuild asserts against: for `sql!`, malformed grammar and inputs
 //! that are not a lone string literal; for `prql!`, PRQL the compiler rejects
-//! (including `take $N`), emitted SQL the oracle rejects (the broken
+//! (including `take $N`, and a whole-row grouping that selects the star it
+//! groups by), emitted SQL the oracle rejects (the broken
 //! s-string), and every placeholder mistake — too few arguments, too many,
 //! a gap in the numbering, and `$0`. The `pass` fixtures are compiled *and
 //! run*, so the expansions are checked live and their assertions are part of

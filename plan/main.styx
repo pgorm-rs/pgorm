@@ -7438,6 +7438,7 @@ children (
         id prqlc-group-by-wildcard
         title "Grouping by a whole relation names its columns"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-17T12:59:45.4974Z
@@ -7451,6 +7452,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found 2026-09-24 by the re-pin agent while probing fork 4ff45819 (dd9a0fee's fix) through the prql! macro's compile options. dd9a0fee refused a grouping by an unknown relation's star only when the star itself was selected, so a named column of that relation read beside the whole-row key slipped through: `from tally | group this (aggregate {n = count this}) | select {fruit, n}` compiled to `SELECT fruit, COUNT(*) AS n FROM tally GROUP BY tally.*`, and PostgreSQL 16 rejected it at execution with 42803 (\"column tally.fruit must appear in the GROUP BY clause\"). The same held for a HAVING filter on such a column (`... | filter fruit == \"apple\"`) and for a sort on one that pushed the grouping into a CTE. Under d6f2fa97 the shape emitted `GROUP BY *`, which the prql! oracle refused at build time, so for prql! users dd9a0fee alone would have moved it from a build-time refusal to a run-time failure. Fixed in the fork at 2ce6a242, before the re-pin landed: a named column the SELECT reads is written out as a key beside the star (`GROUP BY fruit, tally.*`), and a read of the star itself is still refused at compile time (\"does not support grouping by all columns of a relation whose columns are unknown while using its columns outside an aggregation\"). pgorm re-pins straight to 2ce6a242, so no pgorm commit ever carried the 42803 shape."
+            }
+
+            {
+                at 2026-09-24T14:38:45.493273Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -8446,12 +8454,20 @@ children (
         id prqlc-literal-ordinal
         title "A constant key in GROUP BY or ORDER BY is never read as a column position"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-23T22:42:20.48433Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found 2026-09-24 by the agent fixing prqlc-group-by-wildcard in the fork. PostgreSQL reads a bare integer literal in GROUP BY as an output-column position, not a constant, so `from cake | select {id, name} | derive {x = 5} | group this (aggregate …)` compiles to `GROUP BY id, name, 5` and fails at execution with 42P10 \"GROUP BY position 5 is not in select list\". Verified against the live PostgreSQL 16 server. PostgreSQL gives ORDER BY the same positional reading, so a sort key that lowers to an integer literal is the likely sibling; DISTINCT ON's key list is to be checked too. Reachable from pgorm through the prql! macro, which compiles raw PRQL text through the fork. The fix belongs in the fork on branch pgorm/deterministic-star-expansion and lands in pgorm through the same re-pin that carries prqlc-group-by-wildcard's fix (dd9a0fee), so pgorm re-pins once."
+            }
+
+            {
+                at 2026-09-24T14:38:45.551826Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -8489,12 +8505,20 @@ children (
         id prqlc-distinct-on-dropped-key
         title "A DISTINCT ON key the projection drops still orders the deduplication"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-24T00:02:07.653268Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found by the fork agent while fixing prqlc-literal-ordinal in the fork (branch pgorm/deterministic-star-expansion). When a group key is a computed expression and the final projection drops it, prqlc's DISTINCT ON lowering still names the key by its alias in the derived ORDER BY: `from cake | derive {x = id + 1} | group {x} (sort id | take 1) | select {name, id}` compiles to a DISTINCT ON whose ORDER BY cites `x`, a column the SELECT list no longer carries, and PostgreSQL rejects it at execution with SQLSTATE 42703 (undefined column). Verified against live PostgreSQL 16. Reachable from pgorm only through the prql! macro, which compiles raw PRQL text through the fork; pgorm's pipeline builder never constructs the shape. Fixed in the fork at 4ff45819 (\"order DISTINCT ON by a key's expression when the projection drops it\"): the derived ORDER BY now writes the key's expression when the projection drops it. Lands in pgorm through the same re-pin that carries prqlc-group-by-wildcard (dd9a0fee) and prqlc-literal-ordinal (84f572a8)."
+            }
+
+            {
+                at 2026-09-24T14:38:45.601834Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

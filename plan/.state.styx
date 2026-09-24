@@ -854,6 +854,9 @@ assertions (
     {id supply-chain-unscanned, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:29.034891Z}
     {id tokenizer-backslash-standard, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:26:31.551166Z}
     {id select-sources-wide-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:58:57.496733Z}
+    {id prqlc-group-by-wildcard, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.493273Z}
+    {id prqlc-literal-ordinal, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.551826Z}
+    {id prqlc-distinct-on-dropped-key, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.601834Z}
 )
 
 impl_evidence (

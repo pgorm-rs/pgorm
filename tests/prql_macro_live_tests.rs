@@ -6,6 +6,12 @@
 //! that the rows coming back decode. Those are semantics, so they are
 //! asserted against PostgreSQL with decoded rows.
 //!
+//! The same goes for the SQL prqlc writes for a grouping or a deduplication.
+//! A whole-row key, a literal key and a dropped DISTINCT ON key all pass the
+//! macro's grammar check whether or not the server will run them, so the
+//! pinned compiler's handling of each is proved here by the rows that come
+//! back.
+//!
 //! Run the test locally:
 //! DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test prql_macro_live_tests
 #![allow(unused_imports, dead_code)]
@@ -137,6 +143,238 @@ async fn sstring_survives_to_execution() -> Result<(), Error> {
             .collect::<Vec<_>>(),
         vec!["oslo"]
     );
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+/// Six rows, three of them distinct, repeated one, two and three times.
+///
+/// No key: grouping a relation by `this` groups by its whole row, which
+/// counts duplicates, and `prql!` declares no columns, so prqlc knows none of
+/// these.
+const TALLY: &str = sql!(
+    "CREATE TABLE tally (fruit text not null, colour text not null, weight int not null);
+     INSERT INTO tally (fruit, colour, weight) VALUES
+         ('apple', 'red', 1), ('apple', 'red', 1), ('apple', 'green', 2),
+         ('pear', 'green', 3), ('pear', 'green', 3), ('pear', 'green', 3);"
+);
+
+// [spec:pgorm:def:macros.prql/test]    grouping an undeclared relation by
+// `this` writes a qualified whole-row key PostgreSQL can read
+#[pgorm_macros::test]
+async fn grouping_undeclared_rows_counts_duplicates() -> Result<(), Error> {
+    let ctx = TestContext::new("prql_macro_group_whole_row").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(TALLY).await?;
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Count {
+        n: i64,
+    }
+
+    let (query, values) =
+        prql!("from tally | group this (aggregate {n = count this}) | select {n} | sort n");
+    assert_eq!(
+        query,
+        "SELECT COUNT(*) AS n FROM tally GROUP BY tally.* ORDER BY n"
+    );
+    let rows = (query, values).into_model::<Count>().all(&db).await?;
+
+    assert_eq!(rows, vec![Count { n: 1 }, Count { n: 2 }, Count { n: 3 }]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:def:macros.prql/test]    a literal grouping key is projected but
+// left out of GROUP BY, where PostgreSQL would read `5` as a column position;
+// a grouping made only of literals keeps its empty-input answer
+#[pgorm_macros::test]
+async fn literal_group_key_is_not_a_position() -> Result<(), Error> {
+    let ctx = TestContext::new("prql_macro_literal_group_key").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(TALLY).await?;
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Group {
+        fruit: String,
+        colour: String,
+        x: i32,
+        n: i64,
+    }
+
+    let (query, values) = prql!(
+        "from tally | select {fruit, colour} | derive {x = 5} \
+         | group this (aggregate {n = count this}) | sort {fruit, colour}"
+    );
+    assert_eq!(
+        query,
+        "SELECT fruit, colour, 5 AS x, COUNT(*) AS n FROM tally GROUP BY fruit, colour ORDER BY fruit, colour"
+    );
+    let rows = (query, values).into_model::<Group>().all(&db).await?;
+    let group = |fruit: &str, colour: &str, n| Group {
+        fruit: fruit.to_owned(),
+        colour: colour.to_owned(),
+        x: 5,
+        n,
+    };
+    assert_eq!(
+        rows,
+        vec![
+            group("apple", "green", 1),
+            group("apple", "red", 2),
+            group("pear", "green", 3),
+        ]
+    );
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Whole {
+        x: i32,
+        n: i64,
+    }
+
+    // Grouped by a constant alone, a non-empty input is one group and an
+    // empty one is none, where an ungrouped aggregate would answer one row.
+    let only_literals = |floor: i32| {
+        prql!(
+            "from tally | filter weight > $1 | derive {x = 5} | group {x} (aggregate {n = count this})",
+            floor,
+        )
+    };
+    let (query, values) = only_literals(0);
+    assert_eq!(
+        query,
+        "SELECT 5 AS x, COUNT(*) AS n FROM tally WHERE weight > $1 HAVING COUNT(*) > 0"
+    );
+    let rows = (query, values).into_model::<Whole>().all(&db).await?;
+    assert_eq!(rows, vec![Whole { x: 5, n: 6 }]);
+
+    let (query, values) = only_literals(100);
+    let rows = (query, values).into_model::<Whole>().all(&db).await?;
+    assert_eq!(rows, vec![]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:def:macros.prql/test]    a computed DISTINCT ON key, or a computed
+// sort inside the group, that the projection drops is ordered by its
+// expression rather than by an alias the SELECT no longer carries
+#[pgorm_macros::test]
+async fn dropped_distinct_key_still_orders_rows() -> Result<(), Error> {
+    let ctx = TestContext::new("prql_macro_dropped_distinct_key").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(sql!(
+        "CREATE TABLE cake (id int primary key, name text not null);
+         INSERT INTO cake (id, name) VALUES
+             (1, 'sponge'), (2, 'sponge'), (3, 'torte'), (4, 'sponge'),
+             (5, 'torte'), (6, 'tart'), (7, 'tart');"
+    ))
+    .await?;
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Cake {
+        name: String,
+        id: i32,
+    }
+
+    // The newest cake for each residue of its id modulo 3: 6 of {3, 6}, 7 of
+    // {1, 4, 7} and 5 of {2, 5}. The key `x` is not in the output.
+    let (query, values) = prql!(
+        "from cake | derive {x = id % 3} | group {x} (sort {-id} | take 1) | select {name, id}"
+    );
+    assert_eq!(
+        query,
+        "SELECT DISTINCT ON (id % 3) name, id FROM cake ORDER BY id % 3, id DESC"
+    );
+    let mut rows = (query, values).into_model::<Cake>().all(&db).await?;
+    rows.sort_by_key(|cake| cake.id);
+    let cake = |name: &str, id| Cake {
+        name: name.to_owned(),
+        id,
+    };
+    assert_eq!(
+        rows,
+        vec![cake("torte", 5), cake("tart", 6), cake("tart", 7)]
+    );
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Id {
+        id: i32,
+    }
+
+    // A computed sort inside the group reaches the same ORDER BY: the newest
+    // cake of each name, ordered by an expression nothing projects.
+    let (query, values) = prql!("from cake | group {name} (sort {id * -1} | take 1) | select {id}");
+    assert_eq!(
+        query,
+        "SELECT DISTINCT ON (name) id FROM cake ORDER BY name, id * -1"
+    );
+    let mut rows = (query, values).into_model::<Id>().all(&db).await?;
+    rows.sort_by_key(|row| row.id);
+    assert_eq!(rows, vec![Id { id: 4 }, Id { id: 5 }, Id { id: 7 }]);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:def:macros.prql/test]    a named column read beside a whole-row
+// key is written as a key too, since PostgreSQL reads a column outside an
+// aggregate only when it is grouped by name
+#[pgorm_macros::test]
+async fn named_column_beside_whole_row_key() -> Result<(), Error> {
+    let ctx = TestContext::new("prql_macro_whole_row_named_column").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(TALLY).await?;
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct FruitCount {
+        fruit: String,
+        n: i64,
+    }
+
+    // Each distinct row is its own group, so apple appears once per colour.
+    let (query, values) = prql!(
+        "from tally | group this (aggregate {n = count this}) | select {fruit, n} | sort {fruit, n}"
+    );
+    assert_eq!(
+        query,
+        "SELECT fruit, COUNT(*) AS n FROM tally GROUP BY fruit, tally.* ORDER BY fruit, n"
+    );
+    let rows = (query, values).into_model::<FruitCount>().all(&db).await?;
+    let count = |fruit: &str, n| FruitCount {
+        fruit: fruit.to_owned(),
+        n,
+    };
+    assert_eq!(
+        rows,
+        vec![count("apple", 1), count("apple", 2), count("pear", 3)]
+    );
+
+    #[derive(FromQueryResult, Debug, PartialEq)]
+    struct Count {
+        n: i64,
+    }
+
+    // A column read only by HAVING is written as a key all the same.
+    let (query, values) = prql!(
+        r#"from tally | group this (aggregate {n = count this}) | filter fruit == "apple" | select {n} | sort n"#
+    );
+    assert_eq!(
+        query,
+        "SELECT COUNT(*) AS n FROM tally GROUP BY fruit, tally.* HAVING fruit = 'apple' ORDER BY n"
+    );
+    let rows = (query, values).into_model::<Count>().all(&db).await?;
+    assert_eq!(rows, vec![Count { n: 1 }, Count { n: 2 }]);
 
     drop(db);
     ctx.delete().await;
