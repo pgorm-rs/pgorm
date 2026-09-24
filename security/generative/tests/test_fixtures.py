@@ -5,7 +5,7 @@ import unittest
 
 from pgorm_campaign import baseline
 from pgorm_campaign.fixtures import (
-    RESET_DEADLINES,
+    ADMIN_DEADLINES,
     CleanupFailure,
     Fixture,
     FixtureFailure,
@@ -69,11 +69,11 @@ class FixtureTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(any("rm" in call for call in calls))
             self.assertFalse(fixture.report["passed"])
 
-    async def test_a_reset_runs_under_its_own_deadline(self):
+    async def test_administration_runs_under_its_own_deadline(self):
         scripts = []
 
         async def command(*args, **kwargs):
-            scripts.append(kwargs.get("input"))
+            scripts.append((args[args.index("-U") + 1], kwargs.get("input")))
             return Output(0, "", "")
 
         with tempfile.TemporaryDirectory() as directory:
@@ -81,10 +81,15 @@ class FixtureTests(unittest.IsolatedAsyncioTestCase):
             fixture._active = True
             fixture._pairs = [Pair(0, "s", "r", ("subject", "reference"))]
             await fixture.reset(0, baseline.default())
-        self.assertEqual(len(scripts), 2)
-        for script in scripts:
-            self.assertTrue(script.startswith(RESET_DEADLINES))
-            self.assertIn("TRUNCATE", script)
+            await fixture._sql("postgres", "CREATE DATABASE x;")
+            await fixture._sql("subject", "SELECT 1;", role="campaign")
+        self.assertEqual(len(scripts), 4)
+        for role, script in scripts[:3]:
+            self.assertEqual(role, "postgres")
+            self.assertTrue(script.startswith(ADMIN_DEADLINES))
+        self.assertIn("TRUNCATE", scripts[0][1])
+        # The programs' role keeps the deadlines a run records.
+        self.assertEqual(scripts[3], ("campaign", "SELECT 1;"))
 
 
 if __name__ == "__main__":

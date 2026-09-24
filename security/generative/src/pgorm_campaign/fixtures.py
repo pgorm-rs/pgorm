@@ -31,14 +31,17 @@ SELECT json_build_object(
 );
 """
 
-# The server-wide deadlines above are the programs' budget: a generated
-# statement that runs away is cut off at two seconds. A reset is the
-# controller's own work, bounded instead by the `docker exec` deadline in
-# `_sql`, and it takes its own limits for the length of its one session.
-# Inheriting the programs' two seconds let one TRUNCATE on a loaded host
-# deactivate every worker's fixture and turn the rest of a run into
-# incompletes, which is a statement about the host rather than about pgorm.
-RESET_DEADLINES = "SET statement_timeout = '25s';\nSET lock_timeout = '10s';\n"
+# The server-wide deadlines set at startup are the programs' budget: a
+# generated statement that runs away is cut off at two seconds. Provisioning
+# and resets are the controller's own work, bounded instead by the
+# `docker exec` deadline in `_sql`, so an administrative session takes its own
+# limits for its length. Inheriting the programs' two seconds let one TRUNCATE
+# on a loaded host deactivate every worker's fixture and turn the rest of a
+# run into incompletes, and let one CREATE DATABASE abort a run before it
+# began — statements about the host rather than about pgorm. The campaign
+# role's session is left alone, so the settings a run records are the ones
+# its programs ran under.
+ADMIN_DEADLINES = "SET statement_timeout = '25s';\nSET lock_timeout = '10s';\n"
 
 
 class FixtureFailure(RuntimeError):
@@ -90,6 +93,8 @@ class Fixture:
         return await self._run("docker", *args, **kwargs)
 
     async def _sql(self, database, sql, *, role="postgres"):
+        if role == "postgres":
+            sql = ADMIN_DEADLINES + sql
         result = await self._docker(
             "exec",
             "-i",
@@ -266,9 +271,7 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
     async def reset(self, worker, definition, *, rebuild=False):
         """Reset both databases; callers close pooled clients before a DDL rebuild."""
         pair = self.pair(worker)
-        sql = RESET_DEADLINES + (
-            baseline.render(definition) if rebuild else baseline.restore(definition)
-        )
+        sql = baseline.render(definition) if rebuild else baseline.restore(definition)
         async with self._locks[worker]:
             # A failed side never leaves a usable pair for the next program.
             try:
