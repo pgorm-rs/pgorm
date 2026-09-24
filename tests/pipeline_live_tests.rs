@@ -998,7 +998,7 @@ async fn composed_prune_renumbers_across_the_join() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    two sources whose column
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    two sources whose column
 // names collide decode whole models under their own prefixes — the
 // _expr_N dissolution, proven by rows rather than by the emitted string
 #[pgorm_macros::test]
@@ -1052,7 +1052,7 @@ async fn select_sources_decodes_colliding_columns() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    a named restatement
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    a named restatement
 // decodes both occurrences of one table: employee beside manager, whole
 // models on each side
 #[pgorm_macros::test]
@@ -1098,7 +1098,7 @@ async fn select_sources_named_self_join_decodes_both_sides() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    under a right join the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    under a right join the
 // *left* side is the absent one, and the first listed source decodes None —
 // what the all-optional row type exists to carry
 #[pgorm_macros::test]
@@ -1171,7 +1171,7 @@ async fn right_join_leaves_the_first_position_none() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the allowed set composes
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the allowed set composes
 // live ahead of the terminal: filter, derive, sort, take and a join, then
 // whole models out
 #[pgorm_macros::test]
@@ -1208,7 +1208,7 @@ async fn select_sources_composes_with_allowed_stages_live() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    one and one_opt carry the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    one and one_opt carry the
 // terminal's take-1 semantics: first row of the sorted pipeline, RecordNotFound
 // or None when nothing matches
 #[pgorm_macros::test]
@@ -1251,7 +1251,7 @@ async fn select_sources_one_takes_one() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the widest list the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the widest list the
 // terminal takes, decoded live: six sources, each position read back from
 // its own s{i}_ prefix into its own model — two of them the same table under
 // two names, so a crossed prefix decodes cleanly into the wrong row — and a
@@ -1422,7 +1422,7 @@ mod cast_probe {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    a select_as override and
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    a select_as override and
 // the enum-array default alike reach the sources projection: a numeric column
 // read as text decodes, and a tea[] column reads back under text[]
 #[pgorm_macros::test]

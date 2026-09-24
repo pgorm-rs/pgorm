@@ -19,7 +19,7 @@ use crate::{
     SelectorTrait, StaticName,
 };
 
-use super::adapter::{self, PlExpr};
+use super::adapter::{self, Piece, PlExpr};
 use super::builder::{IntoSource, Pipeline, Source};
 use super::error::PipelineError;
 
@@ -47,7 +47,7 @@ mod sealed {
 ///
 /// The trait is sealed: only an entity carries the `Model` a source decodes
 /// into, so the two spellings above are the whole set.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 pub trait SelectableSource: sealed::SealedSource {
     /// The entity whose columns are projected and whose model is decoded.
     type Entity: EntityTrait;
@@ -58,12 +58,12 @@ pub trait SelectableSource: sealed::SealedSource {
     fn qualifier(&self) -> String;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<E: EntityTrait> sealed::SealedSource for E {}
 
 /// A relation read bare: qualified by the entity's own name, exactly as its
 /// columns are everywhere else in the pipeline.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<E: EntityTrait> SelectableSource for E {
     type Entity = E;
 
@@ -72,12 +72,12 @@ impl<E: EntityTrait> SelectableSource for E {
     }
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<S: SelectableSource> sealed::SealedSource for Named<S> {}
 
 /// A relation read under a name: the name is the qualifier, because after
 /// [`named`](super::IntoSource::named) it is the relation's only name.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<S: SelectableSource> SelectableSource for Named<S> {
     type Entity = S::Entity;
 
@@ -92,18 +92,47 @@ impl<S: SelectableSource> SelectableSource for Named<S> {
 /// `s{index}_{col}` ([`source_column_alias`]) — the same prefix scheme and
 /// cast discipline as [`project_source`](crate::query::graph::project_source),
 /// emitted as PL nodes instead of a `SelectStatement`.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 // [spec:pgorm:sem:query.graph.writer+4]
 fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index: usize) {
     for column in <E::Column as Iterable>::iter() {
         let alias = source_column_alias(index, column.as_str());
         let node = adapter::ident_in(vec![qualifier.to_owned()], SqlName::to_string(&column));
         let node = match source_read_cast(&column) {
-            Some(cast) => adapter::call("as", vec![adapter::ident(&cast), node]),
+            Some(cast) => read_cast(node, &cast),
             None => node,
         };
         nodes.push(adapter::aliased(node, alias));
     }
+}
+
+/// `CAST(column AS type)`, with the type written by pgorm-query's
+/// [`TypeName`](pgorm_query::TypeName) part policy and only the column left
+/// to prqlc.
+///
+/// prqlc's own cast, `std.as`, takes its type in a `noresolve` slot and
+/// writes whatever identifier it is given there verbatim, so a type name
+/// handed to it as an identifier would reach the SQL as text — a name of
+/// `--` would comment out the rest of the statement. Writing the cast
+/// ourselves, as an expression pgorm assembles, keeps the type on the one
+/// policy every other writer of the same column uses: the `SelectStatement`
+/// writer renders the cast through the same `to_sql_string`, so the two agree
+/// about a column's read cast character for character. The text carries no
+/// placeholder of a caller's making: a name the policy writes is either bare
+/// or a quoted identifier, which the lexer reads as one token, and a
+/// `TypeName::raw` type expression is program text here as on every other
+/// writer.
+// [spec:pgorm:sem:pipeline.select-sources+4]
+// [spec:pgorm:sem:query.graph.writer+4]
+fn read_cast(column: PlExpr, cast: &pgorm_query::TypeName) -> PlExpr {
+    adapter::assembled(
+        vec![
+            Piece::Text("CAST(".to_owned()),
+            Piece::Node(column),
+            Piece::Text(format!(" AS {})", cast.to_sql_string())),
+        ],
+        None,
+    )
 }
 
 /// The argument of [`select_sources`](Pipeline::select_sources): a single
@@ -113,7 +142,7 @@ fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index:
 /// listing order — every position optional, the first included, because the
 /// pipeline's joins carry no missability in their types and under a right or
 /// full join the *left* side is the absent one.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 pub trait SourceList: sealed::SealedList {
     /// What one row decodes into: `Option<Model>` per source, a bare
     /// `Option<Model>` for a single source rather than a one-tuple.
@@ -125,7 +154,7 @@ pub trait SourceList: sealed::SealedList {
     fn decode(res: &QueryResult) -> Result<Self::Row, Error>;
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<S: SelectableSource> sealed::SealedList for S {
     fn projection(self) -> Vec<PlExpr> {
         let mut nodes = Vec::new();
@@ -136,7 +165,7 @@ impl<S: SelectableSource> sealed::SealedList for S {
 
 /// A source listed alone still decodes as `Option<Model>`: listing it does
 /// not prove a right-joined pipeline matched it.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<S: SelectableSource> SourceList for S {
     type Row = Option<<S::Entity as EntityTrait>::Model>;
 
@@ -149,7 +178,7 @@ impl<S: SelectableSource> SourceList for S {
 /// sources in listing order, the decode reads the same prefixes back.
 macro_rules! source_tuple {
     ( $( $s:ident . $idx:tt @ $pre:literal ),+ ) => {
-        // [spec:pgorm:sem:pipeline.select-sources+3]
+        // [spec:pgorm:sem:pipeline.select-sources+4]
         impl<$( $s: SelectableSource ),+> sealed::SealedList for ( $( $s, )+ ) {
             fn projection(self) -> Vec<PlExpr> {
                 let mut nodes = Vec::new();
@@ -158,7 +187,7 @@ macro_rules! source_tuple {
             }
         }
 
-        // [spec:pgorm:sem:pipeline.select-sources+3]
+        // [spec:pgorm:sem:pipeline.select-sources+4]
         impl<$( $s: SelectableSource ),+> SourceList for ( $( $s, )+ ) {
             type Row = ( $( Option<<$s::Entity as EntityTrait>::Model>, )+ );
 
@@ -181,7 +210,7 @@ source_tuple!(S1.0 @ "s0_", S2.1 @ "s1_", S3.2 @ "s2_", S4.3 @ "s3_", S5.4 @ "s4
 /// [`SelectorRaw`] so execution lands on the ordinary raw-read path.
 struct SourcesRow<T>(PhantomData<T>);
 
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 impl<T: SourceList> SelectorTrait for SourcesRow<T> {
     type Item = T::Row;
 
@@ -209,7 +238,7 @@ impl<T: SourceList> SelectorTrait for SourcesRow<T> {
 /// Reshaping *before* the selection is refused at
 /// [`into_sql`](SelectedSources::into_sql) with
 /// [`PipelineError::ReshapedSources`] naming the offending stage.
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 pub struct SelectedSources<T> {
     pipeline: Pipeline,
     projection: Vec<PlExpr>,
@@ -302,7 +331,7 @@ impl Pipeline {
     /// A listed source the pipeline never read compiles up to prqlc, which
     /// refuses the unresolvable columns as [`PipelineError::Compile`] — the
     /// terminal checks stage shape, not membership.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub fn select_sources<T: SourceList>(self, sources: T) -> SelectedSources<T> {
         SelectedSources {
             projection: sources.projection(),
@@ -322,7 +351,7 @@ impl<T: SourceList> SelectedSources<T> {
     /// hoist would be discharged for, and behind the binding it makes, the
     /// per-source qualifiers it is written in have nothing left to resolve
     /// against.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     fn into_pipeline(self) -> Result<Pipeline, PipelineError> {
         let SelectedSources {
             mut pipeline,
@@ -347,14 +376,14 @@ impl<T: SourceList> SelectedSources<T> {
     /// Everything [`Pipeline::into_sql`] does still happens here — the
     /// reserved-alias screen, prqlc's resolution, the placeholder census —
     /// preceded by the reshaped-pipeline refusal.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub fn into_sql(self) -> Result<(String, Values), PipelineError> {
         self.into_pipeline()?.into_sql()
     }
 
     /// Compile, execute and decode every row as one `Option<Model>` per
     /// listed source.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub async fn all<C>(self, db: &C) -> Result<Vec<T::Row>, Error>
     where
         C: ConnectionTrait,
@@ -374,7 +403,7 @@ impl<T: SourceList> SelectedSources<T> {
     ///
     /// A `take 1` stage is appended to the pipeline before the projection,
     /// as on [`Pipeline::one`], so at most one row leaves the server.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub async fn one<C>(mut self, db: &C) -> Result<T::Row, Error>
     where
         C: ConnectionTrait,
@@ -392,7 +421,7 @@ impl<T: SourceList> SelectedSources<T> {
 
     /// Compile, execute and decode the first row, or `None` when there is
     /// none. Appends `take 1` like [`one`](SelectedSources::one).
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub async fn one_opt<C>(mut self, db: &C) -> Result<Option<T::Row>, Error>
     where
         C: ConnectionTrait,
@@ -419,7 +448,7 @@ impl<T: SourceList> SelectedSources<T> {
 /// [`select_sources`](Pipeline::select_sources), where the entity supplies
 /// the columns and the name qualifies them.
 // [spec:pgorm:sem:pipeline.self-join]
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 #[derive(Debug, Clone)]
 pub struct Named<R> {
     pub(super) relation: R,

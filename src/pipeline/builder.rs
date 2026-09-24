@@ -148,7 +148,7 @@ pub struct Pipeline {
     /// embedded pipeline that reshaped itself is a table-like relation whose
     /// resulting columns the CTE boundary re-exposes, so embedding does not
     /// propagate it.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     pub(super) reshaped: Option<&'static str>,
     /// Whether the stages accumulated so far end in a deduplicating `group`
     /// ([`distinct`](Pipeline::distinct)) that no binding has absorbed yet.
@@ -287,7 +287,7 @@ pub trait IntoSource {
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
     // [spec:pgorm:sem:pipeline.self-join]
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     fn named(self, name: impl Into<AliasName>) -> Named<Self>
     where
         Self: Sized,
@@ -559,7 +559,7 @@ impl Pipeline {
 
     /// Record that `stage` replaced this pipeline's source namespaces,
     /// keeping the *first* offender — the one that did the replacing.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     fn reshaping(mut self, stage: &'static str) -> Self {
         self.reshaped.get_or_insert(stage);
         self
@@ -602,7 +602,7 @@ impl Pipeline {
     /// [`distinct`](Pipeline::distinct) that could not compose or a set
     /// operation that would otherwise have reassociated.
     // [spec:pgorm:req:pipeline.compose]
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     fn settle(&mut self, naming: &naming::Naming, owed_to: &'static str) {
         if self.stages.len() <= 1 {
             return;

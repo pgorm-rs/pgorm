@@ -24,7 +24,7 @@ use pgorm::{
 use super::{
     fixtures::{cast_named, dyn_named},
     oracle::{
-        Policy::{Pipeline as PipelinePolicy, PipelineAlias, PipelineBare, Quoted},
+        Policy::{Pipeline as PipelinePolicy, PipelineAlias, PipelineBare, Quoted, TypePart},
         Rendered, Site,
     },
 };
@@ -277,11 +277,14 @@ fn pipeline_sites() -> Vec<Site> {
             policy: PipelineBare,
             render: |n| pipeline(Pipeline::from(dyn_named::Entity::table(n)).into_sql()),
         },
+        // The read cast's type is written by pgorm through `TypeName`'s part
+        // policy, the same as the `SelectStatement` writer's, rather than
+        // handed to prqlc: it is held to that policy, not the pipeline's.
         Site {
             id: "pgorm/pipeline.select-sources.read-cast",
             api: "Pipeline::select_sources over a ColumnTrait::select_as cast to a runtime type",
             kinds: &["TypeCast.type_name.names[0]"],
-            policy: PipelinePolicy,
+            policy: TypePart,
             render: |n| {
                 cast_named::with_type(n, || {
                     pipeline(

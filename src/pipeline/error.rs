@@ -87,7 +87,7 @@ pub enum PipelineError {
     /// reshaping after the terminal cannot-follow boundary by not doing it
     /// at all — `filter`, `derive`, `sort`, `take`, `join`, `window` and
     /// `append` all leave the sources addressable.
-    // [spec:pgorm:sem:pipeline.select-sources+3]
+    // [spec:pgorm:sem:pipeline.select-sources+4]
     #[error(
         "select_sources after `{0}`: the stage replaced the sources' own column namespaces, \
          so entity models can no longer be projected; list sources before reshaping, or decode \

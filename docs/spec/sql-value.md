@@ -423,7 +423,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+4]
+> [spec:pgorm:def:sql.types.type-name+5]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<Name>`,
 > `name: Name`, `array: bool`, `verbatim: bool`. Rendering
@@ -435,8 +435,11 @@ including panic semantics and quirks inherited from sea-query.
 > part renders as a quoted identifier, case preserved. A name is therefore
 > a name: text that is not an identifier becomes a quoted identifier
 > PostgreSQL refuses, never SQL it executes. `raw_text` gives the unquoted
-> dotted spelling for consumers that quote downstream (the pipeline
-> adapter). `Function::Named` names render under the same part policy, and
+> dotted spelling, which is a description and not SQL: codegen respells a
+> named type from it, and no writer puts it into a statement. The
+> pipeline's `select_sources` read cast renders through `to_sql_string`
+> like every other cast (`[spec:pgorm:sem:pipeline.select-sources+4]`).
+> `Function::Named` names render under the same part policy, and
 > so does `IndexType::Named`'s access method, which reaches
 > `prepare_part` directly because it is a single name rather than a
 > `TypeName` — one policy, not a per-site escape.

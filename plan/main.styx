@@ -8777,12 +8777,27 @@ children (
         id pipeline-read-cast-verbatim
         title "select_sources writes a column's read-cast type name into SQL verbatim"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-24T20:13:35.800801Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found by the identifier render oracle (site `pgorm/pipeline.select-sources.read-cast`, tests/identifier_oracle/registry_orm.rs). `Pipeline::select_sources` projects each column through `source_read_cast` (src/query/graph.rs), which reads the cast target of the column's `ColumnTrait::select_as` back as `TypeName::raw_text()` — the unquoted, dotted spelling — and `project_into` (src/pipeline/sources.rs) passes that text to prqlc as `adapter::ident(&cast)` in the type slot of `std.as`. That slot is `noresolve.type`, and prqlc lowers an unresolved ident by writing its name verbatim, so the type name becomes SQL. With a hand-written `select_as` returning `expr.cast_as(Name::runtime(ty))`: `ty = \";\"` → `SELECT CAST(id AS ;) AS s0_id FROM t`; `\"--\"` → `CAST(id AS --) AS s0_id FROM t` (the rest commented out); `\"a b\"` → `CAST(id AS a b)`; `\"MixedCase\"` → folded to `mixedcase`; `\"\"` → `CAST(id AS )`; and a type text such as `int4) AS s0_id, (SELECT current_user) AS leak, CAST(1 AS int4` would add a projection. Only `\"` and NUL are refused, by the pipeline's identifier screen. The same column rendered through `SelectGraph`/`Select` goes through pgorm-query's `TypeName` part policy and is quoted, so the two writers disagree about one column. Reach: only a hand-written `select_as` whose type text is computed at run time — the enum default (`text`/`text[]`) and `#[pgorm(select_as = \"…\")]` are program text — but `select_as` is a public trait method, and the documented claim that a name in cast position is quoted ([spec:pgorm:def:sql.types.type-name]) does not hold on this path. Direction: pass the `TypeName`'s parts to prqlc as quoted identifier parts (or render the cast through pgorm-query's policy) rather than as raw text in a noresolve slot. Pinned in tests/identifier_oracle/pins.rs; retire the pin with the fix."
+            }
+
+            {
+                at 2026-09-24T21:46:39.555288Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-24T22:19:07.367803Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

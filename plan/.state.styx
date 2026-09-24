@@ -862,6 +862,7 @@ assertions (
     {id sqlmap-smoke-unrunnable, kind @complete, author "brendan@necessary.nu", at 2026-09-24T16:21:33.966967Z}
     {id prqlc-git-dependency, kind @complete, author "brendan@necessary.nu", at 2026-09-24T19:21:11.801942Z}
     {id pipeline-bare-dollar-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T21:45:40.062525Z}
+    {id pipeline-read-cast-verbatim, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:19:07.367803Z}
 )
 
 impl_evidence (

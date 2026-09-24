@@ -63,7 +63,7 @@ known limitations.
 > identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
 > PostgreSQL has no type for. The verbatim rendering is sound exactly because the
 > text is a compile-time literal in the caller's source, unreachable from data;
-> `[spec:pgorm:def:sql.types.type-name+4]` is where that text rides — the
+> `[spec:pgorm:def:sql.types.type-name+5]` is where that text rides — the
 > `verbatim` flag of the ordinary cast node, not a shape of its own
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — and it keeps every
 > *identifier*-borne type name quoted

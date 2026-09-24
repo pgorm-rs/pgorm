@@ -519,7 +519,7 @@ of the crate, compiled in every build. Rules are grouped under
 > so the limit belongs to it, in contrast to `SelectorRaw::one`, which
 > executes its text as written.
 
-> [spec:pgorm:sem:pipeline.select-sources+3]
+> [spec:pgorm:sem:pipeline.select-sources+4]
 > `select_sources(sources)` is the model-decode terminal: where
 > `into_model::<M>` asks the caller for a row type whose projection the
 > caller must have arranged, `select_sources` takes the relations
@@ -542,10 +542,17 @@ of the crate, compiled in every build. Rules are grouped under
 > `select_as` answer — the enum default's `text` / `text[]` and a
 > `#[pgorm(select_as = "…")]` override's cast alike, probed off the
 > method's returned shape so this writer and the `SelectStatement` one
-> cannot disagree about a column's read cast — and aliased `s{i}_{col}`
-> under the writer's 63-byte-bounded spelling,
-> qualified by the source's name — the `named` token, or the entity's own
-> qualification (`[spec:pgorm:sem:pipeline.qualify+3]`). An explicitly
+> cannot disagree about a column's read cast. The cast's type is written by
+> pgorm, as `CAST(column AS type)` around the column prqlc renders, through
+> the `TypeName` part policy both writers share
+> (`[spec:pgorm:def:sql.types.type-name]`); it is never handed to prqlc,
+> whose `std.as` writes the identifier in its type slot verbatim. A name
+> in that position is therefore quoted exactly as the `SelectStatement`
+> writer quotes it, and only a `TypeName::raw` type expression — program
+> text — is written as it stands. Each column is qualified by the source's
+> name — the `named` token, or the entity's own qualification
+> (`[spec:pgorm:sem:pipeline.qualify+3]`) — and aliased `s{i}_{col}` under
+> the writer's 63-byte-bounded spelling. An explicitly
 > aliased projection is what dissolves prqlc's `_expr_N` renaming: two
 > sources sharing a column name land under different prefixes by
 > construction, so the compiler never has to invent names the decode

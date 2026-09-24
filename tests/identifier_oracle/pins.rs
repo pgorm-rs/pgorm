@@ -23,10 +23,6 @@ pub struct Pin {
 /// not pinned; the oracle accepts it as `Verdict::TypeKeyword`.
 const TYPE_PART_KEYWORDS: &str = "type-part-keyword-names";
 
-/// `select_sources` hands a column's read-cast type to prqlc as raw text in a
-/// `noresolve` slot, which prqlc writes verbatim: the type name is SQL.
-const READ_CAST_VERBATIM: &str = "pipeline-read-cast-verbatim";
-
 /// The pins.
 pub const PINS: &[Pin] = &[
     Pin {
@@ -145,30 +141,13 @@ pub const PINS: &[Pin] = &[
         ],
     },
     Pin {
-        node: READ_CAST_VERBATIM,
+        node: TYPE_PART_KEYWORDS,
         site: "pgorm/pipeline.select-sources.read-cast",
         labels: &[
-            "semicolon",
-            "line-comment",
-            "block-comment-open",
-            "block-comment-close",
-            "single-quote",
-            "escape-string-open",
-            "backslash",
-            "space",
-            "inner-space",
-            "newline",
-            "inner-newline",
-            "tab",
-            "carriage-return",
-            "mixed-case",
-            "dotted",
             "keyword-select",
             "keyword-from",
             "keyword-user",
             "keyword-not",
-            "keyword-integer",
-            "empty",
         ],
     },
 ];

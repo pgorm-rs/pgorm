@@ -1667,7 +1667,7 @@ fn nested_embedding_prunes_through_two_levels() {
 
 /// Like [`sql_of`], for the source-select terminal: golden output plus the
 /// grammar oracle.
-// [spec:pgorm:sem:pipeline.select-sources+3/test]
+// [spec:pgorm:sem:pipeline.select-sources+4/test]
 fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     let (sql, _) = selected.into_sql().expect("select_sources compiles");
     if let Err(err) = pg_query::parse(&sql) {
@@ -1676,7 +1676,7 @@ fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     sql
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    two sources with a
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    two sources with a
 // colliding column name land under different prefixes by construction, so
 // prqlc never mints an _expr_N the decode could not predict
 #[test]
@@ -1699,7 +1699,7 @@ fn select_sources_prefixes_dissolve_expr_n() {
     assert!(!built.contains("_expr_"), "{built}");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    a single source needs no
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    a single source needs no
 // tuple and projects one block under s0_
 #[test]
 fn select_sources_takes_a_single_source() {
@@ -1707,7 +1707,7 @@ fn select_sources_takes_a_single_source() {
     assert_eq!(built, "SELECT id AS s0_id, name AS s0_name FROM cake");
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    a named restatement
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    a named restatement
 // qualifies its block by the name, exactly as the join told the two
 // occurrences apart
 #[test]
@@ -1730,7 +1730,7 @@ fn select_sources_named_self_join_qualifies_by_name() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the widest list the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the widest list the
 // terminal takes — six sources — projects the i-th listed source's columns
 // under s{i}_, qualified by that source's own name, and types one
 // Option<Model> per position in listing order
@@ -1808,7 +1808,7 @@ fn select_sources_projects_six_sources_in_listing_order() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the writer's cast
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the writer's cast
 // discipline reaches the PRQL side: an enum column reads back as text
 // [spec:pgorm:sem:query.graph.writer+4/test]
 #[test]
@@ -1820,7 +1820,98 @@ fn select_sources_casts_enum_columns_to_text() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    reshaping before the
+mod read_casts {
+    use crate as pgorm;
+    use crate::entity::prelude::*;
+    use pgorm_query::{Expr, Name, SimpleExpr};
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+    pub struct Model {
+        pub id: i32,
+        pub amount: String,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+    pub struct Entity;
+
+    impl EntityName for Entity {
+        fn table_name(&self) -> &str {
+            "ledger"
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+    pub enum PrimaryKey {
+        Id,
+    }
+
+    impl PrimaryKeyTrait for PrimaryKey {
+        type ValueType = i32;
+        fn auto_increment() -> bool {
+            false
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+    pub enum Column {
+        Id,
+        Amount,
+        Label,
+    }
+
+    impl ColumnTrait for Column {
+        type EntityName = Entity;
+
+        fn def(&self) -> ColumnDef {
+            match self {
+                Self::Id => ColumnType::Integer.def(),
+                Self::Amount | Self::Label => ColumnType::Text.def(),
+            }
+        }
+
+        /// A type expression through the verbatim constructor, and a type
+        /// name that needs quoting through the ordinary one.
+        fn select_as(&self, expr: Expr) -> SimpleExpr {
+            match self {
+                Self::Id => expr.into(),
+                Self::Amount => expr.cast_as_raw("numeric(12, 2)"),
+                Self::Label => expr.cast_as(Name::runtime("Label Type")),
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the read cast's type
+// is written by pgorm-query's TypeName policy, never handed to prqlc as text:
+// a name that needs quoting is quoted, a raw type expression stays verbatim,
+// and both spell the cast exactly as the SelectStatement writer does
+#[test]
+fn select_sources_writes_read_casts_by_type_policy() {
+    use crate::{EntityTrait, QueryTrait};
+
+    let built =
+        sources_sql_of(Pipeline::from(read_casts::Entity).select_sources(read_casts::Entity));
+    assert_eq!(
+        built,
+        "SELECT id AS s0_id, CAST(amount AS numeric(12, 2)) AS s0_amount, \
+         CAST(label AS \"Label Type\") AS s0_label FROM ledger"
+    );
+    let graph = read_casts::Entity::graph().build().0;
+    for cast in [" AS numeric(12, 2))", " AS \"Label Type\")"] {
+        assert!(
+            built.contains(cast) && graph.contains(cast),
+            "{cast}: {graph}"
+        );
+    }
+}
+
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    reshaping before the
 // terminal is refused by the stage's own name, before prqlc compiles
 #[test]
 fn select_sources_refuses_a_reshaped_pipeline() {
@@ -1854,7 +1945,7 @@ fn select_sources_refuses_a_reshaped_pipeline() {
     assert_eq!(err, PipelineError::ReshapedSources("remove"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the refusal names the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the refusal names the
 // stage that did the replacing: the first offender, not the last
 #[test]
 fn select_sources_refusal_names_the_first_offender() {
@@ -1867,7 +1958,7 @@ fn select_sources_refusal_names_the_first_offender() {
     assert_eq!(err, PipelineError::ReshapedSources("select"));
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the whole allowed set
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the whole allowed set
 // ahead of the terminal: filter, derive, sort, take, join, window, distinct
 // and append leave every source addressable
 #[test]
@@ -1893,7 +1984,7 @@ fn select_sources_composes_after_the_allowed_stages() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    append is in the allowed
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    append is in the allowed
 // set because the left side's naming survives it
 #[test]
 fn select_sources_composes_after_append() {
@@ -1908,7 +1999,7 @@ fn select_sources_composes_after_append() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    an embedded pipeline's
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    an embedded pipeline's
 // reshaping stays its own: the CTE boundary re-exposes its projection as a
 // table-like namespace, and the consumer's sources are untouched
 #[test]
@@ -1931,7 +2022,7 @@ fn select_sources_ignores_an_embedded_reshape() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    the catalog-less ceiling:
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    the catalog-less ceiling:
 // a listed source the pipeline never read reaches prqlc, which refuses the
 // unresolvable columns as Compile diagnostics
 #[test]
@@ -2525,7 +2616,7 @@ fn a_join_after_a_settle_keeps_both_sides() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.select-sources+3/test]    a settle replaces the
+// [spec:pgorm:sem:pipeline.select-sources+4/test]    a settle replaces the
 // sources' namespaces exactly as `select` does, so the terminal that projects
 // *by* those names is refused by the same gate rather than reaching prqlc with
 // qualifiers nothing can resolve. The refusal names the deduplication that
@@ -2771,7 +2862,7 @@ fn a_spellable_star_key_hoists_nothing() {
 /// (`select_sources_refuses_a_settled_pipeline`): behind the binding the
 /// relation answers under that binding alone, which is the one thing a
 /// per-source projection cannot do without.
-// [spec:pgorm:sem:pipeline.select-sources+3/test]
+// [spec:pgorm:sem:pipeline.select-sources+4/test]
 #[test]
 fn select_sources_refuses_a_star_deduplication() {
     let err = Pipeline::from(cake::Entity)

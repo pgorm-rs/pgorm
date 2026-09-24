@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+2]
+> [spec:pgorm:req:security.ident-oracle+3]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -109,17 +109,22 @@ the modules under `tests/identifier_oracle/`.
 > `tests/identifier_oracle/pins.rs` and names the plan node that fixes the
 > defect. A test asserts on every run that each pinned site × name pair still
 > fails, so the defect is reported until its fix lands and the pin cannot
-> outlive it. Two defects are pinned:
+> outlive it. One defect is pinned:
 >
 > | Node | Defect |
 > | --- | --- |
 > | `type-part-keyword-names` | `prepare_part` writes keywords bare. `Func::named("not")` renders `not(1)`, a boolean NOT rather than a call, and reserved words at type, function, schema and access-method positions are syntax errors. |
-> | `pipeline-read-cast-verbatim` | `select_sources` writes a column's read-cast type verbatim. |
 >
-> A fixed defect's pairs are held by the main property from then on. The
-> pipeline's leading-`$` and lone-`*` names (`pipeline-bare-dollar-names`),
-> which prqlc wrote bare as a parameter, a dollar quote or the wildcard, are
-> now refusals (`security.ident-oracle.nul`).
+> A fixed defect's pairs are held by the main property from then on:
+>
+> - The pipeline's leading-`$` and lone-`*` names
+>   (`pipeline-bare-dollar-names`), which prqlc wrote bare as a parameter, a
+>   dollar quote or the wildcard, are now refusals
+>   (`security.ident-oracle.nul`).
+> - `select_sources`'s read cast (`pipeline-read-cast-verbatim`), whose type
+>   prqlc wrote verbatim, is now written through `TypeName`'s part policy.
+>   The site is held to that policy, so its keyword names are pinned with
+>   the other `prepare_part` sites.
 >
 > The live leg checks the parser against the server, because the structural
 > oracle trusts a single parser. For one representative site per parse-node

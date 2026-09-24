@@ -22,7 +22,9 @@
 use core::marker::PhantomData;
 use std::fmt;
 
-use pgorm_query::{Condition, Expr, IntoName, JoinType, Name, SelectExpr, SelectStatement};
+use pgorm_query::{
+    Condition, Expr, IntoName, JoinType, Name, SelectExpr, SelectStatement, TypeName,
+};
 
 use super::helper::join_condition;
 use crate::executor::result_name::result_column_name;
@@ -254,13 +256,19 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// a column's read cast. A shape that is not a cast — a hand-written
 /// override projecting something else — projects untouched, exactly as it
 /// stands outside the `SelectStatement` writer's guarantees too.
+///
+/// The target comes back as the `TypeName` itself rather than as text, so
+/// the pipeline renders it through the same part policy
+/// ([`TypeName::to_sql_string`]) the `SelectStatement` writer does: a name is
+/// quoted where it has to be, and only a `TypeName::raw` type expression —
+/// program text — is written as it stands.
 // [spec:pgorm:sem:query.graph.writer+4]
-// [spec:pgorm:sem:pipeline.select-sources+3]
+// [spec:pgorm:sem:pipeline.select-sources+4]
 // [spec:pgorm:req:sql.ast.cast-shape]
-pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<String> {
+pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<TypeName> {
     use pgorm_query::SimpleExpr;
     match col.select_as(Expr::col(Name::new(*col))) {
-        SimpleExpr::AsEnum(type_name, _) => Some(type_name.raw_text()),
+        SimpleExpr::AsEnum(type_name, _) => Some(*type_name),
         _ => None,
     }
 }

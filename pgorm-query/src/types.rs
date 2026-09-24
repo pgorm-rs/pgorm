@@ -13,7 +13,7 @@ pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
     // [spec:pgorm:req:sql.render.ident-quoting+5]
-    // [spec:pgorm:req:security.ident-oracle+2] (the quoting every registered
+    // [spec:pgorm:req:security.ident-oracle+3] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
@@ -202,7 +202,7 @@ pub trait IntoColumnRef {
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+4]
+// [spec:pgorm:def:sql.types.type-name+5]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
@@ -309,8 +309,10 @@ impl TypeName {
         }
     }
 
-    /// The unquoted dotted spelling — `tenant_a.status[]` — for consumers
-    /// that compose their own quoting downstream (the pipeline adapter).
+    /// The unquoted dotted spelling — `tenant_a.status[]` — as a
+    /// description of the type rather than SQL: a part that needs quoting is
+    /// not quoted here, so this text must never be written into a statement.
+    /// [`to_sql_string`](Self::to_sql_string) is the SQL spelling.
     pub fn raw_text(&self) -> String {
         let mut out = String::new();
         if let Some(schema) = &self.schema {
