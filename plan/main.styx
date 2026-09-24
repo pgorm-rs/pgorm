@@ -8771,4 +8771,18 @@ children (
             }
         )
     }
+
+    {
+        id identifier-bypass-surfaces
+        title "No public field or deref route renders a runtime name past its quoting"
+        kind @fix
+        log (
+            {
+                at 2026-09-24T21:09:50.767839Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found by the identifier-render-oracle audit (967b4120) and recorded there as found-but-not-registered; these two are real routes around a quoting guarantee rather than raw SQL by design. (1) `TypeName`'s `verbatim` field is public, so a caller can build a quoted `TypeName` from runtime text and flip it to verbatim by field assignment, defeating the `&'static str` bound that `TypeName::raw` exists to enforce (the raw/template vocabulary, 10a04f40). Make the field private, keep `raw()` as the only verbatim constructor, and check every in-tree reader goes through an accessor. (2) `pgorm_pool::Transaction` derefs to `tokio_postgres::Transaction`, whose own `savepoint(name)` interpolates the name unquoted into `SAVEPOINT {name}` through the simple protocol — so `PgTransaction::savepoint(&mut *txn, name)` bypasses the quoting 276dde57 added to pgorm's wrapper. Either remove the `Deref`/`DerefMut` (and give pgorm-pool the methods callers actually need), or keep it and make the bypass impossible to reach by accident; decide by what in-tree code uses through the deref. Register whatever remains reachable in the oracle. Out of scope, by design or inherent: `String::leak` satisfying `&'static str`, `SqlTemplate` accepting runtime text (it binds values and validates markers), `RecyclingMethod::Custom` (caller configuration), and `SqlName::prepare` being overridable by an implementor (their own type, their own quoting)."
+            }
+        )
+    }
 )
