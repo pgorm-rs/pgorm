@@ -7548,12 +7548,27 @@ children (
         id sqlmap-smoke-unrunnable
         title "The smoke profile schedules only cases its own scan strength can detect"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-17T16:23:05.858085Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "The smoke profile cannot pass. It schedules three cases at level 2 / risk 1, and one of them — parameters — has a control that only sqlmap's level 3 boundaries can reach, so the run ends with \"Undetected controls: parameters-B\" every time. Measured both ways rather than argued: at smoke's settings the control completes with 95 requests and zero findings while select and pipeline-literal each detect in 36, and the same case scanned at the full profile's level 3 / risk 2 passes on B, E, U, S and T with the control firing and no protected finding. So pgorm has not regressed and the oracle is not broken; the profile asks for a detection its own scan strength cannot produce.\n\nTwo details worth keeping. The failure is not silent at the database: the control 500s on 42 of its requests, and the payloads that reach it produce `invalid input syntax for type boolean: \"alice\"` and `unterminated quoted identifier`, which is the injection landing and then erroring identically for the true and the false variant — no observable difference, so boolean-based blind has nothing to compare. And neither the control nor `q::inject_parameters` has changed since the acceptance run: the two commits touching the adapter's main.rs on 2026-09-14 left the parameters arm alone, and inject_parameters has no history since 2026-09-10.\n\nThe reason nobody noticed is separate and worse. The sqlmap workflow has run exactly once in CI, the scheduled full profile on 2026-09-14, and it never scanned anything: it died in setup with `error: cannot update the lock file security/sqlmap/adapter/Cargo.lock because --locked was passed to prevent this`, published `sqlmap / full: NOT-RUN`, and exited. The smoke profile has never run in CI at all. So a profile that fails by construction has sat behind a job that has never reached the scanner, and the local acceptance run on 2026-09-14 was full, which passes. That setup failure is now incidentally repaired — regenerating the adapter's lockfile under prqlc-pin-incomplete made `cargo build --locked` succeed, verified here — so the next scheduled run will actually scan, and will fail on smoke for the reason above unless the profile is fixed first.\n\nThe fix is a choice, not a repair: raise smoke to level 3 / risk 2 and pay the time on every pull request, or drop parameters from smoke and keep the fast check honest about covering less. Swapping in a case whose control fires at level 2 is the third option and probably the right one, but which case that is needs measuring rather than picking."
+            }
+
+            {
+                at 2026-09-24T16:21:33.808352Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Resolved by swapping the smoke case whose control could not fire at smoke strength. The decision was to replace `parameters` with a case whose control fires at level 2 / risk 1, keeping smoke fast and B-only; the replacement was measured, not picked. Every one of the 24 cases carrying a scheduled B technique was scanned at smoke strength (level 2, risk 1, technique B) twice, into target/sqlmap-ci/measure-a and measure-b. All 23 non-`parameters` cases detected their control on both runs; `parameters` completed 95 requests with no finding on both, confirming it is unreachable there rather than flaky. Choice among the reliable candidates by coverage: `select` and `pipeline-literal`, the two cases smoke already carried, are both single-quoted literals in a WHERE. `enum` (`SELECT name FROM reviews WHERE status = CAST('ready' AS fixture.\"{input}\")`) is the only B-scheduled case whose control is a double-quoted identifier, so it adds identifier-quoting coverage the two literal cases lack, exercising the `Name::runtime` / schema-qualified `TypeName` path the pgorm-query restructuring rewrote. Its control fires through `\")` plus a commenting subquery payload at level 2, 64 control requests, ~2 s. Committed as 1e2a6118; profiles.json smoke.cases is now [select, pipeline-literal, enum], and the runner test pins the list and records why `parameters` cannot be on it. Two smoke runs against the fixed tree, target/sqlmap-ci/smoke-fix-1 and smoke-fix-2, both reported `smoke: PASS`, 6 of 6 scans complete (3 cases x control+protected), no undetected controls, no protected findings, clean cleanup, source unchanged. The full-profile re-check runs separately as extra assurance over the pgorm-query re-founding and the prqlc re-pin; it is not this node's acceptance, which is that smoke schedules only cases its own scan strength can detect."
+            }
+
+            {
+                at 2026-09-24T16:21:33.966967Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
