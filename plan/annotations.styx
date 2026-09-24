@@ -13,6 +13,6 @@ sites (
         [spec:pgorm:req:security.sqlmap.ci]
     )}
     {path security/sqlmap/acceptance/2026-09-14.md, spec (
-        [spec:pgorm:req:security.sqlmap.acceptance]
+        [spec:pgorm:req:security.sqlmap.acceptance+1]
     )}
 )

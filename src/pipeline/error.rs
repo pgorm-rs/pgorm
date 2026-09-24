@@ -107,6 +107,7 @@ impl From<PipelineError> for crate::Error {
 /// identifier limit is a different question, about what it may collide with
 /// once the server truncates it.
 // [spec:pgorm:req:pipeline.errors+3]
+// [spec:pgorm:req:security.ident-oracle.nul] (the pipeline's refusal class)
 pub(super) fn unquotable(name: &str) -> bool {
     name.contains('"') || name.contains('\0')
 }

@@ -224,7 +224,7 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > provision the harness, the status is explicitly not-run; the integration
 > policy must obtain a trusted run rather than treating the skip as a pass.
 
-> [spec:pgorm:req:security.sqlmap.acceptance]
+> [spec:pgorm:req:security.sqlmap.acceptance+1]
 > Initial acceptance requires a passing full-profile report against the
 > recorded implementation revision, with all vulnerable controls detected,
 > plus passing direct SQL security regressions against the same source and
@@ -232,9 +232,13 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > regressions before closure. The report may state that pgorm passes that
 > pinned sqlmap integration suite and must identify its manifest/profile;
 > it MUST NOT present scanner silence as proof that every possible ORM
-> query is injection-free. Implementation fixes remain on the corresponding
-> defect nodes; changing or weakening the harness to conceal those defects
-> does not satisfy acceptance.
+> query is injection-free. In particular it MUST NOT claim identifier
+> positions. The scanner cannot close a faithfully quoted identifier at the
+> profile's level, so those positions belong to the identifier render oracle
+> (`[spec:pgorm:req:security.ident-oracle]`), and the README points there.
+> Implementation fixes remain on the corresponding defect nodes; changing or
+> weakening the harness to conceal those defects does not satisfy
+> acceptance.
 
 ## External references
 

@@ -80,7 +80,9 @@ evidence to durable storage before the CI retention window expires.
 A pass covers only the named, pinned manifest/profile. All scheduled scans
 must complete, all required vulnerable controls must be detected, every
 protected case must pass, and cleanup must succeed. Scanner silence is not
-proof that every possible ORM query is injection-free.
+proof that every possible ORM query is injection-free, and for identifier
+positions it is not evidence at all. See
+[Identifier positions](#identifier-positions-the-render-oracle).
 
 The [2026-09-09 acceptance attempt](acceptance/2026-09-09.md) completed all
 420 scans and passed the direct regressions, but failed acceptance because
@@ -125,7 +127,8 @@ evidence, and are never counted as passes.
 Of 210 pairs, 93 are declared inapplicable (Q 35, U 17, E 12, T 12, B 11, S 6),
 leaving 117 scheduled. `schema`, `function`, `column`, `group`,
 `pipeline-projection` and `stored-identifier` have no scheduled technique left
-at all; the suite makes no detection claim about them. Only CONTEXTS.md
+at all; the suite makes no detection claim about them, and their positions are
+covered by the identifier render oracle described below. Only CONTEXTS.md
 sections 7a and 7d are exempted. The section-7c control-shape cells are
 reshaped to fire at level 3 — `insert` (INSERT … SELECT … WHERE),
 `update-value` (value in the WHERE), `cast` (CAST target inside a WHERE) and
@@ -137,3 +140,32 @@ every boundary that closes a `"` below level 5 appends a comparison between two
 invented double-quoted identifiers. A technique whose tests carry no `<comment>`
 at level 3 — error-based and time-based — can only use that suffix, so it never
 produces a statement PostgreSQL will resolve, whatever the surrounding SQL.
+
+## Identifier positions: the render oracle
+
+The identifier positions this suite cannot reach are judged by a separate,
+structural instrument: the identifier render oracle
+(`tests/identifier_oracle_tests.rs`, specified in
+[`docs/spec/ident-oracle.md`](../../docs/spec/ident-oracle.md)). It covers:
+
+- the six cases with no scheduled technique;
+- the cases scheduled for only some techniques (`graph-alias`, `table`,
+  `alias`, `order`, `enum-ddl`);
+- every other public API that renders a caller-supplied name.
+
+Scanner silence says nothing about any of these positions. The oracle does
+not probe them with payloads. It renders each registered name position with a
+hostile-name corpus, parses the statement with libpg_query, and requires the
+name to come back as exactly the identifiers the position should produce,
+with the rest of the parse tree unchanged. A live leg runs the nastiest names
+against a real server.
+
+That instrument, not this one, is where identifier-injection coverage is
+claimed. It has found defects this suite could not reach:
+
+- keyword names read as grammar at type and function positions;
+- pipeline names beginning with `$`, which become placeholders or dollar
+  quotes;
+- a pipeline cast type written verbatim.
+
+Each is filed as a plan node and pinned in the oracle until fixed.

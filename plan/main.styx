@@ -8613,12 +8613,22 @@ children (
             {
                 id identifier-render-oracle
                 title "Every identifier render site round-trips a hostile name as exactly one identifier"
+                implements {
+                    main ([spec:pgorm:req:security.ident-oracle] [spec:pgorm:req:security.ident-oracle.nul])
+                }
                 log (
                     {
                         at 2026-09-24T18:44:29.47518Z
                         author "brendan@necessary.nu"
                         kind @blocker
                         text "The sqlmap suite is structurally unable to fire in identifier positions: six full-profile cases (pipeline-projection, schema, column, group, function, stored-identifier) have no scheduled technique at all and five more (graph-alias, table, alias, order, enum-ddl) only U and/or S, because a level-3 boundary cannot close a faithful double-quoted identifier and attach a payload (security/sqlmap/CONTEXTS.md, acceptance 2026-09-14 \"what this does not claim\"). Yet identifiers are where ORM injection lives — two real holes were found and fixed by hand this month (pipeline identifiers under registry prqlc, f48c6425; pgorm-pool savepoint names, 276dde57). The instrument that can fire everywhere is structural rather than behavioural: for every public API that renders a caller-supplied name into SQL text, render a corpus of hostile names — embedded `\"`, `\\\"`, `\"\"`, NUL, `;`, `--`, `/*`, `$1`, `$$`, unicode including combining marks and right-to-left, 63/64-byte boundaries, keywords, empty — and parse the output with libpg_query (pg_query, already a dependency of pgorm's sql! macro and paginator). Assert the name comes back as exactly one identifier node carrying exactly the input text at the expected position, the statement count is one, and the parse tree's shape equals that of the same statement rendered with a benign name. A name the API refuses (the pipeline's UnquotableIdentifier, NUL) must be refused, never rendered. The site list is an explicit registry the oracle iterates, and a new identifier-bearing API is incomplete until it is registered — scope-collate, scope-sequences, scope-composite-types, scope-on-constraint and scope-merge depend on this node for exactly that reason. Add a spec rule stating the property and the registry obligation, and update security/sqlmap's \"does not claim\" text to point at this instrument for the positions sqlmap cannot reach."
+                    }
+
+                    {
+                        at 2026-09-24T19:29:23.631625Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }
@@ -8709,6 +8719,55 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-09-24: build the whole deferred list recorded in [spec:pgorm:req:sql.scope] (docs/spec/sql-ast.md), which states each entry's cost; every child's work is that cost. Each child graduates its entry by implementing it and deleting it from the rule's Deferred list (bump the rule, repin), with live-database tests for anything whose semantics a render-only test could misrepresent. Children that introduce a caller-named identifier position (COLLATE, sequences, composite types, ON CONSTRAINT, MERGE's target) depend on identifier-render-oracle and must register their sites in it. The composite-type entry records that it \"waits on a consumer\" — build the DDL, and say in the rule what still does not decode a composite value."
+            }
+        )
+    }
+
+    {
+        id type-part-keyword-names
+        title "A keyword passed as a name renders bare where TypeName's part policy applies"
+        kind @fix
+        log (
+            {
+                at 2026-09-24T19:51:27.708282Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found by the identifier render oracle (tests/identifier_oracle_tests.rs, node identifier-render-oracle). `TypeName::prepare_part` (pgorm-query/src/types.rs) writes a part bare whenever it matches `^[a-z_][a-z0-9_]*$`, and that pattern admits SQL keywords, which are not identifiers. Every site under that policy — `Func::named` (in a projection and as a FROM function), `Expr::cast_as` / `cast_as_type` (bare, schema-qualified, array), `Expr::as_enum`, `ColumnType::named`, `ColumnDef::named` with a schema, `ColumnDef::array`, `ColumnDef::enumeration`, `IndexType::Named` — therefore hands a keyword name to the grammar as a keyword. One case changes the statement's shape: `Query::select().expr(Func::named(Name::runtime(\"not\")).arg(1))` renders `SELECT not(1)`, which libpg_query parses as a BoolExpr NOT over 1 rather than a FuncCall of a function named `not` (the same class reaches `row(..)` → RowExpr, `coalesce`/`nullif`/`greatest`/`least`, `exists`/`array` over a subquery, and `only(\"t\")` in FROM-function position → `FROM ONLY t`, per the pgorm-query audit). The rest are refusals by the grammar: `select`, `from`, `user`, `not` at every type position (`SELECT CAST(1 AS select)`), `integer` as a function name (`SELECT integer(1)`) or schema qualifier (`CAST(1 AS integer.ty)`), `left` as an index access method (`USING left`) — so a function, type or access method genuinely named with a keyword cannot be referenced through these APIs at all. This contradicts [spec:pgorm:def:sql.types.type-name] (\"A name is therefore a name: text that is not an identifier becomes a quoted identifier PostgreSQL refuses, never SQL it executes\") and [spec:pgorm:req:sql.render.ident-quoting]. The type-sugar reading the rule intends (`integer` as a type resolving to pg_catalog.int4) is not part of the defect; the oracle accepts it as its own verdict. Direction, not prescription: quote any part PostgreSQL's keyword list does not classify as unreserved, except where the position's grammar needs the bare keyword (type sugar); a fixed list pinned against libpg_query's keyword table would keep the policy total. Pinned in tests/identifier_oracle/pins.rs (49 site × name pairs); retire the pins with the fix."
+            }
+        )
+    }
+
+    {
+        id pipeline-bare-dollar-names
+        title "Pipeline names beginning with $, and a lone *, reach SQL bare through prqlc"
+        kind @fix
+        log (
+            {
+                at 2026-09-24T20:13:35.735754Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found by the identifier render oracle (tests/identifier_oracle_tests.rs, node identifier-render-oracle) at every pipeline identifier site: `Pipeline::from`, `from_schema` (both parts), `col` (both parts), `this`, `that`, a bare `Name` in filter/sort/group, `join`/`append` relations, `as_runtime`, `named_runtime`, the `select_sources` qualifier, and an entity's runtime table name. pgorm's screen at `Pipeline::into_sql` refuses only `\"` and NUL (`unquotable`, src/pipeline/error.rs) and hands every other name to prqlc, which writes it bare whenever its `valid_ident` (`^((\\*)|([a-z_$][a-z0-9_$]*))$`, prqlc/src/sql/utils) accepts it and it is not a keyword. A leading `$` and a lone `*` pass, and PostgreSQL's lexer reads them as something other than a name. Rendered SQL: `Pipeline::from(t).select(col(t, Name::runtime(\"$1\")))` → `SELECT $1 FROM t`, a ParamRef (bound parameter 1) where the benign tree has a ColumnRef, so the projection reads a value instead of a column; `Pipeline::from(t).group(Name::runtime(\"$$\")).aggregate(count_rows())` → `SELECT $$, COUNT(*) FROM t GROUP BY $$`, whose two names open and close one dollar-quoted string that swallows `, COUNT(*) FROM t GROUP BY ` — the FROM and GROUP BY vanish, and a WHERE between two such names (a tenant filter) would vanish the same way; `$tag$` behaves identically; `col(t, Name::runtime(\"*\"))` → `SELECT * FROM t`, the wildcard where a column named `*` was asked for. Elsewhere the same names are syntax errors (`SELECT * FROM $1`, `FROM *.t`). It also falsifies src/pipeline/census.rs's premise that every `$N` in the output was minted by the binder: census would count and renumber an identifier-born `$N`. Python's `validate_name` admits the same names, so pgorm.pipeline reaches it too. The pgorm-query path is unaffected: it quotes unconditionally, and the oracle round-trips these names at all 104 of its identifier sites. Direction, not prescription: stop relying on prqlc's conditional quoting for caller names — refuse a leading `$` and a lone `*` in the screen (a change to [spec:pgorm:req:pipeline.errors]), or have the fork quote any name its lexer-safety test does not match PostgreSQL's (`$` is only safe after the first character). Pinned in tests/identifier_oracle/pins.rs (72 site × name pairs); retire the pins with the fix."
+            }
+
+            {
+                at 2026-09-24T20:14:59.488099Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Correction to the blocker note: the pin count is 68, not 72 — 17 pipeline sites × the four names `$1`, `$$`, `$tag$`, `*`. The 18th pipeline site, `pgorm/pipeline.select-sources.read-cast`, fails on those names too, but there the cause is pipeline-read-cast-verbatim and the pairs are pinned to that node."
+            }
+        )
+    }
+
+    {
+        id pipeline-read-cast-verbatim
+        title "select_sources writes a column's read-cast type name into SQL verbatim"
+        kind @fix
+        log (
+            {
+                at 2026-09-24T20:13:35.800801Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found by the identifier render oracle (site `pgorm/pipeline.select-sources.read-cast`, tests/identifier_oracle/registry_orm.rs). `Pipeline::select_sources` projects each column through `source_read_cast` (src/query/graph.rs), which reads the cast target of the column's `ColumnTrait::select_as` back as `TypeName::raw_text()` — the unquoted, dotted spelling — and `project_into` (src/pipeline/sources.rs) passes that text to prqlc as `adapter::ident(&cast)` in the type slot of `std.as`. That slot is `noresolve.type`, and prqlc lowers an unresolved ident by writing its name verbatim, so the type name becomes SQL. With a hand-written `select_as` returning `expr.cast_as(Name::runtime(ty))`: `ty = \";\"` → `SELECT CAST(id AS ;) AS s0_id FROM t`; `\"--\"` → `CAST(id AS --) AS s0_id FROM t` (the rest commented out); `\"a b\"` → `CAST(id AS a b)`; `\"MixedCase\"` → folded to `mixedcase`; `\"\"` → `CAST(id AS )`; and a type text such as `int4) AS s0_id, (SELECT current_user) AS leak, CAST(1 AS int4` would add a projection. Only `\"` and NUL are refused, by the pipeline's identifier screen. The same column rendered through `SelectGraph`/`Select` goes through pgorm-query's `TypeName` part policy and is quoted, so the two writers disagree about one column. Reach: only a hand-written `select_as` whose type text is computed at run time — the enum default (`text`/`text[]`) and `#[pgorm(select_as = \"…\")]` are program text — but `select_as` is a public trait method, and the documented claim that a name in cast position is quoted ([spec:pgorm:def:sql.types.type-name]) does not hold on this path. Direction: pass the `TypeName`'s parts to prqlc as quoted identifier parts (or render the cast through pgorm-query's policy) rather than as raw text in a noresolve slot. Pinned in tests/identifier_oracle/pins.rs; retire the pin with the fix."
             }
         )
     }

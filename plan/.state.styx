@@ -1838,6 +1838,13 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id identifier-render-oracle, covered_rules (
+        security.ident-oracle
+        security.ident-oracle.nul
+    ), covered_claims (
+        {impl_name main, rule security.ident-oracle}
+        {impl_name main, rule security.ident-oracle.nul}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}
