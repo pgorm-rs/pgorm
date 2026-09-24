@@ -14,7 +14,7 @@ pub struct Status {
 }
 
 // [spec:pgorm:req:security.sqlmap.ci]
-// [spec:pgorm:req:security.sqlmap.profiles]
+// [spec:pgorm:req:security.sqlmap.profiles+2]
 pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
     let bare = |status: &'static str, reason: &str| Status { status, reason: reason.into(), inapplicable: Map::new() };
     let bytes = match fs::read(artifacts.join("run/report.json")) {

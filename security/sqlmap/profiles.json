@@ -8,6 +8,7 @@
     "techniques": [
       "B"
     ],
+    "dbms": "PostgreSQL",
     "level": 2,
     "risk": 1,
     "case_timeout_seconds": 240,
@@ -64,6 +65,7 @@
       "T",
       "Q"
     ],
+    "dbms": "PostgreSQL",
     "level": 3,
     "risk": 2,
     "case_timeout_seconds": 240,

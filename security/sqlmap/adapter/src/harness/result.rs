@@ -153,7 +153,7 @@ pub fn verdict(control: &ScanResult, protected: &ScanResult, technique: &str, ba
 fn case_of(key: &str) -> Option<&str> { key.rsplit_once('-').map(|(case, _)| case) }
 
 /// A technique any retained control detected was never inapplicable for that case.
-// [spec:pgorm:req:security.sqlmap.profiles]
+// [spec:pgorm:req:security.sqlmap.profiles+2]
 pub fn falsified(results: &BTreeMap<String, Value>, inapplicable: &BTreeMap<String, Value>) -> Vec<String> {
     let mut hits = Vec::new();
     for key in inapplicable.keys() {
@@ -189,7 +189,7 @@ fn strings(value: &Value) -> Result<Vec<String>, String> {
 }
 
 /// Declared inapplicability, refused unless it cites checkable scanner evidence.
-// [spec:pgorm:req:security.sqlmap.profiles]
+// [spec:pgorm:req:security.sqlmap.profiles+2]
 pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     let id = case["id"].as_str().ok_or("missing case id")?;
     let declared = match &case["inapplicable"] {
@@ -237,7 +237,7 @@ pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     Ok(out)
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles]
+// [spec:pgorm:req:security.sqlmap.profiles+2]
 pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result<Inventory, String> {
     let cases = manifest["cases"].as_array().ok_or("missing manifest cases")?;
     let mut by_id = BTreeMap::new();

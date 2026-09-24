@@ -54,7 +54,7 @@ fn profile_status_requires_matching_complete_evidence() {
 }
 
 // [spec:pgorm:req:security.sqlmap.ci/test]
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 #[test]
 fn exemptions_are_published_and_never_absorbed() {
     let artifacts = scratch("exemptions");

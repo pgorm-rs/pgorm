@@ -1,4 +1,4 @@
-use pgorm_sqlmap_adapter::harness::{self, Options, process, result::{self, ScanResult}};
+use pgorm_sqlmap_adapter::harness::{self, Options, Settings, process, result::{self, ScanResult}};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, path::{Path, PathBuf}};
 
@@ -138,7 +138,7 @@ fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
     }
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
 fn profiles_keep_238_full_and_six_smoke() {
@@ -170,7 +170,7 @@ fn exempt_entry(evidence: Value) -> Value {
     json!({"reason":"REPLACE-only tests cannot escape the app's quoting at this injection point.","evidence":evidence})
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 #[test]
 fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(evidence())}))).is_ok());
@@ -193,7 +193,7 @@ fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(wide)}))).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 #[test]
 fn exemptions_naming_undeclared_techniques_are_refused() {
     for technique in ["U", "Z", "q"] {
@@ -205,7 +205,7 @@ fn exemptions_naming_undeclared_techniques_are_refused() {
     assert!(result::exemptions(&json!({"id":"a","techniques":["Q"],"inapplicable":[]})).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn exempted_pairs_leave_scheduled_work_and_never_pass() {
@@ -223,7 +223,7 @@ fn exempted_pairs_leave_scheduled_work_and_never_pass() {
     assert!(!result::aggregate(&expected, &inflated, &[], &[]));
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles/test]
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn a_detected_but_exempted_pair_fails_the_run() {
@@ -245,8 +245,53 @@ fn command_options_and_encoding_match_python() {
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
     let mut case = manifest["cases"][0].clone(); case["baseline"] = json!("a b'+&%");
     assert_eq!(harness::target("http://127.0.0.1:12", &case, "control").unwrap(), "http://127.0.0.1:12/case/control/select?input=a+b%27%2B%26%25");
-    let args = harness::scanner_args("python3", Path::new("scanner.py"), TARGET, "B", &profiles["full"], &case, Path::new("output"));
-    assert_eq!(args, ["python3", "scanner.py", "--url", TARGET, "-p", "input", "--dbms", "PostgreSQL", "--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", "B", "--level", "3", "--risk", "2", "--threads", "1", "--retries", "0", "--timeout", "15", "--time-sec", "1", "--union-cols", "1-4", "--output-dir", "output/session", "--report-json", "output/scanner.json", "--answers", "extending=N,include=N,fuzzy=N", "-v", "2"]);
+    let settings = Settings::from_profile(&profiles["full"]).unwrap();
+    let args = harness::scanner_args("python3", Path::new("scanner.py"), TARGET, "B", &settings, &case, Path::new("output")).unwrap();
+    assert_eq!(args, ["python3", "scanner.py", "--url", TARGET, "-p", "input", "--dbms", "PostgreSQL", "--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", "B", "--level", "3", "--risk", "2", "--threads", "1", "--retries", "0", "--timeout", "15", "--time-sec", "3", "--union-cols", "1-4", "--output-dir", "output/session", "--report-json", "output/scanner.json", "--answers", "extending=N,include=N,fuzzy=N", "-v", "2"]);
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+#[test]
+fn declared_settings_reach_scanner_and_fixture() {
+    let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
+    let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
+    for name in ["smoke", "full"] { Settings::from_profile(&profiles[name]).unwrap(); }
+    // Values no hardcoded default shares, so a setting that stops arriving cannot pass by coincidence.
+    let mut profile = profiles["full"].clone();
+    for (field, value) in [("level", 4), ("risk", 1), ("concurrency", 7), ("retries", 5), ("time_sec", 6),
+        ("postgres_statement_timeout_seconds", 17), ("http_timeout_seconds", 23), ("case_timeout_seconds", 301)] {
+        profile[field] = json!(value);
+    }
+    let settings = Settings::from_profile(&profile).unwrap();
+    assert_eq!(settings.case_timeout_seconds, 301);
+    let mut case = manifest["cases"][0].clone(); case["field"] = json!("probe");
+    let args = harness::scanner_args("python3", Path::new("scanner.py"), TARGET, "B", &settings, &case, Path::new("output")).unwrap();
+    let value = |flag: &str| args[args.iter().position(|a| a == flag).unwrap_or_else(|| panic!("{flag} missing")) + 1].as_str();
+    for (flag, expected) in [("-p", "probe"), ("--dbms", "PostgreSQL"), ("--level", "4"), ("--risk", "1"), ("--threads", "7"),
+        ("--retries", "5"), ("--time-sec", "6"), ("--timeout", "23")] {
+        assert_eq!(value(flag), expected, "{flag}");
+    }
+    assert!(harness::target("http://127.0.0.1:12", &case, "control").unwrap().ends_with("?probe=alice"));
+    assert!(harness::container_args("fixture", "postgres", &settings).contains(&"statement_timeout=17s".to_owned()));
+    assert!(harness::role_session("fixture", settings.postgres_statement_timeout_seconds).contains("statement_timeout = '17s'"));
+    // A setting the harness would not apply is refused, as is a missing one.
+    let mut unknown = profiles["full"].clone(); unknown["parallel_cases"] = json!(2);
+    assert!(Settings::from_profile(&unknown).is_err());
+    for field in ["dbms", "level", "risk", "concurrency", "retries", "time_sec", "postgres_statement_timeout_seconds",
+        "http_timeout_seconds", "case_timeout_seconds", "timeout_margin"] {
+        let mut missing = profiles["full"].clone(); missing.as_object_mut().unwrap().remove(field);
+        assert!(Settings::from_profile(&missing).is_err(), "{field}");
+    }
+    let mut other = profiles["full"].clone(); other["dbms"] = json!("MySQL");
+    assert!(Settings::from_profile(&other).is_err());
+    // Timeouts that cannot hold the timed sleep, or that do not nest, are refused.
+    for (field, value) in [("time_sec", 10), ("postgres_statement_timeout_seconds", 15), ("http_timeout_seconds", 240)] {
+        let mut tight = profiles["full"].clone(); tight[field] = json!(value);
+        assert!(Settings::from_profile(&tight).is_err(), "{field}");
+    }
+    let mut unbound = manifest["cases"][0].clone(); unbound.as_object_mut().unwrap().remove("field");
+    assert!(harness::scanner_args("python3", Path::new("scanner.py"), TARGET, "B", &settings, &unbound, Path::new("output")).is_err());
+    assert!(harness::target("http://127.0.0.1:12", &unbound, "control").is_err());
 }
 
 #[tokio::test]

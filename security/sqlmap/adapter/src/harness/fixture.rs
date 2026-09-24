@@ -1,4 +1,4 @@
-use super::{Result, process::{self, Process}, read_json, write_json};
+use super::{Result, Settings, process::{self, Process}, read_json, write_json};
 use serde_json::{Value, json};
 use std::{fs::{self, File}, io::Read, path::{Path, PathBuf}, process::Stdio, time::Duration};
 use tokio::{io::{AsyncBufReadExt, BufReader}, time::{Instant, sleep, timeout}};
@@ -16,6 +16,7 @@ pub struct Fixture {
     pub url: String,
     pub settings: Value,
     admin_url: String,
+    statement_timeout_seconds: u64,
     adapter: Option<Process>,
     container_attempted: bool,
     artifacts: PathBuf,
@@ -25,18 +26,17 @@ impl Fixture {
     pub fn new(artifacts: &Path) -> Result<Self> {
         Ok(Self {
             name: format!("pgorm-sqlmap-{}", secret(6)?), url: String::new(), settings: Value::Null,
-            admin_url: String::new(), adapter: None, container_attempted: false, artifacts: artifacts.into(),
+            admin_url: String::new(), statement_timeout_seconds: 0, adapter: None, container_attempted: false, artifacts: artifacts.into(),
         })
     }
 
-    pub async fn start(&mut self, pins: &Value, adapter: &Path) -> Result<()> {
+    pub async fn start(&mut self, pins: &Value, adapter: &Path, settings: &Settings) -> Result<()> {
         let password = secret(24)?;
         let admin_password = secret(24)?;
         let image = pins["postgres"].as_str().ok_or("missing PostgreSQL image pin")?;
-        let mut docker = process::command("docker", &["run", "--detach", "--name", &self.name,
-            "--label", "pgorm.sqlmap=disposable", "--network", "bridge", "--publish", "127.0.0.1::5432",
-            "--env", "POSTGRES_PASSWORD", "--mount", "type=volume,destination=/var/lib/postgresql/data", "--memory", "512m", "--cpus", "2",
-            image, "-c", "statement_timeout=10000", "-c", "lock_timeout=2000"]);
+        self.statement_timeout_seconds = settings.postgres_statement_timeout_seconds;
+        let args = container_args(&self.name, image, settings);
+        let mut docker = process::command("docker", &args.iter().map(String::as_str).collect::<Vec<_>>());
         docker.env("POSTGRES_PASSWORD", &admin_password);
         // A cancelled docker client may still have created the named container.
         self.container_attempted = true;
@@ -50,7 +50,8 @@ impl Fixture {
         let mapping = process::run("docker", &["port", &self.name, "5432/tcp"]).await?;
         let port: u16 = mapping.strip_prefix("127.0.0.1:").ok_or("unexpected PostgreSQL port binding")?.parse()?;
         self.admin_url = format!("postgresql://postgres:{admin_password}@127.0.0.1:{port}");
-        let sql = format!("CREATE ROLE fixture LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE;\nCREATE DATABASE harness OWNER fixture;\nALTER ROLE fixture SET search_path = fixture, pg_catalog;\nALTER ROLE fixture SET standard_conforming_strings = on;\nALTER ROLE fixture SET statement_timeout = '10s';\nALTER ROLE fixture SET lock_timeout = '2s';\n");
+        let sql = format!("CREATE ROLE fixture LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE;\nCREATE DATABASE harness OWNER fixture;\n{}",
+            role_session("fixture", self.statement_timeout_seconds));
         process::output(&mut process::command("docker", &["exec", "-i", &self.name, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1"]), Some(&sql), 120).await?;
         // Read settings as the role the adapter actually uses.
         let settings = process::run("docker", &["exec", &self.name, "psql", "-U", "fixture", "-d", "harness", "-Atc",
@@ -76,8 +77,7 @@ impl Fixture {
     pub async fn direct_regressions(&self, root: &Path) -> Result<Value> {
         // TestContext creates its own databases on this same disposable server.
         // Give its role the same session settings as the scanner fixture.
-        process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-Atc",
-            "ALTER ROLE postgres SET search_path = fixture, pg_catalog; ALTER ROLE postgres SET standard_conforming_strings = on; ALTER ROLE postgres SET statement_timeout = '10s'; ALTER ROLE postgres SET lock_timeout = '2s';"] ).await?;
+        process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-Atc", &role_session("postgres", self.statement_timeout_seconds)]).await?;
         process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-d", "template1", "-v", "ON_ERROR_STOP=1", "-c", "CREATE SCHEMA fixture"] ).await?;
         let file = File::create(self.artifacts.join("direct-regressions.log"))?;
         let args = ["test", "--locked", "--test", "sql_security_tests", "--", "--test-threads=1"];
@@ -105,6 +105,28 @@ impl Fixture {
         }
         errors
     }
+}
+
+/// The disposable server's `docker run` arguments, its default statement timeout the profile's.
+// [spec:pgorm:req:security.sqlmap.profiles+2]
+pub fn container_args(name: &str, image: &str, settings: &Settings) -> Vec<String> {
+    let mut args: Vec<String> = ["run", "--detach", "--name", name,
+        "--label", "pgorm.sqlmap=disposable", "--network", "bridge", "--publish", "127.0.0.1::5432",
+        "--env", "POSTGRES_PASSWORD", "--mount", "type=volume,destination=/var/lib/postgresql/data", "--memory", "512m", "--cpus", "2", image]
+        .map(str::to_owned).into();
+    args.extend(["-c".into(), format!("statement_timeout={}s", settings.postgres_statement_timeout_seconds), "-c".into(), "lock_timeout=2s".into()]);
+    args
+}
+
+/// The session settings a fixture role runs under, the profile's statement timeout among them.
+// [spec:pgorm:req:security.sqlmap.profiles+2]
+pub fn role_session(role: &str, statement_timeout_seconds: u64) -> String {
+    [
+        format!("ALTER ROLE {role} SET search_path = fixture, pg_catalog;"),
+        format!("ALTER ROLE {role} SET standard_conforming_strings = on;"),
+        format!("ALTER ROLE {role} SET statement_timeout = '{statement_timeout_seconds}s';"),
+        format!("ALTER ROLE {role} SET lock_timeout = '2s';"),
+    ].join("\n") + "\n"
 }
 
 pub fn request_invariant(artifacts: &Path, case: &str) -> Result<bool> {

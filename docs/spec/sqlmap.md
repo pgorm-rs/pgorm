@@ -129,10 +129,14 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > revision requires a reviewed pin update and a fresh control/full-suite
 > run; an earlier report cannot stand for the new revision.
 
-> [spec:pgorm:req:security.sqlmap.profiles]
+> [spec:pgorm:req:security.sqlmap.profiles+2]
 > Version-controlled smoke and full profiles MUST declare their exact case
-> ids, test parameters, PostgreSQL DBMS selection, techniques, level/risk,
-> request concurrency, retry policy and time budgets. Both run
+> ids, PostgreSQL DBMS selection, techniques, level/risk, request
+> concurrency, retry policy and time budgets, and the manifest MUST declare
+> each case's test parameter. The runner MUST apply every declared setting
+> to the scanner invocation or the fixture it governs. It MUST refuse a
+> profile that omits a setting, or declares one the runner does not apply,
+> rather than scan under a value the profile does not record. Both run
 > noninteractively with fresh sqlmap session/output state for every case;
 > cached findings from another case or run MUST NOT satisfy a control or
 > protected result. The full profile includes every manifest case and
@@ -150,6 +154,8 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > counted as passes. Smoke is an explicitly smaller claim.
 > Database and HTTP timeouts MUST allow the profile's expected time-control
 > delay, with a documented margin; an outer deadline still bounds the scan.
+> A profile whose time-control delay, database timeout, HTTP timeout and
+> outer deadline do not strictly increase in that order MUST be refused.
 
 > [spec:pgorm:req:security.sqlmap.execution]
 > The runner MUST inventory expected work before starting, perform baseline

@@ -4,6 +4,7 @@ pub mod result;
 pub mod verdict;
 
 use fixture::Fixture;
+pub use fixture::{container_args, role_session};
 use result::{ScanResult, aggregate, falsified, findings_show_technique, interpret, inventory, verdict};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -106,26 +107,92 @@ async fn scanner(pins: &Value, python: &str, cache: &Path, artifacts: &Path) -> 
     Ok(script)
 }
 
+/// Every scan and fixture setting a profile declares, each of which reaches the scanner
+/// invocation or the fixture. Parsing refuses a field outside this set, so a profile
+/// cannot record a value the run would silently leave unapplied.
+// [spec:pgorm:req:security.sqlmap.profiles+2]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Settings {
+    pub dbms: String,
+    pub level: u64,
+    pub risk: u64,
+    pub concurrency: u64,
+    pub retries: u64,
+    pub time_sec: u64,
+    pub postgres_statement_timeout_seconds: u64,
+    pub http_timeout_seconds: u64,
+    pub case_timeout_seconds: u64,
+}
+
+/// `cases` and `techniques` are read by `result::inventory`; `timeout_margin` is the prose
+/// the timeouts are checked against.
+const PROFILE_FIELDS: [&str; 12] = ["cases", "techniques", "timeout_margin", "dbms", "level", "risk", "concurrency",
+    "retries", "time_sec", "postgres_statement_timeout_seconds", "http_timeout_seconds", "case_timeout_seconds"];
+
+impl Settings {
+    pub fn from_profile(profile: &Value) -> std::result::Result<Self, String> {
+        let fields = profile.as_object().ok_or("profile must be an object")?;
+        if let Some(field) = fields.keys().find(|f| !PROFILE_FIELDS.contains(&f.as_str())) {
+            return Err(format!("profile declares {field}, which the harness does not apply"));
+        }
+        let number = |field: &str, least: u64, most: u64| profile[field].as_u64().filter(|v| (least..=most).contains(v))
+            .ok_or_else(|| format!("profile field {field} must be an integer from {least} to {most}"));
+        // sqlmap's own ceilings: level 5, risk 3, ten threads.
+        let settings = Self {
+            dbms: profile["dbms"].as_str().filter(|d| *d == "PostgreSQL")
+                .ok_or("profile field dbms must be PostgreSQL, the only server the fixture provisions")?.to_owned(),
+            level: number("level", 1, 5)?,
+            risk: number("risk", 1, 3)?,
+            concurrency: number("concurrency", 1, 10)?,
+            retries: number("retries", 0, u64::MAX)?,
+            time_sec: number("time_sec", 1, u64::MAX)?,
+            postgres_statement_timeout_seconds: number("postgres_statement_timeout_seconds", 1, u64::MAX)?,
+            http_timeout_seconds: number("http_timeout_seconds", 1, u64::MAX)?,
+            case_timeout_seconds: number("case_timeout_seconds", 1, u64::MAX)?,
+        };
+        if !profile["timeout_margin"].as_str().is_some_and(|m| !m.trim().is_empty()) {
+            return Err("profile must document its timeout margin".into());
+        }
+        // A timed control sleeps inside the statement, the statement ends before HTTP gives up
+        // on it, and the outer deadline bounds the whole scan.
+        if !(settings.time_sec < settings.postgres_statement_timeout_seconds
+            && settings.postgres_statement_timeout_seconds < settings.http_timeout_seconds
+            && settings.http_timeout_seconds < settings.case_timeout_seconds) {
+            return Err("profile timeouts must nest: time_sec < postgres_statement_timeout_seconds < http_timeout_seconds < case_timeout_seconds".into());
+        }
+        Ok(settings)
+    }
+}
+
+/// The GET parameter the manifest declares for a case: the one the route reads and sqlmap tests.
+fn field(case: &Value) -> Result<&str> {
+    Ok(case["field"].as_str().filter(|f| !f.is_empty()).ok_or("missing test parameter")?)
+}
+
 pub fn target(base: &str, case: &Value, mode: &str) -> Result<String> {
     let id = case["id"].as_str().ok_or("missing case id")?;
     let mut url = url::Url::parse(&format!("{base}/case/{mode}/{id}"))?;
-    url.query_pairs_mut().append_pair("input", case["baseline"].as_str().ok_or("missing baseline")?);
+    url.query_pairs_mut().append_pair(field(case)?, case["baseline"].as_str().ok_or("missing baseline")?);
     Ok(url.into())
 }
 
-pub fn scanner_args(python: &str, script: &Path, target: &str, technique: &str, profile: &Value, case: &Value, output: &Path) -> Vec<String> {
-    let mut args = vec![python.into(), script.to_string_lossy().into_owned(), "--url".into(), target.into()];
-    args.extend(["-p", "input", "--dbms", "PostgreSQL", "--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", technique, "--level"].map(str::to_owned));
-    args.push(profile["level"].to_string());
-    args.push("--risk".into()); args.push(profile["risk"].to_string());
-    args.extend(["--threads", "1", "--retries", "0", "--timeout", "15", "--time-sec", "1", "--union-cols", "1-4", "--output-dir"].map(str::to_owned));
+// [spec:pgorm:req:security.sqlmap.profiles+2]
+pub fn scanner_args(python: &str, script: &Path, target: &str, technique: &str, settings: &Settings, case: &Value, output: &Path) -> Result<Vec<String>> {
+    let mut args = vec![python.into(), script.to_string_lossy().into_owned(), "--url".into(), target.into(),
+        "-p".into(), field(case)?.into(), "--dbms".into(), settings.dbms.clone()];
+    args.extend(["--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", technique].map(str::to_owned));
+    for (flag, value) in [("--level", settings.level), ("--risk", settings.risk), ("--threads", settings.concurrency), ("--retries", settings.retries),
+        ("--timeout", settings.http_timeout_seconds), ("--time-sec", settings.time_sec)] {
+        args.push(flag.into()); args.push(value.to_string());
+    }
+    args.extend(["--union-cols", "1-4", "--output-dir"].map(str::to_owned));
     args.push(output.join("session").to_string_lossy().into_owned());
     args.push("--report-json".into()); args.push(output.join("scanner.json").to_string_lossy().into_owned());
     args.extend(["--answers", "extending=N,include=N,fuzzy=N", "-v", "2"].map(str::to_owned));
     for option in ["prefix", "suffix"] {
         if let Some(value) = case[option].as_str() { args.push(format!("--{option}")); args.push(value.into()); }
     }
-    args
+    Ok(args)
 }
 
 async fn count(fixture: &Fixture, key: &str) -> Result<u64> {
@@ -139,7 +206,7 @@ async fn count(fixture: &Fixture, key: &str) -> Result<u64> {
 
 struct Campaign<'a> {
     options: &'a Options,
-    profile: Value,
+    settings: Settings,
     script: PathBuf,
 }
 
@@ -150,7 +217,7 @@ impl Campaign<'_> {
         let output = self.options.artifacts.join(format!("{id}-{technique}-{mode}"));
         fs::create_dir(&output)?;
         let target = target(&fixture.url, case, mode)?;
-        let args = scanner_args(&self.options.python, &self.script, &target, technique, &self.profile, case, &output);
+        let args = scanner_args(&self.options.python, &self.script, &target, technique, &self.settings, case, &output)?;
         write_json(&output.join("command.json"), &args)?;
         // Keep the scanner invocation even when accounting is unavailable.
         let before = count(fixture, &format!("{mode}/{id}")).await;
@@ -159,7 +226,7 @@ impl Campaign<'_> {
             let mut command = process::command(&args[0], &args[1..].iter().map(String::as_str).collect::<Vec<_>>());
             command.stdout(log.try_clone()?).stderr(log);
             let mut process = process::Process::spawn(&mut command)?;
-            let status = process.wait(self.profile["case_timeout_seconds"].as_u64().ok_or("missing scan deadline")?).await?;
+            let status = process.wait(self.settings.case_timeout_seconds).await?;
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(status.and_then(|s| {
                 use std::os::unix::process::ExitStatusExt;
                 s.code().or_else(|| s.signal().map(|s| -s))
@@ -265,6 +332,7 @@ async fn execute(options: &Options, root: &Path, here: &Path, report: &mut Value
     let manifest = read_json(&here.join("cases.json"))?;
     let profile = read_json(&here.join("profiles.json"))?[&options.profile].clone();
     let result::Inventory { mut work, mut exempt } = inventory(&manifest, &profile, &options.subset)?;
+    let settings = Settings::from_profile(&profile)?;
     if options.baseline_only {
         // The diagnostic probes routes, not techniques, so it covers every selected
         // case including those left with no scheduled technique at all.
@@ -298,9 +366,9 @@ async fn execute(options: &Options, root: &Path, here: &Path, report: &mut Value
     process::run("cargo", &["build", "--locked", "--manifest-path", manifest_path.to_str().ok_or("non-UTF8 manifest path")?, "--bin", "pgorm-sqlmap-adapter"]).await?;
     let adapter = std::env::current_exe()?.with_file_name("pgorm-sqlmap-adapter");
     report["binaries"] = json!({"adapter_sha256":digest(&adapter)?,"harness_sha256":digest(&std::env::current_exe()?)?});
-    fixture.start(&pins, &adapter).await?;
+    fixture.start(&pins, &adapter, &settings).await?;
     report["database"] = fixture.settings.clone();
-    let campaign = Campaign { options, profile, script };
+    let campaign = Campaign { options, settings, script };
     for (case, technique) in work {
         let key = format!("{}-{technique}", case["id"].as_str().ok_or("missing case id")?);
         println!("{key}: baseline");

@@ -5028,6 +5028,14 @@ children (
                         kind @decision
                         text "Acceptance is met, and the criterion worth arguing explicitly is the last clause of the rule, that changing or weakening the harness to conceal defects does not satisfy acceptance. Two changes could be read that way and both deserve an answer rather than silence. Raising the timed-sleep threshold from one second to three is not a weakening: a longer sleep is still a sleep, the change makes a technique more observable rather than less, and it was made because the same cells pass in a targeted run and fail in a saturated one with byte-identical code, which is a measurement artifact and not a property of any injection context. If anything it strengthens the suite, since a threshold that fails under the suite's own load produces false negatives. The ninety-three exemptions are the harder question. They do not conceal any pgorm defect, because no protected route yielded a finding in any run, before or after; what they remove is controls that cannot be made to fire, which narrows what the suite claims rather than hiding what it found. They are also sanctioned by spec rather than invented, since security.sqlmap.profiles was strengthened in the same work to demand per-pair evidence naming the payload, its qualifying clause and where values, and the boundary the context would need. The mechanism refuses a stub reason and fails the run outright if a declared-inapplicable pair is nonetheless detected, which has already caught one false exemption. The honest summary is that acceptance is satisfied against a materially narrower claim than the original ambition: six cases carry no scheduled technique at all and inline query is exempted everywhere, so the suite is silent about schema names, function names, leading projected identifiers and every inline-query context. That narrowing is stated at the top of the acceptance document rather than left to be inferred from an arithmetic total."
                     }
+
+                    {
+                        at 2026-09-24T15:13:27.680462Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "The 2026-09-14 decision entry on this node argues that raising the timed-sleep threshold from one second to three strengthened the suite. That setting never reached the scanner. `scanner_args` hardcodes `--time-sec 1`, and so did the Python twin before it. Commit 041e4412 changed only profiles.json and the README, and the T-control command.json files of the recorded full run (target/sqlmap-ci/full-01) show `--time-sec 1`. So every acceptance run so far scanned at a one-second sleep, and acceptance/2026-09-14.md and acceptance/2026-09-17.md misstate it when they record `time_sec 3`. It also changes the 2026-09-14 diagnosis. The run that passed after the \"fix\" used the same scanner arguments as the run that failed before it, so what changed between them was machine state, not the threshold. The dated documents stay as written, because they record what was believed at the time. The correction goes in acceptance/2026-09-24.md, which is the first full run at the declared three seconds. Fix tracked as sqlmap-profile-args-honoured."
+                        after_done true
+                    }
                 )
             }
 
@@ -8531,6 +8539,28 @@ children (
 
             {
                 at 2026-09-24T14:38:45.601834Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
+            }
+        )
+    }
+
+    {
+        id sqlmap-profile-args-honoured
+        title "Every scan runs with the settings its profile declares"
+        kind @fix
+        sealed true
+        log (
+            {
+                at 2026-09-24T15:13:27.62037Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The full profile declares `time_sec: 3`, and sqlmap has never been given it. `scanner_args` in security/sqlmap/adapter/src/harness/mod.rs hardcodes `--time-sec 1`. The retired harness.py did the same: its argument list, removed in bf12bd48, carried a literal `\"--time-sec\", \"1\"`. Commit 041e4412 (\"Let a timed sleep stand clear of the scan's own load\") is the change that raised time_sec from 1 to 3, but it touched only profiles.json, README.md and the plan, never the invocation. The recorded evidence agrees: every T-control `command.json` under target/sqlmap-ci/full-01, the run behind the 2026-09-17 acceptance, records `--time-sec 1`. The adapter test `command_options_and_encoding_match_python` pins the bug, because it builds the command from `profiles[\"full\"]` and asserts `--time-sec 1`. The profile declares four other settings the harness also never reads: `concurrency` (hardcoded `--threads 1`), `retries` (`--retries 0`), `http_timeout_seconds` (`--timeout 15`) and `postgres_statement_timeout_seconds` (hardcoded `statement_timeout=10000` / `'10s'` on the container, the fixture role and the direct-regression role). These match their hardcoded values only by coincidence, so editing any of them in profiles.json would silently change nothing. The harness reads only cases, techniques, level, risk and case_timeout_seconds. That leaves the profile, the thing security.sqlmap.profiles makes the version-controlled declaration of a run, describing settings the scan does not use, and it leaves two acceptance documents recording a time_sec the scanner never ran."
+            }
+
+            {
+                at 2026-09-24T15:21:20.93194Z
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Done (nplan complete)"

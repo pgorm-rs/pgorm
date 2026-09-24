@@ -34,6 +34,14 @@ to execute the pinned scanner itself; the harness around it is entirely Rust.
 `sqlmap-verdict <profile> <artifact directory>` turns a finished run's
 `run/report.json` into the `ci-status.json` and `ci-summary.txt` CI publishes.
 
+Every setting in `profiles.json` reaches the run. `dbms`, `level`, `risk`,
+`concurrency`, `retries`, `http_timeout_seconds` and `time_sec` become scanner
+options, `postgres_statement_timeout_seconds` is set on the disposable
+server, and `case_timeout_seconds` bounds each scan. Each case's `field` in
+`cases.json` is the parameter under test. The runner refuses a profile with
+a missing or unrecognised field, or with timeouts that do not strictly
+increase from the timed sleep to the scan deadline.
+
 To reproduce a report, check out its recorded source revision, restore any
 recorded source changes and workspace lockfile, use the accompanying
 `pins.json`, `cases.json` and `profiles.json`, then run the recorded profile
