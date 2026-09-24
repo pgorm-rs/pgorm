@@ -19,4 +19,4 @@ pgorm = { path = "../../../.." }
 # a regression check — and it is only a check of what ships if it links the
 # same prqlc the root pins.
 [patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "d6f2fa9753699a4c97385679aa908a032a4afbe4" }
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19" }

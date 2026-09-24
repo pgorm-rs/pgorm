@@ -104,11 +104,24 @@ pgorm-internal = []
 runtime-tokio = []
 tests-cfg = []
 
-# prqlc expands a star by iterating a HashMap sorted only on declaration
-# order, so columns sharing an order value come out in hash order and the
-# same pipeline compiles to different projections between calls. That list
-# is the tuple layout a positional decode reads. Pinned to the fork until
-# the one-line fix lands upstream; see the pipeline-join-distinct-order
-# finding for the reproducer.
+# prqlc is pinned to the fork's pgorm/deterministic-star-expansion branch,
+# which carries fixes to 0.13.14's SQL generation that upstream has not taken:
+#   - star expansion is ordered totally, so one pipeline compiles to one
+#     projection, the tuple layout a positional decode reads (reproducer: the
+#     pipeline-join-distinct-order finding);
+#   - the sort a `take` carries is tracked through anchoring, and a relation's
+#     interior columns map to the ones its reader exposes, so an inherited
+#     ORDER BY names a column and a relation that exist;
+#   - a quoted identifier doubles every delimiter, so distinct names stay
+#     distinct;
+#   - a wildcard used as a key keeps its table prefix, and grouping by one
+#     writes a whole-row key with every named column the query reads written
+#     beside it, and is refused at compile time where the star itself is read
+#     outside an aggregation;
+#   - literal keys are left out of GROUP BY and DISTINCT ON, where PostgreSQL
+#     would read an integer as a column position;
+#   - DISTINCT ON orders by a key's expression when the projection drops it.
+# Every detached workspace that links prqlc repeats this entry, and
+# tests/prqlc_pin_tests.rs holds each one and its lockfile to it.
 [patch.crates-io]
-prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "d6f2fa9753699a4c97385679aa908a032a4afbe4" }
+prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19" }
