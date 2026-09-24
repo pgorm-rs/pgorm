@@ -8582,4 +8582,126 @@ children (
             }
         )
     }
+
+    {
+        id prqlc-git-dependency
+        title "pgorm depends on the prqlc fork directly, so no crate that reaches it can link stock prqlc"
+        kind @fix
+        log (
+            {
+                at 2026-09-24T18:44:29.412539Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "The generative campaign's CI job has failed on both scheduled runs (2026-09-15, 2026-09-22), and the 09-22 run shows why in its artifact: `compile_suite_invocations: 1/1 [incomplete 1]`, `compile: 0 cases`, the item recorded `ProcessFailure: cargo exited with status 101` after 0.66s. The compile suite generates batch crates at run time (security/generative/src/pgorm_campaign/compile_crate.py) that declare their own `[workspace]` and depend on pgorm by path with no `[patch.crates-io]` table — the prqlc-pin-incomplete defect class, missed because tests/prqlc_pin_tests.rs discovers only committed manifests. So `cargo generate-lockfile --offline` resolves stock registry prqlc: in CI nothing fetched it (the workflow fetches only the bridge's lockfile, which pins the fork), so it fails at once; locally it succeeds silently from the cargo cache, so the local compile suite — including the passing full-4311ca278c80 — has been compiling against a prqlc pgorm does not ship (its batch-00 Cargo.lock reads `source = \"registry+https://github.com/rust-lang/crates.io-index\"`). Decided by the operator 2026-09-24: stop patching and make the fork pgorm's real dependency. The root's `prqlc = { version = \"=0.13.14\", … }` becomes `prqlc = { git = \"https://github.com/necessary-nu/prql.git\", rev = \"2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19\", default-features = false }`, which travels with pgorm into every crate that depends on it — detached workspaces, generated compile crates and downstream consumers alike — so all twelve `[patch.crates-io]` prqlc tables and pgorm-python/build.rs's patch-drift check are deleted. The repo is necessary-nu/prql (public, a GitHub fork of PRQL/prql); it already exists and needs no creating. Consequence recorded: crates.io refuses git dependencies, so pgorm is not publishable there while this stands. Acceptance: no manifest in the tree patches prqlc; the pin test is rewritten to assert the single git dependency and that every committed lockfile resolves `git+https://github.com/necessary-nu/prql.git?rev=2ce6a242…`; a test proves a freshly generated compile crate's lockfile resolves the fork; the local compile suite reports its 72 cases against the fork; and a CI run of the generative workflow reports the compile suite passing."
+            }
+        )
+    }
+
+    {
+        id identifier-injection
+        title "Every identifier position is tested for injection by an instrument that can fire there"
+        kind @test
+        children (
+            {
+                id identifier-render-oracle
+                title "Every identifier render site round-trips a hostile name as exactly one identifier"
+                log (
+                    {
+                        at 2026-09-24T18:44:29.47518Z
+                        author "brendan@necessary.nu"
+                        kind @blocker
+                        text "The sqlmap suite is structurally unable to fire in identifier positions: six full-profile cases (pipeline-projection, schema, column, group, function, stored-identifier) have no scheduled technique at all and five more (graph-alias, table, alias, order, enum-ddl) only U and/or S, because a level-3 boundary cannot close a faithful double-quoted identifier and attach a payload (security/sqlmap/CONTEXTS.md, acceptance 2026-09-14 \"what this does not claim\"). Yet identifiers are where ORM injection lives — two real holes were found and fixed by hand this month (pipeline identifiers under registry prqlc, f48c6425; pgorm-pool savepoint names, 276dde57). The instrument that can fire everywhere is structural rather than behavioural: for every public API that renders a caller-supplied name into SQL text, render a corpus of hostile names — embedded `\"`, `\\\"`, `\"\"`, NUL, `;`, `--`, `/*`, `$1`, `$$`, unicode including combining marks and right-to-left, 63/64-byte boundaries, keywords, empty — and parse the output with libpg_query (pg_query, already a dependency of pgorm's sql! macro and paginator). Assert the name comes back as exactly one identifier node carrying exactly the input text at the expected position, the statement count is one, and the parse tree's shape equals that of the same statement rendered with a benign name. A name the API refuses (the pipeline's UnquotableIdentifier, NUL) must be refused, never rendered. The site list is an explicit registry the oracle iterates, and a new identifier-bearing API is incomplete until it is registered — scope-collate, scope-sequences, scope-composite-types, scope-on-constraint and scope-merge depend on this node for exactly that reason. Add a spec rule stating the property and the registry obligation, and update security/sqlmap's \"does not claim\" text to point at this instrument for the positions sqlmap cannot reach."
+                    }
+                )
+            }
+
+            {
+                id sqlmap-identifier-profile
+                title "sqlmap scans the identifier cases at the strength their boundaries need"
+                log (
+                    {
+                        at 2026-09-24T18:44:29.523062Z
+                        author "brendan@necessary.nu"
+                        kind @blocker
+                        text "The full profile pins sqlmap at level 3 / risk 2 (--answers extending=N holds the ceiling), and the recorded exemption evidence says of stored-identifier that \"only the level-5 clause-8 identifier boundary rewrites the slot into a truth context\". So part of the identifier gap may be sqlmap's configured strength rather than the instrument itself. Measure it: a third profile, scoped to the eleven identifier-position cases (pipeline-projection, schema, column, group, function, stored-identifier, graph-alias, table, alias, order, enum-ddl), at level 5 / risk 3 with every technique, run on a quiet machine (see memory: timing-sensitive runs; profile settings now genuinely reach the scanner since 77528abb). For each case-technique pair record detected or not across two runs. Schedule every pair whose control fires reliably; for those that still cannot, tighten the recorded exemption evidence to name the level-5 boundary that was tried. Report the before/after count of scheduled identifier pairs. Whether the new profile joins CI (and on what schedule) is decided from its measured runtime."
+                    }
+                )
+            }
+        )
+    }
+
+    {
+        id sql-scope-deferred
+        title "The deferred PostgreSQL constructs are built and leave sql.scope's deferred list"
+        kind @feat
+        children (
+            {
+                id scope-grouping-sets
+                title "GROUPING SETS, ROLLUP and CUBE are expressible, with GROUPING()"
+            }
+
+            {
+                id scope-simple-case
+                title "Simple-form CASE compares one operand against arm values"
+            }
+
+            {
+                id scope-array-subscripts
+                title "Array subscripts and slices are expressible"
+            }
+
+            {
+                id scope-frame-exclude
+                title "Window frames take expression offsets and an EXCLUDE clause"
+            }
+
+            {
+                id scope-constraint-deferrability
+                title "UNIQUE, PRIMARY KEY and CHECK constraints take deferrability"
+            }
+
+            {
+                id scope-range-types
+                title "Range and multirange values round-trip end to end"
+            }
+
+            {
+                id scope-collate
+                title "COLLATE names a collation in expression, ORDER BY and column positions"
+                deps (identifier-render-oracle)
+            }
+
+            {
+                id scope-sequences
+                title "Sequences have a typed builder, and identity options stop riding raw_suffix"
+                deps (identifier-render-oracle)
+            }
+
+            {
+                id scope-composite-types
+                title "CREATE TYPE AS (composite) is expressible"
+                deps (identifier-render-oracle)
+            }
+
+            {
+                id scope-on-constraint
+                title "ON CONFLICT ON CONSTRAINT names its arbiter through its own typestate"
+                deps (identifier-render-oracle)
+            }
+
+            {
+                id scope-merge
+                title "MERGE is a fifth statement kind"
+                deps (identifier-render-oracle)
+            }
+        )
+        log (
+            {
+                at 2026-09-24T18:44:29.569482Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-09-24: build the whole deferred list recorded in [spec:pgorm:req:sql.scope] (docs/spec/sql-ast.md), which states each entry's cost; every child's work is that cost. Each child graduates its entry by implementing it and deleting it from the rule's Deferred list (bump the rule, repin), with live-database tests for anything whose semantics a render-only test could misrepresent. Children that introduce a caller-named identifier position (COLLATE, sequences, composite types, ON CONSTRAINT, MERGE's target) depend on identifier-render-oracle and must register their sites in it. The composite-type entry records that it \"waits on a consumer\" — build the DDL, and say in the rule what still does not decode a composite value."
+            }
+        )
+    }
 )
