@@ -141,7 +141,7 @@ fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
 // [spec:pgorm:req:security.sqlmap.profiles+2/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
-fn profiles_keep_238_full_and_six_smoke() {
+fn profiles_keep_234_full_and_six_smoke() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
     assert_eq!(manifest["cases"].as_array().unwrap().len(), 35);
@@ -149,6 +149,9 @@ fn profiles_keep_238_full_and_six_smoke() {
     assert_eq!(full.work.len() * 2, 234);
     assert_eq!(full.exempt.len(), 93);
     assert_eq!(result::inventory(&manifest, &profiles["smoke"], &[]).unwrap().work.len() * 2, 6);
+    // Each smoke control must fire at smoke's own level 2 / risk 1: `parameters` needs a level-3
+    // boundary and can never pass here, while `enum` escapes a double-quoted identifier at level 2.
+    assert_eq!(profiles["smoke"]["cases"], json!(["select", "pipeline-literal", "enum"]));
     assert!(result::inventory(&manifest, &profiles["smoke"], &["insert".into()]).is_err());
     assert!(result::inventory(&manifest, &profiles["full"], &["select".into(),"select".into()]).is_err());
     let mut profile = profiles["full"].clone(); profile["techniques"] = json!([]);

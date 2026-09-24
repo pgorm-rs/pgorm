@@ -3,7 +3,7 @@
     "cases": [
       "select",
       "pipeline-literal",
-      "parameters"
+      "enum"
     ],
     "techniques": [
       "B"
