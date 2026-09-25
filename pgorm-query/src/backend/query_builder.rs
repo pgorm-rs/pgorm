@@ -1423,7 +1423,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+5]
+    // [spec:pgorm:req:sql.ddl.column-def+6]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1534,7 +1534,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+4]
+    // [spec:pgorm:req:sql.ddl.alter-table+5]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1608,21 +1608,28 @@ impl QueryBuilder {
                                 write!(sql, " SET DEFAULT ").unwrap();
                                 self.prepare_simple_expr(v, sql);
                             }
-                            ColumnSpec::UniqueKey => {
+                            // [spec:pgorm:req:sql.ddl.deferrability]
+                            ColumnSpec::UniqueKey(deferrability) => {
                                 write!(sql, "ADD UNIQUE (").unwrap();
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, ")").unwrap();
+                                if let Some(deferrability) = deferrability {
+                                    write!(sql, "{}", deferrability.clause()).unwrap();
+                                }
                             }
-                            ColumnSpec::PrimaryKey => {
+                            ColumnSpec::PrimaryKey(deferrability) => {
                                 write!(sql, "ADD PRIMARY KEY (").unwrap();
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, ")").unwrap();
+                                if let Some(deferrability) = deferrability {
+                                    write!(sql, "{}", deferrability.clause()).unwrap();
+                                }
                             }
                             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
                             ColumnSpec::Generated { .. } => {}
                             // `ALTER TABLE` spells identity as an action on the
                             // column, not as a clause of it.
-                            // [spec:pgorm:req:sql.ddl.column-def+5]
+                            // [spec:pgorm:req:sql.ddl.column-def+6]
                             ColumnSpec::Identity(generation) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1671,7 +1678,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+4]
+    // [spec:pgorm:req:sql.ddl.alter-table+5]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1686,7 +1693,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+8]
+    // [spec:pgorm:req:sql.ddl.create-table+9]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1709,11 +1716,11 @@ impl QueryBuilder {
             first = false;
         });
 
-        create.indexes.iter().for_each(|index| {
+        create.indexes.iter().for_each(|constraint| {
             if !first {
                 write!(sql, ", ").unwrap();
             }
-            self.prepare_table_index_expression(index, sql);
+            self.prepare_table_index_expression(constraint, sql);
             first = false;
         });
 
@@ -1753,11 +1760,22 @@ impl QueryBuilder {
             // rendered by `prepare_column_auto_increment`; there is no
             // trailing keyword to spell here.
             ColumnSpec::AutoIncrement => {}
-            ColumnSpec::UniqueKey => write!(sql, "UNIQUE").unwrap(),
-            ColumnSpec::PrimaryKey => write!(sql, "PRIMARY KEY").unwrap(),
+            // [spec:pgorm:req:sql.ddl.deferrability]
+            ColumnSpec::UniqueKey(deferrability) => write!(
+                sql,
+                "UNIQUE{}",
+                deferrability.map_or("", Deferrability::clause)
+            )
+            .unwrap(),
+            ColumnSpec::PrimaryKey(deferrability) => write!(
+                sql,
+                "PRIMARY KEY{}",
+                deferrability.map_or("", Deferrability::clause)
+            )
+            .unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr } => self.prepare_generated_column(expr, sql),
-            // [spec:pgorm:req:sql.ddl.column-def+5]
+            // [spec:pgorm:req:sql.ddl.column-def+6]
             ColumnSpec::Identity(generation) => {
                 write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap()
             }
@@ -1880,8 +1898,8 @@ impl QueryBuilder {
     ///
     /// Always `STORED`: `VIRTUAL` is a syntax error on every PostgreSQL before
     /// 18, so there is no non-stored generated column to render
-    /// (`[spec:pgorm:req:sql.ddl.column-def+5]`).
-    // [spec:pgorm:req:sql.ddl.column-def+5]
+    /// (`[spec:pgorm:req:sql.ddl.column-def+6]`).
+    // [spec:pgorm:req:sql.ddl.column-def+6]
     pub(crate) fn prepare_generated_column(&self, gen_: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
         self.prepare_simple_expr(gen_, sql);
@@ -1903,12 +1921,14 @@ impl QueryBuilder {
 
     /// Write an index as a `CREATE TABLE` constraint. The embedded form puts
     /// `NULLS NOT DISTINCT` before the column list; the standalone
-    /// `CREATE INDEX` of `prepare_index_create_statement` puts it after.
+    /// `CREATE INDEX` of `prepare_index_create_statement` puts it after, and
+    /// has no deferrability to write, which only a constraint takes.
     fn prepare_table_index_expression(
         &self,
-        create: &IndexCreateStatement,
+        constraint: &IndexConstraint,
         sql: &mut dyn SqlWriter,
     ) {
+        let create = &constraint.index;
         if let Some(name) = &create.index.name {
             write!(sql, "CONSTRAINT ").unwrap();
             name.prepare(sql.as_writer());
@@ -1927,7 +1947,7 @@ impl QueryBuilder {
 
         self.prepare_index_columns(&create.index.columns, sql);
 
-        // [spec:pgorm:req:sql.ddl.index-create+8]
+        // [spec:pgorm:req:sql.ddl.index-create+9]
         if !create.include.is_empty() {
             write!(sql, " INCLUDE (").unwrap();
             create.include.iter().fold(true, |first, name| {
@@ -1939,9 +1959,14 @@ impl QueryBuilder {
             });
             write!(sql, ")").unwrap();
         }
+
+        // [spec:pgorm:req:sql.ddl.deferrability]
+        if let Some(deferrability) = constraint.deferrability {
+            write!(sql, "{}", deferrability.clause()).unwrap();
+        }
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
@@ -1971,7 +1996,7 @@ impl QueryBuilder {
         write!(sql, " ").unwrap();
         self.prepare_index_columns(&create.index.columns, sql);
 
-        // [spec:pgorm:req:sql.ddl.index-create+8]
+        // [spec:pgorm:req:sql.ddl.index-create+9]
         if !create.include.is_empty() {
             write!(sql, " INCLUDE (").unwrap();
             create.include.iter().fold(true, |first, name| {
@@ -1990,7 +2015,7 @@ impl QueryBuilder {
 
         // The predicate closes the statement, after every clause that describes
         // the index itself.
-        // [spec:pgorm:req:sql.ddl.index-create+8]
+        // [spec:pgorm:req:sql.ddl.index-create+9]
         self.prepare_condition(&create.r#where, "WHERE", sql);
     }
 
@@ -2037,7 +2062,7 @@ impl QueryBuilder {
     /// Write an index's column list: each entry's target, then its operator
     /// class, then its order — PostgreSQL's order for the three, and the reason
     /// an expression entry composes with a direction the way a named one does.
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     fn prepare_index_columns(&self, columns: &[IndexColumn], sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
         columns.iter().fold(true, |first, col| {
@@ -2072,7 +2097,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+5]
+    // [spec:pgorm:req:sql.ddl.foreign-key+6]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -2084,7 +2109,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+5]
+    // [spec:pgorm:req:sql.ddl.foreign-key+6]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2141,18 +2166,9 @@ impl QueryBuilder {
             self.prepare_foreign_key_action(foreign_key_action, sql);
         }
 
-        if let Some(deferrability) = &create.foreign_key.deferrability {
-            write!(
-                sql,
-                "{}",
-                match deferrability {
-                    Deferrability::NotDeferrable => " NOT DEFERRABLE",
-                    Deferrability::DeferrableInitiallyImmediate =>
-                        " DEFERRABLE INITIALLY IMMEDIATE",
-                    Deferrability::DeferrableInitiallyDeferred => " DEFERRABLE INITIALLY DEFERRED",
-                }
-            )
-            .unwrap();
+        // [spec:pgorm:req:sql.ddl.deferrability]
+        if let Some(deferrability) = create.foreign_key.deferrability {
+            write!(sql, "{}", deferrability.clause()).unwrap();
         }
     }
 

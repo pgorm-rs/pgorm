@@ -8740,6 +8740,22 @@ children (
             {
                 id scope-constraint-deferrability
                 title "UNIQUE, PRIMARY KEY and CHECK constraints take deferrability"
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T04:15:03.79404Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T05:05:47.264161Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

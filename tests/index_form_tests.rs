@@ -61,7 +61,7 @@ async fn indexdef(db: &DatabaseConnection, name: &str) -> Result<String, Error> 
 
 /// The reason partial indexes exist: one active row per owner, with no
 /// constraint at all on the inactive ones.
-// [spec:pgorm:req:sql.ddl.index-create+8/test]
+// [spec:pgorm:req:sql.ddl.index-create+9/test]
 async fn partial_unique_constrains_only_its_predicate(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -127,7 +127,7 @@ async fn partial_unique_constrains_only_its_predicate(
 
 /// An expression index is only worth building if a query reads it, so this
 /// checks the plan as well as the answer.
-// [spec:pgorm:req:sql.ddl.index-create+8/test]
+// [spec:pgorm:req:sql.ddl.index-create+9/test]
 async fn expression_index_answers_a_lower_lookup(db: &DatabaseConnection) -> Result<(), Error> {
     let sql = Index::create(
         Name::runtime("doc"),
@@ -180,7 +180,7 @@ async fn expression_index_answers_a_lower_lookup(db: &DatabaseConnection) -> Res
 
 /// `INCLUDE` columns are payload, not key: the catalogue counts them
 /// separately, and uniqueness ignores them.
-// [spec:pgorm:req:sql.ddl.index-create+8/test]
+// [spec:pgorm:req:sql.ddl.index-create+9/test]
 async fn include_columns_sit_outside_the_key(db: &DatabaseConnection) -> Result<(), Error> {
     let sql = Index::create(Name::runtime("doc"), Name::runtime("name"))
         .name(Name::runtime("doc_name_with_body"))
@@ -212,7 +212,7 @@ async fn include_columns_sit_outside_the_key(db: &DatabaseConnection) -> Result<
 
 /// The operator class renders as a quoted identifier; this settles that the
 /// server resolves one written that way.
-// [spec:pgorm:req:sql.ddl.index-create+8/test]
+// [spec:pgorm:req:sql.ddl.index-create+9/test]
 async fn operator_class_resolves_as_a_quoted_name(db: &DatabaseConnection) -> Result<(), Error> {
     let sql = Index::create(
         Name::runtime("doc"),

@@ -74,12 +74,12 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+8]
+// [spec:pgorm:req:sql.ddl.create-table+9]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
     pub(crate) columns: Vec<ColumnDef>,
-    pub(crate) indexes: Vec<IndexCreateStatement>,
+    pub(crate) indexes: Vec<IndexConstraint>,
     pub(crate) foreign_keys: Vec<ForeignKeyCreateStatement>,
     pub(crate) if_not_exists: bool,
     pub(crate) check: Vec<SimpleExpr>,
@@ -145,13 +145,18 @@ impl TableCreateStatement {
     /// onto this statement's table: an embedded index constrains the table it
     /// sits inside and cannot name another. Pass an owned value — `.to_owned()`
     /// a builder chain you mean to reuse.
+    ///
+    /// An [`IndexCreateStatement`] embeds as it is; one made into an
+    /// [`IndexConstraint`] by
+    /// [`deferrability`](IndexCreateStatement::deferrability) carries the
+    /// clause only a constraint takes.
     pub fn index<I>(&mut self, index: I) -> &mut Self
     where
-        I: Into<IndexCreateStatement>,
+        I: Into<IndexConstraint>,
     {
-        let mut index = index.into();
-        index.table = self.table.clone();
-        self.indexes.push(index);
+        let mut constraint = index.into();
+        constraint.index.table = self.table.clone();
+        self.indexes.push(constraint);
         self
     }
 
@@ -182,12 +187,12 @@ impl TableCreateStatement {
     /// ```
     pub fn primary_key<I>(&mut self, index: I) -> &mut Self
     where
-        I: Into<IndexCreateStatement>,
+        I: Into<IndexConstraint>,
     {
-        let mut index = index.into();
-        index.kind = IndexKind::PrimaryKey;
-        index.table = self.table.clone();
-        self.indexes.push(index);
+        let mut constraint = index.into();
+        constraint.index.kind = IndexKind::PrimaryKey;
+        constraint.index.table = self.table.clone();
+        self.indexes.push(constraint);
         self
     }
 
@@ -268,8 +273,10 @@ impl TableCreateStatement {
         self.foreign_keys.as_ref()
     }
 
-    pub fn get_indexes(&self) -> &Vec<IndexCreateStatement> {
-        self.indexes.as_ref()
+    /// The table-level unique and primary-key constraints, in the order
+    /// they were embedded.
+    pub fn get_indexes(&self) -> &[IndexConstraint] {
+        &self.indexes
     }
 
     /// Append verbatim SQL after the table's own clauses — the escape hatch

@@ -335,7 +335,7 @@ impl TryFrom<&ColumnDef> for Column {
         let unique = col_def
             .get_column_spec()
             .iter()
-            .any(|spec| matches!(spec, ColumnSpec::UniqueKey));
+            .any(|spec| matches!(spec, ColumnSpec::UniqueKey(_)));
         let column = Self {
             name,
             col_type,

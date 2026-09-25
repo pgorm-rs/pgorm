@@ -14,7 +14,7 @@ pub struct TableIndex {
 /// stands bare, an expression is parenthesised — so which one an entry holds is
 /// a state of the type rather than something the renderer infers from the shape
 /// of an expression (`[dec:pgorm:invalid-states-unrepresentable]`).
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 #[derive(Debug, Clone)]
 pub enum IndexColumnTarget {
     Name(Name),
@@ -23,7 +23,7 @@ pub enum IndexColumnTarget {
 
 /// One entry of an index: what it indexes, optionally under an operator class,
 /// optionally in a stated order.
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 #[derive(Debug, Clone)]
 pub struct IndexColumn {
     pub(crate) target: IndexColumnTarget,
@@ -39,7 +39,7 @@ pub enum IndexOrder {
 
 impl IndexColumn {
     /// Index the named column.
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn name<N>(name: N) -> Self
     where
         N: IntoName,
@@ -71,7 +71,7 @@ impl IndexColumn {
     ///     r#"CREATE INDEX "idx-glyph-image-lower" ON "glyph" ((LOWER("image")))"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn expr<E>(expr: E) -> Self
     where
         E: Into<SimpleExpr>,
@@ -88,7 +88,7 @@ impl IndexColumn {
     ///
     /// The class is an identifier, so it renders quoted like every other name
     /// and never as SQL.
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn operator_class<N>(mut self, class: N) -> Self
     where
         N: IntoName,
@@ -101,7 +101,7 @@ impl IndexColumn {
     ///
     /// The `(col, IndexOrder)` tuple is the shorthand for a named column; this
     /// is how an expression entry says the same thing.
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn order(mut self, order: IndexOrder) -> Self {
         self.order = Some(order);
         self
@@ -163,7 +163,7 @@ impl TableIndex {
     /// one caller reads a primary key's columns back, and a primary key indexes
     /// columns only — PostgreSQL has no expression primary key — so there is no
     /// name being dropped there.
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn get_column_names(&self) -> Vec<String> {
         self.columns
             .iter()

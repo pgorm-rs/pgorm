@@ -1,8 +1,8 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+8/test]
-// [spec:pgorm:req:sql.ddl.column-def+5/test]
+// [spec:pgorm:req:sql.ddl.create-table+9/test]
+// [spec:pgorm:req:sql.ddl.column-def+6/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+5/test]
 fn create_1() {
@@ -347,7 +347,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+4/test]
+// [spec:pgorm:req:sql.ddl.alter-table+5/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -363,7 +363,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+4/test]
+// [spec:pgorm:req:sql.ddl.alter-table+5/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -419,7 +419,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+4/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+5/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -570,7 +570,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+8/test]
+// [spec:pgorm:req:sql.ddl.create-table+9/test]
 #[test]
 fn embedded_index_is_the_only_primary_key_spelling() {
     let table = |index: IndexCreateStatement| {
@@ -600,7 +600,7 @@ fn embedded_index_is_the_only_primary_key_spelling() {
     assert_eq!(table(index().unique().to_owned()), expected);
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+4/test]    a foreign key embeds by value, so the source
+// [spec:pgorm:req:sql.ddl.alter-table+5/test]    a foreign key embeds by value, so the source
 // survives only where the call site cloned it
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
@@ -628,7 +628,7 @@ fn alter_embeds_its_foreign_key_by_value() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+5/test]    a generated column is stored, and the virtual
+// [spec:pgorm:req:sql.ddl.column-def+6/test]    a generated column is stored, and the virtual
 // spelling it no longer has a constructor for is one the grammar refuses
 #[test]
 fn generated_column_is_always_stored() {
@@ -655,7 +655,7 @@ fn generated_column_is_always_stored() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+5/test]    both identity forms render, and
+// [spec:pgorm:req:sql.ddl.column-def+6/test]    both identity forms render, and
 // the ALWAYS/BY DEFAULT choice is the only thing that differs between them
 #[test]
 fn identity_column_spells_both_generations() {
@@ -682,7 +682,7 @@ fn identity_column_spells_both_generations() {
     assert_eq!(IdentityGeneration::ByDefault.keyword(), "BY DEFAULT");
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+5/test]    identity is a clause of the
+// [spec:pgorm:req:sql.ddl.column-def+6/test]    identity is a clause of the
 // column, so it renders in insertion order among the other specs
 #[test]
 fn identity_renders_in_insertion_order() {
@@ -701,7 +701,7 @@ fn identity_renders_in_insertion_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+5/test]    the two `ALTER TABLE` positions:
+// [spec:pgorm:req:sql.ddl.column-def+6/test]    the two `ALTER TABLE` positions:
 // a new column carries the clause, an existing one takes the ADD GENERATED action
 #[test]
 fn identity_alters_both_ways() {
@@ -720,7 +720,7 @@ fn identity_alters_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+5/test]    identity and the serial family
+// [spec:pgorm:req:sql.ddl.column-def+6/test]    identity and the serial family
 // are two spellings of one idea, and asking for both renders SQL the grammar
 // takes but the server refuses — the boundary this rule documents rather than types
 #[test]

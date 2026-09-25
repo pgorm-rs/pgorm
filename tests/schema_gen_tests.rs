@@ -218,8 +218,8 @@ fn flags(col: &ColumnDef) -> Flags {
     for spec in col.get_column_spec() {
         match spec {
             ColumnSpec::NotNull => flags.not_null = true,
-            ColumnSpec::UniqueKey => flags.unique = true,
-            ColumnSpec::PrimaryKey => flags.primary_key = true,
+            ColumnSpec::UniqueKey(_) => flags.unique = true,
+            ColumnSpec::PrimaryKey(_) => flags.primary_key = true,
             ColumnSpec::AutoIncrement => flags.auto_increment = true,
             ColumnSpec::Default(_) => flags.default = true,
             ColumnSpec::Comment(comment) => flags.comment = Some(comment.clone()),

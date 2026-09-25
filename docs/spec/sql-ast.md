@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+4]
+> [spec:pgorm:req:sql.surface+5]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -75,7 +75,9 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.grouping`); `FrameStart`, its three side markers
 > `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
 > `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
-> the bound enum `Frame` (`sql.ast.window-statement`).
+> the bound enum `Frame` (`sql.ast.window-statement`); `IndexConstraint`, an
+> index embedded as a table constraint, the one position that takes
+> deferrability (`sql.ddl.deferrability`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -111,7 +113,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+4]
+> [spec:pgorm:req:sql.scope+5]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -161,11 +163,6 @@ today, including panicking edges and deliberate failsafes.
 >   `a COLLATE b` for arbitrary `b`. Wanted in three positions (expression,
 >   `ORDER BY`, column definition), and `pgorm-codegen` already refuses to read
 >   a column carrying one, so closing this is two changes in two crates.
-> - **Deferrability on constraints other than foreign keys.** `UNIQUE`,
->   `PRIMARY KEY` and `CHECK` take the same clause, and reach the renderer
->   through `ColumnSpec` and the index statements rather than through
->   `TableForeignKey`. The foreign-key case is the one with a use an ORM meets
->   — mutually referencing rows — which is why it is built and these are not.
 > - **`CREATE TYPE ... AS (composite)`.** Mechanical: a list of
 >   `(Name, ColumnType)` pairs and a render arm reusing the column-type
 >   renderer, beside the `AS ENUM` form that already exists. It waits on a

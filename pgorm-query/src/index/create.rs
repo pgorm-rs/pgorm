@@ -110,9 +110,9 @@ use super::common::*;
 ///
 /// Table::create(Glyph::Table).index(Index::create(Glyph::Table, Glyph::Aspect).unique());
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 // [spec:pgorm:req:sql.ast+1]
-// [spec:pgorm:req:sql.ddl.create-table+8]
+// [spec:pgorm:req:sql.ddl.create-table+9]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -135,7 +135,7 @@ pub struct IndexCreateStatement {
 /// primary-key image.
 ///
 /// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -148,7 +148,7 @@ pub enum IndexKind {
 ///
 /// Obtained only through [`IndexKind::standalone`], so the standalone renderer
 /// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StandaloneIndexKind {
     Plain,
@@ -282,7 +282,7 @@ impl IndexCreateStatement {
     ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect") INCLUDE ("image")"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.index-create+8]
+    // [spec:pgorm:req:sql.ddl.index-create+9]
     pub fn include<N, I>(&mut self, columns: I) -> &mut Self
     where
         N: IntoName,
@@ -343,7 +343,7 @@ impl IndexCreateStatement {
 ///     .join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+8]
+// [spec:pgorm:req:sql.ddl.index-create+9]
 #[inherent]
 impl ConditionalStatement for IndexCreateStatement {
     pub fn cond_where<C>(&mut self, condition: C) -> &mut Self

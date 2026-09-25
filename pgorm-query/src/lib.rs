@@ -638,8 +638,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+4]
-// [spec:pgorm:req:sql.surface+4/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+5]
+// [spec:pgorm:req:sql.surface+5/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -649,7 +649,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+4]
+// [spec:pgorm:req:sql.scope+5]
 mod backend;
 mod comment;
 pub mod error;
@@ -727,8 +727,9 @@ pub use foreign_key::{
     ForeignKeyDropStatement, TableForeignKey,
 };
 pub use index::{
-    Index, IndexColumn, IndexColumnTarget, IndexCreateStatement, IndexDropStatement, IndexKind,
-    IndexOrder, IndexType, IntoIndexColumn, StandaloneIndexKind, TableIndex,
+    Index, IndexColumn, IndexColumnTarget, IndexConstraint, IndexCreateStatement,
+    IndexDropStatement, IndexKind, IndexOrder, IndexType, IntoIndexColumn, StandaloneIndexKind,
+    TableIndex,
 };
 pub use table::{
     AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,

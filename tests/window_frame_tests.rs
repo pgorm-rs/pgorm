@@ -117,7 +117,7 @@ fn one_day() -> SimpleExpr {
 // a distance in the ordering column's values, an interval over a timestamp
 // [spec:pgorm:req:sql.render.window+5/test]    the offset renders through the expression path,
 // bound and inlined alike
-// [spec:pgorm:req:sql.scope+4/test]
+// [spec:pgorm:req:sql.scope+5/test]
 async fn an_interval_offset_measures_time(db: &DatabaseConnection) -> Result<(), Error> {
     let by_time = framed(
         "at",
@@ -184,7 +184,7 @@ async fn a_numeric_offset_measures_value_distance(db: &DatabaseConnection) -> Re
 // [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: each exclusion
 // removes the rows it names relative to the current row's peers
 // [spec:pgorm:req:sql.render.window+5/test]    ` EXCLUDE …` renders after the frame's bounds
-// [spec:pgorm:req:sql.scope+4/test]
+// [spec:pgorm:req:sql.scope+5/test]
 async fn each_exclusion_removes_its_own_rows(db: &DatabaseConnection) -> Result<(), Error> {
     let whole = || {
         FrameType::Rows

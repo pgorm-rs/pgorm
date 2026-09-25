@@ -6,10 +6,12 @@
 //! - Table Index Drop, see [`IndexDropStatement`]
 
 mod common;
+mod constraint;
 mod create;
 mod drop;
 
 pub use common::*;
+pub use constraint::*;
 pub use create::*;
 pub use drop::*;
 

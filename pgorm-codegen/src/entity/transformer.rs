@@ -3,7 +3,7 @@ use crate::{
     RelationType, TableIdent, util::escape_rust_keyword,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnSpec, TableCreateStatement};
+use pgorm_query::{ColumnSpec, IndexConstraint, TableCreateStatement};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Debug)]
@@ -29,6 +29,7 @@ impl EntityTransformer {
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
                 .get_indexes()
                 .iter()
+                .map(IndexConstraint::get_index)
                 .filter(|index| index.is_unique_key())
                 .map(|index| {
                     index
@@ -44,7 +45,7 @@ impl EntityTransformer {
                 let primary_key = col_def
                     .get_column_spec()
                     .iter()
-                    .any(|spec| matches!(spec, ColumnSpec::PrimaryKey));
+                    .any(|spec| matches!(spec, ColumnSpec::PrimaryKey(_)));
                 if primary_key {
                     primary_keys.push(PrimaryKey {
                         name: col_def.get_column_name(),
@@ -127,6 +128,7 @@ impl EntityTransformer {
                 table_create
                     .get_indexes()
                     .iter()
+                    .map(IndexConstraint::get_index)
                     .filter(|index| index.is_primary_key())
                     .flat_map(|index| {
                         index

@@ -13,6 +13,7 @@ use crate::types::{IntoName, IntoTableName};
 
 mod alter;
 mod column;
+mod column_deferrability;
 mod create;
 mod drop;
 mod interval;

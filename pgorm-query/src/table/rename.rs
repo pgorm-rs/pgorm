@@ -90,7 +90,7 @@ impl std::fmt::Display for TableRenameStatement {
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+4]
+// [spec:pgorm:req:sql.ddl.alter-table+5]
 #[derive(Debug, Clone)]
 pub struct ColumnRenameStatement {
     pub(crate) table: TableName,

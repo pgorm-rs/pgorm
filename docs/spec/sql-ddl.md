@@ -62,18 +62,18 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+8]
+> [spec:pgorm:req:sql.ddl.create-table+9]
 > `TableCreateStatement` composes a table name, ordered `ColumnDef`s (`col()`,
 > which stamps the table ref onto each column), table-level indexes (`index()`
-> and `primary_key()` — the latter takes an `IndexCreateStatement` and forces
-> its kind to `IndexKind::PrimaryKey`, the one position in which that kind is
+> and `primary_key()` — the latter takes an index and forces its kind to
+> `IndexKind::PrimaryKey`, the one position in which that kind is
 > spelled; both restamp the index onto the owning table, as `col()` restamps
 > each column, so an embedded index cannot name another table),
 > foreign keys (`foreign_key()`), check expressions (`check()`), an
 > `if_not_exists` flag, a `comment` and a trailing `extra` string.
 >
 > Every embedder MUST take what it embeds by value. `index()`, `primary_key()`
-> and `foreign_key()` are bounded `Into<IndexCreateStatement>` /
+> and `foreign_key()` are bounded `Into<IndexConstraint>` /
 > `Into<ForeignKeyCreateStatement>` and consume the argument, as `col()`'s
 > `IntoColumnDef` consumes a column: a caller reusing the value writes
 > `.to_owned()` and sees the copy in the source, rather than the embedder
@@ -86,10 +86,16 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > expressions, then foreign-key clauses (in `Mode::Creation`, i.e. without
 > `ALTER TABLE`/`ADD`), then `CHECK (...)` constraints, all comma-separated.
 > Embedded indexes render as `[CONSTRAINT "name" ][PRIMARY KEY |UNIQUE
-> ][NULLS NOT DISTINCT ](cols)[ INCLUDE (names)]`, the keyword chosen by the
-> statement's
-> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+8]`) and `NULLS NOT
-> DISTINCT` emitted only for `Unique`. A table constraint takes `INCLUDE`, so it
+> ][NULLS NOT DISTINCT ](cols)[ INCLUDE (names)][ <deferrability>]`, the
+> keyword chosen by the statement's
+> `IndexKind` (`[spec:pgorm:req:sql.ddl.index-create+9]`) and `NULLS NOT
+> DISTINCT` emitted only for `Unique`. An embedded index is an
+> `IndexConstraint`: an `IndexCreateStatement` converts into one that says
+> nothing about deferral, and `IndexCreateStatement::deferrability(d)` makes
+> one that does, which is the only position a unique or primary-key
+> constraint's deferrability is spelled at table level
+> (`[spec:pgorm:req:sql.ddl.deferrability]`). `get_indexes()` reads them back
+> in embedding order. A table constraint takes `INCLUDE`, so it
 > renders here too; it takes neither the predicate nor an expression entry that
 > the same statement can carry, and those go unrendered rather than producing a
 > clause PostgreSQL has no place for. A `Plain` kind — reachable only through
@@ -120,20 +126,25 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+5]
+> [spec:pgorm:req:sql.ddl.column-def+6]
 > `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
 > `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
-> `UniqueKey`, `PrimaryKey`, `Check(SimpleExpr)`, `Generated { expr }`,
+> `UniqueKey(Option<Deferrability>)`, `PrimaryKey(Option<Deferrability>)`,
+> `Check(SimpleExpr)`, `Generated { expr }`,
 > `Identity(IdentityGeneration)`, `RawSuffix(&'static str)`, `Comment(String)`),
 > populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
-> `not_null()`, `default(v)`, `check(expr)`, `identity()`,
-> `identity_by_default()`, `raw_suffix(s)`, etc.).
+> `not_null()`, `default(v)`, `check(expr)`, `unique_key()`,
+> `unique_key_deferrability(d)`, `primary_key()`,
+> `primary_key_deferrability(d)`, `identity()`, `identity_by_default()`,
+> `raw_suffix(s)`, etc.).
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
-> `UNIQUE`, `PRIMARY KEY`, `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
+> `UNIQUE[ <deferrability>]`, `PRIMARY KEY[ <deferrability>]` (the
+> deferrability of `[spec:pgorm:req:sql.ddl.deferrability]`, carried inside
+> the spec so it cannot trail another), `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
 > STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`, and `RawSuffix`
 > verbatim. A generated column is always stored and
 > `generated(expr)` takes no flag saying otherwise: `VIRTUAL` is a syntax
@@ -221,7 +232,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
-> [spec:pgorm:req:sql.ddl.alter-table+4]
+> [spec:pgorm:req:sql.ddl.alter-table+5]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey` and `DropForeignKey`. Both the table and a first option are
@@ -241,7 +252,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > takes `Into<TableForeignKey>` by value, as `add_column` takes
 > `IntoColumnDef`: an embedder consumes what it embeds, and a borrow that
 > silently cloned would be the third reuse-outcome
-> `[spec:pgorm:req:sql.ddl.create-table+8]` rules out.
+> `[spec:pgorm:req:sql.ddl.create-table+9]` rules out.
 >
 > Rendering MUST emit a single `ALTER TABLE <table> ` prefix
 > with the options comma-separated: `ADD COLUMN [IF NOT EXISTS ]<column-def>`
@@ -264,7 +275,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `ModifyColumn` decomposes into per-aspect Postgres actions: when a type is
 > present, `ALTER COLUMN "c" TYPE <type>`; then per spec `ALTER COLUMN "c"
 > DROP NOT NULL` (for `Null`), `SET NOT NULL`, `SET DEFAULT <expr>`,
-> `ADD UNIQUE ("c")`, `ADD PRIMARY KEY ("c")`, `CHECK (<expr>)` or the
+> `ADD UNIQUE ("c")[ <deferrability>]`, `ADD PRIMARY KEY ("c")[
+> <deferrability>]`, `CHECK (<expr>)` or the
 > `Extra` string, comma-separated. `AutoIncrement`, `Generated` and `Comment`
 > specs are ignored in modify.
 
@@ -342,7 +354,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Indexes
 
-> [spec:pgorm:req:sql.ddl.index-create+8]
+> [spec:pgorm:req:sql.ddl.index-create+9]
 > `IndexCreateStatement` carries a target table, a `TableIndex` (name plus
 > ordered `IndexColumn`s), an `IndexKind`, an `include` list of non-key column
 > names, a `where` predicate, and `nulls_not_distinct`,
@@ -357,13 +369,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
 > column list in every position this statement reaches — standalone
 > `CREATE INDEX ... ()` and the embedded `PRIMARY KEY ()` and `UNIQUE ()` of
-> `[spec:pgorm:req:sql.ddl.create-table+8]` alike — and rejects
+> `[spec:pgorm:req:sql.ddl.create-table+9]` alike — and rejects
 > `CREATE INDEX "n" ON  (...)` at the parenthesis, so both states are
 > unreachable rather than checked
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The index *name* is the one
 > part that stays optional: PostgreSQL derives a name when `CREATE INDEX`
 > omits it, so `CREATE INDEX  ON "t" ("c")` parses and is left buildable. In
-> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+8]` the table
+> the embedded position of `[spec:pgorm:req:sql.ddl.create-table+9]` the table
 > is not rendered at all and the owning statement restamps it, so the
 > constructor argument there names the table the index already belongs to
 > rather than a second one. `IndexKind`
@@ -400,7 +412,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `None`. That absence is typed rather than a failure — a statement marked
 > primary and rendered standalone emits a plain `CREATE INDEX`, and the
 > primary-key constraint is reachable only through the embedded path of
-> `[spec:pgorm:req:sql.ddl.create-table+8]`.
+> `[spec:pgorm:req:sql.ddl.create-table+9]`.
 >
 > The standalone form MUST render `CREATE [UNIQUE ]INDEX [IF NOT EXISTS
 > ]"name" ON <table>[ USING <type>] (cols)[ INCLUDE (names)][ NULLS NOT
@@ -422,14 +434,22 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`[spec:pgorm:req:sql.render.condition-chain]`) and an absent predicate spells
 > no keyword. `include(cols)` appends rather than replaces, matching every other
 > accumulating builder on this statement. Both clauses also render in the
-> embedded position of `[spec:pgorm:req:sql.ddl.create-table+8]` as far as
+> embedded position of `[spec:pgorm:req:sql.ddl.create-table+9]` as far as
 > PostgreSQL allows: a table constraint takes `INCLUDE` and MUST render it, and
 > takes neither a predicate nor an expression entry. Those last two are
 > constructible-but-invalid there for the same reason a `Plain` embedded kind
-> is — the embedded path narrows nothing, it restamps a statement built for the
-> standalone one — and are documented rather than typed, because splitting
-> `IndexCreateStatement` into standalone and embedded types is a change to what
-> `index()` and `primary_key()` accept, not a clause.
+> is — the embedded path restamps a statement built for the standalone one —
+> and are documented rather than typed.
+>
+> The one clause that runs the other way is deferrability: a constraint takes
+> it and `CREATE INDEX` does not, having no `DEFERRABLE` in its grammar. It is
+> therefore not a field of `IndexCreateStatement`, whose standalone rendering
+> would have to drop it or emit a syntax error, but of the `IndexConstraint`
+> that `index()` and `primary_key()` accept, which
+> `IndexCreateStatement::deferrability(d)` makes and which has no rendering of
+> its own (`[spec:pgorm:req:sql.ddl.deferrability]`). That wrapper is where
+> the rest of the split would go, should the predicate and the `Plain` kind
+> ever be narrowed out of the embedded path too.
 >
 > `CONCURRENTLY` MUST NOT be offered. It is not a property of the index but of
 > how the statement runs: PostgreSQL refuses it inside a transaction block, and
@@ -452,7 +472,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+5]
+> [spec:pgorm:req:sql.ddl.foreign-key+6]
 > `TableForeignKey` holds the owning and referenced table names, a non-empty
 > list of `(column, referenced column)` pairs, an optional constraint name, and
 > optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
@@ -473,16 +493,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > them would be a promise the name does not keep
 > (`[spec:pgorm:req:sql.ast+1]`). A second copy is `.to_owned()`.
 >
-> `Deferrability` is `NotDeferrable`, `DeferrableInitiallyImmediate` or
-> `DeferrableInitiallyDeferred` — PostgreSQL's three reachable states as one
-> closed choice rather than two independent flags, because `INITIALLY
-> DEFERRED` is grammatical only on a `DEFERRABLE` constraint and the pair
-> naming a key both undeferrable and initially deferred must not construct
-> (`[dec:pgorm:invalid-states-unrepresentable]`). Unset, the clause renders
-> nothing: `NOT DEFERRABLE` is the server's default, so a builder that emitted
-> it would be asserting a choice the caller did not make. The three differ only
-> in *when* the check runs, which no rendered text shows, so the distinction
-> belongs to the live suite rather than to a render assertion.
+> `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability]`,
+> which unique and primary keys share. The foreign key is the case with a use
+> an ORM meets — rows that reference each other, which only a check deferred
+> to `COMMIT` lets a transaction insert.
 >
 > The standalone statement MUST render `ALTER TABLE <from> ADD [CONSTRAINT
 > "name" ]FOREIGN KEY (cols) REFERENCES <to> (ref-cols)[ ON DELETE <action>]
@@ -492,11 +506,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`, as
 > an embedded index is by `index()`: an embedded key constrains the table it
 > sits inside and MUST NOT name another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+4]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+5]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
-> (`[spec:pgorm:req:sql.ddl.create-table+8]`). `ForeignKeyDropStatement` MUST
+> (`[spec:pgorm:req:sql.ddl.create-table+9]`). `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`; both halves are taken by
 > `ForeignKey::drop(table, name)` and neither has a setter, for the same reason.
 > It holds the constraint name
@@ -505,6 +519,70 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `ALTER TABLE` option is written by the alter renderer instead of borrowing
 > this statement. Foreign-key table targets are `TableName`s, so both forms
 > render and no other shape is constructible.
+
+## Deferrability
+
+> [spec:pgorm:req:sql.ddl.deferrability]
+> `Deferrability` says when a constraint's check runs. It is `NotDeferrable`,
+> `DeferrableInitiallyImmediate` or `DeferrableInitiallyDeferred` —
+> PostgreSQL's three reachable states as one closed choice rather than two
+> independent flags, because `INITIALLY DEFERRED` is grammatical only on a
+> `DEFERRABLE` constraint and the pair naming a constraint both undeferrable
+> and initially deferred MUST NOT construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). It renders ` NOT DEFERRABLE`,
+> ` DEFERRABLE INITIALLY IMMEDIATE` or ` DEFERRABLE INITIALLY DEFERRED`
+> directly after the constraint it qualifies. Unset, the clause renders
+> nothing: `NOT DEFERRABLE` is the server's default, so a builder that emitted
+> it would be asserting a choice the caller did not make.
+>
+> The one enum qualifies every constraint the builder spells that PostgreSQL
+> lets defer. A foreign key carries it as a field
+> (`[spec:pgorm:req:sql.ddl.foreign-key+6]`). A column's own unique and
+> primary keys carry it inside their spec —
+> `ColumnSpec::UniqueKey(Option<Deferrability>)` and
+> `ColumnSpec::PrimaryKey(Option<Deferrability>)`, set by
+> `unique_key_deferrability(d)` and `primary_key_deferrability(d)` beside the
+> clause-less `unique_key()` and `primary_key()` — so the clause is written
+> directly after its `UNIQUE` or `PRIMARY KEY` and cannot trail another spec,
+> where PostgreSQL refuses it as misplaced (`42601`); on `ALTER TABLE`'s modify
+> path it follows `ADD UNIQUE ("c")` or `ADD PRIMARY KEY ("c")`. A table-level
+> `UNIQUE (…)` or `PRIMARY KEY (…)` carries it on an `IndexConstraint`, which
+> `IndexCreateStatement::deferrability(d)` makes by consuming the statement and
+> which `TableCreateStatement::index()` and `primary_key()` embed
+> (`[spec:pgorm:req:sql.ddl.create-table+9]`); there it follows the column list
+> and any `INCLUDE`.
+>
+> Two positions take no deferrability, and the builder has no way to hand them
+> one. A `CHECK` constraint is never deferrable: PostgreSQL refuses a
+> table-level `CHECK (…) DEFERRABLE` in its grammar (`0A000`, "CHECK
+> constraints cannot be marked DEFERRABLE") and a column-level one as a
+> misplaced clause (`42601`), so `ColumnSpec::Check` and
+> `TableCreateStatement::check` carry none, and neither does `NOT NULL`. And
+> `CREATE UNIQUE INDEX` has no `DEFERRABLE` in its grammar (`42601`): only a
+> constraint is deferred, never an index. `IndexCreateStatement`, which
+> renders standalone as that statement, therefore holds no deferrability, and
+> `IndexConstraint`, which does, has no rendering of its own — no `Display` and
+> no build path — so it reaches SQL only embedded.
+>
+> The three states differ only in *when* the check runs, which no rendered
+> text shows, so the distinction belongs to the live suite. `NOT DEFERRABLE`
+> checks a unique or primary key row by row, so `UPDATE … SET n = n + 1` over
+> consecutive values collides with the next row before that row has moved.
+> `DEFERRABLE INITIALLY IMMEDIATE` checks at the end of each statement, where
+> the same update succeeds, and `SET CONSTRAINTS … DEFERRED` can postpone it.
+> `DEFERRABLE INITIALLY DEFERRED` checks at `COMMIT`, so a transaction may hold
+> a duplicate between statements and is refused (`23505`) only if one is
+> still there when it commits — or at `SET CONSTRAINTS … IMMEDIATE`, which runs
+> the check where it is said.
+>
+> The clause has a cost the builder documents rather than refuses: a
+> deferrable unique or primary key, `INITIALLY IMMEDIATE` included, cannot
+> arbitrate an `ON CONFLICT` (`55000`), because the server cannot say whether a
+> row conflicts while the check that would say so may still be pending. The
+> arbiter is inferred from columns (`sql.ast.on-conflict`), so which
+> constraint the inference finds is the server's knowledge, not the
+> builder's; a table that upserts on a column keeps that column's key
+> undeferrable.
 
 ## Enum types
 

@@ -98,7 +98,7 @@ use crate::{Deferrability, ForeignKeyAction, QueryBuilder, TableForeignKey, type
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+5]
+// [spec:pgorm:req:sql.ddl.foreign-key+6]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,

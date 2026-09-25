@@ -13,7 +13,7 @@ use crate::types::*;
 /// referencing and referenced sides cannot disagree in length — a mismatch the
 /// grammar accepts and parse analysis rejects, and so one no parser oracle can
 /// catch. Further pairs are appended with [`TableForeignKey::col`].
-// [spec:pgorm:req:sql.ddl.foreign-key+5]
+// [spec:pgorm:req:sql.ddl.foreign-key+6]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<Name>,
@@ -43,20 +43,45 @@ pub enum ForeignKeyAction {
 /// `DEFERRABLE` constraint, so the pair that would name a constraint both
 /// undeferrable and initially deferred does not construct
 /// (`[dec:pgorm:invalid-states-unrepresentable]`).
+///
+/// A foreign key takes it through
+/// [`TableForeignKey::deferrability`], a column's own unique or primary key
+/// through [`ColumnDef::unique_key_deferrability`](crate::ColumnDef::unique_key_deferrability)
+/// and its primary-key sibling, and a table-level one through
+/// [`IndexCreateStatement::deferrability`](crate::IndexCreateStatement::deferrability).
+/// Nothing else can: PostgreSQL never defers a `CHECK` or `NOT NULL`
+/// constraint, and `CREATE UNIQUE INDEX` has no clause for it.
+// [spec:pgorm:req:sql.ddl.deferrability]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Deferrability {
-    /// `NOT DEFERRABLE` — checked at the end of every statement, and no
-    /// transaction can postpone it. This is the server's default, so it
-    /// renders only because a caller said it.
+    /// `NOT DEFERRABLE` — checked at once, and no transaction can postpone
+    /// it: a foreign key at the end of each statement, a unique or primary key
+    /// as each row is written. This is the server's default, so it renders
+    /// only because a caller said it.
     NotDeferrable,
-    /// `DEFERRABLE INITIALLY IMMEDIATE` — checked per statement like the
-    /// default, but `SET CONSTRAINTS ... DEFERRED` can move it to commit time
-    /// for the rest of a transaction.
+    /// `DEFERRABLE INITIALLY IMMEDIATE` — checked at the end of each
+    /// statement, so a unique key lets one statement pass through a
+    /// duplicate the default would refuse mid-row, and
+    /// `SET CONSTRAINTS ... DEFERRED` can move it to commit time for the rest
+    /// of a transaction.
     DeferrableInitiallyImmediate,
     /// `DEFERRABLE INITIALLY DEFERRED` — checked once, at commit. This is what
     /// lets two tables reference each other, and what lets a batch reorder
     /// rows through a state no single statement could hold.
     DeferrableInitiallyDeferred,
+}
+
+impl Deferrability {
+    /// The clause this state renders as, with the space that separates it
+    /// from the constraint it follows.
+    // [spec:pgorm:req:sql.ddl.deferrability]
+    pub(crate) fn clause(self) -> &'static str {
+        match self {
+            Self::NotDeferrable => " NOT DEFERRABLE",
+            Self::DeferrableInitiallyImmediate => " DEFERRABLE INITIALLY IMMEDIATE",
+            Self::DeferrableInitiallyDeferred => " DEFERRABLE INITIALLY DEFERRED",
+        }
+    }
 }
 
 impl TableForeignKey {

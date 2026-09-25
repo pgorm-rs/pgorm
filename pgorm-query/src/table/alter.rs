@@ -14,7 +14,7 @@ use crate::{ColumnDef, IntoColumnDef, TableForeignKey, backend::QueryBuilder, ty
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+4]
+// [spec:pgorm:req:sql.ddl.alter-table+5]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -112,7 +112,7 @@ impl PendingTableAlter {
 /// let mut alter = Table::alter(Font::Table).drop_column(Font::Name).to_owned();
 /// let moved: TableAlterStatement = alter.take();
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+4]
+// [spec:pgorm:req:sql.ddl.alter-table+5]
 // [spec:pgorm:req:sql.ast+1]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
@@ -135,7 +135,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+4]
+// [spec:pgorm:req:sql.ddl.alter-table+5]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
