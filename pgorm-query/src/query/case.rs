@@ -1,4 +1,4 @@
-use crate::{Condition, IntoCondition, SimpleExpr};
+use crate::{Condition, Expr, IntoCondition, SimpleExpr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CaseStatementCondition {
@@ -6,7 +6,20 @@ pub(crate) struct CaseStatementCondition {
     pub(crate) result: SimpleExpr,
 }
 
-// [spec:pgorm:def:sql.ast.case]
+/// One arm of a [`SimpleCaseStatement`]: the value the operand is compared
+/// with, and the result that comparison selects.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SimpleCaseArm {
+    pub(crate) value: SimpleExpr,
+    pub(crate) result: SimpleExpr,
+}
+
+/// The searched form of `CASE`: `CASE WHEN <condition> THEN <result> … END`.
+///
+/// Each arm holds a condition. The *simple* form, which compares one operand
+/// against each arm's value, is [`SimpleCaseStatement`] — a separate type,
+/// because its arms hold values instead and the two shapes do not mix.
+// [spec:pgorm:def:sql.ast.case+1]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct CaseStatement {
     pub(crate) when: Vec<CaseStatementCondition>,
@@ -131,6 +144,172 @@ impl CaseStatement {
 impl Into<SimpleExpr> for CaseStatement {
     fn into(self) -> SimpleExpr {
         SimpleExpr::Case(Box::new(self))
+    }
+}
+
+/// A simple-form `CASE` holding its operand and no arm yet, as returned by
+/// [`Expr::case_of`].
+///
+/// It has one method, [`when`](Self::when), which adds the first arm and
+/// yields a [`SimpleCaseStatement`]. It does not convert into an expression:
+/// PostgreSQL's grammar requires at least one `WHEN`, so a CASE with none has
+/// no expression to become.
+// [spec:pgorm:def:sql.ast.case+1]
+#[derive(Debug, Clone, PartialEq)]
+pub struct CaseOperand {
+    operand: SimpleExpr,
+}
+
+impl CaseOperand {
+    /// Adds the first `WHEN <value> THEN <result>` arm.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .expr_as(
+    ///         Expr::case_of(Expr::col(Glyph::Aspect)).when(1, "one"),
+    ///         Name::runtime("name"),
+    ///     )
+    ///     .from(Glyph::Table)
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT (CASE "aspect" WHEN 1 THEN 'one' END) AS "name" FROM "glyph""#
+    /// );
+    /// ```
+    pub fn when<V, T>(self, value: V, then: T) -> SimpleCaseStatement
+    where
+        V: Into<SimpleExpr>,
+        T: Into<SimpleExpr>,
+    {
+        SimpleCaseStatement {
+            operand: self.operand,
+            when: vec![SimpleCaseArm {
+                value: value.into(),
+                result: then.into(),
+            }],
+            r#else: None,
+        }
+    }
+}
+
+/// The simple form of `CASE`: `CASE <operand> WHEN <value> THEN <result> …
+/// END`, which compares one operand against each arm's value in turn.
+///
+/// Built from [`Expr::case_of`] and its first [`when`](CaseOperand::when), so
+/// it always holds at least one arm. The comparison is `=`, which makes a NULL
+/// operand match no arm — not even `WHEN NULL` — and fall through to the
+/// `ELSE`, where the searched form's `WHEN x IS NULL` would match. The
+/// searched form, whose arms hold conditions, is [`CaseStatement`].
+// [spec:pgorm:def:sql.ast.case+1]
+#[derive(Debug, Clone, PartialEq)]
+pub struct SimpleCaseStatement {
+    pub(crate) operand: SimpleExpr,
+    pub(crate) when: Vec<SimpleCaseArm>,
+    pub(crate) r#else: Option<SimpleExpr>,
+}
+
+impl SimpleCaseStatement {
+    /// Adds a further `WHEN <value> THEN <result>` arm. Arms are tried in the
+    /// order they were added, and the first whose value equals the operand
+    /// wins.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .expr_as(
+    ///         Expr::case_of(Expr::col(Glyph::Aspect))
+    ///             .when(1, "one")
+    ///             .when(2, "two")
+    ///             .finally("many"),
+    ///         Name::runtime("name"),
+    ///     )
+    ///     .from(Glyph::Table)
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT (CASE "aspect" WHEN 1 THEN 'one' WHEN 2 THEN 'two' ELSE 'many' END) AS "name" FROM "glyph""#
+    /// );
+    /// ```
+    pub fn when<V, T>(mut self, value: V, then: T) -> Self
+    where
+        V: Into<SimpleExpr>,
+        T: Into<SimpleExpr>,
+    {
+        self.when.push(SimpleCaseArm {
+            value: value.into(),
+            result: then.into(),
+        });
+        self
+    }
+
+    /// Ends the case expression with the `ELSE` result, which is what an
+    /// operand equal to no arm's value — a NULL operand included — yields.
+    /// Without one, such an operand yields NULL.
+    pub fn finally<E>(mut self, r#else: E) -> Self
+    where
+        E: Into<SimpleExpr>,
+    {
+        self.r#else = Some(r#else.into());
+        self
+    }
+}
+
+impl From<SimpleCaseStatement> for SimpleExpr {
+    fn from(case: SimpleCaseStatement) -> Self {
+        SimpleExpr::SimpleCase(Box::new(case))
+    }
+}
+
+// `Expr`'s own file is at its function cap, so the entry point to the simple
+// form sits here, beside the two types it leads to.
+impl Expr {
+    /// Starts a simple-form `CASE` over `operand`: `CASE <operand> WHEN …`.
+    ///
+    /// Each [`when`](CaseOperand::when) arm compares the operand with a value
+    /// by `=`, so a NULL operand matches no arm and takes the `ELSE`. For arms
+    /// that each test their own condition, use [`Expr::case`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .column(Glyph::Id)
+    ///     .from(Glyph::Table)
+    ///     .and_where(
+    ///         Expr::expr(
+    ///             Expr::case_of(Expr::col(Glyph::Image))
+    ///                 .when("a", 1)
+    ///                 .when("b", 2)
+    ///                 .finally(0),
+    ///         )
+    ///         .gt(0),
+    ///     )
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "id" FROM "glyph" WHERE (CASE "image" WHEN 'a' THEN 1 WHEN 'b' THEN 2 ELSE 0 END) > 0"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.case+1]
+    pub fn case_of<T>(operand: T) -> CaseOperand
+    where
+        T: Into<SimpleExpr>,
+    {
+        CaseOperand {
+            operand: operand.into(),
+        }
     }
 }
 

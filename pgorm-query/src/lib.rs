@@ -638,8 +638,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface]
-// [spec:pgorm:req:sql.surface/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+1]
+// [spec:pgorm:req:sql.surface+1/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -649,7 +649,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope]
+// [spec:pgorm:req:sql.scope+1]
 mod backend;
 mod comment;
 pub mod error;
@@ -705,12 +705,13 @@ pub use value::{
 // Query statements: the four DML builders, the clauses they take, and the
 // traits that let a caller write against any of them.
 pub use query::{
-    AnyWithClause, CaseStatement, CommonTableExpression, Condition, ConditionExpression,
-    ConditionType, ConditionalStatement, Cycle, DeleteStatement, Frame, FrameClause, FrameType,
-    InsertStatement, IntoCondition, LockBehavior, LockType, OrderedStatement, OverStatement,
-    Overriding, Query, QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause,
-    Search, SearchOrder, SelectExpr, SelectStatement, SubQueryStatement, UnionType,
-    UpdateStatement, WindowSelectType, WindowStatement, WithClause,
+    AnyWithClause, CaseOperand, CaseStatement, CommonTableExpression, Condition,
+    ConditionExpression, ConditionType, ConditionalStatement, Cycle, DeleteStatement, Frame,
+    FrameClause, FrameType, InsertStatement, IntoCondition, LockBehavior, LockType,
+    OrderedStatement, OverStatement, Overriding, Query, QueryStatementBuilder, RecursiveWithClause,
+    Returning, ReturningClause, Search, SearchOrder, SelectExpr, SelectStatement,
+    SimpleCaseStatement, SubQueryStatement, UnionType, UpdateStatement, WindowSelectType,
+    WindowStatement, WithClause,
 };
 pub use query::{
     ConflictAction, ConflictAssignment, ConflictAssignments, ConflictElement, ConflictTarget,

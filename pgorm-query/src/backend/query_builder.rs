@@ -10,6 +10,11 @@ use crate::{
 };
 use std::ops::Deref;
 
+// Construct-specific renderers live in child modules, which see this file's
+// private `prepare_*` methods without widening them.
+#[path = "query_builder_case.rs"]
+mod case;
+
 /// Discard sub-microsecond digits before a temporal value is rendered as a
 /// literal. PostgreSQL stores microseconds and would round a ninth digit,
 /// while the parameter path discards it — so without this the same value means
@@ -471,6 +476,9 @@ impl QueryBuilder {
             SimpleExpr::Case(case_stmt) => {
                 self.prepare_case_statement(case_stmt, sql);
             }
+            SimpleExpr::SimpleCase(case_stmt) => {
+                self.prepare_simple_case_statement(case_stmt, sql);
+            }
             SimpleExpr::Constant(val) => {
                 self.prepare_constant(val, sql);
             }
@@ -489,27 +497,6 @@ impl QueryBuilder {
             write!(sql, " ESCAPE ").unwrap();
             self.prepare_constant(&escape.into(), sql);
         }
-    }
-
-    /// Translate [`CaseStatement`] into SQL statement.
-    fn prepare_case_statement(&self, stmts: &CaseStatement, sql: &mut dyn SqlWriter) {
-        write!(sql, "(CASE").unwrap();
-
-        let CaseStatement { when, r#else } = stmts;
-
-        for case in when.iter() {
-            write!(sql, " WHEN (").unwrap();
-            self.prepare_condition_where(&case.condition, sql);
-            write!(sql, ") THEN ").unwrap();
-
-            self.prepare_simple_expr(&case.result, sql);
-        }
-        if let Some(r#else) = r#else.clone() {
-            write!(sql, " ELSE ").unwrap();
-            self.prepare_simple_expr(&r#else, sql);
-        }
-
-        write!(sql, " END)").unwrap();
     }
 
     /// Translate [`LockType`] into SQL statement.
@@ -2494,7 +2481,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+3]
+    // [spec:pgorm:def:sql.render.precedence+4]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2508,6 +2495,7 @@ impl QueryBuilder {
             | SimpleExpr::Value(_)
             | SimpleExpr::Keyword(_)
             | SimpleExpr::Case(_)
+            | SimpleExpr::SimpleCase(_)
             | SimpleExpr::LikePattern(_)
             | SimpleExpr::AsEnum(_, _)
             | SimpleExpr::SubQuery(_, _) => true,
@@ -2556,7 +2544,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+3]
+// [spec:pgorm:def:sql.render.precedence+4]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface]
+> [spec:pgorm:req:sql.surface+1]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -65,6 +65,10 @@ today, including panicking edges and deliberate failsafes.
 > accessors only the conformance suite calls. Each of those MUST be named
 > individually in `lib.rs` rather than left to a glob, so the residue is a list
 > a later pass can work through rather than a category.
+>
+> The list grows only by a named item that a rule specifies, and each addition
+> is recorded here with that rule: `CaseOperand` and `SimpleCaseStatement`,
+> the simple form of `CASE` (`sql.ast.case`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -100,7 +104,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope]
+> [spec:pgorm:req:sql.scope+1]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -134,11 +138,6 @@ today, including panicking edges and deliberate failsafes.
 >   `Vec<SimpleExpr>`; these need a grouping-element tree (a set of sets, with
 >   the two shorthands as its constructors) and a renderer for it. The
 >   `GROUPING()` function that reads the result belongs with them.
-> - **Simple-form `CASE expr WHEN value`.** `CaseStatement` is searched-only:
->   its arms hold a `Condition`. The operand form compares an expression
->   against arm *values*, so the two arm shapes must not mix — closing this
->   means either a second statement type or an arm enum, not a nullable
->   operand field beside the existing arms.
 > - **Array subscripts and slices (`a[i]`, `a[i:j]`).** A new `SimpleExpr`
 >   variant with an index or a pair of optional bounds, plus an arm in the
 >   renderer's exhaustive match and a place in the atom list of
@@ -392,13 +391,14 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+2]
+> [spec:pgorm:def:sql.ast.expr+3]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
 > `Value` (parameterised), `Values`, `Raw(&'static str)` (verbatim SQL),
-> `Template(SqlTemplate)`, `Keyword`, `AsEnum`, `Case`, and `Constant`
-> (inlined literal). `SqlTemplate` holds a template with `$1`-style splices
+> `Template(SqlTemplate)`, `Keyword`, `AsEnum`, `Case` and `SimpleCase` (the
+> searched and simple forms of `sql.ast.case`), `Constant` (inlined literal),
+> and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
 > (`$$` escaping a literal `$`) already resolved against the expressions it
 > substitutes; its segments are private and its only constructor is
 > `SqlTemplate::new`, which returns `Result`, so the AST cannot hold a template
@@ -417,7 +417,8 @@ today, including panicking edges and deliberate failsafes.
 > `Expr::any`, `Expr::some`, and `Expr::all` wrap a `SelectStatement` in
 > `EXISTS(...)`, `ANY(...)`, `SOME(...)`, and `ALL(...)` respectively.
 > `From` conversions lift `Value`-convertible Rust primitives, `FunctionCall`,
-> `ColumnRef`, `Keyword`, `CaseStatement`, and finished `Expr` builders into
+> `ColumnRef`, `Keyword`, `CaseStatement`, `SimpleCaseStatement`, and finished
+> `Expr` builders into
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
@@ -825,15 +826,41 @@ today, including panicking edges and deliberate failsafes.
 
 ## CASE expressions
 
-> [spec:pgorm:def:sql.ast.case]
-> `CaseStatement` builds a searched CASE expression: each `case(cond, then)`
-> call appends a `WHEN <condition> THEN <result>` arm — the condition is any
+> [spec:pgorm:def:sql.ast.case+1]
+> PostgreSQL's two CASE forms are two types, because their arms have two
+> shapes and a CASE mixing them has no spelling.
+>
+> `CaseStatement` builds the searched form: each `case(cond, then)` call
+> appends a `WHEN <condition> THEN <result>` arm — the condition is any
 > `IntoCondition`, so `Condition` trees render with their `AND`/`OR`/`NOT`
 > structure inside the WHEN — and `finally(expr)` sets the optional `ELSE`
 > result. `Expr::case(cond, then)` is the shorthand constructor for the first
-> arm. A `CaseStatement` converts into `SimpleExpr::Case`, so a whole CASE
-> expression can be projected (with `expr_as`), compared, or used anywhere an
-> expression is accepted.
+> arm. A `CaseStatement` converts into `SimpleExpr::Case`.
+>
+> `SimpleCaseStatement` builds the simple form, `CASE <operand> WHEN <value>
+> THEN <result> … END`, whose arms hold *values* the one operand is compared
+> with. `Expr::case_of(operand)` takes the operand and returns a
+> `CaseOperand`, whose only method, `when(value, then)`, adds the first arm
+> and yields the `SimpleCaseStatement`; that type's own `when` appends further
+> arms in call order and `finally(expr)` sets the `ELSE`. Neither type offers
+> the other's arm method, so a condition arm cannot join an operand CASE nor a
+> value arm a searched one. The operand is a constructor argument rather than
+> an optional field beside the arms, and the first arm is a step rather than a
+> default: PostgreSQL's grammar requires at least one `WHEN`, so `CaseOperand`
+> does not convert into an expression, and a simple CASE with no arm has no
+> value to build. A `SimpleCaseStatement` converts into `SimpleExpr::SimpleCase`.
+>
+> The simple form is not an abbreviation of a searched CASE over `IS NULL`
+> tests. Each arm is the comparison `operand = value`, which is unknown when
+> either side is NULL, so a NULL operand matches no arm — `WHEN NULL`
+> included — and yields the `ELSE`, or NULL without one; the searched form's
+> `WHEN x IS NULL` is the spelling that catches it.
+>
+> Either form can be projected (with `expr_as`), compared, nested in the
+> other's results, or used anywhere an expression is accepted. The searched
+> form's `CaseStatement::new()` still builds a CASE with no arm, which renders
+> `(CASE END)` and which the grammar rejects; `Expr::case`, taking the first
+> arm, is the constructor that cannot.
 
 ## Casts
 

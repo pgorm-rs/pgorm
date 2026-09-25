@@ -110,6 +110,10 @@ fn sweep_expression_shapes() {
             .case(Expr::col(Glyph::Aspect).gt(1), Expr::val("big"))
             .finally(Expr::val("small"))
             .into(),
+        Expr::case_of(Expr::col(Glyph::Aspect))
+            .when(1, Expr::val("one"))
+            .finally(Expr::val("other"))
+            .into(),
         Func::count(Expr::col(Glyph::Id)).into(),
         Func::coalesce([Expr::col(Glyph::Aspect).into(), Expr::val(0).into()]).into(),
         Expr::val("1").cast_as(Name::runtime("int4")),

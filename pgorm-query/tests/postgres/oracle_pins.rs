@@ -608,3 +608,31 @@ fn quantifiers_are_valid_only_after_a_comparison() {
     assert_eq!(bare, r#"SELECT ANY(ARRAY [1,2]) FROM "glyph""#);
     assert_rejected(&bare);
 }
+
+// Open, and named in `sql.ast.case`: PostgreSQL's grammar requires at least one
+// `WHEN`, and the searched form's `CaseStatement::new()` predates
+// [dec:pgorm:invalid-states-unrepresentable], so it still builds a CASE with
+// none. The simple form cannot — `Expr::case_of` yields a `CaseOperand` that
+// converts into nothing until its first `when` — and neither can `Expr::case`,
+// which takes the searched form's first arm.
+// [spec:pgorm:req:sql.render.oracle/test]
+// [spec:pgorm:def:sql.ast.case+1/test]
+#[test]
+fn a_case_needs_at_least_one_arm() {
+    let armless = Query::select()
+        .expr(CaseStatement::new().finally("x"))
+        .to_string();
+
+    assert_eq!(armless, r#"SELECT (CASE ELSE 'x' END)"#);
+    assert_rejected(&armless);
+    assert_rejected(&Query::select().expr(CaseStatement::new()).to_string());
+
+    let armed = Query::select()
+        .expr(
+            Expr::case_of(Expr::col(Glyph::Aspect))
+                .when(1, "one")
+                .finally("x"),
+        )
+        .to_string();
+    assert_parses(&armed);
+}

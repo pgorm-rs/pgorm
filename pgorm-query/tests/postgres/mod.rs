@@ -1,5 +1,6 @@
 use pgorm_query::{tests_cfg::*, *};
 
+mod case;
 mod comment;
 mod extension;
 mod foreign_key;

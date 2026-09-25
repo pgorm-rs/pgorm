@@ -81,6 +81,67 @@ pub fn assert_query_eq(built: &str, expected: &str) {
     assert_parses(built);
 }
 
+/// Every node of kind `kind` (`"CaseExpr"`, `"AIndirection"`, `"GroupingSet"`)
+/// in `sql`'s parse tree, as JSON, each before the nodes nested inside it.
+///
+/// Parsing settles that a render is grammatical; this settles that it is the
+/// construct it was written as. A simple `CASE` whose operand was dropped, a
+/// subscript that became a function call, or a grouping set that flattened
+/// into a plain `GROUP BY` list all still parse.
+///
+/// The tree is read with the protobuf's `{"node": …}` wrappers and its unset
+/// (`null`) fields removed, so a path reads as the parser's own node names —
+/// `case["arg"]["ColumnRef"]` — and an absent field is `None` from `get`.
+///
+/// # Panics
+/// Panics when the PostgreSQL grammar rejects `sql`.
+pub fn parsed_nodes(sql: &str, kind: &str) -> Vec<serde_json::Value> {
+    let parsed =
+        pg_query::parse(sql).unwrap_or_else(|err| panic!("{}", diagnostic(sql, &err.to_string())));
+    let tree = serde_json::to_value(&parsed.protobuf).expect("a parse tree serialises");
+    let mut found = Vec::new();
+    collect_nodes(&unwrapped(tree), kind, &mut found);
+    found
+}
+
+fn unwrapped(node: serde_json::Value) -> serde_json::Value {
+    match node {
+        serde_json::Value::Object(mut fields) => {
+            if fields.len() == 1
+                && let Some(inner) = fields.remove("node")
+            {
+                return unwrapped(inner);
+            }
+            fields
+                .into_iter()
+                .filter(|(_, value)| !value.is_null())
+                .map(|(key, value)| (key, unwrapped(value)))
+                .collect()
+        }
+        serde_json::Value::Array(items) => items.into_iter().map(unwrapped).collect(),
+        other => other,
+    }
+}
+
+fn collect_nodes(node: &serde_json::Value, kind: &str, found: &mut Vec<serde_json::Value>) {
+    match node {
+        serde_json::Value::Object(fields) => {
+            for (key, value) in fields {
+                if key == kind {
+                    found.push(value.clone());
+                }
+                collect_nodes(value, kind, found);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_nodes(item, kind, found);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn diagnostic(sql: &str, message: &str) -> String {
     let mut report = format!(
         "render-conformance oracle: PostgreSQL rejected the rendered SQL\n  {message}\n\n  {sql}\n"

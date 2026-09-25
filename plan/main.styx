@@ -8661,6 +8661,22 @@ children (
             {
                 id scope-simple-case
                 title "Simple-form CASE compares one operand against arm values"
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T00:15:49.1968Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T01:02:12.227018Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

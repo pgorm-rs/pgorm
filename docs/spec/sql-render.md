@@ -296,12 +296,12 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+3]
+> [spec:pgorm:def:sql.render.precedence+4]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
 > `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
-> `LikePattern`, `AsEnum`, or
+> `SimpleCase`, `LikePattern`, `AsEnum`, or
 > `SubQuery` (all but the first two are already self-wrapping — `AsEnum` is
 > the cast of `[spec:pgorm:req:sql.ast.cast-shape]` and spells its own
 > `CAST(…)` parentheses, which is why folding the second cast shape into it
@@ -597,6 +597,33 @@ an ideal Postgres renderer would emit.
 > the renderer has no invalid clause to guard against. Row selection that needs
 > an order or a limit is expressed by the caller as a subquery filter over a
 > SELECT, which carries both.
+
+## CASE
+
+> [spec:pgorm:req:sql.render.case]
+> Both forms of `sql.ast.case` MUST render self-parenthesised, `(CASE … END)`,
+> which is what places them among the atoms of `sql.render.precedence`. The
+> searched form renders each arm as ` WHEN (` condition `) THEN ` result, the
+> condition through `prepare_condition_where`. The simple form renders its
+> operand once, directly after `CASE `, then each arm as ` WHEN ` value
+> ` THEN ` result with the value bare: `WHEN` and `THEN` delimit every
+> expression the grammar admits in those positions, so neither the operand nor
+> a value needs parentheses of its own, and a compound one (`"a" + 1`,
+> `x > 1 AND y < 9`) is read whole. Both forms then render ` ELSE ` and the
+> default result when one is set, and ` END)`; the two share that tail.
+>
+> Parameters number in textual order — the operand, then each arm's value and
+> result in turn, then the `ELSE` — per `sql.render.placeholders`, and the
+> renderer pins none of them (`sql.render.placeholder-typing`). The server
+> types a simple-form arm value from its `=` comparison with the operand, but
+> a result is typed only by its sibling results, so a CASE whose results are
+> all bound values leaves the caller to supply their type.
+>
+> The parser tells the two forms apart by one field — libpg_query's
+> `CaseExpr.arg`, set for the simple form and empty for the searched one — so
+> each rendering is held to that node and not only to the grammar: a simple
+> CASE whose operand went missing still parses, as a searched CASE over
+> non-boolean arms.
 
 ## Custom expressions
 

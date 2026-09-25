@@ -17,7 +17,7 @@ fn select_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.expr+2/test]
+// [spec:pgorm:def:sql.ast.expr+3/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -1037,7 +1037,7 @@ fn select_58() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.case/test]
+// [spec:pgorm:def:sql.ast.case+1/test]
 #[test]
 fn select_59() {
     let query = Query::select()
@@ -2083,7 +2083,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+3/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+4/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2223,7 +2223,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+3/test]
+// [spec:pgorm:def:sql.render.precedence+4/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
