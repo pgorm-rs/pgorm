@@ -8954,4 +8954,18 @@ children (
             }
         )
     }
+
+    {
+        id embedded-index-kinds
+        title "A table constraint embedded in CREATE TABLE is always one PostgreSQL accepts"
+        kind @fix
+        log (
+            {
+                at 2026-09-25T05:07:37.037603Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Flagged independently by three missions (95840ed2's embedding test, a1653e01's index forms, bf3bf75d's deferrability). `TableCreateStatement::index(..)` embeds an `IndexCreateStatement` as a table constraint, and the index type admits shapes a table constraint cannot take: a `Plain` (non-unique, non-primary) kind renders `CONSTRAINT \"idx\" (\"col\")`, which PostgreSQL rejects, and a partial-index predicate or an expression column has no table-constraint spelling either. `sql.ddl.create-table` documents both as known gaps. bf3bf75d introduced `IndexConstraint`, the wrapper `index()`/`primary_key()` now take, which is the natural place to rule them out: only a unique or primary-key index with plain column entries (and optional INCLUDE and deferrability) should convert into an `IndexConstraint`; a plain kind, a predicate or an expression entry should not be representable on the embedded path, and should remain available on standalone `CREATE INDEX`. Establish the accepted table-constraint shapes live, make the refused ones unrepresentable (compile_fail doctests), sweep callers (codegen emits embedded indexes), and update sql.ddl.create-table / sql.ddl.index-create."
+            }
+        )
+    }
 )
