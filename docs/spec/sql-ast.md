@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+3]
+> [spec:pgorm:req:sql.surface+4]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -72,7 +72,10 @@ today, including panicking edges and deliberate failsafes.
 > subscript holds between its brackets (`sql.ast.expr.subscript`);
 > `GroupingElement`, `GroupingSets` and `Grouping`, the GROUP BY items beyond
 > a plain expression and the `GROUPING()` that reads them
-> (`sql.ast.select.grouping`).
+> (`sql.ast.select.grouping`); `FrameStart`, its three side markers
+> `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
+> `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
+> the bound enum `Frame` (`sql.ast.window-statement`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -108,7 +111,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+3]
+> [spec:pgorm:req:sql.scope+4]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -152,13 +155,6 @@ today, including panicking edges and deliberate failsafes.
 >   constraint form its own small typestate, so `and_column` and `and_where`
 >   stay unreachable from it; a variant inside `ConflictElement` would make
 >   both invalid states constructible.
-> - **Window frame `EXCLUDE` and expression offsets.** `Frame`'s offsets are
->   `u32`, so `RANGE '1 day' PRECEDING` has no spelling; widening them to
->   `SimpleExpr` is the honest fix and is a breaking change to a public enum.
->   `EXCLUDE { CURRENT ROW | GROUP | TIES | NO OTHERS }` is a fourth field on
->   `FrameClause`, but it is grammatical only inside a frame, so it needs a
->   builder shape that cannot set it without one — the three existing
->   positional `frame*` methods do not admit a fourth argument cleanly.
 > - **`COLLATE`.** Postfix, and its right operand is a collation *name*, not an
 >   expression, so it is a dedicated `SimpleExpr` variant holding a `Name` —
 >   the shape `AsEnum` uses — rather than a `BinOper`, which would admit
@@ -868,25 +864,64 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+4]
+> [spec:pgorm:def:sql.ast.window-statement+5]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, and the `OverStatement` trait's
 > `partition_by_columns`), ORDER BY expressions (shared
-> `OrderedStatement` trait), and an optional `FrameClause` — a `FrameType`
-> with a start `Frame` and optional end `Frame`
-> (`UnboundedPreceding`, `Preceding(n)`, `CurrentRow`, `Following(n)`,
-> `UnboundedFollowing`), set via `frame_start` (single bound) or
-> `frame_between` (`BETWEEN .. AND ..`).
+> `OrderedStatement` trait), and an optional `FrameClause`, set by
+> `frame(f)` from anything `Into<FrameClause>`; a second call replaces the
+> first.
 >
 > `FrameType` is all three of PostgreSQL's frame modes — `Range`, `Rows`,
 > `Groups` — because the offset means something different under each and none
 > of the three is expressible through the others: `Rows` counts rows, `Range`
 > counts a distance in the ordering column's own values, and `Groups` counts
 > whole peer groups, so `GROUPS 1 PRECEDING` reaches back past every row tied
-> with the one before. Offsets are `u32` and bind as parameters, which is the
-> boundary this type keeps: an interval or expression offset
-> (`RANGE '1 day' PRECEDING`) and the `EXCLUDE` tail are both outside it
-> (`[spec:pgorm:req:sql.scope]`).
+> with the one before.
+>
+> A frame is begun from its mode, and its start is typed by the side of the
+> current row it lies on, because PostgreSQL's grammar refuses every frame
+> whose end comes before its start and none of those MUST construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). `FrameType`'s four methods
+> name the start — `unbounded_preceding()`, `preceding(offset)`,
+> `current_row()`, `following(offset)`, and no `UNBOUNDED FOLLOWING` — and
+> return a `FrameStart<S>`, whose marker `S` is `FramePreceding`,
+> `FrameCurrentRow` or `FrameFollowing`. Its `and_*` methods give the frame an
+> end, `BETWEEN <start> AND <end>`, and each side offers only the ends that may
+> follow it: after a preceding start `and_preceding(offset)`,
+> `and_current_row()`, `and_following(offset)` and `and_unbounded_following()`;
+> after `CURRENT ROW` all but `and_preceding`; after a following start only
+> `and_following` and `and_unbounded_following`. A preceding or current-row
+> start also stands alone as a whole frame, converting into a `FrameClause`,
+> and a following start does not, because PostgreSQL reads a lone start as
+> running to the current row, which lies behind it. `ROWS UNBOUNDED
+> FOLLOWING`, `… AND UNBOUNDED PRECEDING`, `BETWEEN CURRENT ROW AND 1
+> PRECEDING`, `BETWEEN 1 FOLLOWING AND CURRENT ROW` and `ROWS 1 FOLLOWING`
+> therefore have no construction. The public `Frame` enum, which could spell
+> all five, is gone; the bound is the crate's own `FrameBound`.
+>
+> An offset is any `Into<SimpleExpr>`, not a count, because under `Range` it is
+> a value of the type PostgreSQL pairs with the ordering column's — an
+> `interval` over a timestamp, a `numeric` over a numeric — which a count
+> cannot spell. The builder does not know the ordering column's type, so the
+> pairing is the server's to check, and these refusals are the server's: an
+> offset whose type the column's does not pair with (`0A000` under `Range`,
+> and `42804` under `Rows` and `Groups`, whose offsets are `bigint` counts); a
+> `Range` offset in a window without exactly one ORDER BY column (`42P20`); a
+> `Groups` frame in a window with no ORDER BY (`42P20`); an offset that reads a
+> column (`42P10`); and a negative one (`22013`). A bound offset is a `$N` the
+> server types from the same pairing — `interval`, `numeric` or `bigint` — so
+> a text value bound where it expects an `interval` fails at bind, and the
+> offset is spelled with a cast (`sql.render.placeholder-typing`).
+>
+> `FrameClause::exclude(e)` adds the `EXCLUDE` clause, `FrameExclusion` being
+> `CurrentRow`, `Group`, `Ties` or `NoOthers`; a second call replaces the
+> first, and a lone start has the same method. The clause is grammatical only
+> inside a frame, and it is a method of the frame rather than of the window,
+> so a window without a frame has nothing to call it on. Each exclusion is
+> relative to the current row's peers — the rows the window's ORDER BY ties
+> with it — so `Group` and `Ties` differ from `CurrentRow` only where the
+> ordering ties, and `NoOthers` removes nothing: it is the default, spelled.
 >
 > A select projection references a window in one of two ways
 > (`WindowSelectType`): `Query` embeds the window inline (`expr_window`,

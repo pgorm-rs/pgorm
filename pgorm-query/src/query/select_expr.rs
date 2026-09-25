@@ -1,7 +1,7 @@
 use crate::{WindowStatement, expr::SimpleExpr, types::*};
 
 /// Window type in [`SelectExpr`]
-// [spec:pgorm:def:sql.ast.window-statement+4]
+// [spec:pgorm:def:sql.ast.window-statement+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindowSelectType {
     /// Name in [`SelectStatement`][crate::SelectStatement]
@@ -18,7 +18,7 @@ pub enum WindowSelectType {
 /// [`SelectStatement::expr_window`][crate::SelectStatement::expr_window]
 /// family — which takes a [`FunctionCall`][crate::FunctionCall] — and cannot
 /// be taken apart afterwards.
-// [spec:pgorm:def:sql.ast.window-statement+4]
+// [spec:pgorm:def:sql.ast.window-statement+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectExpr {
     pub(crate) expr: SimpleExpr,
@@ -28,7 +28,7 @@ pub struct SelectExpr {
 
 impl SelectExpr {
     /// A projection of `expr` under no alias and no window.
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn new<T>(expr: T) -> Self
     where
         T: Into<SimpleExpr>,
@@ -41,7 +41,7 @@ impl SelectExpr {
     }
 
     /// A projection of `expr` under `alias`.
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn new_as<T, A>(expr: T, alias: A) -> Self
     where
         T: Into<SimpleExpr>,
@@ -55,13 +55,13 @@ impl SelectExpr {
     }
 
     /// The projected expression.
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn expr(&self) -> &SimpleExpr {
         &self.expr
     }
 
     /// The window this projection is evaluated over, if any.
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn window(&self) -> Option<&WindowSelectType> {
         self.window.as_ref()
     }

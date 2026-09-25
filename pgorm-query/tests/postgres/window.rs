@@ -5,9 +5,9 @@ fn counted() -> FunctionCall {
     Func::count(Expr::col(Char::Id))
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    PARTITION BY accumulates from all four entry
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    PARTITION BY accumulates from all four entry
 // points
-// [spec:pgorm:req:sql.render.window+4/test]    an inline window renders ` OVER ( … )`
+// [spec:pgorm:req:sql.render.window+5/test]    an inline window renders ` OVER ( … )`
 #[test]
 fn window_1() {
     assert_eq!(
@@ -39,9 +39,9 @@ fn window_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    ORDER BY comes from the shared
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    ORDER BY comes from the shared
 // `OrderedStatement` trait
-// [spec:pgorm:req:sql.render.window+4/test]    ` PARTITION BY … ORDER BY …`
+// [spec:pgorm:req:sql.render.window+5/test]    ` PARTITION BY … ORDER BY …`
 #[test]
 fn window_2() {
     assert_eq!(
@@ -86,9 +86,9 @@ fn window_2() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    `frame_start` sets a single bound,
-// `frame_between` sets both, for either frame type
-// [spec:pgorm:req:sql.render.window+4/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    a lone start is a whole frame, and
+// `and_*` gives one an end, for either frame type
+// [spec:pgorm:req:sql.render.window+5/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
 // the start bound alone
 #[test]
 fn window_3() {
@@ -98,7 +98,7 @@ fn window_3() {
             .expr_window(
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
-                    .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
+                    .frame(FrameType::Rows.unbounded_preceding())
                     .take()
             )
             .to_string(),
@@ -116,10 +116,10 @@ fn window_3() {
             .expr_window(
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
-                    .frame_between(
-                        FrameType::Range,
-                        Frame::UnboundedPreceding,
-                        Frame::UnboundedFollowing
+                    .frame(
+                        FrameType::Range
+                            .unbounded_preceding()
+                            .and_unbounded_following()
                     )
                     .take()
             )
@@ -132,19 +132,19 @@ fn window_3() {
         .join(" ")
     );
 
-    // The last `frame`/`frame_start`/`frame_between` call wins.
+    // The last `frame` call wins.
     assert_eq!(
         Query::select()
             .from(Char::Table)
             .expr_window(
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
-                    .frame_between(
-                        FrameType::Range,
-                        Frame::UnboundedPreceding,
-                        Frame::UnboundedFollowing
+                    .frame(
+                        FrameType::Range
+                            .unbounded_preceding()
+                            .and_unbounded_following()
                     )
-                    .frame_start(FrameType::Rows, Frame::CurrentRow)
+                    .frame(FrameType::Rows.current_row())
                     .take()
             )
             .to_string(),
@@ -157,7 +157,7 @@ fn window_3() {
     );
 }
 
-// [spec:pgorm:req:sql.render.window+4/test]    a bounded offset renders the value, a space, then
+// [spec:pgorm:req:sql.render.window+5/test]    a bounded offset renders the value, a space, then
 // the keyword
 #[test]
 fn window_4() {
@@ -167,7 +167,7 @@ fn window_4() {
             .expr_window(
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
-                    .frame_between(FrameType::Rows, Frame::Preceding(2), Frame::Following(3))
+                    .frame(FrameType::Rows.preceding(2).and_following(3))
                     .take()
             )
             .build(),
@@ -178,7 +178,7 @@ fn window_4() {
                 r#"FROM "character""#,
             ]
             .join(" "),
-            Values(vec![Value::Unsigned(Some(2)), Value::Unsigned(Some(3))])
+            Values(vec![Value::Int(Some(2)), Value::Int(Some(3))])
         )
     );
 
@@ -189,7 +189,7 @@ fn window_4() {
             .expr_window(
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
-                    .frame_start(FrameType::Rows, Frame::Preceding(2))
+                    .frame(FrameType::Rows.preceding(2))
                     .take()
             )
             .to_string(),
@@ -202,7 +202,7 @@ fn window_4() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    all three frame modes render, GROUPS
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    all three frame modes render, GROUPS
 // included, and an offset means the same to the renderer in each
 #[test]
 fn every_frame_mode_renders_its_keyword() {
@@ -213,7 +213,7 @@ fn every_frame_mode_renders_its_keyword() {
                 counted(),
                 WindowStatement::partition_by(Char::FontSize)
                     .order_by(Char::SizeW, Order::Asc)
-                    .frame_between(r#type, Frame::Preceding(1), Frame::Following(1))
+                    .frame(r#type.preceding(1).and_following(1))
                     .take(),
             )
             .to_string()
@@ -236,9 +236,9 @@ fn every_frame_mode_renders_its_keyword() {
     }
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    `WindowSelectType::Name` references a window
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    `WindowSelectType::Name` references a window
 // declared at statement level with `SelectStatement::window`
-// [spec:pgorm:req:sql.render.window+4/test]    a named reference renders ` OVER "name"` and its
+// [spec:pgorm:req:sql.render.window+5/test]    a named reference renders ` OVER "name"` and its
 // declaration ` WINDOW "name" AS ( … )`
 #[test]
 fn window_5() {
@@ -275,7 +275,7 @@ fn window_5() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    the statement holds at most one named window:
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    the statement holds at most one named window:
 // a second `window()` call replaces the first
 #[test]
 fn window_6() {
@@ -300,13 +300,13 @@ fn window_6() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+4/test]    `take()` moves the contents out and leaves the
+// [spec:pgorm:def:sql.ast.window-statement+5/test]    `take()` moves the contents out and leaves the
 // builder empty
 #[test]
 fn window_7() {
     let mut window = WindowStatement::partition_by(Char::FontSize);
     window.order_by(Char::Id, Order::Asc);
-    window.frame_start(FrameType::Rows, Frame::CurrentRow);
+    window.frame(FrameType::Rows.current_row());
 
     let taken = window.take();
     assert_eq!(window, WindowStatement::new());
@@ -315,7 +315,7 @@ fn window_7() {
 
 // [spec:pgorm:req:sql.render.select-order+4/test]    WINDOW sits with HAVING, ahead of the tail
 // clauses that apply to the whole result
-// [spec:pgorm:req:sql.render.window+4/test]
+// [spec:pgorm:req:sql.render.window+5/test]
 #[test]
 fn window_clause_precedes_order_limit_lock() {
     assert_eq!(

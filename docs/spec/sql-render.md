@@ -418,7 +418,7 @@ an ideal Postgres renderer would emit.
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
 
-> [spec:pgorm:req:sql.render.window+4]
+> [spec:pgorm:req:sql.render.window+5]
 > A window specification is never emitted bare: `prepare_window_spec` wraps it
 > in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
 > way a specification reaches the sink. Both spelling sites therefore agree —
@@ -440,10 +440,21 @@ an ideal Postgres renderer would emit.
 > ` ORDER BY ` order-exprs, then the frame clause: ` RANGE `, ` ROWS ` or
 > ` GROUPS `,
 > followed by either `BETWEEN start AND end` when an end bound exists or the
-> start bound alone. Frame bounds render `UNBOUNDED PRECEDING`,
-> `CURRENT ROW`, `UNBOUNDED FOLLOWING`; bounded offsets render the value —
-> a `$N` parameter in the `build()` path, the literal inline — then a space
-> and the keyword (`$1 PRECEDING`, `2 FOLLOWING`).
+> start bound alone, then ` EXCLUDE ` and `CURRENT ROW`, `GROUP`, `TIES` or
+> `NO OTHERS` when an exclusion is set. Frame bounds render `UNBOUNDED
+> PRECEDING`, `CURRENT ROW`, `UNBOUNDED FOLLOWING`; an offset bound renders its
+> expression through `prepare_simple_expr` — a value as a `$N` parameter in the
+> `build()` path and as the literal inline, a cast or arithmetic as itself —
+> then a space and the keyword (`$1 PRECEDING`, `CAST('1 day' AS interval)
+> PRECEDING`, `1 + 1 FOLLOWING`). The offset takes no parentheses of its own:
+> the keyword after it ends the expression, as `WHEN` and `THEN` do in
+> `sql.render.case`.
+>
+> The frame renders in a child module of the query builder,
+> `query_builder_window.rs`. A frame whose bound, `BETWEEN` or exclusion went
+> missing still parses — as a different frame — so each rendering is held to
+> libpg_query's `frame_options` bitmask and its offset nodes, not only to the
+> grammar.
 
 > [spec:pgorm:req:sql.render.func-mods]
 > `prepare_function_arguments` MUST render a call's parenthesized argument

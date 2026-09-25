@@ -18,7 +18,7 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    Expr, Frame, FrameType, Func, Keyword, Name, Order, OrderedStatement, Query, SelectStatement,
+    Expr, FrameType, Func, Keyword, Name, Order, OrderedStatement, Query, SelectStatement,
     SimpleExpr, UnionType, WindowStatement,
 };
 use pgorm::{ConnectionTrait, entity::prelude::*};
@@ -75,7 +75,7 @@ fn counting(sample: &str) -> SelectStatement {
 /// and `IS NOT DISTINCT FROM` finds exactly them — so the operator is not a
 /// verbose spelling of the comparison it sits beside.
 // [spec:pgorm:req:sql.ast.expr.operators+3/test]
-// [spec:pgorm:req:sql.scope+3/test]
+// [spec:pgorm:req:sql.scope+4/test]
 async fn distinct_from_answers_where_equality_says_unknown(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -128,7 +128,7 @@ async fn distinct_from_answers_where_equality_says_unknown(
 /// run over the same reversed pair, so a dropped keyword shows up as the two
 /// answers agreeing.
 // [spec:pgorm:req:sql.ast.expr.operators+3/test]
-// [spec:pgorm:req:sql.scope+3/test]
+// [spec:pgorm:req:sql.scope+4/test]
 async fn symmetric_between_sorts_the_bounds_it_is_given(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -176,7 +176,7 @@ async fn symmetric_between_sorts_the_bounds_it_is_given(
 /// shape, same operator, identity answer — so a clause the server ignored
 /// would leave both answers at midnight.
 // [spec:pgorm:req:sql.ast.expr.operators+3/test]
-// [spec:pgorm:req:sql.scope+3/test]
+// [spec:pgorm:req:sql.scope+4/test]
 async fn at_time_zone_shifts_the_clock(db: &DatabaseConnection) -> Result<(), Error> {
     let read_in = |zone: &str| {
         let local = Expr::col(Name::runtime("at_local")).at_time_zone("UTC");
@@ -203,13 +203,13 @@ async fn at_time_zone_shifts_the_clock(db: &DatabaseConnection) -> Result<(), Er
 /// `ROWS` counts rows, `RANGE` counts values within a distance, and `GROUPS`
 /// counts peer groups — three different answers from one offset, which is what
 /// makes `GROUPS` a mode rather than a spelling of one of the other two.
-// [spec:pgorm:def:sql.ast.window-statement+4/test]
-// [spec:pgorm:req:sql.scope+3/test]
+// [spec:pgorm:def:sql.ast.window-statement+5/test]
+// [spec:pgorm:req:sql.scope+4/test]
 async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Result<(), Error> {
     let framed = |r#type: FrameType| {
         WindowStatement::new()
             .order_by(Name::runtime("grade"), Order::Asc)
-            .frame_between(r#type, Frame::Preceding(1), Frame::CurrentRow)
+            .frame(r#type.preceding(1).and_current_row())
             .take()
     };
 
@@ -251,7 +251,7 @@ async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Re
 /// `INTERSECT ALL` and `EXCEPT ALL` the middle four answers would be
 /// unreachable from the builder at all.
 // [spec:pgorm:sem:query.build.union+1/test]
-// [spec:pgorm:req:sql.scope+3/test]
+// [spec:pgorm:req:sql.scope+4/test]
 async fn the_all_set_operations_keep_the_duplicates(db: &DatabaseConnection) -> Result<(), Error> {
     let bag = |table: &str| {
         Query::select()

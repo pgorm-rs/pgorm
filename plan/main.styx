@@ -8719,6 +8719,22 @@ children (
             {
                 id scope-frame-exclude
                 title "Window frames take expression offsets and an EXCLUDE clause"
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T03:11:10.059658Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T04:12:26.746987Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

@@ -15,7 +15,7 @@ use pgorm_query::extension::{Extension, Type};
 // between the bound value and the keyword, so the offset reads as an offset
 // rather than as trailing junk after a numeric literal.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.window+4/test]
+// [spec:pgorm:req:sql.render.window+5/test]
 #[test]
 fn window_frame_offset_renders_spaced() {
     let sql = Query::select()
@@ -23,7 +23,7 @@ fn window_frame_offset_renders_spaced() {
         .expr_window(
             Func::count(Expr::col(Char::Id)),
             WindowStatement::partition_by(Char::FontSize)
-                .frame_start(FrameType::Rows, Frame::Preceding(2))
+                .frame(FrameType::Rows.preceding(2))
                 .take(),
         )
         .to_string();
@@ -39,8 +39,8 @@ fn window_frame_offset_renders_spaced() {
 // rejection it used to be pinned to is proved by the `compile_fail` doctest on
 // `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:def:sql.ast.window-statement+4/test]
-// [spec:pgorm:req:sql.render.window+4/test]
+// [spec:pgorm:def:sql.ast.window-statement+5/test]
+// [spec:pgorm:req:sql.render.window+5/test]
 #[test]
 fn over_attaches_only_to_function_calls() {
     let sql = Query::select()

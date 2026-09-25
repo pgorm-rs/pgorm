@@ -10,6 +10,7 @@
 mod case;
 mod condition;
 mod delete;
+mod frame;
 mod grouping;
 mod insert;
 mod on_conflict;
@@ -25,6 +26,7 @@ mod with;
 pub use case::*;
 pub use condition::*;
 pub use delete::*;
+pub use frame::*;
 pub use grouping::*;
 pub use insert::*;
 pub use on_conflict::*;
@@ -36,6 +38,7 @@ pub use traits::*;
 pub use update::*;
 pub use window::*;
 
+pub(crate) use frame::FrameBound;
 pub(crate) use grouping::GroupingKind;
 pub use with::*;
 

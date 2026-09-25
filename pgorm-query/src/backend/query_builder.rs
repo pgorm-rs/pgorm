@@ -18,6 +18,8 @@ mod case;
 mod grouping;
 #[path = "query_builder_subscript.rs"]
 mod subscript;
+#[path = "query_builder_window.rs"]
+mod window;
 
 /// Discard sub-microsecond digits before a temporal value is rendered as a
 /// literal. PostgreSQL stores microseconds and would round a ninth digit,
@@ -538,7 +540,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+4] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+5] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -1276,27 +1278,9 @@ impl QueryBuilder {
         self.prepare_simple_expr(&simple_expr, sql);
     }
 
-    /// Translate [`Frame`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+4] (frame bounds)
-    fn prepare_frame(&self, frame: &Frame, sql: &mut dyn SqlWriter) {
-        match *frame {
-            Frame::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),
-            Frame::Preceding(v) => {
-                sql.push_param(v.into());
-                write!(sql, " PRECEDING").unwrap();
-            }
-            Frame::CurrentRow => write!(sql, "CURRENT ROW").unwrap(),
-            Frame::Following(v) => {
-                sql.push_param(v.into());
-                write!(sql, " FOLLOWING").unwrap();
-            }
-            Frame::UnboundedFollowing => write!(sql, "UNBOUNDED FOLLOWING").unwrap(),
-        }
-    }
-
     /// Translate a [`WindowStatement`] into the parenthesized window
     /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
-    // [spec:pgorm:req:sql.render.window+4]
+    // [spec:pgorm:req:sql.render.window+5]
     fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         write!(sql, "( ").unwrap();
         self.prepare_window_statement(window, sql);
@@ -1304,7 +1288,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+4]
+    // [spec:pgorm:req:sql.render.window+5]
     fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
         if !window.partition_by.is_empty() {
             write!(sql, "PARTITION BY ").unwrap();
@@ -1329,19 +1313,7 @@ impl QueryBuilder {
         }
 
         if let Some(frame) = &window.frame {
-            match frame.r#type {
-                FrameType::Range => write!(sql, " RANGE ").unwrap(),
-                FrameType::Rows => write!(sql, " ROWS ").unwrap(),
-                FrameType::Groups => write!(sql, " GROUPS ").unwrap(),
-            };
-            if let Some(end) = &frame.end {
-                write!(sql, "BETWEEN ").unwrap();
-                self.prepare_frame(&frame.start, sql);
-                write!(sql, " AND ").unwrap();
-                self.prepare_frame(end, sql);
-            } else {
-                self.prepare_frame(&frame.start, sql);
-            }
+            self.prepare_frame_clause(frame, sql);
         }
     }
 

@@ -869,6 +869,7 @@ assertions (
     {id scope-array-subscripts, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:36:17.387681Z}
     {id scope-grouping-sets, kind @complete, author "brendan@necessary.nu", at 2026-09-25T02:33:47.327387Z}
     {id searched-case-needs-arm, kind @complete, author "brendan@necessary.nu", at 2026-09-25T03:10:12.098266Z}
+    {id scope-frame-exclude, kind @complete, author "brendan@necessary.nu", at 2026-09-25T04:12:26.746987Z}
 )
 
 impl_evidence (

@@ -4,6 +4,7 @@ mod case;
 mod comment;
 mod extension;
 mod foreign_key;
+mod frame;
 mod func;
 mod grouping;
 mod index;

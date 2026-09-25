@@ -303,7 +303,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window+4/test]
+// [spec:pgorm:req:sql.render.window+5/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {
@@ -323,21 +323,38 @@ fn sweep_window_function_shapes() {
         ),
         over(
             WindowStatement::partition_by(Char::FontSize)
-                .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
+                .frame(FrameType::Rows.unbounded_preceding())
                 .take(),
         ),
         over(
             WindowStatement::partition_by(Char::FontSize)
-                .frame_start(FrameType::Range, Frame::CurrentRow)
+                .frame(FrameType::Range.current_row())
                 .take(),
         ),
         over(
             WindowStatement::partition_by(Char::FontSize)
-                .frame_between(
-                    FrameType::Rows,
-                    Frame::UnboundedPreceding,
-                    Frame::UnboundedFollowing,
+                .frame(
+                    FrameType::Rows
+                        .unbounded_preceding()
+                        .and_unbounded_following()
+                        .exclude(FrameExclusion::Ties),
                 )
+                .take(),
+        ),
+        over(
+            WindowStatement::partition_by(Char::FontSize)
+                .order_by(Char::SizeW, Order::Asc)
+                .frame(
+                    FrameType::Range
+                        .preceding(Expr::val("1 day").cast_as(Name::runtime("interval")))
+                        .and_following(Expr::val(1).add(1)),
+                )
+                .take(),
+        ),
+        over(
+            WindowStatement::partition_by(Char::FontSize)
+                .order_by(Char::SizeW, Order::Asc)
+                .frame(FrameType::Groups.following(1).and_unbounded_following())
                 .take(),
         ),
         Query::select()

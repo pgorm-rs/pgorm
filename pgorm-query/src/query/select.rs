@@ -574,7 +574,7 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn expr_window(&mut self, func: FunctionCall, window: WindowStatement) -> &mut Self {
         self.expr(SelectExpr {
             expr: func.into(),
@@ -605,7 +605,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn expr_window_as<A>(
         &mut self,
         func: FunctionCall,
@@ -644,7 +644,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
     where
         W: IntoName,
@@ -675,7 +675,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+4]
+    // [spec:pgorm:def:sql.ast.window-statement+5]
     pub fn expr_window_name_as<W, A>(
         &mut self,
         func: FunctionCall,

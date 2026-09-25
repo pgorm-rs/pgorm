@@ -27,44 +27,12 @@ pub trait OverStatement {
     }
 }
 
-/// frame_start or frame_end clause
-#[derive(Debug, Clone, PartialEq)]
-pub enum Frame {
-    UnboundedPreceding,
-    Preceding(u32),
-    CurrentRow,
-    Following(u32),
-    UnboundedFollowing,
-}
-
-/// The unit a frame's offsets are counted in — PostgreSQL's three frame modes.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FrameType {
-    /// Offsets are values, compared against the ordering column: every peer of
-    /// a row is inside the frame with it.
-    Range,
-    /// Offsets are row counts, so peers are split wherever the count falls.
-    Rows,
-    /// Offsets are counts of *peer groups*: `GROUPS 1 PRECEDING` reaches back
-    /// one whole group of ties rather than one row, which `Rows` cannot say
-    /// and `Range` can only say for a value distance.
-    Groups,
-}
-
-/// Frame clause
-#[derive(Debug, Clone, PartialEq)]
-pub struct FrameClause {
-    pub(crate) r#type: FrameType,
-    pub(crate) start: Frame,
-    pub(crate) end: Option<Frame>,
-}
-
 /// Window expression
 ///
 /// # Reference
 ///
 /// <https://www.postgresql.org/docs/current/tutorial-window.html>
-// [spec:pgorm:def:sql.ast.window-statement+4]
+// [spec:pgorm:def:sql.ast.window-statement+5]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,
@@ -96,8 +64,14 @@ impl WindowStatement {
         window
     }
 
-    /// frame clause for frame_start
-    /// # Examples:
+    /// Sets the window's frame, replacing any frame already set.
+    ///
+    /// A frame is begun from its [`FrameType`] and takes its end from the
+    /// [`FrameStart`] that returns, so only the frames PostgreSQL's grammar
+    /// admits are built; a preceding or current-row start stands alone. See
+    /// [`FrameClause`] for the `EXCLUDE` clause.
+    ///
+    /// # Examples
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -107,7 +81,7 @@ impl WindowStatement {
     ///     .expr_window_as(
     ///         Func::count(Expr::col(Char::Id)),
     ///         WindowStatement::partition_by(Char::FontSize)
-    ///             .frame_start(FrameType::Rows, Frame::UnboundedPreceding)
+    ///             .frame(FrameType::Rows.unbounded_preceding())
     ///             .take(),
     ///         Name::runtime("C"))
     ///     .to_owned();
@@ -116,24 +90,13 @@ impl WindowStatement {
     ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ROWS UNBOUNDED PRECEDING ) AS "C" FROM "character""#
     /// );
-    /// ```
-    pub fn frame_start(&mut self, r#type: FrameType, start: Frame) -> &mut Self {
-        self.frame(r#type, start, None)
-    }
-
-    /// frame clause for BETWEEN frame_start AND frame_end
-    ///
-    /// # Examples:
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let query = Query::select()
     ///     .from(Char::Table)
     ///     .expr_window_as(
     ///         Func::count(Expr::col(Char::Id)),
     ///         WindowStatement::partition_by(Char::FontSize)
-    ///             .frame_between(FrameType::Rows, Frame::UnboundedPreceding, Frame::UnboundedFollowing)
+    ///             .frame(FrameType::Rows.unbounded_preceding().and_unbounded_following())
     ///             .take(),
     ///         Name::runtime("C"))
     ///     .to_owned();
@@ -143,14 +106,12 @@ impl WindowStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) AS "C" FROM "character""#
     /// );
     /// ```
-    pub fn frame_between(&mut self, r#type: FrameType, start: Frame, end: Frame) -> &mut Self {
-        self.frame(r#type, start, Some(end))
-    }
-
-    /// frame clause
-    pub fn frame(&mut self, r#type: FrameType, start: Frame, end: Option<Frame>) -> &mut Self {
-        let frame_clause = FrameClause { r#type, start, end };
-        self.frame = Some(frame_clause);
+    // [spec:pgorm:def:sql.ast.window-statement+5]
+    pub fn frame<F>(&mut self, frame: F) -> &mut Self
+    where
+        F: Into<FrameClause>,
+    {
+        self.frame = Some(frame.into());
         self
     }
 }
