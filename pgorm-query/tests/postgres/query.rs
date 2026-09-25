@@ -1037,13 +1037,12 @@ fn select_58() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.case+1/test]
+// [spec:pgorm:def:sql.ast.case+2/test]
 #[test]
 fn select_59() {
     let query = Query::select()
         .expr_as(
-            CaseStatement::new()
-                .case(Expr::col((Glyph::Table, Glyph::Aspect)).gt(0), "positive")
+            Expr::case(Expr::col((Glyph::Table, Glyph::Aspect)).gt(0), "positive")
                 .case(Expr::col((Glyph::Table, Glyph::Aspect)).lt(0), "negative")
                 .finally("zero"),
             Name::runtime("polarity"),

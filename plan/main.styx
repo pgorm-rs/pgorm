@@ -8898,12 +8898,27 @@ children (
         id searched-case-needs-arm
         title "A searched CASE cannot be built without its first arm"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-25T02:36:03.020168Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found while building scope-simple-case (a885cd14). `CaseStatement::new()` constructs a searched CASE with no WHEN arm, so `Query::select().expr(CaseStatement::new().finally(\"x\"))` renders `SELECT (CASE ELSE 'x' END)`, which the grammar rejects; pinned today in pgorm-query/tests/postgres/oracle_pins.rs (~line 613) and named as a limitation in sql.ast.case. The new simple form already rules this out by construction — `Expr::case_of(operand)` returns a `CaseOperand` with no conversion into an expression until its first `when` — and the searched form should match: the only public way to begin a searched CASE takes its first condition and result. Remove or privatise the armless `new()`, sweep its callers (grep all crates, codegen output and pgorm-python included), unpin the oracle case, and update sql.ast.case (bump, repin)."
+            }
+
+            {
+                at 2026-09-25T02:38:28.351223Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-25T03:10:12.098266Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -910,7 +910,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## CASE expressions
 
-> [spec:pgorm:def:sql.ast.case+1]
+> [spec:pgorm:def:sql.ast.case+2]
 > PostgreSQL's two CASE forms are two types, because their arms have two
 > shapes and a CASE mixing them has no spelling.
 >
@@ -918,8 +918,10 @@ today, including panicking edges and deliberate failsafes.
 > appends a `WHEN <condition> THEN <result>` arm — the condition is any
 > `IntoCondition`, so `Condition` trees render with their `AND`/`OR`/`NOT`
 > structure inside the WHEN — and `finally(expr)` sets the optional `ELSE`
-> result. `Expr::case(cond, then)` is the shorthand constructor for the first
-> arm. A `CaseStatement` converts into `SimpleExpr::Case`.
+> result. `Expr::case(cond, then)` is its only constructor and takes the first
+> arm, so a searched CASE holds at least one arm from the start: there is no
+> armless `new()` and no `Default`. A `CaseStatement` converts into
+> `SimpleExpr::Case`.
 >
 > `SimpleCaseStatement` builds the simple form, `CASE <operand> WHEN <value>
 > THEN <result> … END`, whose arms hold *values* the one operand is compared
@@ -941,10 +943,11 @@ today, including panicking edges and deliberate failsafes.
 > `WHEN x IS NULL` is the spelling that catches it.
 >
 > Either form can be projected (with `expr_as`), compared, nested in the
-> other's results, or used anywhere an expression is accepted. The searched
-> form's `CaseStatement::new()` still builds a CASE with no arm, which renders
-> `(CASE END)` and which the grammar rejects; `Expr::case`, taking the first
-> arm, is the constructor that cannot.
+> other's results, or used anywhere an expression is accepted. Neither can be
+> built without a `WHEN` — the searched form's constructor takes the first arm
+> and the simple form's operand step converts into nothing — so `(CASE END)`
+> and `(CASE ELSE … END)`, which the grammar rejects, have no construction
+> (`[dec:pgorm:invalid-states-unrepresentable]`).
 
 ## Casts
 

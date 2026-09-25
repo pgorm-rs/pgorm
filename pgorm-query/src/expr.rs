@@ -53,7 +53,7 @@ pub enum SimpleExpr {
     /// The searched `CASE`, whose arms each test a condition.
     Case(Box<CaseStatement>),
     /// The simple `CASE`, whose arms each compare one operand with a value.
-    // [spec:pgorm:def:sql.ast.case+1]
+    // [spec:pgorm:def:sql.ast.case+2]
     SimpleCase(Box<SimpleCaseStatement>),
     /// An array subscript or slice of the first expression: `a[i]`, `a[l:u]`.
     // [spec:pgorm:req:sql.ast.expr.subscript]
@@ -1372,38 +1372,6 @@ impl Expr {
     // [spec:pgorm:req:sql.ast.cast-shape]
     pub fn cast_as_raw(self, type_expr: &'static str) -> SimpleExpr {
         self.cast_as_type(TypeName::raw(type_expr))
-    }
-
-    /// Adds new `CASE WHEN` to existing case statement.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use pgorm_query::{*, tests_cfg::*};
-    ///
-    /// let query = Query::select()
-    ///     .expr_as(
-    ///         Expr::case(
-    ///                 Expr::col((Glyph::Table, Glyph::Aspect)).is_in([2, 4]),
-    ///                 true
-    ///              )
-    ///             .finally(false),
-    ///          Name::runtime("is_even")
-    ///     )
-    ///     .from(Glyph::Table)
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"SELECT (CASE WHEN ("glyph"."aspect" IN (2, 4)) THEN TRUE ELSE FALSE END) AS "is_even" FROM "glyph""#
-    /// );
-    /// ```
-    pub fn case<C, T>(cond: C, then: T) -> CaseStatement
-    where
-        C: IntoCondition,
-        T: Into<SimpleExpr>,
-    {
-        CaseStatement::new().case(cond, then)
     }
 
     /// Express a `CAST AS` expression.
