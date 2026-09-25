@@ -12,6 +12,7 @@ mod oracle_sweep;
 mod query;
 mod render;
 mod schema;
+mod subscript;
 mod table;
 mod token;
 mod type_vocab;

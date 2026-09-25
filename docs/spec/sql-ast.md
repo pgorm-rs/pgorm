@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+1]
+> [spec:pgorm:req:sql.surface+2]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -68,7 +68,8 @@ today, including panicking edges and deliberate failsafes.
 >
 > The list grows only by a named item that a rule specifies, and each addition
 > is recorded here with that rule: `CaseOperand` and `SimpleCaseStatement`,
-> the simple form of `CASE` (`sql.ast.case`).
+> the simple form of `CASE` (`sql.ast.case`); `Subscript`, what an array
+> subscript holds between its brackets (`sql.ast.expr.subscript`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -104,7 +105,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+1]
+> [spec:pgorm:req:sql.scope+2]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -138,11 +139,6 @@ today, including panicking edges and deliberate failsafes.
 >   `Vec<SimpleExpr>`; these need a grouping-element tree (a set of sets, with
 >   the two shorthands as its constructors) and a renderer for it. The
 >   `GROUPING()` function that reads the result belongs with them.
-> - **Array subscripts and slices (`a[i]`, `a[i:j]`).** A new `SimpleExpr`
->   variant with an index or a pair of optional bounds, plus an arm in the
->   renderer's exhaustive match and a place in the atom list of
->   `sql.render.precedence`. Arrays otherwise have their operators (`@>`,
->   `<@`, `&&`, `||`) and their quantifiers (`ANY`, `ALL`).
 > - **Range and multirange types.** Absent end to end: no `Value` variant, no
 >   `ColumnType` variant, no `CREATE TYPE ... AS RANGE`. A range is a value
 >   with a discriminated subtype and two bound inclusivities, so it needs a
@@ -391,14 +387,15 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+3]
+> [spec:pgorm:def:sql.ast.expr+4]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
 > `Value` (parameterised), `Values`, `Raw(&'static str)` (verbatim SQL),
 > `Template(SqlTemplate)`, `Keyword`, `AsEnum`, `Case` and `SimpleCase` (the
-> searched and simple forms of `sql.ast.case`), `Constant` (inlined literal),
-> and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
+> searched and simple forms of `sql.ast.case`), `Subscript` (an array
+> subscript or slice, `sql.ast.expr.subscript`), `Constant` (inlined
+> literal), and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
 > (`$$` escaping a literal `$`) already resolved against the expressions it
 > substitutes; its segments are private and its only constructor is
 > `SqlTemplate::new`, which returns `Result`, so the AST cannot hold a template
@@ -560,6 +557,40 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr` carries no JSON methods, drilling in more than one step means
 > re-entering the builder with `Expr::expr`; `#>` exists so that the common
 > multi-step path needs one node instead of a nest of them.
+
+> [spec:pgorm:req:sql.ast.expr.subscript]
+> `SimpleExpr::Subscript(base, subscript)` MUST express PostgreSQL's array
+> subscript, where `Subscript` is either `Index(expr)` — one element, `a[i]` —
+> or `Slice(lower, upper)` with each bound an `Option<SimpleExpr>` — `a[l:u]`,
+> `a[l:]`, `a[:u]` and `a[:]`. The node is reached from `Expr` through
+> `index(i)`, `slice(l, u)`, `slice_from(l)`, `slice_to(u)`, and
+> `subscript(Subscript)` for the one form the shorthands do not name, the
+> slice with neither bound. They live in a child module of `expr`, as the
+> JSON family does, and unlike every other combinator there they return an
+> `Expr` rather than a `SimpleExpr`, because a subscripted value is an operand
+> rather than a predicate: it goes on to be compared, or subscripted again,
+> in the same chain.
+>
+> A chain of subscripts is one multi-dimensional access, and the AST keeps it
+> as nested `Subscript` nodes that render as one: `.index(1).index(2)` is
+> `a[1][2]`, the element at row 1, column 2. That is not the same query as
+> subscripting the first access's result, `(a[1])[2]`: PostgreSQL types a
+> single-index access as the array's element type, so the parenthesised form
+> is refused (`42804`, cannot subscript type `integer`) where the chain
+> answers the element, and `sql.render.subscript` therefore never
+> parenthesises a subscripted base.
+>
+> The node carries PostgreSQL's semantics and does not adjust them, so what a
+> caller from a zero-based language expects is wrong in four places, each
+> held by the live suite: arrays count from 1; an index outside the bounds
+> answers NULL rather than raising; a slice outside the bounds is cut to them,
+> and is the empty array rather than NULL when nothing overlaps; and once any
+> subscript in a chain is a slice, every one is, a plain index `i` beside a
+> slice reading as `1:i`.
+>
+> Index and bounds are any `Into<SimpleExpr>`, so a column or an expression
+> can index as readily as a literal; the server coerces each to `int4`, and a
+> bound value is a placeholder it types as `int4`.
 
 > [spec:pgorm:def:sql.ast.keywords+5]
 > `Keyword` represents bare SQL keywords usable as expressions, and the variant

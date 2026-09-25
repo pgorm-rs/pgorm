@@ -12,9 +12,13 @@ mod json;
 mod keyword_operators;
 #[path = "expr_membership.rs"]
 mod membership;
+#[path = "expr_subscript.rs"]
+mod subscript;
+
+pub use subscript::Subscript;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr+3]
+// [spec:pgorm:def:sql.ast.expr+4]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -27,7 +31,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr+3]
+// [spec:pgorm:def:sql.ast.expr+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -51,6 +55,9 @@ pub enum SimpleExpr {
     /// The simple `CASE`, whose arms each compare one operand with a value.
     // [spec:pgorm:def:sql.ast.case+1]
     SimpleCase(Box<SimpleCaseStatement>),
+    /// An array subscript or slice of the first expression: `a[i]`, `a[l:u]`.
+    // [spec:pgorm:req:sql.ast.expr.subscript]
+    Subscript(Box<SimpleExpr>, Box<Subscript>),
     Constant(Value),
     /// The right operand of a `LIKE` / `ILIKE`: a pattern and the optional
     /// `ESCAPE` character, which the grammar admits only as a pattern's tail.

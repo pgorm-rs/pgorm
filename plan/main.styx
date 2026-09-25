@@ -8682,6 +8682,22 @@ children (
             {
                 id scope-array-subscripts
                 title "Array subscripts and slices are expressible"
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T01:05:28.791068Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T01:36:17.387681Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

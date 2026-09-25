@@ -14,6 +14,8 @@ use std::ops::Deref;
 // private `prepare_*` methods without widening them.
 #[path = "query_builder_case.rs"]
 mod case;
+#[path = "query_builder_subscript.rs"]
+mod subscript;
 
 /// Discard sub-microsecond digits before a temporal value is rendered as a
 /// literal. PostgreSQL stores microseconds and would round a ninth digit,
@@ -478,6 +480,9 @@ impl QueryBuilder {
             }
             SimpleExpr::SimpleCase(case_stmt) => {
                 self.prepare_simple_case_statement(case_stmt, sql);
+            }
+            SimpleExpr::Subscript(base, subscript) => {
+                self.prepare_subscript(base, subscript, sql);
             }
             SimpleExpr::Constant(val) => {
                 self.prepare_constant(val, sql);
@@ -2481,7 +2486,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+4]
+    // [spec:pgorm:def:sql.render.precedence+5]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2496,6 +2501,7 @@ impl QueryBuilder {
             | SimpleExpr::Keyword(_)
             | SimpleExpr::Case(_)
             | SimpleExpr::SimpleCase(_)
+            | SimpleExpr::Subscript(_, _)
             | SimpleExpr::LikePattern(_)
             | SimpleExpr::AsEnum(_, _)
             | SimpleExpr::SubQuery(_, _) => true,
@@ -2544,7 +2550,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+4]
+// [spec:pgorm:def:sql.render.precedence+5]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

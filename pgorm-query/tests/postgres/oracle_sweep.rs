@@ -114,6 +114,11 @@ fn sweep_expression_shapes() {
             .when(1, Expr::val("one"))
             .finally(Expr::val("other"))
             .into(),
+        Expr::col(Glyph::Tokens).index(1).index(2).into(),
+        Expr::col(Glyph::Tokens)
+            .slice(1, 2)
+            .slice_from(3)
+            .gt(Expr::val(0)),
         Func::count(Expr::col(Glyph::Id)).into(),
         Func::coalesce([Expr::col(Glyph::Aspect).into(), Expr::val(0).into()]).into(),
         Expr::val("1").cast_as(Name::runtime("int4")),

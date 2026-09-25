@@ -296,13 +296,15 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+4]
+> [spec:pgorm:def:sql.render.precedence+5]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
 > `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
-> `SimpleCase`, `LikePattern`, `AsEnum`, or
-> `SubQuery` (all but the first two are already self-wrapping — `AsEnum` is
+> `SimpleCase`, `Subscript`, `LikePattern`, `AsEnum`, or
+> `SubQuery` (all but the first two are already self-wrapping — a
+> `Subscript` either binds tighter than every operator or wraps its own base,
+> per `sql.render.subscript` — `AsEnum` is
 > the cast of `[spec:pgorm:req:sql.ast.cast-shape]` and spells its own
 > `CAST(…)` parentheses, which is why folding the second cast shape into it
 > could not cost a `BETWEEN` operand its bare rendering); the inner expression
@@ -624,6 +626,35 @@ an ideal Postgres renderer would emit.
 > each rendering is held to that node and not only to the grammar: a simple
 > CASE whose operand went missing still parses, as a searched CASE over
 > non-boolean arms.
+
+## Array subscripts
+
+> [spec:pgorm:req:sql.render.subscript]
+> A `SimpleExpr::Subscript` MUST render its base, then `[` and the subscript,
+> then `]`: an `Index` as its expression, a `Slice` as its lower bound, `:`,
+> and its upper bound, an omitted bound rendering as nothing on its side of
+> the colon (`[2:]`, `[:3]`, `[:]`). Parameters number in textual order — the
+> base's, then the index or each bound.
+>
+> PostgreSQL's grammar admits a subscript directly after a column reference, a
+> parameter, or a parenthesised expression or subquery, and nowhere else:
+> `f(x)[1]`, `CAST(x AS int[])[1]` and `ARRAY[1,2][1]` are syntax errors. The
+> base is therefore written bare in exactly two cases — a `Column`, and a base
+> that is itself a `Subscript`, so that a chain renders as one
+> multi-dimensional access (`"m"[2][3]`) rather than as a subscript of a
+> subscript's result (`("m"[2])[3]`), which the server refuses per
+> `sql.ast.expr.subscript` — and parenthesised in every other case. A `Value`
+> base is parenthesised too even though `$1[1]` would parse, because the same
+> statement's `to_string` rendering inlines the value as a literal, which
+> would not; so is a `Case` or an operator-less `SubQuery` base, whose own
+> parentheses would already suffice, because one rule for every non-column
+> base is cheaper to hold than a list of the bases that happen to wrap
+> themselves.
+>
+> A bound array base needs its type supplied by the caller
+> (`sql.render.placeholder-typing`): `($1)[1]` asks the server to subscript a
+> placeholder of unknown type, and `cast_as_type` with an array `TypeName`
+> is the spelling that gives it one.
 
 ## Custom expressions
 
