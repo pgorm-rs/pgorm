@@ -71,14 +71,16 @@ is what `EntityTrait::find()` produces.
 > no `IntoName for &str` (`[spec:pgorm:def:sql.types+9]`), so the conversion
 > is written rather than inferred.
 
-> [spec:pgorm:sem:query.build.modifiers+8]
+> [spec:pgorm:sem:query.build.modifiers+9]
 > `QuerySelect` mutates the select statement in place: `column` appends a
 > column through `col.select_as(col.into_expr())` (same enum-cast rule as the
 > default list); `columns` iterates it; `column_as` / `expr_as` /
 > `tbl_col_as` append an expression with an explicit alias; `expr` / `exprs`
 > append raw select expressions. `offset` and `limit` take
 > `Into<Option<u64>>`: `Some(n)` sets the clause (last call wins), `None`
-> removes it. `group_by` adds a GROUP BY expression, `having` accumulates
+> removes it. `group_by` adds a GROUP BY expression and `group_by_element` a
+> grouping element (`ROLLUP`, `CUBE`, `GROUPING SETS`, `()`) to the same
+> list, passing through to `sql.ast.select.grouping`; `having` accumulates
 > AND-ed HAVING conditions, `distinct` / `distinct_on` add DISTINCT /
 > DISTINCT ON, and `lock`, `lock_shared`, `lock_exclusive` and
 > `lock_with_behavior` add row-locking clauses. The composition clauses join

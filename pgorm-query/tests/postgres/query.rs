@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+1/test]
-// [spec:pgorm:def:sql.ast.select+2/test]
+// [spec:pgorm:def:sql.ast.select+3/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
 fn select_1() {
@@ -17,7 +17,7 @@ fn select_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.expr+4/test]
+// [spec:pgorm:def:sql.ast.expr+5/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -898,7 +898,7 @@ fn select_53() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.projection+1/test]
+// [spec:pgorm:req:sql.ast.select.projection+2/test]
 #[test]
 fn select_54() {
     assert_eq!(
@@ -942,7 +942,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+3/test]
+// [spec:pgorm:req:sql.render.select-order+4/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -2083,7 +2083,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+5/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+6/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2223,7 +2223,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+5/test]
+// [spec:pgorm:def:sql.render.precedence+6/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
@@ -2827,7 +2827,7 @@ fn a_with_clause_has_one_place_to_live() {
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.select-order+3/test]
+// [spec:pgorm:req:sql.render.select-order+4/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {

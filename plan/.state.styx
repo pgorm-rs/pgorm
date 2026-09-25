@@ -867,6 +867,7 @@ assertions (
     {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
     {id scope-simple-case, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:02:12.227018Z}
     {id scope-array-subscripts, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:36:17.387681Z}
+    {id scope-grouping-sets, kind @complete, author "brendan@necessary.nu", at 2026-09-25T02:33:47.327387Z}
 )
 
 impl_evidence (

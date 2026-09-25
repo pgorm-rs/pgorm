@@ -296,12 +296,12 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+5]
+> [spec:pgorm:def:sql.render.precedence+6]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
 > `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
-> `SimpleCase`, `Subscript`, `LikePattern`, `AsEnum`, or
+> `SimpleCase`, `Subscript`, `Grouping`, `LikePattern`, `AsEnum`, or
 > `SubQuery` (all but the first two are already self-wrapping — a
 > `Subscript` either binds tighter than every operator or wraps its own base,
 > per `sql.render.subscript` — `AsEnum` is
@@ -375,7 +375,7 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+3]
+> [spec:pgorm:req:sql.render.select-order+4]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
 > through the same `prepare_with_clause` the three write statements use and
@@ -383,7 +383,8 @@ an ideal Postgres renderer would emit.
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
-> expression per join; the WHERE condition; ` GROUP BY ` expressions; the
+> expression per join; the WHERE condition; ` GROUP BY ` and its grouping
+> elements (`sql.render.grouping`); the
 > HAVING condition; the optional named window declaration
 > ` WINDOW "name" AS ( … )`; any union clauses; ` ORDER BY ` expressions;
 > ` LIMIT $N`; ` OFFSET $N`; and the row-locking clause. The window
@@ -626,6 +627,32 @@ an ideal Postgres renderer would emit.
 > each rendering is held to that node and not only to the grammar: a simple
 > CASE whose operand went missing still parses, as a searched CASE over
 > non-boolean arms.
+
+## Grouping sets
+
+> [spec:pgorm:req:sql.render.grouping]
+> The GROUP BY list MUST render ` GROUP BY ` and its elements
+> comma-separated, and nothing at all when it is empty. A set of one
+> expression renders that expression bare, so a list built only from the
+> plain group-by methods is byte-identical to the flat expression list it
+> replaced; a set of several renders them parenthesised, `("a", "b")`, and the
+> empty set renders `()`. `ROLLUP` and `CUBE` render the keyword, a space and
+> the parenthesised expression list — `ROLLUP ("a", "b")` — except over no
+> expressions, where they render `()`: `ROLLUP ()` is not in the grammar, and
+> the empty set is exactly what an empty `ROLLUP` or `CUBE` stands for.
+> `GROUPING SETS` renders `GROUPING SETS (`, its elements comma-separated by
+> this same rule, and `)`. A `SimpleExpr::Grouping` renders `GROUPING` and its
+> arguments parenthesised.
+>
+> A tuple item renders as a parenthesised row, `ROLLUP (("a", "b"), "c")`,
+> which is what makes it one unit of the list. The raw grammar does not say
+> so: it reads `("a", "b")` as a row expression — here and as a set of
+> several alike — and only parse analysis turns a parenthesised row in a
+> grouping position into a set. libpg_query, the render oracle, therefore
+> shows a grouping-set node only for `ROLLUP`, `CUBE`, `GROUPING SETS` and
+> `()`, and the goldens are held to exactly those nodes and kinds; that a row
+> groups as one unit is held by the live suite, which counts the rows each
+> element yields and reads `GROUPING()`'s bitmask for each.
 
 ## Array subscripts
 

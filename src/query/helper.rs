@@ -3,9 +3,9 @@ use crate::{
     PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
 };
 use pgorm_query::{
-    AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, IntoCondition, IntoName,
-    LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SimpleExpr, UnionType,
-    WindowStatement,
+    AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, GroupingElement, IntoCondition,
+    IntoName, LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SimpleExpr,
+    UnionType, WindowStatement,
 };
 pub use pgorm_query::{Condition, ConditionalStatement, JoinType, Name, Order, OrderedStatement};
 
@@ -15,7 +15,7 @@ use pgorm_query::IntoColumnRef;
 // LINT: when there is a group by clause, but some columns don't have aggregate functions
 // LINT: when the join table or column does not exists
 /// Abstract API for performing queries
-// [spec:pgorm:sem:query.build.modifiers+8]
+// [spec:pgorm:sem:query.build.modifiers+9]
 pub trait QuerySelect: Sized {
     #[allow(missing_docs)]
     type QueryStatement;
@@ -278,6 +278,32 @@ pub trait QuerySelect: Sized {
         C: IntoSimpleExpr,
     {
         self.query().add_group_by([col.into_simple_expr()]);
+        self
+    }
+
+    /// Add a grouping element — `ROLLUP`, `CUBE`, `GROUPING SETS` or `()` —
+    /// to the GROUP BY list, after anything [`group_by`](Self::group_by)
+    /// already put there
+    /// ```
+    /// use pgorm::{entity::*, pgorm_query::{Func, GroupingElement}, query::*, tests_cfg::cake};
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::find()
+    ///         .select_only()
+    ///         .column(cake::Column::Name)
+    ///         .expr(Func::grouping(cake::Column::Name.into_expr()))
+    ///         .column_as(cake::Column::Id.count(), pgorm::alias("count"))
+    ///         .group_by_element(GroupingElement::rollup([cake::Column::Name.into_expr()]))
+    ///         .as_query()
+    ///         .to_string(),
+    ///     r#"SELECT "cake"."name", GROUPING("cake"."name"), COUNT("cake"."id") AS "count" FROM "cake" GROUP BY ROLLUP ("cake"."name")"#
+    /// );
+    /// ```
+    fn group_by_element<G>(mut self, element: G) -> Self
+    where
+        G: Into<GroupingElement>,
+    {
+        self.query().group_by_element(element);
         self
     }
 
@@ -793,7 +819,7 @@ pub trait QuerySelect: Sized {
 
 // LINT: when the column does not appear in tables selected from
 /// Performs ORDER BY operations
-// [spec:pgorm:sem:query.build.modifiers+8]
+// [spec:pgorm:sem:query.build.modifiers+9]
 pub trait QueryOrder: Sized {
     #[allow(missing_docs)]
     type QueryStatement: OrderedStatement;

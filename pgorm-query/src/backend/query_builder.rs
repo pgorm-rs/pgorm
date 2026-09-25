@@ -14,6 +14,8 @@ use std::ops::Deref;
 // private `prepare_*` methods without widening them.
 #[path = "query_builder_case.rs"]
 mod case;
+#[path = "query_builder_grouping.rs"]
+mod grouping;
 #[path = "query_builder_subscript.rs"]
 mod subscript;
 
@@ -54,7 +56,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+3] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+4] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -190,7 +192,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+3]
+    // [spec:pgorm:req:sql.render.select-order+4]
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_select_statement(
         &self,
@@ -238,13 +240,7 @@ impl QueryBuilder {
 
         if !select.groups.is_empty() {
             write!(sql, " GROUP BY ").unwrap();
-            select.groups.iter().fold(true, |first, expr| {
-                if !first {
-                    write!(sql, ", ").unwrap()
-                }
-                self.prepare_simple_expr(expr, sql);
-                false
-            });
+            self.prepare_grouping_list(&select.groups, sql);
         }
 
         self.prepare_condition(&select.having, "HAVING", sql);
@@ -483,6 +479,11 @@ impl QueryBuilder {
             }
             SimpleExpr::Subscript(base, subscript) => {
                 self.prepare_subscript(base, subscript, sql);
+            }
+            // [spec:pgorm:req:sql.render.grouping]
+            SimpleExpr::Grouping(grouping) => {
+                write!(sql, "GROUPING").unwrap();
+                self.prepare_tuple(&grouping.args, sql);
             }
             SimpleExpr::Constant(val) => {
                 self.prepare_constant(val, sql);
@@ -2486,7 +2487,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+5]
+    // [spec:pgorm:def:sql.render.precedence+6]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2502,6 +2503,7 @@ impl QueryBuilder {
             | SimpleExpr::Case(_)
             | SimpleExpr::SimpleCase(_)
             | SimpleExpr::Subscript(_, _)
+            | SimpleExpr::Grouping(_)
             | SimpleExpr::LikePattern(_)
             | SimpleExpr::AsEnum(_, _)
             | SimpleExpr::SubQuery(_, _) => true,
@@ -2550,7 +2552,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+5]
+// [spec:pgorm:def:sql.render.precedence+6]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

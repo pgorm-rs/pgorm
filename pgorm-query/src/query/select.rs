@@ -1,5 +1,6 @@
 use crate::{
-    AnyWithClause, FunctionCall, QueryStatementBuilder, SubQueryStatement, WindowStatement,
+    AnyWithClause, FunctionCall, GroupingElement, QueryStatementBuilder, SubQueryStatement,
+    WindowStatement,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -30,7 +31,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select+2]
+// [spec:pgorm:def:sql.ast.select+3]
 // [spec:pgorm:def:query.build.with+1]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
@@ -40,7 +41,7 @@ pub struct SelectStatement {
     pub(crate) from: Vec<FromItem>,
     pub(crate) join: Vec<JoinExpr>,
     pub(crate) r#where: ConditionHolder,
-    pub(crate) groups: Vec<SimpleExpr>,
+    pub(crate) groups: Vec<GroupingElement>,
     pub(crate) having: ConditionHolder,
     pub(crate) unions: Vec<(UnionType, SelectStatement)>,
     pub(crate) orders: Vec<OrderExpr>,
@@ -85,7 +86,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select+2]
+// [spec:pgorm:def:sql.ast.select+3]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LockClause {
     pub(crate) r#type: LockType,
@@ -263,7 +264,7 @@ impl SelectStatement {
     /// query.clear_selects();
     /// assert!(query.selects().is_empty());
     /// ```
-    // [spec:pgorm:req:sql.ast.select.projection+1]
+    // [spec:pgorm:req:sql.ast.select.projection+2]
     pub fn selects(&self) -> &[SelectExpr] {
         &self.selects
     }
@@ -287,7 +288,7 @@ impl SelectStatement {
     ///     r#"SELECT 42, MAX("id"), 0 + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.projection+1]
+    // [spec:pgorm:req:sql.ast.select.projection+2]
     pub fn expr<T>(&mut self, expr: T) -> &mut Self
     where
         T: Into<SelectExpr>,
@@ -394,7 +395,7 @@ impl SelectStatement {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character""#
     /// )
     /// ```
-    // [spec:pgorm:req:sql.ast.select.projection+1]
+    // [spec:pgorm:req:sql.ast.select.projection+2]
     pub fn distinct_on<T, I>(&mut self, cols: I) -> &mut Self
     where
         T: IntoColumnRef,
@@ -1484,7 +1485,8 @@ impl SelectStatement {
     where
         I: IntoIterator<Item = SimpleExpr>,
     {
-        self.groups.append(&mut expr.into_iter().collect());
+        self.groups
+            .extend(expr.into_iter().map(|expr| GroupingElement::set([expr])));
         self
     }
 

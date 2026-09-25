@@ -5,6 +5,7 @@ mod comment;
 mod extension;
 mod foreign_key;
 mod func;
+mod grouping;
 mod index;
 mod oracle;
 mod oracle_pins;

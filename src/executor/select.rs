@@ -24,7 +24,7 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
-// [spec:pgorm:sem:query.build.modifiers+8]
+// [spec:pgorm:sem:query.build.modifiers+9]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(
@@ -412,7 +412,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.modifiers+8]
+// [spec:pgorm:sem:query.build.modifiers+9]
 impl<E> SelectProjected<E>
 where
     E: EntityTrait,

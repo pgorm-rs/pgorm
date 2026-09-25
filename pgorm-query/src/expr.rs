@@ -18,7 +18,7 @@ mod subscript;
 pub use subscript::Subscript;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr+4]
+// [spec:pgorm:def:sql.ast.expr+5]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -31,7 +31,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr+4]
+// [spec:pgorm:def:sql.ast.expr+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -58,6 +58,9 @@ pub enum SimpleExpr {
     /// An array subscript or slice of the first expression: `a[i]`, `a[l:u]`.
     // [spec:pgorm:req:sql.ast.expr.subscript]
     Subscript(Box<SimpleExpr>, Box<Subscript>),
+    /// `GROUPING(a, …)`, which reads a row's grouping set.
+    // [spec:pgorm:def:sql.ast.select.grouping]
+    Grouping(Grouping),
     Constant(Value),
     /// The right operand of a `LIKE` / `ILIKE`: a pattern and the optional
     /// `ESCAPE` character, which the grammar admits only as a pattern's tail.

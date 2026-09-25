@@ -29,7 +29,7 @@ chapter is stated twice anywhere else.
 > under the `s0_` prefix through the one writer
 > (`[spec:pgorm:sem:query.graph.writer+4]`), so a graph's select list is
 > non-empty from the moment the value exists and the empty-projection guard
-> of `[spec:pgorm:sem:query.build.modifiers+8]` has nothing to catch. There
+> of `[spec:pgorm:sem:query.build.modifiers+9]` has nothing to catch. There
 > is no conversion between `Select<E>` and `SelectGraph<E, S>` in either
 > direction: a graph's projection is generated from its declaration, never
 > inherited from a builder whose select list a caller may have edited.

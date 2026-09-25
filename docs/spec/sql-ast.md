@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+2]
+> [spec:pgorm:req:sql.surface+3]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -69,7 +69,10 @@ today, including panicking edges and deliberate failsafes.
 > The list grows only by a named item that a rule specifies, and each addition
 > is recorded here with that rule: `CaseOperand` and `SimpleCaseStatement`,
 > the simple form of `CASE` (`sql.ast.case`); `Subscript`, what an array
-> subscript holds between its brackets (`sql.ast.expr.subscript`).
+> subscript holds between its brackets (`sql.ast.expr.subscript`);
+> `GroupingElement`, `GroupingSets` and `Grouping`, the GROUP BY items beyond
+> a plain expression and the `GROUPING()` that reads them
+> (`sql.ast.select.grouping`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -105,7 +108,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+2]
+> [spec:pgorm:req:sql.scope+3]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -135,10 +138,6 @@ today, including panicking edges and deliberate failsafes.
 >   `WHEN MATCHED` / `WHEN NOT MATCHED [BY SOURCE]` action list, plus a source
 >   relation that is already `FromItem`. `ON CONFLICT` covers the upsert that
 >   an ORM actually emits, which is why this ranks below its size.
-> - **`GROUPING SETS` / `ROLLUP` / `CUBE`.** `SelectStatement.groups` is a flat
->   `Vec<SimpleExpr>`; these need a grouping-element tree (a set of sets, with
->   the two shorthands as its constructors) and a renderer for it. The
->   `GROUPING()` function that reads the result belongs with them.
 > - **Range and multirange types.** Absent end to end: no `Value` variant, no
 >   `ColumnType` variant, no `CREATE TYPE ... AS RANGE`. A range is a value
 >   with a discriminated subtype and two bound inclusivities, so it needs a
@@ -220,7 +219,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+2]
+> [spec:pgorm:def:sql.ast.select+3]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
 > WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
 > pays one pointer — `query.build.with` records why the clause lives on the
@@ -230,7 +229,8 @@ today, including panicking edges and deliberate failsafes.
 > gone and MUST NOT return),
 > a list of `SelectExpr` projections (each an expression with optional alias and
 > optional window), `from` table references, `JoinExpr` joins, a WHERE
-> `ConditionHolder`, GROUP BY expressions, a HAVING `ConditionHolder`, a list of
+> `ConditionHolder`, a GROUP BY list of `GroupingElement`s
+> (`sql.ast.select.grouping`), a HAVING `ConditionHolder`, a list of
 > `(UnionType, SelectStatement)` unions, ORDER BY expressions, optional LIMIT
 > and OFFSET values (set from `u64` via `limit`/`offset`, cleared via
 > `reset_limit`/`reset_offset`), an optional `LockClause`, and at most one named
@@ -244,7 +244,7 @@ today, including panicking edges and deliberate failsafes.
 > Structural-control helpers `conditions(bool, then, else)`, `apply_if(Option, f)`
 > and `apply(f)` let callers branch while chaining.
 
-> [spec:pgorm:req:sql.ast.select.projection+1]
+> [spec:pgorm:req:sql.ast.select.projection+2]
 > Projections MUST accumulate in call order: `expr`/`exprs` push anything
 > convertible to `SelectExpr`, `column`/`columns` push `SimpleExpr::Column`
 > projections from any `IntoColumnRef` (bare column, `(table, column)`, or
@@ -258,8 +258,10 @@ today, including panicking edges and deliberate failsafes.
 > clear the distinct flag entirely (render no DISTINCT at all) when the
 > collection is empty.
 >
-> GROUP BY expressions accumulate via `group_by_columns`, `group_by_col`, and
-> `add_group_by`. HAVING accepts conditions through `cond_having` (any
+> GROUP BY items accumulate in call order via `group_by_columns`,
+> `group_by_col` and `add_group_by`, each adding plain expressions, and
+> `group_by_element`, which adds a grouping element of `sql.ast.select.grouping`
+> to the same list. HAVING accepts conditions through `cond_having` (any
 > `IntoCondition`) and `and_having` (a `SimpleExpr` shorthand delegating to
 > `cond_having`); both feed the HAVING `ConditionHolder` with the semantics of
 > `sql.ast.condition.holder`.
@@ -302,6 +304,56 @@ today, including panicking edges and deliberate failsafes.
 > `Condition` tree) and MUST be stored as `JoinOn::Condition` wrapping a
 > `ConditionHolder`, so multi-part conditions built with `Condition::all`/`any`
 > render as chained `AND`/`OR` in the ON clause.
+
+> [spec:pgorm:def:sql.ast.select.grouping]
+> A SELECT's GROUP BY list is a list of `GroupingElement`s — PostgreSQL's
+> `grouping_element` — and each element stands for a list of grouping sets;
+> the query groups by every combination of its items' sets, one set from
+> each. The element's shape is private, so it is built only through its
+> constructors:
+>
+> - `GroupingElement::set(exprs)` — one set of the given expressions, and
+>   `GroupingElement::empty()`, the set of none, which groups the whole input
+>   into one grand-total row (one row even over an empty input);
+> - `GroupingElement::rollup(exprs)` — every leading prefix of the list,
+>   longest first, down to the empty set: `ROLLUP (a, b)` is `(a, b)`, `(a)`
+>   and `()`;
+> - `GroupingElement::cube(exprs)` — every subset of the list, the empty one
+>   included;
+> - `GroupingElement::sets(first)` — `GROUPING SETS`, exactly the sets its
+>   elements stand for, in turn and duplicates kept. It takes its first
+>   element and returns a `GroupingSets` whose `add` appends further ones and
+>   which converts into a `GroupingElement`, so the empty `GROUPING SETS ()`
+>   the grammar rejects has no value to build. Its elements are elements, so
+>   a `ROLLUP` or `CUBE` nests inside it and contributes all its own sets;
+>   `ROLLUP` and `CUBE` take expressions, because the grammar nests nothing
+>   inside them.
+>
+> An item of a `ROLLUP` or `CUBE` that is an `Expr::tuple` is one unit of the
+> list, kept or dropped whole — `ROLLUP ((a, b), c)` has three prefixes, not
+> four. A `ROLLUP` or `CUBE` over no expressions stands for the one empty set.
+>
+> `SelectStatement::group_by_element(element)` appends an element to the same
+> list the plain methods of `sql.ast.select.projection` fill: those add each
+> expression as a set of one, so a statement built only from them groups and
+> renders exactly as a flat expression list did, and elements and plain
+> expressions interleave in call order. The method lives beside the element
+> type rather than on `SelectStatement`'s own file, which is at its function
+> cap, and pgorm's `QuerySelect::group_by_element` passes through to it.
+>
+> `Func::grouping(first)` builds `GROUPING(…)`, the function that reads which
+> of its arguments the current row's set leaves out: a bitmask whose last
+> argument is bit 0, a bit being set when that argument is not grouped. It
+> returns a `Grouping`, whose `arg` adds further arguments and which converts
+> into `SimpleExpr::Grouping`. It is deliberately not a `FunctionCall`:
+> PostgreSQL's grammar spells `GROUPING` as its own expression, with at least
+> one argument and with no `FILTER`, `WITHIN GROUP`, `DISTINCT` or `OVER`, so
+> as a `FunctionCall` it would admit all four and the windowed projections of
+> `sql.ast.window-statement` would accept it. It is how a query tells the
+> NULL a subtotal row puts in an omitted column from a NULL in the data; that
+> each argument is one of the query's grouping expressions — so that it has
+> nothing to read under `GROUP BY ()` — is PostgreSQL's check (`42803`), not
+> the builder's.
 
 > [spec:pgorm:sem:sql.ast.select.union+1]
 > `union(UnionType, query)` appends one compound-query arm and `unions(iter)`
@@ -387,15 +439,16 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+4]
+> [spec:pgorm:def:sql.ast.expr+5]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
 > `Value` (parameterised), `Values`, `Raw(&'static str)` (verbatim SQL),
 > `Template(SqlTemplate)`, `Keyword`, `AsEnum`, `Case` and `SimpleCase` (the
 > searched and simple forms of `sql.ast.case`), `Subscript` (an array
-> subscript or slice, `sql.ast.expr.subscript`), `Constant` (inlined
-> literal), and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
+> subscript or slice, `sql.ast.expr.subscript`), `Grouping` (the
+> `GROUPING()` of `sql.ast.select.grouping`), `Constant` (inlined literal),
+> and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
 > (`$$` escaping a literal `$`) already resolved against the expressions it
 > substitutes; its segments are private and its only constructor is
 > `SqlTemplate::new`, which returns `Result`, so the AST cannot hold a template
@@ -918,7 +971,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+4]
+> [spec:pgorm:def:sql.ast.func+5]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -991,7 +1044,9 @@ today, including panicking edges and deliberate failsafes.
 > A cast is not among them. `CAST` is written by `SimpleExpr::AsEnum`
 > (`[spec:pgorm:req:sql.ast.cast-shape]`), so there is no `Function::Cast`
 > and no `Func` constructor that produces one — a consumer matching on a
-> `FunctionCall` never has to consider a cast.
+> `FunctionCall` never has to consider a cast. Nor is `GROUPING`: the
+> grammar spells it as an expression of its own, so `Func::grouping` returns
+> the `Grouping` of `sql.ast.select.grouping` rather than a `FunctionCall`.
 >
 > `Func::named(name)` calls an arbitrary function by identifier
 > (`Function::Named`). A `FunctionCall` converts into

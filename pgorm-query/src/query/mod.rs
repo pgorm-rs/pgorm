@@ -10,6 +10,7 @@
 mod case;
 mod condition;
 mod delete;
+mod grouping;
 mod insert;
 mod on_conflict;
 mod ordered;
@@ -24,6 +25,7 @@ mod with;
 pub use case::*;
 pub use condition::*;
 pub use delete::*;
+pub use grouping::*;
 pub use insert::*;
 pub use on_conflict::*;
 pub use ordered::*;
@@ -33,6 +35,8 @@ pub use select_expr::*;
 pub use traits::*;
 pub use update::*;
 pub use window::*;
+
+pub(crate) use grouping::GroupingKind;
 pub use with::*;
 
 /// Shorthand for constructing any table query

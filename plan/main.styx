@@ -8656,6 +8656,22 @@ children (
             {
                 id scope-grouping-sets
                 title "GROUPING SETS, ROLLUP and CUBE are expressible, with GROUPING()"
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T01:50:58.756514Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T02:33:47.327387Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

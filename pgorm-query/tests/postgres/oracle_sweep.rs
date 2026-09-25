@@ -14,7 +14,7 @@ fn base() -> SelectStatement {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    the select clause vocabulary
-// [spec:pgorm:req:sql.render.select-order+3/test]
+// [spec:pgorm:req:sql.render.select-order+4/test]
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([
@@ -42,6 +42,18 @@ fn sweep_select_clause_shapes() {
             .and_where(Expr::col(Glyph::Image).is_not_null())
             .add_group_by([Expr::col(Glyph::Id).into()])
             .and_having(Expr::col(Glyph::Aspect).lt(9))
+            .to_string(),
+        base()
+            .expr(Func::grouping(Expr::col(Glyph::Aspect)).arg(Expr::col(Glyph::Image)))
+            .group_by_col(Glyph::Id)
+            .group_by_element(
+                GroupingElement::sets(GroupingElement::rollup([
+                    Expr::col(Glyph::Aspect),
+                    Expr::col(Glyph::Image),
+                ]))
+                .add(GroupingElement::cube([Expr::col(Glyph::Aspect)]))
+                .add(GroupingElement::empty()),
+            )
             .to_string(),
         base()
             .order_by(Glyph::Id, Order::Desc)
