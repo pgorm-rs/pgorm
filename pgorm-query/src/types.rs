@@ -13,7 +13,7 @@ use std::{any::Any, fmt, ops, sync::Arc};
 pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
-    // [spec:pgorm:req:sql.render.ident-quoting+6]
+    // [spec:pgorm:req:sql.render.ident-quoting+7]
     // [spec:pgorm:req:security.ident-oracle+4] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
@@ -22,7 +22,7 @@ pub trait SqlName: Any + Send + Sync {
 
     /// The identifier's text with embedded double quotes doubled, ready to sit
     /// between the quotes [`prepare`](Self::prepare) writes.
-    // [spec:pgorm:req:sql.render.ident-quoting+6]
+    // [spec:pgorm:req:sql.render.ident-quoting+7]
     fn quoted(&self) -> String {
         self.to_string().replace('"', "\"\"")
     }
@@ -205,15 +205,21 @@ pub trait IntoColumnRef {
 /// This is the *only* thing a cast carries as its type: one node shape, the
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
-// [spec:pgorm:def:sql.types.type-name+6]
+// [spec:pgorm:def:sql.types.type-name+7]
 // [spec:pgorm:req:sql.ast.cast-shape]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
     pub schema: Option<Name>,
     pub name: Name,
     pub array: bool,
-    /// Render `name` as the caller's own SQL rather than as an identifier.
-    pub verbatim: bool,
+    /// The type expression [`raw`](Self::raw) was given, which renders as
+    /// written in place of `name`.
+    ///
+    /// Private, and holding the `&'static str` itself rather than a flag: a
+    /// public flag could turn a quoted runtime name into SQL by assignment,
+    /// and a flag over `name` would render whatever `name` was reassigned to.
+    /// Only program text reaches here, through `raw`'s bound.
+    verbatim: Option<&'static str>,
 }
 
 impl TypeName {
@@ -226,29 +232,49 @@ impl TypeName {
             schema: None,
             name: name.into_name(),
             array: false,
-            verbatim: false,
+            verbatim: None,
         }
     }
 
     /// A type EXPRESSION — `BIT(8)`, `numeric(12, 2)` — rendered verbatim,
     /// nothing quoted or escaped.
     ///
-    /// Reachable only through [`Expr::cast_as_raw`](crate::Expr::cast_as_raw),
-    /// whose argument is a literal written in the calling source: the text is
-    /// program text the author already controls, never data, so rendering it
-    /// as SQL adds no reach that writing the SQL by hand would not have. The
-    /// `&'static str` bound is what enforces that — a runtime `String` cannot
-    /// reach this constructor, so no value-derived text can become SQL here.
-    /// Any type that arrives as a *name* — from a schema, a derive attribute,
-    /// or anything a value could reach — takes [`new`](Self::new) and is
-    /// quoted.
+    /// The only constructor of a verbatim type, and the one
+    /// [`Expr::cast_as_raw`](crate::Expr::cast_as_raw) and the derive's
+    /// `select_as` / `save_as` attributes reach. Its argument is a literal
+    /// written in the calling source: the text is program text the author
+    /// already controls, never data, so rendering it as SQL adds no reach that
+    /// writing the SQL by hand would not have. The `&'static str` bound is
+    /// what enforces that — a runtime `String` cannot reach this constructor,
+    /// so no value-derived text can become SQL here. Only that text is
+    /// verbatim: a [`schema`](Self::schema) added to it is a name and renders
+    /// under the part policy like any other, and reassigning `name`
+    /// afterwards does not change what renders. Any type that arrives as a
+    /// *name* — from a schema, a derive attribute, or anything a value could
+    /// reach — takes [`new`](Self::new) and is quoted.
+    ///
+    /// The flag cannot be set any other way, so runtime text cannot be made
+    /// verbatim after the fact:
+    ///
+    /// ```compile_fail,E0616
+    /// use pgorm_query::{Name, TypeName};
+    ///
+    /// let mut ty = TypeName::new(Name::runtime("int4) + 1 --"));
+    /// ty.verbatim = Some("int4");
+    /// ```
     pub fn raw(type_expr: &'static str) -> Self {
         Self {
             schema: None,
             name: Name::runtime(type_expr),
             array: false,
-            verbatim: true,
+            verbatim: Some(type_expr),
         }
+    }
+
+    /// Whether this is a [`raw`](Self::raw) type expression, rendered as
+    /// written rather than as a name.
+    pub fn is_verbatim(&self) -> bool {
+        self.verbatim.is_some()
     }
 
     /// Qualify with a schema.
@@ -279,12 +305,9 @@ impl TypeName {
     /// in an unqualified type (`integer`, which resolves to `int4`), because
     /// that is what a caller naming it means. A [`raw`](Self::raw) type
     /// expression is the one exception to all of this and renders as
-    /// written.
-    // [spec:pgorm:def:sql.types.type-name+6]
+    /// written — that text alone, the schema qualifying it still a name.
+    // [spec:pgorm:def:sql.types.type-name+7]
     pub fn to_sql_string(&self) -> String {
-        if self.verbatim {
-            return self.raw_text();
-        }
         let mut out = String::new();
         let name = match &self.schema {
             Some(schema) => {
@@ -294,7 +317,10 @@ impl TypeName {
             }
             None => Position::Type,
         };
-        Self::prepare_part(&self.name, name, &mut out);
+        match self.verbatim {
+            Some(type_expr) => out.push_str(type_expr),
+            None => Self::prepare_part(&self.name, name, &mut out),
+        }
         if self.array {
             out.push_str("[]");
         }
@@ -311,8 +337,8 @@ impl TypeName {
     /// ([`IndexType::Named`](crate::IndexType::Named)) — so one policy covers
     /// every name-shaped position, each position saying only which of the
     /// grammar's own forms it reads.
-    // [spec:pgorm:req:sql.render.ident-quoting+6]
-    // [spec:pgorm:def:sql.types.type-name+6]
+    // [spec:pgorm:req:sql.render.ident-quoting+7]
+    // [spec:pgorm:def:sql.types.type-name+7]
     pub(crate) fn prepare_part(part: &Name, position: Position, out: &mut String) {
         let text = part.to_string();
         if keywords::bare(&text, position) {
@@ -332,7 +358,10 @@ impl TypeName {
             out.push_str(&schema.to_string());
             out.push('.');
         }
-        out.push_str(&self.name.to_string());
+        match self.verbatim {
+            Some(type_expr) => out.push_str(type_expr),
+            None => out.push_str(&self.name.to_string()),
+        }
         if self.array {
             out.push_str("[]");
         }
@@ -990,6 +1019,25 @@ mod tests {
     pub use crate::{tests_cfg::*, *};
     pub use Character as CharReexport;
     use pretty_assertions::assert_eq;
+
+    // [spec:pgorm:def:sql.types.type-name+7/test]    only the text `raw` was
+    // given renders verbatim: a schema on a raw type is a name, and
+    // reassigning `name` afterwards changes nothing that renders
+    #[test]
+    fn raw_type_renders_only_its_static_text() {
+        let schema = Name::runtime("x\"; DROP TABLE t; --");
+        let qualified = TypeName::raw("numeric(12, 2)").schema(schema).array();
+        assert_eq!(
+            qualified.to_sql_string(),
+            r#""x""; DROP TABLE t; --".numeric(12, 2)[]"#
+        );
+        let mut renamed = TypeName::raw("numeric(12, 2)");
+        renamed.name = Name::runtime("int4) + 1 --");
+        assert!(renamed.is_verbatim());
+        assert_eq!(renamed.to_sql_string(), "numeric(12, 2)");
+        assert_eq!(renamed.raw_text(), "numeric(12, 2)");
+        assert!(!TypeName::new(Name::runtime("numeric")).is_verbatim());
+    }
 
     #[test]
     fn test_identifier() {

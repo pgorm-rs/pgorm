@@ -411,6 +411,18 @@ fn query_sites() -> Vec<Site> {
                     .expr(Expr::val(1).cast_as_type(TypeName::new(n_(n)).schema(fixed("s")))))
             },
         },
+        // A `TypeName::raw` type expression is program text and renders as
+        // written; a schema added to one is a name like any other.
+        Site {
+            id: "query/expr.cast-raw.schema",
+            api: "Expr::cast_as_type(TypeName::raw(type).schema(Name))",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Expr::val(1).cast_as_type(TypeName::raw("ty").schema(n_(n)))))
+            },
+        },
         Site {
             id: "query/expr.cast.array",
             api: "Expr::cast_as_type(TypeName::new(Name).array())",

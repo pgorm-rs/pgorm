@@ -288,7 +288,7 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
         // generated as a different type than the one described, so it is
         // refused here rather than silently respelled.
         ColumnType::Named(type_name) => {
-            if type_name.verbatim || type_name.schema.is_some() || type_name.array {
+            if type_name.is_verbatim() || type_name.schema.is_some() || type_name.array {
                 return Err(Error::TransformError(format!(
                     "{context}: named column type `{}` is not supported by codegen; \
                      only a bare type name survives the generated \

@@ -188,7 +188,7 @@ impl GenericClient for Transaction<'_> {
     where
         T: ?Sized + ToStatement + Sync + Send,
     {
-        tokio_postgres::Transaction::execute(self, query, params).await
+        tokio_postgres::Transaction::execute(&self.txn, query, params).await
     }
 
     async fn execute_raw<P, I, T>(&self, statement: &T, params: I) -> Result<u64, Error>
@@ -198,14 +198,14 @@ impl GenericClient for Transaction<'_> {
         I: IntoIterator<Item = P> + Sync + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        tokio_postgres::Transaction::execute_raw(self, statement, params).await
+        tokio_postgres::Transaction::execute_raw(&self.txn, statement, params).await
     }
 
     async fn query<T>(&self, query: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
     where
         T: ?Sized + ToStatement + Sync + Send,
     {
-        tokio_postgres::Transaction::query(self, query, params).await
+        tokio_postgres::Transaction::query(&self.txn, query, params).await
     }
 
     async fn query_one<T>(
@@ -216,7 +216,7 @@ impl GenericClient for Transaction<'_> {
     where
         T: ?Sized + ToStatement + Sync + Send,
     {
-        tokio_postgres::Transaction::query_one(self, statement, params).await
+        tokio_postgres::Transaction::query_one(&self.txn, statement, params).await
     }
 
     async fn query_opt<T>(
@@ -227,7 +227,7 @@ impl GenericClient for Transaction<'_> {
     where
         T: ?Sized + ToStatement + Sync + Send,
     {
-        tokio_postgres::Transaction::query_opt(self, statement, params).await
+        tokio_postgres::Transaction::query_opt(&self.txn, statement, params).await
     }
 
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
@@ -237,11 +237,11 @@ impl GenericClient for Transaction<'_> {
         I: IntoIterator<Item = P> + Sync + Send,
         I::IntoIter: ExactSizeIterator,
     {
-        tokio_postgres::Transaction::query_raw(self, statement, params).await
+        tokio_postgres::Transaction::query_raw(&self.txn, statement, params).await
     }
 
     async fn prepare(&self, query: &str) -> Result<Statement, Error> {
-        tokio_postgres::Transaction::prepare(self, query).await
+        tokio_postgres::Transaction::prepare(&self.txn, query).await
     }
 
     async fn prepare_typed(
@@ -249,7 +249,7 @@ impl GenericClient for Transaction<'_> {
         query: &str,
         parameter_types: &[Type],
     ) -> Result<Statement, Error> {
-        tokio_postgres::Transaction::prepare_typed(self, query, parameter_types).await
+        tokio_postgres::Transaction::prepare_typed(&self.txn, query, parameter_types).await
     }
 
     async fn prepare_cached(&self, query: &str) -> Result<Statement, Error> {
@@ -266,6 +266,6 @@ impl GenericClient for Transaction<'_> {
     }
 
     async fn batch_execute(&self, query: &str) -> Result<(), Error> {
-        tokio_postgres::Transaction::batch_execute(self, query).await
+        tokio_postgres::Transaction::batch_execute(&self.txn, query).await
     }
 }

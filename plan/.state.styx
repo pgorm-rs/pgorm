@@ -864,6 +864,7 @@ assertions (
     {id pipeline-bare-dollar-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T21:45:40.062525Z}
     {id pipeline-read-cast-verbatim, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:19:07.367803Z}
     {id type-part-keyword-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:48:03.368721Z}
+    {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
 )
 
 impl_evidence (

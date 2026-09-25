@@ -175,8 +175,8 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > rather than once per call. What still bypasses it is `tokio_postgres`'s own
 > statement surface — `Client::query`, `Transaction::execute` and their
 > siblings prepare an unnamed statement per call and consult nothing — which is
-> what pgorm-pool's `Client`/`Transaction` expose by `Deref` and what a caller
-> reaching past `ConnectionTrait` gets.
+> what pgorm-pool's `Client` exposes by `Deref`, what its `Transaction`
+> forwards, and what a caller reaching past `ConnectionTrait` gets.
 >
 > A cached statement outlives the call that prepared it. That is the point, and
 > two things follow from it: the cache is capacity-bounded
@@ -342,7 +342,8 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > The narrowing is `ConnectionTrait`'s alone. `pgorm_pool`'s `GenericClient`
 > (`conn.pool.generic-client`) and the `tokio_postgres` surface that pgorm-pool's
-> `Client` and `Transaction` expose by `Deref` keep `ToStatement`: those are
+> `Client` exposes by `Deref` and its `Transaction` forwards keep
+> `ToStatement`: those are
 > tokio-postgres's own contract, reached past `ConnectionTrait` with a
 > particular connection already in hand, and there a prepared `Statement` is
 > the point rather than the hazard.
@@ -425,7 +426,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > per-connection `StatementCache` (`conn.pool.statement-cache`) and nested
 > transactions go through the wrapper's savepoint logic.
 
-> [spec:pgorm:req:conn.pool.savepoint-name]
+> [spec:pgorm:req:conn.pool.savepoint-name+2]
 > `pgorm_pool::Transaction::savepoint(name)` MUST quote `name` as a
 > PostgreSQL identifier — every `"` in it doubled, the whole wrapped in
 > `"` — before handing it to `tokio_postgres`.
@@ -465,6 +466,15 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `GenericClient::transaction` (`conn.pool.generic-client`) are unaffected
 > — `tokio_postgres` names those itself, `sp_{depth}`, from no caller
 > input.
+>
+> The quoted method MUST be the only route to a savepoint name. pgorm-pool's
+> `Transaction` therefore does not `Deref` to `tokio_postgres::Transaction`,
+> whose own `savepoint` interpolates the name unquoted: through a `Deref`,
+> `tokio_postgres::Transaction::savepoint(&mut *txn, name)` compiled and
+> skipped the quoting. The wrapper forwards the statement methods its
+> callers use instead — `execute`, `execute_raw`, `query`, `query_one`,
+> `query_opt`, `query_raw` and `batch_execute`, each a call with the
+> caller's own statement text — and holds the inner transaction privately.
 
 ## Transactions
 

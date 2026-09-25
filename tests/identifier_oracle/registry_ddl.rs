@@ -67,6 +67,16 @@ pub fn sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "ddl/create-table.column-type-raw-schema",
+            api: "ColumnDef::named(TypeName::raw(type).schema(Name))",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).named(TypeName::raw("ty").schema(n_(n)))))
+            },
+        },
+        Site {
             id: "ddl/create-table.column-type-array",
             api: "ColumnDef::array(ColumnType::named(String))",
             kinds: &["ColumnDef.type_name.names[0]"],

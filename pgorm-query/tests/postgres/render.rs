@@ -125,7 +125,7 @@ const HOSTILE: &str = "hostile\" name --";
 /// The same name after the identifier rule: doubled inner quote, wrapped.
 const HOSTILE_QUOTED: &str = r#""hostile"" name --""#;
 
-// [spec:pgorm:req:sql.render.ident-quoting+6/test]    a caller-supplied type NAME reaches output
+// [spec:pgorm:req:sql.render.ident-quoting+7/test]    a caller-supplied type NAME reaches output
 // quoted, in every position a `ColumnType::Custom` is rendered from
 #[test]
 fn a_custom_column_type_name_is_quoted() {
@@ -168,7 +168,7 @@ fn a_custom_column_type_name_is_quoted() {
     );
 }
 
-// [spec:pgorm:req:sql.render.ident-quoting+6/test]    a caller-supplied index access method
+// [spec:pgorm:req:sql.render.ident-quoting+7/test]    a caller-supplied index access method
 // reaches output quoted
 #[test]
 fn a_custom_index_access_method_is_quoted() {
@@ -190,7 +190,7 @@ fn a_custom_index_access_method_is_quoted() {
     );
 }
 
-// [spec:pgorm:req:sql.render.ident-quoting+6/test]    the schema of a `CREATE EXTENSION` is an
+// [spec:pgorm:req:sql.render.ident-quoting+7/test]    the schema of a `CREATE EXTENSION` is an
 // identifier like every other schema qualifier, and is quoted like one
 #[test]
 fn an_extension_schema_is_quoted() {

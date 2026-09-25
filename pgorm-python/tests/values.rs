@@ -106,7 +106,7 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
             &Value::String(Some(Box::new("calm".into())))
         );
         let rust_type = name.extract::<PyRef<'_, PyTypeName>>()?.rust_type();
-        assert!(!rust_type.verbatim);
+        assert!(!rust_type.is_verbatim());
         assert_eq!(rust_type.name.to_string(), "Mood\"雪");
         Ok(())
     })

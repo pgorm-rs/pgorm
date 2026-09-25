@@ -404,7 +404,7 @@ fn entity_layer_casts_build_the_one_cast_node() {
                     "{spelling}: the operand rides untouched"
                 );
                 assert_eq!(
-                    (type_name.raw_text().as_str(), type_name.verbatim),
+                    (type_name.raw_text().as_str(), type_name.is_verbatim()),
                     (type_text, verbatim),
                     "{spelling}: the type, and how it renders, live in the `TypeName`"
                 );

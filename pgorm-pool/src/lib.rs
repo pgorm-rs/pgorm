@@ -22,6 +22,7 @@
 
 mod config;
 mod generic_client;
+mod transaction;
 
 use std::{
     borrow::Cow,
@@ -41,10 +42,7 @@ use deadpool::managed;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::spawn;
 use tokio::task::JoinHandle;
-use tokio_postgres::{
-    Client as PgClient, Config as PgConfig, Error, IsolationLevel, Statement,
-    Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder, types::Type,
-};
+use tokio_postgres::{Client as PgClient, Config as PgConfig, Error, Statement, types::Type};
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio_postgres::{
@@ -60,6 +58,7 @@ pub use self::config::{
 };
 
 pub use self::generic_client::GenericClient;
+pub use self::transaction::{Transaction, TransactionBuilder};
 
 pub use deadpool::managed::reexports::*;
 deadpool::managed_reexports!(
@@ -559,216 +558,5 @@ impl DerefMut for ClientWrapper {
 impl Drop for ClientWrapper {
     fn drop(&mut self) {
         self.conn_task.abort()
-    }
-}
-
-/// Wrapper around [`tokio_postgres::Transaction`] with a [`StatementCache`]
-/// from the [`Client`] object it was created by.
-pub struct Transaction<'a> {
-    /// Original [`PgTransaction`].
-    txn: PgTransaction<'a>,
-
-    /// [`StatementCache`] of this [`Transaction`].
-    pub statement_cache: Arc<StatementCache>,
-}
-
-impl Transaction<'_> {
-    /// Like [`tokio_postgres::Transaction::prepare()`], but uses an existing
-    /// [`Statement`] from the [`StatementCache`] if possible.
-    pub async fn prepare_cached(&self, query: &str) -> Result<Statement, Error> {
-        self.statement_cache.prepare(self.client(), query).await
-    }
-
-    /// Like [`tokio_postgres::Transaction::prepare_typed()`], but uses an
-    /// existing [`Statement`] from the [`StatementCache`] if possible.
-    pub async fn prepare_typed_cached(
-        &self,
-        query: &str,
-        types: &[Type],
-    ) -> Result<Statement, Error> {
-        self.statement_cache
-            .prepare_typed(self.client(), query, types)
-            .await
-    }
-
-    /// Like [`tokio_postgres::Transaction::commit()`].
-    pub async fn commit(self) -> Result<(), Error> {
-        self.txn.commit().await
-    }
-
-    /// Like [`tokio_postgres::Transaction::rollback()`].
-    pub async fn rollback(self) -> Result<(), Error> {
-        self.txn.rollback().await
-    }
-
-    /// Like [`tokio_postgres::Transaction::transaction()`], but returns a
-    /// wrapped [`Transaction`] with a [`StatementCache`].
-    #[allow(unused_lifetimes)] // false positive
-    pub async fn transaction(&mut self) -> Result<Transaction<'_>, Error> {
-        Ok(Transaction {
-            txn: PgTransaction::transaction(&mut self.txn).await?,
-            statement_cache: self.statement_cache.clone(),
-        })
-    }
-
-    /// Like [`tokio_postgres::Transaction::savepoint()`], but returns a wrapped
-    /// [`Transaction`] with a [`StatementCache`], and quotes `name` as an
-    /// identifier.
-    ///
-    /// `SAVEPOINT` takes no parameters, so the name is the one part of the
-    /// statement that can only travel as SQL text. `tokio_postgres` writes it
-    /// into `SAVEPOINT {name}` — and, from the handle returned here, into
-    /// `RELEASE {name}` and `ROLLBACK TO {name}` — through the simple query
-    /// protocol, which accepts several statements at once. A name is therefore
-    /// quoted before it is handed over: any `"` in it is doubled and the whole
-    /// is wrapped in `"`, which is total over every name PostgreSQL can carry,
-    /// so `x"; DROP TABLE t; --` names a savepoint and nothing else.
-    ///
-    /// Two consequences worth knowing. The name keeps its case and its
-    /// punctuation rather than being folded to lower case, because that is
-    /// what quoting an identifier means; within this handle that is invisible,
-    /// since the release and the rollback quote it the same way. And a name
-    /// holding a NUL byte is refused — PostgreSQL carries no identifier
-    /// containing one under any quoting at all, and the protocol encoder
-    /// rejects it before a byte reaches the server, so the `Err` arrives with
-    /// the transaction untouched.
-    // [spec:pgorm:req:conn.pool.savepoint-name]
-    #[allow(unused_lifetimes)] // false positive
-    pub async fn savepoint<I>(&mut self, name: I) -> Result<Transaction<'_>, Error>
-    where
-        I: Into<String>,
-    {
-        Ok(Transaction {
-            txn: PgTransaction::savepoint(&mut self.txn, quote_identifier(&name.into())).await?,
-            statement_cache: self.statement_cache.clone(),
-        })
-    }
-}
-
-/// `name` as a PostgreSQL quoted identifier: every `"` doubled, the whole
-/// wrapped in `"`.
-///
-/// Total by construction. The delimiter is the only character a quoted
-/// identifier gives special meaning to, and doubling is how PostgreSQL spells
-/// an escaped one, so there is no name this can fail on and no name it can
-/// turn into something other than an identifier.
-// [spec:pgorm:req:conn.pool.savepoint-name]
-fn quote_identifier(name: &str) -> String {
-    let mut quoted = String::with_capacity(name.len() + 2);
-    quoted.push('"');
-    for character in name.chars() {
-        if character == '"' {
-            quoted.push('"');
-        }
-        quoted.push(character);
-    }
-    quoted.push('"');
-    quoted
-}
-
-impl fmt::Debug for Transaction<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Transaction")
-            //.field("txn", &self.txn)
-            .field("statement_cache", &self.statement_cache)
-            .finish()
-    }
-}
-
-impl<'a> Deref for Transaction<'a> {
-    type Target = PgTransaction<'a>;
-
-    fn deref(&self) -> &PgTransaction<'a> {
-        &self.txn
-    }
-}
-
-impl<'a> DerefMut for Transaction<'a> {
-    fn deref_mut(&mut self) -> &mut PgTransaction<'a> {
-        &mut self.txn
-    }
-}
-
-/// Wrapper around [`tokio_postgres::TransactionBuilder`] with a
-/// [`StatementCache`] from the [`Client`] object it was created by.
-#[must_use = "builder does nothing itself, use `.start()` to use it"]
-pub struct TransactionBuilder<'a> {
-    /// Original [`PgTransactionBuilder`].
-    builder: PgTransactionBuilder<'a>,
-
-    /// [`StatementCache`] of this [`TransactionBuilder`].
-    statement_cache: Arc<StatementCache>,
-}
-
-impl<'a> TransactionBuilder<'a> {
-    /// Sets the isolation level of the transaction.
-    ///
-    /// Like [`tokio_postgres::TransactionBuilder::isolation_level()`].
-    pub fn isolation_level(self, isolation_level: IsolationLevel) -> Self {
-        Self {
-            builder: self.builder.isolation_level(isolation_level),
-            statement_cache: self.statement_cache,
-        }
-    }
-
-    /// Sets the access mode of the transaction.
-    ///
-    /// Like [`tokio_postgres::TransactionBuilder::read_only()`].
-    pub fn read_only(self, read_only: bool) -> Self {
-        Self {
-            builder: self.builder.read_only(read_only),
-            statement_cache: self.statement_cache,
-        }
-    }
-
-    /// Sets the deferrability of the transaction.
-    ///
-    /// If the transaction is also serializable and read only, creation
-    /// of the transaction may block, but when it completes the transaction
-    /// is able to run with less overhead and a guarantee that it will not
-    /// be aborted due to serialization failure.
-    ///
-    /// Like [`tokio_postgres::TransactionBuilder::deferrable()`].
-    pub fn deferrable(self, deferrable: bool) -> Self {
-        Self {
-            builder: self.builder.deferrable(deferrable),
-            statement_cache: self.statement_cache,
-        }
-    }
-
-    /// Begins the [`Transaction`].
-    ///
-    /// The transaction will roll back by default - use the commit method
-    /// to commit it.
-    ///
-    /// Like [`tokio_postgres::TransactionBuilder::start()`].
-    pub async fn start(self) -> Result<Transaction<'a>, Error> {
-        Ok(Transaction {
-            txn: self.builder.start().await?,
-            statement_cache: self.statement_cache,
-        })
-    }
-}
-
-impl fmt::Debug for TransactionBuilder<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TransactionBuilder")
-            //.field("builder", &self.builder)
-            .field("statement_cache", &self.statement_cache)
-            .finish()
-    }
-}
-
-impl<'a> Deref for TransactionBuilder<'a> {
-    type Target = PgTransactionBuilder<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.builder
-    }
-}
-
-impl DerefMut for TransactionBuilder<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.builder
     }
 }

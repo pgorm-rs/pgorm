@@ -107,7 +107,7 @@ impl ExtensionCreateStatement {
     ///
     /// The schema is a name and renders as a quoted identifier, so the bound
     /// is the identifier bound every other schema position takes.
-    // [spec:pgorm:req:sql.render.ident-quoting+6]
+    // [spec:pgorm:req:sql.render.ident-quoting+7]
     pub fn schema<T: IntoName>(&mut self, schema: T) -> &mut Self {
         self.schema = Some(schema.into_name());
         self

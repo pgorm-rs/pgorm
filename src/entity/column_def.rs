@@ -63,12 +63,13 @@ pub(crate) fn escape_like_text(text: &str) -> String {
 // [spec:pgorm:sem:entity.traits.column.enum-cast+4]
 pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     match col_type {
-        ColumnType::Enum { name, schema, .. } => Some(pgorm_query::TypeName {
-            schema: schema.clone(),
-            name: Name::clone(name),
-            array: false,
-            verbatim: false,
-        }),
+        ColumnType::Enum { name, schema, .. } => {
+            let type_name = pgorm_query::TypeName::new(Name::clone(name));
+            Some(match schema {
+                Some(schema) => type_name.schema(Name::clone(schema)),
+                None => type_name,
+            })
+        }
         ColumnType::Array(col_type) => Some(enum_type_name(col_type)?.array()),
         _ => None,
     }

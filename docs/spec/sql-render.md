@@ -170,7 +170,7 @@ an ideal Postgres renderer would emit.
 
 ## Identifiers and literals
 
-> [spec:pgorm:req:sql.render.ident-quoting+6]
+> [spec:pgorm:req:sql.render.ident-quoting+7]
 > The quote is the double quote, and it is the only one: PostgreSQL has a
 > single identifier quote, so it is written at the render sites rather than
 > carried in a parameter that could hold another character. Every identifier
@@ -199,8 +199,9 @@ an ideal Postgres renderer would emit.
 > render site inherits it.
 >
 > Only two things in the crate render caller text verbatim, and neither is a
-> name: `TypeName::raw` (bound to `&'static str`, reachable only from
-> `Expr::cast_as_raw`) and `SimpleExpr::Raw` (bound to `&'static str` by
+> name: `TypeName::raw` (bound to `&'static str`, the only way to set the
+> private field it fills, and verbatim for that text alone — a schema on it
+> is a name) and `SimpleExpr::Raw` (bound to `&'static str` by
 > `Expr::raw`). Both carry program text rather than data, and their bounds
 > are what keeps that true.
 

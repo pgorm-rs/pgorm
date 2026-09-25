@@ -423,10 +423,10 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+6]
+> [spec:pgorm:def:sql.types.type-name+7]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<Name>`,
-> `name: Name`, `array: bool`, `verbatim: bool`. Rendering
+> `name: Name`, `array: bool`, and a private `verbatim`. Rendering
 > (`to_sql_string`) joins the parts with `.` and appends a structural `[]`
 > for arrays. Each part is written bare or quoted by one policy
 > (`pgorm-query/src/keywords.rs`), which knows where the part stands.
@@ -500,15 +500,21 @@ including panic semantics and quirks inherited from sea-query.
 > `TypeName`: one policy, not a per-site escape.
 >
 > Type EXPRESSIONS — `BIT(8)`, `numeric(12, 2)` — are not names, and they
-> are the one exception: `TypeName::raw` sets `verbatim`, which makes
-> `to_sql_string` short-circuit to `raw_text` and emit the caller's own SQL
-> unquoted and unescaped. `verbatim` is set nowhere else. Its argument is
-> bound `&'static str`, so only a literal written in the calling source can
-> reach it and no runtime `String` — nothing a value could have reached —
-> can become SQL there; the bound is the enforcement, not the doc. It is
-> called only from `Expr::cast_as_raw`, which carries the same bound, so
-> the set of expressions that can emit an unescaped type name is one a
-> reader can enumerate. A type that arrives as a *name*, including at
+> are the one exception: `TypeName::raw` stores its argument in
+> `verbatim`, and `to_sql_string` writes that text in place of the name,
+> unquoted and unescaped. `verbatim` is private and holds the
+> `&'static str` itself, and `raw` is the only way to set it: a quoted
+> `TypeName` cannot be turned verbatim by assignment, and reassigning
+> `name` on a raw type does not change what renders. `is_verbatim()` is how
+> a reader asks. Only that text is verbatim: a schema qualifying a raw type
+> is a name and renders under the part policy, and `[]` stays structural.
+> The argument is bound `&'static str`, so only a literal written in the
+> calling source can reach it and no runtime `String` — nothing a value
+> could have reached — can become SQL there; the bound is the enforcement,
+> not the doc. It is reached from `Expr::cast_as_raw` and the derive's
+> `select_as` / `save_as` attributes, which carry the same bound, so the set
+> of expressions that can emit an unescaped type name is one a reader can
+> enumerate. A type that arrives as a *name*, including at
 > runtime, takes `TypeName::new` or `ColumnType::named` and is quoted.
 > `Func::cast_as` is deleted, `cast_as` quoting by default instead.
 >

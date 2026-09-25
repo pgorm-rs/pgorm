@@ -116,7 +116,7 @@ fn every_site_holds_every_hostile_name() {
 /// held for the whole keyword list, not only the words the corpus happens to
 /// hold, and a keyword whose bare spelling means something else can only
 /// render quoted.
-// [spec:pgorm:def:sql.types.type-name+6/test]
+// [spec:pgorm:def:sql.types.type-name+7/test]
 // [spec:pgorm:req:security.ident-oracle+4/test]
 #[test]
 fn type_name_sites_hold_every_keyword() {

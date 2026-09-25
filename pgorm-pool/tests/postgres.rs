@@ -701,7 +701,7 @@ const HOSTILE_SAVEPOINT_NAMES: &[&str] = &[
     "Mixed Case Point",
 ];
 
-// [spec:pgorm:req:conn.pool.savepoint-name/test]    a savepoint name is an
+// [spec:pgorm:req:conn.pool.savepoint-name+2/test]    a savepoint name is an
 // identifier, not SQL: a name holding a statement terminator names a savepoint
 // that releases and rolls back normally, and the table it tried to drop lives
 #[tokio::test]
@@ -790,7 +790,7 @@ async fn savepoint_name_cannot_smuggle_sql() {
         .unwrap();
 }
 
-// [spec:pgorm:req:conn.pool.savepoint-name/test]    a NUL byte is refused
+// [spec:pgorm:req:conn.pool.savepoint-name+2/test]    a NUL byte is refused
 // client-side, and the transaction it was asked of is still usable
 #[tokio::test]
 async fn savepoint_name_with_a_nul_is_refused() {
