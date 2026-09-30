@@ -8801,12 +8801,20 @@ children (
                 id scope-on-constraint
                 title "ON CONFLICT ON CONSTRAINT names its arbiter through its own typestate"
                 deps (identifier-render-oracle)
+                sealed true
                 log (
                     {
                         at 2026-09-30T15:25:20.851478Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-30T17:02:07.648474Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
