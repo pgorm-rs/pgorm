@@ -1,6 +1,7 @@
 use pgorm_query::{tests_cfg::*, *};
 
 mod case;
+mod collate;
 mod comment;
 mod deferrability;
 mod extension;

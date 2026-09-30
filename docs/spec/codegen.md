@@ -702,11 +702,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > so the round trip gained a `unique` the statement path dropped. `transform`
 > now reads that spec (`codegen.entity.transform`) and the two paths agree.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+1]
+> [spec:pgorm:req:codegen.ddl.unsupported+2]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
-> / `COMMENT ON COLUMN`. Everything else in the file MUST be reported — never
+> / `COMMENT ON COLUMN` — with a column's `COLLATE` clause, which the bridged
+> statement carries and the entity, like a comment, does not
+> (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
 > skipped, never quietly reinterpreted. A construct outside the subset is
 > ``TransformError("unsupported DDL: <what> at statement <n>")``; a construct
 > inside it that this schema cannot resolve is
@@ -720,9 +722,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Named rejections MUST cover at least: every statement other than the four
 > above; `INHERITS`, `PARTITION BY`, `PARTITION OF`, `OF <type>`, `LIKE`, `WITH`
 > storage options, `TABLESPACE`, `USING <access method>`, `ON COMMIT`,
-> catalog-qualified table names and temporary or unlogged tables; column
+> catalog-qualified table and collation names and temporary or unlogged
+> tables; column
 > `DEFAULT`, `CHECK`, `GENERATED`,
-> identity, `COLLATE`, `STORAGE` and `COMPRESSION` clauses; table-level `CHECK`
+> identity, `STORAGE` and `COMPRESSION` clauses; table-level `CHECK`
 > and `EXCLUDE` constraints, deferrable and `NO INHERIT` constraints, `INCLUDE`
 > columns, constraint index and storage options, and `MATCH` clauses;
 > `REFERENCES` without a referenced column list, which no catalog is present to
@@ -791,7 +794,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+2]
+> [spec:pgorm:sem:codegen.ddl.tables+3]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -809,6 +812,19 @@ compiling the C parser falls on people generating entities and on nobody else.
 > whether or not the DDL spells it, which is Postgres' own rule: the entity
 > model reads nullability off the column alone, so an unstated `NOT NULL` would
 > otherwise generate an `Option` primary key.
+>
+> A column's `COLLATE` clause becomes the column's collation
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+7]`), bare or
+> schema-qualified as written; a catalog-qualified name is a named rejection,
+> as a table's is. It rides on the statement and does not reach the generated
+> entity, as a column comment does not (`codegen.ddl.objects`): the entity
+> model has no collation, and needs none to query the column, because the
+> server compares and sorts a column by its own collation without the
+> statement naming it. The one consumer that would read it off an entity is
+> entity-first schema generation, and a generated entity is the image of a
+> schema that already exists. Emitting it would mean an entity attribute and
+> a schema-generation arm of its own, and until a caller needs to declare a
+> collation from an entity, `parse_schema`'s statements are where it is kept.
 >
 > Table-level `PRIMARY KEY` and `UNIQUE` constraints become the table's
 > primary-key and unique indexes, keeping the constraint name and

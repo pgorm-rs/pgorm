@@ -126,9 +126,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+6]
-> `ColumnDef` holds a name, an optional `ColumnType` and an ordered list of
-> `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
+> [spec:pgorm:req:sql.ddl.column-def+7]
+> `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
+> and an ordered list of `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey(Option<Deferrability>)`, `PrimaryKey(Option<Deferrability>)`,
 > `Check(SimpleExpr)`, `Generated { expr }`,
 > `Identity(IdentityGeneration)`, `RawSuffix(&'static str)`, `Comment(String)`),
@@ -141,7 +141,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `raw_suffix(s)`, etc.).
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
-> each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
+> ` COLLATE ` and the collation's quoted name when it has one
+> (`[spec:pgorm:req:sql.render.collate]`), then each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
 > `UNIQUE[ <deferrability>]`, `PRIMARY KEY[ <deferrability>]` (the
 > deferrability of `[spec:pgorm:req:sql.ddl.deferrability]`, carried inside
 > the spec so it cannot trail another), `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
@@ -199,6 +200,17 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > asserted. Revisiting it means reshaping the spec list, and that reshaping is
 > the work, not this clause.
 >
+> The collation is a slot of the column and not a spec, set by
+> `collate(c)` — any `IntoCollation`, as `Expr::collate` takes
+> (`[spec:pgorm:req:sql.ast.expr.collate]`) — and read back by
+> `get_collation()`. PostgreSQL's grammar lets `COLLATE` stand anywhere among
+> a column's clauses but refuses a second one ("multiple COLLATE clauses not
+> allowed"), so a spec pushed in insertion order could build that refusal and
+> a slot cannot: a second call replaces the first. Where it is written
+> therefore follows the type rather than the call order. It is distinct from
+> a `COLLATE` inside a `DEFAULT` expression, which is the expression's and is
+> self-parenthesised so the grammar cannot read it as the column's.
+>
 > `RawSuffix` is deliberately verbatim and is the one DDL render that
 > interpolates a caller string unquoted. It exists as the escape hatch for
 > column SQL the `ColumnType`/`ColumnSpec` vocabulary cannot spell, so quoting
@@ -232,7 +244,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Inet`→`inet`; `MacAddr`→`macaddr`;
 > `LTree`→`ltree`.
 
-> [spec:pgorm:req:sql.ddl.alter-table+5]
+> [spec:pgorm:req:sql.ddl.alter-table+6]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey` and `DropForeignKey`. Both the table and a first option are
@@ -273,7 +285,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > either.
 >
 > `ModifyColumn` decomposes into per-aspect Postgres actions: when a type is
-> present, `ALTER COLUMN "c" TYPE <type>`; then per spec `ALTER COLUMN "c"
+> present, `ALTER COLUMN "c" TYPE <type>[ COLLATE <collation>]` — the retype
+> is the only place PostgreSQL changes a column's collation, so a modified
+> column that carries a collation and no type writes no collation, as it
+> writes no `Generated` spec; then per spec `ALTER COLUMN "c"
 > DROP NOT NULL` (for `Null`), `SET NOT NULL`, `SET DEFAULT <expr>`,
 > `ADD UNIQUE ("c")[ <deferrability>]`, `ADD PRIMARY KEY ("c")[
 > <deferrability>]`, `CHECK (<expr>)` or the
@@ -506,7 +521,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`, as
 > an embedded index is by `index()`: an embedded key constrains the table it
 > sits inside and MUST NOT name another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+5]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+6]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy

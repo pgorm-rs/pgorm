@@ -106,7 +106,7 @@ async fn catalogue_count(db: &DatabaseConnection, sql: &str, name: &str) -> i64 
 /// `InsertStmt` target columns and `ColumnRef.fields`: a schema, a table and a
 /// column all named with the hostile name, created, written and read through
 /// the builders.
-// [spec:pgorm:req:security.ident-oracle+4/test]
+// [spec:pgorm:req:security.ident-oracle+5/test]
 #[tokio::test]
 async fn live_relation_schema_and_column_names() {
     let (ctx, db) = open("ident_oracle_live_relation").await;
@@ -153,7 +153,7 @@ async fn live_relation_schema_and_column_names() {
 /// `ResTarget.name`, `RangeVar.alias.aliasname`, `RangeSubselect.alias` and
 /// `CommonTableExpr.ctename`: every alias kind, read back as the server
 /// labels it.
-// [spec:pgorm:req:security.ident-oracle+4/test]
+// [spec:pgorm:req:security.ident-oracle+5/test]
 #[tokio::test]
 async fn live_alias_names() {
     let (ctx, db) = open("ident_oracle_live_alias").await;
@@ -207,7 +207,7 @@ async fn live_alias_names() {
 
 /// `FuncCall.funcname` and `TypeCast.type_name`: a function and a domain
 /// created under the hostile name, called and cast to through the builders.
-// [spec:pgorm:req:security.ident-oracle+4/test]
+// [spec:pgorm:req:security.ident-oracle+5/test]
 #[tokio::test]
 async fn live_function_and_type_names() {
     let (ctx, db) = open("ident_oracle_live_function_type").await;
@@ -238,7 +238,7 @@ async fn live_function_and_type_names() {
 
 /// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
 /// the hostile name.
-// [spec:pgorm:req:security.ident-oracle+4/test]
+// [spec:pgorm:req:security.ident-oracle+5/test]
 #[tokio::test]
 async fn live_window_names() {
     let (ctx, db) = open("ident_oracle_live_window").await;
@@ -263,9 +263,47 @@ async fn live_window_names() {
     close(ctx, db).await;
 }
 
+/// `CollateClause.collname` and `ColumnDef.coll_clause`: a collation created
+/// under the hostile name as a copy of `"C"`, named by an expression and by a
+/// column definition through the builders.
+// [spec:pgorm:req:security.ident-oracle+5/test]
+#[tokio::test]
+async fn live_collation_names() {
+    let (ctx, db) = open("ident_oracle_live_collation").await;
+    for (at, name) in NASTY.into_iter().enumerate() {
+        db.batch_execute(&format!("CREATE COLLATION {} FROM \"C\"", ident(name)))
+            .await
+            .expect("the fixture collation is created");
+        let n = || Name::runtime(name);
+        // Under a copy of "C", every upper-case letter sorts first.
+        let compared = Query::select()
+            .expr(Expr::case(Expr::val("B").collate(n()).lt(Expr::val("a")), 1).finally(0))
+            .to_string();
+        assert_eq!(one_i32(&db, &compared).await, 1, "{compared:?}");
+
+        let table = format!("t{at}");
+        run(
+            &db,
+            &Table::create(Name::runtime(table.as_str()))
+                .col(ColumnDef::new(Name::runtime("c")).text().collate(n()))
+                .to_string(),
+        )
+        .await;
+        let declared = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_attribute a JOIN pg_collation k ON k.oid = a.attcollation \
+             WHERE a.attname = 'c' AND k.collname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(declared, 1, "no column collated as {name:?}");
+    }
+    close(ctx, db).await;
+}
+
 /// `IndexStmt.idxname`, `Constraint.conname`, `CreateEnumStmt` type names and
 /// labels, and `COMMENT ON` targets: DDL-only names, checked in the catalogue.
-// [spec:pgorm:req:security.ident-oracle+4/test]
+// [spec:pgorm:req:security.ident-oracle+5/test]
 #[tokio::test]
 async fn live_ddl_object_names_and_labels() {
     let (ctx, db) = open("ident_oracle_live_ddl").await;

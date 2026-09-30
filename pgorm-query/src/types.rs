@@ -14,7 +14,7 @@ pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
     // [spec:pgorm:req:sql.render.ident-quoting+7]
-    // [spec:pgorm:req:security.ident-oracle+4] (the quoting every registered
+    // [spec:pgorm:req:security.ident-oracle+5] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
@@ -671,6 +671,10 @@ pub enum Order {
 #[path = "types_alias.rs"]
 mod types_alias;
 pub use types_alias::*;
+
+#[path = "types_collation.rs"]
+mod types_collation;
+pub use types_collation::*;
 
 /// A name computed at run time, reachable only through
 /// [`Name::runtime`].

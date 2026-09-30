@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+4]
+> [spec:pgorm:req:security.ident-oracle+5]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -162,7 +162,8 @@ the modules under `tests/identifier_oracle/`.
 > - projection, table, subquery and CTE aliases;
 > - function and type names;
 > - window names;
-> - index, constraint, enum-type, label and comment targets.
+> - index, constraint, enum-type, label and comment targets;
+> - collation names, in an expression and in a column definition.
 >
 > For each object, three things MUST hold:
 >

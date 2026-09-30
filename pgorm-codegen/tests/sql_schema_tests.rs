@@ -104,7 +104,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -116,7 +116,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -152,7 +152,7 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a column-level UNIQUE becomes the
+// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a column-level UNIQUE becomes the
 // index Postgres creates for it, which is where the entity model reads unique
 #[test]
 fn column_unique_constraint_marks_the_column() {
@@ -164,7 +164,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -213,7 +213,53 @@ fn comments_are_folded_into_their_table() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a statement the bridge does
+// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a column's COLLATE clause becomes its
+// collation, bare or qualified, and the entity generated from it is the one the
+// uncollated table generates
+#[test]
+fn a_column_collation_rides_on_the_statement() {
+    let collated = r#"CREATE TABLE note (
+        id int PRIMARY KEY,
+        title text COLLATE "C" NOT NULL,
+        body text COLLATE pg_catalog."default"
+    );"#;
+    let collations = |sql: &str| {
+        let tables = parse_schema(sql).expect("schema should parse");
+        tables[0]
+            .get_columns()
+            .iter()
+            .map(|column| {
+                column.get_collation().map(|collation| {
+                    (
+                        collation.schema().map(|schema| schema.to_string()),
+                        collation.name().to_string(),
+                    )
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    let expected = vec![
+        None,
+        Some((None, "C".to_owned())),
+        Some((Some("pg_catalog".to_owned()), "default".to_owned())),
+    ];
+    assert_eq!(collations(collated), expected);
+
+    let plain = r#"CREATE TABLE note (id int PRIMARY KEY, title text NOT NULL, body text);"#;
+    assert_eq!(from_sql(collated).files, from_sql(plain).files);
+
+    // The statement renders the clause back, and reads back as the same
+    // collations.
+    let tables = parse_schema(collated).expect("schema should parse");
+    let rendered = format!("{};", tables[0]);
+    assert!(
+        rendered.contains(r#""title" text COLLATE "C" NOT NULL"#),
+        "{rendered}"
+    );
+    assert_eq!(collations(&rendered), expected);
+}
+
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -243,7 +289,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -277,7 +323,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -298,8 +344,8 @@ fn unsupported_column_clauses_are_named() {
         "unsupported DDL: a GENERATED clause on column `t`.`total` at statement 1",
     );
     assert_error(
-        r#"CREATE TABLE t (name text COLLATE "C");"#,
-        "unsupported DDL: a COLLATE clause on column `t`.`name` at statement 1",
+        r#"CREATE TABLE t (name text COLLATE db.pg_catalog."C");"#,
+        "unsupported DDL: a cross-database collation name on column `t`.`name` at statement 1",
     );
     assert_error(
         "CREATE TABLE t (id int REFERENCES u);",
@@ -344,7 +390,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -371,7 +417,7 @@ fn unsupported_index_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -381,7 +427,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -403,7 +449,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+1/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]

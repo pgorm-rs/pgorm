@@ -8767,6 +8767,22 @@ children (
                 id scope-collate
                 title "COLLATE names a collation in expression, ORDER BY and column positions"
                 deps (identifier-render-oracle)
+                sealed true
+                log (
+                    {
+                        at 2026-09-25T05:18:29.518824Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-09-25T07:07:17.973407Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

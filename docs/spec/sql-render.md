@@ -296,15 +296,18 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+6]
+> [spec:pgorm:def:sql.render.precedence+7]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
 > `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
-> `SimpleCase`, `Subscript`, `Grouping`, `LikePattern`, `AsEnum`, or
+> `SimpleCase`, `Subscript`, `Collate`, `Grouping`, `LikePattern`, `AsEnum`, or
 > `SubQuery` (all but the first two are already self-wrapping — a
 > `Subscript` either binds tighter than every operator or wraps its own base,
-> per `sql.render.subscript` — `AsEnum` is
+> per `sql.render.subscript`; a `Collate` wraps itself, per
+> `sql.render.collate`, because `COLLATE` binds tighter than every binary
+> operator but is not an operand in the grammar's two `b_expr` positions —
+> `AsEnum` is
 > the cast of `[spec:pgorm:req:sql.ast.cast-shape]` and spells its own
 > `CAST(…)` parentheses, which is why folding the second cast shape into it
 > could not cost a `BETWEEN` operand its bare rendering); the inner expression
@@ -693,6 +696,44 @@ an ideal Postgres renderer would emit.
 > (`sql.render.placeholder-typing`): `($1)[1]` asks the server to subscript a
 > placeholder of unknown type, and `cast_as_type` with an array `TypeName`
 > is the spelling that gives it one.
+
+## Collations
+
+> [spec:pgorm:req:sql.render.collate]
+> A `SimpleExpr::Collate` MUST render inside its own parentheses: `(`, the
+> operand, ` COLLATE `, the collation's name, `)`. The name renders through
+> `SqlName::prepare` part by part — the schema, `.`, then the name when it is
+> qualified — so each part is double-quoted with any embedded `"` doubled,
+> whatever it spells (`"C"`, `"und-x-icu"`, `"pg_catalog"."default"`).
+>
+> The parentheses are PostgreSQL's own: its deparser writes a `CollateExpr`
+> the same way. They are needed because `COLLATE` is an `a_expr` production
+> and not a `c_expr`. It binds tighter than every binary operator — only a
+> subscript, `::`, `.` and unary minus bind tighter, and none of those is
+> written around a `Collate` bare — so it would be an atom under any operator
+> the AST places around it, except that two positions take the narrower
+> `b_expr`, which has no `COLLATE` at all. A `BETWEEN` lower bound written
+> `'a' COLLATE "C"` is a syntax error; a column `DEFAULT 'a' COLLATE "C"`
+> parses, and is read as the *column's* collation clause with a default of
+> plain `'a'`, a different statement from the one built. Self-wrapped, the
+> clause is an atom in every position, which is what places it among the
+> atoms of `sql.render.precedence`.
+>
+> Inside the parentheses the operand is written bare when it already binds at
+> least as tightly — a column, a value, a constant, a keyword, a call, a
+> cast, a subscript, a tuple, a subquery, a `CASE` or another `Collate`, each
+> of which is a `c_expr` or wraps itself — and parenthesised when it is a
+> `Unary` or `Binary` expression, a `Raw` fragment, a `Template` or a
+> `LikePattern`: `"a" || "b" COLLATE "C"` collates only `"b"`, so a compound
+> operand is wrapped to be collated whole, and verbatim text is wrapped
+> because nothing about its precedence is known. A `Value` operand is an
+> ordinary placeholder, `($1 COLLATE "C")`: the renderer pins no type on it
+> (`sql.render.placeholder-typing`), and none is needed, because the server
+> types a collated placeholder `text` from the clause itself.
+>
+> The goldens are held to libpg_query's `CollateClause`: its `collname` parts
+> are the name's, and its `arg` is the whole operand — a compound one's
+> operator node, not the operator's right-hand side.
 
 ## Custom expressions
 

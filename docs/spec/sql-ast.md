@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+5]
+> [spec:pgorm:req:sql.surface+6]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -77,7 +77,9 @@ today, including panicking edges and deliberate failsafes.
 > `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
 > the bound enum `Frame` (`sql.ast.window-statement`); `IndexConstraint`, an
 > index embedded as a table constraint, the one position that takes
-> deferrability (`sql.ddl.deferrability`).
+> deferrability (`sql.ddl.deferrability`); `Collation` and `IntoCollation`,
+> the name a `COLLATE` clause carries and the conversions into it
+> (`sql.ast.expr.collate`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -113,7 +115,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+5]
+> [spec:pgorm:req:sql.scope+6]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -157,12 +159,6 @@ today, including panicking edges and deliberate failsafes.
 >   constraint form its own small typestate, so `and_column` and `and_where`
 >   stay unreachable from it; a variant inside `ConflictElement` would make
 >   both invalid states constructible.
-> - **`COLLATE`.** Postfix, and its right operand is a collation *name*, not an
->   expression, so it is a dedicated `SimpleExpr` variant holding a `Name` —
->   the shape `AsEnum` uses — rather than a `BinOper`, which would admit
->   `a COLLATE b` for arbitrary `b`. Wanted in three positions (expression,
->   `ORDER BY`, column definition), and `pgorm-codegen` already refuses to read
->   a column carrying one, so closing this is two changes in two crates.
 > - **`CREATE TYPE ... AS (composite)`.** Mechanical: a list of
 >   `(Name, ColumnType)` pairs and a render arm reusing the column-type
 >   renderer, beside the `AS ENUM` form that already exists. It waits on a
@@ -637,6 +633,47 @@ today, including panicking edges and deliberate failsafes.
 > Index and bounds are any `Into<SimpleExpr>`, so a column or an expression
 > can index as readily as a literal; the server coerces each to `int4`, and a
 > bound value is a placeholder it types as `int4`.
+
+> [spec:pgorm:req:sql.ast.expr.collate]
+> `SimpleExpr::Collate(operand, collation)` MUST express PostgreSQL's
+> `COLLATE`, where the collation is a `Collation`: a name and an optional
+> schema, both `Name`s. It is reached from `Expr` through `collate(c)`, which
+> takes any `IntoCollation` — a name converts bare and a `(schema, name)` pair
+> qualified, as a table name does — and returns an `Expr`, because a collated
+> value is an operand rather than a predicate: it goes on to be compared or
+> ordered in the same chain. It lives in a child module of `expr`, as the
+> subscript family does. The right-hand side is a collation's *name* and
+> never an expression, which is why the node is its own variant rather than a
+> `BinOper`: an operator would admit `a COLLATE b` for an arbitrary `b`, and
+> the grammar has no such form.
+>
+> A collation is an identifier and nothing else, so its name is quoted like
+> every other (`sql.render.collate`). Quoting is what keeps the name the
+> caller wrote: PostgreSQL folds an unquoted identifier to lower case, so a
+> bare `C` names a collation `c` that does not exist (`42704`), and `default`
+> is a reserved word that cannot stand bare at all. `TypeName`'s part policy,
+> which writes the grammar's own type spellings bare, is a type position's
+> and not this one's.
+>
+> The clause is wanted in three positions and each is reached through one of
+> two slots. An expression takes it through this node. `ORDER BY` takes it
+> the same way, through `order_by_expr` and its siblings, because
+> PostgreSQL's grammar has no collation slot on a sort key: `COLLATE` there is
+> part of the key's expression. A column definition takes it through
+> `ColumnDef::collate` (`sql.ddl.column-def`), which is a slot of the column
+> rather than an expression, since the grammar spells it as a clause of the
+> column.
+>
+> A collation decides how text compares and sorts, and the difference it
+> makes is the server's to show, so the live suite holds it: the same values
+> order one way under `"C"` — every upper-case letter before every lower-case
+> one — and another under a linguistic collation, whichever one the server
+> has; a nondeterministic collation, where the server's ICU can make one,
+> makes strings that differ in bytes compare equal; a column declared with a
+> collation compares by it without an expression saying so, and a retype
+> moves it to another; and an unknown collation is refused (`42704`), a
+> lower-case `c` included. A `compile_fail` doctest on `Collation` shows that
+> an expression does not convert into one.
 
 > [spec:pgorm:def:sql.ast.keywords+5]
 > `Keyword` represents bare SQL keywords usable as expressions, and the variant

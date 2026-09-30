@@ -432,6 +432,44 @@ fn query_sites() -> Vec<Site> {
                 sql(Query::select().expr(Expr::val(1).cast_as_type(TypeName::new(n_(n)).array())))
             },
         },
+        // -- collations -----------------------------------------------------
+        Site {
+            id: "query/expr.collate.name",
+            api: "Expr::collate(Name)",
+            kinds: &["CollateClause.collname[0]"],
+            policy: Quoted,
+            render: |n| sql(Query::select().expr(Expr::col(fixed("c")).collate(n_(n)))),
+        },
+        Site {
+            id: "query/expr.collate.schema",
+            api: "Expr::collate((Name, Name)) — the schema part",
+            kinds: &["CollateClause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().expr(Expr::col(fixed("c")).collate((n_(n), fixed("co")))))
+            },
+        },
+        Site {
+            id: "query/expr.collate.qualified",
+            api: "Expr::collate((Name, Name)) — the collation part",
+            kinds: &["CollateClause.collname[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().expr(Expr::col(fixed("c")).collate((fixed("s"), n_(n)))))
+            },
+        },
+        Site {
+            id: "query/select.order-by.collate",
+            api: "OrderedStatement::order_by_expr(Expr::collate(Name), order)",
+            kinds: &["CollateClause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(fixed("c"))
+                    .from(fixed("t"))
+                    .order_by_expr(Expr::col(fixed("c")).collate(n_(n)).into(), Order::Asc))
+            },
+        },
         Site {
             id: "query/expr.as-enum.type",
             api: "Expr::as_enum(Name)",

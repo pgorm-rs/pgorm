@@ -6,6 +6,8 @@
 
 use crate::{error::Result, func::*, query::*, template::SqlTemplate, types::*, value::*};
 
+#[path = "expr_collate.rs"]
+mod collate;
 #[path = "expr_json.rs"]
 mod json;
 #[path = "expr_keyword_operators.rs"]
@@ -58,6 +60,10 @@ pub enum SimpleExpr {
     /// An array subscript or slice of the first expression: `a[i]`, `a[l:u]`.
     // [spec:pgorm:req:sql.ast.expr.subscript]
     Subscript(Box<SimpleExpr>, Box<Subscript>),
+    /// The first expression under a named collation: `(a COLLATE "C")`. The
+    /// right-hand side is a collation's *name*, not an expression.
+    // [spec:pgorm:req:sql.ast.expr.collate]
+    Collate(Box<SimpleExpr>, Box<Collation>),
     /// `GROUPING(a, …)`, which reads a row's grouping set.
     // [spec:pgorm:def:sql.ast.select.grouping]
     Grouping(Grouping),

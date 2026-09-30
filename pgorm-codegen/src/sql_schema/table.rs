@@ -1,10 +1,13 @@
 use super::{Enums, types, unresolved, unsupported};
 use crate::{Error, TableIdent};
 use pg_query::NodeEnum;
-use pg_query::protobuf::{ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar};
+use pg_query::protobuf::{
+    CollateClause, ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar,
+};
 use pgorm_query::{
-    ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, Index,
-    IndexCreateStatement, IntoTableName, Name, Table, TableCreateStatement, TableName,
+    Collation, ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, Index,
+    IndexCreateStatement, IntoCollation, IntoTableName, Name, Table, TableCreateStatement,
+    TableName,
 };
 use std::collections::BTreeMap;
 
@@ -45,7 +48,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 }
 
 /// Bridge one `CREATE TABLE` into the statement the transformer reads.
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
@@ -144,7 +147,7 @@ pub(super) fn build(
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+1]
+// [spec:pgorm:req:codegen.ddl.unsupported+2]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -190,7 +193,7 @@ fn reject_table_features(
 /// A `RangeVar` as the table name a DDL statement targets. Postgres has no
 /// cross-database reference to render, so a catalog-qualified name is refused
 /// rather than quietly reduced to its schema and table.
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
     let table = Name::runtime(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
@@ -214,7 +217,7 @@ struct Column {
     foreign_key: Option<ForeignKeyCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 fn column(
     def: &PgColumnDef,
     target: &TableName,
@@ -244,9 +247,6 @@ fn column(
     if !def.generated.is_empty() {
         return Err(on("a GENERATED clause"));
     }
-    if def.coll_clause.is_some() {
-        return Err(on("a COLLATE clause"));
-    }
     if def.raw_default.is_some() || def.cooked_default.is_some() {
         return Err(on("a DEFAULT clause"));
     }
@@ -261,6 +261,9 @@ fn column(
     let mut column = ColumnDef::new_with_type(Name::runtime(column_name), kind.col_type);
     if kind.auto_increment {
         column.auto_increment();
+    }
+    if let Some(clause) = &def.coll_clause {
+        column.collate(collation(clause, &context, at)?);
     }
 
     let mut not_null = def.is_not_null;
@@ -327,13 +330,30 @@ fn column(
     })
 }
 
+/// A column's `COLLATE` clause as the collation it names: bare, or qualified
+/// by one schema. A catalog-qualified name is a cross-database reference
+/// Postgres does not implement, so it is refused as a table's would be.
+// [spec:pgorm:sem:codegen.ddl.tables+3]
+fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collation, Error> {
+    match types::idents(&clause.collname).as_deref() {
+        Some([name]) => Ok(Name::runtime(name.as_str()).into_collation()),
+        Some([schema, name]) => {
+            Ok((Name::runtime(schema.as_str()), Name::runtime(name.as_str())).into_collation())
+        }
+        _ => Err(unsupported(
+            format!("a cross-database collation name on {context}"),
+            at,
+        )),
+    }
+}
+
 /// What a table-level constraint becomes once bridged.
 enum TableConstraint {
     Index(Box<IndexCreateStatement>),
     ForeignKey(Box<ForeignKeyCreateStatement>),
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 fn table_constraint(
     constraint: &Constraint,
     target: &TableName,
@@ -384,7 +404,7 @@ fn table_constraint(
 
 /// A foreign key over `columns` of `target`, with the referenced table, columns
 /// and actions the constraint declares.
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 fn references(
     constraint: &Constraint,
     target: &TableName,
@@ -457,7 +477,7 @@ fn references(
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no
 /// entity meaning, so it reads as no action declared.
-// [spec:pgorm:sem:codegen.ddl.tables+2]
+// [spec:pgorm:sem:codegen.ddl.tables+3]
 fn action(
     code: &str,
     clause: &str,
@@ -484,7 +504,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+1]
+// [spec:pgorm:req:codegen.ddl.unsupported+2]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -521,7 +541,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+1]
+// [spec:pgorm:req:codegen.ddl.unsupported+2]
 fn constraint_kind(kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

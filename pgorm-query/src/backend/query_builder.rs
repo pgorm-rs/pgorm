@@ -14,6 +14,8 @@ use std::ops::Deref;
 // private `prepare_*` methods without widening them.
 #[path = "query_builder_case.rs"]
 mod case;
+#[path = "query_builder_collate.rs"]
+mod collate;
 #[path = "query_builder_grouping.rs"]
 mod grouping;
 #[path = "query_builder_subscript.rs"]
@@ -481,6 +483,9 @@ impl QueryBuilder {
             }
             SimpleExpr::Subscript(base, subscript) => {
                 self.prepare_subscript(base, subscript, sql);
+            }
+            SimpleExpr::Collate(operand, collation) => {
+                self.prepare_collate(operand, collation, sql);
             }
             // [spec:pgorm:req:sql.render.grouping]
             SimpleExpr::Grouping(grouping) => {
@@ -1423,7 +1428,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+6]
+    // [spec:pgorm:req:sql.ddl.column-def+7]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1435,6 +1440,7 @@ impl QueryBuilder {
         column_def.name.prepare(sql.as_writer());
 
         write_type(column_def, sql);
+        self.prepare_column_collation(column_def, sql);
 
         for column_spec in column_def.spec.iter() {
             if let ColumnSpec::AutoIncrement = column_spec {
@@ -1534,7 +1540,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+5]
+    // [spec:pgorm:req:sql.ddl.alter-table+6]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1578,6 +1584,7 @@ impl QueryBuilder {
                         column_def.name.prepare(sql.as_writer());
                         write!(sql, " TYPE ").unwrap();
                         self.prepare_column_type(column_type, sql);
+                        self.prepare_column_collation(column_def, sql);
                     }
                     let first = column_def.types.is_none();
 
@@ -1629,7 +1636,7 @@ impl QueryBuilder {
                             ColumnSpec::Generated { .. } => {}
                             // `ALTER TABLE` spells identity as an action on the
                             // column, not as a clause of it.
-                            // [spec:pgorm:req:sql.ddl.column-def+6]
+                            // [spec:pgorm:req:sql.ddl.column-def+7]
                             ColumnSpec::Identity(generation) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1678,7 +1685,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+5]
+    // [spec:pgorm:req:sql.ddl.alter-table+6]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1775,7 +1782,7 @@ impl QueryBuilder {
             .unwrap(),
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr } => self.prepare_generated_column(expr, sql),
-            // [spec:pgorm:req:sql.ddl.column-def+6]
+            // [spec:pgorm:req:sql.ddl.column-def+7]
             ColumnSpec::Identity(generation) => {
                 write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap()
             }
@@ -1898,8 +1905,8 @@ impl QueryBuilder {
     ///
     /// Always `STORED`: `VIRTUAL` is a syntax error on every PostgreSQL before
     /// 18, so there is no non-stored generated column to render
-    /// (`[spec:pgorm:req:sql.ddl.column-def+6]`).
-    // [spec:pgorm:req:sql.ddl.column-def+6]
+    /// (`[spec:pgorm:req:sql.ddl.column-def+7]`).
+    // [spec:pgorm:req:sql.ddl.column-def+7]
     pub(crate) fn prepare_generated_column(&self, gen_: &SimpleExpr, sql: &mut dyn SqlWriter) {
         write!(sql, "GENERATED ALWAYS AS (").unwrap();
         self.prepare_simple_expr(gen_, sql);
@@ -2475,7 +2482,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+6]
+    // [spec:pgorm:def:sql.render.precedence+7]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2491,6 +2498,7 @@ impl QueryBuilder {
             | SimpleExpr::Case(_)
             | SimpleExpr::SimpleCase(_)
             | SimpleExpr::Subscript(_, _)
+            | SimpleExpr::Collate(_, _)
             | SimpleExpr::Grouping(_)
             | SimpleExpr::LikePattern(_)
             | SimpleExpr::AsEnum(_, _)
@@ -2540,7 +2548,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+6]
+// [spec:pgorm:def:sql.render.precedence+7]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

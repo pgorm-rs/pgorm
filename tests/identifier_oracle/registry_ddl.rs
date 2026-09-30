@@ -97,6 +97,41 @@ pub fn sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "ddl/create-table.column-collation",
+            api: "ColumnDef::collate(Name)",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(ColumnDef::new(fixed("c")).text().collate(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-table.column-collation-schema",
+            api: "ColumnDef::collate((Name, Name)) — the schema part",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(
+                    ColumnDef::new(fixed("c"))
+                        .text()
+                        .collate((n_(n), fixed("co"))),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-table.column-collation-qualified",
+            api: "ColumnDef::collate((Name, Name)) — the collation part",
+            kinds: &["ColumnDef.coll_clause.collname[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(
+                    ColumnDef::new(fixed("c"))
+                        .text()
+                        .collate((fixed("s"), n_(n))),
+                ))
+            },
+        },
+        Site {
             id: "ddl/create-table.index-constraint-name",
             api: "TableCreateStatement::index(Index::create().name(Name))",
             kinds: &["Constraint.conname"],
@@ -225,6 +260,26 @@ pub fn sites() -> Vec<Site> {
             render: |n| {
                 sql(&Table::alter(fixed("t"))
                     .modify_column(ColumnDef::new(n_(n)).integer().not_null()))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-column-collation",
+            api: "TableAlterStatement::add_column(ColumnDef::collate(Name))",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .add_column(ColumnDef::new(fixed("c")).text().collate(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.modify-column-collation",
+            api: "TableAlterStatement::modify_column(ColumnDef::collate(Name)) — the retype",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .modify_column(ColumnDef::new(fixed("c")).text().collate(n_(n))))
             },
         },
         Site {

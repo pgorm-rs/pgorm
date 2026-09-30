@@ -44,7 +44,7 @@ fn column_attributes(deferrability: Deferrability) -> Vec<ConstrType> {
 
 // [spec:pgorm:req:sql.ddl.deferrability/test]    a column's unique and primary keys carry the
 // clause directly after their keyword, and the parser attaches it to them
-// [spec:pgorm:req:sql.ddl.column-def+6/test]
+// [spec:pgorm:req:sql.ddl.column-def+7/test]
 #[test]
 fn a_column_key_carries_its_deferrability() {
     for (deferrability, text) in STATES {
@@ -151,7 +151,7 @@ fn a_table_constraint_carries_its_deferrability() {
 
 // [spec:pgorm:req:sql.ddl.deferrability/test]    `ALTER TABLE` spells a column's key as
 // `ADD UNIQUE (…)` / `ADD PRIMARY KEY (…)`, the clause after it
-// [spec:pgorm:req:sql.ddl.alter-table+5/test]
+// [spec:pgorm:req:sql.ddl.alter-table+6/test]
 #[test]
 fn an_added_key_carries_its_deferrability() {
     let sql = Table::alter(Glyph::Table)

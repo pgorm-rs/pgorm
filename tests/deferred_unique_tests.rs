@@ -85,8 +85,8 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
 /// clause, refuses the first half of the swap on the spot.
 // [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
-// [spec:pgorm:req:sql.ddl.column-def+6/test]
-// [spec:pgorm:req:sql.scope+5/test]
+// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.scope+6/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -171,7 +171,7 @@ async fn set_constraints_immediate_fires_the_check_early(
 /// ids inside a transaction, and a duplicate id left at `COMMIT` is refused.
 // [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: a deferred primary key
 // behaves as a deferred unique key does
-// [spec:pgorm:req:sql.scope+5/test]
+// [spec:pgorm:req:sql.scope+6/test]
 async fn a_deferred_primary_key_is_checked_at_commit(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -221,7 +221,7 @@ async fn a_deferred_primary_key_is_checked_at_commit(
 /// path that spells a column's unique key as `ADD UNIQUE (…)`.
 // [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: INITIALLY IMMEDIATE is
 // checked at the end of the statement, NOT DEFERRABLE per row
-// [spec:pgorm:req:sql.ddl.alter-table+5/test]
+// [spec:pgorm:req:sql.ddl.alter-table+6/test]
 async fn an_initially_immediate_key_checks_at_statement_end(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
