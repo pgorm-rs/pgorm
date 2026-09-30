@@ -632,6 +632,45 @@ fn query_sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "query/insert.on-conflict.constraint",
+            api: "OnConflict::constraint(Name)",
+            kinds: &["InsertStmt.on_conflict_clause.infer.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::insert()
+                    .into_table(fixed("t"))
+                    .columns([fixed("c")])
+                    .values_panic([1.into()])
+                    .on_conflict(OnConflict::constraint(n_(n)).do_nothing()))
+            },
+        },
+        Site {
+            id: "query/insert.on-conflict.constraint-update-column",
+            api: "ConflictConstraint::update_column(Name)",
+            kinds: &["ResTarget.name", "ColumnRef.fields[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::insert()
+                    .into_table(fixed("t"))
+                    .columns([fixed("c")])
+                    .values_panic([1.into()])
+                    .on_conflict(OnConflict::constraint(fixed("k")).update_column(n_(n))))
+            },
+        },
+        Site {
+            id: "query/insert.on-conflict.constraint-value",
+            api: "ConflictConstraint::value(Name, expr)",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::insert()
+                    .into_table(fixed("t"))
+                    .columns([fixed("c")])
+                    .values_panic([1.into()])
+                    .on_conflict(OnConflict::constraint(fixed("k")).value(n_(n), 2)))
+            },
+        },
+        Site {
             id: "query/insert.returning",
             api: "InsertStatement::returning_col(Name)",
             kinds: &["ColumnRef.fields[0]"],

@@ -1155,7 +1155,7 @@ impl QueryBuilder {
     }
 
     /// Write ON CONFLICT expression
-    // [spec:pgorm:req:sql.render.on-conflict+1]
+    // [spec:pgorm:req:sql.render.on-conflict+2]
     fn prepare_on_conflict(&self, on_conflict: &Option<OnConflict>, sql: &mut dyn SqlWriter) {
         let Some(on_conflict) = on_conflict else {
             return;
@@ -1163,8 +1163,16 @@ impl QueryBuilder {
         write!(sql, " ON CONFLICT").unwrap();
         match on_conflict {
             OnConflict::AnyDoNothing => write!(sql, " DO NOTHING").unwrap(),
-            OnConflict::Targeted { target, action } => {
-                self.prepare_on_conflict_target(target, sql);
+            OnConflict::Targeted { arbiter, action } => {
+                match arbiter {
+                    ConflictArbiter::Inference(target) => {
+                        self.prepare_on_conflict_target(target, sql)
+                    }
+                    ConflictArbiter::Constraint(name) => {
+                        write!(sql, " ON CONSTRAINT ").unwrap();
+                        name.prepare(sql.as_writer());
+                    }
+                }
                 self.prepare_on_conflict_action(action, sql);
             }
         }
@@ -1615,7 +1623,7 @@ impl QueryBuilder {
                                 write!(sql, " SET DEFAULT ").unwrap();
                                 self.prepare_simple_expr(v, sql);
                             }
-                            // [spec:pgorm:req:sql.ddl.deferrability]
+                            // [spec:pgorm:req:sql.ddl.deferrability+2]
                             ColumnSpec::UniqueKey(deferrability) => {
                                 write!(sql, "ADD UNIQUE (").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1767,7 +1775,7 @@ impl QueryBuilder {
             // rendered by `prepare_column_auto_increment`; there is no
             // trailing keyword to spell here.
             ColumnSpec::AutoIncrement => {}
-            // [spec:pgorm:req:sql.ddl.deferrability]
+            // [spec:pgorm:req:sql.ddl.deferrability+2]
             ColumnSpec::UniqueKey(deferrability) => write!(
                 sql,
                 "UNIQUE{}",
@@ -1967,7 +1975,7 @@ impl QueryBuilder {
             write!(sql, ")").unwrap();
         }
 
-        // [spec:pgorm:req:sql.ddl.deferrability]
+        // [spec:pgorm:req:sql.ddl.deferrability+2]
         if let Some(deferrability) = constraint.deferrability {
             write!(sql, "{}", deferrability.clause()).unwrap();
         }
@@ -2173,7 +2181,7 @@ impl QueryBuilder {
             self.prepare_foreign_key_action(foreign_key_action, sql);
         }
 
-        // [spec:pgorm:req:sql.ddl.deferrability]
+        // [spec:pgorm:req:sql.ddl.deferrability+2]
         if let Some(deferrability) = create.foreign_key.deferrability {
             write!(sql, "{}", deferrability.clause()).unwrap();
         }

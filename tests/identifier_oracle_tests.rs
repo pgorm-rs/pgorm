@@ -35,7 +35,7 @@ use identifier_oracle::{
 
 /// Every site's benign rendering parses and puts the name exactly where the
 /// registry says, and no two sites share an id.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[test]
 fn every_site_declares_where_its_name_lands() {
     let sites = sites();
@@ -66,7 +66,7 @@ fn every_site_declares_where_its_name_lands() {
 /// rejection of the empty name, a listed type spelling read as its type, a
 /// listed call form read as its expression. A failure
 /// names the site, the name and the structural difference.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[test]
 fn every_site_holds_every_hostile_name() {
     let sites = sites();
@@ -117,7 +117,7 @@ fn every_site_holds_every_hostile_name() {
 /// hold, and a keyword whose bare spelling means something else can only
 /// render quoted.
 // [spec:pgorm:def:sql.types.type-name+7/test]
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[test]
 fn type_name_sites_hold_every_keyword() {
     let keywords = scanner_keywords();
@@ -184,7 +184,7 @@ fn every_site_keeps_nul_out_of_the_server() {
 /// Each pinned defect still reproduces exactly as filed. A pin fails the
 /// moment its site × name pair starts passing, so a fix cannot land without
 /// the pin being retired, and the defect is reported on every run until then.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[test]
 fn pinned_identifier_defects_still_reproduce() {
     let sites = sites();

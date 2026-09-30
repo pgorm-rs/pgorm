@@ -189,11 +189,11 @@ pub enum ColumnSpec {
     Default(SimpleExpr),
     AutoIncrement,
     /// `UNIQUE`, and the deferrability written directly after it when set.
-    // [spec:pgorm:req:sql.ddl.deferrability]
+    // [spec:pgorm:req:sql.ddl.deferrability+2]
     UniqueKey(Option<Deferrability>),
     /// `PRIMARY KEY`, and the deferrability written directly after it when
     /// set.
-    // [spec:pgorm:req:sql.ddl.deferrability]
+    // [spec:pgorm:req:sql.ddl.deferrability+2]
     PrimaryKey(Option<Deferrability>),
     /// `CHECK (<expr>)`. It carries no deferrability: PostgreSQL never defers
     /// a check constraint.

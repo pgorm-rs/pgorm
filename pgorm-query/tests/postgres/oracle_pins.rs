@@ -82,7 +82,7 @@ fn create_table_renders_no_trailing_options() {
 // `DO NOTHING` — no longer typecheck; the `compile_fail` doctests on
 // `OnConflict` prove it. What remains is the shapes the grammar does accept.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.render.on-conflict+1/test]
+// [spec:pgorm:req:sql.render.on-conflict+2/test]
 #[test]
 fn on_conflict_renders_only_valid_shapes() {
     let insert = |conflict: OnConflict| {
@@ -104,14 +104,25 @@ fn on_conflict_renders_only_valid_shapes() {
             .into(),
     );
 
+    let named = insert(
+        OnConflict::constraint(Name::runtime("glyph_key"))
+            .update_column(Glyph::Aspect)
+            .and_where(Expr::col(Glyph::Image).gt(0))
+            .into(),
+    );
+
     assert!(bare.ends_with("ON CONFLICT DO NOTHING"));
     assert!(targeted.ends_with(r#"ON CONFLICT ("id") DO NOTHING"#));
     assert!(updated.ends_with(
         r#"ON CONFLICT ("id") WHERE "aspect" IS NULL DO UPDATE SET "aspect" = "excluded"."aspect" WHERE "image" > 0"#
     ));
+    assert!(named.ends_with(
+        r#"ON CONFLICT ON CONSTRAINT "glyph_key" DO UPDATE SET "aspect" = "excluded"."aspect" WHERE "image" > 0"#
+    ));
     assert_parses(&bare);
     assert_parses(&targeted);
     assert_parses(&updated);
+    assert_parses(&named);
 }
 
 // Fixed by plan node `unrep.dml-order-limit`, at the type level per

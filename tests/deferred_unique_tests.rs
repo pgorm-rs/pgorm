@@ -83,10 +83,10 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
 /// single `UPDATE` ordering can do through a per-row check — and refuses one
 /// that is still there at `COMMIT`. The control, the same column with no
 /// clause, refuses the first half of the swap on the spot.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: an initially
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
 // [spec:pgorm:req:sql.ddl.column-def+7/test]
-// [spec:pgorm:req:sql.scope+6/test]
+// [spec:pgorm:req:sql.scope+7/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -127,7 +127,7 @@ async fn a_deferred_unique_key_admits_a_transient_duplicate(
 /// the statement that says so, rather than waiting for `COMMIT`. The
 /// constraint is a named table-level `UNIQUE (…)` — the `IndexConstraint`
 /// path — so `SET CONSTRAINTS` has a name to reach it by.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: SET CONSTRAINTS moves
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: SET CONSTRAINTS moves
 // a deferrable key's check
 // [spec:pgorm:req:sql.ddl.create-table+9/test]
 async fn set_constraints_immediate_fires_the_check_early(
@@ -169,9 +169,9 @@ async fn set_constraints_immediate_fires_the_check_early(
 
 /// A primary key takes the same clause through `primary_key()`: two rows swap
 /// ids inside a transaction, and a duplicate id left at `COMMIT` is refused.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: a deferred primary key
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: a deferred primary key
 // behaves as a deferred unique key does
-// [spec:pgorm:req:sql.scope+6/test]
+// [spec:pgorm:req:sql.scope+7/test]
 async fn a_deferred_primary_key_is_checked_at_commit(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -219,7 +219,7 @@ async fn a_deferred_primary_key_is_checked_at_commit(
 /// initially-immediate one is checked once the statement ends, when the
 /// positions are distinct again. The key here is added by `ALTER TABLE`, the
 /// path that spells a column's unique key as `ADD UNIQUE (…)`.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: INITIALLY IMMEDIATE is
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: INITIALLY IMMEDIATE is
 // checked at the end of the statement, NOT DEFERRABLE per row
 // [spec:pgorm:req:sql.ddl.alter-table+6/test]
 async fn an_initially_immediate_key_checks_at_statement_end(
@@ -253,7 +253,7 @@ async fn an_initially_immediate_key_checks_at_statement_end(
 /// pending (`55000`). This holds for `INITIALLY IMMEDIATE` as well as
 /// `INITIALLY DEFERRED`, and it is the cost of the clause — an upsert over the
 /// same column works against the undeferrable control.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: a deferrable key is
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: a deferrable key is
 // refused as an ON CONFLICT arbiter
 async fn a_deferrable_key_cannot_arbitrate_on_conflict(
     db: &DatabaseConnection,
@@ -292,7 +292,7 @@ async fn a_deferrable_key_cannot_arbitrate_on_conflict(
 /// refuses it as misplaced (`42601`), and `CREATE UNIQUE INDEX` has no place
 /// for it at all (`42601`). None of the three is spelled by the builder, so
 /// the SQL here is written out by hand.
-// [spec:pgorm:req:sql.ddl.deferrability/test]    against a live server: CHECK and a standalone
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    against a live server: CHECK and a standalone
 // index refuse deferrability
 async fn check_constraints_and_standalone_indexes_refuse_deferral(
     db: &DatabaseConnection,

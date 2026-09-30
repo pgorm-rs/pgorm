@@ -3,12 +3,13 @@ use crate::{Condition, ConditionHolder, IntoCondition, IntoName, Name, SimpleExp
 /// A complete `ON CONFLICT` clause.
 ///
 /// PostgreSQL admits an arbiter-less clause only for `DO NOTHING`, so these two
-/// variants are the two shapes it accepts: a bare `DO NOTHING`, or a conflict
-/// target paired with the action taken on it. There is no clause without an
-/// action to build, and no `DO UPDATE` without the target PostgreSQL demands
-/// for one.
+/// variants are the two shapes it accepts: a bare `DO NOTHING`, or an arbiter
+/// paired with the action taken on it. There is no clause without an action
+/// to build, and no `DO UPDATE` without the arbiter PostgreSQL demands for
+/// one.
 ///
-/// A clause is built by naming its target first, then its action:
+/// A clause is built by naming its arbiter first — the columns an index is
+/// inferred from, or a constraint by name — then its action:
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
@@ -58,26 +59,46 @@ use crate::{Condition, ConditionHolder, IntoCondition, IntoName, Name, SimpleExp
 ///
 /// OnConflict::do_nothing().update_column(Glyph::Aspect);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 // The arbiter-less form genuinely carries nothing, so the size gap is the
 // shape of the clause rather than a payload to box away.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum OnConflict {
-    /// `ON CONFLICT DO NOTHING`: no inference specification, so a conflict on
-    /// any constraint is swallowed.
+    /// `ON CONFLICT DO NOTHING`: no arbiter, so a conflict on any constraint
+    /// is swallowed.
     AnyDoNothing,
-    /// `ON CONFLICT (..) DO ..`: a conflict target and the action taken on it.
+    /// `ON CONFLICT <arbiter> DO ..`: an arbiter and the action taken on a
+    /// conflict it matches.
     Targeted {
         /// Which conflicts this clause answers for.
-        target: ConflictTarget,
+        arbiter: ConflictArbiter,
         /// What is done about them.
         action: ConflictAction,
     },
 }
 
+/// Which conflicts a targeted `ON CONFLICT` answers for, in either of the two
+/// ways PostgreSQL names an arbiter.
+///
+/// The two are alternatives in the grammar rather than parts of one clause —
+/// a column list or a `WHERE` after `ON CONSTRAINT` is a syntax error — so
+/// each is reached through a builder of its own:
+/// [`OnConflict::column`] and [`OnConflict::expr`] begin an inference target,
+/// [`OnConflict::constraint`] names a constraint.
+// [spec:pgorm:req:sql.ast.on-conflict+2]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConflictArbiter {
+    /// `(..) [WHERE ..]`: the index inference specification, from which the
+    /// server finds the arbiter among the table's unique indexes.
+    Inference(ConflictTarget),
+    /// `ON CONSTRAINT "name"`: a constraint of the target table, named
+    /// outright.
+    Constraint(Name),
+}
+
 /// One entry of a conflict target.
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictElement {
     /// A column, as in `ON CONFLICT ("id")`.
@@ -103,7 +124,7 @@ pub enum ConflictElement {
 ///
 /// OnConflict::columns([Glyph::Id, Glyph::Aspect]);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictTarget {
     pub(crate) first: ConflictElement,
@@ -112,7 +133,7 @@ pub struct ConflictTarget {
 }
 
 /// One assignment of a `DO UPDATE SET`.
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAssignment {
     /// Take the column's value from the row that failed to insert:
@@ -134,7 +155,7 @@ pub enum ConflictAssignment {
 ///
 /// OnConflict::column(Glyph::Id).update_columns::<Glyph, _>([]);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictAssignments {
     pub(crate) first: ConflictAssignment,
@@ -145,7 +166,7 @@ pub struct ConflictAssignments {
 ///
 /// Only `Update` carries a filter, because PostgreSQL accepts `WHERE` only
 /// after `DO UPDATE SET ..`.
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAction {
     /// `DO NOTHING`.
@@ -159,15 +180,52 @@ pub enum ConflictAction {
     },
 }
 
-/// A `DO UPDATE SET` under construction, holding the target it answers for.
+/// An `ON CONFLICT ON CONSTRAINT "name"` arbiter, before its action is chosen.
+///
+/// It holds the constraint's name and nothing else, and its only methods lead
+/// to an action. The column list and the partial-index predicate belong to
+/// index inference, and the grammar has no place for either after
+/// `ON CONSTRAINT`, so neither is reachable from here:
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::constraint(Name::runtime("glyph_aspect_key")).and_column(Glyph::Aspect);
+/// ```
+///
+/// ```compile_fail,E0599
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// OnConflict::constraint(Name::runtime("glyph_aspect_key"))
+///     .and_where(Expr::col(Glyph::Aspect).is_null());
+/// ```
+///
+/// Like a conflict target, it is not a clause until it has an action:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Query::insert()
+///     .into_table(Glyph::Table)
+///     .columns([Glyph::Aspect])
+///     .values_panic([1.into()])
+///     .on_conflict(OnConflict::constraint(Name::runtime("glyph_aspect_key")));
+/// ```
+// [spec:pgorm:req:sql.ast.on-conflict+2]
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConflictConstraint {
+    name: Name,
+}
+
+/// A `DO UPDATE SET` under construction, holding the arbiter it answers for.
 ///
 /// [`InsertStatement::on_conflict`](crate::InsertStatement::on_conflict) takes
 /// anything that converts into an [`OnConflict`], so a chain ending here is
 /// passed as it stands.
-// [spec:pgorm:req:sql.ast.on-conflict+1]
+// [spec:pgorm:req:sql.ast.on-conflict+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictUpdate {
-    target: ConflictTarget,
+    arbiter: ConflictArbiter,
     sets: ConflictAssignments,
     filter: Option<Condition>,
 }
@@ -180,8 +238,8 @@ fn merge(filter: Option<Condition>, addition: Condition) -> Option<Condition> {
 }
 
 impl OnConflict {
-    /// `ON CONFLICT DO NOTHING`, with no inference specification: a conflict on
-    /// any constraint is swallowed.
+    /// `ON CONFLICT DO NOTHING`, with no arbiter: a conflict on any constraint
+    /// is swallowed.
     ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
@@ -266,6 +324,98 @@ impl OnConflict {
         T: Into<SimpleExpr>,
     {
         ConflictTarget::new(ConflictElement::Expr(expr.into()))
+    }
+
+    /// Name the arbiter outright: `ON CONFLICT ON CONSTRAINT "name"`.
+    ///
+    /// Where [`column`](Self::column) lets the server infer the arbiter from
+    /// the columns a unique index covers, this names a unique, primary-key or
+    /// exclusion constraint of the table the statement inserts into. It is
+    /// the only way to reach an exclusion constraint, which inference never
+    /// finds, and an exclusion constraint takes only `DO NOTHING`. A conflict
+    /// on any other constraint of the row is still raised. The name is quoted
+    /// like every other identifier, and takes no schema: a constraint belongs
+    /// to its table.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table)
+    ///     .columns([Glyph::Aspect, Glyph::Image])
+    ///     .values_panic([2.into(), 3.into()])
+    ///     .on_conflict(
+    ///         OnConflict::constraint(Name::runtime("glyph_aspect_key"))
+    ///             .update_column(Glyph::Image)
+    ///             .and_where(Expr::col((Glyph::Table, Glyph::Image)).is_null()),
+    ///     )
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"INSERT INTO "glyph" ("aspect", "image") VALUES (2, 3)"#,
+    ///         r#"ON CONFLICT ON CONSTRAINT "glyph_aspect_key""#,
+    ///         r#"DO UPDATE SET "image" = "excluded"."image" WHERE "glyph"."image" IS NULL"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    pub fn constraint<N>(name: N) -> ConflictConstraint
+    where
+        N: IntoName,
+    {
+        ConflictConstraint {
+            name: name.into_name(),
+        }
+    }
+}
+
+impl ConflictConstraint {
+    /// The constraint this arbiter names.
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+
+    /// Take no action on a conflict with the named constraint.
+    pub fn do_nothing(self) -> OnConflict {
+        OnConflict::Targeted {
+            arbiter: self.into(),
+            action: ConflictAction::DoNothing,
+        }
+    }
+
+    /// Begin a `DO UPDATE SET` whose first assignment takes the column's value
+    /// from the row that failed to insert.
+    pub fn update_column<C>(self, column: C) -> ConflictUpdate
+    where
+        C: IntoName,
+    {
+        ConflictUpdate::new(self.into(), ConflictAssignment::Column(column.into_name()))
+    }
+
+    /// Begin a `DO UPDATE SET` whose first assignment sets `col` to `value`.
+    pub fn value<C, T>(self, col: C, value: T) -> ConflictUpdate
+    where
+        C: IntoName,
+        T: Into<SimpleExpr>,
+    {
+        ConflictUpdate::new(
+            self.into(),
+            ConflictAssignment::Expr(col.into_name(), value.into()),
+        )
+    }
+}
+
+impl From<ConflictConstraint> for ConflictArbiter {
+    fn from(constraint: ConflictConstraint) -> Self {
+        Self::Constraint(constraint.name)
+    }
+}
+
+impl From<ConflictTarget> for ConflictArbiter {
+    fn from(target: ConflictTarget) -> Self {
+        Self::Inference(target)
     }
 }
 
@@ -389,7 +539,7 @@ impl ConflictTarget {
     /// Take no action on a conflict this target matches.
     pub fn do_nothing(self) -> OnConflict {
         OnConflict::Targeted {
-            target: self,
+            arbiter: self.into(),
             action: ConflictAction::DoNothing,
         }
     }
@@ -400,7 +550,7 @@ impl ConflictTarget {
     where
         C: IntoName,
     {
-        ConflictUpdate::new(self, ConflictAssignment::Column(column.into_name()))
+        ConflictUpdate::new(self.into(), ConflictAssignment::Column(column.into_name()))
     }
 
     /// Begin a `DO UPDATE SET` whose first assignment sets `col` to `value`.
@@ -410,7 +560,7 @@ impl ConflictTarget {
         T: Into<SimpleExpr>,
     {
         ConflictUpdate::new(
-            self,
+            self.into(),
             ConflictAssignment::Expr(col.into_name(), value.into()),
         )
     }
@@ -424,9 +574,9 @@ impl ConflictAssignments {
 }
 
 impl ConflictUpdate {
-    fn new(target: ConflictTarget, first: ConflictAssignment) -> Self {
+    fn new(arbiter: ConflictArbiter, first: ConflictAssignment) -> Self {
         Self {
-            target,
+            arbiter,
             sets: ConflictAssignments {
                 first,
                 rest: Vec::new(),
@@ -566,7 +716,7 @@ impl ConflictUpdate {
 impl From<ConflictUpdate> for OnConflict {
     fn from(update: ConflictUpdate) -> Self {
         Self::Targeted {
-            target: update.target,
+            arbiter: update.arbiter,
             action: ConflictAction::Update {
                 sets: update.sets,
                 filter: update.filter,

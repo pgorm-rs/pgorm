@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+6]
+> [spec:pgorm:req:sql.surface+7]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -79,7 +79,9 @@ today, including panicking edges and deliberate failsafes.
 > index embedded as a table constraint, the one position that takes
 > deferrability (`sql.ddl.deferrability`); `Collation` and `IntoCollation`,
 > the name a `COLLATE` clause carries and the conversions into it
-> (`sql.ast.expr.collate`).
+> (`sql.ast.expr.collate`); `ConflictArbiter` and `ConflictConstraint`, the
+> two ways an `ON CONFLICT` names its arbiter and the typestate of the named
+> one (`sql.ast.on-conflict`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -115,7 +117,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+6]
+> [spec:pgorm:req:sql.scope+7]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -152,13 +154,6 @@ today, including panicking edges and deliberate failsafes.
 >   rest is useful; the operators it would be read with (`@>`, `<@`, `&&`)
 >   already exist. This is the largest deferred entry and the one that would
 >   most change `sql.value`.
-> - **`ON CONFLICT ON CONSTRAINT <name>`.** The arbiter today is index
->   inference — a column or expression list with an optional `WHERE`
->   (`sql.ast.on-conflict`) — and a named constraint takes neither. Closing it
->   means splitting the arbiter into inference-or-constraint and giving the
->   constraint form its own small typestate, so `and_column` and `and_where`
->   stay unreachable from it; a variant inside `ConflictElement` would make
->   both invalid states constructible.
 > - **`CREATE TYPE ... AS (composite)`.** Mechanical: a list of
 >   `(Name, ColumnType)` pairs and a render arm reusing the column-type
 >   renderer, beside the `AS ENUM` form that already exists. It waits on a
@@ -740,14 +735,22 @@ today, including panicking edges and deliberate failsafes.
 
 ## ON CONFLICT
 
-> [spec:pgorm:req:sql.ast.on-conflict+1]
+> [spec:pgorm:req:sql.ast.on-conflict+2]
 > `OnConflict` (attached with `InsertStatement::on_conflict`, which accepts
 > anything converting into one) MUST be one of exactly two shapes:
 > `AnyDoNothing`, carrying nothing, for the arbiter-less clause PostgreSQL
-> admits only for `DO NOTHING`; or `Targeted`, pairing a `ConflictTarget` with
+> admits only for `DO NOTHING`; or `Targeted`, pairing a `ConflictArbiter` with
 > a `ConflictAction`. There is no third shape, so a clause without an action
-> and a `DO UPDATE` without the inference specification PostgreSQL demands are
-> both unrepresentable per [dec:pgorm:invalid-states-unrepresentable].
+> and a `DO UPDATE` without the arbiter PostgreSQL demands for one are both
+> unrepresentable per [dec:pgorm:invalid-states-unrepresentable].
+>
+> `ConflictArbiter` MUST be one of the grammar's two ways of naming an
+> arbiter: `Inference(ConflictTarget)`, the index inference specification,
+> or `Constraint(Name)`, a constraint named outright — `ON CONSTRAINT
+> "name"`. They are alternatives, not parts of one clause: a column list or a
+> `WHERE` after `ON CONSTRAINT` is a syntax error. Each is therefore reached
+> through its own builder on the way to an action, and neither builder has
+> the other's methods.
 >
 > `ConflictTarget` MUST hold at least one `ConflictElement` — `Column` or
 > `Expr` — plus an optional filter standing for a partial index's predicate.
@@ -758,17 +761,43 @@ today, including panicking edges and deliberate failsafes.
 > `and_where`, `and_where_option` and `cond_where` MUST fold into that filter
 > through the same merge `sql.ast.condition.holder` specifies.
 >
+> `OnConflict::constraint(name)` MUST yield a `ConflictConstraint`, which holds
+> the name and nothing else and whose only methods are the transitions to an
+> action, so the column list and the predicate that only inference takes are
+> unreachable from it; `compile_fail` doctests show both. The name is a bare
+> `Name`, quoted like every other identifier, with no schema: the grammar
+> spells it as one identifier, because a constraint is looked up on the table
+> the statement inserts into. A constraint variant of `ConflictElement` would
+> have admitted a constraint beside columns and a constraint under a `WHERE`;
+> the typestate admits neither.
+>
 > `ConflictAction` MUST be either `DoNothing`, carrying nothing, or `Update`
-> holding a non-empty `ConflictAssignments` and its own optional filter — the
-> only filter in the clause, because PostgreSQL accepts `WHERE` after
-> `DO UPDATE SET ..` and nowhere else. `ConflictTarget::do_nothing` yields the
-> first; `update_column` and `value` take the first assignment and yield a
+> holding a non-empty `ConflictAssignments` and its own optional filter —
+> the action's only filter, because PostgreSQL accepts `WHERE` after
+> `DO UPDATE SET ..` and not after `DO NOTHING`, whichever arbiter precedes
+> it. Each arbiter's `do_nothing` yields the first; each one's
+> `update_column` and `value` take the first assignment and yield a
 > `ConflictUpdate`, whose `update_column`/`update_columns` add `Column`
 > assignments (rendering `"col" = "excluded"."col"`), whose `value`/`values`
 > add `Expr` assignments (rendering `"col" = <expr>`), and whose
 > `and_where`/`and_where_option`/`cond_where` fold into the update's filter.
 > A `ConflictUpdate` converts into an `OnConflict`, which is how a builder
 > chain reaches the statement.
+>
+> Which constraint a name may reach is the catalogue's to say, not the
+> builder's, so the server settles it and the live suite holds each answer.
+> A unique or primary-key constraint arbitrates either action, and a
+> conflict on any other constraint of the row is still raised (`23505`),
+> which is what separates the named clause from the arbiter-less one. An
+> exclusion constraint arbitrates `DO NOTHING` and refuses `DO UPDATE`
+> (`42809`); it is also the one arbiter that only a name reaches, because
+> inference looks for a unique index and finds none (`42P10`). A deferrable
+> constraint is refused as an arbiter (`55000`, `sql.ddl.deferrability`); a
+> check constraint has no index to arbitrate by (`42809`); and a unique index
+> made by `CREATE UNIQUE INDEX` is not a constraint at all, so its name is
+> not found (`42704`). A name is matched as written: a mixed-case constraint
+> is found because the name is quoted, and bare it would fold to lower case
+> and be refused.
 
 ## RETURNING
 

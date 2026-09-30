@@ -42,7 +42,7 @@ fn column_attributes(deferrability: Deferrability) -> Vec<ConstrType> {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability/test]    a column's unique and primary keys carry the
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    a column's unique and primary keys carry the
 // clause directly after their keyword, and the parser attaches it to them
 // [spec:pgorm:req:sql.ddl.column-def+7/test]
 #[test]
@@ -91,7 +91,7 @@ fn a_column_key_carries_its_deferrability() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability/test]    a table-level unique or primary-key constraint
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    a table-level unique or primary-key constraint
 // carries the clause after its column list and INCLUDE
 // [spec:pgorm:req:sql.ddl.create-table+9/test]
 #[test]
@@ -149,7 +149,7 @@ fn a_table_constraint_carries_its_deferrability() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability/test]    `ALTER TABLE` spells a column's key as
+// [spec:pgorm:req:sql.ddl.deferrability+2/test]    `ALTER TABLE` spells a column's key as
 // `ADD UNIQUE (…)` / `ADD PRIMARY KEY (…)`, the clause after it
 // [spec:pgorm:req:sql.ddl.alter-table+6/test]
 #[test]

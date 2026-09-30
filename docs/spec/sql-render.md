@@ -561,13 +561,16 @@ an ideal Postgres renderer would emit.
 > single derivation exists to prevent is the clause being silently dropped on
 > whichever path forgot it.
 
-> [spec:pgorm:req:sql.render.on-conflict+1]
+> [spec:pgorm:req:sql.render.on-conflict+2]
 > When present, the conflict clause MUST render ` ON CONFLICT`, then its shape.
 > `OnConflict::AnyDoNothing` MUST render ` DO NOTHING` and nothing else.
-> `OnConflict::Targeted` MUST render ` (` the comma-separated target elements
-> `)` — each a quoted conflict column or a rendered conflict expression —
-> then, if the target carries one, ` WHERE ` and its condition; then the
-> action. `ConflictAction::DoNothing` renders ` DO NOTHING`;
+> `OnConflict::Targeted` MUST render its arbiter, then its action. A
+> `ConflictArbiter::Inference` renders ` (` the comma-separated target
+> elements `)` — each a quoted conflict column or a rendered conflict
+> expression — then, if the target carries one, ` WHERE ` and its condition;
+> a `ConflictArbiter::Constraint` renders ` ON CONSTRAINT ` and the
+> constraint's name, quoted by `SqlName::prepare` like every other
+> identifier. `ConflictAction::DoNothing` renders ` DO NOTHING`;
 > `ConflictAction::Update` renders ` DO UPDATE SET ` with comma-separated
 > assignments, where `ConflictAssignment::Column` renders
 > `"col" = "excluded"."col"` (the `excluded` pseudo-table is double-quoted) and
@@ -575,11 +578,12 @@ an ideal Postgres renderer would emit.
 > its condition when the update carries a filter.
 >
 > Because the target list is non-empty and the assignment list is non-empty by
-> construction, the renderer has no empty case to guard: every clause it can be
-> handed is one the PostgreSQL grammar accepts. The one shape the grammar
-> accepts but parse analysis does not — `ON CONFLICT DO UPDATE` with no
-> inference specification — is unrepresentable per `sql.ast.on-conflict`, which
-> is the only guard available since `sql.render.oracle` cannot see it.
+> construction, and a named arbiter carries no list or predicate to misplace,
+> the renderer has no empty case to guard: every clause it can be handed is
+> one the PostgreSQL grammar accepts. The one shape the grammar accepts but
+> parse analysis does not — `ON CONFLICT DO UPDATE` with no arbiter — is
+> unrepresentable per `sql.ast.on-conflict`, which is the only guard available
+> since `sql.render.oracle` cannot see it.
 
 > [spec:pgorm:req:sql.render.returning+1]
 > A returning clause on INSERT, UPDATE, or DELETE MUST render as the final

@@ -26,7 +26,7 @@ use super::IndexCreateStatement;
 ///     .deferrability(Deferrability::DeferrableInitiallyDeferred)
 ///     .to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.deferrability]
+// [spec:pgorm:req:sql.ddl.deferrability+2]
 #[derive(Debug, Clone)]
 pub struct IndexConstraint {
     pub(crate) index: IndexCreateStatement,
@@ -99,7 +99,7 @@ impl IndexCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.deferrability]
+    // [spec:pgorm:req:sql.ddl.deferrability+2]
     pub fn deferrability(self, deferrability: Deferrability) -> IndexConstraint {
         IndexConstraint {
             index: self,

@@ -11,7 +11,7 @@ use pgorm::{
     ConnectionTrait, DatabaseConnection,
     pgorm_query::{
         Asterisk, ColumnDef, Comment, CommonTableExpression, Expr, ForeignKey, Func, Index, Name,
-        Query, Table, WindowStatement, WithClause, extension::Type,
+        OnConflict, Query, Table, WindowStatement, WithClause, extension::Type,
     },
 };
 
@@ -106,7 +106,7 @@ async fn catalogue_count(db: &DatabaseConnection, sql: &str, name: &str) -> i64 
 /// `InsertStmt` target columns and `ColumnRef.fields`: a schema, a table and a
 /// column all named with the hostile name, created, written and read through
 /// the builders.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_relation_schema_and_column_names() {
     let (ctx, db) = open("ident_oracle_live_relation").await;
@@ -153,7 +153,7 @@ async fn live_relation_schema_and_column_names() {
 /// `ResTarget.name`, `RangeVar.alias.aliasname`, `RangeSubselect.alias` and
 /// `CommonTableExpr.ctename`: every alias kind, read back as the server
 /// labels it.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_alias_names() {
     let (ctx, db) = open("ident_oracle_live_alias").await;
@@ -207,7 +207,7 @@ async fn live_alias_names() {
 
 /// `FuncCall.funcname` and `TypeCast.type_name`: a function and a domain
 /// created under the hostile name, called and cast to through the builders.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_function_and_type_names() {
     let (ctx, db) = open("ident_oracle_live_function_type").await;
@@ -238,7 +238,7 @@ async fn live_function_and_type_names() {
 
 /// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
 /// the hostile name.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_window_names() {
     let (ctx, db) = open("ident_oracle_live_window").await;
@@ -266,7 +266,7 @@ async fn live_window_names() {
 /// `CollateClause.collname` and `ColumnDef.coll_clause`: a collation created
 /// under the hostile name as a copy of `"C"`, named by an expression and by a
 /// column definition through the builders.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_collation_names() {
     let (ctx, db) = open("ident_oracle_live_collation").await;
@@ -301,9 +301,59 @@ async fn live_collation_names() {
     close(ctx, db).await;
 }
 
+/// `OnConflictClause.infer.conname`: a unique constraint created under the
+/// hostile name and named as the arbiter of an upsert through the builder,
+/// which has to reach it for the conflicting row to be updated.
+// [spec:pgorm:req:security.ident-oracle+6/test]
+#[tokio::test]
+async fn live_conflict_constraint_names() {
+    let (ctx, db) = open("ident_oracle_live_conflict").await;
+    db.batch_execute("CREATE TABLE u (k integer NOT NULL, v integer NOT NULL)")
+        .await
+        .expect("the fixture table is created");
+    for name in NASTY {
+        db.batch_execute(&format!(
+            "ALTER TABLE u ADD CONSTRAINT {} UNIQUE (k); INSERT INTO u VALUES (1, 1)",
+            ident(name)
+        ))
+        .await
+        .expect("the fixture constraint is created");
+        let declared = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_constraint WHERE contype = 'u' AND conname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(declared, 1, "no unique constraint named {name:?}");
+
+        let upsert = Query::insert()
+            .into_table(Name::runtime("u"))
+            .columns([Name::runtime("k"), Name::runtime("v")])
+            .values_panic([1.into(), 2.into()])
+            .on_conflict(
+                OnConflict::constraint(Name::runtime(name)).update_column(Name::runtime("v")),
+            )
+            .to_string();
+        run(&db, &upsert).await;
+        assert_eq!(
+            one_i32(&db, "SELECT v FROM u WHERE k = 1").await,
+            2,
+            "{upsert:?}"
+        );
+
+        db.batch_execute(&format!(
+            "ALTER TABLE u DROP CONSTRAINT {}; DELETE FROM u",
+            ident(name)
+        ))
+        .await
+        .expect("the fixture constraint is dropped");
+    }
+    close(ctx, db).await;
+}
+
 /// `IndexStmt.idxname`, `Constraint.conname`, `CreateEnumStmt` type names and
 /// labels, and `COMMENT ON` targets: DDL-only names, checked in the catalogue.
-// [spec:pgorm:req:security.ident-oracle+5/test]
+// [spec:pgorm:req:security.ident-oracle+6/test]
 #[tokio::test]
 async fn live_ddl_object_names_and_labels() {
     let (ctx, db) = open("ident_oracle_live_ddl").await;

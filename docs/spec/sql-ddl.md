@@ -94,7 +94,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > nothing about deferral, and `IndexCreateStatement::deferrability(d)` makes
 > one that does, which is the only position a unique or primary-key
 > constraint's deferrability is spelled at table level
-> (`[spec:pgorm:req:sql.ddl.deferrability]`). `get_indexes()` reads them back
+> (`[spec:pgorm:req:sql.ddl.deferrability+2]`). `get_indexes()` reads them back
 > in embedding order. A table constraint takes `INCLUDE`, so it
 > renders here too; it takes neither the predicate nor an expression entry that
 > the same statement can carry, and those go unrendered rather than producing a
@@ -144,7 +144,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > ` COLLATE ` and the collation's quoted name when it has one
 > (`[spec:pgorm:req:sql.render.collate]`), then each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
 > `UNIQUE[ <deferrability>]`, `PRIMARY KEY[ <deferrability>]` (the
-> deferrability of `[spec:pgorm:req:sql.ddl.deferrability]`, carried inside
+> deferrability of `[spec:pgorm:req:sql.ddl.deferrability+2]`, carried inside
 > the spec so it cannot trail another), `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
 > STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`, and `RawSuffix`
 > verbatim. A generated column is always stored and
@@ -462,7 +462,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > would have to drop it or emit a syntax error, but of the `IndexConstraint`
 > that `index()` and `primary_key()` accept, which
 > `IndexCreateStatement::deferrability(d)` makes and which has no rendering of
-> its own (`[spec:pgorm:req:sql.ddl.deferrability]`). That wrapper is where
+> its own (`[spec:pgorm:req:sql.ddl.deferrability+2]`). That wrapper is where
 > the rest of the split would go, should the predicate and the `Plain` kind
 > ever be narrowed out of the embedded path too.
 >
@@ -508,7 +508,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > them would be a promise the name does not keep
 > (`[spec:pgorm:req:sql.ast+1]`). A second copy is `.to_owned()`.
 >
-> `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability]`,
+> `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability+2]`,
 > which unique and primary keys share. The foreign key is the case with a use
 > an ORM meets — rows that reference each other, which only a check deferred
 > to `COMMIT` lets a transaction insert.
@@ -537,7 +537,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Deferrability
 
-> [spec:pgorm:req:sql.ddl.deferrability]
+> [spec:pgorm:req:sql.ddl.deferrability+2]
 > `Deferrability` says when a constraint's check runs. It is `NotDeferrable`,
 > `DeferrableInitiallyImmediate` or `DeferrableInitiallyDeferred` —
 > PostgreSQL's three reachable states as one closed choice rather than two
@@ -593,11 +593,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > The clause has a cost the builder documents rather than refuses: a
 > deferrable unique or primary key, `INITIALLY IMMEDIATE` included, cannot
 > arbitrate an `ON CONFLICT` (`55000`), because the server cannot say whether a
-> row conflicts while the check that would say so may still be pending. The
-> arbiter is inferred from columns (`sql.ast.on-conflict`), so which
-> constraint the inference finds is the server's knowledge, not the
-> builder's; a table that upserts on a column keeps that column's key
-> undeferrable.
+> row conflicts while the check that would say so may still be pending. That
+> holds whether the arbiter is inferred from columns or named outright with
+> `ON CONSTRAINT` (`sql.ast.on-conflict`): which constraint it reaches, and
+> whether that one is deferrable, is the server's knowledge, not the
+> builder's, so a table that upserts on a key keeps that key undeferrable.
 
 ## Enum types
 

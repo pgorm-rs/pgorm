@@ -370,7 +370,7 @@ fn sweep_window_function_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert+2/test]
-// [spec:pgorm:req:sql.render.on-conflict+1/test]
+// [spec:pgorm:req:sql.render.on-conflict+2/test]
 // [spec:pgorm:req:sql.render.returning+1/test]
 #[test]
 fn sweep_insert_shapes() {
@@ -416,6 +416,16 @@ fn sweep_insert_shapes() {
             .on_conflict(
                 OnConflict::expr(Func::lower(Expr::col(Glyph::Tokens)))
                     .and_where(Expr::col(Glyph::Aspect).gt(0))
+                    .update_column(Glyph::Image)
+                    .and_where(Expr::col(Glyph::Id).gt(0)),
+            )
+            .to_string(),
+        insert()
+            .on_conflict(OnConflict::constraint(Name::runtime("glyph_key")).do_nothing())
+            .to_string(),
+        insert()
+            .on_conflict(
+                OnConflict::constraint(Name::runtime("glyph_key"))
                     .update_column(Glyph::Image)
                     .and_where(Expr::col(Glyph::Id).gt(0)),
             )
