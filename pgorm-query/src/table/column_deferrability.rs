@@ -32,7 +32,7 @@ impl ColumnDef {
     ///     r#"CREATE TABLE "glyph" ( "aspect" integer NOT NULL UNIQUE DEFERRABLE INITIALLY DEFERRED )"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.deferrability+2]
+    // [spec:pgorm:req:sql.ddl.deferrability+3]
     pub fn unique_key_deferrability(&mut self, deferrability: Deferrability) -> &mut Self {
         self.spec.push(ColumnSpec::UniqueKey(Some(deferrability)));
         self
@@ -40,7 +40,7 @@ impl ColumnDef {
 
     /// Set a column as primary key whose check runs when `deferrability`
     /// says: `PRIMARY KEY DEFERRABLE INITIALLY DEFERRED` and its two siblings.
-    // [spec:pgorm:req:sql.ddl.deferrability+2]
+    // [spec:pgorm:req:sql.ddl.deferrability+3]
     pub fn primary_key_deferrability(&mut self, deferrability: Deferrability) -> &mut Self {
         self.spec.push(ColumnSpec::PrimaryKey(Some(deferrability)));
         self

@@ -4,14 +4,11 @@ use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
-use pgorm_query::{
-    Index, IndexCreateStatement, IndexOrder, IndexType, IntoIndexColumn as _, IntoTableName, Name,
-    TableName,
-};
+use pgorm_query::{IndexConstraint, Name};
 
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+4]
+// [spec:pgorm:sem:codegen.ddl.objects+5]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -37,12 +34,14 @@ pub(super) fn enum_type(
 /// A `CREATE INDEX`, and the table it belongs to.
 pub(super) struct ParsedIndex {
     pub(super) table: TableIdent,
-    /// The index as the table statement carries it — `None` for an index that
-    /// states no entity fact, which has no place inside a `CREATE TABLE`.
-    pub(super) index: Option<IndexCreateStatement>,
+    /// A unique index as the table constraint it enforces — `None` for an
+    /// index that states no entity fact, which has no place inside a
+    /// `CREATE TABLE`.
+    pub(super) constraint: Option<IndexConstraint>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4]
+// [spec:pgorm:sem:codegen.ddl.objects+5]
+// [spec:pgorm:req:codegen.ddl.unsupported+3]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -93,61 +92,53 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
         if element.nulls_ordering != SortByNulls::SortbyNullsDefault as i32 {
             return Err(on("a NULLS FIRST or NULLS LAST clause"));
         }
-        let column = Name::runtime(element.name.as_str());
-        columns.push(match SortByDir::try_from(element.ordering) {
-            Ok(SortByDir::SortbyDefault) => column.into_index_column(),
-            Ok(SortByDir::SortbyAsc) => (column, IndexOrder::Asc).into_index_column(),
-            Ok(SortByDir::SortbyDesc) => (column, IndexOrder::Desc).into_index_column(),
+        let descending = match SortByDir::try_from(element.ordering) {
+            Ok(SortByDir::SortbyDefault | SortByDir::SortbyAsc) => false,
+            Ok(SortByDir::SortbyDesc) => true,
             _ => return Err(on("an index column ordering")),
+        };
+        columns.push((Name::runtime(element.name.as_str()), descending));
+    }
+    if columns.is_empty() {
+        return Err(on("an index over no columns"));
+    }
+    if !stmt.unique {
+        return Ok(ParsedIndex {
+            table,
+            constraint: None,
         });
     }
 
-    let mut columns = columns.into_iter();
+    // A unique index is carried as the table constraint that enforces the
+    // same uniqueness, and a table constraint's key is plain column names
+    // under the default btree: a descending key column or another access
+    // method has no spelling there, so each is named rather than dropped.
+    let on_unique = |what: &str| unsupported(format!("{what} on unique {name}"), at);
+    if !matches!(stmt.access_method.as_str(), "" | "btree") {
+        return Err(on_unique("an access method other than btree"));
+    }
+    if columns.iter().any(|(_, descending)| *descending) {
+        return Err(on_unique("a DESC column"));
+    }
+    let mut columns = columns.into_iter().map(|(column, _)| column);
     let Some(first) = columns.next() else {
         return Err(on("an index over no columns"));
     };
-    let mut index = Index::create(target(&table), first);
+    let mut constraint = if stmt.nulls_not_distinct {
+        IndexConstraint::unique_nulls_not_distinct(first)
+    } else {
+        IndexConstraint::unique(first)
+    };
     if !stmt.idxname.is_empty() {
-        index.name(Name::runtime(stmt.idxname.as_str()));
-    }
-    if stmt.if_not_exists {
-        index.if_not_exists();
-    }
-    if stmt.nulls_not_distinct {
-        index.nulls_not_distinct();
-    }
-    if stmt.unique {
-        index.unique();
-    }
-    if let Some(index_type) = index_type(&stmt.access_method) {
-        index.index_type(index_type);
+        constraint = constraint.name(Name::runtime(stmt.idxname.as_str()));
     }
     for column in columns {
-        index.col(column);
+        constraint = constraint.col(column);
     }
     Ok(ParsedIndex {
         table,
-        index: stmt.unique.then_some(index),
+        constraint: Some(constraint),
     })
-}
-
-/// A parsed identity back as the name a statement targets.
-// [spec:pgorm:sem:codegen.ddl.objects+4]
-fn target(ident: &TableIdent) -> TableName {
-    let table = Name::runtime(ident.table.as_str());
-    match ident.schema.as_deref() {
-        Some(schema) => (Name::runtime(schema), table).into_table_name(),
-        None => table.into_table_name(),
-    }
-}
-
-fn index_type(access_method: &str) -> Option<IndexType> {
-    match access_method {
-        "" | "btree" => None,
-        "hash" => Some(IndexType::Hash),
-        "gin" => Some(IndexType::Gin),
-        other => Some(IndexType::Named(pgorm_query::Name::runtime(other))),
-    }
 }
 
 /// A `COMMENT ON` the bridge can attach to a table or one of its columns.
@@ -171,7 +162,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4]
+// [spec:pgorm:sem:codegen.ddl.objects+5]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

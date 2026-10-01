@@ -19,6 +19,7 @@ mod render;
 mod schema;
 mod subscript;
 mod table;
+mod table_constraint;
 mod token;
 mod type_vocab;
 mod types;

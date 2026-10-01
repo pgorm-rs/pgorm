@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+9/test]
+// [spec:pgorm:req:sql.ddl.create-table+10/test]
 // [spec:pgorm:req:sql.ddl.column-def+7/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+5/test]
@@ -289,12 +289,9 @@ fn create_15() {
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
             .index(
-                Index::create(Glyph::Table, Glyph::Aspect)
-                    .unique()
-                    .nulls_not_distinct()
+                IndexConstraint::unique_nulls_not_distinct(Glyph::Aspect)
                     .name(Name::runtime("idx-glyph-aspect-image"))
                     .col(Glyph::Image)
-                    .to_owned()
             )
             .to_string(),
         [
@@ -570,34 +567,29 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+9/test]
+// [spec:pgorm:req:sql.ddl.create-table+10/test]    a primary key is a table constraint, the one
+// spelling PostgreSQL has for it
 #[test]
-fn embedded_index_is_the_only_primary_key_spelling() {
-    let table = |index: IndexCreateStatement| {
+fn a_primary_key_is_a_table_constraint() {
+    assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer().not_null())
             .col(ColumnDef::new(Glyph::Image).string().not_null())
-            .primary_key(index)
-            .to_string()
-    };
-    let expected = [
-        r#"CREATE TABLE "glyph" ("#,
-        r#""id" integer NOT NULL,"#,
-        r#""image" varchar NOT NULL,"#,
-        r#"CONSTRAINT "pk-glyph" PRIMARY KEY ("id", "image")"#,
-        r#")"#,
-    ]
-    .join(" ");
-    let index = || {
-        Index::create(Glyph::Table, Glyph::Id)
-            .name(Name::runtime("pk-glyph"))
-            .col(Glyph::Image)
-            .to_owned()
-    };
-
-    assert_eq!(table(index()), expected);
-    assert_eq!(table(index().primary().to_owned()), expected);
-    assert_eq!(table(index().unique().to_owned()), expected);
+            .index(
+                IndexConstraint::primary_key(Glyph::Id)
+                    .name(Name::runtime("pk-glyph"))
+                    .col(Glyph::Image)
+            )
+            .to_string(),
+        [
+            r#"CREATE TABLE "glyph" ("#,
+            r#""id" integer NOT NULL,"#,
+            r#""image" varchar NOT NULL,"#,
+            r#"CONSTRAINT "pk-glyph" PRIMARY KEY ("id", "image")"#,
+            r#")"#,
+        ]
+        .join(" ")
+    );
 }
 
 // [spec:pgorm:req:sql.ddl.alter-table+6/test]    a foreign key embeds by value, so the source

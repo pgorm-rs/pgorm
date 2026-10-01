@@ -3,7 +3,7 @@ use crate::{
     RelationType, TableIdent, util::escape_rust_keyword,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnSpec, IndexConstraint, TableCreateStatement};
+use pgorm_query::{ColumnSpec, TableCreateStatement};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Debug)]
@@ -29,13 +29,12 @@ impl EntityTransformer {
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
                 .get_indexes()
                 .iter()
-                .map(IndexConstraint::get_index)
-                .filter(|index| index.is_unique_key())
-                .map(|index| {
-                    index
-                        .get_index_spec()
-                        .get_column_names()
-                        .into_iter()
+                .filter(|constraint| constraint.is_unique_key())
+                .map(|constraint| {
+                    constraint
+                        .get_columns()
+                        .iter()
+                        .map(|name| name.to_string())
                         .collect()
                 })
                 .collect();
@@ -128,14 +127,14 @@ impl EntityTransformer {
                 table_create
                     .get_indexes()
                     .iter()
-                    .map(IndexConstraint::get_index)
-                    .filter(|index| index.is_primary_key())
-                    .flat_map(|index| {
-                        index
-                            .get_index_spec()
-                            .get_column_names()
-                            .into_iter()
-                            .map(|name| PrimaryKey { name })
+                    .filter(|constraint| constraint.is_primary_key())
+                    .flat_map(|constraint| {
+                        constraint
+                            .get_columns()
+                            .iter()
+                            .map(|name| PrimaryKey {
+                                name: name.to_string(),
+                            })
                             .collect::<Vec<_>>()
                     }),
             );

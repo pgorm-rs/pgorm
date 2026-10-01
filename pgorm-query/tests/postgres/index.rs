@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -59,7 +59,7 @@ fn create_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
 fn create_6() {
     assert_eq!(
@@ -73,7 +73,7 @@ fn create_6() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
 fn standalone_index_spells_plain_or_unique_only() {
     let index = || {
@@ -81,35 +81,31 @@ fn standalone_index_spells_plain_or_unique_only() {
             .name(Name::runtime("idx"))
             .to_owned()
     };
-    let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
-    let unique = r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#;
 
-    assert_eq!(index().to_string(), plain);
-    assert_eq!(index().unique().to_string(), unique);
-    assert_eq!(index().primary().to_string(), plain);
-    assert_eq!(index().primary().unique().to_string(), unique);
-    assert_eq!(index().unique().primary().to_string(), plain);
+    assert_eq!(
+        index().to_string(),
+        r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#
+    );
+    assert_eq!(
+        index().unique().to_string(),
+        r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#
+    );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
-fn index_kind_accessors_are_mutually_exclusive() {
+fn index_kind_is_plain_or_unique() {
     let index = Index::create(Glyph::Table, Glyph::Aspect);
 
     assert_eq!(index.kind(), IndexKind::Plain);
-    assert!(!index.is_primary_key());
     assert!(!index.is_unique_key());
 
     let unique = index.clone().unique().to_owned();
+    assert_eq!(unique.kind(), IndexKind::Unique);
     assert!(unique.is_unique_key());
-    assert!(!unique.is_primary_key());
-
-    let primary = index.clone().unique().primary().to_owned();
-    assert!(primary.is_primary_key());
-    assert!(!primary.is_unique_key());
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
 fn nulls_not_distinct_needs_the_unique_kind() {
     let index = || {
@@ -121,7 +117,6 @@ fn nulls_not_distinct_needs_the_unique_kind() {
     let plain = r#"CREATE INDEX "idx" ON "glyph" ("aspect")"#;
 
     assert_eq!(index().to_string(), plain);
-    assert_eq!(index().primary().to_string(), plain);
     assert_eq!(
         index().unique().to_string(),
         r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect") NULLS NOT DISTINCT"#
@@ -158,35 +153,7 @@ fn drop_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    an index embeds by value: the source survives
-// only because the call site cloned it, and a chained builder has to say `.to_owned()`
-#[test]
-fn index_embeds_by_value() {
-    let index = Index::create(Glyph::Table, Glyph::Aspect)
-        .name(Name::runtime("idx"))
-        .unique()
-        .to_owned();
-
-    assert_eq!(
-        Table::create(Glyph::Table)
-            .col(ColumnDef::new(Glyph::Aspect).integer())
-            .index(index.clone())
-            .to_string(),
-        [
-            r#"CREATE TABLE "glyph" ("#,
-            r#""aspect" integer,"#,
-            r#"CONSTRAINT "idx" UNIQUE ("aspect")"#,
-            r#")"#,
-        ]
-        .join(" ")
-    );
-    assert_eq!(
-        index.to_string(),
-        r#"CREATE UNIQUE INDEX "idx" ON "glyph" ("aspect")"#
-    );
-}
-
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    a predicate closes the
+// [spec:pgorm:req:sql.ddl.index-create+10/test]    a predicate closes the
 // statement, and repeated calls conjoin as they do everywhere else
 #[test]
 fn partial_index_carries_a_predicate() {
@@ -225,7 +192,7 @@ fn partial_index_carries_a_predicate() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    an expression entry is
+// [spec:pgorm:req:sql.ddl.index-create+10/test]    an expression entry is
 // parenthesised where a column name would stand bare, and composes with order
 #[test]
 fn expression_index_parenthesises_its_expression() {
@@ -251,7 +218,7 @@ fn expression_index_parenthesises_its_expression() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    an operator class sits between
+// [spec:pgorm:req:sql.ddl.index-create+10/test]    an operator class sits between
 // the entry and its order, on a named entry and an expression entry alike
 #[test]
 fn operator_class_precedes_the_order() {
@@ -278,8 +245,8 @@ fn operator_class_precedes_the_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    INCLUDE follows the key list
-// in both the standalone and the embedded position
+// [spec:pgorm:req:sql.ddl.index-create+10/test]    INCLUDE follows the key list,
+// on a standalone index as on a table constraint
 #[test]
 fn include_carries_non_key_columns() {
     assert_eq!(
@@ -301,11 +268,9 @@ fn include_carries_non_key_columns() {
             .col(ColumnDef::new(Glyph::Aspect).integer())
             .col(ColumnDef::new(Glyph::Image).text())
             .index(
-                Index::create(Glyph::Table, Glyph::Aspect)
+                IndexConstraint::unique(Glyph::Aspect)
                     .name(Name::runtime("idx"))
-                    .unique()
                     .include([Glyph::Image])
-                    .to_owned()
             )
             .to_string(),
         [
@@ -329,7 +294,7 @@ fn include_carries_non_key_columns() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+9/test]    every clause at once, in the
+// [spec:pgorm:req:sql.ddl.index-create+10/test]    every clause at once, in the
 // order PostgreSQL's grammar puts them
 #[test]
 fn every_index_clause_composes() {

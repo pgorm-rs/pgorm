@@ -8,7 +8,8 @@
 
 use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions, Error};
 use pgorm_query::{
-    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Name, Table, TableCreateStatement,
+    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, IndexConstraint, Name, Table,
+    TableCreateStatement,
 };
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
@@ -267,11 +268,9 @@ pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement 
 
 /// A single-column unique index over `column`, which the transformer reads to
 /// mark the column unique.
-pub fn unique_index(table: &str, column: &str) -> pgorm_query::IndexCreateStatement {
-    Index::create(Name::runtime(table), Name::runtime(column))
+pub fn unique_index(table: &str, column: &str) -> IndexConstraint {
+    IndexConstraint::unique(Name::runtime(column))
         .name(Name::runtime(format!("idx_{table}_{column}")))
-        .unique()
-        .to_owned()
 }
 
 pub fn enum_col(name: &str, enum_name: &str, variants: &[&str]) -> ColumnDef {

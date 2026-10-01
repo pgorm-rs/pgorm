@@ -1,7 +1,7 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, Name, StringLen, Table,
-    TableName, TypeName, Values, extension::Type,
+    ColumnDef, ColumnType, Expr, Index, IndexConstraint, IndexOrder, IndexType, IntoName, Name,
+    StringLen, Table, TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -44,14 +44,8 @@ fn programs() -> BTreeMap<&'static str, String> {
             a("amount"),
             ColumnType::Decimal(Some((12, 3))),
         ))
-        .primary_key(Index::create(table.clone(), a("id \"x\"")))
-        .index(
-            Index::create(table.clone(), a("name"))
-                .name(a("unique \"x\""))
-                .unique()
-                .nulls_not_distinct()
-                .to_owned(),
-        )
+        .index(IndexConstraint::primary_key(a("id \"x\"")))
+        .index(IndexConstraint::unique_nulls_not_distinct(a("name")).name(a("unique \"x\"")))
         .check(Expr::col(a("id \"x\"")).gt(0i64))
         .if_not_exists()
         .to_string();

@@ -7,8 +7,8 @@ mod common;
 use common::*;
 use pgorm_codegen::Column;
 use pgorm_query::{
-    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Index, Name, Table, TableCreateStatement,
-    TableName,
+    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, IndexConstraint, Name, Table,
+    TableCreateStatement, TableName,
 };
 
 fn fk(from_table: &str, from_col: &str, to_table: &str, to_col: &str) -> TableCreateStatement {
@@ -109,10 +109,7 @@ fn transform_rejects_primary_key_over_unknown_column() {
                 .not_null()
                 .to_owned(),
         )
-        .primary_key(Index::create(
-            Name::runtime("cake"),
-            Name::runtime("missing"),
-        ))
+        .index(IndexConstraint::primary_key(Name::runtime("missing")))
         .to_owned();
 
     assert_transform_error(
@@ -258,14 +255,12 @@ fn transform_marks_columns_from_single_column_unique_index() {
                         .not_null()
                         .to_owned(),
                 )
-                .index(unique_index("vendor", "name").to_owned())
+                .index(unique_index("vendor", "name"))
                 // a multi-column unique index marks nothing
                 .index(
-                    Index::create(Name::runtime("vendor"), Name::runtime("region"))
+                    IndexConstraint::unique(Name::runtime("region"))
                         .name(Name::runtime("idx_vendor_region_tier"))
-                        .col(Name::runtime("tier"))
-                        .unique()
-                        .to_owned(),
+                        .col(Name::runtime("tier")),
                 )
                 .to_owned(),
         ],
@@ -301,10 +296,9 @@ fn transform_collects_pks_from_specs_and_table_indexes() {
                         .not_null()
                         .to_owned(),
                 )
-                .primary_key(
-                    Index::create(Name::runtime("cake_filling"), Name::runtime("cake_id"))
-                        .col(Name::runtime("filling_id"))
-                        .to_owned(),
+                .index(
+                    IndexConstraint::primary_key(Name::runtime("cake_id"))
+                        .col(Name::runtime("filling_id")),
                 )
                 .to_owned(),
         ],
@@ -613,7 +607,7 @@ fn inverse_has_one_for_unique_foreign_key() {
                         .integer()
                         .to_owned(),
                 )
-                .index(unique_index("fruit", "cake_id").to_owned())
+                .index(unique_index("fruit", "cake_id"))
                 .foreign_key(ForeignKey::create(
                     Name::runtime("fruit"),
                     Name::runtime("cake_id"),
@@ -712,11 +706,9 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
                         .to_owned(),
                 )
                 .index(
-                    Index::create(Name::runtime("fruit"), Name::runtime("cake_id"))
+                    IndexConstraint::unique(Name::runtime("cake_id"))
                         .name(Name::runtime("idx_fruit_cake"))
-                        .col(Name::runtime("cake_kind"))
-                        .unique()
-                        .to_owned(),
+                        .col(Name::runtime("cake_kind")),
                 )
                 .foreign_key(cake_key("fruit").to_owned())
                 .to_owned(),
@@ -736,12 +728,10 @@ fn inverse_has_one_for_composite_unique_foreign_key() {
                 )
                 .col(ColumnDef::new(Name::runtime("batch")).integer().to_owned())
                 .index(
-                    Index::create(Name::runtime("crumb"), Name::runtime("cake_id"))
+                    IndexConstraint::unique(Name::runtime("cake_id"))
                         .name(Name::runtime("idx_crumb_cake_batch"))
                         .col(Name::runtime("cake_kind"))
-                        .col(Name::runtime("batch"))
-                        .unique()
-                        .to_owned(),
+                        .col(Name::runtime("batch")),
                 )
                 .foreign_key(cake_key("crumb").to_owned())
                 .to_owned(),

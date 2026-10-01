@@ -51,7 +51,7 @@ pub enum ForeignKeyAction {
 /// [`IndexCreateStatement::deferrability`](crate::IndexCreateStatement::deferrability).
 /// Nothing else can: PostgreSQL never defers a `CHECK` or `NOT NULL`
 /// constraint, and `CREATE UNIQUE INDEX` has no clause for it.
-// [spec:pgorm:req:sql.ddl.deferrability+2]
+// [spec:pgorm:req:sql.ddl.deferrability+3]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Deferrability {
     /// `NOT DEFERRABLE` — checked at once, and no transaction can postpone
@@ -74,7 +74,7 @@ pub enum Deferrability {
 impl Deferrability {
     /// The clause this state renders as, with the space that separates it
     /// from the constraint it follows.
-    // [spec:pgorm:req:sql.ddl.deferrability+2]
+    // [spec:pgorm:req:sql.ddl.deferrability+3]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::NotDeferrable => " NOT DEFERRABLE",

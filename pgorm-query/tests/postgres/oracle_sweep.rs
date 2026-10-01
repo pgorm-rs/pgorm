@@ -461,7 +461,7 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+9/test]
+// [spec:pgorm:req:sql.ddl.create-table+10/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -481,11 +481,12 @@ fn sweep_table_ddl_shapes() {
                     .json_binary()
                     .check(Expr::col(Glyph::Aspect).gt(0)),
             )
+            .index(IndexConstraint::primary_key(Glyph::Id).name(Name::runtime("glyph_pk")))
             .index(
-                Index::create(Glyph::Table, Glyph::Id)
-                    .name(Name::runtime("glyph_pk"))
-                    .primary()
-                    .to_owned(),
+                IndexConstraint::unique_nulls_not_distinct(Glyph::Aspect)
+                    .col(Glyph::Image)
+                    .include([Glyph::Tokens])
+                    .deferrability(Deferrability::DeferrableInitiallyDeferred),
             )
             .foreign_key(
                 ForeignKey::create(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
@@ -527,7 +528,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+9/test]
+// [spec:pgorm:req:sql.ddl.index-create+10/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([

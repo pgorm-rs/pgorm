@@ -1,3 +1,4 @@
+use crate::index::ConstraintKey;
 use crate::keywords::Position;
 use crate::{
     extension::{
@@ -1623,7 +1624,7 @@ impl QueryBuilder {
                                 write!(sql, " SET DEFAULT ").unwrap();
                                 self.prepare_simple_expr(v, sql);
                             }
-                            // [spec:pgorm:req:sql.ddl.deferrability+2]
+                            // [spec:pgorm:req:sql.ddl.deferrability+3]
                             ColumnSpec::UniqueKey(deferrability) => {
                                 write!(sql, "ADD UNIQUE (").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1708,7 +1709,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+9]
+    // [spec:pgorm:req:sql.ddl.create-table+10]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1775,7 +1776,7 @@ impl QueryBuilder {
             // rendered by `prepare_column_auto_increment`; there is no
             // trailing keyword to spell here.
             ColumnSpec::AutoIncrement => {}
-            // [spec:pgorm:req:sql.ddl.deferrability+2]
+            // [spec:pgorm:req:sql.ddl.deferrability+3]
             ColumnSpec::UniqueKey(deferrability) => write!(
                 sql,
                 "UNIQUE{}",
@@ -1934,38 +1935,43 @@ impl QueryBuilder {
 
     // INDEX
 
-    /// Write an index as a `CREATE TABLE` constraint. The embedded form puts
-    /// `NULLS NOT DISTINCT` before the column list; the standalone
+    /// Write a `UNIQUE` or `PRIMARY KEY` table constraint. It puts
+    /// `NULLS NOT DISTINCT` before the column list, where the standalone
     /// `CREATE INDEX` of `prepare_index_create_statement` puts it after, and
-    /// has no deferrability to write, which only a constraint takes.
+    /// it alone has deferrability to write. Its key is plain column names:
+    /// the constraint has no entry that could carry an ordering, an operator
+    /// class or an expression.
+    // [spec:pgorm:req:sql.ddl.create-table+10]
     fn prepare_table_index_expression(
         &self,
         constraint: &IndexConstraint,
         sql: &mut dyn SqlWriter,
     ) {
-        let create = &constraint.index;
-        if let Some(name) = &create.index.name {
+        if let Some(name) = &constraint.name {
             write!(sql, "CONSTRAINT ").unwrap();
             name.prepare(sql.as_writer());
             write!(sql, " ").unwrap();
         }
 
-        match create.kind {
-            IndexKind::Plain => {}
-            IndexKind::Unique => write!(sql, "UNIQUE ").unwrap(),
-            IndexKind::PrimaryKey => write!(sql, "PRIMARY KEY ").unwrap(),
+        match constraint.key {
+            ConstraintKey::Unique => write!(sql, "UNIQUE (").unwrap(),
+            ConstraintKey::UniqueNullsNotDistinct => {
+                write!(sql, "UNIQUE NULLS NOT DISTINCT (").unwrap()
+            }
+            ConstraintKey::Primary => write!(sql, "PRIMARY KEY (").unwrap(),
         }
+        constraint.columns.iter().fold(true, |first, name| {
+            if !first {
+                write!(sql, ", ").unwrap();
+            }
+            name.prepare(sql.as_writer());
+            false
+        });
+        write!(sql, ")").unwrap();
 
-        if create.nulls_not_distinct && create.kind == IndexKind::Unique {
-            write!(sql, "NULLS NOT DISTINCT ").unwrap();
-        }
-
-        self.prepare_index_columns(&create.index.columns, sql);
-
-        // [spec:pgorm:req:sql.ddl.index-create+9]
-        if !create.include.is_empty() {
+        if !constraint.include.is_empty() {
             write!(sql, " INCLUDE (").unwrap();
-            create.include.iter().fold(true, |first, name| {
+            constraint.include.iter().fold(true, |first, name| {
                 if !first {
                     write!(sql, ", ").unwrap();
                 }
@@ -1975,24 +1981,21 @@ impl QueryBuilder {
             write!(sql, ")").unwrap();
         }
 
-        // [spec:pgorm:req:sql.ddl.deferrability+2]
+        // [spec:pgorm:req:sql.ddl.deferrability+3]
         if let Some(deferrability) = constraint.deferrability {
             write!(sql, "{}", deferrability.clause()).unwrap();
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.index-create+9]
+    // [spec:pgorm:req:sql.ddl.index-create+10]
     pub(crate) fn prepare_index_create_statement(
         &self,
         create: &IndexCreateStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        let kind = create.kind.standalone();
-
         write!(sql, "CREATE ").unwrap();
-        match kind {
-            Some(StandaloneIndexKind::Unique) => write!(sql, "UNIQUE ").unwrap(),
-            Some(StandaloneIndexKind::Plain) | None => {}
+        if create.kind == IndexKind::Unique {
+            write!(sql, "UNIQUE ").unwrap();
         }
         write!(sql, "INDEX ").unwrap();
 
@@ -2011,7 +2014,7 @@ impl QueryBuilder {
         write!(sql, " ").unwrap();
         self.prepare_index_columns(&create.index.columns, sql);
 
-        // [spec:pgorm:req:sql.ddl.index-create+9]
+        // [spec:pgorm:req:sql.ddl.index-create+10]
         if !create.include.is_empty() {
             write!(sql, " INCLUDE (").unwrap();
             create.include.iter().fold(true, |first, name| {
@@ -2024,13 +2027,13 @@ impl QueryBuilder {
             write!(sql, ")").unwrap();
         }
 
-        if create.nulls_not_distinct && kind == Some(StandaloneIndexKind::Unique) {
+        if create.nulls_not_distinct && create.kind == IndexKind::Unique {
             write!(sql, " NULLS NOT DISTINCT").unwrap();
         }
 
         // The predicate closes the statement, after every clause that describes
         // the index itself.
-        // [spec:pgorm:req:sql.ddl.index-create+9]
+        // [spec:pgorm:req:sql.ddl.index-create+10]
         self.prepare_condition(&create.r#where, "WHERE", sql);
     }
 
@@ -2077,7 +2080,7 @@ impl QueryBuilder {
     /// Write an index's column list: each entry's target, then its operator
     /// class, then its order — PostgreSQL's order for the three, and the reason
     /// an expression entry composes with a direction the way a named one does.
-    // [spec:pgorm:req:sql.ddl.index-create+9]
+    // [spec:pgorm:req:sql.ddl.index-create+10]
     fn prepare_index_columns(&self, columns: &[IndexColumn], sql: &mut dyn SqlWriter) {
         write!(sql, "(").unwrap();
         columns.iter().fold(true, |first, col| {
@@ -2181,7 +2184,7 @@ impl QueryBuilder {
             self.prepare_foreign_key_action(foreign_key_action, sql);
         }
 
-        // [spec:pgorm:req:sql.ddl.deferrability+2]
+        // [spec:pgorm:req:sql.ddl.deferrability+3]
         if let Some(deferrability) = create.foreign_key.deferrability {
             write!(sql, "{}", deferrability.clause()).unwrap();
         }

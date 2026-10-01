@@ -702,7 +702,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > so the round trip gained a `unique` the statement path dropped. `transform`
 > now reads that spec (`codegen.entity.transform`) and the two paths agree.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+2]
+> [spec:pgorm:req:codegen.ddl.unsupported+3]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -731,7 +731,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `REFERENCES` without a referenced column list, which no catalog is present to
 > resolve; index `WHERE`, `INCLUDE`, `CONCURRENTLY`, `COLLATE`, operator
 > classes, `NULLS FIRST`/`NULLS LAST`, expression columns, tablespaces and
-> storage options; and `COMMENT ON` any object other than a table or a column.
+> storage options, and on a unique index a `DESC` column or an access method
+> other than `btree`, which the table constraint it folds into cannot spell
+> (`codegen.ddl.objects`); and `COMMENT ON` any object other than a table or
+> a column.
 > Type spellings outside the vocabulary are named the same way
 > (`codegen.ddl.types`).
 >
@@ -748,9 +751,9 @@ compiling the C parser falls on people generating entities and on nobody else.
 > One construct is accepted without being carried, and only this one: a
 > non-unique `CREATE INDEX`. It states no fact the entity model holds —
 > `codegen.entity.transform` reads unique and primary-key indexes and nothing
-> else — and `pgorm-query` renders an index embedded in a `CREATE TABLE` as a
-> constraint (`sql.ddl.create-table`), so carrying one would emit DDL Postgres
-> rejects. Its table must still exist.
+> else — and a `CREATE TABLE` embeds only unique and primary-key constraints
+> (`sql.ddl.create-table`), so there is no constraint a non-unique index could
+> be carried as. Its table must still exist.
 
 > [spec:pgorm:sem:codegen.ddl.types+4]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
@@ -794,7 +797,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+3]
+> [spec:pgorm:sem:codegen.ddl.tables+4]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -805,9 +808,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `ColumnSpec` —
 > `NOT NULL`, `NULL`, `PRIMARY KEY` — and a column-level `REFERENCES` becomes a
 > foreign key on that one column. A column-level `UNIQUE` becomes a one-column
-> unique index on the table, which is what Postgres itself creates for it and
+> table-level unique constraint (`IndexConstraint::unique`,
+> `sql.ddl.create-table`), which is what Postgres itself creates for it and
 > so the truthful form to bridge it as; `codegen.entity.transform` reads that
-> index and a `ColumnSpec::UniqueKey` alike, so the fact survives either
+> constraint and a `ColumnSpec::UniqueKey` alike, so the fact survives either
 > spelling. A primary-key column is `NOT NULL`
 > whether or not the DDL spells it, which is Postgres' own rule: the entity
 > model reads nullability off the column alone, so an unstated `NOT NULL` would
@@ -827,7 +831,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > collation from an entity, `parse_schema`'s statements are where it is kept.
 >
 > Table-level `PRIMARY KEY` and `UNIQUE` constraints become the table's
-> primary-key and unique indexes, keeping the constraint name and
+> primary-key and unique `IndexConstraint`s, keeping the constraint name and
 > `NULLS NOT DISTINCT`; a table-level `FOREIGN KEY` becomes a foreign key with
 > its columns, referenced table and referenced columns, and both forms keep the
 > constraint name. A foreign key whose two column lists differ in length is a
@@ -841,7 +845,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+4]
+> [spec:pgorm:sem:codegen.ddl.objects+5]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -850,13 +854,20 @@ compiling the C parser falls on people generating entities and on nobody else.
 > is where `transform` discovers enums; an enum type no column names contributes
 > nothing and is returned as no statement of its own.
 >
-> A unique `CREATE INDEX` is folded into its table's indexes, keeping its name,
-> columns, `ASC`/`DESC` ordering, `NULLS NOT DISTINCT`, `IF NOT EXISTS` and
-> access method (`btree` is the default, `hash` → `IndexType::Hash`,
-> `gin` → `IndexType::Gin`, anything else `IndexType::Named`);
-> `codegen.entity.transform` then reads a single-column unique index as that
-> column's `unique` flag. `COMMENT ON TABLE` becomes the statement's comment and
-> `COMMENT ON COLUMN` a `ColumnSpec::Comment` on the named column. Neither
+> A unique `CREATE INDEX` is folded into its table as the unique constraint
+> that enforces the same uniqueness — an `IndexConstraint`
+> (`sql.ddl.create-table`) — keeping its name, its columns and
+> `NULLS NOT DISTINCT`; `codegen.entity.transform` then reads a single-column
+> unique key as that column's `unique` flag. A table constraint's key is
+> plain column names under the default `btree`, so what a unique index can
+> say and a constraint cannot is a named rejection per
+> `codegen.ddl.unsupported` rather than dropped: a `DESC` key column, and an
+> access method other than `btree`. An explicit `ASC` is the default order
+> and folds away with nothing lost. `IF NOT EXISTS` describes the statement
+> that creates the index rather than the index, and that statement is what
+> the folding replaces, so it is read and not carried. `COMMENT ON TABLE`
+> becomes the statement's comment and `COMMENT ON COLUMN` a
+> `ColumnSpec::Comment` on the named column. Neither
 > comment reaches the generated entities, which have no comment surface — they
 > ride on the statements so a caller reading `parse_schema`'s output still has
 > them.

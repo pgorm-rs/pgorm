@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+7]
+> [spec:pgorm:req:sql.surface+8]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -75,13 +75,16 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.grouping`); `FrameStart`, its three side markers
 > `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
 > `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
-> the bound enum `Frame` (`sql.ast.window-statement`); `IndexConstraint`, an
-> index embedded as a table constraint, the one position that takes
-> deferrability (`sql.ddl.deferrability`); `Collation` and `IntoCollation`,
-> the name a `COLLATE` clause carries and the conversions into it
-> (`sql.ast.expr.collate`); `ConflictArbiter` and `ConflictConstraint`, the
+> the bound enum `Frame` (`sql.ast.window-statement`); `IndexConstraint`, the
+> unique or primary-key constraint a `CREATE TABLE` embeds — a builder of its
+> own, and the one table-level position that takes deferrability
+> (`sql.ddl.create-table`, `sql.ddl.deferrability`); `Collation` and
+> `IntoCollation`, the name a `COLLATE` clause carries and the conversions
+> into it (`sql.ast.expr.collate`); `ConflictArbiter` and `ConflictConstraint`, the
 > two ways an `ON CONFLICT` names its arbiter and the typestate of the named
-> one (`sql.ast.on-conflict`).
+> one (`sql.ast.on-conflict`). An item leaves the list with the state it
+> described: `StandaloneIndexKind` went when the primary-key index kind it
+> screened the standalone renderer from did (`sql.ddl.index-create`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose

@@ -84,7 +84,7 @@ fn column_types_map_through_the_vocabulary() {
     assert_contains(generated.file("owner.rs"), "pub name: String,");
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4/test]    a CREATE TYPE ... AS ENUM
+// [spec:pgorm:sem:codegen.ddl.objects+5/test]    a CREATE TYPE ... AS ENUM
 // reaches the generated active enum through the columns that name it
 #[test]
 fn enum_type_reaches_the_generated_active_enum() {
@@ -104,7 +104,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -116,7 +116,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -136,7 +136,7 @@ fn composite_key_junction_becomes_conjunct_relations() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4/test]    a single-column unique index
+// [spec:pgorm:sem:codegen.ddl.objects+5/test]    a single-column unique index
 // marks its column unique; a plain index states no entity fact
 #[test]
 fn unique_index_marks_its_column_unique() {
@@ -152,8 +152,9 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a column-level UNIQUE becomes the
-// index Postgres creates for it, which is where the entity model reads unique
+// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a column-level UNIQUE becomes the
+// table-level unique constraint Postgres creates for it, which is where the entity model
+// reads unique
 #[test]
 fn column_unique_constraint_marks_the_column() {
     let generated = from_sql("CREATE TABLE t (id serial PRIMARY KEY, email text UNIQUE);");
@@ -164,7 +165,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -183,7 +184,7 @@ fn schema_qualified_table_names_are_kept() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4/test]    COMMENT ON statements are folded
+// [spec:pgorm:sem:codegen.ddl.objects+5/test]    COMMENT ON statements are folded
 // into the table and column they describe
 #[test]
 fn comments_are_folded_into_their_table() {
@@ -213,7 +214,7 @@ fn comments_are_folded_into_their_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3/test]    a column's COLLATE clause becomes its
+// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a column's COLLATE clause becomes its
 // collation, bare or qualified, and the entity generated from it is the one the
 // uncollated table generates
 #[test]
@@ -259,7 +260,7 @@ fn a_column_collation_rides_on_the_statement() {
     assert_eq!(collations(&rendered), expected);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -289,7 +290,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -323,7 +324,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -390,7 +391,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -415,9 +416,53 @@ fn unsupported_index_clauses_are_named() {
         &format!("{table} CREATE INDEX i ON t (name NULLS FIRST);"),
         "unsupported DDL: a NULLS FIRST or NULLS LAST clause on index `i` at statement 2",
     );
+    // A unique index is carried as the table constraint enforcing it, whose
+    // key has no ordering and no access method to hold either.
+    assert_error(
+        &format!("{table} CREATE UNIQUE INDEX i ON t (name DESC);"),
+        "unsupported DDL: a DESC column on unique index `i` at statement 2",
+    );
+    assert_error(
+        &format!("{table} CREATE UNIQUE INDEX i ON t USING hash (name);"),
+        "unsupported DDL: an access method other than btree on unique index `i` at statement 2",
+    );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a COMMENT the bridge cannot
+// [spec:pgorm:sem:codegen.ddl.objects+5/test]    a unique index folds into the unique
+// constraint that enforces it, keeping its name, columns and NULLS NOT DISTINCT; an explicit
+// ASC, `USING btree` and IF NOT EXISTS fold away with nothing lost
+#[test]
+fn a_unique_index_folds_into_its_constraint() {
+    let table = "CREATE TABLE t (id int, name text, code text);";
+    let folded = |index: &str| {
+        let tables = parse_schema(&format!("{table} {index}")).expect("schema should parse");
+        tables[0].to_string()
+    };
+    let columns = r#"CREATE TABLE "t" ( "id" integer, "name" text, "code" text"#;
+
+    for index in [
+        "CREATE UNIQUE INDEX t_name ON t (name, code) NULLS NOT DISTINCT;",
+        "CREATE UNIQUE INDEX IF NOT EXISTS t_name ON t USING btree (name ASC, code) \
+         NULLS NOT DISTINCT;",
+    ] {
+        assert_eq!(
+            folded(index),
+            format!(
+                r#"{columns}, CONSTRAINT "t_name" UNIQUE NULLS NOT DISTINCT ("name", "code") )"#
+            ),
+            "{index}"
+        );
+    }
+
+    // A plain index states no entity fact and folds into nothing, ordered or
+    // not, under any access method.
+    assert_eq!(
+        folded("CREATE INDEX t_code ON t USING hash (code); CREATE INDEX t_id ON t (id DESC);"),
+        format!("{columns} )")
+    );
+}
+
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -427,7 +472,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -449,7 +494,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+2/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]
@@ -527,7 +572,7 @@ fn one_spelling_one_variant_round_trips() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+4/test]    the round trip holds for the
+// [spec:pgorm:sem:codegen.ddl.objects+5/test]    the round trip holds for the
 // statements outside the table too: an enum type and a unique index
 #[test]
 fn enum_and_unique_index_round_trip() {
@@ -540,7 +585,7 @@ fn enum_and_unique_index_round_trip() {
                 col("code").string().not_null().to_owned(),
             ],
         );
-        task.index(unique_index("task", "code").to_owned());
+        task.index(unique_index("task", "code"));
         vec![task.take()]
     };
     let enum_type = Type::create(runtime_name("task_state"))

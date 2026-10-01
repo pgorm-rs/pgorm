@@ -5,9 +5,8 @@ use pg_query::protobuf::{
     CollateClause, ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar,
 };
 use pgorm_query::{
-    Collation, ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, Index,
-    IndexCreateStatement, IntoCollation, IntoTableName, Name, Table, TableCreateStatement,
-    TableName,
+    Collation, ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, IndexConstraint,
+    IntoCollation, IntoTableName, Name, Table, TableCreateStatement, TableName,
 };
 use std::collections::BTreeMap;
 
@@ -15,14 +14,14 @@ use std::collections::BTreeMap;
 /// gathered before the table is built so they can be folded in.
 #[derive(Default)]
 pub(super) struct Attachments {
-    pub(super) indexes: Vec<IndexCreateStatement>,
+    pub(super) indexes: Vec<IndexConstraint>,
     pub(super) table_comment: Option<String>,
     pub(super) column_comments: BTreeMap<String, (usize, String)>,
 }
 
 /// The identity a `CREATE TABLE` declares — schema and all — which is the key
 /// every other statement, and the entity transformer, refers to a table by.
-// [spec:pgorm:sem:codegen.ddl.objects+4]
+// [spec:pgorm:sem:codegen.ddl.objects+5]
 pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
     stmt.relation
         .as_ref()
@@ -34,7 +33,7 @@ pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
 }
 
 /// The schema a DDL statement's name is qualified with, if any.
-// [spec:pgorm:sem:codegen.ddl.objects+4]
+// [spec:pgorm:sem:codegen.ddl.objects+5]
 pub(super) fn schema_of(relation: &RangeVar) -> Option<String> {
     Some(relation.schemaname.clone()).filter(|schema| !schema.is_empty())
 }
@@ -48,7 +47,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 }
 
 /// Bridge one `CREATE TABLE` into the statement the transformer reads.
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
@@ -75,7 +74,7 @@ pub(super) fn build(
     let mut columns: Vec<Column> = Vec::new();
     let mut primary_key_columns: Vec<String> = Vec::new();
     let mut foreign_keys: Vec<ForeignKeyCreateStatement> = Vec::new();
-    let mut table_indexes: Vec<IndexCreateStatement> = Vec::new();
+    let mut table_indexes: Vec<IndexConstraint> = Vec::new();
 
     for element in &stmt.table_elts {
         match &element.node {
@@ -92,7 +91,8 @@ pub(super) fn build(
                 match table_constraint(constraint, &target, &table_name, at)? {
                     TableConstraint::Index(index) => {
                         if index.is_primary_key() {
-                            primary_key_columns.extend(index.get_index_spec().get_column_names());
+                            primary_key_columns
+                                .extend(index.get_columns().iter().map(|name| name.to_string()));
                         }
                         table_indexes.push(*index);
                     }
@@ -133,11 +133,7 @@ pub(super) fn build(
     }
 
     for index in table_indexes.into_iter().chain(indexes) {
-        if index.is_primary_key() {
-            create.primary_key(index);
-        } else {
-            create.index(index);
-        }
+        create.index(index);
     }
     for foreign_key in foreign_keys {
         create.foreign_key(foreign_key);
@@ -147,7 +143,7 @@ pub(super) fn build(
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+2]
+// [spec:pgorm:req:codegen.ddl.unsupported+3]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -193,7 +189,7 @@ fn reject_table_features(
 /// A `RangeVar` as the table name a DDL statement targets. Postgres has no
 /// cross-database reference to render, so a catalog-qualified name is refused
 /// rather than quietly reduced to its schema and table.
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
     let table = Name::runtime(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
@@ -213,11 +209,11 @@ struct Column {
     def: ColumnDef,
     not_null: bool,
     primary_key: bool,
-    unique_index: Option<IndexCreateStatement>,
+    unique_index: Option<IndexConstraint>,
     foreign_key: Option<ForeignKeyCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn column(
     def: &PgColumnDef,
     target: &TableName,
@@ -284,15 +280,11 @@ fn column(
             // unique index, and that index is where the entity model reads
             // uniqueness from — a `ColumnSpec::UniqueKey` would be discarded.
             ConstrType::ConstrUnique => {
-                let mut index = Index::create(target.clone(), Name::runtime(column_name));
-                if !constraint.conname.is_empty() {
-                    index.name(Name::runtime(constraint.conname.as_str()));
-                }
-                index.unique();
-                if constraint.nulls_not_distinct {
-                    index.nulls_not_distinct();
-                }
-                unique_index = Some(index);
+                unique_index = Some(key(
+                    constraint,
+                    ConstrType::ConstrUnique,
+                    Name::runtime(column_name),
+                ));
             }
             ConstrType::ConstrForeign => {
                 if foreign_key.is_some() {
@@ -333,7 +325,7 @@ fn column(
 /// A column's `COLLATE` clause as the collation it names: bare, or qualified
 /// by one schema. A catalog-qualified name is a cross-database reference
 /// Postgres does not implement, so it is refused as a table's would be.
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collation, Error> {
     match types::idents(&clause.collname).as_deref() {
         Some([name]) => Ok(Name::runtime(name.as_str()).into_collation()),
@@ -349,11 +341,11 @@ fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collati
 
 /// What a table-level constraint becomes once bridged.
 enum TableConstraint {
-    Index(Box<IndexCreateStatement>),
+    Index(Box<IndexConstraint>),
     ForeignKey(Box<ForeignKeyCreateStatement>),
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn table_constraint(
     constraint: &Constraint,
     target: &TableName,
@@ -371,20 +363,9 @@ fn table_constraint(
             let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
             };
-            let mut index = Index::create(target.clone(), Name::runtime(first));
-            if !constraint.conname.is_empty() {
-                index.name(Name::runtime(constraint.conname.as_str()));
-            }
+            let mut index = key(constraint, kind, Name::runtime(first));
             for column in columns {
-                index.col(Name::runtime(column));
-            }
-            if matches!(kind, ConstrType::ConstrPrimary) {
-                index.primary();
-            } else {
-                index.unique();
-            }
-            if constraint.nulls_not_distinct {
-                index.nulls_not_distinct();
+                index = index.col(Name::runtime(column));
             }
             Ok(TableConstraint::Index(Box::new(index)))
         }
@@ -402,9 +383,25 @@ fn table_constraint(
     }
 }
 
+/// A `PRIMARY KEY` or `UNIQUE` constraint begun at its first column, under the
+/// name and with the `NULLS NOT DISTINCT` it was declared with.
+// [spec:pgorm:sem:codegen.ddl.tables+4]
+fn key(constraint: &Constraint, kind: ConstrType, first: Name) -> IndexConstraint {
+    let key = match kind {
+        ConstrType::ConstrPrimary => IndexConstraint::primary_key(first),
+        _ if constraint.nulls_not_distinct => IndexConstraint::unique_nulls_not_distinct(first),
+        _ => IndexConstraint::unique(first),
+    };
+    if constraint.conname.is_empty() {
+        key
+    } else {
+        key.name(Name::runtime(constraint.conname.as_str()))
+    }
+}
+
 /// A foreign key over `columns` of `target`, with the referenced table, columns
 /// and actions the constraint declares.
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn references(
     constraint: &Constraint,
     target: &TableName,
@@ -477,7 +474,7 @@ fn references(
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no
 /// entity meaning, so it reads as no action declared.
-// [spec:pgorm:sem:codegen.ddl.tables+3]
+// [spec:pgorm:sem:codegen.ddl.tables+4]
 fn action(
     code: &str,
     clause: &str,
@@ -504,7 +501,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+2]
+// [spec:pgorm:req:codegen.ddl.unsupported+3]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -541,7 +538,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+2]
+// [spec:pgorm:req:codegen.ddl.unsupported+3]
 fn constraint_kind(kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

@@ -1,7 +1,7 @@
 use super::*;
 use crate::common::setup::create_table;
 use pgorm::{ConnectionTrait, DatabasePool, error::*, pgorm_query};
-use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Index, Name, Table};
+use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, IndexConstraint, Name, Table};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
     let db = &db.get().await?;
@@ -224,11 +224,10 @@ where
                 .integer()
                 .not_null(),
         )
-        .primary_key(
-            Index::create(cakes_bakers::Entity, cakes_bakers::Column::CakeId)
+        .index(
+            IndexConstraint::primary_key(cakes_bakers::Column::CakeId)
                 .name(Name::runtime("pk-cakes_bakers"))
-                .col(cakes_bakers::Column::BakerId)
-                .to_owned(),
+                .col(cakes_bakers::Column::BakerId),
         )
         .foreign_key(
             ForeignKey::create(

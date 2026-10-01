@@ -8991,12 +8991,34 @@ children (
         id embedded-index-kinds
         title "A table constraint embedded in CREATE TABLE is always one PostgreSQL accepts"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-09-25T05:07:37.037603Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Flagged independently by three missions (95840ed2's embedding test, a1653e01's index forms, bf3bf75d's deferrability). `TableCreateStatement::index(..)` embeds an `IndexCreateStatement` as a table constraint, and the index type admits shapes a table constraint cannot take: a `Plain` (non-unique, non-primary) kind renders `CONSTRAINT \"idx\" (\"col\")`, which PostgreSQL rejects, and a partial-index predicate or an expression column has no table-constraint spelling either. `sql.ddl.create-table` documents both as known gaps. bf3bf75d introduced `IndexConstraint`, the wrapper `index()`/`primary_key()` now take, which is the natural place to rule them out: only a unique or primary-key index with plain column entries (and optional INCLUDE and deferrability) should convert into an `IndexConstraint`; a plain kind, a predicate or an expression entry should not be representable on the embedded path, and should remain available on standalone `CREATE INDEX`. Establish the accepted table-constraint shapes live, make the refused ones unrepresentable (compile_fail doctests), sweep callers (codegen emits embedded indexes), and update sql.ddl.create-table / sql.ddl.index-create."
+            }
+
+            {
+                at 2026-09-30T17:02:45.600184Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-09-30T17:03:08.935552Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Filed prescription refined (agent opus-scope-mission-2): rather than letting \"only a unique or primary-key index with plain column entries\" convert into IndexConstraint — a conversion whose validity is runtime state of an IndexCreateStatement, so it could only be fallible, not typed — IndexConstraint becomes a builder of its own (unique / unique_nulls_not_distinct / primary_key constructors taking the first key column as a Name; col, name, include, deferrability). IndexCreateStatement no longer converts into one and is standalone-only: IndexKind loses PrimaryKey, primary()/is_primary_key()/StandaloneIndexKind/IndexKind::standalone/IndexCreateStatement::deferrability are deleted, and TableCreateStatement::primary_key() goes (index() is the one embedder; the key kind is the constraint's own). NULLS NOT DISTINCT is a constructor, not a setter, because PRIMARY KEY NULLS NOT DISTINCT is a syntax error. Re-verified live on PG 16.15: in a table constraint DESC, ASC, an opclass, COLLATE, an expression, WHERE, USING <method>, a bare (kind-less) key list and PRIMARY KEY NULLS NOT DISTINCT are all syntax errors; UNIQUE NULLS NOT DISTINCT, INCLUDE and DEFERRABLE are accepted; hash/gin/gist/brin all refuse unique indexes. Codegen consequence: a CREATE UNIQUE INDEX is folded into the table as the unique constraint it enforces, so a DESC key column or a non-btree access method on one is now a named rejection (it cannot be carried and must not be dropped); explicit ASC (the default) is accepted; IF NOT EXISTS is a property of the folded-away statement and is dropped, documented."
+            }
+
+            {
+                at 2026-10-01T21:30:43.702126Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

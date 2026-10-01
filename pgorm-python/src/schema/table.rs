@@ -6,7 +6,7 @@ use crate::{
     errors::ConstructionError, expressions, expressions::Compiled, identifiers::PyIdentifier,
     statements::PyTable,
 };
-use pgorm::pgorm_query::{Index, Table, TableCreateStatement, TableName, Values};
+use pgorm::pgorm_query::{IndexConstraint, Table, TableCreateStatement, TableName, Values};
 use pyo3::{prelude::*, types::PyTuple};
 
 pub(super) fn table_name(table: &PyTable) -> PyResult<TableName> {
@@ -48,15 +48,12 @@ impl PyCreateTable {
 
     #[pyo3(signature=(first, *rest))]
     fn primary_key(&self, first: &Bound<'_, PyAny>, rest: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        let mut key = Index::create(
-            self.inner.get_table_name().clone(),
-            PyIdentifier::new(first)?.name(),
-        );
+        let mut key = IndexConstraint::primary_key(PyIdentifier::new(first)?.name());
         for column in rest {
-            key.col(PyIdentifier::new(&column)?.name());
+            key = key.col(PyIdentifier::new(&column)?.name());
         }
         let mut inner = self.inner.clone();
-        inner.primary_key(key);
+        inner.index(key);
         Ok(Self { inner })
     }
 
@@ -68,19 +65,17 @@ impl PyCreateTable {
         name: Option<&Bound<'_, PyAny>>,
         nulls_not_distinct: bool,
     ) -> PyResult<Self> {
-        let mut key = Index::create(
-            self.inner.get_table_name().clone(),
-            PyIdentifier::new(first)?.name(),
-        );
+        let first = PyIdentifier::new(first)?.name();
+        let mut key = if nulls_not_distinct {
+            IndexConstraint::unique_nulls_not_distinct(first)
+        } else {
+            IndexConstraint::unique(first)
+        };
         for column in rest {
-            key.col(PyIdentifier::new(&column)?.name());
+            key = key.col(PyIdentifier::new(&column)?.name());
         }
-        key.unique();
         if let Some(name) = name {
-            key.name(PyIdentifier::new(name)?.name());
-        }
-        if nulls_not_distinct {
-            key.nulls_not_distinct();
+            key = key.name(PyIdentifier::new(name)?.name());
         }
         let mut inner = self.inner.clone();
         inner.index(key);

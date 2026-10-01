@@ -11,12 +11,18 @@ use super::common::*;
 
 /// Create an index for an existing table
 ///
-/// An index indexes at least one column of exactly one table, in both the
-/// standalone and the `CREATE TABLE`-embedded position, so both are taken by the
-/// constructor and `col` appends the remaining columns: neither the empty column
-/// list nor the missing `ON` target PostgreSQL rejects has anywhere to come from.
-/// The index name stays optional, because PostgreSQL derives one when it is
-/// absent.
+/// An index indexes at least one column of exactly one table, so both are
+/// taken by the constructor and `col` appends the remaining columns: neither
+/// the empty column list nor the missing `ON` target PostgreSQL rejects has
+/// anywhere to come from. The index name stays optional, because PostgreSQL
+/// derives one when it is absent.
+///
+/// This is the standalone `CREATE INDEX` and nothing else. A unique or
+/// primary-key constraint written inside `CREATE TABLE` is an
+/// [`IndexConstraint`](crate::IndexConstraint), a builder of its own, because
+/// the table-constraint grammar has no place for most of what an index
+/// carries — a non-unique kind, an expression or ordered entry, an operator
+/// class, a predicate, an access method.
 ///
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
@@ -102,17 +108,8 @@ use super::common::*;
 /// let moved: IndexCreateStatement = index.take();
 /// ```
 ///
-/// Embedding one consumes it, so a `&mut` builder chain does not typecheck —
-/// write the `.to_owned()` and see the copy:
-///
-/// ```compile_fail,E0277
-/// use pgorm_query::{*, tests_cfg::*};
-///
-/// Table::create(Glyph::Table).index(Index::create(Glyph::Table, Glyph::Aspect).unique());
-/// ```
-// [spec:pgorm:req:sql.ddl.index-create+9]
+// [spec:pgorm:req:sql.ddl.index-create+10]
 // [spec:pgorm:req:sql.ast+1]
-// [spec:pgorm:req:sql.ddl.create-table+9]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -125,46 +122,17 @@ pub struct IndexCreateStatement {
     pub(crate) r#where: ConditionHolder,
 }
 
-/// What an index constrains: nothing, uniqueness, or the table's primary key.
+/// What an index constrains: nothing, or uniqueness.
 ///
-/// The three states are mutually exclusive, so no index is both a primary key
-/// and a unique key. PostgreSQL spells `PRIMARY KEY` only as an inline table
-/// constraint, so [`IndexKind::PrimaryKey`] is meaningful only on the embedded
-/// path — it is what [`TableCreateStatement::primary_key`] sets. A standalone
-/// `CREATE INDEX` sees the kind through [`IndexKind::standalone`], which has no
-/// primary-key image.
-///
-/// [`TableCreateStatement::primary_key`]: crate::TableCreateStatement::primary_key
-// [spec:pgorm:req:sql.ddl.index-create+9]
+/// There is no primary-key kind. PostgreSQL spells `PRIMARY KEY` only as a
+/// table constraint, never as `CREATE INDEX`, so a primary key is an
+/// [`IndexConstraint::primary_key`](crate::IndexConstraint::primary_key).
+// [spec:pgorm:req:sql.ddl.index-create+10]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
     Plain,
     Unique,
-    PrimaryKey,
-}
-
-/// The index kinds a standalone `CREATE ... INDEX` can spell.
-///
-/// Obtained only through [`IndexKind::standalone`], so the standalone renderer
-/// cannot be handed a primary key.
-// [spec:pgorm:req:sql.ddl.index-create+9]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StandaloneIndexKind {
-    Plain,
-    Unique,
-}
-
-impl IndexKind {
-    /// This kind as a standalone `CREATE INDEX` prefix, or `None` for
-    /// [`IndexKind::PrimaryKey`], which has no standalone spelling.
-    pub fn standalone(self) -> Option<StandaloneIndexKind> {
-        match self {
-            Self::Plain => Some(StandaloneIndexKind::Plain),
-            Self::Unique => Some(StandaloneIndexKind::Unique),
-            Self::PrimaryKey => None,
-        }
-    }
 }
 
 /// The access method an index is built with — PostgreSQL's `USING <method>`.
@@ -223,17 +191,7 @@ impl IndexCreateStatement {
         self
     }
 
-    /// Set index kind to [`IndexKind::PrimaryKey`], replacing any kind already
-    /// set.
-    ///
-    /// A primary key is only spelled inside `CREATE TABLE`; rendered standalone
-    /// the statement is a plain `CREATE INDEX`.
-    pub fn primary(&mut self) -> &mut Self {
-        self.kind = IndexKind::PrimaryKey;
-        self
-    }
-
-    /// Set index kind to [`IndexKind::Unique`], replacing any kind already set.
+    /// Set index kind to [`IndexKind::Unique`].
     pub fn unique(&mut self) -> &mut Self {
         self.kind = IndexKind::Unique;
         self
@@ -241,8 +199,8 @@ impl IndexCreateStatement {
 
     /// Set nulls to not be treated as distinct values.
     ///
-    /// PostgreSQL defines this only for unique indexes and unique constraints,
-    /// so it is rendered only when the kind is [`IndexKind::Unique`].
+    /// PostgreSQL defines this only for unique indexes, so it is rendered only
+    /// when the kind is [`IndexKind::Unique`].
     pub fn nulls_not_distinct(&mut self) -> &mut Self {
         self.nulls_not_distinct = true;
         self
@@ -267,9 +225,9 @@ impl IndexCreateStatement {
     ///
     /// An included column is not part of the key: it cannot be searched or
     /// ordered by, and exists so a query reading only these columns can be
-    /// answered from the index alone. PostgreSQL allows it on plain, unique and
-    /// primary-key indexes alike, and on a unique index the included columns
-    /// take no part in the uniqueness.
+    /// answered from the index alone. PostgreSQL allows it on plain and unique
+    /// indexes alike, and on a unique index the included columns take no part
+    /// in the uniqueness.
     ///
     /// ```
     /// use pgorm_query::{*, tests_cfg::*};
@@ -282,7 +240,7 @@ impl IndexCreateStatement {
     ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect") INCLUDE ("image")"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.index-create+9]
+    // [spec:pgorm:req:sql.ddl.index-create+10]
     pub fn include<N, I>(&mut self, columns: I) -> &mut Self
     where
         N: IntoName,
@@ -295,10 +253,6 @@ impl IndexCreateStatement {
 
     pub fn kind(&self) -> IndexKind {
         self.kind
-    }
-
-    pub fn is_primary_key(&self) -> bool {
-        self.kind == IndexKind::PrimaryKey
     }
 
     pub fn is_unique_key(&self) -> bool {
@@ -343,7 +297,7 @@ impl IndexCreateStatement {
 ///     .join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+9]
+// [spec:pgorm:req:sql.ddl.index-create+10]
 #[inherent]
 impl ConditionalStatement for IndexCreateStatement {
     pub fn cond_where<C>(&mut self, condition: C) -> &mut Self

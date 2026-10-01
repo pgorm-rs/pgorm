@@ -638,8 +638,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+7]
-// [spec:pgorm:req:sql.surface+7/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+8]
+// [spec:pgorm:req:sql.surface+8/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -729,8 +729,7 @@ pub use foreign_key::{
 };
 pub use index::{
     Index, IndexColumn, IndexColumnTarget, IndexConstraint, IndexCreateStatement,
-    IndexDropStatement, IndexKind, IndexOrder, IndexType, IntoIndexColumn, StandaloneIndexKind,
-    TableIndex,
+    IndexDropStatement, IndexKind, IndexOrder, IndexType, IntoIndexColumn, TableIndex,
 };
 pub use table::{
     AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,

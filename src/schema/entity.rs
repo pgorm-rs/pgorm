@@ -3,8 +3,8 @@ use crate::{
     PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Index, IndexCreateStatement,
-    Name, SqlName, TableCreateStatement,
+    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Index, IndexConstraint,
+    IndexCreateStatement, Name, SqlName, TableCreateStatement,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -276,16 +276,11 @@ where
     if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
         let mut primary_keys = E::PrimaryKey::iter();
         if let Some(first) = primary_keys.next() {
-            let mut idx_pk = Index::create(entity.table_ref(), first);
+            let mut key = IndexConstraint::primary_key(first);
             for primary_key in primary_keys {
-                idx_pk.col(primary_key);
+                key = key.col(primary_key);
             }
-            stmt.primary_key(
-                idx_pk
-                    .name(Name::runtime(format!("pk-{}", entity.to_string())))
-                    .primary()
-                    .to_owned(),
-            );
+            stmt.index(key.name(Name::runtime(format!("pk-{}", entity.to_string()))));
         }
     }
 
@@ -365,15 +360,10 @@ mod tests {
                     .decimal()
                     .not_null(),
             )
-            .primary_key(
-                Index::create(
-                    CakeFillingPrice.table_ref(),
-                    cake_filling_price::Column::CakeId,
-                )
-                .name(Name::runtime("pk-cake_filling_price"))
-                .col(cake_filling_price::Column::FillingId)
-                .primary()
-                .to_owned(),
+            .index(
+                IndexConstraint::primary_key(cake_filling_price::Column::CakeId)
+                    .name(Name::runtime("pk-cake_filling_price"))
+                    .col(cake_filling_price::Column::FillingId),
             )
             .foreign_key(
                 ForeignKeyCreateStatement::new(

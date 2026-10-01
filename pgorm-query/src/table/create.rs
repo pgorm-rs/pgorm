@@ -74,7 +74,7 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+9]
+// [spec:pgorm:req:sql.ddl.create-table+10]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
@@ -139,28 +139,12 @@ impl TableCreateStatement {
         self
     }
 
-    /// Add a table-level index expression to the create statement
+    /// Add a table-level `UNIQUE` or `PRIMARY KEY` constraint.
     ///
-    /// The index is consumed, as `col()` consumes its column, and is restamped
-    /// onto this statement's table: an embedded index constrains the table it
-    /// sits inside and cannot name another. Pass an owned value — `.to_owned()`
-    /// a builder chain you mean to reuse.
-    ///
-    /// An [`IndexCreateStatement`] embeds as it is; one made into an
-    /// [`IndexConstraint`] by
-    /// [`deferrability`](IndexCreateStatement::deferrability) carries the
-    /// clause only a constraint takes.
-    pub fn index<I>(&mut self, index: I) -> &mut Self
-    where
-        I: Into<IndexConstraint>,
-    {
-        let mut constraint = index.into();
-        constraint.index.table = self.table.clone();
-        self.indexes.push(constraint);
-        self
-    }
-
-    /// Add an primary key.
+    /// The constraint is consumed, as `col()` consumes its column, and names
+    /// no table of its own: it constrains the table it is written inside. Its
+    /// key — unique or primary — is the one it was built with, so this is the
+    /// only embedder either needs.
     ///
     /// # Examples
     ///
@@ -171,7 +155,7 @@ impl TableCreateStatement {
     /// statement
     ///     .col(ColumnDef::new(Glyph::Id).integer().not_null())
     ///     .col(ColumnDef::new(Glyph::Image).string().not_null())
-    ///     .primary_key(Index::create(Glyph::Table, Glyph::Id).col(Glyph::Image).to_owned());
+    ///     .index(IndexConstraint::primary_key(Glyph::Id).col(Glyph::Image));
     ///
     /// assert_eq!(
     ///     statement.to_string(),
@@ -185,14 +169,12 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    pub fn primary_key<I>(&mut self, index: I) -> &mut Self
+    // [spec:pgorm:req:sql.ddl.create-table+10]
+    pub fn index<I>(&mut self, constraint: I) -> &mut Self
     where
         I: Into<IndexConstraint>,
     {
-        let mut constraint = index.into();
-        constraint.index.kind = IndexKind::PrimaryKey;
-        constraint.index.table = self.table.clone();
-        self.indexes.push(constraint);
+        self.indexes.push(constraint.into());
         self
     }
 

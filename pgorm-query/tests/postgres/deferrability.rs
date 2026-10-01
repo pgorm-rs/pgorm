@@ -42,7 +42,7 @@ fn column_attributes(deferrability: Deferrability) -> Vec<ConstrType> {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability+2/test]    a column's unique and primary keys carry the
+// [spec:pgorm:req:sql.ddl.deferrability+3/test]    a column's unique and primary keys carry the
 // clause directly after their keyword, and the parser attaches it to them
 // [spec:pgorm:req:sql.ddl.column-def+7/test]
 #[test]
@@ -91,9 +91,9 @@ fn a_column_key_carries_its_deferrability() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability+2/test]    a table-level unique or primary-key constraint
+// [spec:pgorm:req:sql.ddl.deferrability+3/test]    a table-level unique or primary-key constraint
 // carries the clause after its column list and INCLUDE
-// [spec:pgorm:req:sql.ddl.create-table+9/test]
+// [spec:pgorm:req:sql.ddl.create-table+10/test]
 #[test]
 fn a_table_constraint_carries_its_deferrability() {
     for (deferrability, text) in STATES {
@@ -101,18 +101,11 @@ fn a_table_constraint_carries_its_deferrability() {
             .col(ColumnDef::new(Glyph::Id).integer())
             .col(ColumnDef::new(Glyph::Aspect).integer())
             .col(ColumnDef::new(Glyph::Image).text())
-            .primary_key(
-                Index::create(Glyph::Table, Glyph::Id)
-                    .to_owned()
-                    .deferrability(deferrability),
-            )
+            .index(IndexConstraint::primary_key(Glyph::Id).deferrability(deferrability))
             .index(
-                Index::create(Glyph::Table, Glyph::Aspect)
+                IndexConstraint::unique_nulls_not_distinct(Glyph::Aspect)
                     .name(Name::runtime("glyph_aspect"))
-                    .unique()
-                    .nulls_not_distinct()
                     .include([Glyph::Image])
-                    .to_owned()
                     .deferrability(deferrability),
             )
             .to_string();
@@ -139,17 +132,17 @@ fn a_table_constraint_carries_its_deferrability() {
         }
     }
 
-    // A plain statement embeds as a constraint that says nothing about deferral.
+    // A constraint that is not told otherwise says nothing about deferral.
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer())
-            .primary_key(Index::create(Glyph::Table, Glyph::Id))
+            .index(IndexConstraint::primary_key(Glyph::Id))
             .to_string(),
         r#"CREATE TABLE "glyph" ( "id" integer, PRIMARY KEY ("id") )"#
     );
 }
 
-// [spec:pgorm:req:sql.ddl.deferrability+2/test]    `ALTER TABLE` spells a column's key as
+// [spec:pgorm:req:sql.ddl.deferrability+3/test]    `ALTER TABLE` spells a column's key as
 // `ADD UNIQUE (…)` / `ADD PRIMARY KEY (…)`, the clause after it
 // [spec:pgorm:req:sql.ddl.alter-table+6/test]
 #[test]
