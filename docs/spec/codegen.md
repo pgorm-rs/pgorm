@@ -818,7 +818,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > otherwise generate an `Option` primary key.
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+7]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+8]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity

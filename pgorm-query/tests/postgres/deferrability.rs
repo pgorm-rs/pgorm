@@ -44,7 +44,7 @@ fn column_attributes(deferrability: Deferrability) -> Vec<ConstrType> {
 
 // [spec:pgorm:req:sql.ddl.deferrability+3/test]    a column's unique and primary keys carry the
 // clause directly after their keyword, and the parser attaches it to them
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 #[test]
 fn a_column_key_carries_its_deferrability() {
     for (deferrability, text) in STATES {

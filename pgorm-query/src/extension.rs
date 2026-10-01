@@ -235,7 +235,7 @@ macro_rules! impl_extension_statement_builder {
         /// Renders the statement with every value inlined as an escaped SQL
         /// literal. This is its only rendering: it binds nothing, so there is
         /// no placeholder form to choose between.
-        // [spec:pgorm:req:sql.ddl+7]
+        // [spec:pgorm:req:sql.ddl+8]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -946,7 +946,7 @@ macro_rules! impl_type_statement_builder {
         }
 
         #[doc = $display_doc]
-        // [spec:pgorm:req:sql.ddl+7]
+        // [spec:pgorm:req:sql.ddl+8]
         impl fmt::Display for $struct_name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut sql = String::with_capacity(256);
@@ -969,7 +969,7 @@ macro_rules! impl_type_statement_build {
             /// returns is for inspection — logging the labels apart from the
             /// SQL, feeding a proxy that expands them — and the statement you
             /// execute is the inlined `Display` rendering.
-            // [spec:pgorm:req:sql.ddl+7]
+            // [spec:pgorm:req:sql.ddl+8]
             // [spec:pgorm:req:sql.render.ddl.enum-type+5]
             pub fn build(&self) -> (String, Values) {
                 let mut sql = SqlWriterValues::new("$", true);

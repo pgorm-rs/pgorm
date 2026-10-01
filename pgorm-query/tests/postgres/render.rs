@@ -234,7 +234,7 @@ fn enum_labels_render_as_data_in_both_paths() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+7/test]    a DDL statement with no placeholder-emitting build inlines
+// [spec:pgorm:req:sql.ddl+8/test]    a DDL statement with no placeholder-emitting build inlines
 // the values it carries, which is what its `Display` doc claims
 #[test]
 fn a_display_only_ddl_statement_inlines_its_values() {

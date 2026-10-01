@@ -8789,6 +8789,29 @@ children (
                 id scope-sequences
                 title "Sequences have a typed builder, and identity options stop riding raw_suffix"
                 deps (identifier-render-oracle)
+                sealed true
+                log (
+                    {
+                        at 2026-10-01T22:11:58.454217Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-01T23:10:34.553498Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Built as the sql.scope entry described, with three shape decisions recorded in sql.ddl.sequence. (1) The shared vocabulary is SequenceOption (INCREMENT BY, MIN/NO MINVALUE, MAX/NO MAXVALUE, START WITH, CACHE, CYCLE/NO CYCLE) collected into SequenceOptions, which has one slot per clause (a bound and its NO form share one: both together is 42601) and no empty value, so ALTER SEQUENCE taking it alone always writes a clause and an identity column only writes parentheses when it has options (`AS IDENTITY ()` is 42601). (2) AS, RESTART and OWNED BY are not options but methods of the sequence statements: live on PG 16.15 an identity refuses AS (42601, conflicting with the column type), and OWNED BY there is accepted and ignored; OWNED BY takes (table, column) so the bare column the server refuses (42601) cannot be built. (3) Not built, recorded with reasons: TEMPORARY/UNLOGGED and SET LOGGED (persistence, as sql.scope rules out table storage), OWNER TO (roles), SET SCHEMA (no table counterpart), identity SEQUENCE NAME, and ALTER TABLE ... ALTER COLUMN SET <option> — Sequence::alter on the identity's derived sequence name reaches every option that form does (live: INCREMENT/RESTART/AS accepted on an identity sequence; OWNED BY 0A000). Numeric domain errors (zero step/cache, crossed bounds, start outside, bound outside type) are left to the server: each is 22023 and judged against the whole definition."
+                    }
+
+                    {
+                        at 2026-10-01T23:10:34.664342Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

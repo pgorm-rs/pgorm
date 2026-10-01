@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+10/test]
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+5/test]
 fn create_1() {
@@ -620,7 +620,7 @@ fn alter_embeds_its_foreign_key_by_value() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+7/test]    a generated column is stored, and the virtual
+// [spec:pgorm:req:sql.ddl.column-def+8/test]    a generated column is stored, and the virtual
 // spelling it no longer has a constructor for is one the grammar refuses
 #[test]
 fn generated_column_is_always_stored() {
@@ -647,7 +647,7 @@ fn generated_column_is_always_stored() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+7/test]    both identity forms render, and
+// [spec:pgorm:req:sql.ddl.column-def+8/test]    both identity forms render, and
 // the ALWAYS/BY DEFAULT choice is the only thing that differs between them
 #[test]
 fn identity_column_spells_both_generations() {
@@ -674,7 +674,7 @@ fn identity_column_spells_both_generations() {
     assert_eq!(IdentityGeneration::ByDefault.keyword(), "BY DEFAULT");
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+7/test]    identity is a clause of the
+// [spec:pgorm:req:sql.ddl.column-def+8/test]    identity is a clause of the
 // column, so it renders in insertion order among the other specs
 #[test]
 fn identity_renders_in_insertion_order() {
@@ -693,7 +693,7 @@ fn identity_renders_in_insertion_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+7/test]    the two `ALTER TABLE` positions:
+// [spec:pgorm:req:sql.ddl.column-def+8/test]    the two `ALTER TABLE` positions:
 // a new column carries the clause, an existing one takes the ADD GENERATED action
 #[test]
 fn identity_alters_both_ways() {
@@ -712,7 +712,7 @@ fn identity_alters_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+7/test]    identity and the serial family
+// [spec:pgorm:req:sql.ddl.column-def+8/test]    identity and the serial family
 // are two spellings of one idea, and asking for both renders SQL the grammar
 // takes but the server refuses — the boundary this rule documents rather than types
 #[test]

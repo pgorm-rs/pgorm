@@ -318,8 +318,9 @@
 //!   they expose `build()` and `build_collect(sink)` too — but PostgreSQL takes
 //!   no bind parameter in DDL, so their `$N` rendering is for inspection and the
 //!   inlined one is what you execute.
-//! - **Every other schema statement** — table, index, foreign-key, comment,
-//!   extension, `DROP TYPE` — binds nothing that can reach a placeholder sink.
+//! - **Every other schema statement** — table, index, foreign-key, sequence,
+//!   comment, extension, `DROP TYPE` — binds nothing that can reach a
+//!   placeholder sink.
 //!   The inlined rendering is the only one they have, and it is their `Display`.
 //!
 //! ```rust
@@ -638,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+8]
-// [spec:pgorm:req:sql.surface+8/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+9]
+// [spec:pgorm:req:sql.surface+9/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -649,7 +650,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+7]
+// [spec:pgorm:req:sql.scope+8]
 mod backend;
 mod comment;
 pub mod error;
@@ -663,6 +664,7 @@ mod keywords;
 mod prepare;
 mod query;
 mod schema;
+mod sequence;
 mod table;
 mod template;
 mod token;
@@ -730,6 +732,10 @@ pub use foreign_key::{
 pub use index::{
     Index, IndexColumn, IndexColumnTarget, IndexConstraint, IndexCreateStatement,
     IndexDropStatement, IndexKind, IndexOrder, IndexType, IntoIndexColumn, TableIndex,
+};
+pub use sequence::{
+    PendingSequenceAlter, Sequence, SequenceAlterStatement, SequenceCreateStatement,
+    SequenceDropStatement, SequenceOption, SequenceOptions, SequenceRenameStatement, SequenceType,
 };
 pub use table::{
     AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,

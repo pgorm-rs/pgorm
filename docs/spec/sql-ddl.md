@@ -4,17 +4,19 @@ This section specifies the schema (DDL) statement builders in `pgorm-query`:
 table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
 `pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` and extension
-statements (`pgorm-query/src/extension.rs`), `COMMENT ON` statements
+statements (`pgorm-query/src/extension.rs`), sequence statements
+(`pgorm-query/src/sequence/`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
 implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+7]
+> [spec:pgorm:req:sql.ddl+8]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
+> `Sequence` (`create`/`alter`/`drop`/`rename`),
 > `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`).
 >
 > The render surface a statement exposes MUST follow from what it binds, not
@@ -33,8 +35,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > that pair is for inspection and the inlined rendering is what a caller
 > executes; both the `build` doc and the `Display` doc MUST say so.
 >
-> Every other DDL statement — table, index, foreign-key, comment, extension,
-> `DROP TYPE` — has no placeholder-emitting entry point at all: its renderer is
+> Every other DDL statement — table, index, foreign-key, sequence, comment,
+> extension, `DROP TYPE` — has no placeholder-emitting entry point at all: its renderer is
 > `pub(crate)` and its only public route is `Display` over a `String` sink, so
 > a value it carries (a column `DEFAULT`, a `CHECK` expression) is always
 > inlined as an escaped literal and there is nothing left to bind. These expose
@@ -145,19 +147,20 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+7]
+> [spec:pgorm:req:sql.ddl.column-def+8]
 > `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
 > and an ordered list of `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `UniqueKey(Option<Deferrability>)`, `PrimaryKey(Option<Deferrability>)`,
 > `Check(SimpleExpr)`, `Generated { expr }`,
-> `Identity(IdentityGeneration)`, `RawSuffix(&'static str)`, `Comment(String)`),
+> `Identity(IdentityGeneration, Option<SequenceOptions>)`, `RawSuffix(&'static str)`,
+> `Comment(String)`),
 > populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
 > `not_null()`, `default(v)`, `check(expr)`, `unique_key()`,
 > `unique_key_deferrability(d)`, `primary_key()`,
 > `primary_key_deferrability(d)`, `identity()`, `identity_by_default()`,
-> `raw_suffix(s)`, etc.).
+> `identity_with(generation, options)`, `raw_suffix(s)`, etc.).
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
@@ -165,8 +168,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `UNIQUE[ <deferrability>]`, `PRIMARY KEY[ <deferrability>]` (the
 > deferrability of `[spec:pgorm:req:sql.ddl.deferrability+3]`, carried inside
 > the spec so it cannot trail another), `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
-> STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`, and `RawSuffix`
-> verbatim. A generated column is always stored and
+> STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
+> `RawSuffix` verbatim. A generated column is always stored and
 > `generated(expr)` takes no flag saying otherwise: `VIRTUAL` is a syntax
 > error on every PostgreSQL before 18, the builder cannot know which release
 > it is writing for, and rendering is infallible — there is no error channel
@@ -200,15 +203,29 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `identity` as the recommended form. In `ALTER TABLE`, `Identity` is the one
 > spec that spells an action rather than a clause: on `ADD COLUMN` it renders as
 > the column clause above, on `MODIFY` it renders
-> `ALTER COLUMN "c" ADD GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`.
+> `ALTER COLUMN "c" ADD GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`.
 >
-> Two boundaries are deliberate. The sequence options — `START WITH`,
-> `INCREMENT BY`, `CACHE`, and the rest of the `( ... )` tail — have no
-> spelling: they are a sequence definition wearing a column clause, and the
-> column vocabulary is the wrong shape to grow one; `raw_suffix` carries them
-> verbatim until a typed sequence builder exists to take them properly. And
-> identity's exclusivity with `Default`, `Generated` and `AutoIncrement` is
-> documented rather than typed. Those are four *separate explicit calls* a
+> An identity column owns a sequence, and that sequence's options are the ones
+> a standalone sequence takes (`[spec:pgorm:req:sql.ddl.sequence]`), from the
+> same `SequenceOption` vocabulary: `identity_with(generation, options)` takes
+> the form and any `Into<SequenceOptions>`, and the column writes ` (<options>)`
+> after `AS IDENTITY`, in `CREATE TABLE`, `ADD COLUMN` and `MODIFY` alike.
+> `identity()` and `identity_by_default()` carry `None` and write no
+> parentheses, the only spelling of no options there is: `AS IDENTITY ()` is a
+> syntax error, and `SequenceOptions` has no empty value to render one from.
+> The two clauses of a standalone sequence that are not `SequenceOption`s stay
+> out of it: the sequence counts in the column's own type, and PostgreSQL
+> refuses an `AS` there as conflicting with it (`42601`); the column owns it,
+> and an `OWNED BY` there is accepted and changes nothing. `SEQUENCE NAME`,
+> which would name the sequence rather than let PostgreSQL derive
+> `<table>_<column>_seq`, is not built, and neither is `ALTER COLUMN ... SET
+> <option>`: `pg_get_serial_sequence` reports the derived name, and
+> `Sequence::alter` under it reaches every option the column form does — only
+> `OWNED BY` is refused there, as moving an identity sequence's ownership
+> (`0A000`). These options used to have no spelling and rode `raw_suffix`.
+>
+> One boundary is deliberate: identity's exclusivity with `Default`,
+> `Generated` and `AutoIncrement` is documented rather than typed. Those are four *separate explicit calls* a
 > caller has to write, not a flag the API offers — unlike the `stored: false`
 > that `Generated` used to advertise, nothing here presents the invalid
 > combination as a choice — and collapsing them into one slot would move
@@ -651,6 +668,78 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > so the last call wins. `Type::drop(name)` takes the first name and `name()` /
 > `names()` append further ones, so the list is non-empty by construction and
 > the `DROP TYPE ` PostgreSQL rejects at end of input does not build.
+
+## Sequences
+
+> [spec:pgorm:req:sql.ddl.sequence]
+> `Sequence` builds the statements a sequence takes: `create(name)`,
+> `alter(name)`, `drop(name)` and `rename(from, to)`. A sequence is a
+> relation, so each name is an `IntoTableName` — a bare name or a
+> `(schema, name)` pair — rendered as quoted, dot-joined identifiers, and the
+> new name of a rename is a bare `Name`, because `RENAME TO` leaves a sequence
+> in its schema and the grammar refuses a qualified one (`42601`).
+>
+> - `SequenceCreateStatement` MUST render `CREATE SEQUENCE [IF NOT EXISTS
+>   ]<name>[ AS <type>][ <options>][ OWNED BY <owner>]`.
+> - `SequenceAlterStatement` MUST render `ALTER SEQUENCE [IF EXISTS ]<name>[ AS
+>   <type>][ <options>][ RESTART[ WITH <n>]][ OWNED BY <owner>]` with at least
+>   one clause after the name. `Sequence::alter` yields a `PendingSequenceAlter`
+>   and only choosing a clause on it — `as_type`, `options`, `restart`,
+>   `restart_with`, `owned_by`, `owned_by_none` — produces a statement, on which
+>   the same clauses chain: `ALTER SEQUENCE "s"` alone is a syntax error, so it
+>   MUST NOT construct (`[dec:pgorm:invalid-states-unrepresentable]`), as
+>   `PendingTableAlter` and `PendingTypeAlter` do for theirs.
+> - `SequenceDropStatement` MUST render `DROP SEQUENCE [IF EXISTS ]<name>[,
+>   <name>...][ CASCADE| RESTRICT]`. `Sequence::drop` takes the first name and
+>   `name()` appends, so the list is non-empty; `cascade()` and `restrict()`
+>   share one slot, the last call winning.
+> - `SequenceRenameStatement` MUST render `ALTER SEQUENCE <name> RENAME TO
+>   <new>`.
+>
+> Every statement renders through `Display` alone: a sequence carries names
+> and integers and nothing to bind (`[spec:pgorm:req:sql.ddl+8]`).
+>
+> The options are one vocabulary for every position that takes them, a
+> standalone sequence's and an identity column's
+> (`[spec:pgorm:req:sql.ddl.column-def+8]`): `SequenceOption` is `IncrementBy`,
+> `MinValue` / `NoMinValue`, `MaxValue` / `NoMaxValue`, `StartWith`, `Cache`
+> and `Cycle` / `NoCycle`, each number an `i64` written as an integer literal,
+> `i64::MIN` and `i64::MAX` included. `SequenceOptions` holds one or more of
+> them, at most one per clause — a bound and its `NO` form share a clause, as
+> `CYCLE` and `NO CYCLE` do — because PostgreSQL refuses a clause given twice,
+> and those pairs too (`42601`, *conflicting or redundant options*); an option
+> for a clause already filled replaces the one there, and a second
+> `options(..)` call merges in the same way. It has no empty value: it is built
+> `From` its first option and grows by `and`, so an alter that takes it as its
+> only clause still writes one, and an identity column writes its parentheses
+> only when it has a set. Its clauses MUST render space-separated in one fixed
+> order — increment, minimum, maximum, start, cache, cycle — whatever order
+> they were given in.
+>
+> The clauses only a standalone sequence takes are methods of its statements,
+> not options. `AS` is a `SequenceType` — `smallint`, `integer`, `bigint` —
+> the three types PostgreSQL accepts (`22023` for any other), so the choice is
+> a closed set rather than a `ColumnType`; it sets the default bounds, and an
+> alter moves a bound that sat at the old type's limit to the new one's.
+> `RESTART [WITH n]` is the alter's. `OWNED BY` takes a table and a column, so
+> the bare column PostgreSQL refuses (`42601`, *invalid OWNED BY option*) does
+> not construct; dropping the column or its table then drops the sequence, and
+> `owned_by_none()` writes `OWNED BY NONE`, which releases it. A table in
+> another schema than the sequence's is the server's refusal (`55000`).
+>
+> The numbers are judged by the server, not by the type: a zero step, a cache
+> below one, bounds that cross, a start outside them and a bound outside the
+> counting type are each refused with `22023`, and each is checked against the
+> rest of the definition — including what an alter leaves unchanged — which no
+> single option can see. A `NO CYCLE` sequence past its bound fails at
+> `nextval` (`2200H`). The live suite holds those refusals, and that a
+> sequence the builder creates or alters hands out the values its options say.
+>
+> Four spellings are not built, each a whole statement through `execute`:
+> `TEMPORARY` / `UNLOGGED` and `SET { LOGGED | UNLOGGED }` are persistence
+> choices of the kind `[spec:pgorm:req:sql.scope+8]` rules out for tables;
+> `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
+> no table counterpart in the builder either.
 
 ## Extensions
 

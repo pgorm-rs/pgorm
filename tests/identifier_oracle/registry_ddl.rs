@@ -3,7 +3,7 @@
 
 use pgorm::pgorm_query::{
     ColumnDef, ColumnType, Comment, ForeignKey, Index, IndexColumn, IndexConstraint, IndexType,
-    Table, TableForeignKey, TypeName,
+    Sequence, SequenceOption, Table, TableForeignKey, TypeName,
     extension::{Extension, Type},
 };
 
@@ -621,6 +621,116 @@ pub fn sites() -> Vec<Site> {
             kinds: &["AlterEnumStmt.new_val"],
             policy: Literal,
             render: |n| sql(&Type::alter(fixed("ty")).rename_value("a", n)),
+        },
+        // -- SEQUENCE ------------------------------------------------------
+        Site {
+            id: "ddl/create-sequence.name",
+            api: "Sequence::create(Name)",
+            kinds: &["CreateSeqStmt.sequence.relname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::create(n_(n))),
+        },
+        Site {
+            id: "ddl/create-sequence.schema",
+            api: "Sequence::create((Name, Name)) — the schema part",
+            kinds: &["CreateSeqStmt.sequence.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::create((n_(n), fixed("s")))),
+        },
+        Site {
+            id: "ddl/create-sequence.owned-by-table",
+            api: "SequenceCreateStatement::owned_by(Name, column) — the table",
+            kinds: &["DefElem.arg.List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(Sequence::create(fixed("s")).owned_by(n_(n), fixed("c"))),
+        },
+        Site {
+            id: "ddl/create-sequence.owned-by-schema",
+            api: "SequenceCreateStatement::owned_by((Name, Name), column) — the schema part",
+            kinds: &["DefElem.arg.List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(Sequence::create(fixed("s")).owned_by((n_(n), fixed("t")), fixed("c"))),
+        },
+        Site {
+            id: "ddl/create-sequence.owned-by-column",
+            api: "SequenceCreateStatement::owned_by(table, Name) — the column",
+            kinds: &["DefElem.arg.List.items[1]"],
+            policy: Quoted,
+            render: |n| sql(Sequence::create(fixed("s")).owned_by(fixed("t"), n_(n))),
+        },
+        Site {
+            id: "ddl/alter-sequence.name",
+            api: "Sequence::alter(Name)",
+            kinds: &["AlterSeqStmt.sequence.relname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::alter(n_(n)).restart()),
+        },
+        Site {
+            id: "ddl/alter-sequence.schema",
+            api: "Sequence::alter((Name, Name)) — the schema part",
+            kinds: &["AlterSeqStmt.sequence.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::alter((n_(n), fixed("s"))).options(SequenceOption::Cache(2))),
+        },
+        Site {
+            id: "ddl/alter-sequence.owned-by-table",
+            api: "PendingSequenceAlter::owned_by(Name, column) — the table",
+            kinds: &["DefElem.arg.List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::alter(fixed("s")).owned_by(n_(n), fixed("c"))),
+        },
+        Site {
+            id: "ddl/alter-sequence.owned-by-column",
+            api: "SequenceAlterStatement::owned_by(table, Name) — the column",
+            kinds: &["DefElem.arg.List.items[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Sequence::alter(fixed("s"))
+                    .restart()
+                    .owned_by(fixed("t"), n_(n)))
+            },
+        },
+        Site {
+            id: "ddl/drop-sequence.name",
+            api: "Sequence::drop(Name)",
+            kinds: &["DropStmt.objects[0].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::drop(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-sequence.further-name",
+            api: "SequenceDropStatement::name(Name)",
+            kinds: &["DropStmt.objects[1].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(Sequence::drop(fixed("s")).name(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-sequence.schema",
+            api: "Sequence::drop((Name, Name)) — the schema part",
+            kinds: &["DropStmt.objects[0].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::drop((n_(n), fixed("s")))),
+        },
+        Site {
+            id: "ddl/rename-sequence.from",
+            api: "Sequence::rename(Name, to)",
+            kinds: &["RenameStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::rename(n_(n), fixed("t"))),
+        },
+        Site {
+            id: "ddl/rename-sequence.schema",
+            api: "Sequence::rename((Name, Name), to) — the schema part",
+            kinds: &["RenameStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::rename((n_(n), fixed("s")), fixed("t"))),
+        },
+        Site {
+            id: "ddl/rename-sequence.to",
+            api: "Sequence::rename(from, Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Sequence::rename(fixed("s"), n_(n))),
         },
         // -- EXTENSION -----------------------------------------------------
         Site {

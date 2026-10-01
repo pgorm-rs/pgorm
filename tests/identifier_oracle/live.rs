@@ -11,7 +11,8 @@ use pgorm::{
     ConnectionTrait, DatabaseConnection,
     pgorm_query::{
         Asterisk, ColumnDef, Comment, CommonTableExpression, Expr, ForeignKey, Func, Index, Name,
-        OnConflict, Query, Table, WindowStatement, WithClause, extension::Type,
+        OnConflict, Query, Sequence, SequenceOption, Table, WindowStatement, WithClause,
+        extension::Type,
     },
 };
 
@@ -106,7 +107,7 @@ async fn catalogue_count(db: &DatabaseConnection, sql: &str, name: &str) -> i64 
 /// `InsertStmt` target columns and `ColumnRef.fields`: a schema, a table and a
 /// column all named with the hostile name, created, written and read through
 /// the builders.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_relation_schema_and_column_names() {
     let (ctx, db) = open("ident_oracle_live_relation").await;
@@ -153,7 +154,7 @@ async fn live_relation_schema_and_column_names() {
 /// `ResTarget.name`, `RangeVar.alias.aliasname`, `RangeSubselect.alias` and
 /// `CommonTableExpr.ctename`: every alias kind, read back as the server
 /// labels it.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_alias_names() {
     let (ctx, db) = open("ident_oracle_live_alias").await;
@@ -207,7 +208,7 @@ async fn live_alias_names() {
 
 /// `FuncCall.funcname` and `TypeCast.type_name`: a function and a domain
 /// created under the hostile name, called and cast to through the builders.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_function_and_type_names() {
     let (ctx, db) = open("ident_oracle_live_function_type").await;
@@ -238,7 +239,7 @@ async fn live_function_and_type_names() {
 
 /// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
 /// the hostile name.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_window_names() {
     let (ctx, db) = open("ident_oracle_live_window").await;
@@ -266,7 +267,7 @@ async fn live_window_names() {
 /// `CollateClause.collname` and `ColumnDef.coll_clause`: a collation created
 /// under the hostile name as a copy of `"C"`, named by an expression and by a
 /// column definition through the builders.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_collation_names() {
     let (ctx, db) = open("ident_oracle_live_collation").await;
@@ -304,7 +305,7 @@ async fn live_collation_names() {
 /// `OnConflictClause.infer.conname`: a unique constraint created under the
 /// hostile name and named as the arbiter of an upsert through the builder,
 /// which has to reach it for the conflicting row to be updated.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_conflict_constraint_names() {
     let (ctx, db) = open("ident_oracle_live_conflict").await;
@@ -351,9 +352,93 @@ async fn live_conflict_constraint_names() {
     close(ctx, db).await;
 }
 
+/// `CreateSeqStmt.sequence`, the `OWNED BY` column list, `AlterSeqStmt`,
+/// `RenameStmt` and `DropStmt` over a sequence: a schema, a table and a column
+/// created under the hostile name, and a sequence in that schema owned by the
+/// column, then restarted, renamed and dropped through the builders. A table
+/// and a sequence share one namespace, so the sequence's names are the hostile
+/// name with a suffix, every hostile byte still in them.
+// [spec:pgorm:req:security.ident-oracle+7/test]
+#[tokio::test]
+async fn live_sequence_names() {
+    let (ctx, db) = open("ident_oracle_live_sequence").await;
+    for name in NASTY {
+        let n = || Name::runtime(name);
+        db.batch_execute(&format!(
+            "CREATE SCHEMA {schema}; CREATE TABLE {schema}.{schema} ({schema} bigint)",
+            schema = ident(name)
+        ))
+        .await
+        .expect("the fixture schema, table and column are created");
+        let sequence = format!("{name}_seq");
+        let renamed = format!("{name}_renamed");
+        let in_schema = |relname: &str| (n(), Name::runtime(relname));
+
+        run(
+            &db,
+            &Sequence::create(in_schema(&sequence))
+                .options(SequenceOption::StartWith(5))
+                .owned_by((n(), n()), n())
+                .to_string(),
+        )
+        .await;
+        let owned = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_class s JOIN pg_namespace ns ON ns.oid = s.relnamespace \
+             JOIN pg_depend d ON d.objid = s.oid AND d.deptype = 'a' \
+             JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid \
+             JOIN pg_class t ON t.oid = a.attrelid \
+             WHERE s.relkind = 'S' AND s.relname = $1 || '_seq' AND ns.nspname = $1 \
+             AND t.relname = $1 AND a.attname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(owned, 1, "no sequence {sequence:?} owned by {name:?}");
+
+        run(
+            &db,
+            &Sequence::alter(in_schema(&sequence))
+                .restart_with(42)
+                .to_string(),
+        )
+        .await;
+        let next = catalogue_count(
+            &db,
+            "SELECT nextval(s.oid) FROM pg_class s JOIN pg_namespace ns ON ns.oid = s.relnamespace \
+             WHERE s.relkind = 'S' AND s.relname = $1 || '_seq' AND ns.nspname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(next, 42, "the restart did not reach {sequence:?}");
+
+        run(
+            &db,
+            &Sequence::rename(in_schema(&sequence), Name::runtime(renamed.as_str())).to_string(),
+        )
+        .await;
+        let moved = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_class WHERE relkind = 'S' AND relname = $1",
+            &renamed,
+        )
+        .await;
+        assert_eq!(moved, 1, "no sequence renamed to {renamed:?}");
+
+        run(&db, &Sequence::drop(in_schema(&renamed)).to_string()).await;
+        let left = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_class WHERE relkind = 'S' AND relname = $1",
+            &renamed,
+        )
+        .await;
+        assert_eq!(left, 0, "the sequence {renamed:?} survived its drop");
+    }
+    close(ctx, db).await;
+}
+
 /// `IndexStmt.idxname`, `Constraint.conname`, `CreateEnumStmt` type names and
 /// labels, and `COMMENT ON` targets: DDL-only names, checked in the catalogue.
-// [spec:pgorm:req:security.ident-oracle+6/test]
+// [spec:pgorm:req:security.ident-oracle+7/test]
 #[tokio::test]
 async fn live_ddl_object_names_and_labels() {
     let (ctx, db) = open("ident_oracle_live_ddl").await;

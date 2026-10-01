@@ -17,6 +17,7 @@ mod oracle_sweep;
 mod query;
 mod render;
 mod schema;
+mod sequence;
 mod subscript;
 mod table;
 mod table_constraint;

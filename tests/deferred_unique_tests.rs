@@ -87,8 +87,8 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
 /// clause, refuses the first half of the swap on the spot.
 // [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
-// [spec:pgorm:req:sql.scope+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
+// [spec:pgorm:req:sql.scope+8/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -171,7 +171,7 @@ async fn set_constraints_immediate_fires_the_check_early(
 /// ids inside a transaction, and a duplicate id left at `COMMIT` is refused.
 // [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: a deferred primary key
 // behaves as a deferred unique key does
-// [spec:pgorm:req:sql.scope+7/test]
+// [spec:pgorm:req:sql.scope+8/test]
 async fn a_deferred_primary_key_is_checked_at_commit(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {

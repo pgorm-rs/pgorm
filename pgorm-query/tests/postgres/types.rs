@@ -171,7 +171,7 @@ fn identifier_equality_is_type_and_text() {
     assert_ne!(Name::runtime("same"), Name::runtime("other"));
 }
 
-// [spec:pgorm:req:sql.ddl+7/test]    the two type statements that bind expose `build()`, and its
+// [spec:pgorm:req:sql.ddl+8/test]    the two type statements that bind expose `build()`, and its
 // pair is the SQL with `$N` placeholders plus the labels in emission order
 #[test]
 fn the_label_binding_type_statements_build() {

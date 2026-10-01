@@ -15,8 +15,11 @@
 
 pub mod common;
 pub use common::{TestContext, setup::*};
-use pgorm::pgorm_query::{ColumnDef, Expr, Name, Overriding, Query, Table};
+use pgorm::pgorm_query::{
+    ColumnDef, Expr, IdentityGeneration, Name, Overriding, Query, Sequence, SequenceOption, Table,
+};
 use pgorm::{ConnectionTrait, entity::prelude::*};
+use tokio_postgres::error::SqlState;
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
@@ -28,6 +31,7 @@ async fn main() -> Result<(), Error> {
     by_default_accepts_an_explicit_value(&db).await?;
     identity_excludes_default_and_generated(&db).await?;
     added_to_an_existing_column(&db).await?;
+    the_options_define_the_identity_sequence(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -42,7 +46,7 @@ async fn ddl(db: &DatabaseConnection, sql: String) -> Result<(), Error> {
 
 /// Both forms fill the column from their own sequence when the insert leaves it
 /// out, and the values are the sequence's, not the type's zero.
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 async fn identity_generates_values_without_being_asked(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -124,7 +128,7 @@ async fn identity_generates_values_without_being_asked(
 }
 
 /// The whole point of `ALWAYS`: a statement cannot hand the column a value.
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 async fn always_refuses_an_explicit_value(db: &DatabaseConnection) -> Result<(), Error> {
     let refused = db
         .execute("INSERT INTO id_always (id, label) VALUES (99, 'c')", &[])
@@ -158,7 +162,7 @@ async fn always_refuses_an_explicit_value(db: &DatabaseConnection) -> Result<(),
 
 /// The whole point of `BY DEFAULT`: the sequence fills in only where the
 /// statement stays silent.
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 async fn by_default_accepts_an_explicit_value(db: &DatabaseConnection) -> Result<(), Error> {
     db.execute(
         "INSERT INTO id_by_default (id, label) VALUES (99, 'c')",
@@ -177,7 +181,7 @@ async fn by_default_accepts_an_explicit_value(db: &DatabaseConnection) -> Result
 /// The mutual exclusion the rule documents instead of typing: the grammar takes
 /// each of these, the server does not. Both renders are built by the ordinary
 /// fluent chain, so this is exactly what a caller who combined them would get.
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 async fn identity_excludes_default_and_generated(db: &DatabaseConnection) -> Result<(), Error> {
     let with_default = Table::create(Name::runtime("id_and_default"))
         .col(
@@ -237,7 +241,7 @@ async fn identity_excludes_default_and_generated(db: &DatabaseConnection) -> Res
 
 /// `ALTER TABLE` reaches identity from both sides: a new column carries the
 /// clause, an existing one takes the `ADD GENERATED` action.
-// [spec:pgorm:req:sql.ddl.column-def+7/test]
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
 async fn added_to_an_existing_column(db: &DatabaseConnection) -> Result<(), Error> {
     ddl(
         db,
@@ -269,6 +273,142 @@ async fn added_to_an_existing_column(db: &DatabaseConnection) -> Result<(), Erro
         .await?;
     let row = db.query_one("SELECT id, later FROM id_later", &[]).await?;
     assert_eq!((row.get::<_, i32>(0), row.get::<_, i32>(1)), (1, 1));
+
+    Ok(())
+}
+
+/// An identity's options are its sequence's: the values start and step as
+/// they say, in `CREATE TABLE`, `ADD COLUMN` and `ADD GENERATED` alike, and
+/// the catalogue holds the definition. Afterwards the sequence is reached by
+/// the name PostgreSQL derived for it, through the sequence builder, for every
+/// clause but `OWNED BY` (`0A000`). `AS` is not among the options because the
+/// server refuses it there (`42601`): the column's type is what the sequence
+/// counts in.
+// [spec:pgorm:req:sql.ddl.column-def+8/test]
+// [spec:pgorm:req:sql.ddl.sequence/test]
+async fn the_options_define_the_identity_sequence(db: &DatabaseConnection) -> Result<(), Error> {
+    let refused_with = |error: Error, state: &SqlState| match error {
+        Error::Postgres(e) => assert_eq!(e.code(), Some(state), "{e}"),
+        other => panic!("expected Error::Postgres, got {other:?}"),
+    };
+    let step = |sequence: &'static str| async move {
+        let row = db
+            .query_one(
+                "SELECT start_value, increment_by, cache_size, min_value, max_value, cycle \
+                 FROM pg_sequences WHERE sequencename = $1",
+                &[&sequence],
+            )
+            .await?;
+        Ok::<_, Error>((
+            row.get::<_, i64>(0),
+            row.get::<_, i64>(1),
+            row.get::<_, i64>(2),
+            row.get::<_, i64>(3),
+            row.get::<_, i64>(4),
+            row.get::<_, bool>(5),
+        ))
+    };
+
+    ddl(
+        db,
+        Table::create(Name::runtime("id_opts"))
+            .col(
+                ColumnDef::new(Name::runtime("id"))
+                    .big_integer()
+                    .identity_with(
+                        IdentityGeneration::Always,
+                        SequenceOption::StartWith(100)
+                            .and(SequenceOption::IncrementBy(10))
+                            .and(SequenceOption::Cache(5)),
+                    )
+                    .primary_key(),
+            )
+            .col(ColumnDef::new(Name::runtime("n")).integer().not_null())
+            .to_string(),
+    )
+    .await?;
+    let sequence = db
+        .query_one("SELECT pg_get_serial_sequence('id_opts', 'id')", &[])
+        .await?
+        .get::<_, String>(0);
+    assert_eq!(sequence, "public.id_opts_id_seq");
+    assert_eq!(
+        step("id_opts_id_seq").await?,
+        (100, 10, 5, 1, i64::MAX, false)
+    );
+
+    ddl(
+        db,
+        Table::alter(Name::runtime("id_opts"))
+            .add_column(
+                ColumnDef::new(Name::runtime("down"))
+                    .integer()
+                    .identity_with(
+                        IdentityGeneration::ByDefault,
+                        SequenceOption::MinValue(-5)
+                            .and(SequenceOption::MaxValue(-4))
+                            .and(SequenceOption::StartWith(-5))
+                            .and(SequenceOption::Cycle),
+                    ),
+            )
+            .to_string(),
+    )
+    .await?;
+    ddl(
+        db,
+        Table::alter(Name::runtime("id_opts"))
+            .modify_column(ColumnDef::new(Name::runtime("n")).identity_with(
+                IdentityGeneration::ByDefault,
+                SequenceOption::StartWith(7).and(SequenceOption::IncrementBy(7)),
+            ))
+            .to_string(),
+    )
+    .await?;
+
+    db.batch_execute(
+        "INSERT INTO id_opts DEFAULT VALUES; INSERT INTO id_opts DEFAULT VALUES; \
+         INSERT INTO id_opts DEFAULT VALUES;",
+    )
+    .await?;
+    let rows: Vec<(i64, i32, i32)> = db
+        .query_all("SELECT id, down, n FROM id_opts ORDER BY id", &[])
+        .await?
+        .iter()
+        .map(|r| (r.get(0), r.get(1), r.get(2)))
+        .collect();
+    assert_eq!(rows, [(100, -5, 7), (110, -4, 14), (120, -5, 21)]);
+
+    // The identity's sequence answers to the sequence builder under its
+    // derived name.
+    ddl(
+        db,
+        Sequence::alter(Name::runtime("id_opts_id_seq"))
+            .restart_with(1000)
+            .to_string(),
+    )
+    .await?;
+    db.execute("INSERT INTO id_opts DEFAULT VALUES", &[])
+        .await?;
+    let row = db.query_one("SELECT max(id) FROM id_opts", &[]).await?;
+    assert_eq!(row.get::<_, i64>(0), 1000);
+
+    let moved = ddl(
+        db,
+        Sequence::alter(Name::runtime("id_opts_id_seq"))
+            .owned_by_none()
+            .to_string(),
+    )
+    .await
+    .expect_err("an identity sequence's ownership moved");
+    refused_with(moved, &SqlState::FEATURE_NOT_SUPPORTED);
+
+    let typed = ddl(
+        db,
+        "CREATE TABLE id_typed (id integer GENERATED ALWAYS AS IDENTITY (AS bigint))".to_owned(),
+    )
+    .await
+    .expect_err("an identity took a sequence type of its own");
+    refused_with(typed, &SqlState::SYNTAX_ERROR);
 
     Ok(())
 }
