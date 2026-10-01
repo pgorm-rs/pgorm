@@ -9022,4 +9022,18 @@ children (
             }
         )
     }
+
+    {
+        id cursor-bind-jiff-gate
+        title "pgorm builds without with-jiff: the cursor's civil-datetime binding names jiff ungated"
+        kind @fix
+        log (
+            {
+                at 2026-10-01T21:31:54.195734Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while landing embedded-index-kinds (2026-09-30): `cargo nextest run -p pgorm-codegen` and `cargo check -p pgorm-codegen --all-targets` fail to compile pgorm with E0433 \"cannot find module or crate `jiff`\" in src/executor/cursor_bind.rs, at the PG_EPOCH const, civil_micros_since_pg_epoch and bind_civil_datetime. pgorm-codegen's dev-dependency is `pgorm = { path = \"../\", default-features = false, features = [\"macros\"] }`, and jiff is an optional dependency of pgorm (`with-jiff = [\"jiff\"]`), but cursor_bind.rs names `jiff::` with no `#[cfg(feature = \"with-jiff\")]`; the ungated paths arrived with dd8ecb09 (hand-encoding the civil datetime). A workspace-wide build hides it by feature unification, which is why `cargo nextest run --workspace` and `nplan check` stay green. minimal-feature-build (Done) fixed the same contract for rust_decimal, so this is a regression of it. Acceptance: pgorm compiles under `--no-default-features` and `--no-default-features --features macros` again (gate the civil-datetime bind path on with-jiff, or reach jiff's types through a dependency that is always present), and a check that builds pgorm without feature unification, in the configurations minimal-feature-build named, guards it so it cannot regress silently a second time."
+            }
+        )
+    }
 )
