@@ -40,7 +40,14 @@ serde.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tokio-postgres.workspace = true
-jiff = { version = "0.2.37", default-features = false, features = ["std"], optional = true }
+# Required, not optional, for the reason `rust_decimal` below is: `Value::Date`,
+# `Time`, `DateTime` and `DateTimeWithTimeZone` are unconditional variants of
+# `pgorm-query`'s value model, and the always-built bind path encodes a naive
+# datetime itself, naming jiff's civil types to do it. jiff is compiled in
+# every configuration anyway — `pgorm-query` and tokio-postgres's
+# `with-jiff-0_2` both depend on it — so `with-jiff` gates the conversion
+# surface (`TryGetable`, `IntoActiveValue`, the prelude names), not the crate.
+jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 log = { version = "0.4.34", default-features = false }
 # Required, not optional. `Value::Decimal` is an unconditional variant of
@@ -132,8 +139,8 @@ macros = ["pgorm-macros/derive"]
 # that want query identities in their metrics pay for it. libpg_query itself is
 # linked either way (see `pg_query` above).
 metrics-fingerprint = []
-with-json = ["serde_json", "jiff?/serde", "uuid?/serde"]
-with-jiff = ["jiff"]
+with-json = ["serde_json", "jiff/serde", "uuid?/serde"]
+with-jiff = []
 with-uuid = ["uuid"]
 postgres-array = []
 pgorm-internal = []

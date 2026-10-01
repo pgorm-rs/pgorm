@@ -246,7 +246,7 @@ impl<T: TryGetable> TryGetable for Option<T> {
     }
 }
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 macro_rules! try_getable_all {
     ( $type: ty ) => {
         impl TryGetable for $type {
@@ -361,11 +361,11 @@ try_getable_uuid!(uuid::fmt::Urn, uuid::Uuid::urn);
 /// `ipnetwork::IpNetwork` ships no `FromSql` impl and the orphan rule forbids
 /// writing one for it here, so decoding routes through a local newtype that
 /// reads the wire format with `postgres_protocol` and rebuilds the network.
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 #[derive(Debug)]
 struct InetSql(IpNetwork);
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 impl<'a> FromSql<'a> for InetSql {
     fn from_sql(
         _ty: &Type,
@@ -381,11 +381,11 @@ impl<'a> FromSql<'a> for InetSql {
 }
 
 /// The `mac_address::MacAddress` counterpart of [`InetSql`].
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 #[derive(Debug)]
 struct MacAddrSql(MacAddress);
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 impl<'a> FromSql<'a> for MacAddrSql {
     fn from_sql(
         _ty: &Type,
@@ -400,7 +400,7 @@ impl<'a> FromSql<'a> for MacAddrSql {
     }
 }
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 impl TryGetable for IpNetwork {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
         res: &QueryResult,
@@ -416,7 +416,7 @@ impl TryGetable for IpNetwork {
     }
 }
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 impl TryGetable for MacAddress {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
         res: &QueryResult,
@@ -432,7 +432,7 @@ impl TryGetable for MacAddress {
     }
 }
 
-// [spec:pgorm:def:exec.decode.types+2]
+// [spec:pgorm:def:exec.decode.types+3]
 impl TryGetable for Vector {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
         res: &QueryResult,
@@ -936,7 +936,7 @@ mod tests {
         assert_eq!(Error::from(try_get_error), Error::Type(expected));
     }
 
-    // [spec:pgorm:def:exec.decode.types+2/test]
+    // [spec:pgorm:def:exec.decode.types+3/test]
     #[test]
     fn decodes_inet_wire_format() {
         let v4 = InetSql::from_sql(&Type::INET, &[2, 24, 0, 4, 10, 0, 0, 1]).unwrap();
@@ -957,7 +957,7 @@ mod tests {
         assert!(!<InetSql as FromSql>::accepts(&Type::MACADDR));
     }
 
-    // [spec:pgorm:def:exec.decode.types+2/test]
+    // [spec:pgorm:def:exec.decode.types+3/test]
     #[test]
     fn decodes_macaddr_wire_format() {
         let mac = MacAddrSql::from_sql(&Type::MACADDR, &[0, 0x11, 0x22, 0x33, 0x44, 0x55]).unwrap();

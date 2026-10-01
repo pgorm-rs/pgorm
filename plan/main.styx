@@ -9027,12 +9027,34 @@ children (
         id cursor-bind-jiff-gate
         title "pgorm builds without with-jiff: the cursor's civil-datetime binding names jiff ungated"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-01T21:31:54.195734Z
                 author "brendan@necessary.nu"
                 kind @blocker
                 text "Found while landing embedded-index-kinds (2026-09-30): `cargo nextest run -p pgorm-codegen` and `cargo check -p pgorm-codegen --all-targets` fail to compile pgorm with E0433 \"cannot find module or crate `jiff`\" in src/executor/cursor_bind.rs, at the PG_EPOCH const, civil_micros_since_pg_epoch and bind_civil_datetime. pgorm-codegen's dev-dependency is `pgorm = { path = \"../\", default-features = false, features = [\"macros\"] }`, and jiff is an optional dependency of pgorm (`with-jiff = [\"jiff\"]`), but cursor_bind.rs names `jiff::` with no `#[cfg(feature = \"with-jiff\")]`; the ungated paths arrived with dd8ecb09 (hand-encoding the civil datetime). A workspace-wide build hides it by feature unification, which is why `cargo nextest run --workspace` and `nplan check` stay green. minimal-feature-build (Done) fixed the same contract for rust_decimal, so this is a regression of it. Acceptance: pgorm compiles under `--no-default-features` and `--no-default-features --features macros` again (gate the civil-datetime bind path on with-jiff, or reach jiff's types through a dependency that is always present), and a check that builds pgorm without feature unification, in the configurations minimal-feature-build named, guards it so it cannot regress silently a second time."
+            }
+
+            {
+                at 2026-10-01T21:43:20.560679Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-01T22:11:02.956694Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Two corrections to the filed text. (1) minimal-feature-build left no guard to extend: d4653f88 made rust_decimal required and recorded the contract in exec.decode.types, but added no check, CI job or test that builds pgorm without feature unification — its acceptance was a one-off manual check. The guard is therefore new, built on the existing mechanism (an nplan platform in .config/nplan/config.styx, `rust-features`), with the manifests in its file scope so a feature-edge change re-runs it: `cargo check -p pgorm --lib` with --no-default-features, with --no-default-features --features macros, and with the defaults. The Decimal-enabled configuration it named no longer exists. (2) Gating the bind path on with-jiff would be wrong, not just one of two options: Value::DateTime is an unconditional variant of pgorm-query's value model, so the bind path must encode it in every configuration, and a gated path would change a naive datetime's wire encoding by feature. jiff is compiled in every configuration anyway (pgorm-query and tokio-postgres's with-jiff-0_2 depend on it), so it is now a required dependency of pgorm, as rust_decimal is, and with-jiff gates the conversion surface only. exec.decode.types+3 records this and replaces its stale chrono text. Sensitivity: restoring HEAD's Cargo.toml (jiff optional) made the new minimal and macros-only checks fail with the four E0433s; default passed, as it must."
+            }
+
+            {
+                at 2026-10-01T22:11:03.011048Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

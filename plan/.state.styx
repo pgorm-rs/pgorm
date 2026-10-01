@@ -874,6 +874,7 @@ assertions (
     {id scope-collate, kind @complete, author "brendan@necessary.nu", at 2026-09-25T07:07:17.973407Z}
     {id scope-on-constraint, kind @complete, author "brendan@necessary.nu", at 2026-09-30T17:02:07.648474Z}
     {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
+    {id cursor-bind-jiff-gate, kind @complete, author "brendan@necessary.nu", at 2026-10-01T22:11:03.011048Z}
 )
 
 impl_evidence (

@@ -182,6 +182,29 @@ platforms (
             }
         }
     }
+    {
+        // The rust platform builds the workspace, where feature unification
+        // hands pgorm every feature any member's dev-dependency asks for, so
+        // a path named outside its feature gate compiles there and nowhere
+        // else. These build pgorm's library alone, with no dev-dependency in
+        // play, in the configurations a dependent can ask for: no defaults,
+        // macros only (pgorm-codegen's dev-dependency), and the defaults. The
+        // manifests are in scope because a feature edge moving is as likely a
+        // cause as a source change.
+        platform "rust-features"
+        files (Cargo.toml Cargo.lock src/**/*.rs pgorm-macros/Cargo.toml pgorm-macros/src/**/*.rs pgorm-pool/Cargo.toml pgorm-pool/src/**/*.rs pgorm-query/Cargo.toml pgorm-query/src/**/*.rs pgorm-query/pgorm-query-attr/Cargo.toml pgorm-query/pgorm-query-attr/src/**/*.rs pgorm-query/pgorm-query-derive/Cargo.toml pgorm-query/pgorm-query-derive/src/**/*.rs pgorm-sql-macro/Cargo.toml pgorm-sql-macro/src/**/*.rs)
+        checks {
+            minimal {
+                cmd "cargo check -p pgorm --lib --no-default-features"
+            }
+            macros-only {
+                cmd "cargo check -p pgorm --lib --no-default-features --features macros"
+            }
+            default {
+                cmd "cargo check -p pgorm --lib"
+            }
+        }
+    }
 )
 
 commit {

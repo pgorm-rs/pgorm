@@ -61,7 +61,7 @@ fn models() -> Vec<net_decode::Model> {
     ]
 }
 
-// [spec:pgorm:def:exec.decode.types+2/test]
+// [spec:pgorm:def:exec.decode.types+3/test]
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("value_decode_tests_valuedecode").await;
@@ -79,7 +79,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.types+2/test]
+// [spec:pgorm:def:exec.decode.types+3/test]
 // [spec:pgorm:def:exec.cursor.binding+5/test]    `IpNetwork` and `MacAddress`
 // values, and a `None` payload emitted as SQL NULL, bound through `ValueHolder`
 async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Error> {
@@ -102,7 +102,7 @@ async fn round_trip_inet_and_macaddr(db: &DatabaseConnection) -> Result<(), Erro
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.types+2/test]
+// [spec:pgorm:def:exec.decode.types+3/test]
 async fn decode_inet_and_macaddr_as_tuple(db: &DatabaseConnection) -> Result<(), Error> {
     let decoded: Vec<(IpNetwork, MacAddress, Option<IpNetwork>)> = net_decode::Entity::find()
         .select([

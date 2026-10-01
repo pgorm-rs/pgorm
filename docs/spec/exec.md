@@ -97,7 +97,7 @@ These rules capture what the code does today, including known gaps.
 > every entity model reads it, so the second arises only for a projection
 > that leaves the key out.
 
-> [spec:pgorm:def:exec.decode.types+2]
+> [spec:pgorm:def:exec.decode.types+3]
 > The scalar Rust types implementing `TryGetable` by direct delegation to
 > `Row::try_get` (and therefore accepting exactly the Postgres types
 > tokio-postgres's `FromSql` accepts for them) are: `bool`, `i8`, `i16`,
@@ -118,16 +118,32 @@ These rules capture what the code does today, including known gaps.
 > and turning it off did not drop a dependency — it only failed to build.
 >
 > Feature-gated additions: `serde_json::Value` (`with-json`);
-> `chrono::NaiveDate`, `NaiveTime`, `NaiveDateTime`,
-> `DateTime<FixedOffset>`, `DateTime<Utc>`, `DateTime<Local>`
-> (`with-chrono`). These three features are weaker than they look for the
+> `jiff::civil::Date`, `jiff::civil::Time`, `jiff::civil::DateTime` and
+> `jiff::Timestamp` (`with-jiff`); `uuid::Uuid` and its format wrappers
+> (`with-uuid`). These three features are weaker than they look for the
 > same reason — the underlying types are unconditional in `pgorm-query` and
 > their `FromSql`/`ToSql` impls come from `postgres-types` through
 > tokio-postgres's own always-on features — so what they gate is the
-> conversion surface, not the dependency. They still build with the feature
-> off, which is why they remain.
+> conversion surface (`TryGetable`, `IntoActiveValue`, the prelude names),
+> not the dependency. They still build with the feature off, which is why
+> they remain.
 >
-> There is no time-crate or bigdecimal support: chrono is the only
+> `jiff` is, like `rust_decimal`, a required dependency rather than an
+> optional one. The bind path writes a naive datetime itself rather than
+> through `postgres-types`
+> (`[spec:pgorm:req:exec.cursor.binding-gaps+3]`), so it names jiff's civil
+> types in every configuration; an optional edge left a build without
+> `with-jiff` unable to compile. The crate is compiled in any case,
+> `pgorm-query` and tokio-postgres's `with-jiff-0_2` both depending on it, so
+> `with-jiff` turning off removes the conversion surface and nothing else.
+>
+> A workspace build cannot show any of this, because feature unification
+> hands `pgorm` every feature any member's dev-dependency asks for. The
+> `rust-features` checks in `.config/nplan/config.styx` therefore build the
+> library alone — with no default features, with `macros` only, and with
+> the defaults — and a path named outside its feature gate fails there.
+>
+> There is no time-crate, chrono or bigdecimal support: jiff is the only
 > datetime path and `Decimal` the only arbitrary-precision numeric.
 > With `with-uuid`, `uuid::Uuid` and its format wrappers
 > (`uuid::fmt::Braced`, `Hyphenated`, `Simple`, `Urn`) decode by first
