@@ -876,6 +876,7 @@ assertions (
     {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
     {id cursor-bind-jiff-gate, kind @complete, author "brendan@necessary.nu", at 2026-10-01T22:11:03.011048Z}
     {id scope-sequences, kind @complete, author "brendan@necessary.nu", at 2026-10-01T23:10:34.664342Z}
+    {id scope-composite-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T20:35:59.619861Z}
 )
 
 impl_evidence (

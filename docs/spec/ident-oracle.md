@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+7]
+> [spec:pgorm:req:security.ident-oracle+8]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -166,7 +166,8 @@ the modules under `tests/identifier_oracle/`.
 > - collation names, in an expression and in a column definition;
 > - the constraint an `ON CONFLICT ON CONSTRAINT` names as its arbiter;
 > - sequence names, schema-qualified, created, altered, renamed and dropped,
->   and the schema, table and column an `OWNED BY` names.
+>   and the schema, table and column an `OWNED BY` names;
+> - composite type names, and the names and collations of their attributes.
 >
 > For each object, three things MUST hold:
 >

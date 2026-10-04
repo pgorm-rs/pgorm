@@ -17,6 +17,8 @@ use std::ops::Deref;
 mod case;
 #[path = "query_builder_collate.rs"]
 mod collate;
+#[path = "query_builder_composite.rs"]
+mod composite;
 #[path = "query_builder_grouping.rs"]
 mod grouping;
 #[path = "query_builder_sequence.rs"]
@@ -2296,7 +2298,7 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
-    // [spec:pgorm:req:sql.ddl.type-enum+5]
+    // [spec:pgorm:req:sql.ddl.type-enum+6]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
         match as_type {
             TypeAs::Enum(values) => {
@@ -2309,6 +2311,7 @@ impl QueryBuilder {
                 }
                 write!(sql, ")").unwrap();
             }
+            TypeAs::Composite(attributes) => self.prepare_composite_attributes(attributes, sql),
         }
     }
 
@@ -2358,7 +2361,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+5]
+    // [spec:pgorm:req:sql.ddl.type-enum+6]
     // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub(crate) fn prepare_type_create_statement(
         &self,
@@ -2375,7 +2378,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+6]
     pub(crate) fn prepare_type_drop_statement(
         &self,
         drop: &TypeDropStatement,
@@ -2401,7 +2404,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+6]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,

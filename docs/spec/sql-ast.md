@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+9]
+> [spec:pgorm:req:sql.surface+10]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -87,7 +87,9 @@ today, including panicking edges and deliberate failsafes.
 > `SequenceRenameStatement`, the sequence statements and the typestate an
 > alter starts in, with `SequenceOption`, `SequenceOptions` and
 > `SequenceType`, the options a sequence and an identity column share and the
-> type a sequence counts in (`sql.ddl.sequence`). An item leaves the list with the state it
+> type a sequence counts in (`sql.ddl.sequence`); `CompositeAttribute`, in
+> `extension` beside the type statements, the attribute a composite type
+> holds (`sql.ddl.type-composite`). An item leaves the list with the state it
 > described: `StandaloneIndexKind` went when the primary-key index kind it
 > screened the standalone renderer from did (`sql.ddl.index-create`).
 
@@ -125,7 +127,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+8]
+> [spec:pgorm:req:sql.scope+9]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -162,11 +164,16 @@ today, including panicking edges and deliberate failsafes.
 >   rest is useful; the operators it would be read with (`@>`, `<@`, `&&`)
 >   already exist. This is the largest deferred entry and the one that would
 >   most change `sql.value`.
-> - **`CREATE TYPE ... AS (composite)`.** Mechanical: a list of
->   `(Name, ColumnType)` pairs and a render arm reusing the column-type
->   renderer, beside the `AS ENUM` form that already exists. It waits on a
->   consumer: nothing in the ORM decodes a composite value, so the DDL would
->   create a type no entity could name.
+> - **Composite attribute alteration.** `ALTER TYPE ... ADD ATTRIBUTE`,
+>   `DROP ATTRIBUTE [IF EXISTS]`, `ALTER ATTRIBUTE ... TYPE` and `RENAME
+>   ATTRIBUTE ... TO`, each taking `CASCADE` / `RESTRICT` to carry the change
+>   into typed tables: four `TypeAlterOpt` variants, two of them carrying the
+>   `CompositeAttribute` the create already renders, and a behaviour slot —
+>   plus a list, since `ADD`, `DROP` and `ALTER` chain comma-separated in one
+>   statement where `TypeAlterStatement` holds exactly one option. It waits on
+>   what the composite's DDL was built without: nothing in the ORM reads a
+>   composite value (`sql.ddl.type-composite`), so a type that changes shape
+>   has no reader to keep in step.
 >
 > **Out of scope** — not the builder's job:
 >

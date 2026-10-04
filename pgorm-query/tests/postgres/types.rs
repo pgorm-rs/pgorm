@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::extension::Type;
 
-// [spec:pgorm:req:sql.ddl.type-enum+5/test]
+// [spec:pgorm:req:sql.ddl.type-enum+6/test]
 #[test]
 // [spec:pgorm:req:sql.render.ddl.enum-type+5/test]
 fn create_1() {
@@ -48,7 +48,7 @@ fn create_3() {
     }
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
 #[test]
 fn drop_1() {
     assert_eq!(
@@ -78,7 +78,7 @@ fn drop_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
 #[test]
 fn alter_1() {
     assert_eq!(

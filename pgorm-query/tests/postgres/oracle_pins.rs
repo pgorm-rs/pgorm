@@ -231,7 +231,7 @@ fn table_rename_target_is_bare_name() {
 // name, not an enum label, so it leaves the value pipeline and renders as the
 // quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
 #[test]
 fn alter_type_rename_emits_identifier() {
     let sql = Type::alter(Font::Table)
@@ -541,8 +541,8 @@ fn foreign_keys_name_two_tables_and_a_pair() {
 // and the option-less `ALTER TYPE` PostgreSQL rejects have nowhere to come
 // from. The `compile_fail` doctests on each statement type prove it.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+5/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5/test]
+// [spec:pgorm:req:sql.ddl.type-enum+6/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
 // [spec:pgorm:req:sql.ddl.extension+5/test]
 #[test]
 fn type_and_extension_names_are_taken() {
@@ -575,7 +575,7 @@ fn type_and_extension_names_are_taken() {
 // missing values, that PostgreSQL rejected, so the list is always parenthesised
 // once the type is an enum and both accepted shapes stay buildable.
 // [spec:pgorm:req:sql.render.oracle/test]
-// [spec:pgorm:req:sql.ddl.type-enum+5/test]
+// [spec:pgorm:req:sql.ddl.type-enum+6/test]
 #[test]
 fn empty_enum_and_shell_type_are_valid() {
     let shell = Type::create(Name::runtime("font_family")).to_string();

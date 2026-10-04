@@ -3,7 +3,7 @@
 This section specifies the schema (DDL) statement builders in `pgorm-query`:
 table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
-`pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` and extension
+`pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` and extension
 statements (`pgorm-query/src/extension.rs`), sequence statements
 (`pgorm-query/src/sequence/`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
@@ -613,7 +613,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+5]
+> [spec:pgorm:req:sql.ddl.type-enum+6]
 > An enum type reference declares an optional schema — `Type::create` and its
 > siblings take any `IntoTypeRef`, so `(schema, name)` names a qualified type
 > and a bare name an unqualified one — and every DDL rendering MUST qualify
@@ -638,10 +638,16 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > supports `Type`, `SchemaType` and `DatabaseSchemaType` dotted forms) while
 > the labels pass through the value pipeline, i.e. single-quoted string
 > literals in `to_string` builds and bind parameters in parameterised builds.
-> `TypeAs` has no other variants (composite/range/base are commented out
-> upstream).
+> `TypeAs` has two variants, `Enum` and `Composite`
+> (`[spec:pgorm:req:sql.ddl.type-composite]`), and what a type is, is that
+> one slot: `as_enum()` and `values()` on a composite replace its attributes
+> with a label list, as `as_composite()` and `attribute()` replace an
+> enumeration's labels, so a statement never carries both. A range is
+> deferred (`[spec:pgorm:req:sql.scope+9]`), and a base type, which names C
+> input and output functions, belongs with `CREATE FUNCTION` outside the
+> builder.
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+> [spec:pgorm:req:sql.ddl.type-alter-drop+6]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
@@ -668,6 +674,68 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > so the last call wins. `Type::drop(name)` takes the first name and `name()` /
 > `names()` append further ones, so the list is non-empty by construction and
 > the `DROP TYPE ` PostgreSQL rejects at end of input does not build.
+>
+> None of this is particular to an enumeration. `DROP TYPE` and `RENAME TO`
+> name a type of any kind and serve a composite unchanged
+> (`[spec:pgorm:req:sql.ddl.type-composite]`); the label options are an
+> enumeration's, and the server refuses them on any other type (`42809`).
+
+## Composite types
+
+> [spec:pgorm:req:sql.ddl.type-composite]
+> `TypeCreateStatement` defines a composite type — a row type — beside the
+> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+6]`. `as_composite()`
+> makes it one, and `attribute(name, type)` and `attribute_collated(name,
+> type, collation)` append an attribute, implying `as_composite()` when it has
+> not been called. The marker and the attributes are one field
+> (`TypeAs::Composite(Vec<CompositeAttribute>)`), so no attribute list
+> survives without the `AS (...)` that renders it.
+>
+> A composite MUST render `CREATE TYPE <name> AS (<attribute>, ...)`, each
+> attribute its name as a quoted identifier, one space, its `ColumnType` as a
+> column writes it (`[spec:pgorm:def:sql.render.ddl.types+5]`), and then
+> ` COLLATE <collation>` when it has one, quoted as
+> `[spec:pgorm:req:sql.render.collate]` writes a column's. The parentheses
+> MUST be present for an empty list too: `CREATE TYPE "t" AS ()` is the empty
+> composite PostgreSQL accepts.
+>
+> An attribute is a `CompositeAttribute`, not a `ColumnDef`. The grammar gives
+> an attribute a name, a type and a collation and nothing else — `NOT NULL`,
+> `DEFAULT`, a constraint or `GENERATED` after it is a syntax error (`42601`)
+> — so the spec list that could spell those is absent rather than ignored.
+> The rest is the server's to refuse: a repeated attribute name (`42701`), a
+> collation on a type that has none (`42804`), and a name the schema already
+> uses — a composite is a relation itself, so a sequence's or an index's name
+> is taken (`42P07`), and a table's or a view's is the name of the row type it
+> already has (`42710`).
+>
+> What a type is, is one slot. Choosing a kind — `as_enum` or `values`,
+> `as_composite` or `attribute` — replaces the other kind's list, as the last
+> of `cascade()` and `restrict()` wins, so no statement carries labels and
+> attributes at once.
+>
+> `DROP TYPE` and `ALTER TYPE ... RENAME TO` need nothing new for a
+> composite, and nothing was added: `TypeDropStatement` and `rename_to` name a
+> type of any kind, and the live suite drops and renames a composite through
+> them — `RESTRICT` refusing while a column still has the type (`2BP01`),
+> `CASCADE` dropping that column with it. The label alterations are an
+> enumeration's, and the server refuses them on a composite (`42809`, *is not
+> an enum*). The composite's own alterations — `ADD`, `DROP` and `ALTER
+> ATTRIBUTE`, and `RENAME ATTRIBUTE` — are not built:
+> `[spec:pgorm:req:sql.scope+9]` defers them, for the reason the next
+> paragraph gives.
+>
+> Nothing in pgorm reads a composite value. A column can be declared with the
+> type (`ColumnType::named`), but no `Value` variant carries a composite, no
+> `TryGetable` decodes one, and tokio-postgres decodes one only into a Rust
+> type with a derived `FromSql`, which pgorm neither derives nor re-exports —
+> so a model field of a composite type fails to decode, and the live suite
+> holds a `String` refused. The read path is to expand the value in the
+> projection, `(<column>).<attribute>` through `Expr::raw` or an
+> `SqlTemplate`, or to cast it to `text` and parse that. The type this builds
+> is therefore one raw SQL and server-side code can use and the ORM cannot yet
+> name — what the deferral recorded before the DDL was built. A decode is what
+> a consumer would add, and the attribute alterations wait on it.
 
 ## Sequences
 
@@ -737,7 +805,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Four spellings are not built, each a whole statement through `execute`:
 > `TEMPORARY` / `UNLOGGED` and `SET { LOGGED | UNLOGGED }` are persistence
-> choices of the kind `[spec:pgorm:req:sql.scope+8]` rules out for tables;
+> choices of the kind `[spec:pgorm:req:sql.scope+9]` rules out for tables;
 > `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
 > no table counterpart in the builder either.
 

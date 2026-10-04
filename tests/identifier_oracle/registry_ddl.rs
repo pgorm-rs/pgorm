@@ -574,6 +574,72 @@ pub fn sites() -> Vec<Site> {
             render: |n| sql(Type::create(fixed("ty")).as_enum().values([n])),
         },
         Site {
+            id: "ddl/create-type.composite-name",
+            api: "Type::create(Name).attribute(..)",
+            kinds: &["CompositeTypeStmt.typevar.relname"],
+            policy: Quoted,
+            render: |n| sql(Type::create(n_(n)).attribute(fixed("a"), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/create-type.composite-schema",
+            api: "Type::create((Name, type)).attribute(..) — the schema part",
+            kinds: &["CompositeTypeStmt.typevar.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create((n_(n), fixed("ty"))).attribute(fixed("a"), ColumnType::Integer))
+            },
+        },
+        Site {
+            id: "ddl/create-type.composite-database",
+            api: "Type::create((Name, schema, type)).attribute(..) — the database part",
+            kinds: &["CompositeTypeStmt.typevar.catalogname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create((n_(n), fixed("s"), fixed("ty")))
+                    .attribute(fixed("a"), ColumnType::Integer))
+            },
+        },
+        Site {
+            id: "ddl/create-type.attribute",
+            api: "TypeCreateStatement::attribute(Name, type)",
+            kinds: &["ColumnDef.colname"],
+            policy: Quoted,
+            render: |n| sql(Type::create(fixed("ty")).attribute(n_(n), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/create-type.attribute-type",
+            api: "TypeCreateStatement::attribute(name, ColumnType::named(String))",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| sql(Type::create(fixed("ty")).attribute(fixed("a"), ColumnType::named(n))),
+        },
+        Site {
+            id: "ddl/create-type.attribute-collation",
+            api: "TypeCreateStatement::attribute_collated(name, type, Name)",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).attribute_collated(
+                    fixed("a"),
+                    ColumnType::Text,
+                    n_(n),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-type.attribute-collation-qualified",
+            api: "TypeCreateStatement::attribute_collated(name, type, (Name, Name)) — the collation part",
+            kinds: &["ColumnDef.coll_clause.collname[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).attribute_collated(
+                    fixed("a"),
+                    ColumnType::Text,
+                    (fixed("s"), n_(n)),
+                ))
+            },
+        },
+        Site {
             id: "ddl/drop-type.name",
             api: "Type::drop(Name)",
             kinds: &["TypeName.names[0]"],

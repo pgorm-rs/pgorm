@@ -8818,6 +8818,22 @@ children (
                 id scope-composite-types
                 title "CREATE TYPE AS (composite) is expressible"
                 deps (identifier-render-oracle)
+                sealed true
+                log (
+                    {
+                        at 2026-10-01T23:33:28.128166Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-04T20:35:59.619861Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

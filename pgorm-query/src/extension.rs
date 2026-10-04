@@ -4,6 +4,11 @@ use crate::{
     IntoName, Name, PgInterval, QueryBuilder, SqlName, SqlWriter, SqlWriterValues, value::Values,
 };
 
+#[path = "extension_composite.rs"]
+mod composite;
+
+pub use composite::CompositeAttribute;
+
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Extension;
@@ -481,8 +486,10 @@ where
 /// `values` make it an enumeration, and the parenthesised value list is always
 /// rendered once it is one, because `CREATE TYPE "t" AS ENUM ()` is an accepted
 /// spelling of the empty enum while `CREATE TYPE "t" AS ENUM` is not a
-/// statement at all.
-// [spec:pgorm:req:sql.ddl.type-enum+5]
+/// statement at all. `as_composite` and `attribute` make it a composite
+/// instead, `AS (...)`; what the type is, is one slot, so choosing one kind
+/// replaces the other's list.
+// [spec:pgorm:req:sql.ddl.type-enum+6]
 #[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
     pub(crate) name: TypeRef,
@@ -490,10 +497,13 @@ pub struct TypeCreateStatement {
 }
 
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
-// [spec:pgorm:req:sql.ddl.type-enum+5]
+// [spec:pgorm:req:sql.ddl.type-enum+6]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
-    // Composite,
+    /// `AS (..)`, a composite carrying its attributes, the marker and the
+    /// attributes one fact as an enumeration's marker and labels are.
+    // [spec:pgorm:req:sql.ddl.type-composite]
+    Composite(Vec<CompositeAttribute>),
     /// `AS ENUM (..)`, carrying its labels: the marker and the values are one
     /// fact, so no value list survives without the `AS ENUM` that renders it.
     ///
@@ -501,9 +511,6 @@ pub enum TypeAs {
     /// identifier — so it is carried as a `String` rather than as a name.
     // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     Enum(Vec<String>),
-    /* Range,
-     * Base,
-     * Array, */
 }
 
 /// Drop one or more types
@@ -517,7 +524,7 @@ pub enum TypeAs {
 ///
 /// Type::drop().if_exists();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
 #[derive(Debug, Clone)]
 pub struct TypeDropStatement {
     pub(crate) first: TypeRef,
@@ -537,7 +544,7 @@ pub struct TypeDropStatement {
 ///
 /// Type::alter(Font::Table).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
 #[derive(Debug, Clone)]
 pub struct PendingTypeAlter {
     name: TypeRef,
@@ -549,7 +556,7 @@ pub struct PendingTypeAlter {
 /// option: it is reachable only by choosing an option on a
 /// [`PendingTypeAlter`], so the `ALTER TYPE "font"` PostgreSQL rejects has no
 /// constructor.
-// [spec:pgorm:req:sql.ddl.type-alter-drop+5]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
 #[derive(Debug, Clone)]
 pub struct TypeAlterStatement {
     pub(crate) name: TypeRef,
@@ -625,6 +632,10 @@ impl TypeCreateStatement {
     /// Define the type as an enumeration, whose values are appended by
     /// [`TypeCreateStatement::values`]
     ///
+    /// This replaces a composite's attributes, as
+    /// [`as_composite`](Self::as_composite) replaces an enumeration's labels:
+    /// a type is one kind or the other.
+    ///
     /// ```
     /// use pgorm_query::{*, extension::Type, tests_cfg::*};
     ///
@@ -633,8 +644,9 @@ impl TypeCreateStatement {
     ///     r#"CREATE TYPE "font" AS ENUM ()"#
     /// );
     /// ```
+    // [spec:pgorm:req:sql.ddl.type-enum+6]
     pub fn as_enum(&mut self) -> &mut Self {
-        if self.as_type.is_none() {
+        if !matches!(self.as_type, Some(TypeAs::Enum(_))) {
             self.as_type = Some(TypeAs::Enum(Vec::new()));
         }
         self
