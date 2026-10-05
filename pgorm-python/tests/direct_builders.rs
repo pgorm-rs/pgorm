@@ -185,7 +185,7 @@ fn snapshots(values: Values) -> TestResult<Json> {
         for value in values.0 {
             // Only the stable snapshot encoder is shared. Expected query ASTs
             // and their parameter values above are built independently in Rust.
-            let value = Py::new(py, PyValue::from_rust(value))?;
+            let value = Py::new(py, PyValue::from_rust(value)?)?;
             let snapshot = value.bind(py).call_method0("snapshot")?;
             let encoded: String = json.call_method1("dumps", (snapshot,))?.extract()?;
             result.push(serde_json::from_str::<Json>(&encoded)?);

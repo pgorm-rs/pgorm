@@ -142,7 +142,7 @@ bound parameter is held to.
 > cursor is totally ordered and can be resumed mid-tie through `after_with`
 > / `before_with`.
 
-> [spec:pgorm:def:exec.cursor.binding+5]
+> [spec:pgorm:def:exec.cursor.binding+6]
 > `ValueHolder` (cursor.rs) is a public newtype over `pgorm_query::Value`
 > implementing `tokio_postgres::types::ToSql`; every executor path
 > (select, insert, update, delete, cursor, paginator) wraps built
@@ -157,7 +157,10 @@ bound parameter is held to.
 > `DateTimeWithTimeZone` and `Uuid` bind their payload, with `None` payloads
 > emitted as SQL `NULL` (`IsNull::Yes`); `Array` recursively wraps its
 > elements in `ValueHolder` (a `None` array is `NULL`), so the numeric
-> coercion also applies element-wise against the array's member type.
+> coercion also applies element-wise against the array's member type;
+> `Range` and `Multirange` write their bounds through `ValueHolder` the same
+> way, against the range's subtype, per
+> `[spec:pgorm:req:exec.cursor.binding-range]`.
 >
 > Two variants are written by hand rather than delegated, each because the
 > library impl refuses or discards a value PostgreSQL accepts.
@@ -201,7 +204,7 @@ bound parameter is held to.
 > is per-variant, so it lives where the variant is in hand: `to_sql`, which
 > `to_sql_checked!` reaches and which runs client-side while the bind
 > message is being encoded, before anything is sent. What it accepts is
-> `[spec:pgorm:req:exec.cursor.binding-accepts]`.
+> `[spec:pgorm:req:exec.cursor.binding-accepts+1]`.
 
 > [spec:pgorm:req:exec.cursor.binding-coerce+2]
 > When the Postgres type inferred for a placeholder is in the numeric
@@ -236,7 +239,7 @@ bound parameter is held to.
 > and a `TinyInt` bound against `"char"` keep the encodings those impls
 > define while a value that does not fit is an error instead of a
 > reinterpretation. Every *other* inferred type is refused by
-> `[spec:pgorm:req:exec.cursor.binding-accepts]`: an integer or a float has
+> `[spec:pgorm:req:exec.cursor.binding-accepts+1]`: an integer or a float has
 > no representation `bytea`, `text`, `bool` or `uuid` could receive, and
 > writing one anyway is what let a mismatch through. Because `Value::Array`
 > binds through `Vec<ValueHolder>`, which hands each element the array's
@@ -252,7 +255,7 @@ bound parameter is held to.
 > no arm may `panic!`, `unimplemented!` or `todo!`, and no arm may reach a
 > panic in a delegate. The former panicking arms are gone.
 > `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned` (u16) no longer
-> exist as variants at all (see `[spec:pgorm:def:sql.value+2]`), so passing
+> exist as variants at all (see `[spec:pgorm:def:sql.value+3]`), so passing
 > a `u8` or `u16` is a compile error rather than a runtime panic;
 > `Value::Vector`, `Value::IpNetwork` and `Value::MacAddress` bind per
 > `[spec:pgorm:def:exec.cursor.binding+4]`.
@@ -261,7 +264,7 @@ bound parameter is held to.
 > `to_sql` reads its member type out of `Kind::Array` and `panic!`s on
 > anything else, so the arm MUST establish that the target is an array
 > itself and raise the refusal of
-> `[spec:pgorm:req:exec.cursor.binding-accepts]` when it is not. A
+> `[spec:pgorm:req:exec.cursor.binding-accepts+1]` when it is not. A
 > `Value::Array` against a scalar placeholder is reachable — an active
 > model whose column type is a scalar `jsonb` but whose Rust field is a
 > `Vec` produces exactly that when the JSON-flattening branch of
@@ -280,16 +283,16 @@ bound parameter is held to.
 > accepted by the server and read as 825373492, the integer those four
 > ASCII bytes spell. The same path serves predicates and writes, so a
 > mismatch selected and stored wrong values rather than erroring.
-> `[spec:pgorm:req:exec.cursor.binding-accepts]` closes it.
+> `[spec:pgorm:req:exec.cursor.binding-accepts+1]` closes it.
 >
 > `bits_tests` used to be the standing example of the gap, where saving an
 > integer into a `BIT(n)` column made Postgres infer `bit` for a parameter
 > the driver wrote as an `int8` (`22P03`). It is no longer one:
-> `[spec:pgorm:req:sql.render.cast-param-type+3]` pins a cast operand's
+> `[spec:pgorm:req:sql.render.cast-param-type+4]` pins a cast operand's
 > placeholder to the type the value is actually written as, and the test
 > runs unignored.
 
-> [spec:pgorm:req:exec.cursor.binding-accepts]
+> [spec:pgorm:req:exec.cursor.binding-accepts+1]
 > A `Value` MUST NOT be written into a placeholder whose inferred Postgres
 > type its binary representation is not the wire format of.
 > `ValueHolder::to_sql` decides this per variant and raises a `ToSql` error
@@ -335,6 +338,8 @@ bound parameter is held to.
 > | `Vector` | a type named `vector` |
 > | `IpNetwork` | `inet`, `cidr` |
 > | `MacAddress` | `macaddr` |
+> | `Range` | any range type, built-in or created; each bound is then held to the subtype by the same rule (`[spec:pgorm:req:exec.cursor.binding-range]`) |
+> | `Multirange` | a built-in multirange type; each range's bounds are then held to the subtype |
 >
 > All four chrono datetime variants take `timestamp` and `timestamptz`
 > alike because the two share one representation — microseconds since
@@ -355,6 +360,41 @@ bound parameter is held to.
 > that does not match it is refused where it previously produced a server
 > error or wrong bytes.
 
+
+> [spec:pgorm:req:exec.cursor.binding-range]
+> A `Value::Range` binds against a placeholder whose type is a range — the
+> built-in six, or a range type a schema created, which tokio-postgres
+> reports as a range over its subtype all the same — and a
+> `Value::Multirange` against a built-in multirange; anything else is
+> refused before the statement is sent
+> (`[spec:pgorm:req:exec.cursor.binding-accepts+1]`). A `None` payload is
+> `NULL`. The range is written through
+> `postgres_protocol::types::range_to_sql` — the empty range as its flag byte
+> alone, otherwise a flag byte saying which sides are inclusive or unbounded
+> and each present bound length-prefixed — and each bound is written by
+> `ValueHolder` itself against the subtype, so a bound gets every coercion
+> and every encoding fix a scalar of its variant gets: an `int8` value
+> narrowed to an `int4range`'s subtype, a naive datetime at the ends of the
+> calendar, a zero `numeric` keeping its scale
+> (`[spec:pgorm:def:exec.cursor.binding+6]`), and a bound of the wrong variant
+> refused by that bound's own rule. A `NULL` bound is written as no bound,
+> because that is what PostgreSQL's constructors read it as and what the
+> literal rendering writes (`[spec:pgorm:def:sql.value.range]`); sent as a
+> `NULL`, its length of -1 would be read by the range's receive function as
+> a length.
+>
+> A multirange is written as a count and then each range length-prefixed in
+> a range's own encoding, against the subtype the multirange's kind names. A
+> multirange a schema created cannot be bound: tokio-postgres learns a
+> type's kind from `pg_range` joined on the *range* type, so the multirange
+> arrives as a simple type with no subtype to write the bounds in, and
+> guessing one would send bytes the server could read as another type.
+>
+> PostgreSQL types a placeholder beside a range column by the column: in
+> `r @> $1`, `$1 <@ r` and `r && $1` it infers the range type, so an element
+> written as `col.contains(3)` is refused as an `Int` against `int4range`.
+> The element test pins its operand — `Expr::val(3).cast_as(alias("int4"))`
+> — and then reaches the element form of the operator.
 
 ## Offset pagination (`exec.paginator`)
 

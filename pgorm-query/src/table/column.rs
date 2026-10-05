@@ -1,5 +1,5 @@
 use super::interval::IntervalSpec;
-use crate::{Deferrability, SequenceOptions, expr::*, types::*};
+use crate::{Deferrability, RangeType, SequenceOptions, expr::*, types::*};
 use std::sync::Arc;
 
 /// Specification of a table column
@@ -53,7 +53,9 @@ pub trait IntoColumnDef {
 /// | Inet                  | inet                     |
 /// | MacAddr               | macaddr                  |
 /// | LTree                 | ltree                    |
-// [spec:pgorm:def:sql.types.column-type+7]
+/// | Range                 | int4range, ..., tstzrange |
+/// | Multirange            | int4multirange, ...      |
+// [spec:pgorm:def:sql.types.column-type+8]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -95,6 +97,15 @@ pub enum ColumnType {
     Inet,
     MacAddr,
     LTree,
+    /// One of the built-in range types, `int4range` through `tstzrange`. A
+    /// range type created by `CREATE TYPE ... AS RANGE` is
+    /// [`Named`](Self::Named), as every other created type is.
+    // [spec:pgorm:def:sql.value.range]
+    Range(RangeType),
+    /// The multirange over one of the built-in range types,
+    /// `int4multirange` through `tstzmultirange`.
+    // [spec:pgorm:def:sql.value.range]
+    Multirange(RangeType),
 }
 
 /// Length for var-char; default to 255
@@ -107,7 +118,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+7]
+// [spec:pgorm:def:sql.types.column-type+8]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -139,6 +150,8 @@ impl PartialEq for ColumnType {
                         .eq(r_variants.iter().map(|v| v.to_string()))
             }
             (Self::Array(l0), Self::Array(r0)) => l0 == r0,
+            (Self::Range(l0), Self::Range(r0)) => l0 == r0,
+            (Self::Multirange(l0), Self::Multirange(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -527,7 +540,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+7]
+    // [spec:pgorm:def:sql.types.column-type+8]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self

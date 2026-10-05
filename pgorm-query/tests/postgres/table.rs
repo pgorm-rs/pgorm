@@ -4,7 +4,7 @@ use crate::oracle::{assert_eq, assert_eq_unparsed};
 // [spec:pgorm:req:sql.ddl.create-table+10/test]
 // [spec:pgorm:req:sql.ddl.column-def+8/test]
 #[test]
-// [spec:pgorm:def:sql.render.ddl.types+5/test]
+// [spec:pgorm:def:sql.render.ddl.types+6/test]
 fn create_1() {
     assert_eq!(
         Table::create(Glyph::Table)
@@ -112,7 +112,7 @@ fn create_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+4/test]
+// [spec:pgorm:req:sql.ddl.column-types+5/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -207,7 +207,7 @@ fn create_9() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+7/test]    a precision rides on the second-bearing
+// [spec:pgorm:def:sql.types.column-type+8/test]    a precision rides on the second-bearing
 // field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {
@@ -249,7 +249,7 @@ fn create_11() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+4/test]
+// [spec:pgorm:req:sql.ddl.column-types+5/test]
 #[test]
 fn create_12() {
     assert_eq!(

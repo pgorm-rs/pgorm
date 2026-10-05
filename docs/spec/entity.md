@@ -360,7 +360,7 @@ explicit limitations.
 > `delete` MUST state this asymmetry rather than promise an abort the code does not
 > perform.
 
-> [spec:pgorm:req:entity.active-model.into+1]
+> [spec:pgorm:req:entity.active-model.into+2]
 > `IntoActiveModel<A>` converts a type into an active model and has a blanket identity
 > impl for any `ActiveModelTrait`; derived models convert `Model` → `ActiveModel` with
 > every field `Unchanged` (used by `Model::delete`, `set_from_json`, and by callers
@@ -369,9 +369,10 @@ explicit limitations.
 > `Option<V>` MUST map `Some(v)` → `Set(Some(v))` and `None` → `NotSet`;
 > `Option<Option<V>>` MUST map `Some(inner)` → `Set(inner)` (allowing an explicit
 > `Set(None)` to null a column) and `None` → `NotSet`; the plain scalar impls
-> (`bool`, integer and float primitives, `&'static str`, `String`, `Vec<u8>`, and the
-> feature-gated `Json`/date-time/`Decimal`/`Uuid` types) MUST produce `Set`
-> (`src/entity/active_model.rs`).
+> (`bool`, integer and float primitives, `&'static str`, `String`, `Vec<u8>`, the
+> feature-gated `Json`/date-time/`Decimal`/`Uuid` types, and the `Range` and
+> `Multirange` of each built-in subtype, those over jiff types under
+> `with-jiff`) MUST produce `Set` (`src/entity/active_model.rs`).
 
 > [spec:pgorm:req:entity.active-model.json+3]
 > Under the `with-json` feature, `ActiveModelTrait::from_json` builds an active model
@@ -580,7 +581,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+4]
+> [spec:pgorm:def:entity.prelude+5]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -599,7 +600,12 @@ explicit limitations.
 > `ConnectionTrait`, `TransactionTrait`; `Iterable`, `Condition`, `JoinType`,
 > `Value`, the `error` module's contents, and the handful of `pgorm_query`
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
-> `ForeignKeyAction`, `Arc`).
+> `ForeignKeyAction`, `Arc`), with the range vocabulary a field of a range
+> column is written in — `Range`, `Multirange` and `RangeType`
+> (`[spec:pgorm:def:sql.value.range]`) — so a generated entity's
+> `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
+> the glob. A file that also imports `std::ops::Range` by name keeps its
+> own: an explicit import shadows a glob.
 >
 > `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.
 > `order` is an ordinary table name, so an entity aliased `Order` is ordinary

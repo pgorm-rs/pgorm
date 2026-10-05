@@ -113,12 +113,12 @@ impl InputKind {
                 Self::Enum(_) => Err(DecodeError::new_err(
                     "compiled enum array returned an incompatible Rust Value",
                 )),
-                _ => Ok(PyValue::from_rust(value)),
+                _ => PyValue::from_rust(value),
             },
             Self::Enum(_) => Err(DecodeError::new_err(
                 "compiled enum returned an incompatible Rust Value",
             )),
-            _ => Ok(PyValue::from_rust(value)),
+            _ => PyValue::from_rust(value),
         }
     }
 

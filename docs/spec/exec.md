@@ -109,7 +109,7 @@ These rules capture what the code does today, including known gaps.
 > `[spec:pgorm:def:exec.cursor.binding+4]`'s bind path is always compiled
 > and needs `Decimal`'s `ToSql` in every configuration — both for
 > `Value::Decimal`, an unconditional variant of the value model
-> (`[spec:pgorm:def:sql.value+2]`), and for the `numeric` arm of
+> (`[spec:pgorm:def:sql.value+3]`), and for the `numeric` arm of
 > `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which is how *every*
 > integer and float reaches a `numeric` placeholder. `rust_decimal` is
 > compiled in any case, `pgorm-query` depending on it unconditionally; only
@@ -189,6 +189,40 @@ These rules capture what the code does today, including known gaps.
 > macros delegate to `Row::try_get` for `Vec<$type>`, which the two
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
+
+> [spec:pgorm:def:exec.decode.range]
+> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range]`)
+> implement `TryGetable` for each built-in subtype: `i32`, `i64` and
+> `Decimal` unconditionally, and `jiff::civil::Date`,
+> `jiff::civil::DateTime` and `jiff::Timestamp` under `with-jiff`, the gate
+> their scalars have (`[spec:pgorm:def:exec.decode.types+3]`). pgorm-query
+> owns the two types but not the wire crates, so they have no `FromSql`, and
+> the orphan rule forbids writing one here; each decodes through a private
+> local newtype — `RangeSql` and `MultirangeSql` — as an address decodes
+> through `InetSql`. Giving pgorm-query `postgres-protocol` instead would
+> change the dependency set every detached workspace locks, for an impl only
+> pgorm calls.
+>
+> `RangeSql<T>` accepts a type whose kind is a range over a type `T`
+> accepts, so it reads a range type a schema created over that subtype as
+> it reads the built-in. It reads the flag byte through
+> `postgres_protocol::types::range_from_sql`: the empty flag is
+> `Range::Empty` and nothing else, never two unbounded sides; an unbounded
+> side is `Bound::Unbounded`; each present bound is decoded by `T`'s own
+> `FromSql` against the subtype, so a bound fails exactly as that value
+> outside a range fails — a subtype's `infinity` among them, which is a bound
+> value and not an absent bound. A NULL bound is a malformed message, since
+> the server never sends one, and is refused rather than read as either.
+> `MultirangeSql<T>` accepts a built-in multirange over a type `T` accepts
+> and reads its count of length-prefixed ranges, refusing a count, a length
+> or a trailing byte the message does not hold. A multirange a schema
+> created is reported by tokio-postgres as a simple type, which neither
+> accepts. `TryGetable::accepts` answers through the newtype, so
+> `VerifyStatement` reports a range column of another subtype or a
+> multirange read as a range.
+>
+> There is no array of ranges: `Vec<Range<T>>` implements neither
+> `TryGetable` nor `ValueType` (`[spec:pgorm:def:sql.value.array+5]`).
 
 > [spec:pgorm:def:exec.decode.many]
 > `TryGetableMany` extracts tuples from a row: `try_get_many` takes a

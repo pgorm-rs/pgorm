@@ -36,7 +36,7 @@ today, including panicking edges and deliberate failsafes.
 > `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
 > not, and a caller who wants a second copy of one writes `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+10]
+> [spec:pgorm:req:sql.surface+11]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -89,9 +89,14 @@ today, including panicking edges and deliberate failsafes.
 > `SequenceType`, the options a sequence and an identity column share and the
 > type a sequence counts in (`sql.ddl.sequence`); `CompositeAttribute`, in
 > `extension` beside the type statements, the attribute a composite type
-> holds (`sql.ddl.type-composite`). An item leaves the list with the state it
-> described: `StandaloneIndexKind` went when the primary-key index kind it
-> screened the standalone renderer from did (`sql.ddl.index-create`).
+> holds (`sql.ddl.type-composite`); `Range`, `Multirange`, `RangeType` and
+> `RangeElement`, a range value, a multirange value, which built-in range
+> type a range is, and the sealed set of types the built-ins range over
+> (`sql.value.range`); `RangeDefinition`, in `extension` beside the type
+> statements, a range type's subtype and options (`sql.ddl.type-range`). An
+> item leaves the list with the state it described: `StandaloneIndexKind`
+> went when the primary-key index kind it screened the standalone renderer
+> from did (`sql.ddl.index-create`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
@@ -122,12 +127,12 @@ today, including panicking edges and deliberate failsafes.
 > carries the note that it inlines rather than binds, and points at `build`.
 > The inlined form escapes what it writes, so the warning is not about
 > injection; it is that the server re-parses the literal and the type pinning
-> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+3]`) is
+> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+4]`) is
 > lost.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+9]
+> [spec:pgorm:req:sql.scope+10]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -157,13 +162,6 @@ today, including panicking edges and deliberate failsafes.
 >   `WHEN MATCHED` / `WHEN NOT MATCHED [BY SOURCE]` action list, plus a source
 >   relation that is already `FromItem`. `ON CONFLICT` covers the upsert that
 >   an ORM actually emits, which is why this ranks below its size.
-> - **Range and multirange types.** Absent end to end: no `Value` variant, no
->   `ColumnType` variant, no `CREATE TYPE ... AS RANGE`. A range is a value
->   with a discriminated subtype and two bound inclusivities, so it needs a
->   `Value` variant that round-trips through tokio-postgres before any of the
->   rest is useful; the operators it would be read with (`@>`, `<@`, `&&`)
->   already exist. This is the largest deferred entry and the one that would
->   most change `sql.value`.
 > - **Composite attribute alteration.** `ALTER TYPE ... ADD ATTRIBUTE`,
 >   `DROP ATTRIBUTE [IF EXISTS]`, `ALTER ATTRIBUTE ... TYPE` and `RENAME
 >   ATTRIBUTE ... TO`, each taking `CASCADE` / `RESTRICT` to carry the change

@@ -21,6 +21,8 @@ mod collate;
 mod composite;
 #[path = "query_builder_grouping.rs"]
 mod grouping;
+#[path = "query_builder_range.rs"]
+mod range;
 #[path = "query_builder_sequence.rs"]
 mod sequence;
 #[path = "query_builder_subscript.rs"]
@@ -470,7 +472,7 @@ impl QueryBuilder {
             // one shape; the type a `TypeName`, so a name is a name and never
             // SQL; a `Value` operand keeps the source-typed placeholder pin of
             // `sql.render.cast-param-type`.
-            // [spec:pgorm:req:sql.render.cast-param-type+3]
+            // [spec:pgorm:req:sql.render.cast-param-type+4]
             // [spec:pgorm:req:sql.ast.cast-shape]
             SimpleExpr::AsEnum(type_name, expr) => {
                 write!(sql, "CAST(").unwrap();
@@ -1055,8 +1057,8 @@ impl QueryBuilder {
     }
 
     /// Convert a SQL value into syntax-specific string
-    // [spec:pgorm:sem:sql.value.render+1]
-    // [spec:pgorm:def:sql.render.value-literals+4]
+    // [spec:pgorm:sem:sql.value.render+2]
+    // [spec:pgorm:def:sql.render.value-literals+5]
     pub(crate) fn value_to_string(&self, v: &Value) -> String {
         let mut s = String::new();
         match v {
@@ -1081,6 +1083,7 @@ impl QueryBuilder {
             Value::Uuid(None) => write!(s, "NULL").unwrap(),
             Value::IpNetwork(None) => write!(s, "NULL").unwrap(),
             Value::MacAddress(None) => write!(s, "NULL").unwrap(),
+            Value::Range(_, None) | Value::Multirange(_, None) => write!(s, "NULL").unwrap(),
             Value::Array(_, None) => write!(s, "NULL").unwrap(),
             Value::Vector(None) => write!(s, "NULL").unwrap(),
             Value::Bool(Some(b)) => write!(s, "{}", if *b { "TRUE" } else { "FALSE" }).unwrap(),
@@ -1155,6 +1158,8 @@ impl QueryBuilder {
             }
             Value::IpNetwork(Some(v)) => write!(s, "'{v}'").unwrap(),
             Value::MacAddress(Some(v)) => write!(s, "'{v}'").unwrap(),
+            Value::Range(ty, Some(v)) => self.write_range(*ty, v, &mut s),
+            Value::Multirange(ty, Some(v)) => self.write_multirange(*ty, v, &mut s),
         };
         s
     }
@@ -1409,7 +1414,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.ddl.panics+4]
-    // [spec:pgorm:def:sql.render.ddl.types+5] (serial family for auto-increment columns)
+    // [spec:pgorm:def:sql.render.ddl.types+6] (serial family for auto-increment columns)
     fn prepare_column_auto_increment(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         match column_type.serial_spelling() {
             Some(serial) => write!(sql, "{serial}").unwrap(),
@@ -1473,8 +1478,8 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types+4]
-    // [spec:pgorm:def:sql.render.ddl.types+5]
+    // [spec:pgorm:req:sql.ddl.column-types+5]
+    // [spec:pgorm:def:sql.render.ddl.types+6]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -1548,6 +1553,8 @@ impl QueryBuilder {
                 ColumnType::Inet => "inet".into(),
                 ColumnType::MacAddr => "macaddr".into(),
                 ColumnType::LTree => "ltree".into(),
+                ColumnType::Range(ty) => ty.range_type_name().into(),
+                ColumnType::Multirange(ty) => ty.multirange_type_name().into(),
             }
         )
         .unwrap()
@@ -2298,7 +2305,7 @@ impl QueryBuilder {
     }
 
     // TYPE BUILDER
-    // [spec:pgorm:req:sql.ddl.type-enum+6]
+    // [spec:pgorm:req:sql.ddl.type-enum+7]
     fn prepare_create_as_type(&self, as_type: &TypeAs, sql: &mut dyn SqlWriter) {
         match as_type {
             TypeAs::Enum(values) => {
@@ -2312,6 +2319,7 @@ impl QueryBuilder {
                 write!(sql, ")").unwrap();
             }
             TypeAs::Composite(attributes) => self.prepare_composite_attributes(attributes, sql),
+            TypeAs::Range(range) => self.prepare_range_definition(range, sql),
         }
     }
 
@@ -2361,7 +2369,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-enum+6]
+    // [spec:pgorm:req:sql.ddl.type-enum+7]
     // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     pub(crate) fn prepare_type_create_statement(
         &self,

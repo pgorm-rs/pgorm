@@ -65,7 +65,7 @@ impl PyEntityQuery {
             inner = inner.change(Change::Order(
                 order.expr.inner.clone(),
                 order.direction.rust_order(),
-                order.nulls.map(|n| n.rust_nulls()),
+                order.nulls.as_ref().map(|n| n.rust_nulls()),
             ));
         }
         Ok(Self { inner })

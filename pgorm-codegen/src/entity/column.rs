@@ -3,7 +3,7 @@ use crate::{
     util::{escape_rust_keyword, safe_ident},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, StringLen};
+use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, RangeType, StringLen};
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 use std::fmt::Write as FmtWrite;
@@ -21,7 +21,7 @@ impl Column {
     /// Reject anything the writer could not render: a type outside the mapping
     /// table, and a DB name whose case-converted forms are not Rust
     /// identifiers.
-    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("column `{}`", self.name);
@@ -47,9 +47,9 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+3]
+    // [spec:pgorm:sem:codegen.entity.types+4]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
-    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
     pub fn get_rs_type(&self) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType) -> String {
             #[allow(unreachable_patterns)]
@@ -75,6 +75,10 @@ impl Column {
                 ColumnType::Enum { name, .. } => name.to_string().to_upper_camel_case(),
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type))
+                }
+                ColumnType::Range(range) => format!("Range<{}>", range_element(*range)),
+                ColumnType::Multirange(range) => {
+                    format!("Multirange<{}>", range_element(*range))
                 }
                 other => unreachable!(
                     "column type {other:?} reached the writer; \
@@ -124,7 +128,7 @@ impl Column {
         col_type.map(|ty| quote! { column_type = #ty })
     }
 
-    // [spec:pgorm:req:codegen.entity.types.unsupported+2]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
     pub fn get_def(&self) -> TokenStream {
         fn write_col_def(col_type: &ColumnType) -> TokenStream {
             match col_type {
@@ -170,6 +174,14 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     let column_type = write_col_def(column_type);
                     quote! { ColumnType::Array(Arc::new(#column_type)) }
+                }
+                ColumnType::Range(range) => {
+                    let range = range_type_tokens(*range);
+                    quote! { ColumnType::Range(#range) }
+                }
+                ColumnType::Multirange(range) => {
+                    let range = range_type_tokens(*range);
+                    quote! { ColumnType::Multirange(#range) }
                 }
                 #[allow(unreachable_patterns)]
                 other => unreachable!(
@@ -250,10 +262,35 @@ impl Column {
     }
 }
 
+/// The Rust type a built-in range ranges over, as the prelude names it.
+// [spec:pgorm:sem:codegen.entity.types+4]
+fn range_element(range: RangeType) -> &'static str {
+    match range {
+        RangeType::Int4 => "i32",
+        RangeType::Int8 => "i64",
+        RangeType::Numeric => "Decimal",
+        RangeType::Date => "Date",
+        RangeType::Timestamp => "DateTime",
+        RangeType::TimestampTz => "DateTimeWithTimeZone",
+    }
+}
+
+/// The `RangeType` naming a built-in range, as generated source spells it.
+fn range_type_tokens(range: RangeType) -> TokenStream {
+    match range {
+        RangeType::Int4 => quote! { RangeType::Int4 },
+        RangeType::Int8 => quote! { RangeType::Int8 },
+        RangeType::Numeric => quote! { RangeType::Numeric },
+        RangeType::Date => quote! { RangeType::Date },
+        RangeType::Timestamp => quote! { RangeType::Timestamp },
+        RangeType::TimestampTz => quote! { RangeType::TimestampTz },
+    }
+}
+
 /// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
 /// through `Array` element types, over the enum names they will emit, and over
 /// the named types they will respell.
-// [spec:pgorm:req:codegen.entity.types.unsupported+2]
+// [spec:pgorm:req:codegen.entity.types.unsupported+3]
 fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> {
     match col_type {
         ColumnType::Char(_)
@@ -297,6 +334,19 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
                 )));
             }
             Ok(())
+        }
+        ColumnType::Range(_) | ColumnType::Multirange(_) => Ok(()),
+        // A `Vec` of ranges has no value conversion, so an array of them has
+        // no field type the entity could compile with.
+        ColumnType::Array(inner_col_type)
+            if matches!(
+                inner_col_type.as_ref(),
+                ColumnType::Range(_) | ColumnType::Multirange(_)
+            ) =>
+        {
+            Err(Error::TransformError(format!(
+                "{context}: column type {col_type:?} is not supported by codegen"
+            )))
         }
         ColumnType::Array(inner_col_type) => validate_col_type(context, inner_col_type),
         other => Err(Error::TransformError(format!(

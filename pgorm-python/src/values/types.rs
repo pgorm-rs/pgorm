@@ -57,7 +57,11 @@ macro_rules! scalar_kinds {
         pub const SCALAR_NAMES: &[&str] = &[$($name),+];
 
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
-            match kind { $(ArrayType::$variant => $name),+ }
+            match kind {
+                $(ArrayType::$variant => $name,)+
+                ArrayType::Range(_) => "range",
+                ArrayType::Multirange(_) => "multirange",
+            }
         }
 
         pub fn parse_scalar(name: &str) -> PyResult<ArrayType> {
@@ -68,13 +72,19 @@ macro_rules! scalar_kinds {
         }
 
         pub fn scalar_null(kind: &ArrayType) -> Value {
-            match kind { $(ArrayType::$variant => Value::$variant(None)),+ }
+            match kind {
+                $(ArrayType::$variant => Value::$variant(None),)+
+                ArrayType::Range(ty) => Value::Range(*ty, None),
+                ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
+            }
         }
 
         pub fn rust_tag(value: &Value) -> Tag {
             match value {
                 $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
+                Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
+                Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
             }
         }
 
@@ -82,6 +92,8 @@ macro_rules! scalar_kinds {
             match value {
                 $(Value::$variant(value) => value.is_none(),)+
                 Value::Array(_, value) => value.is_none(),
+                Value::Range(_, value) => value.is_none(),
+                Value::Multirange(_, value) => value.is_none(),
             }
         }
     };

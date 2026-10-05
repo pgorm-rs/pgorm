@@ -44,7 +44,7 @@ fn python_scalars_preserve_rust_variants() -> PyResult<()> {
                 actual.extract::<PyRef<'_, PyValue>>()?.rust_value(),
                 &expected
             );
-            let inverse = Py::new(py, PyValue::from_rust(expected))?;
+            let inverse = Py::new(py, PyValue::from_rust(expected)?)?;
             assert!(actual.eq(inverse)?);
         }
         Ok(())
@@ -61,7 +61,7 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
             Value::Date(Some(Box::new(date(0, 1, 1)))),
             Value::Float(Some(f32::from_bits(0x7f800001))),
         ] {
-            let value = Py::new(py, PyValue::from_rust(inner))?;
+            let value = Py::new(py, PyValue::from_rust(inner)?)?;
             let error = value.bind(py).getattr("value").err().ok_or_else(|| {
                 pyo3::exceptions::PyAssertionError::new_err("lossy conversion succeeded")
             })?;
@@ -108,6 +108,29 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
         let rust_type = name.extract::<PyRef<'_, PyTypeName>>()?.rust_type();
         assert!(!rust_type.is_verbatim());
         assert_eq!(rust_type.name.to_string(), "Mood\"雪");
+        Ok(())
+    })
+}
+
+// [spec:pgorm:def:sql.value.range/test]    a range or multirange is refused where a Rust value
+// would become a Python one, NULL or not
+#[test]
+fn rust_ranges_are_refused_by_name() -> PyResult<()> {
+    use pgorm::pgorm_query::{Multirange, Range, RangeType};
+
+    Python::initialize();
+    Python::attach(|py| {
+        for inner in [
+            Value::from(Range::from(1..5)),
+            Value::Range(RangeType::Date, None),
+            Value::from(Multirange::<i64>::default()),
+        ] {
+            let error = PyValue::from_rust(inner).err().ok_or_else(|| {
+                pyo3::exceptions::PyAssertionError::new_err("a range reached Python")
+            })?;
+            assert_eq!(error.get_type(py).name()?, "UnsupportedCapabilityError");
+            assert!(error.to_string().contains("range and multirange"));
+        }
         Ok(())
     })
 }

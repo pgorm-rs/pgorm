@@ -101,7 +101,7 @@ an ideal Postgres renderer would emit.
 > values in an `Order::Field` ordering (see `sql.render.select-order`) are
 > inlined via `value_to_string` even in parameterized mode.
 
-> [spec:pgorm:req:sql.render.cast-param-type+3]
+> [spec:pgorm:req:sql.render.cast-param-type+4]
 > A `SimpleExpr::Value` cast operand MUST be rendered through
 > `push_param_source_typed` rather than `push_param`. There is one place this
 > can arise, because a cast has one shape
@@ -118,8 +118,11 @@ an ideal Postgres renderer would emit.
 > name from `Value::source_type_name`: `bool`; `int2` for `TinyInt` and
 > `SmallInt`, `int4` for `Int`, `int8` for `BigInt`, `Unsigned` and
 > `BigUnsigned`; `float4` / `float8`; `text` for `String` and `Char`; `bytea`;
-> `date`, `time`, `timestamp`, and `timestamptz`; `uuid`; `numeric`; `inet`; `macaddr`; and, for `Array`, the element
-> name from `ArrayType::source_type_name` suffixed `[]`. `Json` and `Vector`
+> `date`, `time`, `timestamp`, and `timestamptz`; `uuid`; `numeric`; `inet`; `macaddr`;
+> for `Range` and `Multirange`, the built-in range or multirange type their
+> tag names (`int4range`, `tstzmultirange`); and, for `Array`, the element
+> name from `ArrayType::source_type_name` suffixed `[]`, a range element's
+> name being its range type's (`int8range[]`). `Json` and `Vector`
 > are `None` and stay unpinned — a JSON payload binds as either `json` or
 > `jsonb` depending on which the server asked for, and the pgvector type name
 > is not guaranteed to resolve in the search path.
@@ -221,7 +224,7 @@ an ideal Postgres renderer would emit.
 > inverse mapping (a backslash followed by `0 b t n r` maps back to the
 > control character; any other escaped character maps to itself).
 
-> [spec:pgorm:def:sql.render.value-literals+4]
+> [spec:pgorm:def:sql.render.value-literals+5]
 > `value_to_string` defines the inline literal syntax per `Value` variant:
 >
 > Every `None` variant of every `Value` type renders as the bare keyword
@@ -240,7 +243,7 @@ an ideal Postgres renderer would emit.
 > datetime `%Y-%m-%d %H:%M:%S%.f %:z`, always at `+00:00` because the value
 > carries an instant rather than an offset. Sub-second digits are kept, to the
 > microsecond PostgreSQL stores and the parameter path binds
-> (`sql.value.render+1`); `%.f` omits the fraction and its dot when it is zero,
+> (`sql.value.render+2`); `%.f` omits the fraction and its dot when it is zero,
 > so a whole second renders as it would without the directive. A format
 > string MUST NOT name a field its value lacks: an unfillable directive is
 > written through into the rendered text rather than refused. `Uuid`,
@@ -258,6 +261,12 @@ an ideal Postgres renderer would emit.
 > name to pin (see `sql.render.cast-param-type`), so their empty arrays keep the
 > untypeable spelling. `Vector(Some(v))` renders as a quoted pgvector literal
 > `'[f1,f2,…]'`.
+>
+> `Range(ty, Some(r))` renders as `ty`'s constructor called with each bound's
+> own literal, `NULL` for no bound and a bracket pair for inclusivity —
+> `int4range(1, 5, '[)')` — and the empty range as `'empty'::int4range`;
+> `Multirange(ty, Some(m))` as `ty`'s multirange constructor over those,
+> `int4multirange()` when empty (`sql.value.render+2`).
 >
 > `Keyword` expressions render as bare `NULL`, `CURRENT_DATE`, `CURRENT_TIME`,
 > or `CURRENT_TIMESTAMP` — the whole lexicon, with no caller-supplied arm.
@@ -838,7 +847,7 @@ an ideal Postgres renderer would emit.
 
 ## DDL
 
-> [spec:pgorm:def:sql.render.ddl.types+5]
+> [spec:pgorm:def:sql.render.ddl.types+6]
 > `prepare_column_type` defines the Rust-side `ColumnType` → PostgreSQL type
 > name mapping (all lowercase): Char(n) → `char(n)`/`char`; String →
 > `varchar(n)`/`varchar`; Text → `text`; SmallInteger → `smallint`; Integer →
@@ -853,7 +862,9 @@ an ideal Postgres renderer would emit.
 > Money → `money`; Json → `json`; JsonBinary → `jsonb`; Uuid →
 > `uuid`; Array(t) → recursive element type plus `[]`; Vector →
 > `vector(n)`/`vector`; Cidr → `cidr`; Inet → `inet`; MacAddr → `macaddr`;
-> LTree → `ltree`; Named/Enum → the type name through `TypeName`'s part
+> LTree → `ltree`; Range(t) → `t`'s range type, `int4range` through
+> `tstzrange`; Multirange(t) → `t`'s multirange type, `int4multirange`
+> through `tstzmultirange`; Named/Enum → the type name through `TypeName`'s part
 > policy (`sql.types.type-name`), a lowercase name that is no restricted
 > keyword bare and anything else quoted, never the identifier's raw
 > string. The mapping is

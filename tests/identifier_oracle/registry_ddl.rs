@@ -4,7 +4,7 @@
 use pgorm::pgorm_query::{
     ColumnDef, ColumnType, Comment, ForeignKey, Index, IndexColumn, IndexConstraint, IndexType,
     Sequence, SequenceOption, Table, TableForeignKey, TypeName,
-    extension::{Extension, Type},
+    extension::{Extension, RangeDefinition, Type},
 };
 
 use super::{
@@ -636,6 +636,121 @@ pub fn sites() -> Vec<Site> {
                     fixed("a"),
                     ColumnType::Text,
                     (fixed("s"), n_(n)),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-name",
+            api: "Type::create(Name).as_range(..)",
+            kinds: &["CreateRangeStmt.type_name[0]"],
+            policy: Quoted,
+            render: |n| sql(Type::create(n_(n)).as_range(RangeDefinition::new(ColumnType::Integer))),
+        },
+        Site {
+            id: "ddl/create-type.range-schema",
+            api: "Type::create((Name, type)).as_range(..) — the schema part",
+            kinds: &["CreateRangeStmt.type_name[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create((n_(n), fixed("ty")))
+                    .as_range(RangeDefinition::new(ColumnType::Integer)))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-database",
+            api: "Type::create((Name, schema, type)).as_range(..) — the database part",
+            kinds: &["CreateRangeStmt.type_name[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create((n_(n), fixed("s"), fixed("ty")))
+                    .as_range(RangeDefinition::new(ColumnType::Integer)))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-subtype",
+            api: "RangeDefinition::new(ColumnType::named(String))",
+            kinds: &["TypeName.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Type::create(fixed("ty")).as_range(RangeDefinition::new(ColumnType::named(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-opclass",
+            api: "RangeDefinition::subtype_opclass(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty"))
+                    .as_range(RangeDefinition::new(ColumnType::Integer).subtype_opclass(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-collation",
+            api: "RangeDefinition::collation(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty"))
+                    .as_range(RangeDefinition::new(ColumnType::Text).collation(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-collation-qualified",
+            api: "RangeDefinition::collation((Name, Name)) — the collation part",
+            kinds: &["TypeName.names[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).as_range(
+                    RangeDefinition::new(ColumnType::Text).collation((fixed("s"), n_(n))),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-type.range-subtype-diff",
+            api: "RangeDefinition::subtype_diff(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty"))
+                    .as_range(RangeDefinition::new(ColumnType::Double).subtype_diff(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-type.multirange-name",
+            api: "RangeDefinition::multirange_type_name(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).as_range(
+                    RangeDefinition::new(ColumnType::Integer).multirange_type_name(n_(n)),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-type.multirange-schema",
+            api: "RangeDefinition::multirange_type_name((Name, type)) — the schema part",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).as_range(
+                    RangeDefinition::new(ColumnType::Integer)
+                        .multirange_type_name((n_(n), fixed("tys"))),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-type.multirange-database",
+            api: "RangeDefinition::multirange_type_name((Name, schema, type)) — the database part",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Type::create(fixed("ty")).as_range(
+                    RangeDefinition::new(ColumnType::Integer).multirange_type_name((
+                        n_(n),
+                        fixed("s"),
+                        fixed("tys"),
+                    )),
                 ))
             },
         },

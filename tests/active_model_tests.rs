@@ -643,7 +643,7 @@ mod row_dto {
 }
 use row_dto::{NewRow, UpdateRow};
 
-// [spec:pgorm:req:entity.active-model.into+1/test]    the blanket identity
+// [spec:pgorm:req:entity.active-model.into+2/test]    the blanket identity
 // `IntoActiveModel` impl, the derived `Model -> ActiveModel` conversion putting
 // every field in `Unchanged`, and the `IntoActiveValue` state mapping for
 // `Option<V>`, `Option<Option<V>>` and the plain scalar impls

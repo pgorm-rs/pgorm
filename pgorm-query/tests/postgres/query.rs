@@ -1125,7 +1125,7 @@ fn select_62() {
 
 // [spec:pgorm:def:sql.ast.insert+3/test]
 // [spec:pgorm:req:sql.render.insert+2/test]
-// [spec:pgorm:def:sql.render.value-literals+4/test]
+// [spec:pgorm:def:sql.render.value-literals+5/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_2() {
@@ -2345,7 +2345,7 @@ fn every_cast_spelling_builds_one_node_shape() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+3/test]
+// [spec:pgorm:req:sql.render.cast-param-type+4/test]
 #[test]
 fn cast_param_is_pinned_to_the_source_type() {
     assert_eq!(
@@ -2393,7 +2393,7 @@ fn cast_param_is_pinned_to_the_source_type() {
     );
 }
 
-// [spec:pgorm:req:sql.render.cast-param-type+3/test]
+// [spec:pgorm:req:sql.render.cast-param-type+4/test]
 #[test]
 fn cast_param_is_not_pinned_when_rendered_inline() {
     assert_eq!(

@@ -1,6 +1,9 @@
 use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error as _;
 
+#[path = "query_range.rs"]
+mod range;
+
 /// Defines the result of a query operation on a Model
 // [spec:pgorm:def:exec.decode+3]
 #[derive(Debug)]

@@ -103,8 +103,16 @@ macro_rules! scalar_kinds {
         pub const SCALAR_NAMES: &[&str] = &[$($name),+];
 
         /// The portable name of a Rust scalar variant.
+        ///
+        /// A range or multirange has a name here so the function is total,
+        /// but no portable kind: neither name is in `wire.SCALARS`, so
+        /// [`validate`] refuses a value tagged with one.
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
-            match kind { $(ArrayType::$variant => $name),+ }
+            match kind {
+                $(ArrayType::$variant => $name,)+
+                ArrayType::Range(_) => "range",
+                ArrayType::Multirange(_) => "multirange",
+            }
         }
 
         /// The scalar variant a portable name denotes.
@@ -117,7 +125,11 @@ macro_rules! scalar_kinds {
 
         /// The typed SQL NULL of a scalar kind.
         pub fn scalar_null(kind: &ArrayType) -> Value {
-            match kind { $(ArrayType::$variant => Value::$variant(None)),+ }
+            match kind {
+                $(ArrayType::$variant => Value::$variant(None),)+
+                ArrayType::Range(ty) => Value::Range(*ty, None),
+                ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
+            }
         }
 
         /// The tag a Rust value carries on its own, before enum identity applies.
@@ -125,6 +137,8 @@ macro_rules! scalar_kinds {
             match value {
                 $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
+                Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
+                Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
             }
         }
 
@@ -136,6 +150,8 @@ macro_rules! scalar_kinds {
             match value {
                 $(Value::$variant(value) => value.is_none(),)+
                 Value::Array(_, value) => value.is_none(),
+                Value::Range(_, value) => value.is_none(),
+                Value::Multirange(_, value) => value.is_none(),
             }
         }
     };
@@ -275,6 +291,11 @@ impl Tagged {
                     })
                     .collect::<Vec<_>>()
             })),
+            // No portable encoding exists, and the kind is refused by
+            // `validate`; the data is the value's SQL literal, a description
+            // rather than an invented payload.
+            Value::Range(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
+            Value::Multirange(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
         }
     }
 }

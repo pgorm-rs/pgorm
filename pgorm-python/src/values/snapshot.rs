@@ -1,4 +1,5 @@
 use pgorm::pgorm_query::Value;
+use pyo3::PyResult;
 use serde_json::{Value as Json, json};
 
 use super::{
@@ -7,8 +8,10 @@ use super::{
 };
 
 // [spec:pgorm:req:python.value-tags]
-pub(super) fn encode(value: &PyValue) -> Json {
-    json!({"version": 1, "type": tag(&value.tag), "sql_null": is_null(&value.inner), "data": payload(value)})
+pub(super) fn encode(value: &PyValue) -> PyResult<Json> {
+    Ok(
+        json!({"version": 1, "type": tag(&value.tag), "sql_null": is_null(&value.inner), "data": payload(value)?}),
+    )
 }
 
 fn tag(value: &Tag) -> Json {
@@ -19,13 +22,13 @@ fn tag(value: &Tag) -> Json {
     }
 }
 
-fn payload(value: &PyValue) -> Json {
+fn payload(value: &PyValue) -> PyResult<Json> {
     macro_rules! string {
         ($value:expr) => {
             json!($value.as_ref().map(|value| value.to_string()))
         };
     }
-    match &value.inner {
+    Ok(match &value.inner {
         Value::Bool(value) => json!(value),
         Value::TinyInt(value) => string!(value),
         Value::SmallInt(value) => string!(value),
@@ -54,20 +57,32 @@ fn payload(value: &PyValue) -> Json {
                 .map(|value| format!("{:08x}", value.to_bits()))
                 .collect::<Vec<_>>()
         })),
-        Value::Array(_, values) => json!(values.as_ref().map(|values| {
+        Value::Array(_, values) => json!(
             values
-                .iter()
-                .map(|inner| {
-                    let tag = match &value.tag {
-                        Tag::Array(element) => (**element).clone(),
-                        _ => super::types::rust_tag(inner),
-                    };
-                    encode(&PyValue {
-                        inner: inner.clone(),
-                        tag,
-                    })
+                .as_ref()
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|inner| {
+                            let tag = match &value.tag {
+                                Tag::Array(element) => (**element).clone(),
+                                _ => super::types::rust_tag(inner),
+                            };
+                            encode(&PyValue {
+                                inner: inner.clone(),
+                                tag,
+                            })
+                        })
+                        .collect::<PyResult<Vec<_>>>()
                 })
-                .collect::<Vec<_>>()
-        })),
-    }
+                .transpose()?
+        ),
+        // `PyValue::from_rust` refuses these, so a value never holds one; the
+        // refusal is repeated rather than a payload invented.
+        Value::Range(..) | Value::Multirange(..) => {
+            return Err(crate::UnsupportedCapabilityError::new_err(
+                super::UNSUPPORTED_RANGE,
+            ));
+        }
+    })
 }

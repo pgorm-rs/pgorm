@@ -8,7 +8,7 @@ impl QueryBuilder {
     /// type as a column writes it, and its collation when it has one. The
     /// parentheses are written for an empty list too: `AS ()` is the empty
     /// composite, and `AS` alone is no statement.
-    // [spec:pgorm:req:sql.ddl.type-composite]
+    // [spec:pgorm:req:sql.ddl.type-composite+1]
     pub(super) fn prepare_composite_attributes(
         &self,
         attributes: &[CompositeAttribute],

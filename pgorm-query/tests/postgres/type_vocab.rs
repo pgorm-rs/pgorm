@@ -568,7 +568,7 @@ fn at_time_zone_takes_any_zone_expression() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+7/test]    `StringLen` parameterises varchar and the
+// [spec:pgorm:def:sql.types.column-type+8/test]    `StringLen` parameterises varchar and the
 // convenience constructors go through it
 #[test]
 fn string_len_and_the_convenience_constructors() {
@@ -613,8 +613,9 @@ fn auto_increment_without_serial_form_renders_type() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+7/test]    equality compares parameters, renders
-// `Custom`/`Enum` identifiers, recurses into `Array`, and otherwise compares discriminants
+// [spec:pgorm:def:sql.types.column-type+8/test]    equality compares parameters, renders
+// `Custom`/`Enum` identifiers, recurses into `Array`, compares a range's range type, and
+// otherwise compares discriminants
 #[test]
 fn column_type_equality_semantics() {
     // Parameterised variants compare their parameters.
@@ -681,6 +682,24 @@ fn column_type_equality_semantics() {
         ColumnType::Array(Arc::new(ColumnType::Text))
     );
 
+    // `Range` and `Multirange` compare the range type they name.
+    assert_eq!(
+        ColumnType::Range(RangeType::Date),
+        ColumnType::Range(RangeType::Date)
+    );
+    assert_ne!(
+        ColumnType::Range(RangeType::Date),
+        ColumnType::Range(RangeType::Timestamp)
+    );
+    assert_ne!(
+        ColumnType::Multirange(RangeType::Int4),
+        ColumnType::Multirange(RangeType::Int8)
+    );
+    assert_ne!(
+        ColumnType::Range(RangeType::Int4),
+        ColumnType::Multirange(RangeType::Int4)
+    );
+
     // Everything else compares discriminants.
     assert_eq!(ColumnType::Text, ColumnType::Text);
     assert_ne!(ColumnType::Text, ColumnType::Json);
@@ -688,7 +707,7 @@ fn column_type_equality_semantics() {
     assert_ne!(ColumnType::MacAddr, ColumnType::LTree);
 }
 
-// [spec:pgorm:def:sql.types.column-type+7/test]    `PgInterval` displays as SQL keywords and
+// [spec:pgorm:def:sql.types.column-type+8/test]    `PgInterval` displays as SQL keywords and
 // has a case-insensitive `TryFrom<&str>` inverse
 #[test]
 fn pg_interval_display_and_parse_round_trip() {
@@ -730,7 +749,7 @@ fn pg_interval_display_and_parse_round_trip() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+7/test]    the precision vocabulary is the closed set
+// [spec:pgorm:def:sql.types.column-type+8/test]    the precision vocabulary is the closed set
 // PostgreSQL accepts, and nothing outside it constructs
 #[test]
 fn interval_precision_is_zero_through_six() {

@@ -59,6 +59,11 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
             })
         };
     }
+    if matches!(ty.kind(), Kind::Range(_) | Kind::Multirange(_)) {
+        return Err(DecodeError::new_err(format!(
+            "column {index} is a range or multirange, which the Python binding does not decode"
+        )));
+    }
     if matches!(ty.kind(), Kind::Enum(_)) {
         let inner = typed::<EnumLabel>(row, index, array, ArrayType::String, |v| {
             Value::String(v.map(|v| Box::new(v.0)))
@@ -109,5 +114,5 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
             )));
         }
     }?;
-    Ok(PyValue::from_rust(inner))
+    PyValue::from_rust(inner)
 }

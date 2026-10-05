@@ -521,7 +521,7 @@ pub trait ActiveModelBehavior: ActiveModelTrait {
 }
 
 /// A Trait for any type that can be converted into an ActiveModel
-// [spec:pgorm:req:entity.active-model.into+1]
+// [spec:pgorm:req:entity.active-model.into+2]
 pub trait IntoActiveModel<A>
 where
     A: ActiveModelTrait,
@@ -540,7 +540,7 @@ where
 }
 
 /// Any type that can be converted into an [ActiveValue]
-// [spec:pgorm:req:entity.active-model.into+1]
+// [spec:pgorm:req:entity.active-model.into+2]
 pub trait IntoActiveValue<V>
 where
     V: Into<Value>,
@@ -621,6 +621,38 @@ impl_into_active_value!(crate::prelude::Decimal);
 #[cfg(feature = "with-uuid")]
 #[cfg_attr(docsrs, doc(cfg(feature = "with-uuid")))]
 impl_into_active_value!(crate::prelude::Uuid);
+
+// [spec:pgorm:def:sql.value.range]
+impl_into_active_value!(crate::prelude::Range<i32>);
+impl_into_active_value!(crate::prelude::Range<i64>);
+impl_into_active_value!(crate::prelude::Range<crate::prelude::Decimal>);
+impl_into_active_value!(crate::prelude::Multirange<i32>);
+impl_into_active_value!(crate::prelude::Multirange<i64>);
+impl_into_active_value!(crate::prelude::Multirange<crate::prelude::Decimal>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Range<crate::prelude::Date>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Range<crate::prelude::DateTime>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Range<crate::prelude::DateTimeWithTimeZone>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Multirange<crate::prelude::Date>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Multirange<crate::prelude::DateTime>);
+
+#[cfg(feature = "with-jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "with-jiff")))]
+impl_into_active_value!(crate::prelude::Multirange<crate::prelude::DateTimeWithTimeZone>);
 
 impl<V> Default for ActiveValue<V>
 where

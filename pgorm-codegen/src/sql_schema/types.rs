@@ -2,7 +2,7 @@ use super::{Enums, unresolved, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
-use pgorm_query::{ColumnType, IntervalSpec, Name, StringLen};
+use pgorm_query::{ColumnType, IntervalSpec, Name, RangeType, StringLen};
 use std::sync::Arc;
 
 /// A column's type together with the auto-increment fact the `serial` family
@@ -16,7 +16,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+4]
+// [spec:pgorm:sem:codegen.ddl.types+5]
 pub(super) fn column_kind(
     type_name: &TypeName,
     enums: &Enums,
@@ -79,7 +79,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+4]
+// [spec:pgorm:sem:codegen.ddl.types+5]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
@@ -122,6 +122,9 @@ fn named_type(
                 at,
             ));
         }
+    }
+    if let (Some(col_type), []) = (builtin_range(name), modifiers) {
+        return Ok(plain(col_type));
     }
     let col_type = match (name.as_str(), modifiers) {
         ("serial" | "serial4", []) => return Ok(serial(ColumnType::Integer)),
@@ -177,6 +180,30 @@ fn named_type(
         _ => return Err(unsupported(format!("type `{name}` on {context}"), at)),
     };
     Ok(plain(col_type))
+}
+
+/// A built-in range or multirange type by its catalogue name. None takes a
+/// type modifier, so a modified one falls through to the refusal below.
+// [spec:pgorm:sem:codegen.ddl.types+5]
+fn builtin_range(name: &str) -> Option<ColumnType> {
+    [
+        RangeType::Int4,
+        RangeType::Int8,
+        RangeType::Numeric,
+        RangeType::Date,
+        RangeType::Timestamp,
+        RangeType::TimestampTz,
+    ]
+    .into_iter()
+    .find_map(|range| {
+        if name == range.range_type_name() {
+            Some(ColumnType::Range(range))
+        } else if name == range.multirange_type_name() {
+            Some(ColumnType::Multirange(range))
+        } else {
+            None
+        }
+    })
 }
 
 fn plain(col_type: ColumnType) -> ColumnKind {

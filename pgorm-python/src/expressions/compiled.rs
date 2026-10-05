@@ -15,7 +15,7 @@ pub struct Compiled {
 #[pymethods]
 impl Compiled {
     #[getter]
-    fn params(&self) -> Vec<PyValue> {
+    fn params(&self) -> PyResult<Vec<PyValue>> {
         self.values
             .0
             .iter()

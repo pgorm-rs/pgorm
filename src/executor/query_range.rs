@@ -1,0 +1,271 @@
+//! Decoding a range or a multirange column into [`Range`] / [`Multirange`].
+//!
+//! pgorm-query owns the two types but not the wire crates, so it has no
+//! `FromSql` for them, and the orphan rule forbids writing one here. Decoding
+//! routes through local newtypes instead, as `InetSql` does for an address,
+//! and each bound is decoded by its subtype's own `FromSql`.
+
+use std::ops::Bound;
+
+use pgorm_query::{Multirange, Range};
+use postgres_protocol::types::{self as wire, RangeBound};
+use tokio_postgres::{
+    row::RowIndex,
+    types::{FromSql, Kind, Type},
+};
+
+use super::{QueryResult, TryGetError, TryGetable};
+
+type WireResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
+
+/// A [`Range`] read from the wire, over any subtype a `FromSql` reads.
+// [spec:pgorm:def:exec.decode.range]
+#[derive(Debug)]
+struct RangeSql<T>(Range<T>);
+
+// [spec:pgorm:def:exec.decode.range]
+impl<'a, T> FromSql<'a> for RangeSql<T>
+where
+    T: FromSql<'a>,
+{
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> WireResult<Self> {
+        match ty.kind() {
+            Kind::Range(subtype) => range_from_sql(subtype, raw).map(Self),
+            _ => Err(format!("`{ty}` is not a range type").into()),
+        }
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(ty.kind(), Kind::Range(subtype) if T::accepts(subtype))
+    }
+}
+
+/// A [`Multirange`] read from the wire: a count of ranges, each
+/// length-prefixed in a range's own encoding.
+// [spec:pgorm:def:exec.decode.range]
+#[derive(Debug)]
+struct MultirangeSql<T>(Multirange<T>);
+
+// [spec:pgorm:def:exec.decode.range]
+impl<'a, T> FromSql<'a> for MultirangeSql<T>
+where
+    T: FromSql<'a>,
+{
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> WireResult<Self> {
+        let Kind::Multirange(subtype) = ty.kind() else {
+            return Err(format!("`{ty}` is not a multirange type").into());
+        };
+        let mut raw = raw;
+        let count = usize::try_from(read_i32(&mut raw)?)?;
+        let ranges = (0..count)
+            .map(|_| {
+                let len = usize::try_from(read_i32(&mut raw)?)?;
+                let (range, rest) = raw.split_at_checked(len).ok_or("invalid message size")?;
+                raw = rest;
+                range_from_sql(subtype, range)
+            })
+            .collect::<WireResult<Multirange<T>>>()?;
+        if !raw.is_empty() {
+            return Err("invalid message size".into());
+        }
+        Ok(Self(ranges))
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(ty.kind(), Kind::Multirange(subtype) if T::accepts(subtype))
+    }
+}
+
+fn read_i32(raw: &mut &[u8]) -> WireResult<i32> {
+    let (head, rest) = raw.split_first_chunk::<4>().ok_or("invalid message size")?;
+    *raw = rest;
+    Ok(i32::from_be_bytes(*head))
+}
+
+/// The empty flag decodes to [`Range::Empty`] and nothing else: a range with
+/// no bounds is the range with no values, never the range of every value.
+// [spec:pgorm:def:exec.decode.range]
+fn range_from_sql<'a, T>(subtype: &Type, raw: &'a [u8]) -> WireResult<Range<T>>
+where
+    T: FromSql<'a>,
+{
+    Ok(match wire::range_from_sql(raw)? {
+        wire::Range::Empty => Range::Empty,
+        wire::Range::Nonempty(lower, upper) => Range::Bounds {
+            lower: bound_from_sql(subtype, lower)?,
+            upper: bound_from_sql(subtype, upper)?,
+        },
+    })
+}
+
+/// A bound the server sends is a value or no bound; it never sends a NULL
+/// one, so a NULL is a malformed message rather than something to read as
+/// either.
+fn bound_from_sql<'a, T>(
+    subtype: &Type,
+    bound: RangeBound<Option<&'a [u8]>>,
+) -> WireResult<Bound<T>>
+where
+    T: FromSql<'a>,
+{
+    Ok(match bound {
+        RangeBound::Inclusive(Some(raw)) => Bound::Included(T::from_sql(subtype, raw)?),
+        RangeBound::Exclusive(Some(raw)) => Bound::Excluded(T::from_sql(subtype, raw)?),
+        RangeBound::Unbounded => Bound::Unbounded,
+        RangeBound::Inclusive(None) | RangeBound::Exclusive(None) => {
+            return Err("a range bound is NULL".into());
+        }
+    })
+}
+
+// [spec:pgorm:def:exec.decode.range]
+macro_rules! try_getable_range {
+    ( $type: ty ) => {
+        impl TryGetable for Range<$type> {
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: RangeSql<$type> =
+                    res.row.try_get(idx).map_err(TryGetError::postgres)?;
+                Ok(result.0)
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]    the newtype that reads the wire format
+            fn accepts(ty: &Type) -> bool {
+                <RangeSql<$type> as FromSql>::accepts(ty)
+            }
+        }
+
+        impl TryGetable for Multirange<$type> {
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: MultirangeSql<$type> =
+                    res.row.try_get(idx).map_err(TryGetError::postgres)?;
+                Ok(result.0)
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]    the newtype that reads the wire format
+            fn accepts(ty: &Type) -> bool {
+                <MultirangeSql<$type> as FromSql>::accepts(ty)
+            }
+        }
+    };
+}
+
+try_getable_range!(i32);
+try_getable_range!(i64);
+try_getable_range!(rust_decimal::Decimal);
+
+#[cfg(feature = "with-jiff")]
+try_getable_range!(jiff::civil::Date);
+
+#[cfg(feature = "with-jiff")]
+try_getable_range!(jiff::civil::DateTime);
+
+#[cfg(feature = "with-jiff")]
+try_getable_range!(jiff::Timestamp);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn int4(value: i32) -> Vec<u8> {
+        [&4i32.to_be_bytes()[..], &value.to_be_bytes()[..]].concat()
+    }
+
+    fn decode(raw: &[u8]) -> WireResult<Range<i32>> {
+        RangeSql::<i32>::from_sql(&Type::INT4_RANGE, raw).map(|range| range.0)
+    }
+
+    // [spec:pgorm:def:exec.decode.range/test]
+    #[test]
+    fn decodes_each_bound_with_its_inclusivity() {
+        assert_eq!(
+            decode(&[&[0b0000_0010][..], &int4(1), &int4(6)].concat()).unwrap(),
+            Range::from(1..6)
+        );
+        assert_eq!(
+            decode(&[&[0b0000_0100][..], &int4(1), &int4(6)].concat()).unwrap(),
+            Range::new(Bound::Excluded(1), Bound::Included(6))
+        );
+        assert_eq!(
+            decode(&[&[0b0001_0010][..], &int4(1)].concat()).unwrap(),
+            Range::from(1..)
+        );
+        assert_eq!(decode(&[0b0001_1000]).unwrap(), Range::from(..));
+    }
+
+    // [spec:pgorm:def:exec.decode.range/test]
+    #[test]
+    fn decodes_the_empty_flag_as_the_empty_range() {
+        assert_eq!(decode(&[0b0000_0001]).unwrap(), Range::Empty);
+        assert_ne!(decode(&[0b0000_0001]).unwrap(), Range::from(..));
+    }
+
+    // [spec:pgorm:def:exec.decode.range/test]
+    #[test]
+    fn refuses_a_malformed_range() {
+        let null_bound = [&[0b0000_0010][..], &(-1i32).to_be_bytes()[..], &int4(6)].concat();
+        assert_eq!(
+            decode(&null_bound).unwrap_err().to_string(),
+            "a range bound is NULL"
+        );
+        assert!(decode(&[0b0000_0010, 0, 0, 0, 4, 0]).is_err());
+        assert!(decode(&[0b0000_0001, 0]).is_err());
+    }
+
+    // [spec:pgorm:def:exec.decode.range/test]
+    #[test]
+    fn decodes_a_multirange_range_by_range() {
+        let first = [&[0b0000_0010][..], &int4(1), &int4(4)].concat();
+        let second = [&[0b0000_0010][..], &int4(5), &int4(8)].concat();
+        let raw = [
+            &2i32.to_be_bytes()[..],
+            &i32::try_from(first.len()).unwrap().to_be_bytes()[..],
+            &first,
+            &i32::try_from(second.len()).unwrap().to_be_bytes()[..],
+            &second,
+        ]
+        .concat();
+        let decoded = MultirangeSql::<i32>::from_sql(&Type::INT4MULTI_RANGE, &raw)
+            .unwrap()
+            .0;
+        assert_eq!(
+            decoded,
+            [Range::from(1..4), Range::from(5..8)].into_iter().collect()
+        );
+        let empty = MultirangeSql::<i32>::from_sql(&Type::INT4MULTI_RANGE, &0i32.to_be_bytes())
+            .unwrap()
+            .0;
+        assert_eq!(empty, Multirange::default());
+        assert!(
+            MultirangeSql::<i32>::from_sql(&Type::INT4MULTI_RANGE, &raw[..raw.len() - 1]).is_err()
+        );
+    }
+
+    // [spec:pgorm:sem:exec.verify.accepts/test]
+    #[test]
+    fn accepts_the_range_types_over_its_subtype() {
+        let created = Type::new(
+            "slot".to_owned(),
+            16_384,
+            Kind::Range(Type::INT4),
+            "public".to_owned(),
+        );
+        assert!(<Range<i32> as TryGetable>::accepts(&Type::INT4_RANGE));
+        assert!(<Range<i32> as TryGetable>::accepts(&created));
+        assert!(!<Range<i32> as TryGetable>::accepts(&Type::INT8_RANGE));
+        assert!(!<Range<i32> as TryGetable>::accepts(&Type::INT4MULTI_RANGE));
+        assert!(!<Range<i32> as TryGetable>::accepts(&Type::INT4));
+        assert!(<Multirange<i64> as TryGetable>::accepts(
+            &Type::INT8MULTI_RANGE
+        ));
+        assert!(!<Multirange<i64> as TryGetable>::accepts(&Type::INT8_RANGE));
+        assert!(<Range<rust_decimal::Decimal> as TryGetable>::accepts(
+            &Type::NUM_RANGE
+        ));
+    }
+}

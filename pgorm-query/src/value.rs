@@ -22,10 +22,10 @@ pub use mac_address::MacAddress;
 
 pub use pgvector::Vector;
 
-use crate::{ColumnType, QueryBuilder, StringLen};
+use crate::{ColumnType, Multirange, QueryBuilder, Range, RangeType, StringLen};
 
 /// [`Value`] types variant for Postgres array
-// [spec:pgorm:def:sql.value.array+4]
+// [spec:pgorm:def:sql.value.array+5]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -60,6 +60,14 @@ pub enum ArrayType {
     MacAddress,
 
     Vector,
+
+    /// A range over one of the built-in range types, `int4range[]`.
+    // [spec:pgorm:def:sql.value.range]
+    Range(RangeType),
+
+    /// A multirange over one of the built-in range types, `int4multirange[]`.
+    // [spec:pgorm:def:sql.value.range]
+    Multirange(RangeType),
 }
 
 /// Value variants
@@ -69,7 +77,7 @@ pub enum ArrayType {
 /// The float-carrying variants (`Float`, `Double` and `Vector`) compare by bit pattern
 /// rather than by IEEE equality, which is what lets `PartialEq`, `Eq` and `Hash` agree:
 /// `NaN` equals itself, and `0.0` and `-0.0` are distinct values.
-// [spec:pgorm:def:sql.value+2]
+// [spec:pgorm:def:sql.value+3]
 #[derive(Clone, Debug)]
 pub enum Value {
     Bool(Option<bool>),
@@ -111,6 +119,17 @@ pub enum Value {
     IpNetwork(Option<Box<IpNetwork>>),
 
     MacAddress(Option<Box<MacAddress>>),
+
+    /// A range, tagged with the built-in range type it is so that a NULL and
+    /// an empty range still name one. Its bounds are values of the variant
+    /// the range type ranges over — `Int` for `int4range` — and a NULL bound
+    /// is no bound, as it is to PostgreSQL's range constructors.
+    // [spec:pgorm:def:sql.value.range]
+    Range(RangeType, Option<Box<Range<Value>>>),
+
+    /// A multirange, tagged as [`Value::Range`] is.
+    // [spec:pgorm:def:sql.value.range]
+    Multirange(RangeType, Option<Box<Multirange<Value>>>),
 }
 
 impl std::fmt::Display for Value {
@@ -244,7 +263,7 @@ impl Value {
     /// `None` means the variant has no single type to pin it to: `Json` binds
     /// as either `json` or `jsonb`, and `Vector` binds as an extension type
     /// whose name is not guaranteed to resolve in the current search path.
-    // [spec:pgorm:req:sql.render.cast-param-type+3]
+    // [spec:pgorm:req:sql.render.cast-param-type+4]
     pub fn source_type_name(&self) -> Option<Cow<'static, str>> {
         match self {
             Self::Json(_) | Self::Vector(_) => None,
@@ -271,6 +290,8 @@ impl Value {
             Self::Decimal(_) => Some(Cow::Borrowed("numeric")),
             Self::IpNetwork(_) => Some(Cow::Borrowed("inet")),
             Self::MacAddress(_) => Some(Cow::Borrowed("macaddr")),
+            Self::Range(ty, _) => Some(Cow::Borrowed(ty.range_type_name())),
+            Self::Multirange(ty, _) => Some(Cow::Borrowed(ty.multirange_type_name())),
         }
     }
 }
@@ -278,7 +299,7 @@ impl Value {
 impl ArrayType {
     /// Name of the Postgres type an element of this array is bound as. See
     /// [`Value::source_type_name`].
-    // [spec:pgorm:req:sql.render.cast-param-type+3]
+    // [spec:pgorm:req:sql.render.cast-param-type+4]
     pub fn source_type_name(&self) -> Option<&'static str> {
         match self {
             Self::Json | Self::Vector => None,
@@ -302,6 +323,8 @@ impl ArrayType {
             Self::Decimal => Some("numeric"),
             Self::IpNetwork => Some("inet"),
             Self::MacAddress => Some("macaddr"),
+            Self::Range(ty) => Some(ty.range_type_name()),
+            Self::Multirange(ty) => Some(ty.multirange_type_name()),
         }
     }
 }
@@ -604,7 +627,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
-// [spec:pgorm:def:sql.value.array+4]
+// [spec:pgorm:def:sql.value.array+5]
 pub mod with_array {
     use super::*;
     use std::sync::Arc;
@@ -880,7 +903,7 @@ impl Value {
     /// an empty iterator still names its element type: an untagged empty array
     /// has no inline spelling PostgreSQL can type, and no element to infer one
     /// from.
-    // [spec:pgorm:def:sql.value.array+4]
+    // [spec:pgorm:def:sql.value.array+5]
     pub fn array<V, I>(values: I) -> Self
     where
         V: Into<Value> + ValueType,
@@ -1505,7 +1528,7 @@ mod tests {
     /// A `timestamptz` is an absolute instant: PostgreSQL never stored the
     /// offset the value was written with, so the literal renders in UTC
     /// whatever offset it was parsed from.
-    // [spec:pgorm:sem:sql.value.render+1/test]
+    // [spec:pgorm:sem:sql.value.render+2/test]
     #[test]
     fn timestamptz_literal_renders_at_utc() {
         use crate::*;
@@ -1520,7 +1543,7 @@ mod tests {
     /// `strftime` is lenient: a directive the payload cannot fill is copied
     /// into the output instead of failing, so a stray `%` in a rendered literal
     /// is the only evidence that a format string outran its type.
-    // [spec:pgorm:sem:sql.value.render+1/test]
+    // [spec:pgorm:sem:sql.value.render+2/test]
     #[test]
     fn temporal_literals_render_without_stray_directives() {
         let rendered = [
@@ -1553,7 +1576,7 @@ mod tests {
     /// as `23:59:59` — silently, and at every magnitude rather than only at a
     /// boundary. `%.f` omits the fraction when it is zero, which is why the
     /// whole-second literals above are unchanged.
-    // [spec:pgorm:sem:sql.value.render+1/test]
+    // [spec:pgorm:sem:sql.value.render+2/test]
     #[test]
     fn temporal_literals_keep_sub_second_digits() {
         let literals = [
@@ -1621,7 +1644,7 @@ mod tests {
         assert_eq!(out.to_string(), num);
     }
 
-    // [spec:pgorm:def:sql.value.array+4/test]
+    // [spec:pgorm:def:sql.value.array+5/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
@@ -1630,7 +1653,7 @@ mod tests {
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
-    // [spec:pgorm:def:sql.value.array+4/test]
+    // [spec:pgorm:def:sql.value.array+5/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);
@@ -1638,7 +1661,7 @@ mod tests {
         assert_eq!(out, None);
     }
 
-    // [spec:pgorm:def:sql.value.array+4/test]
+    // [spec:pgorm:def:sql.value.array+5/test]
     #[test]
     fn vector_has_an_array_type_tag() {
         assert_eq!(<Vector as ValueType>::array_type(), ArrayType::Vector);

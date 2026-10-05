@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:def:sql.value+2/test]    every variant wraps an Option; None keeps the type tag
+// [spec:pgorm:def:sql.value+3/test]    every variant wraps an Option; None keeps the type tag
 #[test]
 fn null_is_typed_none_not_shared_null() {
     let int_null: Value = Option::<i32>::None.into();
@@ -25,7 +25,7 @@ fn null_is_typed_none_not_shared_null() {
     assert_eq!(big_int_null.to_string(), "NULL");
 }
 
-// [spec:pgorm:def:sql.value+2/test]    payloads larger than a pointer are boxed
+// [spec:pgorm:def:sql.value+3/test]    payloads larger than a pointer are boxed
 #[test]
 fn oversized_payloads_boxed_to_keep_enum_small() {
     // `String`, `Vec<u8>`, `serde_json::Value`, `DateTime` and friends are all
@@ -34,7 +34,7 @@ fn oversized_payloads_boxed_to_keep_enum_small() {
     assert!(size_of::<Value>() < size_of::<Vec<u8>>() + size_of::<serde_json::Value>());
 }
 
-// [spec:pgorm:def:sql.value+2/test]    PartialEq, Eq and Hash, all three agreeing
+// [spec:pgorm:def:sql.value+3/test]    PartialEq, Eq and Hash, all three agreeing
 #[test]
 fn value_is_hashable_as_map_key() {
     let mut map: HashMap<Value, &str> = HashMap::new();
@@ -64,7 +64,7 @@ fn value_is_hashable_as_map_key() {
     assert_eq!(null_map.get(&Value::Float(None)), Some(&"null float"));
 }
 
-// [spec:pgorm:def:sql.value+2/test]    NaN equals itself, so a NaN key is findable
+// [spec:pgorm:def:sql.value+3/test]    NaN equals itself, so a NaN key is findable
 #[test]
 fn nan_is_reflexive_and_looks_itself_up() {
     let nan = Value::Double(Some(f64::NAN));
@@ -83,7 +83,7 @@ fn nan_is_reflexive_and_looks_itself_up() {
     assert_eq!(doubles(&[f64::NAN]), doubles(&[f64::NAN]));
 }
 
-// [spec:pgorm:def:sql.value+2/test]    `0.0` and `-0.0` are distinct keys, by
+// [spec:pgorm:def:sql.value+3/test]    `0.0` and `-0.0` are distinct keys, by
 // design: PostgreSQL matches them with `=`, so a relation keyed on a float can
 // have a row the server matched miss its bucket in a `HashMap<ValueTuple, _>`
 #[test]
@@ -108,7 +108,7 @@ fn positive_and_negative_zero_are_distinct_keys() {
     assert_ne!(doubles(&[0.0]), doubles(&[-0.0]));
 }
 
-// [spec:pgorm:def:sql.value+2/test]    equality implies equal hashes across the
+// [spec:pgorm:def:sql.value+3/test]    equality implies equal hashes across the
 // float variants, which is the contract a map key is required to keep
 #[test]
 fn float_equality_and_hashing_agree() {
@@ -164,7 +164,7 @@ fn doubles(elements: &[f64]) -> Value {
     )
 }
 
-// [spec:pgorm:def:sql.value+2/test]    Display renders the Postgres SQL literal
+// [spec:pgorm:def:sql.value+3/test]    Display renders the Postgres SQL literal
 #[test]
 fn display_renders_a_postgres_literal() {
     assert_eq!(Value::Bool(Some(true)).to_string(), "TRUE");
@@ -188,7 +188,7 @@ fn display_renders_a_postgres_literal() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+4/test]    an empty array literal
+// [spec:pgorm:def:sql.render.value-literals+5/test]    an empty array literal
 // carries a cast to its element type: PostgreSQL rejects a bare `ARRAY []` with
 // "cannot determine type of empty array", there being no element to infer from
 #[test]
@@ -214,7 +214,7 @@ fn empty_array_literal_names_element_type() {
     assert_eq!(Value::array([1, 2]).to_string(), "ARRAY [1,2]");
 }
 
-// [spec:pgorm:def:sql.value.array+4/test]    `Value::array` tags the element
+// [spec:pgorm:def:sql.value.array+5/test]    `Value::array` tags the element
 // type from `V`, not from the elements, so an empty list is still typed
 #[test]
 fn value_array_tags_element_type_from_rust() {
@@ -231,7 +231,7 @@ fn value_array_tags_element_type_from_rust() {
     );
 }
 
-// [spec:pgorm:def:sql.value+2/test]    the two surviving unsigned variants
+// [spec:pgorm:def:sql.value+3/test]    the two surviving unsigned variants
 #[test]
 fn unsigned_variants_carry_oid_and_limit_counts() {
     let oid: Value = 42u32.into();
@@ -353,7 +353,7 @@ fn decimal_to_f64_converts_the_payload() {
     assert_eq!(Value::Decimal(None).decimal_to_f64(), None);
 }
 
-// [spec:pgorm:def:sql.render.value-literals+4/test]    a char renders as its whole
+// [spec:pgorm:def:sql.render.value-literals+5/test]    a char renders as its whole
 // UTF-8 text, quoted and escaped exactly like a one-character string
 #[test]
 fn char_renders_whole_scalar_not_low_byte() {
@@ -367,7 +367,7 @@ fn char_renders_whole_scalar_not_low_byte() {
     );
 }
 
-// [spec:pgorm:def:sql.render.value-literals+4/test]    the char literals the renderer
+// [spec:pgorm:def:sql.render.value-literals+5/test]    the char literals the renderer
 // emits are ones the PostgreSQL grammar accepts
 #[test]
 fn char_literals_parse_as_postgres_literals() {

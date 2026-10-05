@@ -16,6 +16,7 @@ mod oracle;
 mod oracle_pins;
 mod oracle_sweep;
 mod query;
+mod range;
 mod render;
 mod schema;
 mod sequence;

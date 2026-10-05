@@ -10,7 +10,7 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use std::sync::Arc;
 
-// [spec:pgorm:sem:codegen.entity.types+3/test]    `Column::get_rs_type` follows
+// [spec:pgorm:sem:codegen.entity.types+4/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
@@ -76,7 +76,7 @@ fn column_rust_types_follow_the_mapping_table() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+3/test]    `Float` and `Double` also map
+// [spec:pgorm:sem:codegen.entity.types+4/test]    `Float` and `Double` also map
 // to `f32` / `f64`, and either one suppresses the Model's `Eq` derive —
 // recursively through `Array`
 #[test]
@@ -316,7 +316,7 @@ fn derived_entity_names_the_hostile_type_exactly() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+3/test]    the expanded writer spells the
+// [spec:pgorm:sem:codegen.entity.types+4/test]    the expanded writer spells the
 // same name the same way, so the two emission paths agree on a hostile name as
 // they do on a benign one
 #[test]
@@ -338,7 +338,7 @@ fn hostile_named_type_survives_the_expanded_column_def() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    a named type the
+// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    a named type the
 // generated `ColumnType::named("..")` could not rebuild — schema-qualified, an
 // array, or a type expression — is refused by name rather than respelled as a
 // different type
@@ -372,7 +372,7 @@ fn column_conversion_rejects_an_unrespellable_named_type() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    a type outside the
+// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    a type outside the
 // mapping fails the whole run with a `TransformError` naming table, column and
 // type — no placeholder code, and no panic
 #[test]
@@ -391,7 +391,7 @@ fn transform_rejects_column_type_outside_mapping() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+2/test]    the check sits at
+// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    the check sits at
 // `Column` construction, so the writer never meets an unmapped type; `Array`
 // element types are checked through
 #[test]
@@ -505,4 +505,36 @@ fn compact_primary_key_facts_surface_as_field_attributes() {
         "#[pgorm(primary_key, auto_increment = false)] pub cake_id: i32,
          #[pgorm(primary_key, auto_increment = false)] pub filling_id: i32,",
     );
+}
+
+// [spec:pgorm:sem:codegen.entity.types+4/test]    a range column is the `Range` of its
+// subtype's Rust type, and the expanded writer names its `RangeType`
+#[test]
+fn range_columns_name_their_range_type() {
+    use pgorm_query::RangeType;
+
+    for (col_type, rust_type, def) in [
+        (
+            ColumnType::Range(RangeType::Int4),
+            "Range < i32 >",
+            "ColumnType :: Range (RangeType :: Int4) . def ()",
+        ),
+        (
+            ColumnType::Range(RangeType::Numeric),
+            "Range < Decimal >",
+            "ColumnType :: Range (RangeType :: Numeric) . def ()",
+        ),
+        (
+            ColumnType::Multirange(RangeType::TimestampTz),
+            "Multirange < DateTimeWithTimeZone >",
+            "ColumnType :: Multirange (RangeType :: TimestampTz) . def ()",
+        ),
+    ] {
+        let col_def = ColumnDef::new_with_type(Name::runtime("span"), col_type)
+            .not_null()
+            .to_owned();
+        let column = Column::try_from(&col_def).expect("a range column is supported");
+        assert_eq!(column.get_rs_type().to_string(), rust_type);
+        assert_eq!(column.get_def().to_string(), def);
+    }
 }

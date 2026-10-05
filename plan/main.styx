@@ -8761,6 +8761,29 @@ children (
             {
                 id scope-range-types
                 title "Range and multirange values round-trip end to end"
+                sealed true
+                log (
+                    {
+                        at 2026-10-04T21:28:10.422435Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-04T21:28:24.375798Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Range design. VALUE: pgorm-query gains RangeType (closed: PostgreSQL's six built-ins Int4/Int8/Numeric/Date/Timestamp/TimestampTz, each naming its range and multirange), Range<T> = Empty | Bounds{lower,upper: std::ops::Bound<T>} (the empty range is its own value, never a pair of bounds), Multirange<T> (newtype over Vec<Range<T>>, because Vec<Range<T>> is int4range[]), and a sealed RangeElement for i32/i64/Decimal/civil::Date/civil::DateTime/jiff::Timestamp. Value::Range(RangeType, Option<Box<Range<Value>>>) and Value::Multirange(..) mirror Value::Array: the tag types NULL and the empty range; ArrayType gains Range/Multirange tags because array_type() is total (no NotU8, so Vec<Range<T>> has no conversion, like Vector). A NULL bound is no bound on every path (PostgreSQL's constructor semantics). Equality is structural; canonicalisation and bound ordering are the server's ([1,5] -> [1,6); [5,1) -> 22000). WIRE: bind in pgorm's ValueHolder via postgres-protocol's range_to_sql, each bound recursing through ValueHolder against Kind::Range(subtype), so bounds inherit the civil-datetime and numeric-zero-scale encodings; multirange = count + length-prefixed ranges; user-defined multiranges arrive as Kind::Simple from tokio-postgres's type lookup and are refused rather than guessed. Decode via pgorm-local RangeSql/MultirangeSql newtypes over range_from_sql (InetSql precedent) — no FromSql in pgorm-query, which would add postgres-protocol to it and churn five detached lockfiles; no ToSql for Range<T>, because binding is Value's job. TryGetable/IntoActiveValue: i32/i64/Decimal unconditional, jiff subtypes under with-jiff (the existing split). Literal rendering uses the constructor functions (int4range(1, 5, '[)'), 'empty'::int4range, int4multirange(...)) so bounds reuse their own literal rendering. DDL: ColumnType::Range/Multirange(RangeType); CREATE TYPE ... AS RANGE via TypeAs::Range(extension::RangeDefinition{subtype: ColumnType, subtype_opclass, collation, subtype_diff, multirange_type_name}); CANONICAL left out (needs a shell type and a C function: 42P17/42P13/0A000 live). Codegen maps the twelve built-in names; user range types stay refused there. PYTHON: named refusal — capabilities already list range/multirange unsupported; a Python range surface needs a range class, new snapshot tags, stubs and acceptance suites, a binding project of its own. CAMPAIGN: no coverage obligation (matrix is hand-written); an outside_runtime 'unsupported' entry records it; the replay crate gains hand arms."
+                    }
+
+                    {
+                        at 2026-10-04T23:55:37.285787Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

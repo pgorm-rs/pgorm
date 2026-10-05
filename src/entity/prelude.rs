@@ -20,7 +20,7 @@
 //! writing it as a token instead of a string is only cheaper than
 //! `Name::runtime` if the token is already in scope.
 
-// [spec:pgorm:def:entity.prelude+4]
+// [spec:pgorm:def:entity.prelude+5]
 // [spec:pgorm:sem:query.build.alias+2]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
@@ -70,3 +70,6 @@ pub use uuid::Uuid;
 
 // [spec:pgorm:def:exec.decode.types+3]
 pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};
+
+// [spec:pgorm:def:exec.decode.range]
+pub use crate::pgorm_query::{Multirange, Range, RangeType};

@@ -59,7 +59,7 @@ fn schema_sql_generates_one_file_per_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+4/test]    the type spellings map onto the
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    the type spellings map onto the
 // ColumnType vocabulary, serial included
 #[test]
 fn column_types_map_through_the_vocabulary() {
@@ -354,7 +354,7 @@ fn unsupported_column_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+4/test]    a type spelling outside the
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    a type spelling outside the
 // vocabulary is named, and so is a modifier the vocabulary cannot hold
 #[test]
 fn unsupported_types_are_named() {
@@ -544,7 +544,7 @@ fn rendered_ddl_round_trips_through_the_bridge() {
     assert_eq!(round_tripped.files, direct.files);
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+4/test]    the types that once shared a
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    the types that once shared a
 // spelling with another variant now each recover themselves
 #[test]
 fn one_spelling_one_variant_round_trips() {
@@ -602,5 +602,55 @@ fn enum_and_unique_index_round_trip() {
     assert_eq!(
         from_sql(&text).files,
         generate(statements(), Opts::default()).files
+    );
+}
+
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    each built-in range and multirange type
+// reads back as the `Range` or `Multirange` of its subtype
+#[test]
+fn range_types_map_through_the_vocabulary() {
+    let generated = from_sql(
+        "CREATE TABLE span (\
+             id integer PRIMARY KEY, \
+             a int4range NOT NULL, b int8range NOT NULL, c numrange NOT NULL, \
+             d daterange NOT NULL, e tsrange NOT NULL, f tstzrange, \
+             g int4multirange NOT NULL, h int8multirange NOT NULL, i nummultirange NOT NULL, \
+             j datemultirange NOT NULL, k tsmultirange NOT NULL, l tstzmultirange\
+         );",
+    );
+    let span = generated.file("span.rs");
+    for field in [
+        "pub a: Range<i32>,",
+        "pub b: Range<i64>,",
+        "pub c: Range<Decimal>,",
+        "pub d: Range<Date>,",
+        "pub e: Range<DateTime>,",
+        "pub f: Option<Range<DateTimeWithTimeZone> >,",
+        "pub g: Multirange<i32>,",
+        "pub h: Multirange<i64>,",
+        "pub i: Multirange<Decimal>,",
+        "pub j: Multirange<Date>,",
+        "pub k: Multirange<DateTime>,",
+        "pub l: Option<Multirange<DateTimeWithTimeZone> >,",
+    ] {
+        assert_contains(span, field);
+    }
+    // The derive takes the column type from the field's own `ValueType`, so
+    // the compact form states none.
+    assert_not_contains(span, "column_type");
+}
+
+// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    an array of ranges has no
+// field type to generate, so it is refused by name
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    and a range type takes no modifier
+#[test]
+fn an_array_or_modified_range_is_refused() {
+    assert_error(
+        "CREATE TABLE span (id integer PRIMARY KEY, a int4range[]);",
+        "table `span` column `a`: column type Array(Range(Int4)) is not supported by codegen",
+    );
+    assert_error(
+        "CREATE TABLE span (id integer PRIMARY KEY, a int4range(3));",
+        "unsupported DDL: `int4range` with a type modifier on column `span`.`a` at statement 1",
     );
 }

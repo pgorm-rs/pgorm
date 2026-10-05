@@ -3,7 +3,7 @@
 This section specifies the schema (DDL) statement builders in `pgorm-query`:
 table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
-`pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` and extension
+`pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` / `AS RANGE` and extension
 statements (`pgorm-query/src/extension.rs`), sequence statements
 (`pgorm-query/src/sequence/`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
@@ -256,7 +256,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > program text reaches that position. Anything expressible through the typed
 > setters MUST use them instead.
 
-> [spec:pgorm:req:sql.ddl.column-types+4]
+> [spec:pgorm:req:sql.ddl.column-types+5]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
 > contract, and it is total: every variant has exactly one Postgres spelling
 > and none can fail. It MUST spell: `Char(Some(n))`→`char(n)`,
@@ -278,7 +278,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `TypeName`'s part policy (`sql.types.type-name`), a lowercase name that
 > is no restricted keyword bare and anything else quoted; `Cidr`→`cidr`;
 > `Inet`→`inet`; `MacAddr`→`macaddr`;
-> `LTree`→`ltree`.
+> `LTree`→`ltree`; `Range(t)`→ the range type `t` names (`int4range`,
+> `int8range`, `numrange`, `daterange`, `tsrange`, `tstzrange`) and
+> `Multirange(t)`→ its multirange (`int4multirange` through
+> `tstzmultirange`).
 
 > [spec:pgorm:req:sql.ddl.alter-table+6]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
@@ -613,7 +616,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Enum types
 
-> [spec:pgorm:req:sql.ddl.type-enum+6]
+> [spec:pgorm:req:sql.ddl.type-enum+7]
 > An enum type reference declares an optional schema — `Type::create` and its
 > siblings take any `IntoTypeRef`, so `(schema, name)` names a qualified type
 > and a bare name an unqualified one — and every DDL rendering MUST qualify
@@ -638,14 +641,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > supports `Type`, `SchemaType` and `DatabaseSchemaType` dotted forms) while
 > the labels pass through the value pipeline, i.e. single-quoted string
 > literals in `to_string` builds and bind parameters in parameterised builds.
-> `TypeAs` has two variants, `Enum` and `Composite`
-> (`[spec:pgorm:req:sql.ddl.type-composite]`), and what a type is, is that
-> one slot: `as_enum()` and `values()` on a composite replace its attributes
-> with a label list, as `as_composite()` and `attribute()` replace an
-> enumeration's labels, so a statement never carries both. A range is
-> deferred (`[spec:pgorm:req:sql.scope+9]`), and a base type, which names C
-> input and output functions, belongs with `CREATE FUNCTION` outside the
-> builder.
+> `TypeAs` has three variants, `Enum`, `Composite`
+> (`[spec:pgorm:req:sql.ddl.type-composite+1]`) and `Range`
+> (`[spec:pgorm:req:sql.ddl.type-range]`), and what a type is, is that
+> one slot: `as_enum()` and `values()` on a composite or a range replace it
+> with a label list, as `as_composite()` and `attribute()` and `as_range()`
+> replace what was there, so a statement never carries two kinds. A base
+> type, which names C input and output functions, belongs with
+> `CREATE FUNCTION` outside the builder.
 
 > [spec:pgorm:req:sql.ddl.type-alter-drop+6]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
@@ -677,14 +680,15 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > None of this is particular to an enumeration. `DROP TYPE` and `RENAME TO`
 > name a type of any kind and serve a composite unchanged
-> (`[spec:pgorm:req:sql.ddl.type-composite]`); the label options are an
+> (`[spec:pgorm:req:sql.ddl.type-composite+1]`); the label options are an
 > enumeration's, and the server refuses them on any other type (`42809`).
 
 ## Composite types
 
-> [spec:pgorm:req:sql.ddl.type-composite]
+> [spec:pgorm:req:sql.ddl.type-composite+1]
 > `TypeCreateStatement` defines a composite type — a row type — beside the
-> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+6]`. `as_composite()`
+> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the range of
+> `[spec:pgorm:req:sql.ddl.type-range]`. `as_composite()`
 > makes it one, and `attribute(name, type)` and `attribute_collated(name,
 > type, collation)` append an attribute, implying `as_composite()` when it has
 > not been called. The marker and the attributes are one field
@@ -693,7 +697,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A composite MUST render `CREATE TYPE <name> AS (<attribute>, ...)`, each
 > attribute its name as a quoted identifier, one space, its `ColumnType` as a
-> column writes it (`[spec:pgorm:def:sql.render.ddl.types+5]`), and then
+> column writes it (`[spec:pgorm:def:sql.render.ddl.types+6]`), and then
 > ` COLLATE <collation>` when it has one, quoted as
 > `[spec:pgorm:req:sql.render.collate]` writes a column's. The parentheses
 > MUST be present for an empty list too: `CREATE TYPE "t" AS ()` is the empty
@@ -710,9 +714,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > already has (`42710`).
 >
 > What a type is, is one slot. Choosing a kind — `as_enum` or `values`,
-> `as_composite` or `attribute` — replaces the other kind's list, as the last
-> of `cascade()` and `restrict()` wins, so no statement carries labels and
-> attributes at once.
+> `as_composite` or `attribute`, `as_range` — replaces what the other kind
+> held, as the last of `cascade()` and `restrict()` wins, so no statement
+> carries labels, attributes or a range definition at once.
 >
 > `DROP TYPE` and `ALTER TYPE ... RENAME TO` need nothing new for a
 > composite, and nothing was added: `TypeDropStatement` and `rename_to` name a
@@ -722,7 +726,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > enumeration's, and the server refuses them on a composite (`42809`, *is not
 > an enum*). The composite's own alterations — `ADD`, `DROP` and `ALTER
 > ATTRIBUTE`, and `RENAME ATTRIBUTE` — are not built:
-> `[spec:pgorm:req:sql.scope+9]` defers them, for the reason the next
+> `[spec:pgorm:req:sql.scope+10]` defers them, for the reason the next
 > paragraph gives.
 >
 > Nothing in pgorm reads a composite value. A column can be declared with the
@@ -736,6 +740,71 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is therefore one raw SQL and server-side code can use and the ORM cannot yet
 > name — what the deferral recorded before the DDL was built. A decode is what
 > a consumer would add, and the attribute alterations wait on it.
+
+## Range types
+
+> [spec:pgorm:req:sql.ddl.type-range]
+> `TypeCreateStatement::as_range(definition)` defines a range type, beside the
+> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the composite of
+> `[spec:pgorm:req:sql.ddl.type-composite+1]`, in the one slot what a type is
+> occupies (`TypeAs::Range`), so it replaces a label or attribute list and is
+> replaced by one. The definition is an `extension::RangeDefinition`,
+> constructed over its subtype, `RangeDefinition::new(subtype)`, because
+> `SUBTYPE` is the one option PostgreSQL requires (`42601` without it): a
+> range type without one does not construct
+> (`[dec:pgorm:invalid-states-unrepresentable]`). The subtype is a
+> `ColumnType`, written as a column's type is
+> (`[spec:pgorm:def:sql.render.ddl.types+6]`), so a type created elsewhere is
+> named by `ColumnType::named`; PostgreSQL discards a type modifier there, so
+> a range over `varchar(10)` is a range over `varchar`.
+>
+> The other options are set on the definition and written only when set, each
+> a name and so quoted:
+>
+> - `subtype_opclass(name)`, `SUBTYPE_OPCLASS`: the b-tree operator class
+>   that orders the subtype, when its default is not the ordering wanted;
+> - `collation(collation)`, `COLLATION`: the collation a collatable subtype
+>   is ordered under, any `IntoCollation` and so schema-qualifiable;
+> - `subtype_diff(name)`, `SUBTYPE_DIFF`: the function measuring the
+>   distance between two subtype values, which a GiST index over the range is
+>   much faster for having;
+> - `multirange_type_name(name)`, `MULTIRANGE_TYPE_NAME`: what the multirange
+>   PostgreSQL creates beside the range is called, any `IntoTypeRef` and so
+>   schema-qualified as the range's own name can be. Unset, PostgreSQL
+>   derives it from the range's name, replacing `range` with `multirange` or
+>   appending `_multirange` (`floatrange` → `floatmultirange`).
+>
+> The operator class and the difference function are unqualified, as a
+> function name is everywhere in this builder (`Func::named`), and resolve on
+> the search path. The statement MUST render `CREATE TYPE <name> AS RANGE
+> (SUBTYPE = <type>[, SUBTYPE_OPCLASS = <name>][, COLLATION = <collation>][,
+> SUBTYPE_DIFF = <name>][, MULTIRANGE_TYPE_NAME = <name>])`, in the order
+> PostgreSQL documents them. It binds nothing, so its two renderings are one.
+>
+> `CANONICAL` is not built, and MUST NOT be until this builder can author
+> the function it names. A canonical function takes and returns the range
+> type itself, so it has to exist before the range does, against a shell type
+> created first; PostgreSQL refuses the option on a type with no shell
+> (`42P17`), refuses a shell type as an SQL function's argument (`42P13`) and
+> as a PL/pgSQL function's result (`0A000`), which leaves a C function — a
+> function body, outside the builder as `CREATE FUNCTION` is
+> (`[spec:pgorm:req:sql.scope+10]`). A range without one is continuous, as
+> `numrange` is: its bounds are stored as written.
+>
+> The rest is the server's to refuse, with its own codes: a collation on a
+> subtype that has none (`42809`), a difference function that does not take
+> two subtype values (`42883`), an operator class for another type (`42804`)
+> or none of that name (`42704`), and a subtype that does not exist
+> (`42704`). `DROP TYPE` and `ALTER TYPE ... RENAME TO` reach a range as they
+> reach the other kinds, and the live suite drops one through them —
+> `RESTRICT` refusing while a column has the type (`2BP01`), `CASCADE`
+> taking the multirange with it.
+>
+> A value of a created range type over one of the built-in subtypes reads
+> and writes as `Range<T>` (`[spec:pgorm:def:sql.value.range]`); its
+> multirange does not, because tokio-postgres reports it as a simple type
+> (`[spec:pgorm:req:exec.cursor.binding-range]`). A column of either is
+> `ColumnType::named`.
 
 ## Sequences
 
@@ -805,7 +874,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Four spellings are not built, each a whole statement through `execute`:
 > `TEMPORARY` / `UNLOGGED` and `SET { LOGGED | UNLOGGED }` are persistence
-> choices of the kind `[spec:pgorm:req:sql.scope+9]` rules out for tables;
+> choices of the kind `[spec:pgorm:req:sql.scope+10]` rules out for tables;
 > `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
 > no table counterpart in the builder either.
 

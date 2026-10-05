@@ -34,7 +34,7 @@ fn eq_vector(a: Option<&pgvector::Vector>, b: Option<&pgvector::Vector>) -> bool
     }
 }
 
-// [spec:pgorm:def:sql.value+2]
+// [spec:pgorm:def:sql.value+3]
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -63,6 +63,9 @@ impl PartialEq for Value {
             (Self::Vector(a), Self::Vector(b)) => eq_vector(a.as_deref(), b.as_deref()),
             (Self::IpNetwork(a), Self::IpNetwork(b)) => a == b,
             (Self::MacAddress(a), Self::MacAddress(b)) => a == b,
+            // Bounds compare through this same impl, as array elements do.
+            (Self::Range(a_ty, a), Self::Range(b_ty, b)) => a_ty == b_ty && a == b,
+            (Self::Multirange(a_ty, a), Self::Multirange(b_ty, b)) => a_ty == b_ty && a == b,
             _ => false,
         }
     }
@@ -97,7 +100,7 @@ fn hash_vector<H: std::hash::Hasher>(value: Option<&pgvector::Vector>, state: &m
     }
 }
 
-// [spec:pgorm:def:sql.value+2]
+// [spec:pgorm:def:sql.value+3]
 impl Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -124,6 +127,8 @@ impl Hash for Value {
             Value::Vector(value) => hash_vector(value.as_deref(), state),
             Value::IpNetwork(value) => value.hash(state),
             Value::MacAddress(value) => value.hash(state),
+            Value::Range(_, value) => value.hash(state),
+            Value::Multirange(_, value) => value.hash(state),
         }
     }
 }

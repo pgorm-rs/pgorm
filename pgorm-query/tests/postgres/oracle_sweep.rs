@@ -595,7 +595,7 @@ fn sweep_schema_object_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    every `ColumnType` that has a PostgreSQL spelling
-// [spec:pgorm:def:sql.render.ddl.types+5/test]
+// [spec:pgorm:def:sql.render.ddl.types+6/test]
 #[test]
 fn sweep_column_type_vocabulary() {
     let types = [
@@ -636,6 +636,14 @@ fn sweep_column_type_vocabulary() {
         ColumnType::Inet,
         ColumnType::MacAddr,
         ColumnType::LTree,
+        ColumnType::Range(RangeType::Int4),
+        ColumnType::Range(RangeType::Int8),
+        ColumnType::Range(RangeType::Numeric),
+        ColumnType::Range(RangeType::Date),
+        ColumnType::Range(RangeType::Timestamp),
+        ColumnType::Range(RangeType::TimestampTz),
+        ColumnType::Multirange(RangeType::Int4),
+        ColumnType::Multirange(RangeType::TimestampTz),
     ];
 
     sweep(types.into_iter().map(|column_type| {

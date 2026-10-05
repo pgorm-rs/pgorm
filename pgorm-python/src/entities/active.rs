@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use super::backend::{Active, Write};
 use crate::values::PyValue;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[pyclass(module = "pgorm", eq, from_py_object)]
 pub enum ActiveState {
     NotSet,

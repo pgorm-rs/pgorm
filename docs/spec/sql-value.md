@@ -8,7 +8,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## The Value container
 
-> [spec:pgorm:def:sql.value+2]
+> [spec:pgorm:def:sql.value+3]
 > `Value` is the single enum container for all SQL values. Every variant wraps
 > an `Option` of its payload; `None` encodes SQL NULL while preserving the type
 > tag. Payloads larger than one pointer are boxed so the enum stays small:
@@ -20,8 +20,12 @@ including panic semantics and quirks inherited from sea-query.
 > `DateTime(Box<civil::DateTime>)`,
 > `DateTimeWithTimeZone(Box<jiff::Timestamp>)`, `Uuid(Box<Uuid>)`,
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
-> `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)` and
-> `MacAddress(Box<MacAddress>)`.
+> `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)`,
+> `MacAddress(Box<MacAddress>)`, and the two range carriers of
+> `[spec:pgorm:def:sql.value.range]`,
+> `Range(RangeType, Option<Box<Range<Value>>>)` and
+> `Multirange(RangeType, Option<Box<Multirange<Value>>>)`, which carry their
+> range type beside the payload as `Array` carries its element type.
 >
 > There are no `u8` or `u16` variants. Postgres has no unsigned integer
 > types, so the MySQL-era `TinyUnsigned`/`SmallUnsigned` spellings — whose
@@ -50,7 +54,9 @@ including panic semantics and quirks inherited from sea-query.
 > `Double` on their payloads, `Vector` element-wise over its `f32` slice, with
 > a `None` payload equal only to another `None` (and hashed as a zero byte).
 > `Array` compares its element tag and then its elements through this same
-> impl, so a float nested in an array is compared bitwise too. Every other
+> impl, so a float nested in an array is compared bitwise too, and `Range` and
+> `Multirange` compare their range type and then their bounds the same way.
+> Every other
 > variant compares structurally, and values of two different variants are
 > never equal. `Display` renders the value as a Postgres SQL literal by
 > delegating to `QueryBuilder.value_to_string`.
@@ -93,7 +99,7 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array+4]`).
+> `[spec:pgorm:def:sql.value.array+5]`).
 
 > [spec:pgorm:def:sql.value.value-type+3]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
@@ -145,14 +151,18 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Arrays
 
-> [spec:pgorm:def:sql.value.array+4]
+> [spec:pgorm:def:sql.value.array+5]
 > `ArrayType` is the element-type tag carried by `Value::Array`; its variants
 > mirror the scalar `Value` variants (`Bool` through `Bytes`, `Json`, the six
-> temporal tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`). There is
-> no nested-array tag. `ValueType::array_type()` is total — `pgvector::Vector`
-> answers `ArrayType::Vector` rather than panicking — but `Vector` does not
-> implement `NotU8`, so `Vec<Vector>` has no `From`/`ValueType` impl and the tag
-> reaches no `Value` through the generic array conversions.
+> temporal tags, `Uuid`, `Decimal`, `IpNetwork`, `MacAddress`, `Vector`), plus
+> `Range(RangeType)` and `Multirange(RangeType)`, the tags of an array of
+> ranges (`int4range[]`) and of multiranges. There is no nested-array tag.
+> `ValueType::array_type()` is total — `pgvector::Vector` answers
+> `ArrayType::Vector` and `Range<i32>` `ArrayType::Range(RangeType::Int4)`
+> rather than panicking — but neither `Vector` nor a range implements
+> `NotU8`, so `Vec<Vector>` and `Vec<Range<T>>` have no `From`/`ValueType`
+> impl and those tags reach a `Value` only through `Value::array`, which
+> names its element type and needs no marker.
 >
 > `Vec<T>` converts to `Value::Array(T::array_type(), ...)` only for `T`
 > implementing the `NotU8` marker trait (all supported element types except
@@ -172,6 +182,88 @@ including panic semantics and quirks inherited from sea-query.
 > resolve. It is the constructor behind the array-parameter predicates
 > (`[spec:pgorm:req:sql.ast.expr.eq-any]`) and, unlike `From<Vec<T>>`, needs no
 > `NotU8` bound, the caller having already named the element type.
+
+## Ranges
+
+> [spec:pgorm:def:sql.value.range]
+> A range value is `Range<T>`, an enum of two shapes: `Empty`, and
+> `Bounds { lower, upper }` with each bound a `std::ops::Bound<T>` —
+> `Included`, `Excluded` or `Unbounded`. The empty range is a value of its
+> own and MUST NOT be spelled as a pair of bounds, because no pair of bounds
+> is equal to it: the server writes `[5,5)` back as `empty`, `(,)` is the
+> range of every value, and a decode that read the empty flag as two
+> unbounded sides would turn a range containing nothing into one containing
+> everything. An unbounded side is not a side bounded by a subtype's own
+> `infinity` either: `[2024-01-01,infinity)` keeps `infinity` as a bound
+> value (`upper_inf` is false), and decoding it fails exactly as decoding
+> that `infinity` outside a range does, rather than reading it as
+> `Unbounded`.
+>
+> `Range::new(lower, upper)` builds the bounds shape, `is_empty`, `lower` and
+> `upper` read it (`None` for the empty range), and `map` converts each
+> bound's value keeping its inclusivity. The standard library's ranges
+> convert to the bounds they spell: `a..b` is `[a,b)`, `a..=b` is `[a,b]`,
+> `a..` is `[a,)`, `..b` is `(,b)`, `..=b` is `(,b]` and `..` is `(,)`.
+> Nothing on the Rust side evaluates the bounds: equality is structural, and
+> canonicalisation and ordering are the server's. A discrete range comes back
+> in its canonical form — `int4range` `[1,5]` reads back as `[1,6)`, and `(1,5]`
+> as `[2,6)` — while a continuous one (`numrange`, `tsrange`, `tstzrange`)
+> comes back as written; inverted bounds are refused (`22000`), as is a
+> discrete bound whose canonical form overflows (`int4range` `[1,2147483647]`,
+> `22003`).
+>
+> A multirange is `Multirange<T>`, a list of ranges built from a `Vec`, an
+> iterator or `Default` (the empty multirange), read by `iter` and
+> `IntoIterator`. It is its own type rather than a `Vec<Range<T>>` because
+> PostgreSQL has both and they are different types: a `Vec` of ranges is an
+> array, `int4range[]`. The server stores a multirange sorted, with
+> overlapping and adjacent ranges merged and empty ones dropped, so
+> `{[5,8), [1,3), [2,4), empty}` reads back as `{[1,4),[5,8)}`.
+>
+> `RangeType` names which of PostgreSQL's six built-in range types a range
+> is, by the subtype it ranges over: `Int4`, `Int8`, `Numeric`, `Date`,
+> `Timestamp` and `TimestampTz`, whose `range_type_name` and
+> `multirange_type_name` are `int4range`/`int4multirange` through
+> `tstzrange`/`tstzmultirange`. The set is closed because PostgreSQL's is.
+> `RangeElement` is the sealed trait of the Rust types those six range over —
+> `i32`, `i64`, `Decimal`, `civil::Date`, `civil::DateTime` and
+> `jiff::Timestamp` — and answers the `RangeType`; it is sealed because the
+> answer is one of the six, and a type with no built-in range would have to
+> name one it is not.
+>
+> For `T: RangeElement`, `Range<T>` and `Multirange<T>` convert into
+> `Value::Range` / `Value::Multirange` tagged with `T::range_type()`, each
+> bound becoming the `Value` of `T`'s own variant; `Nullable` gives the
+> tagged `NULL`, and `ValueType` inverts the conversion, refusing another
+> range type's tag — the tag is what refuses an empty range of another
+> subtype, which has no bound to tell it by. `column_type()` is
+> `ColumnType::Range(T::range_type())` or `ColumnType::Multirange(..)`, and
+> `array_type()` the matching `ArrayType` tag.
+>
+> A `Range<Value>` built by hand can carry a `NULL` bound, which no typed
+> range can. It MUST mean no bound, everywhere: that is how PostgreSQL's
+> range constructors read a `NULL` argument (`int4range(NULL, 5)` is
+> `(,5)`), so the literal rendering
+> (`[spec:pgorm:sem:sql.value.render+2]`), the binding
+> (`[spec:pgorm:req:exec.cursor.binding-range]`) and `ValueType`'s
+> extraction all read it so and the two renderings of one value agree.
+>
+> A range type created by `CREATE TYPE ... AS RANGE`
+> (`[spec:pgorm:req:sql.ddl.type-range]`) has a name only its schema knows,
+> so `RangeType` has no variant for it and a column of one is
+> `ColumnType::Named`. A value of one over one of the six subtypes still
+> binds and decodes through `Range<T>`, because the wire format of a range is
+> its subtype's; a range over any other subtype has no Rust type here.
+>
+> The Python binding refuses ranges, by name: its capability manifest lists
+> `range` and `multirange` as unsupported, a range column fails to decode
+> with an error saying so, and a Rust value becoming a Python one —
+> `PyValue::from_rust`, through which a registered entity's fields and a
+> compiled statement's parameters pass — is refused with
+> `UnsupportedCapabilityError`. A Python range would need a range class the
+> standard library does not have, new tags in the versioned value
+> snapshot, type stubs and the acceptance suites over a built wheel: a
+> binding surface of its own rather than an arm of this one.
 
 ## Value tuples
 
@@ -212,7 +304,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Literal rendering
 
-> [spec:pgorm:sem:sql.value.render+1]
+> [spec:pgorm:sem:sql.value.render+2]
 > `QueryBuilder.value_to_string` renders a `Value` as an inline Postgres
 > literal (also used by `Display for Value` and by `SqlWriter for String` when
 > a statement is built without parameter binding). `None` payloads render as
@@ -233,11 +325,26 @@ including panic semantics and quirks inherited from sea-query.
 > alone, a ninth digit would be rounded by the server on the literal path and
 > discarded by the encoder on the bound one, so the same value would mean two
 > different things depending on how it travelled
-> (`[spec:pgorm:def:exec.cursor.binding+5]`).
+> (`[spec:pgorm:def:exec.cursor.binding+6]`).
 >
 > `Uuid`, `IpNetwork` and `MacAddress` render as
 > quoted display strings. `Array` renders as `ARRAY [elem,...]` recursively
 > and `Vector` as a quoted bracket literal `'[v1,v2,...]'`.
+>
+> A range renders as a call of its range type's constructor,
+> `int4range(1, 5, '[)')`: each bound is written by this same rendering of
+> its own variant, an unbounded side as `NULL` — which is how the constructor
+> reads one, so a `NULL` bound means no bound here as it does on the bound
+> path — and the third argument is the two brackets, `[` or `(` for the lower
+> side and `]` or `)` for the upper, an unbounded side always open. The empty
+> range has no bounds to pass and is the one textual literal,
+> `'empty'::int4range`, cast so that it names its type the way an empty
+> array does. A multirange is its multirange type's constructor over its
+> ranges, `int4multirange(int4range(1, 3, '[)'), 'empty'::int4range)`, and
+> the empty multirange `int4multirange()`. A constructor call needs no
+> quoting rules of its own: the range text form would have to quote and
+> escape each bound's text inside its own brackets, a second escaper for
+> values the literal rendering already writes.
 
 ## Identifier machinery
 
@@ -521,7 +628,7 @@ including panic semantics and quirks inherited from sea-query.
 > Carrying the answer here rather than in a second node shape is what lets a
 > cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
-> [spec:pgorm:def:sql.types.column-type+7]
+> [spec:pgorm:def:sql.types.column-type+8]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -537,8 +644,11 @@ including panic semantics and quirks inherited from sea-query.
 > `Enum { name, schema, variants }` (`schema: Option<Name>` — a qualified
 > enum type carries its schema in the type itself, so every rendering that
 > names the type can qualify),
-> `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`
-> and `LTree`. `ColumnType::serial_spelling` reports the serial form of the
+> `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`,
+> `LTree`, and `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
+> built-in range and multirange types (`[spec:pgorm:def:sql.value.range]`); a
+> range type a schema creates is `Named`, as every other created type is.
+> `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
 > (`[spec:pgorm:req:sql.ddl.column-def+4]`).
 >
@@ -577,6 +687,7 @@ including panic semantics and quirks inherited from sea-query.
 >
 > `ColumnType` equality compares parameters for the parameterised variants,
 > compares `Named` and `Enum` by rendered identifier strings (and variant
-> lists), compares `Array` element types recursively, and otherwise compares
-> enum discriminants. Convenience constructors: `ColumnType::named(str)`,
+> lists), compares `Array` element types recursively, compares `Range` and
+> `Multirange` by the range type they name, and otherwise compares enum
+> discriminants. Convenience constructors: `ColumnType::named(str)`,
 > `ColumnType::string(Option<u32>)` and `ColumnType::var_binary(u32)`.

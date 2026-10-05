@@ -12,7 +12,8 @@ use pgorm::{
     pgorm_query::{
         Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Expr, ForeignKey, Func,
         Index, Name, OnConflict, Query, Sequence, SequenceOption, Table, WindowStatement,
-        WithClause, extension::Type,
+        WithClause,
+        extension::{RangeDefinition, Type},
     },
 };
 
@@ -107,7 +108,7 @@ async fn catalogue_count(db: &DatabaseConnection, sql: &str, name: &str) -> i64 
 /// `InsertStmt` target columns and `ColumnRef.fields`: a schema, a table and a
 /// column all named with the hostile name, created, written and read through
 /// the builders.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_relation_schema_and_column_names() {
     let (ctx, db) = open("ident_oracle_live_relation").await;
@@ -154,7 +155,7 @@ async fn live_relation_schema_and_column_names() {
 /// `ResTarget.name`, `RangeVar.alias.aliasname`, `RangeSubselect.alias` and
 /// `CommonTableExpr.ctename`: every alias kind, read back as the server
 /// labels it.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_alias_names() {
     let (ctx, db) = open("ident_oracle_live_alias").await;
@@ -208,7 +209,7 @@ async fn live_alias_names() {
 
 /// `FuncCall.funcname` and `TypeCast.type_name`: a function and a domain
 /// created under the hostile name, called and cast to through the builders.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_function_and_type_names() {
     let (ctx, db) = open("ident_oracle_live_function_type").await;
@@ -239,7 +240,7 @@ async fn live_function_and_type_names() {
 
 /// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
 /// the hostile name.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_window_names() {
     let (ctx, db) = open("ident_oracle_live_window").await;
@@ -267,7 +268,7 @@ async fn live_window_names() {
 /// `CollateClause.collname` and `ColumnDef.coll_clause`: a collation created
 /// under the hostile name as a copy of `"C"`, named by an expression and by a
 /// column definition through the builders.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_collation_names() {
     let (ctx, db) = open("ident_oracle_live_collation").await;
@@ -305,7 +306,7 @@ async fn live_collation_names() {
 /// `OnConflictClause.infer.conname`: a unique constraint created under the
 /// hostile name and named as the arbiter of an upsert through the builder,
 /// which has to reach it for the conflicting row to be updated.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_conflict_constraint_names() {
     let (ctx, db) = open("ident_oracle_live_conflict").await;
@@ -358,7 +359,7 @@ async fn live_conflict_constraint_names() {
 /// column, then restarted, renamed and dropped through the builders. A table
 /// and a sequence share one namespace, so the sequence's names are the hostile
 /// name with a suffix, every hostile byte still in them.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_sequence_names() {
     let (ctx, db) = open("ident_oracle_live_sequence").await;
@@ -440,7 +441,7 @@ async fn live_sequence_names() {
 /// `coll_clause`: a collation created under the hostile name, then a
 /// composite type of that name whose one attribute has the name too and is
 /// collated by it, checked in the catalogue and dropped through the builders.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_composite_type_names() {
     let (ctx, db) = open("ident_oracle_live_composite").await;
@@ -474,9 +475,97 @@ async fn live_composite_type_names() {
     close(ctx, db).await;
 }
 
+/// `CreateRangeStmt.type_name` and its options' `TypeName.names`: a schema,
+/// a btree operator class over `float8`, a difference function and a
+/// collation created under the hostile name, then a range type of that name
+/// in that schema ordered and measured by them, with a multirange named after
+/// it, and a second range over `text` collated by it — each checked in the
+/// catalogue and dropped through the builders.
+// [spec:pgorm:req:security.ident-oracle+9/test]
+#[tokio::test]
+async fn live_range_type_names() {
+    let (ctx, db) = open("ident_oracle_live_range").await;
+    for name in NASTY {
+        db.batch_execute(&format!(
+            "CREATE SCHEMA {i}; CREATE COLLATION {i} FROM \"C\"; \
+             CREATE FUNCTION {i}(float8, float8) RETURNS float8 \
+             LANGUAGE sql IMMUTABLE AS 'SELECT $1 - $2'; \
+             CREATE OPERATOR CLASS {i} FOR TYPE float8 USING btree AS \
+             OPERATOR 1 <, OPERATOR 2 <=, OPERATOR 3 =, OPERATOR 4 >=, OPERATOR 5 >, \
+             FUNCTION 1 btfloat8cmp(float8, float8)",
+            i = ident(name)
+        ))
+        .await
+        .expect("the fixture schema, collation, function and operator class are created");
+        let n = || Name::runtime(name);
+        let multirange = format!("{name}_m");
+        let text_range = format!("{name}_t");
+
+        run(
+            &db,
+            &Type::create((n(), n()))
+                .as_range(
+                    RangeDefinition::new(ColumnType::Double)
+                        .subtype_opclass(n())
+                        .subtype_diff(n())
+                        .multirange_type_name((n(), Name::runtime(multirange.as_str()))),
+                )
+                .to_string(),
+        )
+        .await;
+        let declared = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_range r JOIN pg_type t ON t.oid = r.rngtypid \
+             JOIN pg_namespace tn ON tn.oid = t.typnamespace \
+             JOIN pg_opclass o ON o.oid = r.rngsubopc \
+             JOIN pg_proc p ON p.oid = r.rngsubdiff \
+             JOIN pg_type m ON m.oid = r.rngmultitypid \
+             JOIN pg_namespace mn ON mn.oid = m.typnamespace \
+             WHERE t.typname = $1 AND tn.nspname = $1 AND o.opcname = $1 \
+             AND p.proname = $1 AND m.typname = $1 || '_m' AND mn.nspname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(declared, 1, "no range {name:?} with those options");
+
+        run(
+            &db,
+            &Type::create(Name::runtime(text_range.as_str()))
+                .as_range(RangeDefinition::new(ColumnType::Text).collation(n()))
+                .to_string(),
+        )
+        .await;
+        let collated = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_range r JOIN pg_type t ON t.oid = r.rngtypid \
+             JOIN pg_collation k ON k.oid = r.rngcollation \
+             WHERE t.typname = $1 || '_t' AND k.collname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(collated, 1, "no range {text_range:?} collated by {name:?}");
+
+        run(&db, &Type::drop((n(), n())).to_string()).await;
+        run(
+            &db,
+            &Type::drop(Name::runtime(text_range.as_str())).to_string(),
+        )
+        .await;
+        let left = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_type \
+             WHERE typname::text IN ($1::text, $1::text || '_m', $1::text || '_t')",
+            name,
+        )
+        .await;
+        assert_eq!(left, 0, "a range type of {name:?} survived its drop");
+    }
+    close(ctx, db).await;
+}
+
 /// `IndexStmt.idxname`, `Constraint.conname`, `CreateEnumStmt` type names and
 /// labels, and `COMMENT ON` targets: DDL-only names, checked in the catalogue.
-// [spec:pgorm:req:security.ident-oracle+8/test]
+// [spec:pgorm:req:security.ident-oracle+9/test]
 #[tokio::test]
 async fn live_ddl_object_names_and_labels() {
     let (ctx, db) = open("ident_oracle_live_ddl").await;

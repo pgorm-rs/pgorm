@@ -341,7 +341,7 @@ fn qualified_enum_preserves_its_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+4/test]    a qualified reference resolves
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    a qualified reference resolves
 // only its exact identity: a same-named enum under another qualification MUST
 // NOT satisfy it
 #[test]
@@ -354,7 +354,7 @@ fn qualified_enum_does_not_resolve_another_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+4/test]    nor does an unqualified
+// [spec:pgorm:sem:codegen.ddl.types+5/test]    nor does an unqualified
 // reference resolve a type declared only under a schema
 #[test]
 fn unqualified_reference_needs_an_unqualified_declaration() {

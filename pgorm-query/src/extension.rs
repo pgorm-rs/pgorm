@@ -6,8 +6,11 @@ use crate::{
 
 #[path = "extension_composite.rs"]
 mod composite;
+#[path = "extension_range.rs"]
+mod range;
 
 pub use composite::CompositeAttribute;
+pub use range::RangeDefinition;
 
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -291,7 +294,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+7]
+// [spec:pgorm:def:sql.types.column-type+8]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {
@@ -489,7 +492,7 @@ where
 /// statement at all. `as_composite` and `attribute` make it a composite
 /// instead, `AS (...)`; what the type is, is one slot, so choosing one kind
 /// replaces the other's list.
-// [spec:pgorm:req:sql.ddl.type-enum+6]
+// [spec:pgorm:req:sql.ddl.type-enum+7]
 #[derive(Debug, Clone)]
 pub struct TypeCreateStatement {
     pub(crate) name: TypeRef,
@@ -497,12 +500,12 @@ pub struct TypeCreateStatement {
 }
 
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
-// [spec:pgorm:req:sql.ddl.type-enum+6]
+// [spec:pgorm:req:sql.ddl.type-enum+7]
 #[derive(Debug, Clone)]
 pub enum TypeAs {
     /// `AS (..)`, a composite carrying its attributes, the marker and the
     /// attributes one fact as an enumeration's marker and labels are.
-    // [spec:pgorm:req:sql.ddl.type-composite]
+    // [spec:pgorm:req:sql.ddl.type-composite+1]
     Composite(Vec<CompositeAttribute>),
     /// `AS ENUM (..)`, carrying its labels: the marker and the values are one
     /// fact, so no value list survives without the `AS ENUM` that renders it.
@@ -511,6 +514,9 @@ pub enum TypeAs {
     /// identifier — so it is carried as a `String` rather than as a name.
     // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     Enum(Vec<String>),
+    /// `AS RANGE (..)`, carrying the subtype and the options beside it.
+    // [spec:pgorm:req:sql.ddl.type-range]
+    Range(RangeDefinition),
 }
 
 /// Drop one or more types
@@ -644,7 +650,7 @@ impl TypeCreateStatement {
     ///     r#"CREATE TYPE "font" AS ENUM ()"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.type-enum+6]
+    // [spec:pgorm:req:sql.ddl.type-enum+7]
     pub fn as_enum(&mut self) -> &mut Self {
         if !matches!(self.as_type, Some(TypeAs::Enum(_))) {
             self.as_type = Some(TypeAs::Enum(Vec::new()));

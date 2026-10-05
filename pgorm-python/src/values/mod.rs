@@ -26,11 +26,20 @@ pub struct PyValue {
 
 impl PyValue {
     /// Wrap a Rust value without changing its variant or payload.
-    pub fn from_rust(inner: Value) -> Self {
-        Self {
+    ///
+    /// A range or multirange is refused here, where a Rust value first becomes
+    /// a Python one: the binding has no Python range type, no tag for one and
+    /// no snapshot encoding, so it cannot hand the value over or carry it.
+    pub fn from_rust(inner: Value) -> PyResult<Self> {
+        if matches!(inner, Value::Range(..) | Value::Multirange(..)) {
+            return Err(crate::UnsupportedCapabilityError::new_err(
+                UNSUPPORTED_RANGE,
+            ));
+        }
+        Ok(Self {
             tag: types::rust_tag(&inner),
             inner,
-        }
+        })
     }
 
     /// Borrow the value for Rust builder and parameter APIs.
@@ -122,9 +131,9 @@ impl PyValue {
 
     #[staticmethod]
     fn json(value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(Value::Json(Some(Box::new(
+        Self::from_rust(Value::Json(Some(Box::new(
             json::from_python(value, 0).map_err(construction_error)?,
-        )))))
+        ))))
     }
 
     #[staticmethod]
@@ -200,13 +209,18 @@ impl PyValue {
 
     /// JSON-compatible, lossless inspection data. Float payloads use IEEE bits.
     fn snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        json::to_python(py, &snapshot::encode(self))
+        json::to_python(py, &snapshot::encode(self)?)
     }
 
     fn __repr__(&self) -> String {
         format!("Value(kind={:?}, is_null={})", self.kind(), self.is_null())
     }
 }
+
+/// Why a range or multirange value is refused: the binding declares both
+/// unsupported in its capability manifest.
+const UNSUPPORTED_RANGE: &str =
+    "range and multirange values are not supported by the Python binding";
 
 fn construction_error(error: PyErr) -> PyErr {
     Python::attach(|py| {

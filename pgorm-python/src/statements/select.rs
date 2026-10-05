@@ -9,7 +9,7 @@ use crate::{
 
 /// Join kinds which require an ON condition; CROSS JOIN has its own method.
 #[pyclass(name = "Join", module = "pgorm", eq, from_py_object)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Join {
     Inner,
     Left,
@@ -18,7 +18,7 @@ pub enum Join {
 }
 
 impl Join {
-    fn rust_join(self) -> JoinType {
+    fn rust_join(&self) -> JoinType {
         match self {
             Self::Inner => JoinType::InnerJoin,
             Self::Left => JoinType::LeftJoin,
@@ -112,7 +112,7 @@ impl PySelect {
             let ordering = ordering
                 .extract::<PyRef<'_, OrderBy>>()
                 .map_err(|_| ConstructionError::new_err("order_by requires OrderBy expressions"))?;
-            match ordering.nulls {
+            match &ordering.nulls {
                 Some(nulls) => next.inner.order_by_expr_with_nulls(
                     ordering.expr.inner.clone(),
                     ordering.direction.rust_order(),

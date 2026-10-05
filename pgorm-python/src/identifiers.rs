@@ -49,14 +49,14 @@ pub(crate) fn validate_name(name: &str) -> PyResult<()> {
 
 /// Typed SQL ordering direction.
 #[pyclass(name = "Direction", module = "pgorm", eq, from_py_object)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Direction {
     Asc,
     Desc,
 }
 
 impl Direction {
-    pub fn rust_order(self) -> Order {
+    pub fn rust_order(&self) -> Order {
         match self {
             Self::Asc => Order::Asc,
             Self::Desc => Order::Desc,
@@ -66,14 +66,14 @@ impl Direction {
 
 /// Typed placement of NULL values in an ordering.
 #[pyclass(name = "Nulls", module = "pgorm", eq, from_py_object)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Nulls {
     First,
     Last,
 }
 
 impl Nulls {
-    pub fn rust_nulls(self) -> NullOrdering {
+    pub fn rust_nulls(&self) -> NullOrdering {
         match self {
             Self::First => NullOrdering::First,
             Self::Last => NullOrdering::Last,

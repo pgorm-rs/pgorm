@@ -372,7 +372,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+3]
+> [spec:pgorm:sem:codegen.entity.types+4]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -388,12 +388,16 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > | `Boolean` | `bool` |
 > | `Enum { name, .. }` | UpperCamelCase of `name` |
 > | `Array(inner)` | `Vec<T(inner)>` (recursive) |
+> | `Range(t)` / `Multirange(t)` | `Range<E>` / `Multirange<E>`, `E` being `i32`, `i64`, `Decimal`, `Date`, `DateTime` or `DateTimeWithTimeZone` for `Int4` through `TimestampTz` |
 > | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime+1` |
 >
 > No row produces an unsigned Rust integer: Postgres has no unsigned integer
 > type, so a generated field MUST NOT claim one.
 >
-> The named types resolve through `pgorm::entity::prelude::*`.
+> The named types resolve through `pgorm::entity::prelude::*`. The expanded
+> writer names a range column's type `ColumnType::Range(RangeType::Int4)`,
+> which resolves the same way; the compact writer states no `column_type` for
+> one, the derive taking it from the field's own `ValueType`.
 >
 > The `Eq` derive is added to the Model derive list only when no column's
 > type is `Float` or `Double`, checked recursively through `Array` element
@@ -427,7 +431,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+2]
+> [spec:pgorm:req:codegen.entity.types.unsupported+3]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -436,7 +440,10 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > not supported by codegen")``, where `<type>` is the `ColumnType`'s `Debug`
 > form; outside `transform` the message names the column alone. `Array`
 > element types are checked recursively, so an array of an unsupported
-> element type is itself unsupported.
+> element type is itself unsupported. An array of ranges or multiranges is
+> unsupported though its element is not: `Vec<Range<T>>` has no value
+> conversion (`[spec:pgorm:def:sql.value.array+5]`), so no field type for it
+> would compile.
 >
 > A type inside the table can still be beyond the writer, in which case the
 > same gate refuses it with its own message. `Enum { name, .. }` is refused
@@ -755,7 +762,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so there is no constraint a non-unique index could
 > be carried as. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+4]
+> [spec:pgorm:sem:codegen.ddl.types+5]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
@@ -771,7 +778,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `bool` → `Boolean`, `money` → `Money`, `bytea` → `Bytea`, `bit` → `Bit`,
 > `varbit` → `VarBit`, `json` → `Json`, `jsonb` → `JsonBinary`, `uuid` → `Uuid`,
 > `inet`/`cidr`/`macaddr`/`ltree` → `Inet`/`Cidr`/`MacAddr`/`LTree`,
-> `vector` → `Vector`. `serial`, `bigserial` and `smallserial` (and
+> `vector` → `Vector`, the six built-in range types `int4range`,
+> `int8range`, `numrange`, `daterange`, `tsrange` and `tstzrange` →
+> `Range(Int4)` through `Range(TimestampTz)`, and their multiranges
+> `int4multirange` through `tstzmultirange` → `Multirange(..)`. A range type
+> the file creates is not read — `CREATE TYPE ... AS RANGE` is refused by
+> name, as a composite is — so a column of one is unsupported. `serial`, `bigserial` and `smallserial` (and
 > `serial4`/`serial8`/`serial2`) are `Integer`/`BigInteger`/`SmallInteger` plus
 > the auto-increment fact the renderer spells as the serial family. A name the
 > file declared as an enum type resolves to `ColumnType::Enum` carrying that
@@ -782,7 +794,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > bound wraps the element type in `Array`; only one unsized `[]` is accepted.
 >
 > The map is close to a bijection because the forward contract
-> (`[spec:pgorm:req:sql.ddl.column-types+4]`) no longer spells one Postgres
+> (`[spec:pgorm:req:sql.ddl.column-types+5]`) no longer spells one Postgres
 > type under several names: `bytea`, `timestamp`, `smallint` and `money` each
 > have exactly one `ColumnType` to come back to, so `Bytea`, `Timestamp`,
 > `SmallInteger` and `Money` are recovered rather than chosen from a set. Where
