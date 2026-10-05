@@ -636,6 +636,79 @@ children (
                     }
                 )
             }
+
+            {
+                id composite-keys
+                title "Composite primary keys work at the edges the core left out"
+                children (
+                    {
+                        id composite-key-generated-column
+                        title "A key column the database generates can sit inside a composite key"
+                        kind @feat
+                        log (
+                            {
+                                at 2026-10-05T09:33:28.834012Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Survey 2026-10-05 at c24fea1e: the common multi-tenant shape (tenant_id, id serial/identity) as a composite primary key cannot be declared. pgorm-macros/src/derives/entity_model.rs (~line 456) forces auto_increment to false whenever more than one field is a primary key, so it is one global flag rather than a property of a column. A live probe of an entity keyed (tenant, seq) with no flags got no serial/identity from Schema::create_table_from_entity, and an insert with seq NotSet failed 23502 (not-null violation). The workaround today is hand-written DDL with an identity or default_expr. Acceptance: a column inside a composite key can be declared generated (decide between a per-field auto_increment and an identity attribute, checking what single-column keys already use and the identity column options typed in cba07b39). Schema-gen emits the identity/default for that column only. Inserting with it NotSet sends no value and returns the full key tuple including the generated part, through exec_returning_pk and exec_returning_model, for one row and many. PrimaryKeyTrait::auto_increment() (spec: true only for exactly one key column, macros.derive.entity-model.primary-key) gets a meaning stated for the composite case. Live tests cover all of it. Rules to revisit: macros.derive.entity-model.primary-key, entity.traits.primary-key, schema.from-entity, exec.crud.insert."
+                            }
+                        )
+                    }
+
+                    {
+                        id composite-key-writes
+                        title "Composite-key lookups take borrowed parts, many-row inserts return every key, and every write path has a live test"
+                        kind @feat
+                        deps (composite-key-generated-column)
+                        log (
+                            {
+                                at 2026-10-05T09:33:28.887066Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Survey 2026-10-05 at c24fea1e, three items. (1) find_by_id((1, \"x\")) does not compile against an (i32, String) key: From<({integer}, &str)> is missing, so callers must write \"x\".to_owned(). Single-column keys presumably accept &str, so check how they convert and give key tuples per-element Into conversion, for every lookup that takes a key value (find_by_id, delete_by_id, and any others), at every arity 1-12 without blowing up compile time. (2) Insert::many(..).exec_returning_pk returns only the last row's key, and no rule says so. Decide whether a many-row insert should return every key in insertion order (RETURNING gives them all) or say the limit plainly in exec.crud.insert. Prefer returning all of them if it doesn't break single-row callers' types. (3) Most composite write paths have no permanent live test. The survey proved these live only with probes it then deleted: insert returning the key tuple, insert_many, find_by_id/delete_by_id, ActiveModel update/delete (a half-NotSet key gives PrimaryKeyNotSet), upsert via OnConflict::column(A).and_columns([B]) DO UPDATE returning model and key plus on_conflict_do_nothing reporting Conflicted, load_one/load_many/load_many_via over a composite FK and a composite junction (including an empty bucket), find_related both directions, find_linked over 2 and 3 hops, and a composite-root graph resumed with after_with at arity 3. Land these as a permanent live test file. Also noted: there is no OnConflict::columns convenience. Consider whether it belongs here, or file it."
+                            }
+                        )
+                    }
+
+                    {
+                        id composite-key-refusals
+                        title "Two primary-key sources and keys past twelve columns are refused by name"
+                        kind @fix
+                        deps (composite-key-generated-column)
+                        log (
+                            {
+                                at 2026-10-05T09:33:28.935128Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Survey 2026-10-05 at c24fea1e, two refusals missing. (1) Two primary-key sources: PostgreSQL rejects a table with more than one PRIMARY KEY (42P16, check live), but pgorm-query renders two column-level PRIMARY KEYs. In codegen, two column-level PKs, or a column-level plus a table-level PK, become a composite key or a duplicate PrimaryKey variant whose generated code does not compile (pgorm-codegen/src/sql_schema/table.rs around :83/:93, pgorm-codegen/src/entity/transformer.rs around :126). Codegen's cake_filling() test fixture relies on that invalid shape and must be rewritten to the valid table-level form. Make the invalid state unrepresentable or refused in pgorm-query, per [dec:pgorm:invalid-states-unrepresentable]; see how 889b9ea0 reshaped embedded constraints. Codegen should give a named rejection per codegen.ddl.unsupported's pattern. (2) Past twelve key columns, the entity macro and codegen produce six raw E0277 trait errors (PrimaryKeyArity, TryFromU64, TryFromValueTuple, Debug/PartialEq on a 13-tuple) rather than one named error. Give the macro a named compile error, with a compile-fail test, and codegen's transform a named refusal."
+                            }
+                        )
+                    }
+
+                    {
+                        id composite-key-edge-coverage
+                        title "Composite keys are tested where they were only exercised: tuple DeriveRelation, DDL-path composite FKs, Python registered entities, the campaign"
+                        kind @test
+                        deps (composite-key-refusals composite-key-writes)
+                        log (
+                            {
+                                at 2026-10-05T09:33:28.984925Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Survey 2026-10-05 at c24fea1e, where composite keys work but nothing permanent proves it. (1) DeriveRelation with tuple from/to has only compile-fail tests in pgorm-macros, so add a passing one that also checks the rendered join constrains every column pair. (2) Codegen's DDL path (parse_schema) has no composite-foreign-key test; a survey fork generated and compiled one fine, so make that permanent. (3) pgorm-python: Python-declared p.Model supports composite keys through key(mapping) (python/pgorm/models/model.py ~:99), but test_alias_joins_and_composite_keys covers lookup only. Registered Rust entities handle composite keys in code (src/entities/metadata.rs ~:164), but every fixture has a single id, so that path is untested; add a composite-key fixture and cover the operations Python has. Python's tests need a maturin build and the TLS fixture, and maturin develop writes a .so into pgorm-python/python/pgorm, which is now gitignored. (4) The generative campaign covers composite primary keys (models.composite-key, compile cases entity-key-composite/lookup/arity) but no composite foreign key anywhere, so add one to the matrix, keep coverage declared complete, and keep its unit tests green. Don't run the full campaign inside the node; the lead runs it."
+                            }
+                        )
+                    }
+                )
+                log (
+                    {
+                        at 2026-10-05T09:33:28.780356Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-05, asked \"what about composite primary keys? SeaORM couldn't handle that at all\": a survey at c24fea1e (24 existing tests run, plus live probes since deleted) found the core works end to end — tuple keys of arity 1-12, find_by_id/delete_by_id, ActiveModel insert/update/delete, insert returning the key tuple, upsert on the full key, composite FKs, find_related both ways, a composite junction for many-to-many, Linked over 2-3 hops, load_one/load_many/load_many_via batching as (a,b) IN (...), graph decode and grouping, keyset cursors with every key column as a tiebreak, paginate/count, schema-gen PRIMARY KEY (a,b) plus composite FOREIGN KEY, and codegen's tuple keys and junction detection. The operator chose to build all four gap groups the survey found, as the four children of this node. The ordering is in deps: generated-column first because it reshapes how the entity macro records auto_increment, which writes and refusals both touch; edge-coverage last because it tests what the other three settle."
+                    }
+                )
+            }
         )
     }
 
