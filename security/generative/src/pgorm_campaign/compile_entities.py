@@ -218,7 +218,46 @@ def relation_cases():
             ),
         ]
     )
-    return [_accept("entity-relation-pair", body, "belongs_to plus a Related impl")]
+    tenant_child = entity_module(
+        table="rel_tenant_child",
+        columns=(("parent_id", "i32", ""),),
+        keys=(("tenant_id", "i32"), ("id", "i32")),
+        relation=(
+            '        #[pgorm(belongs_to = "super::parent::Entity", '
+            'from = "(Column::TenantId, Column::ParentId)", '
+            'to = "(super::parent::Column::TenantId, super::parent::Column::Id)")]\n'
+            "        Parent,"
+        ),
+    )
+    composite = "\n\n".join(
+        [
+            _nested(
+                "parent",
+                entity_module(
+                    table="rel_tenant_parent",
+                    columns=(),
+                    keys=(("tenant_id", "i32"), ("id", "i32")),
+                ),
+            ),
+            _nested(
+                "child",
+                tenant_child
+                + "\n\n    impl Related<super::parent::Entity> for Entity {\n"
+                "        fn to() -> RelationDef {\n"
+                "            Relation::Parent.def()\n        }\n    }"
+                "\n\n    pub fn parent_of(child: &Model) -> Select<super::parent::Entity> {\n"
+                "        child.find_related(super::parent::Entity)\n    }",
+            ),
+        ]
+    )
+    return [
+        _accept("entity-relation-pair", body, "belongs_to plus a Related impl"),
+        _accept(
+            "entity-relation-composite",
+            composite,
+            "a two-column foreign key: tuple from/to onto a two-column key",
+        ),
+    ]
 
 
 def negative_cases():

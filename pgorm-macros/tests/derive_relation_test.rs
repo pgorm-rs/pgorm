@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use pgorm::entity::prelude::*;
-use pgorm::pgorm_query::{ConditionType, Name};
+use pgorm::pgorm_query::{ConditionType, Name, Values};
 use pgorm::{Key, RelationType, SqlName};
 
 mod cake {
@@ -107,6 +107,69 @@ mod entity_override {
     }
 }
 
+/// A shelf keyed `(tenant_id, id)`, and the books on it: a book names its
+/// shelf by both columns, so `from` and `to` are tuples.
+mod shelf {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "shelf")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub tenant_id: i32,
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[pgorm(has_many = "super::book::Entity")]
+        Books,
+    }
+
+    impl Related<super::book::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Books.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+mod book {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "book")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub tenant_id: i32,
+        #[pgorm(primary_key)]
+        pub id: i32,
+        pub shelf_id: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {
+        #[pgorm(
+            belongs_to = "super::shelf::Entity",
+            from = "(Column::TenantId, Column::ShelfId)",
+            to = "(super::shelf::Column::TenantId, super::shelf::Column::Id)",
+            on_delete = "Cascade"
+        )]
+        Shelf,
+    }
+
+    impl Related<super::shelf::Entity> for Entity {
+        fn to() -> RelationDef {
+            Relation::Shelf.def()
+        }
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 fn cols(id: &Key) -> Vec<String> {
     id.iter().map(|i| SqlName::to_string(&**i)).collect()
 }
@@ -182,4 +245,63 @@ fn the_entity_identifier_is_overridable() {
     assert_eq!(def.from_tbl, cake::Entity.table_ref().into());
     assert_eq!(def.to_tbl, fruit::Entity.table_ref().into());
     assert_eq!(def.rel_type, RelationType::HasOne);
+}
+
+// [spec:pgorm:syn:macros.derive.relation+1/test]    tuple `from` / `to` pair
+// column by column: the def carries every pair in order, and the join it
+// renders, both ways round, constrains every pair rather than the first
+#[test]
+fn tuple_from_to_joins_every_column_pair() {
+    let def = book::Relation::Shelf.def();
+    assert_eq!(def.rel_type, RelationType::HasOne);
+    assert_eq!(
+        cols(&def.columns.from_key()),
+        vec!["tenant_id".to_owned(), "shelf_id".to_owned()]
+    );
+    assert_eq!(
+        cols(&def.columns.to_key()),
+        vec!["tenant_id".to_owned(), "id".to_owned()]
+    );
+    assert!(matches!(def.on_delete, Some(ForeignKeyAction::Cascade)));
+
+    let (books, _) = book::Entity::find()
+        .join(JoinType::InnerJoin, book::Relation::Shelf.def())
+        .build();
+    assert_eq!(
+        books,
+        [
+            r#"SELECT "book"."tenant_id", "book"."id", "book"."shelf_id" FROM "book""#,
+            r#"INNER JOIN "shelf" ON "book"."tenant_id" = "shelf"."tenant_id""#,
+            r#"AND "book"."shelf_id" = "shelf"."id""#,
+        ]
+        .join(" ")
+    );
+
+    let reversed = shelf::Relation::Books.def();
+    assert_eq!(reversed.rel_type, RelationType::HasMany);
+    assert_eq!(
+        cols(&reversed.columns.from_key()),
+        vec!["tenant_id".to_owned(), "id".to_owned()]
+    );
+    assert_eq!(
+        cols(&reversed.columns.to_key()),
+        vec!["tenant_id".to_owned(), "shelf_id".to_owned()]
+    );
+    let shelf = shelf::Model {
+        tenant_id: 7,
+        id: 3,
+        label: "fiction".to_owned(),
+    };
+    let (books_on_shelf, values) = shelf.find_related(book::Entity).build();
+    assert_eq!(
+        books_on_shelf,
+        [
+            r#"SELECT "book"."tenant_id", "book"."id", "book"."shelf_id" FROM "book""#,
+            r#"INNER JOIN "shelf" ON "shelf"."tenant_id" = "book"."tenant_id""#,
+            r#"AND "shelf"."id" = "book"."shelf_id""#,
+            r#"WHERE "shelf"."tenant_id" = $1 AND "shelf"."id" = $2"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(values, Values(vec![7.into(), 3.into()]));
 }

@@ -1,4 +1,4 @@
-use crate::{account, note};
+use crate::{account, membership, note};
 
 use pgorm::pgorm_query::Name;
 use pgorm::{EntityTrait, Opt, RelationDef, Req, SelectGraph};
@@ -27,6 +27,9 @@ pub fn required(aliases: &[String]) -> SelectGraph<account::Entity, (Req<note::E
 // [spec:pgorm:req:python.graph/test]
 pub fn register(registry: &mut pgorm_python::entities::Registry) -> PyResult<()> {
     registry.graph::<account::Entity, (), _>("app.AccountOnly", |_| account::Entity::graph())?;
+    registry.graph::<membership::Entity, (), _>("app.MembershipOnly", |_| {
+        membership::Entity::graph()
+    })?;
     registry.graph("app.AccountNotes", optional)?;
     registry.graph("app.RequiredNotes", required)?;
     registry.graph("app.MixedNotes", |aliases| {

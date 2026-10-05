@@ -4,7 +4,10 @@
 mod common;
 
 use common::*;
-use pgorm::{ColumnTrait, ColumnTypeTrait, PrimaryKeyTrait};
+use pgorm::{
+    ColumnTrait, ColumnTypeTrait, EntityTrait, JoinType, ModelTrait, PrimaryKeyTrait, QuerySelect,
+    QueryTrait, RelationTrait,
+};
 use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
 use pgorm_codegen::{Error, WriterOutput};
 use pgorm_query::extension::Type;
@@ -23,6 +26,30 @@ const TENANT_TICKET: &str = "CREATE TABLE tenant_ticket (
     id int GENERATED ALWAYS AS IDENTITY,
     title text NOT NULL,
     PRIMARY KEY (tenant_id, id)
+);";
+
+/// The entities the bridge generates for a two-column foreign key onto a
+/// two-column key, compiled here as well as compared: the relation the writer
+/// emits pairs both columns, and the derive accepts it.
+#[path = "sql/tenant_task.rs"]
+mod tenant_task;
+#[path = "sql/tenant_task_note.rs"]
+mod tenant_task_note;
+
+const TENANT_TASKS: &str = "CREATE TABLE tenant_task (
+    tenant_id int NOT NULL,
+    id int NOT NULL,
+    title text NOT NULL,
+    PRIMARY KEY (tenant_id, id)
+);
+CREATE TABLE tenant_task_note (
+    tenant_id int NOT NULL,
+    id int NOT NULL,
+    task_id int NOT NULL,
+    body text NOT NULL,
+    PRIMARY KEY (tenant_id, id),
+    CONSTRAINT tenant_task_note_task FOREIGN KEY (tenant_id, task_id)
+        REFERENCES tenant_task (tenant_id, id) ON DELETE CASCADE
 );";
 
 fn from_sql(sql: &str) -> Generated {
@@ -750,4 +777,57 @@ fn identity_forms_reach_both_formats() {
         "Self::B => ColumnType::BigInteger.def().identity_by_default(),",
     );
     assert_contains(&pair, "fn auto_increment() -> bool { true }");
+}
+
+// [spec:pgorm:sem:codegen.ddl.tables+6/test]    a table-level FOREIGN KEY over two
+// columns is bridged as one key pairing them in order, and the entities
+// generated from it compile, the owning side's relation and the target's
+// inverse each joining on both pairs
+#[test]
+fn a_composite_foreign_key_joins_on_both_pairs() {
+    let statements = parse_schema(TENANT_TASKS).expect("the schema parses");
+    let foreign_keys = statements[1].get_foreign_key_create_stmts();
+    assert_eq!(foreign_keys.len(), 1);
+    let key = foreign_keys[0].get_foreign_key();
+    assert_eq!(key.get_columns(), ["tenant_id", "task_id"]);
+    assert_eq!(key.get_ref_columns(), ["tenant_id", "id"]);
+
+    // The writer closes an attribute list with a trailing comma, which rustfmt
+    // drops from the compiled copy, so the comparison sets it aside.
+    let generated = from_sql(TENANT_TASKS);
+    for (file, fixture) in [
+        ("tenant_task.rs", include_str!("sql/tenant_task.rs")),
+        (
+            "tenant_task_note.rs",
+            include_str!("sql/tenant_task_note.rs"),
+        ),
+    ] {
+        let written = norm(generated.file(file)).replace(", )", ")");
+        assert!(written.contains(&norm(fixture)), "{file}: {written}");
+    }
+
+    let (joined, _) = tenant_task_note::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            tenant_task_note::Relation::TenantTask.def(),
+        )
+        .build();
+    assert!(
+        joined.ends_with(
+            r#"INNER JOIN "tenant_task" ON "tenant_task_note"."tenant_id" = "tenant_task"."tenant_id" AND "tenant_task_note"."task_id" = "tenant_task"."id""#
+        ),
+        "{joined}"
+    );
+    let task = tenant_task::Model {
+        tenant_id: 7,
+        id: 3,
+        title: "triage".to_owned(),
+    };
+    let (notes, _) = task.find_related(tenant_task_note::Entity).build();
+    assert!(
+        notes.ends_with(
+            r#"INNER JOIN "tenant_task" ON "tenant_task"."tenant_id" = "tenant_task_note"."tenant_id" AND "tenant_task"."id" = "tenant_task_note"."task_id" WHERE "tenant_task"."tenant_id" = $1 AND "tenant_task"."id" = $2"#
+        ),
+        "{notes}"
+    );
 }

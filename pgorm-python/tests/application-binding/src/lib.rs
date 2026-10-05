@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod graphs;
+pub mod membership;
 pub mod note;
 pub mod sources;
 
@@ -20,6 +21,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let mut registry = pgorm_python::entities::Registry::default();
     registry.entity::<account::Entity>("app.Account")?;
     registry.entity::<note::Entity>("app.Note")?;
+    registry.entity::<membership::Entity>("app.Membership")?;
     graphs::register(&mut registry)?;
     sources::register(&mut registry)?;
     pgorm_python::install(module, registry)

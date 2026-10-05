@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import unittest
 import pgorm as p
+from pgorm import schema as s
 import registered_entities as fixture
 
 
@@ -55,7 +56,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         manifest = p.capabilities()
         self.assertEqual(manifest["graph_policy"]["source_arities"], list(range(1, 8)))
         graphs = {graph["name"]: graph for graph in manifest["registrations"]["graphs"]}
-        self.assertEqual(len(graphs), 8)
+        self.assertEqual(len(graphs), 9)
         self.assertEqual([source["slot"] for source in graphs["app.MixedNotes"]["sources"]], ["root", "Req", "Opt"])
         self.assertEqual(graphs["app.AccountNotes"]["terminals"], ["all", "one_opt", "cursor.all"])
         self.assertEqual(graphs["app.AccountNotes"]["sources"][1]["entity"], "app.Note")
@@ -113,6 +114,28 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(p.DecodeError):
                     await terminal(connection)
             self.assertEqual((await query.filter(query.col(0, "id") == 3).one_opt(connection))[1], None)
+
+    # [spec:pgorm:req:python.graph/test]
+    async def test_composite_root_cursor_ties_on_whole_key(self):
+        membership = p.entity("app.Membership")
+        async with self.pool.connection() as connection:
+            await connection.execute(s.from_entity(membership).table)
+            for tenant, identity, role in ((1, 1, "a"), (1, 2, "a"), (2, 1, "a"), (2, 2, "b")):
+                await membership.active().set("tenant_id", tenant).set("id", identity).set("role", role).insert(connection)
+            cursor = p.graph("app.MembershipOnly").find().cursor("role")
+            cases = [
+                ("first", cursor.first(3), [(1, 1), (1, 2), (2, 1)]),
+                ("after_whole_key", cursor.after_with("a", 1, 2).first(2), [(2, 1), (2, 2)]),
+                ("before_whole_key", cursor.before_with("a", 2, 1).last(2), [(1, 1), (1, 2)]),
+                ("primary_after", cursor.after("a"), [(2, 2)]),
+            ]
+            for name, selected, expected in cases:
+                with self.subTest(name=name):
+                    rows = await selected.all(connection)
+                    self.assertEqual([(row["tenant_id"], row["id"]) for row in rows], expected)
+        for values in (("a",), ("a", 1), ("a", 1, 2, 3)):
+            with self.subTest(values=values), self.assertRaises(p.ConstructionError):
+                cursor.after_with(*values)
 
     # [spec:pgorm:req:python.graph/test]
     async def test_invalid_shapes_aliases_and_boundaries_fail(self):

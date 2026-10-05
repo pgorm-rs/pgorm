@@ -34,6 +34,21 @@ JUNCTION = (
     "    PRIMARY KEY (task_id, label_id)\n);"
 )
 
+COMPOSITE_FOREIGN_KEY = (
+    "CREATE TABLE tenant_task (\n"
+    "    tenant_id integer NOT NULL,\n"
+    "    id integer NOT NULL,\n"
+    "    title text NOT NULL,\n"
+    "    PRIMARY KEY (tenant_id, id)\n);"
+    "\n\nCREATE TABLE tenant_task_note (\n"
+    "    tenant_id integer NOT NULL,\n"
+    "    id integer NOT NULL,\n"
+    "    task_id integer NOT NULL,\n"
+    "    body text,\n"
+    "    PRIMARY KEY (tenant_id, id),\n"
+    "    FOREIGN KEY (tenant_id, task_id) REFERENCES tenant_task (tenant_id, id)\n);"
+)
+
 ENUMERATED = (
     "CREATE TYPE task_state AS ENUM ('open', 'closed');\n\n"
     "CREATE TABLE task (\n"
@@ -89,6 +104,11 @@ def schema_cases():
         ("codegen-simple", SIMPLE, "one table, one serial key"),
         ("codegen-related", RELATED, "a foreign key becomes a derived relation"),
         ("codegen-junction", JUNCTION, "a composite-key junction and its two edges"),
+        (
+            "codegen-composite-foreign-key",
+            COMPOSITE_FOREIGN_KEY,
+            "a two-column foreign key onto a two-column key, and its inverse",
+        ),
         ("codegen-enum", ENUMERATED, "an enum type, nullable and not"),
         ("codegen-wide", WIDE, "every column type the bridge maps"),
         ("codegen-keywords", KEYWORDS, "column names that are Rust keywords"),

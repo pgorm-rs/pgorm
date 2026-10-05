@@ -742,12 +742,27 @@ children (
                         title "Composite keys are tested where they were only exercised: tuple DeriveRelation, DDL-path composite FKs, Python registered entities, the campaign"
                         kind @test
                         deps (composite-key-refusals composite-key-writes)
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T09:33:28.984925Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Survey 2026-10-05 at c24fea1e, where composite keys work but nothing permanent proves it. (1) DeriveRelation with tuple from/to has only compile-fail tests in pgorm-macros, so add a passing one that also checks the rendered join constrains every column pair. (2) Codegen's DDL path (parse_schema) has no composite-foreign-key test; a survey fork generated and compiled one fine, so make that permanent. (3) pgorm-python: Python-declared p.Model supports composite keys through key(mapping) (python/pgorm/models/model.py ~:99), but test_alias_joins_and_composite_keys covers lookup only. Registered Rust entities handle composite keys in code (src/entities/metadata.rs ~:164), but every fixture has a single id, so that path is untested; add a composite-key fixture and cover the operations Python has. Python's tests need a maturin build and the TLS fixture, and maturin develop writes a .so into pgorm-python/python/pgorm, which is now gitignored. (4) The generative campaign covers composite primary keys (models.composite-key, compile cases entity-key-composite/lookup/arity) but no composite foreign key anywhere, so add one to the matrix, keep coverage declared complete, and keep its unit tests green. Don't run the full campaign inside the node; the lead runs it."
+                            }
+
+                            {
+                                at 2026-10-05T19:09:46.290286Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-05T21:16:37.554772Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }
