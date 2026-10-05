@@ -787,6 +787,34 @@ children (
                             }
                         )
                     }
+
+                    {
+                        id composite-key-arity-tests
+                        title "Keys past two columns are tested where they are written by hand: 3- and 12-column table-key tuples, and borrowed parts in a 3-column lookup"
+                        kind @test
+                        log (
+                            {
+                                at 2026-10-05T22:00:12.548054Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Filed 2026-10-06 at the operator's request (\"you did do variadic tuples right? primary keys can be more than two cols\"). The code is variadic: IntoTableKey (pgorm-query/src/table/key.rs:249-277) and IntoPrimaryKey (src/entity/primary_key.rs:112) are macro-generated for tuples of 1 to 12, and TableKey::cols takes any length. Declaration is tested at every arity 1-12 (test_composite_primary_key). Three columns are proven live through the entity schema path: book_author in tests/composite_key_tests.rs, keyed (tenant_id, book_id, author_id), created by create_table_from_entity and read with find_by_id((1, 1, 2)). Four columns are covered by render only (quad in entity_trait_tests). Two gaps remain. The hand-written tuple form on the table builder, .primary_key((a, b, c)) / .unique((..)) / add_primary_key / add_unique, is only tested with 1- and 2-tuples (pgorm-query/tests/postgres/table_constraint.rs, codegen transform_tests). Borrowed key parts, find_by_id((1, \"a\")), are only tested on 2-column keys. Acceptance: a 3-tuple and a 12-tuple table key, each rendered and accepted by the live server with its PRIMARY KEY / UNIQUE read back from the catalogue in order; a key past 12 columns via TableKey::cols proven live; and a borrowed &str (and Cow) part in a lookup on a key of 3 or more columns, live."
+                            }
+                        )
+                    }
+
+                    {
+                        id table-key-distinct-columns
+                        title "A table key cannot name the same column twice"
+                        kind @fix
+                        log (
+                            {
+                                at 2026-10-05T22:00:12.634924Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Found while landing composite-key-refusals (d982a21d): TableKey still accepts a repeated column, e.g. .primary_key((a, a)) or TableKey::new(a).col(a), which PostgreSQL refuses with 42701 (column appears twice in key; verify live, for unique and primary, inline and ALTER ADD). Decide between making it unrepresentable or refused per [dec:pgorm:invalid-states-unrepresentable] (check how TableKey's other invariants are kept and what is cheap at tuple-conversion time), and dropping or deduplicating it, which is a silent reinterpretation and probably wrong. The same question applies to the ON CONFLICT target if on-conflict-columns adopts TableKey's shape first: a repeated inference column there may be accepted by the server, so check before sharing the rule."
+                            }
+                        )
+                    }
                 )
                 log (
                     {
@@ -9359,6 +9387,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by composite-key-edge-coverage (779159ca), and failing at 06c564f5 before any of its changes. pgorm-python/checks/entities.py fails at two steps. (1) Its cargo test --lib step: application-binding sources::tests::source_selection_matches_native_rust_projection names a source alias `runtime alias \"雪\"`. (2) registered_sources.py test_aliases_parameters_and_decode_failures names `notes \"雪\"`. Both are refused with \"cannot be written as a pipeline name: it contains a double quote or NUL byte, begins with `$`, or is `*`\". That refusal arrived in f48c6425 (pipeline identifiers no quoting can represent), and the fixtures were never updated, because nplan check runs only fmt and clippy over the application binding, never this script. The other steps pass when these two are skipped: registered_entities, registered_graphs, graph_oracle, registered_schema, registered_transactions, registered_execution plus execution_oracle parity and its mismatch rejection. So does the summary. Acceptance: the two fixtures use a hostile name a pipeline can spell, the refused name keeps a test asserting the refusal, and checks/entities.py runs green end to end through tests/with_postgres.py. Consider whether some platform should run this check, so it cannot rot unseen again."
+            }
+        )
+    }
+
+    {
+        id composite-attribute-alteration
+        title "A composite type's attributes can be added, dropped, retyped and renamed"
+        kind @feat
+        log (
+            {
+                at 2026-10-05T22:00:12.722833Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed 2026-10-06 from the sql.scope Deferred entry \"Composite attribute alteration\" that scope-composite-types recorded (55c23657, docs/spec/sql-ast.md). ALTER TYPE ... ADD ATTRIBUTE, DROP ATTRIBUTE [IF EXISTS], ALTER ATTRIBUTE ... TYPE and RENAME ATTRIBUTE ... TO each take CASCADE / RESTRICT to carry the change into typed tables. That is four TypeAlterOpt variants, two of them carrying the CompositeAttribute the create already renders, plus a behaviour slot, plus a list, since ADD, DROP and ALTER chain comma-separated in one statement where TypeAlterStatement holds exactly one option today. The entry records why it waited: nothing in pgorm reads a composite value (sql.ddl.type-composite), so a type that changes shape has no reader to keep in step. Building it graduates the entry from sql.scope (bump, repin). Attribute names are caller-named identifiers and must be registered in the identifier render oracle."
             }
         )
     }
