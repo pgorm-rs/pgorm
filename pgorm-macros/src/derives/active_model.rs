@@ -9,7 +9,7 @@ use syn::{Data, DataStruct, Field, Fields, LitStr, Type, punctuated::IntoIter};
 
 /// Method to derive an [ActiveModel](pgorm::ActiveModel)
 // [spec:pgorm:sem:macros.derive.active-model+3]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+1]    the field-key vocabulary this
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]    the field-key vocabulary this
 // derive shares with `DeriveEntityModel`
 pub fn expand_derive_active_model(ident: Ident, data: Data) -> syn::Result<TokenStream> {
     // including ignored fields

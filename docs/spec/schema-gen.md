@@ -8,20 +8,28 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+4]
+> [spec:pgorm:sem:schema.from-entity+5]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
 > the declared `ColumnType` (with `Enum { name, .. }` rewritten to a named
 > type reference naming the Postgres enum), `NOT NULL` unless the column is
-> nullable, a unique key for `unique` columns, plus any default value and
-> column comment.
+> nullable, a unique key for `unique` columns, plus the column's default — a
+> `DEFAULT` expression or a `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`,
+> whichever its definition holds (`entity.traits.column-def`) — and its
+> comment.
 >
-> Primary-key handling depends on key arity: a column matching a primary-key
-> column gains `auto_increment` when `E::PrimaryKey::auto_increment()` is
-> true, and the inline `PRIMARY KEY` flag only when the key arity is 1;
-> composite keys (arity > 1) instead emit a table-level primary-key index
-> named `pk-{table}`. Foreign keys are generated from `E::Relation` entries
+> Primary-key handling depends on key arity. When it is 1, the key column gains
+> the inline `PRIMARY KEY` flag, and is drawn from the serial family when
+> `E::PrimaryKey::auto_increment()` is true and the column holds no default of
+> its own: PostgreSQL refuses `serial` beside a `DEFAULT` or an identity
+> (42601), and a key filled by either is generated already. Composite keys
+> (arity > 1) emit a table-level primary-key index named `pk-{table}` instead,
+> and no key column of theirs is drawn from the serial family whatever
+> `auto_increment()` says: a composite key's generated column is the one whose
+> definition holds an identity, rendered on that column alone, so
+> `(tenant_id, id)` with `id` an identity builds a table whose inserts name
+> `tenant_id` and get `id`. Foreign keys are generated from `E::Relation` entries
 > whose `RelationDef` has `is_owner == false` (the belongs-to side); owner-side
 > relations produce no constraint. A foreign key carries the full table name
 > of both sides — schema qualification included, via `unpack_table_name` — so
@@ -72,7 +80,7 @@ executes SQL.
 > scalar and an array of it, say) yield one statement, because Postgres has no
 > `CREATE TYPE IF NOT EXISTS` and re-creating a type is an error rather than a
 > no-op. Both halves match the generation path
-> (`[spec:pgorm:sem:codegen.entity.transform+7]`), which registers an
+> (`[spec:pgorm:sem:codegen.entity.transform+8]`), which registers an
 > `ActiveEnum` for every column whose array-inner type is `ColumnType::Enum`,
 > keyed by enum name.
 > `Schema::create_enum_from_active_enum::<A>()` builds the same statement from

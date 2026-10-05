@@ -932,7 +932,7 @@ fn column_trait_column_to_column_surface() {
 // entity.traits.column-def
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.traits.column-def/test]    `ColumnTypeTrait::def()`
+// [spec:pgorm:req:entity.traits.column-def+1/test]    `ColumnTypeTrait::def()`
 // initialises a definition as non-null, non-unique, non-indexed with no default
 // and no comment; each builder method flips exactly one attribute; and
 // `get_column_type` / `is_null` expose the type and nullability
@@ -1005,7 +1005,7 @@ fn column_def_defaults_and_builders() {
 // entity.traits.primary-key
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.primary-key+3/test]    `PrimaryKeyArity::ARITY` is
+// [spec:pgorm:def:entity.traits.primary-key+4/test]    `PrimaryKeyArity::ARITY` is
 // 1 for any single scalar and matches the component count for tuples up to 12;
 // `auto_increment` reports whether the key is database-generated; and
 // `PrimaryKeyToColumn` maps variants to columns and back, with `from_column`

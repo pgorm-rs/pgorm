@@ -15,7 +15,7 @@ use crate::{
 ///
 /// Ordered by bare name first, so the entity map — and every output that walks
 /// it — stays alphabetical by table name however the schemas sort.
-// [spec:pgorm:sem:codegen.entity.transform+7]
+// [spec:pgorm:sem:codegen.entity.transform+8]
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableIdent {
     pub table: String,
@@ -24,7 +24,7 @@ pub struct TableIdent {
 
 impl TableIdent {
     /// The identity a DDL statement's table name spells.
-    // [spec:pgorm:sem:codegen.entity.transform+7]
+    // [spec:pgorm:sem:codegen.entity.transform+8]
     pub fn of(name: &TableName) -> Self {
         Self {
             table: name.table().to_string(),
@@ -34,7 +34,7 @@ impl TableIdent {
 }
 
 /// As the schema wrote it: `schema.table`, or `table` when unqualified.
-// [spec:pgorm:sem:codegen.entity.transform+7]
+// [spec:pgorm:sem:codegen.entity.transform+8]
 impl fmt::Display for TableIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.schema {
@@ -57,7 +57,7 @@ pub struct Entity {
 
 impl Entity {
     /// Which table this entity is generated from.
-    // [spec:pgorm:sem:codegen.entity.transform+7]
+    // [spec:pgorm:sem:codegen.entity.transform+8]
     pub fn ident(&self) -> TableIdent {
         TableIdent {
             table: self.table_name.clone(),
@@ -68,14 +68,14 @@ impl Entity {
     /// The schema the generated entity names: the source table's own qualifier
     /// when it had one, else the configured default. A fact the schema states
     /// is never overridden by an option.
-    // [spec:pgorm:sem:codegen.entity.transform+7]
+    // [spec:pgorm:sem:codegen.entity.transform+8]
     pub fn effective_schema<'a>(&'a self, default: &'a Option<String>) -> Option<&'a str> {
         self.schema_name.as_deref().or(default.as_deref())
     }
 
     /// Everything the writer derives from this entity's DB names, checked while
     /// the caller can still be handed the failure.
-    // [spec:pgorm:sem:codegen.entity.transform+7]
+    // [spec:pgorm:sem:codegen.entity.transform+8]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let qualified = self.ident().to_string();
@@ -194,9 +194,21 @@ impl Entity {
         self.relations.iter().map(|rel| rel.get_attrs()).collect()
     }
 
-    // [spec:pgorm:sem:codegen.entity.pk]
+    /// Whether the database generates the whole key: every key column is an
+    /// identity, or the key is one serial column — the reading the derive
+    /// gives the compact form's attributes.
+    // [spec:pgorm:sem:codegen.entity.pk+1]
     pub fn get_primary_key_auto_increment(&self) -> Ident {
-        let auto_increment = self.columns.iter().any(|col| col.auto_increment);
+        let keys: Vec<&Column> = self
+            .columns
+            .iter()
+            .filter(|col| self.primary_keys.iter().any(|key| key.name == col.name))
+            .collect();
+        let auto_increment = if keys.iter().any(|col| col.identity.is_some()) {
+            keys.iter().all(|col| col.identity.is_some())
+        } else {
+            matches!(keys.as_slice(), [key] if key.auto_increment)
+        };
         format_ident!("{}", auto_increment)
     }
 
@@ -301,6 +313,7 @@ mod tests {
                     name: "id".to_owned(),
                     col_type: ColumnType::Integer,
                     auto_increment: false,
+                    identity: None,
                     not_null: false,
                     unique: false,
                 },
@@ -308,6 +321,7 @@ mod tests {
                     name: "name".to_owned(),
                     col_type: ColumnType::String(StringLen::None),
                     auto_increment: false,
+                    identity: None,
                     not_null: false,
                     unique: false,
                 },

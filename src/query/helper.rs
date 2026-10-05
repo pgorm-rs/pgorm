@@ -1138,7 +1138,7 @@ fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> 
 /// The full table name a [`FromItem`] contributes to a foreign key: schema
 /// qualification included, so a `REFERENCES` clause names the table the
 /// relation actually points at rather than whatever `search_path` resolves.
-// [spec:pgorm:sem:schema.from-entity+4]
+// [spec:pgorm:sem:schema.from-entity+5]
 pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName {
     match from_item {
         FromItem::Table(table) => table.name.clone(),

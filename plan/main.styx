@@ -645,12 +645,27 @@ children (
                         id composite-key-generated-column
                         title "A key column the database generates can sit inside a composite key"
                         kind @feat
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T09:33:28.834012Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Survey 2026-10-05 at c24fea1e: the common multi-tenant shape (tenant_id, id serial/identity) as a composite primary key cannot be declared. pgorm-macros/src/derives/entity_model.rs (~line 456) forces auto_increment to false whenever more than one field is a primary key, so it is one global flag rather than a property of a column. A live probe of an entity keyed (tenant, seq) with no flags got no serial/identity from Schema::create_table_from_entity, and an insert with seq NotSet failed 23502 (not-null violation). The workaround today is hand-written DDL with an identity or default_expr. Acceptance: a column inside a composite key can be declared generated (decide between a per-field auto_increment and an identity attribute, checking what single-column keys already use and the identity column options typed in cba07b39). Schema-gen emits the identity/default for that column only. Inserting with it NotSet sends no value and returns the full key tuple including the generated part, through exec_returning_pk and exec_returning_model, for one row and many. PrimaryKeyTrait::auto_increment() (spec: true only for exactly one key column, macros.derive.entity-model.primary-key) gets a meaning stated for the composite case. Live tests cover all of it. Rules to revisit: macros.derive.entity-model.primary-key, entity.traits.primary-key, schema.from-entity, exec.crud.insert."
+                            }
+
+                            {
+                                at 2026-10-05T09:43:29.606253Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-05T10:57:22.968642Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }

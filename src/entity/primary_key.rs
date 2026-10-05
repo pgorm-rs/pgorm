@@ -3,7 +3,6 @@ use crate::{TryFromU64, TryGetableMany};
 use pgorm_query::{IntoValueTuple, TryFromValueTuple};
 use std::fmt::Debug;
 
-//LINT: composite primary key cannot auto increment
 /// A Trait for to be used to define a Primary Key.
 ///
 /// A primary key can be derived manually
@@ -37,7 +36,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key+3]
+// [spec:pgorm:def:entity.traits.primary-key+4]
 pub trait PrimaryKeyTrait: StaticName + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -50,7 +49,16 @@ pub trait PrimaryKeyTrait: StaticName + Iterable {
         + TryFromU64
         + PrimaryKeyArity;
 
-    /// Method to call to perform `AUTOINCREMENT` operation on a Primary Key
+    /// Whether the database generates the whole key, so that an insert
+    /// naming no key column still writes a row with one.
+    ///
+    /// For a one-column key this is the serial family schema generation draws
+    /// it from — or the column's own default or identity, which it then uses
+    /// instead. A composite key is generated whole only when every column of
+    /// it is an identity: `(tenant_id, id)` with `id` generated reports
+    /// `false`, since the caller still supplies `tenant_id`, and the generated
+    /// part is that column's fact, carried by its
+    /// [`ColumnDef::identity`](crate::ColumnDef::identity).
     fn auto_increment() -> bool;
 }
 
@@ -69,7 +77,7 @@ pub trait PrimaryKeyToColumn {
 }
 
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key+3]
+// [spec:pgorm:def:entity.traits.primary-key+4]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

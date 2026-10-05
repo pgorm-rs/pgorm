@@ -41,7 +41,7 @@ pub(super) struct ParsedIndex {
 }
 
 // [spec:pgorm:sem:codegen.ddl.objects+5]
-// [spec:pgorm:req:codegen.ddl.unsupported+3]
+// [spec:pgorm:req:codegen.ddl.unsupported+4]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {

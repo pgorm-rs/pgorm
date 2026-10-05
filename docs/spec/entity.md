@@ -107,15 +107,22 @@ explicit limitations.
 > enum was dropped and `ColumnTypeTrait` (`def()`, `get_enum_name()`) bridges a
 > `ColumnType` or existing `ColumnDef` into a `ColumnDef`.
 
-> [spec:pgorm:req:entity.traits.column-def]
+> [spec:pgorm:req:entity.traits.column-def+1]
 > `ColumnDef` (`src/entity/column.rs`) carries a column's definition attributes:
-> `col_type: ColumnType`, `null`, `unique`, `indexed`, `default: Option<SimpleExpr>`,
-> and `comment: Option<String>`. `ColumnTypeTrait::def()` MUST initialise a definition
+> `col_type: ColumnType`, `null`, `unique`, `indexed`, `default`, and
+> `comment: Option<String>`. `ColumnTypeTrait::def()` MUST initialise a definition
 > as non-null, non-unique, non-indexed, with no default and no comment. Builder methods
 > flip individual attributes: `unique()`, `indexed()`, `null()` / `nullable()` (aliases),
-> `comment(v)`, `default_value(T: Into<Value>)`, and `default(T: Into<SimpleExpr>)`
-> (the latter accepting arbitrary expressions). `get_column_type()` and `is_null()`
-> expose the type and nullability for introspection.
+> `comment(v)`, `default_value(T: Into<Value>)`, `default(T: Into<SimpleExpr>)`
+> (the latter accepting arbitrary expressions), and `identity()` /
+> `identity_by_default()` (`GENERATED ALWAYS` / `BY DEFAULT AS IDENTITY`).
+> `get_column_type()` and `is_null()` expose the type and nullability for introspection.
+>
+> `default` is one slot, `Option<ColumnDefault>`, holding either a default expression
+> or an identity form and never both: PostgreSQL refuses a column declaring both (42601,
+> "both default and identity specified"), so a definition holding both would describe
+> no table. The builders writing it replace whatever it held. There is no sequence-option
+> form: an entity declares which form generates a column, not how its sequence counts.
 
 > [spec:pgorm:sem:entity.traits.column.enum-cast+4]
 > Enum-typed columns are transparently cast at the SQL boundary
@@ -149,13 +156,18 @@ explicit limitations.
 > spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
 > scalar and array comparisons of one column cannot disagree about its cast.
 
-> [spec:pgorm:def:entity.traits.primary-key+3]
+> [spec:pgorm:def:entity.traits.primary-key+4]
 > `PrimaryKeyTrait: StaticName + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
 > `Sized + Send + Debug + PartialEq + IntoValueTuple + TryFromValueTuple
-> + TryGetableMany + TryFromU64 + PrimaryKeyArity`; `auto_increment()` reports whether the key is
-> database-generated. `PrimaryKeyToColumn` maps key variants to columns (`into_column`)
+> + TryGetableMany + TryFromU64 + PrimaryKeyArity`; `auto_increment()` reports whether the
+> database generates the *whole* key, so an insert naming no key column still writes a row
+> with one: a one-column key the serial family (or the column's own default or identity)
+> fills, or a composite key every column of which is an identity. A composite key with one
+> generated column — `(tenant_id, id)`, `id` an identity — reports false, because the
+> caller still supplies `tenant_id`; the generated part is that column's fact, carried by
+> its `ColumnDef` (`entity.traits.column-def`). `PrimaryKeyToColumn` maps key variants to columns (`into_column`)
 > and back (`from_column -> Option<Self>`). `PrimaryKeyArity` exposes a
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.

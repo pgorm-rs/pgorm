@@ -1,10 +1,10 @@
 use crate::{
     ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Error, Iterable, PrimaryKeyArity,
-    PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema,
+    PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema, entity::ColumnDefault,
 };
 use pgorm_query::{
-    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, Index, IndexConstraint,
-    IndexCreateStatement, Name, SqlName, TableCreateStatement,
+    ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, IdentityGeneration, Index,
+    IndexConstraint, IndexCreateStatement, Name, SqlName, TableCreateStatement,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -238,7 +238,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+4]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+5]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,7 +257,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+4]
+// [spec:pgorm:sem:schema.from-entity+5]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -295,7 +295,7 @@ where
     stmt.take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+4]    column + primary-key projection
+// [spec:pgorm:sem:schema.from-entity+5]    column + primary-key projection
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
@@ -308,21 +308,33 @@ where
     if orm_column_def.unique {
         column_def.unique_key();
     }
-    if let Some(default) = orm_column_def.default {
-        column_def.default(default);
+    let fills_itself = orm_column_def.default.is_some();
+    match orm_column_def.default {
+        Some(ColumnDefault::Expr(default)) => {
+            column_def.default(default);
+        }
+        Some(ColumnDefault::Identity(IdentityGeneration::Always)) => {
+            column_def.identity();
+        }
+        Some(ColumnDefault::Identity(IdentityGeneration::ByDefault)) => {
+            column_def.identity_by_default();
+        }
+        None => {}
     }
     if let Some(comment) = orm_column_def.comment {
         column_def.comment(comment);
     }
-    for primary_key in E::PrimaryKey::iter() {
-        if column.to_string() == primary_key.into_column().to_string() {
-            if E::PrimaryKey::auto_increment() {
-                column_def.auto_increment();
-            }
-            if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY == 1 {
-                column_def.primary_key();
-            }
+    // Only a one-column key is drawn from the serial family, and only when the
+    // column names no fill of its own: PostgreSQL refuses `serial` beside a
+    // `DEFAULT` or an identity (42601). A composite key's generated part is
+    // its column's identity, rendered above.
+    if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY == 1
+        && E::PrimaryKey::iter().any(|key| column.to_string() == key.into_column().to_string())
+    {
+        if E::PrimaryKey::auto_increment() && !fills_itself {
+            column_def.auto_increment();
         }
+        column_def.primary_key();
     }
     column_def
 }

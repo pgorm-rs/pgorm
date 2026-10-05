@@ -3,7 +3,7 @@ use crate::{
     util::{escape_rust_keyword, safe_ident},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, RangeType, StringLen};
+use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, IdentityGeneration, RangeType, StringLen};
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 use std::fmt::Write as FmtWrite;
@@ -13,6 +13,8 @@ pub struct Column {
     pub(crate) name: String,
     pub(crate) col_type: ColumnType,
     pub(crate) auto_increment: bool,
+    /// The identity form generating the column, if it is one.
+    pub(crate) identity: Option<IdentityGeneration>,
     pub(crate) not_null: bool,
     pub(crate) unique: bool,
 }
@@ -109,7 +111,7 @@ impl Column {
     /// instead of ending the literal early and respelling the rest of the
     /// attribute as tokens. `validate_col_type` has already refused any
     /// `Named` shape this one-name spelling could not carry.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+3]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -204,7 +206,22 @@ impl Column {
                 .unique()
             });
         }
+        if let Some(identity) = self.identity {
+            col_def.extend(match identity {
+                IdentityGeneration::Always => quote! { .identity() },
+                IdentityGeneration::ByDefault => quote! { .identity_by_default() },
+            });
+        }
         col_def
+    }
+
+    /// The field attribute declaring the column's identity, if it is one.
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
+    pub fn get_identity_attr(&self) -> Option<TokenStream> {
+        self.identity.map(|identity| match identity {
+            IdentityGeneration::Always => quote! { identity },
+            IdentityGeneration::ByDefault => quote! { identity_by_default },
+        })
     }
 
     pub fn get_info(&self) -> String {
@@ -224,6 +241,13 @@ impl Column {
         let mut info = String::new();
         if self.auto_increment {
             write!(&mut info, ", auto_increment").unwrap();
+        }
+        match self.identity {
+            Some(IdentityGeneration::Always) => write!(&mut info, ", identity").unwrap(),
+            Some(IdentityGeneration::ByDefault) => {
+                write!(&mut info, ", identity_by_default").unwrap()
+            }
+            None => {}
         }
         if self.not_null {
             write!(&mut info, ", not_null").unwrap();
@@ -363,7 +387,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+7]
+// [spec:pgorm:sem:codegen.entity.transform+8]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 
@@ -378,10 +402,24 @@ impl TryFrom<&ColumnDef> for Column {
             .get_column_spec()
             .iter()
             .any(|spec| matches!(spec, ColumnSpec::AutoIncrement));
-        let not_null = col_def
-            .get_column_spec()
-            .iter()
-            .any(|spec| matches!(spec, ColumnSpec::NotNull));
+        let mut identity = None;
+        for spec in col_def.get_column_spec() {
+            if let ColumnSpec::Identity(generation, options) = spec {
+                if options.is_some() {
+                    return Err(Error::TransformError(format!(
+                        "column `{name}`: an entity declares an identity's form, \
+                         not its sequence options"
+                    )));
+                }
+                identity = Some(*generation);
+            }
+        }
+        // An identity column is NOT NULL whether or not it says so.
+        let not_null = identity.is_some()
+            || col_def
+                .get_column_spec()
+                .iter()
+                .any(|spec| matches!(spec, ColumnSpec::NotNull));
         let unique = col_def
             .get_column_spec()
             .iter()
@@ -390,6 +428,7 @@ impl TryFrom<&ColumnDef> for Column {
             name,
             col_type,
             auto_increment,
+            identity,
             not_null,
             unique,
         };
@@ -416,6 +455,7 @@ mod tests {
                     name: $name.to_owned(),
                     col_type: $col_type,
                     auto_increment: false,
+                    identity: None,
                     not_null: false,
                     unique: false,
                 }

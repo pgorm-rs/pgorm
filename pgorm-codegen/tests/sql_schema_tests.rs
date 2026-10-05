@@ -4,12 +4,26 @@
 mod common;
 
 use common::*;
+use pgorm::{ColumnTrait, ColumnTypeTrait, PrimaryKeyTrait};
 use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
 use pgorm_codegen::{Error, WriterOutput};
 use pgorm_query::extension::Type;
 use pgorm_query::{ColumnSpec, ColumnType, TableName};
 
 const SCHEMA: &str = include_str!("sql/schema.sql");
+
+/// The entity the bridge generates for an identity inside a composite key,
+/// compiled here as well as compared: the derive accepts what the writer
+/// emits.
+#[path = "sql/tenant_ticket.rs"]
+mod tenant_ticket;
+
+const TENANT_TICKET: &str = "CREATE TABLE tenant_ticket (
+    tenant_id int,
+    id int GENERATED ALWAYS AS IDENTITY,
+    title text NOT NULL,
+    PRIMARY KEY (tenant_id, id)
+);";
 
 fn from_sql(sql: &str) -> Generated {
     Generated {
@@ -104,7 +118,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -116,7 +130,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -152,7 +166,7 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a column-level UNIQUE becomes the
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    a column-level UNIQUE becomes the
 // table-level unique constraint Postgres creates for it, which is where the entity model
 // reads unique
 #[test]
@@ -165,7 +179,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -214,7 +228,7 @@ fn comments_are_folded_into_their_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+4/test]    a column's COLLATE clause becomes its
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    a column's COLLATE clause becomes its
 // collation, bare or qualified, and the entity generated from it is the one the
 // uncollated table generates
 #[test]
@@ -260,7 +274,7 @@ fn a_column_collation_rides_on_the_statement() {
     assert_eq!(collations(&rendered), expected);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -290,7 +304,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -324,7 +338,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -337,8 +351,8 @@ fn unsupported_column_clauses_are_named() {
         "unsupported DDL: a CHECK constraint on column `t`.`id` at statement 1",
     );
     assert_error(
-        "CREATE TABLE t (id int GENERATED ALWAYS AS IDENTITY);",
-        "unsupported DDL: an identity clause on column `t`.`id` at statement 1",
+        "CREATE TABLE t (id int GENERATED ALWAYS AS IDENTITY (START WITH 10));",
+        "unsupported DDL: sequence options on the identity of column `t`.`id` at statement 1",
     );
     assert_error(
         "CREATE TABLE t (id int, total int GENERATED ALWAYS AS (id * 2) STORED);",
@@ -391,7 +405,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -462,7 +476,7 @@ fn a_unique_index_folds_into_its_constraint() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -472,7 +486,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -494,7 +508,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+3/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+4/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]
@@ -653,4 +667,67 @@ fn an_array_or_modified_range_is_refused() {
         "CREATE TABLE span (id integer PRIMARY KEY, a int4range(3));",
         "unsupported DDL: `int4range` with a type modifier on column `span`.`a` at statement 1",
     );
+}
+
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    an identity inside a composite
+// key is carried, not refused, and the generated entity declares it on its
+// column and compiles: the key is not generated whole, the column is
+// [spec:pgorm:sem:codegen.entity.compact.attrs+4/test]    `identity` follows
+// `primary_key`, and the identity column carries no `auto_increment = false`
+#[test]
+fn composite_key_identity_generates_a_compiling_entity() {
+    let generated = from_sql(TENANT_TICKET);
+    assert_contains(
+        generated.file("tenant_ticket.rs"),
+        include_str!("sql/tenant_ticket.rs"),
+    );
+
+    assert!(!tenant_ticket::PrimaryKey::auto_increment());
+    assert_eq!(
+        tenant_ticket::Column::Id.def(),
+        ColumnType::Integer.def().identity()
+    );
+    assert_eq!(
+        tenant_ticket::Column::TenantId.def(),
+        ColumnType::Integer.def()
+    );
+}
+
+// [spec:pgorm:sem:codegen.ddl.tables+5/test]    `BY DEFAULT` keeps its form, an
+// identity column is NOT NULL unasked, and the expanded format chains the
+// builder and answers `auto_increment()` for the key alone
+// [spec:pgorm:sem:codegen.entity.pk+1/test]    a key every column of which is
+// an identity is generated whole
+#[test]
+fn identity_forms_reach_both_formats() {
+    let by_default = from_sql(
+        "CREATE TABLE seq_row (id int GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, n int);",
+    );
+    assert_contains(
+        by_default.file("seq_row.rs"),
+        "#[pgorm(primary_key, identity_by_default)] pub id: i32,",
+    );
+
+    let expanded_out = |sql: &str, file: &str| {
+        files(entities_from_sql(sql, expanded()).expect("schema should generate"))
+            .into_iter()
+            .find(|(name, _)| name == file)
+            .map(|(_, content)| content)
+            .expect("the table's file")
+    };
+    let ticket = expanded_out(TENANT_TICKET, "tenant_ticket.rs");
+    assert_contains(&ticket, "Self::Id => ColumnType::Integer.def().identity(),");
+    assert_contains(&ticket, "fn auto_increment() -> bool { false }");
+
+    let pair = expanded_out(
+        "CREATE TABLE pair (a int GENERATED ALWAYS AS IDENTITY, \
+         b bigint GENERATED BY DEFAULT AS IDENTITY, PRIMARY KEY (a, b));",
+        "pair.rs",
+    );
+    assert_contains(&pair, "pub a: i32, pub b: i64,");
+    assert_contains(
+        &pair,
+        "Self::B => ColumnType::BigInteger.def().identity_by_default(),",
+    );
+    assert_contains(&pair, "fn auto_increment() -> bool { true }");
 }

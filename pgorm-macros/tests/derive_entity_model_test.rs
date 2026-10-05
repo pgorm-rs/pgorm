@@ -204,6 +204,68 @@ mod shared_auto_increment {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// The multi-tenant key: the tenant is supplied, the row number generated. The
+/// generated part is the column's identity, so the key as a whole is not
+/// generated and `auto_increment()` stays false.
+mod tenant_identity {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "tenant_identity")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub tenant_id: i32,
+        #[pgorm(primary_key, identity)]
+        pub id: i64,
+        #[pgorm(identity_by_default)]
+        pub seq: i16,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// Every column of the key is an identity, so the database generates the whole
+/// key and `auto_increment()` is true for a composite key.
+mod all_identity {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "all_identity")]
+    pub struct Model {
+        #[pgorm(primary_key, identity)]
+        pub a: i32,
+        #[pgorm(primary_key, identity_by_default)]
+        pub b: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// A one-column identity key: generated whole, and not by the serial family.
+mod single_identity {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "single_identity")]
+    pub struct Model {
+        #[pgorm(primary_key, identity)]
+        pub id: i32,
+        #[pgorm(auto_increment = false)]
+        pub not_a_key: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// No `table_name`, so no `Entity` struct is generated: the entity module is
 /// hand-finished and `DeriveEntityModel` contributes only `Column`,
 /// `PrimaryKey`, `Model` and `ActiveModel`.
@@ -259,7 +321,7 @@ mod serde_keys {
 }
 
 // [spec:pgorm:sem:macros.derive.entity-model+5/test]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    struct-level table_name / schema_name / comment
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    struct-level table_name / schema_name / comment
 #[test]
 fn struct_attributes_drive_entity_and_entity_name() {
     // (3) `table_name` present, so `pub struct Entity;` plus a hand-rolled
@@ -393,7 +455,7 @@ fn json_key_reports_the_serde_key() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    `table_iden` adds a Table variant
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    `table_iden` adds a Table variant
 #[test]
 fn table_iden_variant_is_skipped_by_enum_iter() {
     // The variant exists...
@@ -406,14 +468,14 @@ fn table_iden_variant_is_skipped_by_enum_iter() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    the Table variant has no column def
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    the Table variant has no column def
 #[test]
 #[should_panic(expected = "Table cannot be used as a column")]
 fn table_iden_variant_has_no_column_def() {
     let _ = filling::Column::Table.def();
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+1/test]    field-level keys
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    field-level keys
 #[test]
 fn field_level_attributes_shape_the_column_defs() {
     use pgorm::ColumnTypeTrait;
@@ -448,7 +510,7 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+6/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
@@ -481,7 +543,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+5/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+6/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.
@@ -521,7 +583,7 @@ fn sql_column_names_are_pinned_only_when_needed() {
     assert_eq!(renamed::Column::SecondName.to_string(), "explicit");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+2/test]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]
 #[test]
 fn primary_key_value_type_and_auto_increment() {
     // A single key contributes a bare type...
@@ -541,7 +603,45 @@ fn primary_key_value_type_and_auto_increment() {
     assert!(!shared_auto_increment::PrimaryKey::auto_increment());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+2/test]    what DerivePrimaryKey itself emits
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    an identity
+// column inside a composite key: its def carries the identity, the other key
+// column's does not, and the key is not generated whole
+#[test]
+fn identity_inside_a_composite_key() {
+    let _: <tenant_identity::PrimaryKey as PrimaryKeyTrait>::ValueType = (1i32, 2i64);
+    assert!(!tenant_identity::PrimaryKey::auto_increment());
+    assert_eq!(
+        tenant_identity::Column::TenantId.def(),
+        ColumnType::Integer.def()
+    );
+    assert_eq!(
+        tenant_identity::Column::Id.def(),
+        ColumnType::BigInteger.def().identity()
+    );
+    assert_eq!(
+        tenant_identity::Column::Seq.def(),
+        ColumnType::SmallInteger.def().identity_by_default()
+    );
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    the key is
+// generated whole when every key column is an identity, whatever its arity and
+// whatever a non-key field says about `auto_increment`
+#[test]
+fn every_identity_key_column_generates_the_key() {
+    assert!(all_identity::PrimaryKey::auto_increment());
+    assert_eq!(
+        all_identity::Column::A.def(),
+        ColumnType::Integer.def().identity()
+    );
+    assert!(single_identity::PrimaryKey::auto_increment());
+    assert_eq!(
+        single_identity::Column::Id.def(),
+        ColumnType::Integer.def().identity()
+    );
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
     // `StaticName` maps the variant to its snake_case name, or a `column_name`

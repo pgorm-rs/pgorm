@@ -12,14 +12,14 @@ pub(crate) mod column_def;
 pub use column_def::*;
 
 /// Defines a Column for an Entity
-// [spec:pgorm:req:entity.traits.column-def]
+// [spec:pgorm:req:entity.traits.column-def+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDef {
     pub(crate) col_type: ColumnType,
     pub(crate) null: bool,
     pub(crate) unique: bool,
     pub(crate) indexed: bool,
-    pub(crate) default: Option<SimpleExpr>,
+    pub(crate) default: Option<ColumnDefault>,
     pub(crate) comment: Option<String>,
 }
 

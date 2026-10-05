@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
 
-// [spec:pgorm:def:codegen.entity+2]
+// [spec:pgorm:def:codegen.entity+3]
 #[derive(Clone, Debug)]
 pub struct EntityWriter {
     pub(crate) entities: Vec<Entity>,
@@ -353,7 +353,7 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+1]
+    // [spec:pgorm:def:codegen.entity.expanded+2]
     // [spec:pgorm:sem:codegen.entity.expanded.blocks+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
@@ -460,7 +460,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+1]
+    // [spec:pgorm:def:codegen.entity.expanded+2]
     pub fn gen_impl_entity_name(entity: &Entity, schema_name: &Option<String>) -> TokenStream {
         let schema_name = match Self::gen_schema_name(entity, schema_name) {
             Some(schema_name) => quote! {
@@ -568,7 +568,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.pk]
+    // [spec:pgorm:sem:codegen.entity.pk+1]
     pub fn gen_impl_primary_key(entity: &Entity) -> TokenStream {
         let primary_key_auto_increment = entity.get_primary_key_auto_increment();
         let value_type = entity.get_primary_key_rs_type();
@@ -709,7 +709,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+3]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
     // [spec:pgorm:sem:codegen.entity.compact.model+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
@@ -742,9 +742,12 @@ impl EntityWriter {
                 }
                 if is_primary_key {
                     attrs.push(quote! { primary_key });
-                    if !col.auto_increment {
+                    if !col.auto_increment && col.identity.is_none() {
                         attrs.push(quote! { auto_increment = false });
                     }
+                }
+                if let Some(identity) = col.get_identity_attr() {
+                    attrs.push(identity);
                 }
                 if let Some(ts) = col.get_col_type_attrs() {
                     attrs.extend([ts]);
@@ -850,6 +853,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -857,6 +861,7 @@ mod tests {
                         name: "name".to_owned(),
                         col_type: ColumnType::Text,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -889,6 +894,7 @@ mod tests {
                         name: "cake_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -896,6 +902,7 @@ mod tests {
                         name: "filling_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -944,6 +951,7 @@ mod tests {
                         name: "cake_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -951,6 +959,7 @@ mod tests {
                         name: "filling_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -958,6 +967,7 @@ mod tests {
                         name: "price".to_owned(),
                         col_type: ColumnType::Decimal(None),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -992,6 +1002,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -999,6 +1010,7 @@ mod tests {
                         name: "name".to_owned(),
                         col_type: ColumnType::String(StringLen::N(255)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1020,6 +1032,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1027,6 +1040,7 @@ mod tests {
                         name: "name".to_owned(),
                         col_type: ColumnType::String(StringLen::N(255)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1034,6 +1048,7 @@ mod tests {
                         name: "cake_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1077,6 +1092,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1084,6 +1100,7 @@ mod tests {
                         name: "_name_".to_owned(),
                         col_type: ColumnType::String(StringLen::N(255)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1091,6 +1108,7 @@ mod tests {
                         name: "fruitId".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1120,6 +1138,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1127,6 +1146,7 @@ mod tests {
                         name: "testing".to_owned(),
                         col_type: ColumnType::SmallInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1134,6 +1154,7 @@ mod tests {
                         name: "rust".to_owned(),
                         col_type: ColumnType::SmallInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1141,6 +1162,7 @@ mod tests {
                         name: "keywords".to_owned(),
                         col_type: ColumnType::SmallInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1148,6 +1170,7 @@ mod tests {
                         name: "type".to_owned(),
                         col_type: ColumnType::SmallInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1155,6 +1178,7 @@ mod tests {
                         name: "typeof".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1162,6 +1186,7 @@ mod tests {
                         name: "crate".to_owned(),
                         col_type: ColumnType::BigInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1169,6 +1194,7 @@ mod tests {
                         name: "self".to_owned(),
                         col_type: ColumnType::BigInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1176,6 +1202,7 @@ mod tests {
                         name: "self_id1".to_owned(),
                         col_type: ColumnType::BigInteger,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1183,6 +1210,7 @@ mod tests {
                         name: "self_id2".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1190,6 +1218,7 @@ mod tests {
                         name: "fruit_id1".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1197,6 +1226,7 @@ mod tests {
                         name: "fruit_id2".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1204,6 +1234,7 @@ mod tests {
                         name: "cake_id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1283,6 +1314,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1290,6 +1322,7 @@ mod tests {
                         name: "name".to_owned(),
                         col_type: ColumnType::Text,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1297,6 +1330,7 @@ mod tests {
                         name: "price".to_owned(),
                         col_type: ColumnType::Float,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1329,6 +1363,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1336,6 +1371,7 @@ mod tests {
                         name: "name".to_owned(),
                         col_type: ColumnType::Text,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1343,6 +1379,7 @@ mod tests {
                         name: "price".to_owned(),
                         col_type: ColumnType::Double,
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1375,6 +1412,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1382,6 +1420,7 @@ mod tests {
                         name: "integers".to_owned(),
                         col_type: ColumnType::Array(Arc::new(ColumnType::Integer)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1389,6 +1428,7 @@ mod tests {
                         name: "integers_opt".to_owned(),
                         col_type: ColumnType::Array(Arc::new(ColumnType::Integer)),
                         auto_increment: false,
+                        identity: None,
                         not_null: false,
                         unique: false,
                     },
@@ -1407,6 +1447,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1414,6 +1455,7 @@ mod tests {
                         name: "floats".to_owned(),
                         col_type: ColumnType::Array(Arc::new(ColumnType::Float)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1421,6 +1463,7 @@ mod tests {
                         name: "doubles".to_owned(),
                         col_type: ColumnType::Array(Arc::new(ColumnType::Double)),
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1439,6 +1482,7 @@ mod tests {
                         name: "id1".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1446,6 +1490,7 @@ mod tests {
                         name: "id2".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1480,6 +1525,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1487,6 +1533,7 @@ mod tests {
                         name: "parent_id1".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -1494,6 +1541,7 @@ mod tests {
                         name: "parent_id2".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2139,6 +2187,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2146,6 +2195,7 @@ mod tests {
                         name: "payload".to_owned(),
                         col_type: ColumnType::Json,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2153,6 +2203,7 @@ mod tests {
                         name: "payload_binary".to_owned(),
                         col_type: ColumnType::JsonBinary,
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2226,6 +2277,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2240,6 +2292,7 @@ mod tests {
                             ],
                         },
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2254,6 +2307,7 @@ mod tests {
                             ],
                         },
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2272,6 +2326,7 @@ mod tests {
                         name: "id".to_owned(),
                         col_type: ColumnType::Integer,
                         auto_increment: true,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2286,6 +2341,7 @@ mod tests {
                             ],
                         },
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2300,6 +2356,7 @@ mod tests {
                             ],
                         },
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },
@@ -2315,6 +2372,7 @@ mod tests {
                             ],
                         },
                         auto_increment: false,
+                        identity: None,
                         not_null: true,
                         unique: false,
                     },

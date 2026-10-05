@@ -9,13 +9,13 @@ golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
 a live database reach the same pipeline through `sql_schema`, specified under
 [Schema from DDL text](#schema-from-ddl-text).
 
-> [spec:pgorm:def:codegen.entity+2]
+> [spec:pgorm:def:codegen.entity+3]
 > The entity generator is the pipeline
 > `EntityTransformer::transform(Vec<TableCreateStatement>) -> EntityWriter`
 > followed by `EntityWriter::generate(&EntityWriterContext) -> WriterOutput`.
 > An `Entity` carries `table_name`, `schema_name` (the source table's own
 > qualifier, `None` when it had none — `codegen.entity.transform`), `columns`
-> (name, `ColumnType`, `auto_increment`, `not_null`, `unique`), `relations`,
+> (name, `ColumnType`, `auto_increment`, `identity`, `not_null`, `unique`), `relations`,
 > `conjunct_relations`,
 > and `primary_keys`. A `WriterOutput` is a list of `OutputFile { name, content }`
 > — the writer never touches the filesystem; callers (e.g. `pgorm-cli`) write
@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+7]
+> [spec:pgorm:sem:codegen.entity.transform+8]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -77,7 +77,16 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > which. `<table>` below is that identity.
 >
 > Per column: `auto_increment`, `not_null` and `unique` come from the
-> presence of the matching `ColumnSpec` on the column definition; a column
+> presence of the matching `ColumnSpec` on the column definition, and
+> `identity` from a `ColumnSpec::Identity`'s form, which also makes the column
+> `not_null` — PostgreSQL's own rule for an identity column, and the one the
+> derive holds the generated field to. An identity carrying sequence options
+> is refused with
+> ``TransformError("table `<table>` column `<column>`: an entity declares an
+> identity's form, not its sequence options")``: an entity has no place for
+> them (`macros.derive.entity-model.primary-key`), and dropping them would
+> generate an entity whose schema counts differently from the one it was read
+> from. A column
 > with no `ColumnType` yields
 > ``TransformError("table `<table>` column `<column>`: column type should
 > not be empty")``. The table's indexes then widen `unique`, never narrow
@@ -262,7 +271,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expands the Entity/Column/PrimaryKey machinery that the expanded format
 > spells out.
 
-> [spec:pgorm:def:codegen.entity.expanded+1]
+> [spec:pgorm:def:codegen.entity.expanded+2]
 > The expanded format (`expanded_format == true`) emits per entity, in
 > order: the same imports; `#[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 > pub struct Entity;`; `impl EntityName for Entity` containing
@@ -281,18 +290,22 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `Copy, Clone, Debug, EnumIter` (no `DeriveRelation`); `impl ColumnTrait
 > for Column` whose `def()` matches every column to a `ColumnType`
 > expression chain (`ColumnType::X.def()` + `.null()` when nullable +
-> `.unique()` when unique, and `<EnumName>::db_type()` for enum columns);
+> `.unique()` when unique + `.identity()` / `.identity_by_default()` for an
+> identity column, and `<EnumName>::db_type()` for enum columns);
 > `impl RelationTrait for Relation` whose `def()` matches every variant to a
 > `RelationDef` expression — or has the body `panic!("No RelationDef")` when
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+3]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+4]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
-> key, followed by `auto_increment = false` when that PK column is not
-> auto-increment; `column_type = "..."` for exactly the types whose default
+> key, followed by `auto_increment = false` when that PK column is neither
+> auto-increment nor an identity; `identity` or `identity_by_default` when
+> the column is one, key or not — the derive refuses an identity beside
+> `auto_increment`, so an identity key column carries `primary_key, identity`
+> and nothing more; `column_type = "..."` for exactly the types whose default
 > mapping is ambiguous — `Float`, `Double`, `Decimal(Some((p, s)))`,
 > `Money`, `Text`, `JsonBinary`, `named("...")`, `Bytea` — with
 > `nullable` appended (only
@@ -419,7 +432,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `timestamp` is; mapping it to the instant type would claim a time zone the
 > column does not carry, and would disagree with the inference table's
 > `DateTime`→`Timestamp` direction
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+5]`).
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+6]`).
 >
 > There is no option selecting between date/time crates, and codegen MUST NOT
 > offer one. jiff is the single temporal crate pgorm models PostgreSQL with,
@@ -508,15 +521,29 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Primary keys
 
-> [spec:pgorm:sem:codegen.entity.pk]
+> [spec:pgorm:sem:codegen.entity.pk+1]
 > In the expanded format, `impl PrimaryKeyTrait for PrimaryKey` sets
 > `type ValueType` to the single PK column's Rust type, or to a tuple
 > `(T1, T2, ...)` of the column types for composite keys, and
-> `fn auto_increment() -> bool` returns true when any column of the table
-> is auto-increment (the check is over all columns, not just PK columns).
-> In the compact format the same facts surface as the `primary_key` /
-> `auto_increment = false` field attributes described in
-> `codegen.entity.compact.attrs`.
+> `fn auto_increment() -> bool` answers whether the database generates the
+> whole key (`entity.traits.primary-key`), reading the key's own columns and
+> no others: true when every key column is an identity, and otherwise only
+> for a one-column key that is auto-increment. A serial column outside the
+> key does not make the key generated, and neither does one identity column
+> of a composite key. This is the reading the derive gives the compact form
+> (`macros.derive.entity-model.primary-key`), where the same facts surface
+> as the `primary_key` / `auto_increment = false` / `identity` field
+> attributes described in `codegen.entity.compact.attrs`, so the two formats
+> of one table agree. They did not while the expanded check ran over every
+> column: a table keyed `(tenant_id, id)` with `id serial` answered true, and
+> schema generation from that entity drew both key columns from the serial
+> family.
+>
+> A serial column inside a composite key has no attribute to land on — the
+> derive offers per-column generation only as an identity — so it generates
+> as a plain key column. The entity still works against the table it was read
+> from, whose `DEFAULT nextval(..)` fills the column an insert leaves `NotSet`;
+> only schema generation from the entity loses the default.
 
 ## Relations
 
@@ -709,7 +736,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > so the round trip gained a `unique` the statement path dropped. `transform`
 > now reads that spec (`codegen.entity.transform`) and the two paths agree.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+3]
+> [spec:pgorm:req:codegen.ddl.unsupported+4]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -732,7 +759,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > catalog-qualified table and collation names and temporary or unlogged
 > tables; column
 > `DEFAULT`, `CHECK`, `GENERATED`,
-> identity, `STORAGE` and `COMPRESSION` clauses; table-level `CHECK`
+> `STORAGE` and `COMPRESSION` clauses, and an identity's sequence options; table-level `CHECK`
 > and `EXCLUDE` constraints, deferrable and `NO INHERIT` constraints, `INCLUDE`
 > columns, constraint index and storage options, and `MATCH` clauses;
 > `REFERENCES` without a referenced column list, which no catalog is present to
@@ -809,7 +836,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+4]
+> [spec:pgorm:sem:codegen.ddl.tables+5]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -828,6 +855,14 @@ compiling the C parser falls on people generating entities and on nobody else.
 > whether or not the DDL spells it, which is Postgres' own rule: the entity
 > model reads nullability off the column alone, so an unstated `NOT NULL` would
 > otherwise generate an `Option` primary key.
+>
+> A column's `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY` becomes the
+> column's identity of that form (`ColumnDef::identity` /
+> `identity_by_default`), and the column `NOT NULL` with it, which is again
+> Postgres' own rule. Its sequence options — `(START WITH 10)` and the rest —
+> are a named rejection (`codegen.ddl.unsupported`): the entity a schema
+> generates declares the identity's form and nothing more
+> (`codegen.entity.transform`).
 >
 > A column's `COLLATE` clause becomes the column's collation
 > (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+8]`), bare or

@@ -5,7 +5,9 @@ pub mod common;
 pub use common::{TestContext, setup::*};
 
 use pgorm::{Error, Schema, entity::prelude::*};
-use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, QueryBuilder, TableCreateStatement};
+use pgorm_query::{
+    ColumnDef, ColumnSpec, ColumnType, IdentityGeneration, QueryBuilder, TableCreateStatement,
+};
 use pretty_assertions::assert_eq;
 
 mod factory {
@@ -136,6 +138,62 @@ mod widget_tag {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// A composite key whose second column the database generates.
+mod tenant_row {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "tenant_row")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub tenant_id: i32,
+        #[pgorm(primary_key, identity)]
+        pub id: i64,
+        pub note: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// A one-column key filled by an identity rather than the serial family.
+mod identity_key {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "identity_key")]
+    pub struct Model {
+        #[pgorm(primary_key, identity_by_default)]
+        pub id: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// A one-column integer key with a default of its own, which the serial
+/// family would collide with.
+mod defaulted_key {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "defaulted_key")]
+    pub struct Model {
+        #[pgorm(primary_key, default_value = 7)]
+        pub id: i32,
+        pub note: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// A bare (unqualified) entity whose comments contain the one character the
 /// comment literal has to escape.
 mod quirk {
@@ -203,6 +261,7 @@ struct Flags {
     primary_key: bool,
     auto_increment: bool,
     default: bool,
+    identity: Option<IdentityGeneration>,
     comment: Option<String>,
 }
 
@@ -222,6 +281,7 @@ fn flags(col: &ColumnDef) -> Flags {
             ColumnSpec::PrimaryKey(_) => flags.primary_key = true,
             ColumnSpec::AutoIncrement => flags.auto_increment = true,
             ColumnSpec::Default(_) => flags.default = true,
+            ColumnSpec::Identity(generation, _) => flags.identity = Some(*generation),
             ColumnSpec::Comment(comment) => flags.comment = Some(comment.clone()),
             _ => {}
         }
@@ -229,7 +289,7 @@ fn flags(col: &ColumnDef) -> Flags {
     flags
 }
 
-// [spec:pgorm:sem:schema.from-entity+4/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
+// [spec:pgorm:sem:schema.from-entity+5/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
 #[test]
 fn create_table_from_entity_projects_columns() {
     let schema = Schema::new();
@@ -332,7 +392,7 @@ fn create_table_from_entity_projects_columns() {
     assert!(!widget::Relation::Factory.def().is_owner);
 }
 
-// [spec:pgorm:sem:schema.from-entity+4/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
+// [spec:pgorm:sem:schema.from-entity+5/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
 #[test]
 fn create_table_composite_key_emits_index() {
     let schema = Schema::new();
@@ -358,7 +418,7 @@ fn create_table_composite_key_emits_index() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+4/test]    the entity comment first, then the commented
+// [spec:pgorm:sem:schema.from-entity+5/test]    the entity comment first, then the commented
 // columns in Column order, targeting entity.table_ref() with the text quoted
 #[test]
 fn create_comments_from_entity_emits_statements() {
@@ -551,7 +611,7 @@ fn create_enum_from_active_enum_errs_non_enum() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+4/test]    the projected DDL is accepted by Postgres and enforces what it declares
+// [spec:pgorm:sem:schema.from-entity+5/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
 // [spec:pgorm:sem:schema.from-entity.enum+3/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
@@ -736,7 +796,117 @@ async fn array_only_enum_schema_executes_on_postgres() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:schema.from-entity+4/test]    the comment statements execute, and only they
+// [spec:pgorm:sem:schema.from-entity+5/test]    a composite key's generated
+// column carries its identity, the supplied column nothing, and neither the
+// serial family nor an inline PRIMARY KEY
+#[test]
+fn composite_key_identity_lands_on_its_column() {
+    let stmt = Schema::new().create_table_from_entity(tenant_row::Entity);
+    assert_eq!(
+        flags(column(&stmt, "tenant_id")),
+        Flags {
+            not_null: true,
+            ..Default::default()
+        }
+    );
+    assert_eq!(
+        flags(column(&stmt, "id")),
+        Flags {
+            not_null: true,
+            identity: Some(IdentityGeneration::Always),
+            ..Default::default()
+        }
+    );
+    assert_eq!(
+        stmt.to_string(),
+        [
+            r#"CREATE TABLE "tenant_row" ( "tenant_id" integer NOT NULL,"#,
+            r#""id" bigint NOT NULL GENERATED ALWAYS AS IDENTITY,"#,
+            r#""note" varchar NOT NULL,"#,
+            r#"CONSTRAINT "pk-tenant_row" PRIMARY KEY ("tenant_id", "id") )"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:sem:schema.from-entity+5/test]    a one-column key that fills
+// itself — an identity or a default of its own — is not also drawn from the
+// serial family, which PostgreSQL refuses beside either (42601)
+#[test]
+fn key_with_its_own_fill_is_not_serial() {
+    let identity = Schema::new().create_table_from_entity(identity_key::Entity);
+    assert!(identity_key::PrimaryKey::auto_increment());
+    assert_eq!(
+        flags(column(&identity, "id")),
+        Flags {
+            not_null: true,
+            primary_key: true,
+            identity: Some(IdentityGeneration::ByDefault),
+            ..Default::default()
+        }
+    );
+
+    let defaulted = Schema::new().create_table_from_entity(defaulted_key::Entity);
+    assert!(defaulted_key::PrimaryKey::auto_increment());
+    assert_eq!(
+        flags(column(&defaulted, "id")),
+        Flags {
+            not_null: true,
+            primary_key: true,
+            default: true,
+            ..Default::default()
+        }
+    );
+}
+
+// [spec:pgorm:sem:schema.from-entity+5/test]    the tables a key that fills
+// itself projects to are ones the server builds, and fill the key unasked
+#[pgorm_macros::test]
+async fn self_filling_keys_execute_on_postgres() -> Result<(), Error> {
+    let ctx = TestContext::new("schema_gen_self_filling_keys").await;
+    let db = ctx.db.get().await?;
+    let schema = Schema::new();
+
+    for stmt in [
+        schema.create_table_from_entity(tenant_row::Entity),
+        schema.create_table_from_entity(identity_key::Entity),
+        schema.create_table_from_entity(defaulted_key::Entity),
+    ] {
+        db.execute(&stmt.to_string(), &[]).await?;
+    }
+
+    let row: (i32, i64) = db
+        .query_one(
+            r#"INSERT INTO "tenant_row" ("tenant_id", "note") VALUES (5, 'n') RETURNING "tenant_id", "id""#,
+            &[],
+        )
+        .await
+        .map(|row| (row.get(0), row.get(1)))?;
+    assert_eq!(row, (5, 1));
+    let id: i32 = db
+        .query_one(
+            r#"INSERT INTO "identity_key" DEFAULT VALUES RETURNING "id""#,
+            &[],
+        )
+        .await?
+        .get(0);
+    assert_eq!(id, 1);
+    let id: i32 = db
+        .query_one(
+            r#"INSERT INTO "defaulted_key" ("note") VALUES ('n') RETURNING "id""#,
+            &[],
+        )
+        .await?
+        .get(0);
+    assert_eq!(id, 7);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:schema.from-entity+5/test]    the comment statements execute, and only they
 // attach anything: the text arrives in pg_description exactly as declared
 #[pgorm_macros::test]
 async fn entity_comments_land_in_pg_description() -> Result<(), Error> {

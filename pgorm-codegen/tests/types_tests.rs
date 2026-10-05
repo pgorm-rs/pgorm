@@ -5,7 +5,9 @@ mod common;
 
 use common::*;
 use pgorm_codegen::{Column, EntityTransformer, Error};
-use pgorm_query::{ColumnDef, ColumnType, Name, StringLen, Table, TypeName};
+use pgorm_query::{
+    ColumnDef, ColumnType, IdentityGeneration, Name, SequenceOption, StringLen, TypeName,
+};
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use std::sync::Arc;
@@ -235,7 +237,7 @@ fn attribute_string_value(attr: &str) -> String {
         .value()
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    the compact attribute
+// [spec:pgorm:sem:codegen.entity.compact.attrs+4/test]    the compact attribute
 // carries a named type's name as a rendered string literal, so a name holding a
 // quote arrives at the derive as the name that was described rather than as
 // tokens that escaped the literal
@@ -303,7 +305,7 @@ fn hostile_named_type_survives_the_compact_attribute() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+3/test]    and the entity the
+// [spec:pgorm:sem:codegen.entity.compact.attrs+4/test]    and the entity the
 // derive builds from it names the type that was described, character for
 // character
 #[test]
@@ -411,7 +413,7 @@ fn column_conversion_rejects_unsupported_type() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.pk/test]    the expanded `ValueType` is the PK
+// [spec:pgorm:sem:codegen.entity.pk+1/test]    the expanded `ValueType` is the PK
 // column's Rust type, or a tuple for a composite key
 #[test]
 fn expanded_pk_value_type_is_type_or_tuple() {
@@ -439,59 +441,81 @@ fn expanded_pk_value_type_is_type_or_tuple() {
     assert_contains(text_key.file("setting.rs"), "type ValueType = String;");
 }
 
-// [spec:pgorm:sem:codegen.entity.pk/test]    `auto_increment()` is true when any
-// column of the table is auto-increment, not just a primary-key column
+// [spec:pgorm:sem:codegen.entity.pk+1/test]    `auto_increment()` reads the key
+// alone: a serial column outside the key does not flip it, a one-column serial
+// key does, and an identity inside a composite key does not, since the rest of
+// the key is still the caller's
 #[test]
-fn expanded_pk_auto_increment_looks_at_every_column() {
-    let generated = generate(
-        vec![
-            Table::create(Name::runtime("ticket"))
-                .col(
-                    ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
-                        .not_null()
-                        .primary_key()
-                        .to_owned(),
-                )
-                // not part of the primary key, yet it flips `auto_increment()`
-                .col(
-                    ColumnDef::new(Name::runtime("seq"))
-                        .integer()
-                        .not_null()
-                        .auto_increment()
-                        .to_owned(),
-                )
-                .to_owned(),
-        ],
-        expanded(),
-    );
+fn expanded_pk_auto_increment_reads_only_the_key() {
+    let auto_increment = |columns: Vec<ColumnDef>| {
+        let generated = generate(vec![table_with("ticket", columns)], expanded());
+        let file = norm(generated.file("ticket.rs"));
+        if file.contains(&norm("fn auto_increment() -> bool { true }")) {
+            true
+        } else {
+            assert!(file.contains(&norm("fn auto_increment() -> bool { false }")));
+            false
+        }
+    };
+    let code = || {
+        ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
+            .not_null()
+            .primary_key()
+            .to_owned()
+    };
+    let serial_seq = ColumnDef::new(Name::runtime("seq"))
+        .integer()
+        .not_null()
+        .auto_increment()
+        .to_owned();
 
-    assert_contains(
-        generated.file("ticket.rs"),
-        "impl PrimaryKeyTrait for PrimaryKey {
-            type ValueType = String;
-            fn auto_increment() -> bool { true }
-        }",
-    );
+    assert!(!auto_increment(vec![code(), serial_seq]));
+    assert!(!auto_increment(vec![code()]));
+    assert!(auto_increment(vec![serial_pk("id")]));
 
-    let no_auto = generate(
-        vec![table_with(
-            "ticket",
-            vec![
-                ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
-                    .not_null()
-                    .primary_key()
-                    .to_owned(),
-            ],
-        )],
-        expanded(),
-    );
-    assert_contains(
-        no_auto.file("ticket.rs"),
-        "fn auto_increment() -> bool { false }",
-    );
+    let tenant = ColumnDef::new(Name::runtime("tenant_id"))
+        .integer()
+        .not_null()
+        .primary_key()
+        .to_owned();
+    let generated_id = ColumnDef::new(Name::runtime("id"))
+        .integer()
+        .identity()
+        .primary_key()
+        .to_owned();
+    assert!(!auto_increment(vec![tenant, generated_id.clone()]));
+    assert!(auto_increment(vec![generated_id]));
 }
 
-// [spec:pgorm:sem:codegen.entity.pk/test]    in the compact format the same facts
+// [spec:pgorm:sem:codegen.entity.transform+8/test]    an identity is read off
+// the column definition as its form, and makes the column NOT NULL; one
+// carrying sequence options is refused, since an entity declares no options
+#[test]
+fn column_conversion_reads_an_identity() {
+    let plain = ColumnDef::new(Name::runtime("seq"))
+        .integer()
+        .identity_by_default()
+        .to_owned();
+    let column = Column::try_from(&plain).expect("an identity converts");
+    assert_eq!(
+        column.get_info(),
+        "Column `seq`: i32, identity_by_default, not_null"
+    );
+
+    let with_options = ColumnDef::new(Name::runtime("seq"))
+        .integer()
+        .identity_with(IdentityGeneration::Always, SequenceOption::StartWith(10))
+        .to_owned();
+    match Column::try_from(&with_options) {
+        Err(Error::TransformError(msg)) => assert_eq!(
+            msg,
+            "column `seq`: an entity declares an identity's form, not its sequence options"
+        ),
+        other => panic!("expected a TransformError, got {other:?}"),
+    }
+}
+
+// [spec:pgorm:sem:codegen.entity.pk+1/test]    in the compact format the same facts
 // surface as the `primary_key` / `auto_increment = false` field attributes
 #[test]
 fn compact_primary_key_facts_surface_as_field_attributes() {
