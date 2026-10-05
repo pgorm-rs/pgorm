@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+11]
-// [spec:pgorm:req:sql.surface+11/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+12]
+// [spec:pgorm:req:sql.surface+12/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -650,7 +650,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+10]
+// [spec:pgorm:req:sql.scope+11]
 mod backend;
 mod comment;
 pub mod error;
@@ -707,21 +707,24 @@ pub use value::{
 };
 pub use value_range::{Multirange, Range, RangeElement, RangeType};
 
-// Query statements: the four DML builders, the clauses they take, and the
+// Query statements: the five DML builders, the clauses they take, and the
 // traits that let a caller write against any of them.
 pub use query::{
     AnyWithClause, CaseOperand, CaseStatement, CommonTableExpression, Condition,
     ConditionExpression, ConditionType, ConditionalStatement, Cycle, DeleteStatement, FrameClause,
     FrameCurrentRow, FrameExclusion, FrameFollowing, FramePreceding, FrameStart, FrameType,
-    Grouping, GroupingElement, GroupingSets, InsertStatement, IntoCondition, LockBehavior,
-    LockType, OrderedStatement, OverStatement, Overriding, Query, QueryStatementBuilder,
-    RecursiveWithClause, Returning, ReturningClause, Search, SearchOrder, SelectExpr,
-    SelectStatement, SimpleCaseStatement, SubQueryStatement, UnionType, UpdateStatement,
-    WindowSelectType, WindowStatement, WithClause,
+    Grouping, GroupingElement, GroupingSets, InsertStatement, IntoCondition, IntoSubQueryStatement,
+    LockBehavior, LockType, OrderedStatement, OverStatement, Overriding, Query,
+    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, Search, SearchOrder,
+    SelectExpr, SelectStatement, SimpleCaseStatement, SubQueryStatement, UnionType,
+    UpdateStatement, WindowSelectType, WindowStatement, WithClause,
 };
 pub use query::{
     ConflictAction, ConflictArbiter, ConflictAssignment, ConflictAssignments, ConflictConstraint,
     ConflictElement, ConflictTarget, ConflictUpdate, OnConflict,
+};
+pub use query::{
+    MatchedAction, MergeInsert, MergeStatement, MergeUpdate, NotMatchedAction, PendingMerge,
 };
 pub use types::{NullOrdering, Order, OrderExpr};
 

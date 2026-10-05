@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ast+1/test]
+// [spec:pgorm:req:sql.ast+2/test]
 // [spec:pgorm:def:sql.ast.select+3/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
@@ -1011,8 +1011,8 @@ fn select_57() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+3/test]
-// [spec:pgorm:req:sql.render.cte+3/test]
+// [spec:pgorm:def:sql.ast.with+4/test]
+// [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn select_58() {
     let select = SelectStatement::new()
@@ -1215,7 +1215,7 @@ fn insert_from_select() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+3/test]
+// [spec:pgorm:def:sql.ast.with+4/test]
 #[test]
 fn insert_6() -> error::Result<()> {
     let select = SelectStatement::new()
@@ -2580,9 +2580,9 @@ fn condition_holder_5() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+3/test]    a non-recursive clause takes its first CTE at
+// [spec:pgorm:def:sql.ast.with+4/test]    a non-recursive clause takes its first CTE at
 // construction and renders every one it was given
-// [spec:pgorm:req:sql.render.cte+3/test]
+// [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn with_clause_renders_each_of_its_ctes() {
     let cte = |name: &str| {
@@ -2608,7 +2608,7 @@ fn with_clause_renders_each_of_its_ctes() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+3/test]    `from_select` names the CTE after the select's first
+// [spec:pgorm:def:sql.ast.with+4/test]    `from_select` names the CTE after the select's first
 // FROM table and takes its columns from the projection
 #[test]
 fn from_select_names_the_cte_after_its_table() {
@@ -2635,7 +2635,7 @@ fn from_select_names_the_cte_after_its_table() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+3/test]    a select with no FROM table has no name to derive, so
+// [spec:pgorm:def:sql.ast.with+4/test]    a select with no FROM table has no name to derive, so
 // `from_select` declines rather than yielding a nameless CTE
 #[test]
 fn from_select_declines_a_select_without_a_table() {
@@ -2701,7 +2701,7 @@ fn recursive_with_clause_renders_search_and_cycle() {
     );
 }
 
-// [spec:pgorm:def:query.build.with+1/test]    the clause is carried on the select, so the value is
+// [spec:pgorm:def:query.build.with+2/test]    the clause is carried on the select, so the value is
 // still a `SelectStatement` and every builder method still applies afterwards
 // [spec:pgorm:sem:query.build.with.attach+1/test]    and the last clause set is the one that renders
 #[test]
@@ -2752,9 +2752,9 @@ fn carried_with_clause_leaves_the_select_shapeable() {
 
 // [spec:pgorm:req:query.build.with.single+1/test]    one clause, one place: every statement carries
 // its own and renders exactly one WITH, with no wrapper type to give a second one a home
-// [spec:pgorm:def:query.build.with+1/test]    and `with` is the same verb on all four statements —
+// [spec:pgorm:def:query.build.with+2/test]    and `with` is the same verb on all four statements —
 // same receiver, same return, same last-call-wins slot
-// [spec:pgorm:req:sql.render.cte+3/test]
+// [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn a_with_clause_has_one_place_to_live() {
     let cte = || {

@@ -19,8 +19,12 @@ mod case;
 mod collate;
 #[path = "query_builder_composite.rs"]
 mod composite;
+#[path = "query_builder_cte.rs"]
+mod cte;
 #[path = "query_builder_grouping.rs"]
 mod grouping;
+#[path = "query_builder_merge.rs"]
+mod merge;
 #[path = "query_builder_range.rs"]
 mod range;
 #[path = "query_builder_sequence.rs"]
@@ -845,18 +849,10 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.render.cte+3]
+    // [spec:pgorm:req:sql.render.cte+4]
     pub(crate) fn prepare_with_clause(&self, with_clause: &AnyWithClause, sql: &mut dyn SqlWriter) {
         match with_clause {
-            AnyWithClause::Plain(plain) => {
-                write!(sql, "WITH ").unwrap();
-                for (i, cte) in plain.ctes().enumerate() {
-                    if i != 0 {
-                        write!(sql, ", ").unwrap();
-                    }
-                    self.prepare_with_query_clause_common_table(cte, sql);
-                }
-            }
+            AnyWithClause::Plain(plain) => self.prepare_plain_with_clause(plain, sql),
             AnyWithClause::Recursive(recursive) => {
                 write!(sql, "WITH RECURSIVE ").unwrap();
                 self.prepare_with_query_clause_common_table(&recursive.cte, sql);

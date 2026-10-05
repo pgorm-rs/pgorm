@@ -271,7 +271,7 @@ fn sweep_union_and_locking_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    common table expressions
-// [spec:pgorm:req:sql.render.cte+3/test]
+// [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn sweep_cte_shapes() {
     let named = |name: &str| {
@@ -457,6 +457,61 @@ fn sweep_update_and_delete_shapes() {
             .from_table(Glyph::Table)
             .returning(Query::returning().columns([Glyph::Id]))
             .to_string(),
+    ]);
+}
+
+// [spec:pgorm:req:sql.render.oracle/test]    MERGE
+// [spec:pgorm:req:sql.render.merge/test]
+#[test]
+fn sweep_merge_shapes() {
+    let on = || Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id));
+    let merge = || Query::merge(Glyph::Table, Font::Table, on());
+    let name = || Expr::col((Font::Table, Font::Name));
+    sweep([
+        merge().when_matched(MatchedAction::Delete).to_string(),
+        merge().when_matched(MatchedAction::DoNothing).to_string(),
+        merge()
+            .when_matched(MergeUpdate::value(Glyph::Image, name()).and_value(Glyph::Aspect, 1))
+            .to_string(),
+        merge()
+            .when_not_matched(NotMatchedAction::InsertDefaultValues)
+            .to_string(),
+        merge()
+            .when_not_matched(NotMatchedAction::DoNothing)
+            .to_string(),
+        merge()
+            .when_matched_and(name().is_null(), MatchedAction::Delete)
+            .when_matched(MergeUpdate::value(Glyph::Image, name()))
+            .when_not_matched_and(
+                Expr::col((Font::Table, Font::Language)).eq("en"),
+                MergeInsert::value(Glyph::Id, Expr::col((Font::Table, Font::Id)))
+                    .overriding(Overriding::SystemValue),
+            )
+            .when_not_matched(
+                MergeInsert::value(Glyph::Id, Expr::col((Font::Table, Font::Id)))
+                    .overriding(Overriding::UserValue),
+            )
+            .to_string(),
+        Query::merge(
+            (Name::runtime("public"), Glyph::Table)
+                .into_named_table()
+                .alias(Name::runtime("g")),
+            FromItem::SubQuery(
+                Query::select()
+                    .columns([Font::Id, Font::Name])
+                    .from(Font::Table)
+                    .take(),
+                Name::runtime("s"),
+            ),
+            Expr::col((Name::runtime("g"), Glyph::Id)).equals((Name::runtime("s"), Font::Id)),
+        )
+        .when_matched(MatchedAction::Delete)
+        .only()
+        .with(WithClause::new(CommonTableExpression::new(
+            Name::runtime("w"),
+            base(),
+        )))
+        .to_string(),
     ]);
 }
 
@@ -748,8 +803,19 @@ fn sweep_placeholder_builds() {
     let (cast, _) = Query::select()
         .expr(Expr::val(1).cast_as(Name::runtime("text")))
         .build();
+    let (merge, _) = Query::merge(
+        Glyph::Table,
+        Font::Table,
+        Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    )
+    .when_matched_and(
+        Expr::col(Glyph::Aspect).gt(1),
+        MergeUpdate::value(Glyph::Aspect, 2),
+    )
+    .when_not_matched(MergeInsert::value(Glyph::Id, 3))
+    .build();
 
-    sweep([select, insert, update, delete, cast]);
+    sweep([select, insert, update, delete, cast, merge]);
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    `assert_query_eq` is the paired helper: it holds a

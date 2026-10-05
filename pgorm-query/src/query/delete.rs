@@ -1,6 +1,6 @@
 use crate::{
-    AnyWithClause, QueryStatementBuilder, ReturningClause, SimpleExpr, SubQueryStatement,
-    backend::QueryBuilder, prepare::*, query::condition::*, types::*, value::*,
+    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, ReturningClause, SimpleExpr,
+    SubQueryStatement, backend::QueryBuilder, prepare::*, query::condition::*, types::*, value::*,
 };
 use inherent::inherent;
 
@@ -67,7 +67,7 @@ use inherent::inherent;
 /// );
 /// ```
 // [spec:pgorm:def:sql.ast.delete+4]
-// [spec:pgorm:def:query.build.with+1]
+// [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeleteStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
@@ -264,12 +264,15 @@ impl QueryStatementBuilder for DeleteStatement {
         QueryBuilder.prepare_delete_statement(self, sql);
     }
 
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
+}
+
+#[inherent]
+impl IntoSubQueryStatement for DeleteStatement {
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::DeleteStatement(self)
     }
-
-    pub fn build(&self) -> (String, Values);
-    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
 /// Renders every value inlined as an escaped SQL literal rather than bound —

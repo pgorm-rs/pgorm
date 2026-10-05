@@ -878,6 +878,7 @@ assertions (
     {id scope-sequences, kind @complete, author "brendan@necessary.nu", at 2026-10-01T23:10:34.664342Z}
     {id scope-composite-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T20:35:59.619861Z}
     {id scope-range-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T23:55:37.285787Z}
+    {id scope-merge, kind @complete, author "brendan@necessary.nu", at 2026-10-05T01:58:35.862938Z}
 )
 
 impl_evidence (

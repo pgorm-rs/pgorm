@@ -1,5 +1,5 @@
 use crate::{
-    ColumnRef, DeleteStatement, FromItem, InsertStatement, IntoName, Name, QueryStatementBuilder,
+    ColumnRef, DeleteStatement, FromItem, InsertStatement, IntoName, IntoSubQueryStatement, Name,
     SelectExpr, SelectStatement, SimpleExpr, SubQueryStatement, UpdateStatement,
 };
 
@@ -19,7 +19,7 @@ use crate::{
 /// pgorm-query does not enforce that: a write CTE with no RETURNING renders
 /// happily and is refused by the server. Supplying the RETURNING clause is the
 /// caller's part.
-// [spec:pgorm:def:sql.ast.with+3]
+// [spec:pgorm:def:sql.ast.with+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
     pub(crate) table_name: Name,
@@ -34,7 +34,7 @@ impl CommonTableExpression {
     pub fn new<T, Q>(table_name: T, query: Q) -> Self
     where
         T: IntoName,
-        Q: QueryStatementBuilder,
+        Q: IntoSubQueryStatement,
     {
         Self {
             table_name: table_name.into_name(),
@@ -280,7 +280,7 @@ impl Cycle {
 ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "table") SELECT * FROM "cte""#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.with+3]
+// [spec:pgorm:def:sql.ast.with+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithClause {
     pub(crate) first: CommonTableExpression,
@@ -412,9 +412,11 @@ impl RecursiveWithClause {
     }
 }
 
-/// Either form of WITH clause. This is what every statement builder's `with`
-/// method accepts, and what the statement then carries.
-// [spec:pgorm:def:sql.ast.with+3]
+/// Either form of WITH clause. This is what the `with` method of a SELECT,
+/// INSERT, UPDATE or DELETE accepts, and what the statement then carries. A
+/// [`MergeStatement`](crate::MergeStatement) takes the plain form alone,
+/// because PostgreSQL refuses `WITH RECURSIVE` before a `MERGE`.
+// [spec:pgorm:def:sql.ast.with+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyWithClause {
     /// A non-recursive clause of one or more common table expressions.
@@ -448,6 +450,8 @@ impl SelectStatement {
     /// [`InsertStatement`], [`UpdateStatement`] and [`DeleteStatement`] carry a
     /// clause the same way, through a method of the same name, receiver and
     /// return: `with` means one thing across all four.
+    /// [`MergeStatement::with`](crate::MergeStatement::with) is that method
+    /// too, taking the plain [`WithClause`] alone.
     ///
     /// The last call wins; a statement carries at most one clause.
     ///
@@ -495,7 +499,7 @@ impl SelectStatement {
     ///     r#"WITH RECURSIVE "cte_traversal" ("id", "depth", "next", "value") AS (SELECT "id", 1, "next", "value" FROM "table" UNION ALL (SELECT "id", "depth" + 1, "next", "value" FROM "table" INNER JOIN "cte_traversal" ON "cte_traversal"."next" = "table"."id")) SELECT * FROM "cte_traversal""#
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:def:query.build.with+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:req:query.build.with.single+1]
     pub fn with<C>(&mut self, clause: C) -> &mut Self
@@ -545,7 +549,7 @@ impl InsertStatement {
     ///     r#"WITH "cte" ("id", "image", "aspect") AS (SELECT "id", "image", "aspect" FROM "glyph") INSERT INTO "glyph" ("id", "image", "aspect") SELECT "id", "image", "aspect" FROM "cte""#
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:def:query.build.with+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:req:query.build.with.single+1]
     pub fn with<C>(&mut self, clause: C) -> &mut Self
@@ -588,7 +592,7 @@ impl UpdateStatement {
     ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph") UPDATE "glyph" SET "aspect" = 2.1345 WHERE "id" IN (SELECT "id" FROM "cte")"#
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:def:query.build.with+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:req:query.build.with.single+1]
     pub fn with<C>(&mut self, clause: C) -> &mut Self
@@ -630,7 +634,7 @@ impl DeleteStatement {
     ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "glyph") DELETE FROM "glyph" WHERE "id" IN (SELECT "id" FROM "cte")"#
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:def:query.build.with+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:req:query.build.with.single+1]
     pub fn with<C>(&mut self, clause: C) -> &mut Self

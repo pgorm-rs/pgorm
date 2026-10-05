@@ -10,19 +10,32 @@ today, including panicking edges and deliberate failsafes.
 
 ## Overview
 
-> [spec:pgorm:req:sql.ast+1]
+> [spec:pgorm:req:sql.ast+2]
 > pgorm-query MUST provide a programmatic AST for building SQL statements,
-> comprising `SelectStatement`, `InsertStatement`, `UpdateStatement` and
-> `DeleteStatement`, plus the `Query` shorthand whose
+> comprising `SelectStatement`, `InsertStatement`, `UpdateStatement`,
+> `DeleteStatement` and `MergeStatement`, plus the `Query` shorthand whose
 > associated functions (`Query::select()`, `Query::insert()`, `Query::update()`,
-> `Query::delete()`, `Query::with()`, `Query::returning()`) construct fresh
-> builders. Builder methods MUST mutate in place and return `&mut Self` so calls
-> chain; constructing or mutating a statement MUST NOT touch a database.
+> `Query::delete()`, `Query::merge(..)`, `Query::with()`, `Query::returning()`)
+> construct fresh builders. `Query::merge` returns a `PendingMerge`, which
+> becomes a statement when its first arm is added (`sql.ast.merge`). Builder
+> methods MUST mutate in place and return `&mut Self` so calls chain;
+> constructing or mutating a statement MUST NOT touch a database.
 >
-> Any of the four statement kinds MUST be embeddable as a subquery via
-> `into_sub_query_statement`, which wraps it in the `SubQueryStatement` enum
-> (`SelectStatement`, `InsertStatement`, `UpdateStatement`, `DeleteStatement`).
-> There is no fifth variant for a WITH-prefixed statement: a clause is carried
+> The four statement kinds PostgreSQL nests MUST be embeddable as a subquery
+> through `IntoSubQueryStatement::into_sub_query_statement`. It wraps the
+> statement in the `SubQueryStatement` enum (`SelectStatement`,
+> `InsertStatement`, `UpdateStatement`, `DeleteStatement`), which is what a
+> common table expression and an expression subquery hold. Nesting is a trait
+> of its own rather than a method of `QueryStatementBuilder`, because MERGE
+> renders without nesting. PostgreSQL 16 refuses `MERGE` as a CTE body
+> (`0A000`) and as an expression subquery (`42601`), so `MergeStatement`
+> renders and builds like the other four but has no `SubQueryStatement` arm
+> and does not implement the trait, and a CTE built around one does not
+> typecheck. Of the three costs `sql.scope` lists for a new statement kind,
+> the arm is the one that does not apply on the server targeted. PostgreSQL 17
+> accepts MERGE as a CTE body, so the arm is deferred with the rest of that
+> release's MERGE grammar (`sql.scope`).
+> There is no variant for a WITH-prefixed statement: a clause is carried
 > by the statement it prefixes (`query.build.with`), so the prefix nests
 > wherever the statement does.
 >
@@ -33,10 +46,11 @@ today, including panicking edges and deliberate failsafes.
 > has no `take()` at all rather than a `take()` that copies: `SelectStatement`,
 > `WindowStatement`, `TableIndex`, `ColumnDef`, `TableCreateStatement` and
 > `TableDropStatement` have one; `IndexCreateStatement`,
-> `ForeignKeyCreateStatement`, `TableForeignKey` and `TableAlterStatement` do
-> not, and a caller who wants a second copy of one writes `.to_owned()`.
+> `ForeignKeyCreateStatement`, `TableForeignKey`, `TableAlterStatement` and
+> `MergeStatement` do not, and a caller who wants a second copy of one writes
+> `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+11]
+> [spec:pgorm:req:sql.surface+12]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -93,7 +107,13 @@ today, including panicking edges and deliberate failsafes.
 > `RangeElement`, a range value, a multirange value, which built-in range
 > type a range is, and the sealed set of types the built-ins range over
 > (`sql.value.range`); `RangeDefinition`, in `extension` beside the type
-> statements, a range type's subtype and options (`sql.ddl.type-range`). An
+> statements, a range type's subtype and options (`sql.ddl.type-range`);
+> `MergeStatement`, `PendingMerge`, `MatchedAction`, `NotMatchedAction`,
+> `MergeUpdate` and `MergeInsert`: the MERGE statement, the typestate before
+> its first arm, the actions each kind of arm takes, and the assignments an
+> update writes and the row an insert writes (`sql.ast.merge`);
+> `IntoSubQueryStatement`, the conversion the four nesting statements share
+> and MERGE lacks (`sql.ast`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`).
@@ -132,7 +152,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+10]
+> [spec:pgorm:req:sql.scope+11]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -158,10 +178,21 @@ today, including panicking edges and deliberate failsafes.
 >
 > **Deferred** — worth building, not built:
 >
-> - **`MERGE`.** A fifth statement kind: its own AST node, renderer, and
->   `WHEN MATCHED` / `WHEN NOT MATCHED [BY SOURCE]` action list, plus a source
->   relation that is already `FromItem`. `ON CONFLICT` covers the upsert that
->   an ORM actually emits, which is why this ranks below its size.
+> - **`MERGE`'s PostgreSQL 17 grammar.** `MERGE` is built (`sql.ast.merge`)
+>   to the grammar PostgreSQL 15 and 16 share. Release 17 adds three things:
+>   `WHEN NOT MATCHED BY SOURCE`, a third arm kind for target rows that no
+>   source row matched, taking `UPDATE`, `DELETE` or `DO NOTHING`; `RETURNING`,
+>   with `merge_action()` naming the action each row took; and `MERGE` as a
+>   common table expression's body. On the 16 the suite runs against, the
+>   first two are syntax errors (`42601`) and the third is refused (`0A000`).
+>   The builder cannot know which release it is writing for, which is the
+>   reason `sql.ddl.column-def` gives for refusing `VIRTUAL`, so these wait
+>   on the server. Closing the entry costs a third arm kind beside the
+>   matched and not-matched ones, written `BY SOURCE` (with `BY TARGET` as
+>   the not-matched spelling it implies); a returning slot and a
+>   `merge_action()` function; and the `SubQueryStatement` arm and
+>   `IntoSubQueryStatement` impl that `sql.ast` records as absent. The first
+>   consumer would be an ORM terminal that reads the returned rows.
 > - **Composite attribute alteration.** `ALTER TYPE ... ADD ATTRIBUTE`,
 >   `DROP ATTRIBUTE [IF EXISTS]`, `ALTER ATTRIBUTE ... TYPE` and `RENAME
 >   ATTRIBUTE ... TO`, each taking `CASCADE` / `RESTRICT` to carry the change
@@ -882,13 +913,83 @@ today, including panicking edges and deliberate failsafes.
 > `OrderedStatement` and offers no `limit`, and an ordered or limited delete is
 > written as a subquery filter over a SELECT.
 
+## MERGE statements
+
+> [spec:pgorm:req:sql.ast.merge]
+> `MergeStatement` is the MERGE AST node. It holds a target `NamedTable`
+> (`[spec:pgorm:def:sql.types.table-ref+4]`: a name, bare or
+> schema-qualified, with an optional alias), an `only` flag, a source
+> `FromItem`, the join condition, an optional plain `WithClause`, and its
+> `WHEN` arms. `Query::merge(target, source, on)` takes the three required
+> parts: any `IntoNamedTable`, any `IntoFromItem` (a table, a subquery, a
+> values list, a function call or a template fragment, the currency of
+> `sql.ast.select.from`) and any `IntoCondition`. It returns a
+> `PendingMerge`, which is not a statement: it implements neither
+> `QueryStatementBuilder` nor `Display`. Each of its four methods
+> (`when_matched`, `when_matched_and`, `when_not_matched` and
+> `when_not_matched_and`) adds the first arm and returns the
+> `MergeStatement`, so a MERGE with no WHEN clause (`42601`) has no
+> constructor. `MergeStatement` has the same four methods as `&mut self`
+> builders, plus `with(WithClause)` and `only()`.
+>
+> An arm's action MUST be typed by the kind of row the arm takes.
+> `when_matched*` takes any `Into<MatchedAction>`: `Update(MergeUpdate)`,
+> `Delete` or `DoNothing`. `when_not_matched*` takes any
+> `Into<NotMatchedAction>`: `Insert(MergeInsert)`, `InsertDefaultValues` or
+> `DoNothing`. So an INSERT for a matched row and an UPDATE or DELETE for an
+> unmatched one, each `42601`, do not typecheck, and `compile_fail` doctests
+> show both. `MergeUpdate` and `MergeInsert` hold `(column, expression)`
+> pairs and are non-empty by construction: `value(col, expr)` takes the
+> first pair, and `and_value` and `and_values` append further pairs in
+> order. The pairing keeps an insert's column list and its `VALUES` row the
+> same length, which a separate list and row could break, so the positional
+> `INSERT VALUES (..)` with no column list is not offered. A column is a bare
+> `Name`: PostgreSQL resolves it against the target and refuses one
+> qualified by the table (`42703`). `MergeInsert::overriding` sets
+> `OVERRIDING SYSTEM VALUE` or `OVERRIDING USER VALUE`, and the last call
+> wins. It is reachable on the values form only, because
+> `INSERT OVERRIDING .. DEFAULT VALUES` is `42601`.
+>
+> Each kind's arms MUST be held as its conditional arms in call order,
+> followed by at most one unconditional arm. A row takes the first
+> conditional arm of its kind whose condition holds, so the order is part of
+> the statement's meaning, and the unconditional arm takes the rows they
+> leave. PostgreSQL refuses an arm after an unconditional arm of the same
+> kind as unreachable (`42601`). That error is raised in parse analysis, so
+> libpg_query alone would accept the statement. This builder cannot
+> represent it: `when_matched` and `when_not_matched` set the kind's one
+> unconditional arm, the last call wins, and the arm renders after the
+> kind's conditional arms whenever it was added. The two kinds never compete
+> for a row, so holding them apart changes nothing.
+>
+> `with` takes a `WithClause` rather than `AnyWithClause`, because
+> PostgreSQL refuses `WITH RECURSIVE` on a MERGE (`42601`). A data-modifying
+> common table expression is accepted. `only()` writes `ONLY` before the
+> target, so the rows of tables that inherit from it are neither matched nor
+> written.
+>
+> Every value travels through the bound-parameter pipeline of
+> `sql.ast.build`, whether it sits in the join condition, an arm's
+> condition, an assignment or the inserted row. The server types such a
+> parameter by the column it is assigned to or compared with. A value in the
+> source relation is assigned to no column, so a bound `VALUES` row or
+> function argument has only the type an unknown parameter gets. Annotating
+> it is the caller's obligation under `sql.render.placeholder-typing`, and
+> the live suite holds both refusals (`42883`, `42725`).
+>
+> No ORM path emits MERGE. The upsert an entity layer writes is
+> `ON CONFLICT` (`sql.ast.on-conflict`), and MERGE on PostgreSQL 16 has no
+> `RETURNING`, which every model-returning write terminal needs. A caller
+> runs a MERGE by building it and executing the `(String, Values)` pair.
+
 ## WITH clauses and CTEs
 
-> [spec:pgorm:def:sql.ast.with+3]
+> [spec:pgorm:def:sql.ast.with+4]
 > `CommonTableExpression` defines one named query in a WITH clause and MUST be
 > complete the moment it exists: `CommonTableExpression::new(table_name, query)`
-> takes both mandatory parts, the query being any `QueryStatementBuilder` stored
-> as a `SubQueryStatement` — the AST does not restrict UPDATE/DELETE CTEs;
+> takes both mandatory parts. The query is any statement implementing
+> `IntoSubQueryStatement`, stored as a `SubQueryStatement`, and a MERGE is
+> not one (`sql.ast`). The AST does not restrict UPDATE/DELETE CTEs;
 > validity is left to PostgreSQL. Only the genuinely optional parts remain
 > builder methods: the column list (`column`/`columns`) and the `materialized`
 > flag rendering `MATERIALIZED` / `NOT MATERIALIZED`.
@@ -905,9 +1006,11 @@ today, including panicking edges and deliberate failsafes.
 > CTE collection: `WithClause::new(cte)` takes the first, `cte` appends further
 > ones, and `ctes` iterates them in order. `RecursiveWithClause` is the
 > recursive form, described by `sql.ast.with.recursive`. `AnyWithClause` is the
-> closed sum of the two, and `Into<AnyWithClause>` is what `stmt.with(clause)`
-> accepts on each of select, insert, update and delete — the only way a clause
-> reaches a statement.
+> closed sum of the two. `Into<AnyWithClause>` is what `stmt.with(clause)`
+> accepts on each of select, insert, update and delete, and
+> `MergeStatement::with` accepts the plain `WithClause` alone
+> (`query.build.with`). Those setters are the only ways a clause reaches a
+> statement.
 >
 > A clause has exactly one home, the statement that carries it. There is no
 > wrapper type holding a clause plus the statement it prefixes, and therefore no

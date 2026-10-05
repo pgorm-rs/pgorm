@@ -1,6 +1,7 @@
 use crate::{
-    AnyWithClause, OnConflict, QueryStatementBuilder, ReturningClause, SelectStatement, SimpleExpr,
-    SubQueryStatement, Values, backend::QueryBuilder, error::*, prepare::*, types::*,
+    AnyWithClause, IntoSubQueryStatement, OnConflict, QueryStatementBuilder, ReturningClause,
+    SelectStatement, SimpleExpr, SubQueryStatement, Values, backend::QueryBuilder, error::*,
+    prepare::*, types::*,
 };
 use inherent::inherent;
 
@@ -53,7 +54,7 @@ pub enum Overriding {
 /// );
 /// ```
 // [spec:pgorm:def:sql.ast.insert+3]
-// [spec:pgorm:def:query.build.with+1]
+// [spec:pgorm:def:query.build.with+2]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InsertStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
@@ -493,12 +494,15 @@ impl QueryStatementBuilder for InsertStatement {
         QueryBuilder.prepare_insert_statement(self, sql);
     }
 
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
+}
+
+#[inherent]
+impl IntoSubQueryStatement for InsertStatement {
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::InsertStatement(self)
     }
-
-    pub fn build(&self) -> (String, Values);
-    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
 /// Renders every value inlined as an escaped SQL literal rather than bound —

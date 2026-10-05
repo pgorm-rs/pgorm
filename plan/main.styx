@@ -8885,6 +8885,22 @@ children (
                 id scope-merge
                 title "MERGE is a fifth statement kind"
                 deps (identifier-render-oracle)
+                sealed true
+                log (
+                    {
+                        at 2026-10-05T00:31:32.04922Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Design, each point checked live on the 16.15 test server. (1) Version line: build the PostgreSQL 15/16 MERGE grammar. No minimum version is written in docs/spec; the builder already emits PG15 constructs and is live-tested on 16, and sql.ddl.column-def's precedent (VIRTUAL refused because the builder cannot know which release it writes for) applies: WHEN NOT MATCHED BY SOURCE, RETURNING with merge_action(), and MERGE as a CTE body are 42601/0A000 on 16 and work on 17 (probed in a throwaway postgres:17 container, removed). They become a new sql.scope Deferred entry with their cost and a follow-up node. (2) Typestate: Query::merge(target, source, on) returns PendingMerge, which has no arms and is no statement; its four arm methods (when_matched, when_matched_and, when_not_matched, when_not_matched_and) return MergeStatement, so a MERGE without a WHEN clause (42601) has no constructor. Matched arms take MatchedAction {Update(MergeUpdate), Delete, DoNothing}, not-matched arms NotMatchedAction {Insert(MergeInsert), InsertDefaultValues, DoNothing}, so MATCHED-INSERT and NOT MATCHED-UPDATE/DELETE (42601) do not typecheck. MergeUpdate and MergeInsert hold (column, expression) pairs, non-empty by construction, so counts always match; OVERRIDING is reachable only on the values form (OVERRIDING ... DEFAULT VALUES is 42601). Per kind the statement holds its conditional arms in call order plus at most one unconditional arm, which renders after them: PostgreSQL refuses an arm after an unconditional one of its kind (42601 'unreachable WHEN clause', from parse analysis, so libpg_query alone would pass it), and that statement has no representation. MATCHED arms render before NOT MATCHED; the two never compete for a row. (3) WITH: with(WithClause) only, because WITH RECURSIVE on MERGE is 42601. (4) No SubQueryStatement arm: 16 refuses MERGE in WITH (0A000) and as an expression subquery (42601). into_sub_query_statement moves out of QueryStatementBuilder into its own IntoSubQueryStatement trait, implemented by the four statements that nest; MergeStatement implements QueryStatementBuilder and Display. This is a public API change for generic code that called the method through QueryStatementBuilder. (5) Values in SET, VALUES and conditions travel as bound parameters; their types are inferred from the target columns. Callers run it as build() then execute_raw. (6) ORM untouched: ON CONFLICT covers the upsert, and MERGE on 16 has no RETURNING, which every model-returning write terminal needs. (7) Python gets nothing in this node, because python.statements does not require MERGE; it goes to a follow-up node. The generative matrix is driven through the Python surface and stays as it is; the migration template has no hit."
+                    }
+
+                    {
+                        at 2026-10-05T01:58:35.862938Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
+                )
             }
         )
         log (

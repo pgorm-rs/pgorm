@@ -1,4 +1,4 @@
-//! Query statements (select, insert, update & delete).
+//! Query statements (select, insert, update, delete & merge).
 //!
 //! # Usage
 //!
@@ -6,6 +6,9 @@
 //! - Query Insert, see [`InsertStatement`]
 //! - Query Update, see [`UpdateStatement`]
 //! - Query Delete, see [`DeleteStatement`]
+//! - Query Merge, see [`MergeStatement`]
+
+use crate::{IntoFromItem, IntoNamedTable};
 
 mod case;
 mod condition;
@@ -13,6 +16,7 @@ mod delete;
 mod frame;
 mod grouping;
 mod insert;
+mod merge;
 mod on_conflict;
 mod ordered;
 mod returning;
@@ -29,6 +33,7 @@ pub use delete::*;
 pub use frame::*;
 pub use grouping::*;
 pub use insert::*;
+pub use merge::*;
 pub use on_conflict::*;
 pub use ordered::*;
 pub use returning::*;
@@ -43,7 +48,7 @@ pub(crate) use grouping::GroupingKind;
 pub use with::*;
 
 /// Shorthand for constructing any table query
-// [spec:pgorm:req:sql.ast+1]
+// [spec:pgorm:req:sql.ast+2]
 #[derive(Debug, Clone)]
 pub struct Query;
 
@@ -56,7 +61,7 @@ pub enum QueryStatement {
     Delete(DeleteStatement),
 }
 
-// [spec:pgorm:req:sql.ast+1]
+// [spec:pgorm:req:sql.ast+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubQueryStatement {
     SelectStatement(SelectStatement),
@@ -84,6 +89,27 @@ impl Query {
     /// Construct table [`DeleteStatement`]
     pub fn delete() -> DeleteStatement {
         DeleteStatement::new()
+    }
+
+    /// Begin a `MERGE` into `target` from `source`, pairing their rows where
+    /// `on` holds. The result is a [`PendingMerge`], which becomes a
+    /// [`MergeStatement`] when its first `WHEN` arm is added.
+    ///
+    /// The target is a table name, optionally schema-qualified and aliased,
+    /// and the source is any relation a `FROM` clause takes: a table, a
+    /// subquery, a values list, a function call or a validated fragment.
+    // [spec:pgorm:req:sql.ast.merge]
+    pub fn merge<T, S, C>(target: T, source: S, on: C) -> PendingMerge
+    where
+        T: IntoNamedTable,
+        S: IntoFromItem,
+        C: IntoCondition,
+    {
+        PendingMerge {
+            target: target.into_named_table(),
+            source: source.into_from_item(),
+            on: on.into_condition(),
+        }
     }
 
     /// Construct [`WithClause`] around its first common table expression

@@ -523,7 +523,7 @@ an ideal Postgres renderer would emit.
 
 ## CTEs
 
-> [spec:pgorm:req:sql.render.cte+3]
+> [spec:pgorm:req:sql.render.cte+4]
 > A `WithClause` renders `WITH ` followed by its comma-separated common table
 > expressions; a `RecursiveWithClause` renders `WITH RECURSIVE ` followed by the
 > single one it holds. Each CTE renders as: quoted table name; optional
@@ -541,7 +541,10 @@ an ideal Postgres renderer would emit.
 > is called from `prepare_select_statement` (`sql.render.select-order`),
 > `prepare_insert_statement` (`sql.render.insert`) and the UPDATE and DELETE
 > halves of `sql.render.update-delete`, each for that statement's own carried
-> clause and always as the first thing written. There is no second rendering
+> clause and always as the first thing written. A MERGE carries only the plain
+> form, so `prepare_merge_statement` calls the plain half,
+> `prepare_plain_with_clause`, which `prepare_with_clause` writes a plain
+> clause through (`sql.render.merge`). There is no second rendering
 > path — no wrapper statement to prefix (`query.build.with.single`) — so a CTE
 > query reads identically whichever statement it prefixes and at whatever
 > nesting level `SubQueryStatement` places it.
@@ -627,6 +630,30 @@ an ideal Postgres renderer would emit.
 > the renderer has no invalid clause to guard against. Row selection that needs
 > an order or a limit is expressed by the caller as a subquery filter over a
 > SELECT, which carries both.
+
+## MERGE
+
+> [spec:pgorm:req:sql.render.merge]
+> A `MergeStatement` MUST open with its carried WITH clause when it has one,
+> written by the plain-clause renderer that `prepare_with_clause` also uses
+> (`sql.render.cte`). Then come `MERGE INTO `, `ONLY ` when set, and the
+> target as a named table (`"schema"."t" AS "a"`). ` USING ` follows with the
+> source written by `prepare_from_item`, so every FROM item renders as it does
+> in a SELECT (`sql.render.subquery`), and then ` ON ` and the join
+> condition. The arms come last: every matched arm, then every not-matched
+> arm, each kind's conditional arms in call order and its unconditional arm
+> after them (`sql.ast.merge`).
+>
+> An arm renders ` WHEN MATCHED` or ` WHEN NOT MATCHED`, then ` AND ` and
+> its condition when it has one, then ` THEN ` and its action. The condition
+> takes no parentheses. Here `AND` is the clause's keyword rather than an
+> operator, and the condition runs to `THEN`, so a top-level `OR` is read
+> whole, as the parse tree shows. The actions render as `UPDATE SET "col" =
+> <expr>, ..`, `DELETE`, `DO NOTHING`, `INSERT DEFAULT VALUES`, and
+> `INSERT ("col", ..)` followed by an optional ` OVERRIDING SYSTEM VALUE` or
+> ` OVERRIDING USER VALUE`, then ` VALUES (<expr>, ..)`. The insert's column
+> list and its row are written from the same pairs. On the `build()` path
+> every value is a `$N` placeholder, numbered in text order.
 
 ## CASE
 

@@ -124,7 +124,7 @@ struct PriceBracket {
     cakes: i64,
 }
 
-// [spec:pgorm:def:query.build.with+1/test]    a recursive CTE drives the query and the rows land in a
+// [spec:pgorm:def:query.build.with+2/test]    a recursive CTE drives the query and the rows land in a
 // `FromQueryResult` struct through every terminal the ORM owns
 // [spec:pgorm:sem:query.build.with.attach+1/test]
 // [spec:pgorm:sem:exec.crud.selector-entry+2/test]

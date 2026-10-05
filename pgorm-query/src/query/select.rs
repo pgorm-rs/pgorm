@@ -1,6 +1,6 @@
 use crate::{
-    AnyWithClause, FunctionCall, GroupingElement, QueryStatementBuilder, SubQueryStatement,
-    WindowStatement,
+    AnyWithClause, FunctionCall, GroupingElement, IntoSubQueryStatement, QueryStatementBuilder,
+    SubQueryStatement, WindowStatement,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -32,7 +32,7 @@ use inherent::inherent;
 /// );
 /// ```
 // [spec:pgorm:def:sql.ast.select+3]
-// [spec:pgorm:def:query.build.with+1]
+// [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
@@ -1887,12 +1887,15 @@ impl QueryStatementBuilder for SelectStatement {
         QueryBuilder.prepare_select_statement(self, sql);
     }
 
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
+}
+
+#[inherent]
+impl IntoSubQueryStatement for SelectStatement {
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::SelectStatement(self)
     }
-
-    pub fn build(&self) -> (String, Values);
-    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
 /// Renders every value inlined as an escaped SQL literal rather than bound —

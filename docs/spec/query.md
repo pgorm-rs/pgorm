@@ -259,11 +259,13 @@ The composition clauses — WITH, LATERAL, WINDOW and the set operators — are 
 in-place mutations of the same `SelectStatement`, so none of them changes what a
 builder is or what its rows decode into.
 
-> [spec:pgorm:def:query.build.with+1]
+> [spec:pgorm:def:query.build.with+2]
 > A WITH clause attaches to a statement by being *carried on it*: each of
 > `SelectStatement`, `InsertStatement`, `UpdateStatement` and `DeleteStatement`
 > holds `with: Option<Box<AnyWithClause>>` and renders its own prefix
-> (`sql.render.select-order`, `sql.render.insert`, `sql.render.update-delete`).
+> (`sql.render.select-order`, `sql.render.insert`, `sql.render.update-delete`),
+> and `MergeStatement` holds `with: Option<Box<WithClause>>`
+> (`sql.render.merge`).
 > It MUST NOT be modelled as a wrapper around the statement, because a wrapper
 > erases it — the ORM's whole spine is a `SelectStatement`, and a value that has
 > stopped being one can no longer take a filter, an ordering, a `LIMIT`, a
@@ -276,7 +278,10 @@ builder is or what its rows decode into.
 > generic method covers both clause forms, so the type-split pair `with_cte` /
 > `with_recursive_cte` is deleted rather than kept as a second vocabulary for
 > the same slot. `with` overwrites: the last call wins and a statement carries
-> at most one clause (`query.build.with.single`).
+> at most one clause (`query.build.with.single`). `MergeStatement`'s setter
+> has the same name, receiver and return, and it overwrites the same way. It
+> takes a `WithClause` alone, because PostgreSQL refuses `WITH RECURSIVE` on
+> a MERGE (`42601`), so a recursive clause there does not typecheck.
 >
 > `QuerySelect` re-exposes it as the owned-`self` default method `with`
 > returning `Self` — the same verb at the ORM's own receiver convention — so

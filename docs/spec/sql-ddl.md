@@ -79,7 +79,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `.to_owned()` or `.clone()` and sees the copy in the source, rather than the
 > embedder cloning or draining a `&mut` behind their back. Reuse after the
 > call therefore has one outcome across all three
-> (`[spec:pgorm:req:sql.ast+1]`).
+> (`[spec:pgorm:req:sql.ast+2]`).
 >
 > Rendering MUST emit `CREATE TABLE [IF NOT EXISTS ]<table> ( ... )` with the
 > body in this fixed order: column definitions, then embedded index
@@ -139,7 +139,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > parenthesis has no constructor
 > (`[dec:pgorm:invalid-states-unrepresentable]`). `take()` moves every
 > accumulated part out and copies only that name, for the same reason
-> (`[spec:pgorm:req:sql.ast+1]`).
+> (`[spec:pgorm:req:sql.ast+2]`).
 >
 > A statement with no columns renders `CREATE TABLE <table> (  )`, and that is
 > deliberately left buildable: PostgreSQL accepts a table with no columns, so
@@ -297,7 +297,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > MUST NOT return. The statement has no `take()` for the same reason: moving the
 > options out would leave the action-less statement this type exists to rule
 > out, and a `take()` that copied instead would be a promise the name does not
-> keep (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`.
+> keep (`[spec:pgorm:req:sql.ast+2]`) — a second copy is `.to_owned()`.
 >
 > `add_foreign_key` — on both `PendingTableAlter` and `TableAlterStatement` —
 > takes `Into<TableForeignKey>` by value, as `add_column` takes
@@ -416,11 +416,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > MUST both be non-empty by construction: `Index::create(table, col)` and
 > `IndexCreateStatement::new(table, col)` take the table and the first column
 > and `col()` appends the rest, in the pattern
-> `[spec:pgorm:def:sql.ast.with+3]` uses for CTEs, and there is no `table()`
+> `[spec:pgorm:def:sql.ast.with+4]` uses for CTEs, and there is no `table()`
 > setter. It has no `take()` at all: moving the table or the columns out would
 > leave exactly the target-less, column-less husk the constructor rules out, and
 > a `take()` that copied instead would be a promise the name does not keep
-> (`[spec:pgorm:req:sql.ast+1]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
+> (`[spec:pgorm:req:sql.ast+2]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
 > column list (`CREATE INDEX ... ()`) and rejects `CREATE INDEX "n" ON  (...)`
 > at the parenthesis, so both states are unreachable rather than checked
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The index *name* is the one
@@ -522,7 +522,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > wrapping it has a `take()`: moving the tables and the first pair out would
 > leave exactly the husk the constructor rules out, and a `take()` that copied
 > them would be a promise the name does not keep
-> (`[spec:pgorm:req:sql.ast+1]`). A second copy is `.to_owned()`.
+> (`[spec:pgorm:req:sql.ast+2]`). A second copy is `.to_owned()`.
 >
 > `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability+3]`,
 > which unique and primary keys share. The foreign key is the case with a use
@@ -726,7 +726,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > enumeration's, and the server refuses them on a composite (`42809`, *is not
 > an enum*). The composite's own alterations — `ADD`, `DROP` and `ALTER
 > ATTRIBUTE`, and `RENAME ATTRIBUTE` — are not built:
-> `[spec:pgorm:req:sql.scope+10]` defers them, for the reason the next
+> `[spec:pgorm:req:sql.scope+11]` defers them, for the reason the next
 > paragraph gives.
 >
 > Nothing in pgorm reads a composite value. A column can be declared with the
@@ -788,7 +788,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`42P17`), refuses a shell type as an SQL function's argument (`42P13`) and
 > as a PL/pgSQL function's result (`0A000`), which leaves a C function — a
 > function body, outside the builder as `CREATE FUNCTION` is
-> (`[spec:pgorm:req:sql.scope+10]`). A range without one is continuous, as
+> (`[spec:pgorm:req:sql.scope+11]`). A range without one is continuous, as
 > `numrange` is: its bounds are stored as written.
 >
 > The rest is the server's to refuse, with its own codes: a collation on a
@@ -874,7 +874,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Four spellings are not built, each a whole statement through `execute`:
 > `TEMPORARY` / `UNLOGGED` and `SET { LOGGED | UNLOGGED }` are persistence
-> choices of the kind `[spec:pgorm:req:sql.scope+10]` rules out for tables;
+> choices of the kind `[spec:pgorm:req:sql.scope+11]` rules out for tables;
 > `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
 > no table counterpart in the builder either.
 

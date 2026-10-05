@@ -722,7 +722,7 @@ pub trait QuerySelect: Sized {
     ///     )
     /// );
     /// ```
-    // [spec:pgorm:def:query.build.with+1]
+    // [spec:pgorm:def:query.build.with+2]
     // [spec:pgorm:sem:query.build.with.attach+1]
     // [spec:pgorm:sem:sql.render.placeholder-typing]
     fn with<C>(mut self, clause: C) -> Self

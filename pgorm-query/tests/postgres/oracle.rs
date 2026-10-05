@@ -12,11 +12,12 @@
 /// Statement keywords the [`assert_eq`] shim uses to tell a whole rendered
 /// statement from a rendered fragment (a bare column reference, a value literal,
 /// an expression) that no grammar could parse on its own.
-const STATEMENT_KEYWORDS: [&str; 11] = [
+const STATEMENT_KEYWORDS: [&str; 12] = [
     "SELECT ",
     "INSERT ",
     "UPDATE ",
     "DELETE ",
+    "MERGE ",
     "WITH ",
     "CREATE ",
     "ALTER ",

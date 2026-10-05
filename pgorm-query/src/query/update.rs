@@ -1,6 +1,7 @@
 use crate::{
-    AnyWithClause, QueryStatementBuilder, ReturningClause, SubQueryStatement,
-    backend::QueryBuilder, expr::*, prepare::*, query::condition::*, types::*, value::*,
+    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, ReturningClause,
+    SubQueryStatement, backend::QueryBuilder, expr::*, prepare::*, query::condition::*, types::*,
+    value::*,
 };
 use inherent::inherent;
 
@@ -71,7 +72,7 @@ use inherent::inherent;
 /// );
 /// ```
 // [spec:pgorm:req:sql.ast.update+5]
-// [spec:pgorm:def:query.build.with+1]
+// [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UpdateStatement {
     pub(crate) with: Option<Box<AnyWithClause>>,
@@ -363,12 +364,15 @@ impl QueryStatementBuilder for UpdateStatement {
         QueryBuilder.prepare_update_statement(self, sql);
     }
 
+    pub fn build(&self) -> (String, Values);
+    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
+}
+
+#[inherent]
+impl IntoSubQueryStatement for UpdateStatement {
     pub fn into_sub_query_statement(self) -> SubQueryStatement {
         SubQueryStatement::UpdateStatement(self)
     }
-
-    pub fn build(&self) -> (String, Values);
-    pub fn build_collect(&self, sql: &mut dyn SqlWriter) -> String;
 }
 
 /// Renders every value inlined as an escaped SQL literal rather than bound —

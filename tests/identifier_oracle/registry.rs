@@ -30,8 +30,8 @@
 
 use pgorm::pgorm_query::{
     Asterisk, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable, JoinType,
-    LockType, Name, OnConflict, Order, Query, RecursiveWithClause, Search, SearchOrder,
-    SqlTemplate, TypeName, WindowStatement, WithClause,
+    LockType, MatchedAction, MergeInsert, MergeUpdate, Name, OnConflict, Order, Query,
+    RecursiveWithClause, Search, SearchOrder, SqlTemplate, TypeName, WindowStatement, WithClause,
 };
 
 use super::oracle::{
@@ -65,7 +65,7 @@ pub fn sites() -> Vec<Site> {
 }
 
 // ---------------------------------------------------------------------------
-// pgorm-query: SELECT, INSERT, UPDATE, DELETE and their expressions
+// pgorm-query: SELECT, INSERT, UPDATE, DELETE, MERGE and their expressions
 // ---------------------------------------------------------------------------
 
 fn query_sites() -> Vec<Site> {
@@ -744,7 +744,126 @@ fn query_sites() -> Vec<Site> {
             policy: Quoted,
             render: |n| sql(Query::delete().from_table(fixed("t")).returning_col(n_(n))),
         },
+        // -- MERGE ---------------------------------------------------------
+        Site {
+            id: "query/merge.target",
+            api: "Query::merge(Name, ..)",
+            kinds: &["MergeStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(n_(n), fixed("s"), merge_on())
+                    .when_matched(MatchedAction::Delete))
+            },
+        },
+        Site {
+            id: "query/merge.target.schema",
+            api: "Query::merge((Name, Name), ..) — the schema part",
+            kinds: &["MergeStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge((n_(n), fixed("t")), fixed("s"), merge_on())
+                    .when_matched(MatchedAction::Delete))
+            },
+        },
+        Site {
+            id: "query/merge.target-alias",
+            api: "Query::merge(NamedTable::alias(Name), ..)",
+            kinds: &["MergeStmt.relation.alias.aliasname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(
+                    fixed("t").into_named_table().alias(n_(n)),
+                    fixed("s"),
+                    merge_on(),
+                )
+                .when_matched(MatchedAction::Delete))
+            },
+        },
+        Site {
+            id: "query/merge.source",
+            api: "Query::merge(.., Name, ..)",
+            kinds: &["RangeVar.relname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(fixed("t"), n_(n), merge_on())
+                    .when_matched(MatchedAction::Delete))
+            },
+        },
+        Site {
+            id: "query/merge.update.value",
+            api: "MergeUpdate::value(Name, expr)",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(fixed("t"), fixed("s"), merge_on())
+                    .when_matched(MergeUpdate::value(n_(n), 1)))
+            },
+        },
+        Site {
+            id: "query/merge.update.and-value",
+            api: "MergeUpdate::and_value(Name, expr)",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(fixed("t"), fixed("s"), merge_on())
+                    .when_matched(MergeUpdate::value(fixed("c"), 1).and_value(n_(n), 2)))
+            },
+        },
+        Site {
+            id: "query/merge.update.and-values",
+            api: "MergeUpdate::and_values([(Name, expr)])",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(
+                    &Query::merge(fixed("t"), fixed("s"), merge_on()).when_matched(
+                        MergeUpdate::value(fixed("c"), 1)
+                            .and_values([(n_(n), Expr::val(2).into())]),
+                    ),
+                )
+            },
+        },
+        Site {
+            id: "query/merge.insert.value",
+            api: "MergeInsert::value(Name, expr)",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(fixed("t"), fixed("s"), merge_on())
+                    .when_not_matched(MergeInsert::value(n_(n), 1)))
+            },
+        },
+        Site {
+            id: "query/merge.insert.and-value",
+            api: "MergeInsert::and_value(Name, expr)",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Query::merge(fixed("t"), fixed("s"), merge_on())
+                    .when_not_matched(MergeInsert::value(fixed("c"), 1).and_value(n_(n), 2)))
+            },
+        },
+        Site {
+            id: "query/merge.insert.and-values",
+            api: "MergeInsert::and_values([(Name, expr)])",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(
+                    &Query::merge(fixed("t"), fixed("s"), merge_on()).when_not_matched(
+                        MergeInsert::value(fixed("c"), 1)
+                            .and_values([(n_(n), Expr::val(2).into())]),
+                    ),
+                )
+            },
+        },
     ]
+}
+
+/// The join condition of the MERGE sites, over fixed names only, so the name
+/// under test is the one thing in the statement that moves.
+fn merge_on() -> pgorm::pgorm_query::SimpleExpr {
+    Expr::col((fixed("t"), fixed("c"))).equals((fixed("s"), fixed("c")))
 }
 
 /// A recursive CTE named `w` over a fixed column `c`, for the SEARCH and
