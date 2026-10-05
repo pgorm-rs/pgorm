@@ -31,17 +31,17 @@ impl ColumnDef {
     ///                     IdentityGeneration::Always,
     ///                     SequenceOption::StartWith(1000).and(SequenceOption::IncrementBy(10)),
     ///                 )
-    ///                 .primary_key()
     ///         )
+    ///         .primary_key(Glyph::Id)
     ///         .to_string(),
     ///     [
     ///         r#"CREATE TABLE "glyph" ( "id" bigint GENERATED ALWAYS AS IDENTITY"#,
-    ///         r#"(INCREMENT BY 10 START WITH 1000) PRIMARY KEY )"#,
+    ///         r#"(INCREMENT BY 10 START WITH 1000), PRIMARY KEY ("id") )"#,
     ///     ]
     ///     .join(" "),
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.column-def+8]
+    // [spec:pgorm:req:sql.ddl.column-def+9]
     pub fn identity_with<O>(&mut self, generation: IdentityGeneration, options: O) -> &mut Self
     where
         O: Into<SequenceOptions>,

@@ -812,9 +812,10 @@ class Emitter:
                     definition = f"sch.ColumnDef({literal(column['name'])}, {kind})"
                     nullable = "null" if column["nullable"] else "not_null"
                     definition = call(definition, nullable, [])
-                    if column["primary"]:
-                        definition = call(definition, "primary_key", [])
                     query = call(query, "column", [definition])
+                key = [column["name"] for column in d["columns"] if column["primary"]]
+                if key:
+                    query = call(query, "primary_key", [literal(name) for name in key])
                 return query
             case "schema.drop":
                 return f"sch.drop_table({var(i['table'])})"

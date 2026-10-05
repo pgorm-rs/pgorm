@@ -1,7 +1,7 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Expr, Index, IndexConstraint, IndexOrder, IndexType, IntoName, Name,
-    StringLen, Table, TableName, TypeName, Values, extension::Type,
+    ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, Name, StringLen, Table,
+    TableKey, TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -44,8 +44,12 @@ fn programs() -> BTreeMap<&'static str, String> {
             a("amount"),
             ColumnType::Decimal(Some((12, 3))),
         ))
-        .index(IndexConstraint::primary_key(a("id \"x\"")))
-        .index(IndexConstraint::unique_nulls_not_distinct(a("name")).name(a("unique \"x\"")))
+        .primary_key(a("id \"x\""))
+        .unique(
+            TableKey::new(a("name"))
+                .nulls_not_distinct()
+                .name(a("unique \"x\"")),
+        )
         .check(Expr::col(a("id \"x\"")).gt(0i64))
         .if_not_exists()
         .to_string();
@@ -62,17 +66,14 @@ fn programs() -> BTreeMap<&'static str, String> {
         (
             "column_specs",
             Table::create(table.clone())
-                .col(
-                    ColumnDef::new_with_type(a("id"), ColumnType::BigInteger)
-                        .primary_key()
-                        .auto_increment(),
-                )
+                .col(ColumnDef::new_with_type(a("id"), ColumnType::BigInteger).auto_increment())
                 .col(
                     ColumnDef::new_with_type(a("n"), ColumnType::Integer)
-                        .unique_key()
                         .null()
                         .check(Expr::col(a("n")).gt(0i64)),
                 )
+                .primary_key(a("id"))
+                .unique(a("n"))
                 .to_string(),
         ),
         (
@@ -125,6 +126,23 @@ fn programs() -> BTreeMap<&'static str, String> {
                     ColumnDef::new_with_type(a("extra"), ColumnType::String(StringLen::None))
                         .not_null()
                         .default("hello"),
+                )
+                .to_string(),
+        ),
+        (
+            "add_primary_key",
+            Table::alter(table.clone())
+                .add_primary_key((a("id \"x\""), a("name")))
+                .to_string(),
+        ),
+        (
+            "add_unique",
+            Table::alter(table.clone())
+                .add_unique(
+                    TableKey::new(a("name"))
+                        .col(a("id \"x\""))
+                        .name(a("unique \"x\""))
+                        .nulls_not_distinct(),
                 )
                 .to_string(),
         ),

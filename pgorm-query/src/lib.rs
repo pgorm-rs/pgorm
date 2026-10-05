@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+12]
-// [spec:pgorm:req:sql.surface+12/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+13]
+// [spec:pgorm:req:sql.surface+13/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -735,8 +735,8 @@ pub use foreign_key::{
     ForeignKeyDropStatement, TableForeignKey,
 };
 pub use index::{
-    Index, IndexColumn, IndexColumnTarget, IndexConstraint, IndexCreateStatement,
-    IndexDropStatement, IndexKind, IndexOrder, IndexType, IntoIndexColumn, TableIndex,
+    Index, IndexColumn, IndexColumnTarget, IndexCreateStatement, IndexDropStatement, IndexKind,
+    IndexOrder, IndexType, IntoIndexColumn, TableIndex,
 };
 pub use sequence::{
     PendingSequenceAlter, Sequence, SequenceAlterStatement, SequenceCreateStatement,
@@ -744,9 +744,10 @@ pub use sequence::{
 };
 pub use table::{
     AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, IdentityGeneration,
-    IntervalPrecision, IntervalSpec, IntoColumnDef, PendingTableAlter, PgInterval, StringLen,
-    Table, TableAlterOption, TableAlterStatement, TableCreateStatement, TableDropOpt,
-    TableDropStatement, TableRenameStatement, TableTruncateStatement,
+    IntervalPrecision, IntervalSpec, IntoColumnDef, IntoTableKey, PendingTableAlter, PgInterval,
+    Primary, StringLen, Table, TableAlterOption, TableAlterStatement, TableCreateStatement,
+    TableDropOpt, TableDropStatement, TableKey, TableRenameStatement, TableTruncateStatement,
+    Unique,
 };
 
 // Rendering: the sink a statement is written into, and the two entry points

@@ -34,9 +34,10 @@ def dispatch(name, i, d, p):
                     column["name"], datatype(column["kind"], p, schema)
                 )
                 value = value.null() if column["nullable"] else value.not_null()
-                if column["primary"]:
-                    value = value.primary_key()
                 query = query.column(value)
+            key = [column["name"] for column in d["columns"] if column["primary"]]
+            if key:
+                query = query.primary_key(*key)
             return query, ["pgorm_query::Table::create", "pgorm_query::ColumnDef"]
         case "schema.drop":
             return schema.drop_table(i["table"]), ["pgorm_query::Table::drop"]

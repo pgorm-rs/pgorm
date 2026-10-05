@@ -236,7 +236,7 @@ fn ddl_index_and_constraint_names_escape_quotes() {
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer())
-            .index(IndexConstraint::unique(Glyph::Id).name(Name::runtime(r#"i"dx"#)))
+            .unique(TableKey::new(Glyph::Id).name(Name::runtime(r#"i"dx"#)))
             .to_string(),
         r#"CREATE TABLE "glyph" ( "id" integer, CONSTRAINT "i""dx" UNIQUE ("id") )"#
     );

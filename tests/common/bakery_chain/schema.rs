@@ -1,7 +1,7 @@
 use super::*;
 use crate::common::setup::create_table;
 use pgorm::{ConnectionTrait, DatabasePool, error::*, pgorm_query};
-use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, IndexConstraint, Name, Table};
+use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Name, Table, TableKey};
 
 pub async fn create_tables(db: &DatabasePool) -> Result<(), Error> {
     let db = &db.get().await?;
@@ -26,9 +26,9 @@ where
             ColumnDef::new(bakery::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(bakery::Column::Id)
         .col(ColumnDef::new(bakery::Column::Name).string().not_null())
         .col(
             ColumnDef::new(bakery::Column::ProfitMargin)
@@ -49,9 +49,9 @@ where
             ColumnDef::new(baker::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(baker::Column::Id)
         .col(ColumnDef::new(baker::Column::Name).string().not_null())
         .col(
             ColumnDef::new(baker::Column::ContactDetails)
@@ -85,9 +85,9 @@ where
             ColumnDef::new(customer::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(customer::Column::Id)
         .col(ColumnDef::new(customer::Column::Name).string().not_null())
         .col(ColumnDef::new(customer::Column::Notes).text())
         .to_owned();
@@ -104,9 +104,9 @@ where
             ColumnDef::new(order::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(order::Column::Id)
         .col(
             ColumnDef::new(order::Column::Total)
                 .decimal_len(16, 4)
@@ -159,9 +159,9 @@ where
             ColumnDef::new(lineitem::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(lineitem::Column::Id)
         .col(
             ColumnDef::new(lineitem::Column::Price)
                 .decimal_len(16, 4)
@@ -224,8 +224,8 @@ where
                 .integer()
                 .not_null(),
         )
-        .index(
-            IndexConstraint::primary_key(cakes_bakers::Column::CakeId)
+        .primary_key(
+            TableKey::new(cakes_bakers::Column::CakeId)
                 .name(Name::runtime("pk-cakes_bakers"))
                 .col(cakes_bakers::Column::BakerId),
         )
@@ -265,9 +265,9 @@ where
             ColumnDef::new(cake::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(cake::Column::Id)
         .col(ColumnDef::new(cake::Column::Name).string().not_null())
         .col(
             ColumnDef::new(cake::Column::Price)

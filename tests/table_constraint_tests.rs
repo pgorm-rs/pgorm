@@ -1,20 +1,20 @@
 #![allow(unused_imports, dead_code)]
 
-//! Unique and primary-key table constraints against a live PostgreSQL server.
+//! Primary and unique keys against a live PostgreSQL server.
 //!
-//! `IndexConstraint` exists so that every table constraint the builder can
-//! embed is one PostgreSQL accepts; the shapes it refuses — a non-unique
-//! kind, an ordered, collated, classed or computed key entry, a predicate, an
-//! access method — have no method to reach them, which the `compile_fail`
-//! doctests on the type hold. What only a server can settle is the other
-//! half: that each shape the builder *can* make is created as the constraint
-//! it names, and behaves as one. Each case below reads the constraint back
-//! out of `pg_constraint` and `pg_index`, and sets the row its key refuses
-//! beside the row it admits.
+//! `TableKey` exists so that every key the builder can declare is one
+//! PostgreSQL accepts; the shapes it refuses — a non-unique kind, an ordered,
+//! collated, classed or computed key entry, a predicate, an access method,
+//! `NULLS NOT DISTINCT` on a primary key, a second primary key — have no
+//! method to reach them, which the `compile_fail` doctests on the type hold.
+//! What only a server can settle is the other half: that each shape the
+//! builder *can* make is created as the key it names, and behaves as one. Each
+//! case below reads the constraint back out of `pg_constraint` and
+//! `pg_index`, and sets the row its key refuses beside the row it admits.
 
 pub mod common;
 pub use common::{TestContext, setup::*};
-use pgorm::pgorm_query::{ColumnDef, Deferrability, IndexConstraint, Name, Table};
+use pgorm::pgorm_query::{ColumnDef, Deferrability, Name, Table, TableKey};
 use pgorm::{ConnectionTrait, entity::prelude::*};
 use tokio_postgres::error::SqlState;
 
@@ -26,6 +26,7 @@ async fn main() -> Result<(), Error> {
     every_shape_is_created_as_it_names(&db).await?;
     each_key_refuses_what_it_should(&db).await?;
     the_grammar_has_no_other_shape(&db).await?;
+    a_later_primary_key_replaces_the_first(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -45,9 +46,9 @@ fn n(name: &str) -> Name {
 }
 
 /// `CREATE TABLE ledger (a int NOT NULL, b int NOT NULL, c int, d text, …)`
-/// carrying one constraint of every shape the builder has: a composite
-/// primary key with an `INCLUDE`, a named two-column unique key, a
-/// `NULLS NOT DISTINCT` unique key, and a deferrable one.
+/// carrying one key of every shape the builder has: a composite primary key
+/// with an `INCLUDE`, a named two-column unique key, a `NULLS NOT DISTINCT`
+/// unique key, and a deferrable one.
 fn ledger() -> String {
     Table::create(n("ledger"))
         .col(ColumnDef::new(n("a")).integer().not_null())
@@ -55,20 +56,20 @@ fn ledger() -> String {
         .col(ColumnDef::new(n("c")).integer())
         .col(ColumnDef::new(n("d")).text())
         .col(ColumnDef::new(n("e")).integer())
-        .index(
-            IndexConstraint::primary_key(n("a"))
+        .primary_key(
+            TableKey::new(n("a"))
                 .col(n("b"))
                 .name(n("ledger_pk"))
                 .include([n("d")]),
         )
-        .index(
-            IndexConstraint::unique(n("c"))
-                .col(n("d"))
-                .name(n("ledger_c_d")),
+        .unique(TableKey::new(n("c")).col(n("d")).name(n("ledger_c_d")))
+        .unique(
+            TableKey::new(n("e"))
+                .name(n("ledger_e"))
+                .nulls_not_distinct(),
         )
-        .index(IndexConstraint::unique_nulls_not_distinct(n("e")).name(n("ledger_e")))
-        .index(
-            IndexConstraint::unique(n("b"))
+        .unique(
+            TableKey::new(n("b"))
                 .name(n("ledger_b"))
                 .deferrability(Deferrability::DeferrableInitiallyDeferred),
         )
@@ -78,9 +79,9 @@ fn ledger() -> String {
 /// Each constraint as the catalogue holds it: its type, its key columns and
 /// included columns by name, whether nulls are distinct, and whether it is
 /// deferrable and initially deferred.
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    against a live server: every constraint
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    against a live server: every constraint
 // shape the builder makes is created, and is the constraint it names
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]
 async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(), Error> {
     let create = ledger();
     db.batch_execute(&create).await?;
@@ -143,7 +144,7 @@ async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(
 /// says it should: a composite key only a repeat of the whole key, an
 /// included column never, a plain unique key any number of nulls, and a
 /// `NULLS NOT DISTINCT` one a second null.
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    against a live server: each key refuses
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    against a live server: each key refuses
 // what it should and nothing else
 async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), Error> {
     let insert = |a: i32, b: i32, c: Option<i32>, d: &str, e: Option<i32>| {
@@ -182,13 +183,13 @@ async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), 
     Ok(())
 }
 
-/// The shapes `IndexConstraint` has no method for are the ones the
+/// The shapes `TableKey` has no method for are the ones the
 /// table-constraint grammar refuses outright (`42601`): a key list with no
 /// kind, an ordered, collated, classed or computed key entry, a predicate, an
 /// access method, and `NULLS NOT DISTINCT` on a primary key. Each is written
 /// raw here, because the builder cannot write it at all; the control beside
 /// them is the same table with a key the grammar takes.
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    against a live server: the table-constraint
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    against a live server: the table-constraint
 // shapes the builder cannot express are the ones PostgreSQL refuses
 async fn the_grammar_has_no_other_shape(db: &DatabaseConnection) -> Result<(), Error> {
     for constraint in [
@@ -208,6 +209,64 @@ async fn the_grammar_has_no_other_shape(db: &DatabaseConnection) -> Result<(), E
     }
     db.batch_execute("CREATE TABLE refused (k integer, t text, UNIQUE (k))")
         .await?;
+
+    Ok(())
+}
+
+/// The key columns of `table`'s primary key, in key order, and the key's
+/// name, as the catalogue holds them.
+async fn primary_key_of(db: &DatabaseConnection, table: &str) -> Result<(String, String), Error> {
+    let row = db
+        .query_one(
+            &format!(
+                "SELECT c.conname::text, string_agg(a.attname, ',' ORDER BY k.ord) \
+                 FROM pg_constraint c, unnest(c.conkey) WITH ORDINALITY k(attnum, ord) \
+                 JOIN pg_attribute a ON a.attnum = k.attnum \
+                 WHERE c.conrelid = '{table}'::regclass AND c.contype = 'p' \
+                 AND a.attrelid = c.conrelid GROUP BY c.conname"
+            ),
+            &[],
+        )
+        .await?;
+    Ok((row.get(0), row.get(1)))
+}
+
+/// A table has one primary key, and a second is refused in every spelling
+/// SQL has for one (`42P16`). The builder holds the key in one slot, so a
+/// table it builds with two `primary_key` calls has the second's key and
+/// only that, under the second's name.
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    against a live server: the second key a table
+// is given replaces the first, where SQL that declares two is refused
+async fn a_later_primary_key_replaces_the_first(db: &DatabaseConnection) -> Result<(), Error> {
+    for raw in [
+        "CREATE TABLE keyed (a int PRIMARY KEY, b int PRIMARY KEY)",
+        "CREATE TABLE keyed (a int PRIMARY KEY, b int, PRIMARY KEY (a, b))",
+        "CREATE TABLE keyed (a int, b int, PRIMARY KEY (a), PRIMARY KEY (b))",
+    ] {
+        let refused = db.batch_execute(raw).await.expect_err(raw);
+        refused_with(&refused, &SqlState::INVALID_TABLE_DEFINITION);
+    }
+
+    let create = Table::create(n("keyed"))
+        .col(ColumnDef::new(n("a")).integer().not_null())
+        .col(ColumnDef::new(n("b")).integer().not_null())
+        .primary_key(TableKey::new(n("a")).name(n("keyed_first")))
+        .primary_key(TableKey::new(n("b")).col(n("a")).name(n("keyed_second")))
+        .to_string();
+    db.batch_execute(&create).await?;
+    assert_eq!(
+        primary_key_of(db, "keyed").await?,
+        ("keyed_second".to_owned(), "b,a".to_owned()),
+        "{create}"
+    );
+
+    db.execute("INSERT INTO keyed VALUES (1, 1), (1, 2)", &[])
+        .await?;
+    let refused = db
+        .execute("INSERT INTO keyed VALUES (1, 2)", &[])
+        .await
+        .expect_err("a repeated (b, a)");
+    refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
 
     Ok(())
 }

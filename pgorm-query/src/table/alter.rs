@@ -1,4 +1,7 @@
-use crate::{ColumnDef, IntoColumnDef, TableForeignKey, backend::QueryBuilder, types::*};
+use crate::{
+    ColumnDef, IntoColumnDef, IntoTableKey, Primary, TableForeignKey, TableKey, Unique,
+    backend::QueryBuilder, types::*,
+};
 
 /// A table awaiting its first alter action.
 ///
@@ -14,7 +17,7 @@ use crate::{ColumnDef, IntoColumnDef, TableForeignKey, backend::QueryBuilder, ty
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+6]
+// [spec:pgorm:req:sql.ddl.alter-table+7]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -74,6 +77,24 @@ impl PendingTableAlter {
     {
         self.with(TableAlterOption::DropForeignKey(name.into_name()))
     }
+
+    /// Give the table its primary key: `ADD PRIMARY KEY (…)`.
+    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    pub fn add_primary_key<K>(self, key: K) -> TableAlterStatement
+    where
+        K: IntoTableKey<Primary>,
+    {
+        self.with(TableAlterOption::AddPrimaryKey(key.into_table_key()))
+    }
+
+    /// Add a unique key to the table: `ADD UNIQUE (…)`.
+    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    pub fn add_unique<K>(self, key: K) -> TableAlterStatement
+    where
+        K: IntoTableKey<Unique>,
+    {
+        self.with(TableAlterOption::AddUnique(key.into_table_key()))
+    }
 }
 
 /// Alter a table
@@ -112,7 +133,7 @@ impl PendingTableAlter {
 /// let mut alter = Table::alter(Font::Table).drop_column(Font::Name).to_owned();
 /// let moved: TableAlterStatement = alter.take();
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+6]
+// [spec:pgorm:req:sql.ddl.alter-table+7]
 // [spec:pgorm:req:sql.ast+2]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
@@ -135,7 +156,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+6]
+// [spec:pgorm:req:sql.ddl.alter-table+7]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
@@ -143,6 +164,11 @@ pub enum TableAlterOption {
     DropColumn(Name),
     AddForeignKey(TableForeignKey),
     DropForeignKey(Name),
+    /// `ADD [CONSTRAINT "name"] PRIMARY KEY (…)`. The table may already have
+    /// one, which only the server knows: it refuses a second (`42P16`).
+    AddPrimaryKey(TableKey<Primary>),
+    /// `ADD [CONSTRAINT "name"] UNIQUE [NULLS NOT DISTINCT] (…)`.
+    AddUnique(TableKey<Unique>),
 }
 
 impl TableAlterOption {
@@ -334,6 +360,52 @@ impl TableAlterStatement {
         T: IntoName,
     {
         self.add_alter_option(TableAlterOption::DropForeignKey(name.into_name()))
+    }
+
+    /// Give the table its primary key: `ADD PRIMARY KEY (…)`, the key the
+    /// table declares when it is created
+    /// ([`TableCreateStatement::primary_key`](crate::TableCreateStatement::primary_key)).
+    ///
+    /// Whether the table has a key already is the server's knowledge, not the
+    /// builder's, so a second is refused there (`42P16`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let table = Table::alter(Glyph::Table)
+    ///     .add_column(ColumnDef::new(Glyph::Aspect).integer().not_null())
+    ///     .add_primary_key(TableKey::new(Glyph::Id).col(Glyph::Aspect).name(Name::runtime("glyph_pk")))
+    ///     .add_unique(TableKey::new(Glyph::Image).nulls_not_distinct())
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     table.to_string(),
+    ///     [
+    ///         r#"ALTER TABLE "glyph" ADD COLUMN "aspect" integer NOT NULL,"#,
+    ///         r#"ADD CONSTRAINT "glyph_pk" PRIMARY KEY ("id", "aspect"),"#,
+    ///         r#"ADD UNIQUE NULLS NOT DISTINCT ("image")"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    pub fn add_primary_key<K>(&mut self, key: K) -> &mut Self
+    where
+        K: IntoTableKey<Primary>,
+    {
+        self.add_alter_option(TableAlterOption::AddPrimaryKey(key.into_table_key()))
+    }
+
+    /// Add a unique key to the table: `ADD UNIQUE (…)`, the key a table
+    /// declares with [`TableCreateStatement::unique`](crate::TableCreateStatement::unique).
+    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    pub fn add_unique<K>(&mut self, key: K) -> &mut Self
+    where
+        K: IntoTableKey<Unique>,
+    {
+        self.add_alter_option(TableAlterOption::AddUnique(key.into_table_key()))
     }
 
     fn add_alter_option(&mut self, alter_option: TableAlterOption) -> &mut Self {

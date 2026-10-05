@@ -18,11 +18,11 @@ use super::common::*;
 /// derives one when it is absent.
 ///
 /// This is the standalone `CREATE INDEX` and nothing else. A unique or
-/// primary-key constraint written inside `CREATE TABLE` is an
-/// [`IndexConstraint`](crate::IndexConstraint), a builder of its own, because
-/// the table-constraint grammar has no place for most of what an index
-/// carries — a non-unique kind, an expression or ordered entry, an operator
-/// class, a predicate, an access method.
+/// primary key written inside `CREATE TABLE` is a
+/// [`TableKey`](crate::TableKey), a type of its own, because the
+/// table-constraint grammar has no place for most of what an index carries — a
+/// non-unique kind, an expression or ordered entry, an operator class, a
+/// predicate, an access method.
 ///
 /// ```compile_fail,E0061
 /// use pgorm_query::{*, tests_cfg::*};
@@ -108,7 +108,7 @@ use super::common::*;
 /// let moved: IndexCreateStatement = index.take();
 /// ```
 ///
-// [spec:pgorm:req:sql.ddl.index-create+10]
+// [spec:pgorm:req:sql.ddl.index-create+11]
 // [spec:pgorm:req:sql.ast+2]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
@@ -125,9 +125,9 @@ pub struct IndexCreateStatement {
 /// What an index constrains: nothing, or uniqueness.
 ///
 /// There is no primary-key kind. PostgreSQL spells `PRIMARY KEY` only as a
-/// table constraint, never as `CREATE INDEX`, so a primary key is an
-/// [`IndexConstraint::primary_key`](crate::IndexConstraint::primary_key).
-// [spec:pgorm:req:sql.ddl.index-create+10]
+/// table constraint, never as `CREATE INDEX`, so a primary key is the table's
+/// [`TableCreateStatement::primary_key`](crate::TableCreateStatement::primary_key).
+// [spec:pgorm:req:sql.ddl.index-create+11]
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexKind {
     #[default]
@@ -240,7 +240,7 @@ impl IndexCreateStatement {
     ///     r#"CREATE INDEX "idx-glyph-aspect" ON "glyph" ("aspect") INCLUDE ("image")"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.index-create+10]
+    // [spec:pgorm:req:sql.ddl.index-create+11]
     pub fn include<N, I>(&mut self, columns: I) -> &mut Self
     where
         N: IntoName,
@@ -297,7 +297,7 @@ impl IndexCreateStatement {
 ///     .join(" ")
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.index-create+10]
+// [spec:pgorm:req:sql.ddl.index-create+11]
 #[inherent]
 impl ConditionalStatement for IndexCreateStatement {
     pub fn cond_where<C>(&mut self, condition: C) -> &mut Self

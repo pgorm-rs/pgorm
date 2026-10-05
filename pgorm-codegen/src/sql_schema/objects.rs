@@ -4,11 +4,11 @@ use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
-use pgorm_query::{IndexConstraint, Name};
+use pgorm_query::{Name, TableKey, Unique};
 
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+5]
+// [spec:pgorm:sem:codegen.ddl.objects+6]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -34,14 +34,14 @@ pub(super) fn enum_type(
 /// A `CREATE INDEX`, and the table it belongs to.
 pub(super) struct ParsedIndex {
     pub(super) table: TableIdent,
-    /// A unique index as the table constraint it enforces — `None` for an
-    /// index that states no entity fact, which has no place inside a
+    /// A unique index as the unique key it enforces — `None` for an index
+    /// that states no entity fact, which has no place inside a
     /// `CREATE TABLE`.
-    pub(super) constraint: Option<IndexConstraint>,
+    pub(super) constraint: Option<TableKey<Unique>>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+5]
-// [spec:pgorm:req:codegen.ddl.unsupported+4]
+// [spec:pgorm:sem:codegen.ddl.objects+6]
+// [spec:pgorm:req:codegen.ddl.unsupported+5]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -124,16 +124,12 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let Some(first) = columns.next() else {
         return Err(on("an index over no columns"));
     };
-    let mut constraint = if stmt.nulls_not_distinct {
-        IndexConstraint::unique_nulls_not_distinct(first)
-    } else {
-        IndexConstraint::unique(first)
-    };
+    let mut constraint = TableKey::new(first).cols(columns);
+    if stmt.nulls_not_distinct {
+        constraint = constraint.nulls_not_distinct();
+    }
     if !stmt.idxname.is_empty() {
         constraint = constraint.name(Name::runtime(stmt.idxname.as_str()));
-    }
-    for column in columns {
-        constraint = constraint.col(column);
     }
     Ok(ParsedIndex {
         table,
@@ -162,7 +158,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+5]
+// [spec:pgorm:sem:codegen.ddl.objects+6]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

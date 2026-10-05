@@ -38,7 +38,8 @@ async fn cycle_table(
     deferrability: Deferrability,
 ) -> Result<(), Error> {
     let create = Table::create(Name::runtime(table))
-        .col(ColumnDef::new(Name::runtime("id")).integer().primary_key())
+        .col(ColumnDef::new(Name::runtime("id")).integer())
+        .primary_key(Name::runtime("id"))
         .col(ColumnDef::new(Name::runtime("next")).integer())
         .to_string();
     db.batch_execute(&create).await?;

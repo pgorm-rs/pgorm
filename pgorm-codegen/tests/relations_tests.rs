@@ -7,13 +7,14 @@ use common::*;
 use pgorm_query::{ColumnDef, ForeignKey, ForeignKeyAction, Name, Table, TableCreateStatement};
 
 fn bare(table: &str) -> TableCreateStatement {
-    table_with(table, vec![serial_pk("id")])
+    keyed_with(table, &["id"], vec![serial("id")])
 }
 
 /// `cake` with a self-referencing `base_id`.
 fn self_referencing_cake() -> TableCreateStatement {
     Table::create(Name::runtime("cake"))
-        .col(serial_pk("id"))
+        .col(serial("id"))
+        .primary_key(Name::runtime("id"))
         .col(
             ColumnDef::new(Name::runtime("base_id"))
                 .integer()
@@ -34,16 +35,15 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
             ColumnDef::new(Name::runtime(left.1))
                 .integer()
                 .not_null()
-                .primary_key()
                 .to_owned(),
         )
         .col(
             ColumnDef::new(Name::runtime(right.1))
                 .integer()
                 .not_null()
-                .primary_key()
                 .to_owned(),
         )
+        .primary_key((Name::runtime(left.1), Name::runtime(right.1)))
         .foreign_key(ForeignKey::create(
             Name::runtime(name),
             Name::runtime(left.1),
@@ -61,7 +61,8 @@ fn junction(name: &str, left: (&str, &str), right: (&str, &str)) -> TableCreateS
 
 fn basket_with_two_fruit_keys() -> TableCreateStatement {
     Table::create(Name::runtime("basket"))
-        .col(serial_pk("id"))
+        .col(serial("id"))
+        .primary_key(Name::runtime("id"))
         .col(
             ColumnDef::new(Name::runtime("fruit_id1"))
                 .integer()
@@ -152,23 +153,23 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
 
     let composite = generate(
         vec![
-            table_with(
+            keyed_with(
                 "cake",
+                &["id", "kind"],
                 vec![
                     ColumnDef::new(Name::runtime("id"))
                         .integer()
                         .not_null()
-                        .primary_key()
                         .to_owned(),
                     ColumnDef::new(Name::runtime("kind"))
                         .integer()
                         .not_null()
-                        .primary_key()
                         .to_owned(),
                 ],
             ),
             Table::create(Name::runtime("fruit"))
-                .col(serial_pk("id"))
+                .col(serial("id"))
+                .primary_key(Name::runtime("id"))
                 .col(
                     ColumnDef::new(Name::runtime("cake_id"))
                         .integer()
@@ -208,7 +209,7 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
 #[test]
 fn foreign_key_actions_render_only_when_declared() {
     let mut audit = Table::create(Name::runtime("audit"));
-    audit.col(serial_pk("id"));
+    audit.col(serial("id")).primary_key(Name::runtime("id"));
 
     let cases = [
         ("restrict", ForeignKeyAction::Restrict, "Restrict"),
@@ -285,9 +286,9 @@ fn inverse_relations_render_without_from_and_to() {
                     ColumnDef::new(Name::runtime("user_id"))
                         .integer()
                         .not_null()
-                        .primary_key()
                         .to_owned(),
                 )
+                .primary_key(Name::runtime("user_id"))
                 .foreign_key(ForeignKey::create(
                     Name::runtime("profile"),
                     Name::runtime("user_id"),
@@ -377,7 +378,8 @@ fn conjunct_shadowed_relations_lose_their_plain_related_impl() {
         vec![
             bare("users"),
             Table::create(Name::runtime("bills"))
-                .col(serial_pk("id"))
+                .col(serial("id"))
+                .primary_key(Name::runtime("id"))
                 .col(
                     ColumnDef::new(Name::runtime("user_id"))
                         .integer()

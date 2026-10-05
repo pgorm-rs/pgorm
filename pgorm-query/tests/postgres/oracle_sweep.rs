@@ -516,7 +516,8 @@ fn sweep_merge_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+10/test]
+// [spec:pgorm:req:sql.ddl.create-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -526,21 +527,22 @@ fn sweep_table_ddl_shapes() {
                 ColumnDef::new(Glyph::Id)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
+                    .auto_increment(),
             )
             .col(ColumnDef::new(Glyph::Aspect).double().default(1.0))
-            .col(ColumnDef::new(Glyph::Image).text().unique_key())
+            .col(ColumnDef::new(Glyph::Image).text())
             .col(
                 ColumnDef::new(Glyph::Tokens)
                     .json_binary()
                     .check(Expr::col(Glyph::Aspect).gt(0)),
             )
-            .index(IndexConstraint::primary_key(Glyph::Id).name(Name::runtime("glyph_pk")))
-            .index(
-                IndexConstraint::unique_nulls_not_distinct(Glyph::Aspect)
+            .primary_key(TableKey::new(Glyph::Id).name(Name::runtime("glyph_pk")))
+            .unique(Glyph::Image)
+            .unique(
+                TableKey::new(Glyph::Aspect)
                     .col(Glyph::Image)
                     .include([Glyph::Tokens])
+                    .nulls_not_distinct()
                     .deferrability(Deferrability::DeferrableInitiallyDeferred),
             )
             .foreign_key(
@@ -565,6 +567,16 @@ fn sweep_table_ddl_shapes() {
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).null())
             .to_string(),
+        Table::alter(Glyph::Table)
+            .add_primary_key((Glyph::Id, Glyph::Aspect))
+            .add_unique(
+                TableKey::new(Glyph::Image)
+                    .name(Name::runtime("glyph_image"))
+                    .include([Glyph::Tokens])
+                    .nulls_not_distinct()
+                    .deferrability(Deferrability::DeferrableInitiallyImmediate),
+            )
+            .to_string(),
         Table::rename_column(Glyph::Table, Glyph::Aspect, Name::runtime("ratio")).to_string(),
         Table::alter(Glyph::Table)
             .drop_column(Glyph::Aspect)
@@ -583,7 +595,7 @@ fn sweep_table_ddl_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle/test]    index, foreign-key, type, extension and comment DDL
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
     sweep([

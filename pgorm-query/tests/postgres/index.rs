@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -59,7 +59,7 @@ fn create_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn create_6() {
     assert_eq!(
@@ -73,7 +73,7 @@ fn create_6() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn standalone_index_spells_plain_or_unique_only() {
     let index = || {
@@ -92,7 +92,7 @@ fn standalone_index_spells_plain_or_unique_only() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn index_kind_is_plain_or_unique() {
     let index = Index::create(Glyph::Table, Glyph::Aspect);
@@ -105,7 +105,7 @@ fn index_kind_is_plain_or_unique() {
     assert!(unique.is_unique_key());
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]
+// [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn nulls_not_distinct_needs_the_unique_kind() {
     let index = || {
@@ -153,7 +153,7 @@ fn drop_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]    a predicate closes the
+// [spec:pgorm:req:sql.ddl.index-create+11/test]    a predicate closes the
 // statement, and repeated calls conjoin as they do everywhere else
 #[test]
 fn partial_index_carries_a_predicate() {
@@ -192,7 +192,7 @@ fn partial_index_carries_a_predicate() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]    an expression entry is
+// [spec:pgorm:req:sql.ddl.index-create+11/test]    an expression entry is
 // parenthesised where a column name would stand bare, and composes with order
 #[test]
 fn expression_index_parenthesises_its_expression() {
@@ -218,7 +218,7 @@ fn expression_index_parenthesises_its_expression() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]    an operator class sits between
+// [spec:pgorm:req:sql.ddl.index-create+11/test]    an operator class sits between
 // the entry and its order, on a named entry and an expression entry alike
 #[test]
 fn operator_class_precedes_the_order() {
@@ -245,7 +245,7 @@ fn operator_class_precedes_the_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]    INCLUDE follows the key list,
+// [spec:pgorm:req:sql.ddl.index-create+11/test]    INCLUDE follows the key list,
 // on a standalone index as on a table constraint
 #[test]
 fn include_carries_non_key_columns() {
@@ -267,8 +267,8 @@ fn include_carries_non_key_columns() {
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Aspect).integer())
             .col(ColumnDef::new(Glyph::Image).text())
-            .index(
-                IndexConstraint::unique(Glyph::Aspect)
+            .unique(
+                TableKey::new(Glyph::Aspect)
                     .name(Name::runtime("idx"))
                     .include([Glyph::Image])
             )
@@ -294,7 +294,7 @@ fn include_carries_non_key_columns() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.index-create+10/test]    every clause at once, in the
+// [spec:pgorm:req:sql.ddl.index-create+11/test]    every clause at once, in the
 // order PostgreSQL's grammar puts them
 #[test]
 fn every_index_clause_composes() {

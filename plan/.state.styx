@@ -882,6 +882,7 @@ assertions (
     {id sqlmap-identifier-profile, kind @complete, author "brendan@necessary.nu", at 2026-10-05T03:49:29.250867Z}
     {id composite-key-generated-column, kind @complete, author "brendan@necessary.nu", at 2026-10-05T10:57:22.968642Z}
     {id composite-key-writes, kind @complete, author "brendan@necessary.nu", at 2026-10-05T13:28:02.338181Z}
+    {id composite-key-refusals, kind @complete, author "brendan@necessary.nu", at 2026-10-05T19:06:49.235085Z}
 )
 
 impl_evidence (

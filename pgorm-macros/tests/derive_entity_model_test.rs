@@ -583,7 +583,7 @@ fn sql_column_names_are_pinned_only_when_needed() {
     assert_eq!(renamed::Column::SecondName.to_string(), "explicit");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]
 #[test]
 fn primary_key_value_type_and_auto_increment() {
     // A single key contributes a bare type...
@@ -603,7 +603,7 @@ fn primary_key_value_type_and_auto_increment() {
     assert!(!shared_auto_increment::PrimaryKey::auto_increment());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    an identity
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    an identity
 // column inside a composite key: its def carries the identity, the other key
 // column's does not, and the key is not generated whole
 #[test]
@@ -624,7 +624,7 @@ fn identity_inside_a_composite_key() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    the key is
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    the key is
 // generated whole when every key column is an identity, whatever its arity and
 // whatever a non-key field says about `auto_increment`
 #[test]
@@ -641,7 +641,7 @@ fn every_identity_key_column_generates_the_key() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    what DerivePrimaryKey itself emits
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
     // `StaticName` maps the variant to its snake_case name, or a `column_name`

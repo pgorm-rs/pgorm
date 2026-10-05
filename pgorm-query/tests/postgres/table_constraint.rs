@@ -2,19 +2,20 @@ use super::*;
 use crate::oracle::{assert_eq, parsed_nodes};
 use pg_query::protobuf::ConstrType;
 
-fn table(constraint: IndexConstraint) -> String {
-    Table::create(Glyph::Table)
+/// `glyph`, its three columns, and whatever keys `keyed` declares on it.
+fn table(keyed: impl FnOnce(&mut TableCreateStatement) -> &mut TableCreateStatement) -> String {
+    let mut table = Table::create(Glyph::Table);
+    table
         .col(ColumnDef::new(Glyph::Id).integer().not_null())
         .col(ColumnDef::new(Glyph::Aspect).integer().not_null())
-        .col(ColumnDef::new(Glyph::Image).text())
-        .index(constraint)
-        .to_string()
+        .col(ColumnDef::new(Glyph::Image).text());
+    keyed(&mut table).to_string()
 }
 
-/// The one key constraint in `sql` — `PRIMARY KEY` or `UNIQUE`, as against
-/// the columns' `NOT NULL`s — as the parser read it.
-fn constraint_node(sql: &str) -> serde_json::Value {
-    let mut found: Vec<_> = parsed_nodes(sql, "Constraint")
+/// The key constraints in `sql` — `PRIMARY KEY` and `UNIQUE`, as against the
+/// columns' `NOT NULL`s — as the parser read them, in order.
+fn key_nodes(sql: &str) -> Vec<serde_json::Value> {
+    parsed_nodes(sql, "Constraint")
         .into_iter()
         .filter(|node| {
             matches!(
@@ -22,7 +23,12 @@ fn constraint_node(sql: &str) -> serde_json::Value {
                 ConstrType::ConstrPrimary | ConstrType::ConstrUnique
             )
         })
-        .collect();
+        .collect()
+}
+
+/// The one key constraint in `sql`, as the parser read it.
+fn constraint_node(sql: &str) -> serde_json::Value {
+    let mut found = key_nodes(sql);
     assert_eq!(found.len(), 1, "exactly one key constraint in {sql}");
     found.remove(0)
 }
@@ -48,33 +54,62 @@ fn contype(node: &serde_json::Value) -> ConstrType {
     ConstrType::try_from(code as i32).expect("a known constraint type")
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    each key an embedded constraint can declare
-// renders as the table constraint it names, its key columns plain names
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    a column or a tuple of them converts into a
+// key of either kind, which renders as the table constraint it names, its columns plain names
 #[test]
 fn every_key_renders_as_its_table_constraint() {
     let cases = [
         (
-            IndexConstraint::primary_key(Glyph::Id).col(Glyph::Aspect),
+            table(|t| t.primary_key((Glyph::Id, Glyph::Aspect))),
             r#"PRIMARY KEY ("id", "aspect")"#,
             ConstrType::ConstrPrimary,
+            vec!["id", "aspect"],
             false,
         ),
         (
-            IndexConstraint::unique(Glyph::Aspect),
+            table(|t| t.primary_key(Glyph::Id)),
+            r#"PRIMARY KEY ("id")"#,
+            ConstrType::ConstrPrimary,
+            vec!["id"],
+            false,
+        ),
+        (
+            table(|t| t.unique(Glyph::Aspect)),
             r#"UNIQUE ("aspect")"#,
             ConstrType::ConstrUnique,
+            vec!["aspect"],
             false,
         ),
         (
-            IndexConstraint::unique_nulls_not_distinct(Glyph::Image).col(Glyph::Aspect),
+            table(|t| t.unique((Glyph::Image,))),
+            r#"UNIQUE ("image")"#,
+            ConstrType::ConstrUnique,
+            vec!["image"],
+            false,
+        ),
+        (
+            table(|t| {
+                t.unique(
+                    TableKey::new(Glyph::Image)
+                        .col(Glyph::Aspect)
+                        .nulls_not_distinct(),
+                )
+            }),
             r#"UNIQUE NULLS NOT DISTINCT ("image", "aspect")"#,
             ConstrType::ConstrUnique,
+            vec!["image", "aspect"],
             true,
+        ),
+        (
+            table(|t| t.unique(TableKey::new(Glyph::Id).cols([Glyph::Aspect, Glyph::Image]))),
+            r#"UNIQUE ("id", "aspect", "image")"#,
+            ConstrType::ConstrUnique,
+            vec!["id", "aspect", "image"],
+            false,
         ),
     ];
 
-    for (constraint, rendered, kind, nulls_not_distinct) in cases {
-        let sql = table(constraint.clone());
+    for (sql, rendered, kind, columns, nulls_not_distinct) in cases {
         assert_eq!(
             sql,
             [
@@ -85,36 +120,43 @@ fn every_key_renders_as_its_table_constraint() {
         );
         let node = constraint_node(&sql);
         assert_eq!(contype(&node), kind, "{sql}");
-        assert_eq!(
-            names(&node["keys"]),
-            constraint
-                .get_columns()
-                .iter()
-                .map(|name| name.to_string())
-                .collect::<Vec<_>>(),
-            "{sql}"
-        );
+        assert_eq!(names(&node["keys"]), columns, "{sql}");
         assert_eq!(node["nulls_not_distinct"], nulls_not_distinct, "{sql}");
-        assert_eq!(
-            constraint.is_primary_key(),
-            kind == ConstrType::ConstrPrimary
-        );
-        assert_eq!(constraint.is_unique_key(), kind == ConstrType::ConstrUnique);
-        assert_eq!(constraint.is_nulls_not_distinct(), nulls_not_distinct);
     }
+
+    // The tuple impls reach twelve columns, as a primary key's value does.
+    let twelve = TableKey::<Primary>::new(Name::runtime("c1"))
+        .cols((2..=12).map(|at| Name::runtime(format!("c{at}"))));
+    assert_eq!(twelve.get_columns().len(), 12);
+    let converted: TableKey<Unique> = (
+        Glyph::Id,
+        Glyph::Aspect,
+        Glyph::Image,
+        Glyph::Id,
+        Glyph::Aspect,
+        Glyph::Image,
+        Glyph::Id,
+        Glyph::Aspect,
+        Glyph::Image,
+        Glyph::Id,
+        Glyph::Aspect,
+        Glyph::Image,
+    )
+        .into_table_key();
+    assert_eq!(converted.get_columns().len(), 12);
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    a name, INCLUDE and deferrability ride on
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    a name, INCLUDE and deferrability ride on
 // any key, in the grammar's order
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]
 #[test]
-fn a_constraint_takes_a_name_include_and_deferrability() {
-    let constraint = IndexConstraint::unique(Glyph::Aspect)
+fn a_key_takes_a_name_include_and_deferrability() {
+    let key = TableKey::new(Glyph::Aspect)
         .name(Name::runtime("glyph_aspect"))
         .include([Glyph::Image])
         .include([Glyph::Id])
         .deferrability(Deferrability::DeferrableInitiallyImmediate);
-    let sql = table(constraint.clone());
+    let sql = table(|t| t.unique(key.clone()));
     assert!(
         sql.ends_with(
             r#""image" text, CONSTRAINT "glyph_aspect" UNIQUE ("aspect") INCLUDE ("image", "id") DEFERRABLE INITIALLY IMMEDIATE )"#
@@ -128,18 +170,19 @@ fn a_constraint_takes_a_name_include_and_deferrability() {
     assert_eq!(node["initdeferred"], false, "{sql}");
 
     assert_eq!(
-        constraint.get_name().map(|name| name.to_string()),
+        key.get_name().map(|name| name.to_string()),
         Some("glyph_aspect".to_owned())
     );
-    assert_eq!(constraint.get_include().len(), 2);
+    assert_eq!(key.get_include().len(), 2);
     assert_eq!(
-        constraint.get_deferrability(),
+        key.get_deferrability(),
         Some(Deferrability::DeferrableInitiallyImmediate)
     );
+    assert!(!key.is_nulls_not_distinct());
 
-    // Unnamed, the constraint writes no CONSTRAINT clause and PostgreSQL
-    // derives the name.
-    let sql = table(IndexConstraint::primary_key(Glyph::Id));
+    // Unnamed, the key writes no CONSTRAINT clause and PostgreSQL derives the
+    // name.
+    let sql = table(|t| t.primary_key(Glyph::Id));
     assert!(
         sql.ends_with(r#""image" text, PRIMARY KEY ("id") )"#),
         "{sql}"
@@ -147,26 +190,64 @@ fn a_constraint_takes_a_name_include_and_deferrability() {
     assert_eq!(constraint_node(&sql)["conname"], "", "{sql}");
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    constraints embed in order, by value, after
-// the columns
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    the primary key is one slot a later call
+// replaces, so a table renders one PRIMARY KEY however often it is declared; the unique keys
+// append, and every key follows the columns, the primary key first
 #[test]
-fn constraints_embed_in_order() {
-    let key = IndexConstraint::primary_key(Glyph::Id);
+fn one_primary_key_and_any_unique_keys() {
     let statement = Table::create(Glyph::Table)
         .col(ColumnDef::new(Glyph::Id).integer().not_null())
-        .col(ColumnDef::new(Glyph::Aspect).integer())
-        .index(key.clone())
-        .index(IndexConstraint::unique(Glyph::Aspect))
+        .unique(Glyph::Image)
+        .primary_key(TableKey::new(Glyph::Aspect).name(Name::runtime("first")))
+        .col(ColumnDef::new(Glyph::Aspect).integer().not_null())
+        .unique((Glyph::Aspect, Glyph::Image))
+        .primary_key((Glyph::Id, Glyph::Aspect))
+        .col(ColumnDef::new(Glyph::Image).text())
         .to_owned();
+    let sql = statement.to_string();
     assert_eq!(
-        statement.to_string(),
-        r#"CREATE TABLE "glyph" ( "id" integer NOT NULL, "aspect" integer, PRIMARY KEY ("id"), UNIQUE ("aspect") )"#
+        sql,
+        [
+            r#"CREATE TABLE "glyph" ( "id" integer NOT NULL, "aspect" integer NOT NULL, "image" text,"#,
+            r#"PRIMARY KEY ("id", "aspect"), UNIQUE ("image"), UNIQUE ("aspect", "image") )"#,
+        ]
+        .join(" ")
     );
-    let read: Vec<bool> = statement
-        .get_indexes()
+    let kinds: Vec<ConstrType> = key_nodes(&sql).iter().map(contype).collect();
+    assert_eq!(
+        kinds,
+        [
+            ConstrType::ConstrPrimary,
+            ConstrType::ConstrUnique,
+            ConstrType::ConstrUnique
+        ]
+    );
+
+    let key = statement
+        .get_primary_key()
+        .expect("the key the last call declared");
+    assert_eq!(
+        key.get_columns()
+            .iter()
+            .map(|name| name.to_string())
+            .collect::<Vec<_>>(),
+        ["id", "aspect"]
+    );
+    assert!(
+        key.get_name().is_none(),
+        "the replaced key's name went with it"
+    );
+    let unique: Vec<Vec<String>> = statement
+        .get_unique_keys()
         .iter()
-        .map(IndexConstraint::is_primary_key)
+        .map(|key| {
+            key.get_columns()
+                .iter()
+                .map(|name| name.to_string())
+                .collect()
+        })
         .collect();
-    assert_eq!(read, [true, false]);
-    assert!(key.is_primary_key());
+    assert_eq!(unique, [vec!["image"], vec!["aspect", "image"]]);
+
+    assert!(Table::create(Glyph::Table).get_primary_key().is_none());
 }

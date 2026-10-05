@@ -14,9 +14,10 @@ async def main() -> None:
     table = p.Table("python_schema_example")
     statement = (
         s.create_table(table)
-        .column(s.ColumnDef("id", "integer").primary_key().auto_increment())
+        .column(s.ColumnDef("id", "integer").auto_increment())
         .column(s.ColumnDef("name", s.DataType("varchar", length=80)).not_null())
         .column(s.ColumnDef("created_at", "timestamptz"))
+        .primary_key("id")
     )
     print(statement.inspect().sql)
     async with p.Pool(os.environ["PGORM_TEST_DSN"]) as pool:
@@ -36,9 +37,12 @@ if __name__ == "__main__":
 ```
 
 Builder methods return new objects. `ColumnDef` supports nullability, defaults,
-primary keys, uniqueness, auto increment, check constraints and stored generated
-expressions. `CreateTable` supports composite primary keys, named unique
-constraints, checks and `if_not_exists`. Use unqualified `p.col(...)` expressions
+auto increment, check constraints and stored generated expressions. Keys are
+the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
+which a later call replaces, and `CreateTable.unique(*columns, name=...,
+nulls_not_distinct=...)` adds a unique key, so a table cannot be written with
+two primary keys. `CreateTable` also supports checks and `if_not_exists`. Use
+unqualified `p.col(...)` expressions
 inside checks and generated columns. Table targets must be `p.Table` without
 an alias; `schema=` retains the qualified identifier.
 

@@ -13,8 +13,9 @@ async def runtime(db):
     table = p.Table("runtime", schema="python_entities")
     await db.execute(
         s.create_table(table)
-        .column(s.ColumnDef("id", "integer").primary_key())
+        .column(s.ColumnDef("id", "integer"))
         .column(s.ColumnDef("name", "text"))
+        .primary_key("id")
     )
     inserted = await db.execute(
         p.insert(table).columns("id", "name").values(1, "O'Brien 雪")

@@ -18,7 +18,7 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    ColumnDef, Deferrability, Index, IndexConstraint, Name, OnConflict, Query, Table,
+    ColumnDef, Deferrability, Index, Name, OnConflict, Query, Table, TableKey, Unique,
 };
 use pgorm::{ConnectionTrait, TransactionTrait, entity::prelude::*};
 use tokio_postgres::error::SqlState;
@@ -48,20 +48,27 @@ fn refused_with(error: &Error, state: &SqlState) {
     }
 }
 
-/// `CREATE TABLE <table> (id int PRIMARY KEY, position int NOT NULL <unique>)`
-/// over positions 1 and 2, the column's uniqueness carried by `unique`.
+/// `CREATE TABLE <table> (id int, position int NOT NULL, PRIMARY KEY (id)[,
+/// <unique>])` over positions 1 and 2, the position's uniqueness, if any,
+/// carried by `unique`.
 async fn slots(
     db: &DatabaseConnection,
     table: &str,
-    unique: impl FnOnce(&mut ColumnDef) -> &mut ColumnDef,
+    unique: Option<TableKey<Unique>>,
 ) -> Result<(), Error> {
-    let mut position = ColumnDef::new(Name::runtime("position"));
-    position.integer().not_null();
-    unique(&mut position);
-    let create = Table::create(Name::runtime(table))
-        .col(ColumnDef::new(Name::runtime("id")).integer().primary_key())
-        .col(position)
-        .to_string();
+    let mut create = Table::create(Name::runtime(table));
+    create
+        .col(ColumnDef::new(Name::runtime("id")).integer())
+        .col(
+            ColumnDef::new(Name::runtime("position"))
+                .integer()
+                .not_null(),
+        )
+        .primary_key(Name::runtime("id"));
+    if let Some(unique) = unique {
+        create.unique(unique);
+    }
+    let create = create.to_string();
     db.batch_execute(&create).await?;
     db.execute(
         &format!("INSERT INTO {table} (id, position) VALUES (1, 1), (2, 2)"),
@@ -80,27 +87,30 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
     .await
 }
 
-/// A column-level `UNIQUE DEFERRABLE INITIALLY DEFERRED` lets a transaction
+/// A `UNIQUE (…) DEFERRABLE INITIALLY DEFERRED` lets a transaction
 /// hold a duplicate between statements — the swap of two positions, which no
 /// single `UPDATE` ordering can do through a per-row check — and refuses one
 /// that is still there at `COMMIT`. The control, the same column with no
 /// clause, refuses the first half of the swap on the spot.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: an initially
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
-// [spec:pgorm:req:sql.ddl.column-def+8/test]
+// [spec:pgorm:req:sql.ddl.create-table+11/test]
 // [spec:pgorm:req:sql.scope+11/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
-    slots(db, "immediate_slot", |c| c.unique_key()).await?;
+    let position = || TableKey::new(Name::runtime("position"));
+    slots(db, "immediate_slot", Some(position())).await?;
     let refused = collide(db, "immediate_slot")
         .await
         .expect_err("the default key refuses the duplicate per row");
     refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
 
-    slots(db, "deferred_slot", |c| {
-        c.unique_key_deferrability(Deferrability::DeferrableInitiallyDeferred)
-    })
+    slots(
+        db,
+        "deferred_slot",
+        Some(position().deferrability(Deferrability::DeferrableInitiallyDeferred)),
+    )
     .await?;
 
     let txn = db.begin().await?;
@@ -126,24 +136,24 @@ async fn a_deferred_unique_key_admits_a_transient_duplicate(
 }
 
 /// `SET CONSTRAINTS <name> IMMEDIATE` runs a deferred check on the spot, at
-/// the statement that says so, rather than waiting for `COMMIT`. The
-/// constraint is a named table-level `UNIQUE (…)` — the `IndexConstraint`
-/// path — so `SET CONSTRAINTS` has a name to reach it by.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: SET CONSTRAINTS moves
+/// the statement that says so, rather than waiting for `COMMIT`. The key is
+/// named, so `SET CONSTRAINTS` has a name to reach it by.
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: SET CONSTRAINTS moves
 // a deferrable key's check
-// [spec:pgorm:req:sql.ddl.create-table+10/test]
+// [spec:pgorm:req:sql.ddl.create-table+11/test]
 async fn set_constraints_immediate_fires_the_check_early(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
     let create = Table::create(Name::runtime("named_slot"))
-        .col(ColumnDef::new(Name::runtime("id")).integer().primary_key())
+        .col(ColumnDef::new(Name::runtime("id")).integer())
+        .primary_key(Name::runtime("id"))
         .col(
             ColumnDef::new(Name::runtime("position"))
                 .integer()
                 .not_null(),
         )
-        .index(
-            IndexConstraint::unique(Name::runtime("position"))
+        .unique(
+            TableKey::new(Name::runtime("position"))
                 .name(Name::runtime("named_slot_position"))
                 .deferrability(Deferrability::DeferrableInitiallyDeferred),
         )
@@ -167,9 +177,9 @@ async fn set_constraints_immediate_fires_the_check_early(
     Ok(())
 }
 
-/// A primary key takes the same clause through `primary_key()`: two rows swap
-/// ids inside a transaction, and a duplicate id left at `COMMIT` is refused.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: a deferred primary key
+/// A primary key takes the same clause: two rows swap ids inside a
+/// transaction, and a duplicate id left at `COMMIT` is refused.
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: a deferred primary key
 // behaves as a deferred unique key does
 // [spec:pgorm:req:sql.scope+11/test]
 async fn a_deferred_primary_key_is_checked_at_commit(
@@ -178,8 +188,8 @@ async fn a_deferred_primary_key_is_checked_at_commit(
     let create = Table::create(Name::runtime("seat"))
         .col(ColumnDef::new(Name::runtime("id")).integer().not_null())
         .col(ColumnDef::new(Name::runtime("holder")).text().not_null())
-        .index(
-            IndexConstraint::primary_key(Name::runtime("id"))
+        .primary_key(
+            TableKey::new(Name::runtime("id"))
                 .deferrability(Deferrability::DeferrableInitiallyDeferred),
         )
         .to_string();
@@ -216,28 +226,33 @@ async fn a_deferred_primary_key_is_checked_at_commit(
 /// A `NOT DEFERRABLE` unique key is checked row by row, so shifting every
 /// position up by one collides with the next row before it has moved; an
 /// initially-immediate one is checked once the statement ends, when the
-/// positions are distinct again. The key here is added by `ALTER TABLE`, the
-/// path that spells a column's unique key as `ADD UNIQUE (…)`.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: INITIALLY IMMEDIATE is
+/// positions are distinct again. The key here is added by `ALTER TABLE`'s
+/// `ADD UNIQUE (…)`.
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: INITIALLY IMMEDIATE is
 // checked at the end of the statement, NOT DEFERRABLE per row
-// [spec:pgorm:req:sql.ddl.alter-table+6/test]
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]
 async fn an_initially_immediate_key_checks_at_statement_end(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
     let shift = |table: &str| format!("UPDATE {table} SET position = position + 1");
 
-    slots(db, "row_checked_slot", |c| c.unique_key()).await?;
+    slots(
+        db,
+        "row_checked_slot",
+        Some(TableKey::new(Name::runtime("position"))),
+    )
+    .await?;
     let refused = db
         .execute(&shift("row_checked_slot"), &[])
         .await
         .expect_err("slot 1 lands on slot 2 before slot 2 moves");
     refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
 
-    slots(db, "statement_checked_slot", |c| c).await?;
+    slots(db, "statement_checked_slot", None).await?;
     let alter = Table::alter(Name::runtime("statement_checked_slot"))
-        .modify_column(
-            ColumnDef::new(Name::runtime("position"))
-                .unique_key_deferrability(Deferrability::DeferrableInitiallyImmediate),
+        .add_unique(
+            TableKey::new(Name::runtime("position"))
+                .deferrability(Deferrability::DeferrableInitiallyImmediate),
         )
         .to_string();
     assert!(alter.ends_with("DEFERRABLE INITIALLY IMMEDIATE"), "{alter}");
@@ -252,15 +267,18 @@ async fn an_initially_immediate_key_checks_at_statement_end(
 /// pending (`55000`). This holds for `INITIALLY IMMEDIATE` as well as
 /// `INITIALLY DEFERRED`, and it is the cost of the clause — an upsert over the
 /// same column works against the undeferrable control.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: a deferrable key is
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: a deferrable key is
 // refused as an ON CONFLICT arbiter
 async fn a_deferrable_key_cannot_arbitrate_on_conflict(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
-    slots(db, "upsert_slot", |c| c.unique_key()).await?;
-    slots(db, "deferrable_upsert_slot", |c| {
-        c.unique_key_deferrability(Deferrability::DeferrableInitiallyImmediate)
-    })
+    let position = || TableKey::new(Name::runtime("position"));
+    slots(db, "upsert_slot", Some(position())).await?;
+    slots(
+        db,
+        "deferrable_upsert_slot",
+        Some(position().deferrability(Deferrability::DeferrableInitiallyImmediate)),
+    )
     .await?;
 
     let upsert = |table: &'static str| {
@@ -291,7 +309,7 @@ async fn a_deferrable_key_cannot_arbitrate_on_conflict(
 /// refuses it as misplaced (`42601`), and `CREATE UNIQUE INDEX` has no place
 /// for it at all (`42601`). None of the three is spelled by the builder, so
 /// the SQL here is written out by hand.
-// [spec:pgorm:req:sql.ddl.deferrability+3/test]    against a live server: CHECK and a standalone
+// [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: CHECK and a standalone
 // index refuse deferrability
 async fn check_constraints_and_standalone_indexes_refuse_deferral(
     db: &DatabaseConnection,

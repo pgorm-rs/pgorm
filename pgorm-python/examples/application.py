@@ -25,15 +25,17 @@ async def run(dsn: str) -> dict[str, object]:
     events = p.Table("example_events_" + suffix)
     account_ddl = (
         s.create_table(accounts.table)
-        .column(s.ColumnDef("id", "integer").primary_key())
+        .column(s.ColumnDef("id", "integer"))
         .column(s.ColumnDef("name", "text").not_null())
         .column(s.ColumnDef("visits", "integer").not_null().default(0))
+        .primary_key("id")
     )
     event_ddl = (
         s.create_table(events)
-        .column(s.ColumnDef("id", "integer").primary_key())
+        .column(s.ColumnDef("id", "integer"))
         .column(s.ColumnDef("account_id", "integer").not_null())
         .column(s.ColumnDef("kind", "text").not_null())
+        .primary_key("id")
     )
     async with p.Pool(dsn) as pool:
         await pool.execute(account_ddl)

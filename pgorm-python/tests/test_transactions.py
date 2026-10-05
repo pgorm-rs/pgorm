@@ -13,7 +13,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=3)
         self.table = p.Table("python_transaction_items")
-        await self.pool.execute(s.create_table(self.table).column(s.ColumnDef("id", "integer").primary_key()).column(s.ColumnDef("name", "text")))
+        await self.pool.execute(s.create_table(self.table).column(s.ColumnDef("id", "integer")).column(s.ColumnDef("name", "text")).primary_key("id"))
 
     async def asyncTearDown(self):
         if self.pool.closed:

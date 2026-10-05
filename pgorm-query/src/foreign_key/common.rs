@@ -44,14 +44,12 @@ pub enum ForeignKeyAction {
 /// undeferrable and initially deferred does not construct
 /// (`[dec:pgorm:invalid-states-unrepresentable]`).
 ///
-/// A foreign key takes it through
-/// [`TableForeignKey::deferrability`], a column's own unique or primary key
-/// through [`ColumnDef::unique_key_deferrability`](crate::ColumnDef::unique_key_deferrability)
-/// and its primary-key sibling, and a table-level one through
-/// [`IndexCreateStatement::deferrability`](crate::IndexCreateStatement::deferrability).
+/// A foreign key takes it through [`TableForeignKey::deferrability`], and a
+/// primary or unique key through
+/// [`TableKey::deferrability`](crate::TableKey::deferrability).
 /// Nothing else can: PostgreSQL never defers a `CHECK` or `NOT NULL`
 /// constraint, and `CREATE UNIQUE INDEX` has no clause for it.
-// [spec:pgorm:req:sql.ddl.deferrability+3]
+// [spec:pgorm:req:sql.ddl.deferrability+4]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Deferrability {
     /// `NOT DEFERRABLE` — checked at once, and no transaction can postpone
@@ -74,7 +72,7 @@ pub enum Deferrability {
 impl Deferrability {
     /// The clause this state renders as, with the space that separates it
     /// from the constraint it follows.
-    // [spec:pgorm:req:sql.ddl.deferrability+3]
+    // [spec:pgorm:req:sql.ddl.deferrability+4]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::NotDeferrable => " NOT DEFERRABLE",

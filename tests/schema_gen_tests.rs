@@ -7,6 +7,7 @@ pub use common::{TestContext, setup::*};
 use pgorm::{Error, Schema, entity::prelude::*};
 use pgorm_query::{
     ColumnDef, ColumnSpec, ColumnType, IdentityGeneration, QueryBuilder, TableCreateStatement,
+    TableKey,
 };
 use pretty_assertions::assert_eq;
 
@@ -257,8 +258,6 @@ pub enum Size {
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Flags {
     not_null: bool,
-    unique: bool,
-    primary_key: bool,
     auto_increment: bool,
     default: bool,
     identity: Option<IdentityGeneration>,
@@ -277,8 +276,6 @@ fn flags(col: &ColumnDef) -> Flags {
     for spec in col.get_column_spec() {
         match spec {
             ColumnSpec::NotNull => flags.not_null = true,
-            ColumnSpec::UniqueKey(_) => flags.unique = true,
-            ColumnSpec::PrimaryKey(_) => flags.primary_key = true,
             ColumnSpec::AutoIncrement => flags.auto_increment = true,
             ColumnSpec::Default(_) => flags.default = true,
             ColumnSpec::Identity(generation, _) => flags.identity = Some(*generation),
@@ -289,7 +286,14 @@ fn flags(col: &ColumnDef) -> Flags {
     flags
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    table ref, comment, per-column projection, single-column key, belongs-to foreign keys
+fn key_columns<K>(key: &TableKey<K>) -> Vec<String> {
+    key.get_columns()
+        .iter()
+        .map(|name| name.to_string())
+        .collect()
+}
+
+// [spec:pgorm:sem:schema.from-entity+6/test]    table ref, comment, per-column projection, single-column key, unique keys, belongs-to foreign keys
 #[test]
 fn create_table_from_entity_projects_columns() {
     let schema = Schema::new();
@@ -319,21 +323,20 @@ fn create_table_from_entity_projects_columns() {
             .collect::<Vec<_>>()
     );
 
-    // Single-column primary key: inline PRIMARY KEY plus auto_increment.
+    // Single-column primary key: the table's key over it, left for PostgreSQL
+    // to name, and the serial family on the column.
     assert!(widget::PrimaryKey::auto_increment());
     assert_eq!(
         flags(column(&stmt, "id")),
         Flags {
             not_null: true,
-            primary_key: true,
             auto_increment: true,
             ..Default::default()
         }
     );
-    assert!(
-        stmt.get_indexes().is_empty(),
-        "arity-1 keys emit no table-level index"
-    );
+    let key = stmt.get_primary_key().expect("the entity's key");
+    assert_eq!(key_columns(key), ["id"]);
+    assert!(key.get_name().is_none(), "a one-column key is not named");
 
     // Declared column types are carried through.
     assert_eq!(
@@ -345,9 +348,10 @@ fn create_table_from_entity_projects_columns() {
         Some(ColumnType::String(_))
     ));
 
-    // `unique` columns gain a unique key; `indexed` ones gain nothing here.
-    assert!(flags(column(&stmt, "code")).unique);
-    assert!(!flags(column(&stmt, "batch")).unique);
+    // `unique` columns gain a unique key of their own; `indexed` ones gain
+    // nothing here.
+    let unique: Vec<Vec<String>> = stmt.get_unique_keys().iter().map(key_columns).collect();
+    assert_eq!(unique, [["code"]]);
 
     // NOT NULL unless the column is nullable.
     assert!(flags(column(&stmt, "code")).not_null);
@@ -392,23 +396,22 @@ fn create_table_from_entity_projects_columns() {
     assert!(!widget::Relation::Factory.def().is_owner);
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    composite keys emit a table-level pk-{table} index instead of the inline flag
+// [spec:pgorm:sem:schema.from-entity+6/test]    a composite key is the table's key, named pk-{table}
 #[test]
 fn create_table_composite_key_emits_index() {
     let schema = Schema::new();
     let stmt = schema.create_table_from_entity(widget_tag::Entity);
 
     for name in ["widget_id", "tag"] {
-        let flags = flags(column(&stmt, name));
-        assert!(
-            !flags.primary_key,
-            "composite key columns carry no inline PRIMARY KEY: {name}"
-        );
-        assert!(!flags.auto_increment);
+        assert!(!flags(column(&stmt, name)).auto_increment);
     }
 
-    let indexes = stmt.get_indexes();
-    assert_eq!(indexes.len(), 1);
+    let key = stmt.get_primary_key().expect("the entity's key");
+    assert_eq!(key_columns(key), ["widget_id", "tag"]);
+    assert_eq!(
+        key.get_name().map(|name| name.to_string()).as_deref(),
+        Some("pk-widget_tag")
+    );
     let rendered = stmt.to_string();
     assert!(rendered.contains("\"pk-widget_tag\""), "{rendered}");
     assert!(rendered.contains("PRIMARY KEY"), "{rendered}");
@@ -418,7 +421,7 @@ fn create_table_composite_key_emits_index() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    the entity comment first, then the commented
+// [spec:pgorm:sem:schema.from-entity+6/test]    the entity comment first, then the commented
 // columns in Column order, targeting entity.table_ref() with the text quoted
 #[test]
 fn create_comments_from_entity_emits_statements() {
@@ -493,10 +496,10 @@ fn create_index_from_entity_names_indexed_columns() {
         r#"CREATE INDEX "idx-widget-batch" ON "public"."widget" ("batch")"#
     );
 
-    // Unique columns are not covered here: `code` gets a column-level unique key from
-    // the table projection, not an index statement of its own.
+    // Unique columns are not covered here: `code` gets a unique key from the
+    // table projection, not an index statement of its own.
     let table = schema.create_table_from_entity(widget::Entity);
-    assert!(flags(column(&table, "code")).unique);
+    assert_eq!(key_columns(&table.get_unique_keys()[0]), ["code"]);
     assert!(
         !stmts.iter().any(|stmt| stmt.to_string().contains("code")),
         "uniqueness is not emitted as a separate index"
@@ -611,7 +614,7 @@ fn create_enum_from_active_enum_errs_non_enum() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    the projected DDL is accepted by Postgres and enforces what it declares
+// [spec:pgorm:sem:schema.from-entity+6/test]    the projected DDL is accepted by Postgres and enforces what it declares
 // [spec:pgorm:sem:schema.from-entity.index+1/test]    the schema-qualified index executes and reaches pg_indexes under its generated name
 // [spec:pgorm:sem:schema.from-entity.enum+3/test]    the projected type is a usable Postgres enum
 #[pgorm_macros::test]
@@ -796,7 +799,7 @@ async fn array_only_enum_schema_executes_on_postgres() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    a composite key's generated
+// [spec:pgorm:sem:schema.from-entity+6/test]    a composite key's generated
 // column carries its identity, the supplied column nothing, and neither the
 // serial family nor an inline PRIMARY KEY
 #[test]
@@ -829,7 +832,7 @@ fn composite_key_identity_lands_on_its_column() {
     );
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    a one-column key that fills
+// [spec:pgorm:sem:schema.from-entity+6/test]    a one-column key that fills
 // itself — an identity or a default of its own — is not also drawn from the
 // serial family, which PostgreSQL refuses beside either (42601)
 #[test]
@@ -840,10 +843,13 @@ fn key_with_its_own_fill_is_not_serial() {
         flags(column(&identity, "id")),
         Flags {
             not_null: true,
-            primary_key: true,
             identity: Some(IdentityGeneration::ByDefault),
             ..Default::default()
         }
+    );
+    assert_eq!(
+        key_columns(identity.get_primary_key().expect("a key")),
+        ["id"]
     );
 
     let defaulted = Schema::new().create_table_from_entity(defaulted_key::Entity);
@@ -852,14 +858,17 @@ fn key_with_its_own_fill_is_not_serial() {
         flags(column(&defaulted, "id")),
         Flags {
             not_null: true,
-            primary_key: true,
             default: true,
             ..Default::default()
         }
     );
+    assert_eq!(
+        key_columns(defaulted.get_primary_key().expect("a key")),
+        ["id"]
+    );
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    the tables a key that fills
+// [spec:pgorm:sem:schema.from-entity+6/test]    the tables a key that fills
 // itself projects to are ones the server builds, and fill the key unasked
 #[pgorm_macros::test]
 async fn self_filling_keys_execute_on_postgres() -> Result<(), Error> {
@@ -906,7 +915,7 @@ async fn self_filling_keys_execute_on_postgres() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    the comment statements execute, and only they
+// [spec:pgorm:sem:schema.from-entity+6/test]    the comment statements execute, and only they
 // attach anything: the text arrives in pg_description exactly as declared
 #[pgorm_macros::test]
 async fn entity_comments_land_in_pg_description() -> Result<(), Error> {

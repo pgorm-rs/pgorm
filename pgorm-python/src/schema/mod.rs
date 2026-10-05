@@ -40,5 +40,7 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(table::add_column, module)?)?;
     module.add_function(wrap_pyfunction!(table::modify_column, module)?)?;
     module.add_function(wrap_pyfunction!(table::drop_column, module)?)?;
+    module.add_function(wrap_pyfunction!(table::add_primary_key, module)?)?;
+    module.add_function(wrap_pyfunction!(table::add_unique, module)?)?;
     Ok(())
 }

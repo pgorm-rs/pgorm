@@ -31,9 +31,9 @@ async fn setup_schema(db: &DatabaseConnection) -> Result<(), Error> {
             ColumnDef::new(cake::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(cake::Column::Id)
         .col(ColumnDef::new(cake::Column::Name).string().not_null())
         .to_owned();
 

@@ -8,8 +8,8 @@
 
 use pgorm_codegen::{EntityTransformer, EntityWriterContext, EntityWriterOptions, Error};
 use pgorm_query::{
-    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, IndexConstraint, Name, Table,
-    TableCreateStatement,
+    ColumnDef, ColumnType, ForeignKey, ForeignKeyAction, Name, Table, TableCreateStatement,
+    TableKey, Unique,
 };
 use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
@@ -159,20 +159,20 @@ pub fn col(name: &str) -> ColumnDef {
     ColumnDef::new(Name::runtime(name))
 }
 
-/// `id` integer, not null, auto-increment, primary key.
-pub fn serial_pk(name: &str) -> ColumnDef {
+/// `name` integer, not null, auto-increment: the column a serial key is over.
+pub fn serial(name: &str) -> ColumnDef {
     ColumnDef::new(Name::runtime(name))
         .integer()
         .not_null()
         .auto_increment()
-        .primary_key()
         .to_owned()
 }
 
 /// `cake`: serial pk + nullable text name.
 pub fn cake() -> TableCreateStatement {
     Table::create(Name::runtime("cake"))
-        .col(serial_pk("id"))
+        .col(serial("id"))
+        .primary_key(Name::runtime("id"))
         .col(ColumnDef::new(Name::runtime("name")).text().to_owned())
         .to_owned()
 }
@@ -180,7 +180,8 @@ pub fn cake() -> TableCreateStatement {
 /// `fruit`: serial pk, not-null name, nullable `cake_id` FK to `cake`.
 pub fn fruit() -> TableCreateStatement {
     Table::create(Name::runtime("fruit"))
-        .col(serial_pk("id"))
+        .col(serial("id"))
+        .primary_key(Name::runtime("id"))
         .col(
             ColumnDef::new(Name::runtime("name"))
                 .string()
@@ -209,7 +210,8 @@ pub fn fruit() -> TableCreateStatement {
 /// `filling`: serial pk + not-null name.
 pub fn filling() -> TableCreateStatement {
     Table::create(Name::runtime("filling"))
-        .col(serial_pk("id"))
+        .col(serial("id"))
+        .primary_key(Name::runtime("id"))
         .col(
             ColumnDef::new(Name::runtime("name"))
                 .string()
@@ -227,16 +229,15 @@ pub fn cake_filling() -> TableCreateStatement {
             ColumnDef::new(Name::runtime("cake_id"))
                 .integer()
                 .not_null()
-                .primary_key()
                 .to_owned(),
         )
         .col(
             ColumnDef::new(Name::runtime("filling_id"))
                 .integer()
                 .not_null()
-                .primary_key()
                 .to_owned(),
         )
+        .primary_key(TableKey::new(Name::runtime("cake_id")).col(Name::runtime("filling_id")))
         .foreign_key(ForeignKey::create(
             Name::runtime("cake_filling"),
             Name::runtime("cake_id"),
@@ -266,11 +267,21 @@ pub fn table_with(table: &str, columns: Vec<ColumnDef>) -> TableCreateStatement 
     stmt
 }
 
-/// A single-column unique index over `column`, which the transformer reads to
-/// mark the column unique.
-pub fn unique_index(table: &str, column: &str) -> IndexConstraint {
-    IndexConstraint::unique(Name::runtime(column))
-        .name(Name::runtime(format!("idx_{table}_{column}")))
+/// A single table built from an explicit column list, keyed by the columns
+/// `key` names.
+pub fn keyed_with(table: &str, key: &[&str], columns: Vec<ColumnDef>) -> TableCreateStatement {
+    let mut stmt = table_with(table, columns);
+    let (first, rest) = key.split_first().expect("a key names a column");
+    stmt.primary_key(
+        TableKey::new(Name::runtime(*first)).cols(rest.iter().map(|column| Name::runtime(*column))),
+    );
+    stmt
+}
+
+/// A named one-column unique key over `column`, which the transformer reads
+/// to mark the column unique.
+pub fn unique_key(table: &str, column: &str) -> TableKey<Unique> {
+    TableKey::new(Name::runtime(column)).name(Name::runtime(format!("idx_{table}_{column}")))
 }
 
 pub fn enum_col(name: &str, enum_name: &str, variants: &[&str]) -> ColumnDef {

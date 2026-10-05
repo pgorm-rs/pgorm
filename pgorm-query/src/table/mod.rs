@@ -14,11 +14,11 @@ use crate::types::{IntoName, IntoTableName};
 mod alter;
 mod column;
 mod column_collation;
-mod column_deferrability;
 mod column_identity;
 mod create;
 mod drop;
 mod interval;
+mod key;
 mod rename;
 mod truncate;
 
@@ -27,6 +27,7 @@ pub use column::*;
 pub use create::*;
 pub use drop::*;
 pub use interval::*;
+pub use key::*;
 pub use rename::*;
 pub use truncate::*;
 

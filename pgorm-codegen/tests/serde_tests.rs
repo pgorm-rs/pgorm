@@ -9,10 +9,11 @@ use pgorm_query::{ColumnDef, ColumnType, Name};
 use std::str::FromStr;
 
 fn task_schema() -> Vec<pgorm_query::TableCreateStatement> {
-    vec![table_with(
+    vec![keyed_with(
         "task",
+        &["id"],
         vec![
-            serial_pk("id"),
+            serial("id"),
             typed("_secret", ColumnType::Integer),
             enum_col("state", "task_state", &["open", "done"]),
         ],
@@ -155,12 +156,12 @@ fn serde_skip_deserializing_pk_needs_deserializing_variant() {
 #[test]
 fn hidden_column_check_wins_for_hidden_pk() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
+            &["_id"],
             vec![
                 ColumnDef::new_with_type(Name::runtime("_id"), ColumnType::Integer)
                     .not_null()
-                    .primary_key()
                     .to_owned(),
             ],
         )],
@@ -250,9 +251,10 @@ fn serde_derives_are_spliced_after_the_eq_slot() {
 
     // `Eq` suppressed by a float column: the fragment still occupies the slot
     let floaty = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
-            vec![serial_pk("id"), typed("ratio", ColumnType::Float)],
+            &["id"],
+            vec![serial("id"), typed("ratio", ColumnType::Float)],
         )],
         Opts {
             with_serde: WithSerde::Both,

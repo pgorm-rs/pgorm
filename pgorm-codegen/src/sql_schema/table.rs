@@ -6,8 +6,8 @@ use pg_query::protobuf::{
 };
 use pgorm_query::{
     Collation, ColumnDef, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement,
-    IdentityGeneration, IndexConstraint, IntoCollation, IntoTableName, Name, Table,
-    TableCreateStatement, TableName,
+    IdentityGeneration, IntoCollation, IntoTableName, Name, Primary, Table, TableCreateStatement,
+    TableKey, TableName, Unique,
 };
 use std::collections::BTreeMap;
 
@@ -15,14 +15,14 @@ use std::collections::BTreeMap;
 /// gathered before the table is built so they can be folded in.
 #[derive(Default)]
 pub(super) struct Attachments {
-    pub(super) indexes: Vec<IndexConstraint>,
+    pub(super) indexes: Vec<TableKey<Unique>>,
     pub(super) table_comment: Option<String>,
     pub(super) column_comments: BTreeMap<String, (usize, String)>,
 }
 
 /// The identity a `CREATE TABLE` declares — schema and all — which is the key
 /// every other statement, and the entity transformer, refers to a table by.
-// [spec:pgorm:sem:codegen.ddl.objects+5]
+// [spec:pgorm:sem:codegen.ddl.objects+6]
 pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
     stmt.relation
         .as_ref()
@@ -34,7 +34,7 @@ pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
 }
 
 /// The schema a DDL statement's name is qualified with, if any.
-// [spec:pgorm:sem:codegen.ddl.objects+5]
+// [spec:pgorm:sem:codegen.ddl.objects+6]
 pub(super) fn schema_of(relation: &RangeVar) -> Option<String> {
     Some(relation.schemaname.clone()).filter(|schema| !schema.is_empty())
 }
@@ -48,7 +48,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 }
 
 /// Bridge one `CREATE TABLE` into the statement the transformer reads.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
@@ -73,30 +73,31 @@ pub(super) fn build(
     }
 
     let mut columns: Vec<Column> = Vec::new();
-    let mut primary_key_columns: Vec<String> = Vec::new();
+    let mut primary_key: Option<TableKey<Primary>> = None;
     let mut foreign_keys: Vec<ForeignKeyCreateStatement> = Vec::new();
-    let mut table_indexes: Vec<IndexConstraint> = Vec::new();
+    let mut unique_keys: Vec<TableKey<Unique>> = Vec::new();
 
+    // A second primary key is refused rather than handed to the statement,
+    // whose one slot would keep the later key and drop the earlier in silence.
+    let mut declare = |key: TableKey<Primary>| match primary_key.replace(key) {
+        Some(_) => Err(second_primary_key(&table_name, at)),
+        None => Ok(()),
+    };
     for element in &stmt.table_elts {
         match &element.node {
             Some(NodeEnum::ColumnDef(def)) => {
                 let mut column = column(def, &target, &table_name, at, enums, &column_comments)?;
                 if column.primary_key {
-                    primary_key_columns.push(column.name.clone());
+                    declare(TableKey::new(Name::runtime(column.name.as_str())))?;
                 }
                 foreign_keys.extend(column.foreign_key.take());
-                table_indexes.extend(column.unique_index.take());
+                unique_keys.extend(column.unique_key.take());
                 columns.push(column);
             }
             Some(NodeEnum::Constraint(constraint)) => {
                 match table_constraint(constraint, &target, &table_name, at)? {
-                    TableConstraint::Index(index) => {
-                        if index.is_primary_key() {
-                            primary_key_columns
-                                .extend(index.get_columns().iter().map(|name| name.to_string()));
-                        }
-                        table_indexes.push(*index);
-                    }
+                    TableConstraint::Primary(key) => declare(*key)?,
+                    TableConstraint::Unique(key) => unique_keys.push(*key),
                     TableConstraint::ForeignKey(foreign_key) => foreign_keys.push(*foreign_key),
                 }
             }
@@ -126,15 +127,25 @@ pub(super) fn build(
 
     // A primary-key column is NOT NULL by Postgres' own rule, spelled out or
     // not; the entity model reads nullability off the column alone.
+    let keyed = |name: &str| {
+        primary_key.as_ref().is_some_and(|key| {
+            key.get_columns()
+                .iter()
+                .any(|column| column.to_string() == name)
+        })
+    };
     for mut column in columns {
-        if !column.not_null && primary_key_columns.contains(&column.name) {
+        if !column.not_null && keyed(&column.name) {
             column.def.not_null();
         }
         create.col(column.def);
     }
 
-    for index in table_indexes.into_iter().chain(indexes) {
-        create.index(index);
+    if let Some(key) = primary_key {
+        create.primary_key(key);
+    }
+    for key in unique_keys.into_iter().chain(indexes) {
+        create.unique(key);
     }
     for foreign_key in foreign_keys {
         create.foreign_key(foreign_key);
@@ -142,9 +153,21 @@ pub(super) fn build(
     Ok(create.take())
 }
 
+/// A table declaring a primary key beside the one it already has — on a second
+/// column, as a table constraint beside a column's, or twice on one column.
+/// PostgreSQL refuses every such table (42P16), and none is a composite key:
+/// that is one `PRIMARY KEY (a, b)`.
+// [spec:pgorm:req:codegen.ddl.unsupported+5]
+fn second_primary_key(table_name: &str, at: usize) -> Error {
+    unresolved(
+        format!("table `{table_name}` declares more than one primary key"),
+        at,
+    )
+}
+
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+4]
+// [spec:pgorm:req:codegen.ddl.unsupported+5]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -190,7 +213,7 @@ fn reject_table_features(
 /// A `RangeVar` as the table name a DDL statement targets. Postgres has no
 /// cross-database reference to render, so a catalog-qualified name is refused
 /// rather than quietly reduced to its schema and table.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
     let table = Name::runtime(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
@@ -210,11 +233,11 @@ struct Column {
     def: ColumnDef,
     not_null: bool,
     primary_key: bool,
-    unique_index: Option<IndexConstraint>,
+    unique_key: Option<TableKey<Unique>>,
     foreign_key: Option<ForeignKeyCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn column(
     def: &PgColumnDef,
     target: &TableName,
@@ -266,7 +289,7 @@ fn column(
     let mut not_null = def.is_not_null;
     let mut nullable = false;
     let mut primary_key = false;
-    let mut unique_index = None;
+    let mut unique_key = None;
     let mut foreign_key = None;
     for node in &def.constraints {
         let Some(NodeEnum::Constraint(constraint)) = &node.node else {
@@ -285,15 +308,16 @@ fn column(
         match constraint_type(constraint, &context, at)? {
             ConstrType::ConstrNotnull => not_null = true,
             ConstrType::ConstrNull => nullable = true,
+            ConstrType::ConstrPrimary if primary_key => {
+                return Err(second_primary_key(table_name, at));
+            }
             ConstrType::ConstrPrimary => primary_key = true,
-            // Postgres implements a UNIQUE column constraint as a one-column
-            // unique index, and that index is where the entity model reads
-            // uniqueness from — a `ColumnSpec::UniqueKey` would be discarded.
+            // A column's UNIQUE is a one-column unique key: a key is the
+            // table's, and Postgres implements this one as that key.
             ConstrType::ConstrUnique => {
-                unique_index = Some(key(
+                unique_key = Some(unique(
                     constraint,
-                    ConstrType::ConstrUnique,
-                    Name::runtime(column_name),
+                    key(constraint, Name::runtime(column_name)),
                 ));
             }
             ConstrType::ConstrForeign => {
@@ -316,9 +340,6 @@ fn column(
     } else if nullable {
         column.null();
     }
-    if primary_key {
-        column.primary_key();
-    }
     if let Some((_, comment)) = comments.get(column_name) {
         column.comment(comment.as_str());
     }
@@ -327,7 +348,7 @@ fn column(
         def: column.take(),
         not_null,
         primary_key,
-        unique_index,
+        unique_key,
         foreign_key,
     })
 }
@@ -335,7 +356,7 @@ fn column(
 /// The form of a column's `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`.
 /// Sequence options are refused: an entity declares which form generates the
 /// column, not how its sequence counts.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn identity(
     constraint: &Constraint,
     context: &str,
@@ -360,7 +381,7 @@ fn identity(
 /// A column's `COLLATE` clause as the collation it names: bare, or qualified
 /// by one schema. A catalog-qualified name is a cross-database reference
 /// Postgres does not implement, so it is refused as a table's would be.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collation, Error> {
     match types::idents(&clause.collname).as_deref() {
         Some([name]) => Ok(Name::runtime(name.as_str()).into_collation()),
@@ -376,11 +397,12 @@ fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collati
 
 /// What a table-level constraint becomes once bridged.
 enum TableConstraint {
-    Index(Box<IndexConstraint>),
+    Primary(Box<TableKey<Primary>>),
+    Unique(Box<TableKey<Unique>>),
     ForeignKey(Box<ForeignKeyCreateStatement>),
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn table_constraint(
     constraint: &Constraint,
     target: &TableName,
@@ -398,11 +420,15 @@ fn table_constraint(
             let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
             };
-            let mut index = key(constraint, kind, Name::runtime(first));
-            for column in columns {
-                index = index.col(Name::runtime(column));
-            }
-            Ok(TableConstraint::Index(Box::new(index)))
+            let columns = columns.map(|column| Name::runtime(column.as_str()));
+            Ok(if kind == ConstrType::ConstrPrimary {
+                TableConstraint::Primary(Box::new(
+                    key(constraint, Name::runtime(first)).cols(columns),
+                ))
+            } else {
+                let key = key(constraint, Name::runtime(first)).cols(columns);
+                TableConstraint::Unique(Box::new(unique(constraint, key)))
+            })
         }
         ConstrType::ConstrForeign => {
             let columns = types::idents(&constraint.fk_attrs)
@@ -419,14 +445,10 @@ fn table_constraint(
 }
 
 /// A `PRIMARY KEY` or `UNIQUE` constraint begun at its first column, under the
-/// name and with the `NULLS NOT DISTINCT` it was declared with.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
-fn key(constraint: &Constraint, kind: ConstrType, first: Name) -> IndexConstraint {
-    let key = match kind {
-        ConstrType::ConstrPrimary => IndexConstraint::primary_key(first),
-        _ if constraint.nulls_not_distinct => IndexConstraint::unique_nulls_not_distinct(first),
-        _ => IndexConstraint::unique(first),
-    };
+/// name it was declared with.
+// [spec:pgorm:sem:codegen.ddl.tables+6]
+fn key<K>(constraint: &Constraint, first: Name) -> TableKey<K> {
+    let key = TableKey::new(first);
     if constraint.conname.is_empty() {
         key
     } else {
@@ -434,9 +456,20 @@ fn key(constraint: &Constraint, kind: ConstrType, first: Name) -> IndexConstrain
     }
 }
 
+/// A unique key with the `NULLS NOT DISTINCT` its constraint was declared
+/// with, which only a unique key can carry.
+// [spec:pgorm:sem:codegen.ddl.tables+6]
+fn unique(constraint: &Constraint, key: TableKey<Unique>) -> TableKey<Unique> {
+    if constraint.nulls_not_distinct {
+        key.nulls_not_distinct()
+    } else {
+        key
+    }
+}
+
 /// A foreign key over `columns` of `target`, with the referenced table, columns
 /// and actions the constraint declares.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn references(
     constraint: &Constraint,
     target: &TableName,
@@ -509,7 +542,7 @@ fn references(
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no
 /// entity meaning, so it reads as no action declared.
-// [spec:pgorm:sem:codegen.ddl.tables+5]
+// [spec:pgorm:sem:codegen.ddl.tables+6]
 fn action(
     code: &str,
     clause: &str,
@@ -536,7 +569,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+4]
+// [spec:pgorm:req:codegen.ddl.unsupported+5]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -573,7 +606,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+4]
+// [spec:pgorm:req:codegen.ddl.unsupported+5]
 fn constraint_kind(kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

@@ -419,9 +419,18 @@ class ExprEmitter:
                         "    column."
                         + ("null();" if column["nullable"] else "not_null();")
                     )
-                    if column["primary"]:
-                        body.append("    column.primary_key();")
                     body.append("    statement.col(column);")
+                # A key is the table's: the primary columns, in order, are one
+                # key, declared once after the columns.
+                key = [column["name"] for column in d["columns"] if column["primary"]]
+                if key:
+                    first, *rest = key
+                    declared = (
+                        f"{Q}::TableKey::new({Q}::Name::runtime({literal(first)}))"
+                    )
+                    for name in rest:
+                        declared += f".col({Q}::Name::runtime({literal(name)}))"
+                    body.append(f"    statement.primary_key({declared});")
                 body.append("    statement.to_string()")
                 return "{\n" + "\n".join(body) + "\n    }"
             case "schema.drop":

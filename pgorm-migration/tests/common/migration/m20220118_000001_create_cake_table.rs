@@ -11,9 +11,9 @@ impl MigrationTrait for Migration {
                 ColumnDef::new(Cake::Id)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
+                    .auto_increment(),
             )
+            .primary_key(Cake::Id)
             .col(ColumnDef::new(Cake::Name).string().not_null())
             .to_owned();
         tx.execute(&table.to_string(), &[]).await?;

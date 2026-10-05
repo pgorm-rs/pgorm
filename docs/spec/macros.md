@@ -74,7 +74,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+3]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+4]`).
 >
 > The `json_key()` arm is the one place the derive reads an attribute outside the
 > `#[pgorm(...)]` namespace: the key is the field's own name, put through
@@ -205,7 +205,7 @@ known limitations.
 > `DeriveValueType` too: a newtype over one of the four refused types is the same
 > compile error.
 
-> [spec:pgorm:sem:macros.derive.entity-model.primary-key+3]
+> [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
 > its type to `PrimaryKeyTrait::ValueType` — a bare type for a single key, a tuple for
 > composite keys. `auto_increment()` reports whether the database generates the whole
@@ -239,6 +239,14 @@ known limitations.
 > author who wrote it got a key column with no generator, whose insert fails `23502`.
 > PostgreSQL itself refuses an identity over a non-integer column (22023); the derive
 > leaves that to the server, since a `column_type` override decides the type.
+>
+> A key MUST have at most twelve columns, the widest tuple `ValueType`'s traits are
+> implemented for (`entity.traits.primary-key`). A thirteenth `primary_key` field is one
+> compile error spanned at its key, naming the limit; before this rule the derive
+> generated the 13-tuple and the caller read a cascade of E0277s on traits they never
+> wrote. `primary_key` given twice on one field is a compile error spanned at the
+> second: a field is one column of the key, and the repeat used to add its type to
+> `ValueType` twice beside one `PrimaryKey` variant.
 >
 > `DerivePrimaryKey` itself (enums only; other inputs are a compile error) generates
 > `SqlName` delegating to `StaticName::as_str`, an `StaticName` impl mapping each variant

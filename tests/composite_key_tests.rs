@@ -258,7 +258,7 @@ fn new_ticket(tenant_id: i32, title: &str) -> ticket::ActiveModel {
     }
 }
 
-// [spec:pgorm:sem:schema.from-entity+5/test]    the generated part of a
+// [spec:pgorm:sem:schema.from-entity+6/test]    the generated part of a
 // composite key gets its identity in the table schema-gen builds, and nothing
 // else in the key does
 // [spec:pgorm:sem:exec.crud.insert+6/test]    an insert leaving the generated
@@ -346,7 +346,7 @@ async fn many_rows_each_get_a_generated_key_part() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3/test]    `identity`
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    `identity`
 // is `GENERATED ALWAYS`: a number the insert supplies is refused by the server
 // (428C9), so the generated part cannot be claimed by accident;
 // `identity_by_default` keeps a supplied number and generates an omitted one

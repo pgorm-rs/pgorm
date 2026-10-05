@@ -12,9 +12,9 @@ impl MigrationTrait for Migration {
                 ColumnDef::new(Fruit::Id)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
+                    .auto_increment(),
             )
+            .primary_key(Fruit::Id)
             .col(ColumnDef::new(Fruit::Name).string().not_null())
             .col(ColumnDef::new(Fruit::CakeId).integer().not_null())
             .foreign_key(

@@ -50,7 +50,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+12]
+> [spec:pgorm:req:sql.surface+13]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -89,10 +89,12 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.grouping`); `FrameStart`, its three side markers
 > `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
 > `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
-> the bound enum `Frame` (`sql.ast.window-statement`); `IndexConstraint`, the
-> unique or primary-key constraint a `CREATE TABLE` embeds — a builder of its
-> own, and the one table-level position that takes deferrability
-> (`sql.ddl.create-table`, `sql.ddl.deferrability`); `Collation` and
+> the bound enum `Frame` (`sql.ast.window-statement`); `TableKey`,
+> `IntoTableKey`, `Primary` and `Unique`, a table's key — one type for the
+> primary key and the unique keys, a tuple of one or more columns that one
+> column or a tuple converts into, and its two kinds — and the one table-level
+> position that takes deferrability (`sql.ddl.create-table`,
+> `sql.ddl.deferrability`); `Collation` and
 > `IntoCollation`, the name a `COLLATE` clause carries and the conversions
 > into it (`sql.ast.expr.collate`); `ConflictArbiter` and `ConflictConstraint`, the
 > two ways an `ON CONFLICT` names its arbiter and the typestate of the named
@@ -116,7 +118,9 @@ today, including panicking edges and deliberate failsafes.
 > and MERGE lacks (`sql.ast`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
-> from did (`sql.ddl.index-create`).
+> from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
+> column could also declare did, `TableKey` replacing it
+> (`sql.ddl.create-table`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose

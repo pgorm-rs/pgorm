@@ -1,6 +1,6 @@
 use crate::{
-    ColumnDef, ColumnSpec, Comment, CommentStatement, IntoColumnDef, QueryBuilder, SimpleExpr,
-    foreign_key::*, index::*, types::*,
+    ColumnDef, ColumnSpec, Comment, CommentStatement, IntoColumnDef, IntoTableKey, Primary,
+    QueryBuilder, SimpleExpr, TableKey, Unique, foreign_key::*, types::*,
 };
 
 /// Create a table
@@ -22,12 +22,13 @@ use crate::{
 /// let table = Table::create(Char::Table)
 ///     .if_not_exists()
 ///     .comment("table's comment")
-///     .col(ColumnDef::new(Char::Id).integer().not_null().auto_increment().primary_key())
+///     .col(ColumnDef::new(Char::Id).integer().not_null().auto_increment())
 ///     .col(ColumnDef::new(Char::FontSize).integer().not_null().comment("font's size"))
 ///     .col(ColumnDef::new(Char::Character).string().not_null())
 ///     .col(ColumnDef::new(Char::SizeW).integer().not_null())
 ///     .col(ColumnDef::new(Char::SizeH).integer().not_null())
 ///     .col(ColumnDef::new(Char::FontId).integer().default(Value::Int(None)))
+///     .primary_key(Char::Id)
 ///     .foreign_key(
 ///         ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
 ///             .name(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
@@ -41,12 +42,13 @@ use crate::{
 ///     table.to_string(),
 ///     [
 ///         r#"CREATE TABLE IF NOT EXISTS "character" ("#,
-///             r#""id" serial NOT NULL PRIMARY KEY,"#,
+///             r#""id" serial NOT NULL,"#,
 ///             r#""font_size" integer NOT NULL,"#,
 ///             r#""character" varchar NOT NULL,"#,
 ///             r#""size_w" integer NOT NULL,"#,
 ///             r#""size_h" integer NOT NULL,"#,
 ///             r#""font_id" integer DEFAULT NULL,"#,
+///             r#"PRIMARY KEY ("id"),"#,
 ///             r#"CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#,
 ///                 r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
 ///                 r#"ON DELETE CASCADE ON UPDATE CASCADE"#,
@@ -74,12 +76,14 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+10]
+// [spec:pgorm:req:sql.ddl.create-table+11]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
     pub(crate) columns: Vec<ColumnDef>,
-    pub(crate) indexes: Vec<IndexConstraint>,
+    /// One slot, because a table has one primary key.
+    pub(crate) primary_key: Option<TableKey<Primary>>,
+    pub(crate) unique_keys: Vec<TableKey<Unique>>,
     pub(crate) foreign_keys: Vec<ForeignKeyCreateStatement>,
     pub(crate) if_not_exists: bool,
     pub(crate) check: Vec<SimpleExpr>,
@@ -96,7 +100,8 @@ impl TableCreateStatement {
         Self {
             table: table.into_table_name(),
             columns: Vec::new(),
-            indexes: Vec::new(),
+            primary_key: None,
+            unique_keys: Vec::new(),
             foreign_keys: Vec::new(),
             if_not_exists: false,
             check: Vec::new(),
@@ -139,12 +144,16 @@ impl TableCreateStatement {
         self
     }
 
-    /// Add a table-level `UNIQUE` or `PRIMARY KEY` constraint.
+    /// Declare the table's primary key: `PRIMARY KEY (…)`.
     ///
-    /// The constraint is consumed, as `col()` consumes its column, and names
-    /// no table of its own: it constrains the table it is written inside. Its
-    /// key — unique or primary — is the one it was built with, so this is the
-    /// only embedder either needs.
+    /// A table has one primary key, and PostgreSQL refuses a second
+    /// (`42P16`), so this is one slot rather than a list: a later call
+    /// replaces the key an earlier one declared, as a second
+    /// [`raw_suffix`](Self::raw_suffix) replaces the first. A column has no key
+    /// clause of its own, so this is the only place a key is declared, and the
+    /// table cannot be written with two. One column or a tuple of them
+    /// converts into the key; [`TableKey::new`] builds one with a name,
+    /// `INCLUDE` or deferrability.
     ///
     /// # Examples
     ///
@@ -155,7 +164,8 @@ impl TableCreateStatement {
     /// statement
     ///     .col(ColumnDef::new(Glyph::Id).integer().not_null())
     ///     .col(ColumnDef::new(Glyph::Image).string().not_null())
-    ///     .index(IndexConstraint::primary_key(Glyph::Id).col(Glyph::Image));
+    ///     .primary_key(Glyph::Id)
+    ///     .primary_key((Glyph::Id, Glyph::Image));
     ///
     /// assert_eq!(
     ///     statement.to_string(),
@@ -169,21 +179,54 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+10]
-    pub fn index<I>(&mut self, constraint: I) -> &mut Self
+    // [spec:pgorm:req:sql.ddl.create-table+11]
+    pub fn primary_key<K>(&mut self, key: K) -> &mut Self
     where
-        I: Into<IndexConstraint>,
+        K: IntoTableKey<Primary>,
     {
-        self.indexes.push(constraint.into());
+        self.primary_key = Some(key.into_table_key());
+        self
+    }
+
+    /// Add a unique key: `UNIQUE (…)`, after the ones already added.
+    ///
+    /// A table has any number of unique keys, so each call appends one. One
+    /// column or a tuple of them converts into the key; [`TableKey::new`]
+    /// builds one with a name, `INCLUDE`, deferrability or
+    /// [`nulls_not_distinct`](TableKey::nulls_not_distinct).
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Table::create(Glyph::Table)
+    ///         .col(ColumnDef::new(Glyph::Aspect).integer())
+    ///         .col(ColumnDef::new(Glyph::Image).text())
+    ///         .unique(Glyph::Aspect)
+    ///         .unique((Glyph::Image, Glyph::Aspect))
+    ///         .to_string(),
+    ///     [
+    ///         r#"CREATE TABLE "glyph" ( "aspect" integer, "image" text,"#,
+    ///         r#"UNIQUE ("aspect"), UNIQUE ("image", "aspect") )"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.create-table+11]
+    pub fn unique<K>(&mut self, key: K) -> &mut Self
+    where
+        K: IntoTableKey<Unique>,
+    {
+        self.unique_keys.push(key.into_table_key());
         self
     }
 
     /// Add a foreign key
     ///
-    /// The key is consumed, as `col()` and `index()` consume their column and
-    /// index, and is restamped onto this statement's table: an embedded key
-    /// constrains the table it sits inside and cannot name another. Pass an
-    /// owned value — `.to_owned()` a builder chain you mean to reuse.
+    /// The key is consumed, as `col()` consumes its column, and is restamped
+    /// onto this statement's table: an embedded key constrains the table it
+    /// sits inside and cannot name another. Pass an owned value —
+    /// `.to_owned()` a builder chain you mean to reuse.
     pub fn foreign_key<F>(&mut self, foreign_key: F) -> &mut Self
     where
         F: Into<ForeignKeyCreateStatement>,
@@ -219,8 +262,9 @@ impl TableCreateStatement {
     ///
     /// let table = Table::create(Char::Table)
     ///     .comment("one row per character")
-    ///     .col(ColumnDef::new(Char::Id).integer().not_null().primary_key())
+    ///     .col(ColumnDef::new(Char::Id).integer().not_null())
     ///     .col(ColumnDef::new(Char::FontSize).integer().comment("in points"))
+    ///     .primary_key(Char::Id)
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -255,10 +299,16 @@ impl TableCreateStatement {
         self.foreign_keys.as_ref()
     }
 
-    /// The table-level unique and primary-key constraints, in the order
-    /// they were embedded.
-    pub fn get_indexes(&self) -> &[IndexConstraint] {
-        &self.indexes
+    /// The table's primary key, if it declares one.
+    // [spec:pgorm:req:sql.ddl.create-table+11]
+    pub fn get_primary_key(&self) -> Option<&TableKey<Primary>> {
+        self.primary_key.as_ref()
+    }
+
+    /// The table's unique keys, in the order they were added.
+    // [spec:pgorm:req:sql.ddl.create-table+11]
+    pub fn get_unique_keys(&self) -> &[TableKey<Unique>] {
+        &self.unique_keys
     }
 
     /// Append verbatim SQL after the table's own clauses — the escape hatch
@@ -278,7 +328,6 @@ impl TableCreateStatement {
     ///         ColumnDef::new(Char::Id)
     ///             .uuid()
     ///             .raw_suffix("DEFAULT uuid_generate_v4()")
-    ///             .primary_key()
     ///             .not_null(),
     ///     )
     ///     .col(
@@ -288,6 +337,7 @@ impl TableCreateStatement {
     ///             .not_null(),
     ///     )
     ///     .col(ColumnDef::new(Char::UserData).json_binary().not_null())
+    ///     .primary_key(Char::Id)
     ///     .raw_suffix("USING columnar")
     ///     .to_owned();
     ///
@@ -295,9 +345,10 @@ impl TableCreateStatement {
     ///     table.to_string(),
     ///     [
     ///         r#"CREATE TABLE "character" ("#,
-    ///         r#""id" uuid DEFAULT uuid_generate_v4() PRIMARY KEY NOT NULL,"#,
+    ///         r#""id" uuid DEFAULT uuid_generate_v4() NOT NULL,"#,
     ///         r#""created_at" timestamp with time zone DEFAULT NOW() NOT NULL,"#,
-    ///         r#""user_data" jsonb NOT NULL"#,
+    ///         r#""user_data" jsonb NOT NULL,"#,
+    ///         r#"PRIMARY KEY ("id")"#,
     ///         r#") USING columnar"#,
     ///     ]
     ///     .join(" ")
@@ -320,7 +371,8 @@ impl TableCreateStatement {
         Self {
             table: self.table.clone(),
             columns: std::mem::take(&mut self.columns),
-            indexes: std::mem::take(&mut self.indexes),
+            primary_key: self.primary_key.take(),
+            unique_keys: std::mem::take(&mut self.unique_keys),
             foreign_keys: std::mem::take(&mut self.foreign_keys),
             if_not_exists: self.if_not_exists,
             check: std::mem::take(&mut self.check),

@@ -14,7 +14,7 @@ from pgorm import schema as s
 async def main() -> None:
     table = p.Table("python_transaction_example")
     async with p.Pool(os.environ["PGORM_TEST_DSN"]) as pool:
-        await pool.execute(s.create_table(table).column(s.ColumnDef("id", "integer").primary_key()))
+        await pool.execute(s.create_table(table).column(s.ColumnDef("id", "integer")).primary_key("id"))
         try:
             async with pool.transaction() as tx:
                 await tx.execute(p.insert(table).columns("id").values(1))

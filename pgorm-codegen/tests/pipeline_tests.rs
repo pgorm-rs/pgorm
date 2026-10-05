@@ -17,23 +17,25 @@ const HEADER: &str = concat!(
 fn vendor_schema() -> Vec<pgorm_query::TableCreateStatement> {
     vec![
         Table::create(Name::runtime("vendor"))
-            .col(serial_pk("id"))
+            .col(serial("id"))
+            .primary_key(Name::runtime("id"))
             .col(
                 ColumnDef::new(Name::runtime("name"))
                     .string()
                     .not_null()
                     .to_owned(),
             )
-            .index(unique_index("vendor", "name"))
+            .unique(unique_key("vendor", "name"))
             .to_owned(),
     ]
 }
 
 fn enum_schema() -> Vec<pgorm_query::TableCreateStatement> {
-    vec![table_with(
+    vec![keyed_with(
         "task",
+        &["id"],
         vec![
-            serial_pk("id"),
+            serial("id"),
             enum_col("state", "task_state", &["open", "done"]),
         ],
     )]
@@ -119,10 +121,11 @@ fn errors_are_the_two_variant_error_enum() {
 #[test]
 fn every_context_option_selects_generated_output() {
     let schema = || {
-        vec![table_with(
+        vec![keyed_with(
             "task",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("state", "task_state", &["open", "done"]),
                 ColumnDef::new_with_type(Name::runtime("_secret"), ColumnType::Integer)
                     .not_null()
@@ -287,10 +290,11 @@ fn index_file_name_follows_the_lib_flag() {
 #[test]
 fn index_file_lists_prelude_entities_then_active_enums() {
     let mut schema = cake_schema();
-    schema.push(table_with(
+    schema.push(keyed_with(
         "task",
+        &["id"],
         vec![
-            serial_pk("id"),
+            serial("id"),
             enum_col("state", "task_state", &["open", "done"]),
         ],
     ));
@@ -456,12 +460,12 @@ fn assert_context_error(opts: Opts, expected: &str) {
 #[test]
 fn temporal_columns_reach_model_and_value_type() {
     let schema = || {
-        vec![table_with(
+        vec![keyed_with(
             "event",
+            &["at"],
             vec![
                 ColumnDef::new_with_type(Name::runtime("at"), ColumnType::Date)
                     .not_null()
-                    .primary_key()
                     .to_owned(),
                 ColumnDef::new_with_type(Name::runtime("seen"), ColumnType::Timestamp)
                     .not_null()

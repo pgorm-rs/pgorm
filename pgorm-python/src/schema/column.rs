@@ -37,16 +37,6 @@ impl PyColumnDef {
         inner.null();
         Self { inner }
     }
-    fn primary_key(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.primary_key();
-        Self { inner }
-    }
-    fn unique(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.unique_key();
-        Self { inner }
-    }
     fn auto_increment(&self) -> Self {
         let mut inner = self.inner.clone();
         inner.auto_increment();

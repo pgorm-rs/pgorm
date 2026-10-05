@@ -3,14 +3,19 @@ use crate::{
     RelationType, TableIdent, util::escape_rust_keyword,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnSpec, TableCreateStatement};
+use pgorm_query::TableCreateStatement;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+/// The most columns an entity's primary key can have: its `ValueType` is a
+/// tuple for a composite key, and pgorm's key traits stop at 12 parts.
+// [spec:pgorm:sem:codegen.entity.transform+9]
+const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+8]
+    // [spec:pgorm:sem:codegen.entity.transform+9]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+1]
@@ -27,34 +32,32 @@ impl EntityTransformer {
             let ident = TableIdent::of(table_create.get_table_name());
             let table_name = ident.to_string();
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
-                .get_indexes()
+                .get_unique_keys()
                 .iter()
-                .filter(|constraint| constraint.is_unique_key())
-                .map(|constraint| {
-                    constraint
-                        .get_columns()
+                .map(|key| {
+                    key.get_columns()
                         .iter()
                         .map(|name| name.to_string())
                         .collect()
                 })
                 .collect();
-            let mut primary_keys: Vec<PrimaryKey> = Vec::new();
+            let primary_keys: Vec<PrimaryKey> = table_create
+                .get_primary_key()
+                .map(|key| {
+                    key.get_columns()
+                        .iter()
+                        .map(|name| PrimaryKey {
+                            name: name.to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             let mut columns: Vec<Column> = Vec::new();
             for col_def in table_create.get_columns() {
-                let primary_key = col_def
-                    .get_column_spec()
-                    .iter()
-                    .any(|spec| matches!(spec, ColumnSpec::PrimaryKey(_)));
-                if primary_key {
-                    primary_keys.push(PrimaryKey {
-                        name: col_def.get_column_name(),
-                    });
-                }
                 let mut col = Column::try_from(col_def).map_err(|err| err.in_table(&table_name))?;
-                col.unique = col.unique
-                    || unique_column_sets
-                        .iter()
-                        .any(|columns| columns.len() == 1 && columns.contains(&col.name));
+                col.unique = unique_column_sets
+                    .iter()
+                    .any(|columns| columns.len() == 1 && columns.contains(&col.name));
                 if let pgorm_query::ColumnType::Enum {
                     name,
                     schema,
@@ -123,21 +126,13 @@ impl EntityTransformer {
                 })
                 .rev()
                 .collect();
-            primary_keys.extend(
-                table_create
-                    .get_indexes()
-                    .iter()
-                    .filter(|constraint| constraint.is_primary_key())
-                    .flat_map(|constraint| {
-                        constraint
-                            .get_columns()
-                            .iter()
-                            .map(|name| PrimaryKey {
-                                name: name.to_string(),
-                            })
-                            .collect::<Vec<_>>()
-                    }),
-            );
+            if primary_keys.len() > MAX_KEY_COLUMNS {
+                return Err(Error::TransformError(format!(
+                    "table `{table_name}`: a primary key of {} columns; an entity's key has at \
+                     most {MAX_KEY_COLUMNS}, the widest tuple its value can be",
+                    primary_keys.len()
+                )));
+            }
             let entity = Entity {
                 table_name: ident.table.clone(),
                 schema_name: ident.schema.clone(),
@@ -301,7 +296,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+8]
+// [spec:pgorm:sem:codegen.entity.transform+9]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -347,7 +342,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+8]
+// [spec:pgorm:sem:codegen.entity.transform+9]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {

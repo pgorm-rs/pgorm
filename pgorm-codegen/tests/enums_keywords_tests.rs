@@ -13,17 +13,19 @@ use pgorm_query::{ColumnDef, ColumnType, Name, Table};
 fn active_enums_are_generated_into_one_alphabetical_file() {
     let generated = generate(
         vec![
-            table_with(
+            keyed_with(
                 "zoo",
+                &["id"],
                 vec![
-                    serial_pk("id"),
+                    serial("id"),
                     enum_col("kind", "zebra_kind", &["plains", "mountain"]),
                 ],
             ),
-            table_with(
+            keyed_with(
                 "orchard",
+                &["id"],
                 vec![
-                    serial_pk("id"),
+                    serial("id"),
                     enum_col("kind", "apple_kind", &["fuji", "gala"]),
                 ],
             ),
@@ -49,10 +51,11 @@ fn active_enums_are_generated_into_one_alphabetical_file() {
 #[test]
 fn active_enum_derives_attributes_and_string_values() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "tea_pairing",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("tea", "tea_kind", &["EverydayTea", "BreakfastTea"]),
             ],
         )],
@@ -86,10 +89,11 @@ fn active_enum_derives_attributes_and_string_values() {
 #[test]
 fn active_enum_variant_naming_digits_punctuation_multibyte() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "doc",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("ty", "ty", &["Question", "A-B-C", "3D", "/", "//", "你好"]),
             ],
         )],
@@ -121,10 +125,11 @@ fn active_enum_variant_naming_digits_punctuation_multibyte() {
 #[test]
 fn entity_files_import_enums_and_render_db_type() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "tea_pairing",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("first_tea", "tea_kind", &["black", "green"]),
                 enum_col("second_tea", "tea_kind", &["black", "green"]),
             ],
@@ -149,10 +154,11 @@ fn entity_files_import_enums_and_render_db_type() {
 #[test]
 fn rust_keywords_in_column_names_become_raw_identifiers() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("type", ColumnType::Integer),
                 typed("typeof", ColumnType::Integer),
                 typed("match", ColumnType::Integer),
@@ -187,10 +193,11 @@ fn rust_keywords_in_column_names_become_raw_identifiers() {
 #[test]
 fn crate_and_self_keywords_get_a_trailing_underscore() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("crate", ColumnType::Integer),
                 typed("self", ColumnType::Integer),
             ],
@@ -214,8 +221,8 @@ fn crate_and_self_keywords_get_a_trailing_underscore() {
 fn keyword_table_names_escaped_in_index_and_prelude() {
     let generated = generate(
         vec![
-            table_with("type", vec![serial_pk("id")]),
-            table_with("crate", vec![serial_pk("id")]),
+            keyed_with("type", &["id"], vec![serial("id")]),
+            keyed_with("crate", &["id"], vec![serial("id")]),
         ],
         Opts::default(),
     );
@@ -249,7 +256,8 @@ fn non_snake_case_names_preserved_by_column_name() {
     let schema = || {
         vec![
             Table::create(Name::runtime("cake"))
-                .col(serial_pk("id"))
+                .col(serial("id"))
+                .primary_key(Name::runtime("id"))
                 .col(
                     ColumnDef::new_with_type(Name::runtime("bakedAt"), ColumnType::Integer)
                         .not_null()
@@ -280,8 +288,8 @@ fn non_snake_case_names_preserved_by_column_name() {
 fn colliding_table_names_are_refused() {
     assert_transform_error(
         vec![
-            table_with("CakeFilling", vec![serial_pk("id")]),
-            table_with("cake_filling", vec![serial_pk("id")]),
+            keyed_with("CakeFilling", &["id"], vec![serial("id")]),
+            keyed_with("cake_filling", &["id"], vec![serial("id")]),
         ],
         "tables `CakeFilling` and `cake_filling` both generate the module name `cake_filling`",
     );
@@ -293,10 +301,11 @@ fn colliding_table_names_are_refused() {
 #[test]
 fn colliding_column_names_are_refused() {
     assert_transform_error(
-        vec![table_with(
+        vec![keyed_with(
             "cake",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("bakedAt", ColumnType::Integer),
                 typed("baked_at", ColumnType::Integer),
             ],
@@ -311,10 +320,11 @@ fn colliding_column_names_are_refused() {
 #[test]
 fn colliding_enum_names_and_variants_are_refused() {
     assert_transform_error(
-        vec![table_with(
+        vec![keyed_with(
             "cake",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("kind", "media type", &["photo"]),
                 enum_col("sort", "media_type", &["video"]),
             ],
@@ -323,10 +333,11 @@ fn colliding_enum_names_and_variants_are_refused() {
     );
 
     assert_transform_error(
-        vec![table_with(
+        vec![keyed_with(
             "cake",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 enum_col("kind", "tea", &["Earl Grey", "earl_grey"]),
             ],
         )],

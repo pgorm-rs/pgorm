@@ -65,9 +65,9 @@ where
                 .integer()
                 .not_null()
                 .comment("ID")
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(applog::Column::Id)
         .col(
             ColumnDef::new(applog::Column::Action)
                 .string()
@@ -96,12 +96,8 @@ where
     C: ConnectionTrait,
 {
     let stmt = pgorm_query::Table::create(metadata::Entity)
-        .col(
-            ColumnDef::new(metadata::Column::Uuid)
-                .uuid()
-                .not_null()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(metadata::Column::Uuid).uuid().not_null())
+        .primary_key(metadata::Column::Uuid)
         .col(ColumnDef::new(metadata::Column::Type).string().not_null())
         .col(ColumnDef::new(metadata::Column::Key).string().not_null())
         .col(ColumnDef::new(metadata::Column::Value).string().not_null())
@@ -118,12 +114,8 @@ where
     C: ConnectionTrait,
 {
     let stmt = pgorm_query::Table::create(repository::Entity)
-        .col(
-            ColumnDef::new(repository::Column::Id)
-                .string()
-                .not_null()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(repository::Column::Id).string().not_null())
+        .primary_key(repository::Column::Id)
         .col(
             ColumnDef::new(repository::Column::Owner)
                 .string()
@@ -141,12 +133,8 @@ where
     C: ConnectionTrait,
 {
     let stmt = pgorm_query::Table::create(self_join::Entity)
-        .col(
-            ColumnDef::new(self_join::Column::Uuid)
-                .uuid()
-                .not_null()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(self_join::Column::Uuid).uuid().not_null())
+        .primary_key(self_join::Column::Uuid)
         .col(ColumnDef::new(self_join::Column::UuidRef).uuid())
         .col(ColumnDef::new(self_join::Column::Time).time())
         .foreign_key(
@@ -172,7 +160,8 @@ where
     primary_key_col.bytea();
 
     let stmt = pgorm_query::Table::create(byte_primary_key::Entity)
-        .col(primary_key_col.not_null().primary_key())
+        .col(primary_key_col.not_null())
+        .primary_key(byte_primary_key::Column::Id)
         .col(
             ColumnDef::new(byte_primary_key::Column::Value)
                 .string()
@@ -192,9 +181,9 @@ where
             ColumnDef::new(active_enum::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(active_enum::Column::Id)
         .col(ColumnDef::new(active_enum::Column::Category).string_len(1))
         .col(ColumnDef::new(active_enum::Column::Color).integer())
         .col(
@@ -215,9 +204,9 @@ where
             ColumnDef::new(active_enum_child::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(active_enum_child::Column::Id)
         .col(
             ColumnDef::new(active_enum_child::Column::ParentId)
                 .integer()
@@ -253,9 +242,9 @@ where
             ColumnDef::new(transaction_log::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(transaction_log::Column::Id)
         .col(
             ColumnDef::new(transaction_log::Column::Date)
                 .date()
@@ -290,9 +279,9 @@ where
             ColumnDef::new(insert_default::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(insert_default::Column::Id)
         .to_owned();
 
     create_table(db, &create_table_stmt, InsertDefault).await
@@ -307,9 +296,9 @@ where
             ColumnDef::new(json_vec::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(json_vec::Column::Id)
         .col(ColumnDef::new(json_vec::Column::StrVec).json())
         .to_owned();
 
@@ -325,9 +314,9 @@ where
             ColumnDef::new(json_struct::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(json_struct::Column::Id)
         .col(ColumnDef::new(json_struct::Column::Json).json().not_null())
         .col(
             ColumnDef::new(json_struct::Column::JsonValue)
@@ -349,9 +338,9 @@ where
             ColumnDef::new(json_vec_derive::json_string_vec::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(json_vec_derive::json_string_vec::Column::Id)
         .col(ColumnDef::new(json_vec_derive::json_string_vec::Column::StrVec).json())
         .to_owned();
 
@@ -367,9 +356,9 @@ where
             ColumnDef::new(json_vec_derive::json_struct_vec::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(json_vec_derive::json_struct_vec::Column::Id)
         .col(
             ColumnDef::new(json_vec_derive::json_struct_vec::Column::StructVec)
                 .json_binary()
@@ -392,9 +381,9 @@ where
             ColumnDef::new(collection::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(collection::Column::Id)
         .col(
             ColumnDef::new(collection::Column::Name)
                 .named(alias("citext"))
@@ -460,9 +449,9 @@ where
             ColumnDef::new(pi::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(pi::Column::Id)
         .col(
             ColumnDef::new(pi::Column::Decimal)
                 .decimal_len(11, 10)
@@ -483,9 +472,9 @@ where
             ColumnDef::new(event_trigger::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(event_trigger::Column::Id)
         .col(
             ColumnDef::new(event_trigger::Column::Events)
                 .array(pgorm_query::ColumnType::String(StringLen::None))
@@ -505,9 +494,9 @@ where
             ColumnDef::new(uuid_fmt::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(uuid_fmt::Column::Id)
         .col(ColumnDef::new(uuid_fmt::Column::Uuid).uuid().not_null())
         .col(
             ColumnDef::new(uuid_fmt::Column::UuidBraced)
@@ -539,9 +528,9 @@ where
             ColumnDef::new(edit_log::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(edit_log::Column::Id)
         .col(ColumnDef::new(edit_log::Column::Action).string().not_null())
         .col(ColumnDef::new(edit_log::Column::Values).json().not_null())
         .to_owned();
@@ -557,9 +546,9 @@ where
         .col(
             ColumnDef::new(teas::Column::Id)
                 .enumeration(TeaEnum, [TeaVariant::EverydayTea, TeaVariant::BreakfastTea])
-                .not_null()
-                .primary_key(),
+                .not_null(),
         )
+        .primary_key(teas::Column::Id)
         .col(ColumnDef::new(teas::Column::Category).string_len(1))
         .col(ColumnDef::new(teas::Column::Color).integer())
         .to_owned();
@@ -572,12 +561,8 @@ where
     C: ConnectionTrait,
 {
     let create_table_stmt = pgorm_query::Table::create(categories::Entity.table_ref())
-        .col(
-            ColumnDef::new(categories::Column::Id)
-                .integer()
-                .not_null()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(categories::Column::Id).integer().not_null())
+        .primary_key(categories::Column::Id)
         .col(
             ColumnDef::new(categories::Column::Categories)
                 .array(ColumnType::String(StringLen::N(1))),
@@ -596,9 +581,9 @@ where
             ColumnDef::new(binary::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(binary::Column::Id)
         .col(ColumnDef::new(binary::Column::Binary).bytea().not_null())
         .col(ColumnDef::new(binary::Column::Binary10).bytea().not_null())
         .col(
@@ -620,9 +605,9 @@ where
             ColumnDef::new(bits::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(bits::Column::Id)
         .col(ColumnDef::new(bits::Column::Bit0).bit(None).not_null())
         .col(ColumnDef::new(bits::Column::Bit1).bit(Some(1)).not_null())
         .col(ColumnDef::new(bits::Column::Bit8).bit(Some(8)).not_null())
@@ -654,9 +639,9 @@ where
                 ColumnDef::new(Column::Id)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
+                    .auto_increment(),
             )
+            .primary_key(Column::Id)
             .col(ColumnDef::new(Column::Name).string().not_null())
             .to_owned();
 
@@ -675,9 +660,9 @@ where
             ColumnDef::new(value_type::value_type_general::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(value_type::value_type_general::Column::Id)
         .col(
             ColumnDef::new(value_type::value_type_general::Column::Number)
                 .integer()
@@ -696,9 +681,9 @@ where
             ColumnDef::new(value_type::value_type_pg::Column::Id)
                 .integer()
                 .not_null()
-                .auto_increment()
-                .primary_key(),
+                .auto_increment(),
         )
+        .primary_key(value_type::value_type_pg::Column::Id)
         .col(
             ColumnDef::new(value_type::value_type_pg::Column::Number)
                 .integer()

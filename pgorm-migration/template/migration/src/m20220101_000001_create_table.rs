@@ -13,9 +13,8 @@ impl MigrationTrait for Migration {
                 ColumnDef::new(Post::Id)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
-            )
+                    .auto_increment(),
+            ).primary_key(Post::Id)
             .col(ColumnDef::new(Post::Title).string().not_null())
             .col(ColumnDef::new(Post::Text).string().not_null())
             .to_owned();

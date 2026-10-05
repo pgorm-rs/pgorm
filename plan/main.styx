@@ -705,12 +705,34 @@ children (
                         title "Two primary-key sources and keys past twelve columns are refused by name"
                         kind @fix
                         deps (composite-key-generated-column)
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T09:33:28.935128Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Survey 2026-10-05 at c24fea1e, two refusals missing. (1) Two primary-key sources: PostgreSQL rejects a table with more than one PRIMARY KEY (42P16, check live), but pgorm-query renders two column-level PRIMARY KEYs. In codegen, two column-level PKs, or a column-level plus a table-level PK, become a composite key or a duplicate PrimaryKey variant whose generated code does not compile (pgorm-codegen/src/sql_schema/table.rs around :83/:93, pgorm-codegen/src/entity/transformer.rs around :126). Codegen's cake_filling() test fixture relies on that invalid shape and must be rewritten to the valid table-level form. Make the invalid state unrepresentable or refused in pgorm-query, per [dec:pgorm:invalid-states-unrepresentable]; see how 889b9ea0 reshaped embedded constraints. Codegen should give a named rejection per codegen.ddl.unsupported's pattern. (2) Past twelve key columns, the entity macro and codegen produce six raw E0277 trait errors (PrimaryKeyArity, TryFromU64, TryFromValueTuple, Debug/PartialEq on a 13-tuple) rather than one named error. Give the macro a named compile error, with a compile-fail test, and codegen's transform a named refusal."
+                            }
+
+                            {
+                                at 2026-10-05T13:40:48.746612Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-05T14:48:15.514542Z
+                                author "brendan@necessary.nu"
+                                kind @decision
+                                text "Operator 2026-10-06: a table's keys follow PostgreSQL's own model, where a primary key is a special case of a unique key and each is a tuple of one or n columns. The operator rejected three alternatives: deleting the column spelling in favour of the index(IndexConstraint::...) chain; letting several column marks accumulate into a composite key; and leaving two primary keys constructible. The shape: one key type, a non-empty ordered column list that a column or a tuple converts into, carrying name, INCLUDE and deferrability, with NULLS NOT DISTINCT on unique keys only, since a primary key refuses it with 42601. TableCreateStatement holds one primary-key slot, where a later .primary_key(..) replaces the earlier one, and a list of unique keys appended by .unique(..). Two primary keys are therefore unrepresentable. ColumnDef::primary_key() and ColumnDef::unique_key(), with their deferrability variants, are removed, as are index() and IndexConstraint, which this replaces; keys are declared only on the table. Keys always render table-level after the columns, one form per concept, and the golden churn that costs is accepted. Python's CreateTable.primary_key(*cols) already has this shape. The key type should also suit the ON CONFLICT target that on-conflict-columns asks for, but that node stays separate."
+                            }
+
+                            {
+                                at 2026-10-05T19:06:49.235085Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }

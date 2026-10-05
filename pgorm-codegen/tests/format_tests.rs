@@ -67,10 +67,10 @@ fn compact_field_attribute_parts_assembled_in_fixed_order() {
                         Name::runtime("camelCase"),
                         ColumnType::Decimal(Some((10, 2))),
                     )
-                    .primary_key()
                     .to_owned(),
                 )
-                .index(unique_index("ledger", "camelCase"))
+                .primary_key(Name::runtime("camelCase"))
+                .unique(unique_key("ledger", "camelCase"))
                 .to_owned(),
         ],
         Opts::default(),
@@ -95,10 +95,11 @@ fn compact_field_attribute_parts_assembled_in_fixed_order() {
 #[test]
 fn compact_column_type_attribute_covers_ambiguous_types() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("a_float", ColumnType::Float),
                 typed("a_double", ColumnType::Double),
                 typed("a_decimal", ColumnType::Decimal(Some((10, 2)))),
@@ -136,10 +137,11 @@ fn compact_column_type_attribute_covers_ambiguous_types() {
 #[test]
 fn compact_fields_without_applicable_parts_carry_no_attribute() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("count", ColumnType::Integer),
                 typed_null("maybe", ColumnType::Integer),
                 typed_null("note", ColumnType::Text),
@@ -168,7 +170,8 @@ fn compact_model_assembles_derives_attributes_fields_in_order() {
     let generated = generate(
         vec![
             Table::create(Name::runtime("cake"))
-                .col(serial_pk("id"))
+                .col(serial("id"))
+                .primary_key(Name::runtime("id"))
                 // not snake_case: the raw DB name is preserved by `column_name`
                 .col(
                     ColumnDef::new_with_type(Name::runtime("bakedAt"), ColumnType::Timestamp)
@@ -208,12 +211,12 @@ fn compact_model_assembles_derives_attributes_fields_in_order() {
 #[test]
 fn compact_model_pk_membership_uses_raw_column_name() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "ledger",
+            &["entryId"],
             vec![
                 ColumnDef::new_with_type(Name::runtime("entryId"), ColumnType::Integer)
                     .not_null()
-                    .primary_key()
                     .to_owned(),
             ],
         )],
@@ -320,11 +323,12 @@ fn expanded_column_def_chains_null_unique_enum_type() {
     let generated = generate(
         vec![
             Table::create(Name::runtime("task"))
-                .col(serial_pk("id"))
+                .col(serial("id"))
+                .primary_key(Name::runtime("id"))
                 .col(typed_null("note", ColumnType::Text))
                 .col(typed("email", ColumnType::String(StringLen::None)))
                 .col(enum_col("state", "task_state", &["open", "done"]))
-                .index(unique_index("task", "email"))
+                .unique(unique_key("task", "email"))
                 .to_owned(),
         ],
         expanded(),
@@ -378,10 +382,11 @@ fn expanded_relation_trait_def_matches_variants_or_panics() {
 #[test]
 fn expanded_column_enum_preserves_non_snake_case_names() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "cake",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("bakedAt", ColumnType::Integer),
                 typed("plain", ColumnType::Integer),
             ],
@@ -424,9 +429,10 @@ fn expanded_sections_are_one_contiguous_block_each() {
 #[test]
 fn expanded_model_block_layout() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
-            vec![serial_pk("id"), typed_null("note", ColumnType::Text)],
+            &["id"],
+            vec![serial("id"), typed_null("note", ColumnType::Text)],
         )],
         Opts {
             expanded_format: true,
@@ -492,10 +498,11 @@ fn entity_imports_each_enum_once_in_first_use() {
     };
 
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 // `zeta` is used first even though `alpha` sorts before it
                 enum_col("first", "zeta", &["a", "b"]),
                 enum_col("second", "alpha", &["one"]),
@@ -526,9 +533,10 @@ fn entity_imports_each_enum_once_in_first_use() {
 #[test]
 fn active_enums_file_imports_serde_not_enum_modules() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "task",
-            vec![serial_pk("id"), enum_col("state", "task_state", &["open"])],
+            &["id"],
+            vec![serial("id"), enum_col("state", "task_state", &["open"])],
         )],
         Opts {
             with_serde: WithSerde::Both,

@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+8]
+> [spec:pgorm:sem:codegen.entity.transform+9]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -76,8 +76,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > unqualified one — so a message about one of two same-named tables says
 > which. `<table>` below is that identity.
 >
-> Per column: `auto_increment`, `not_null` and `unique` come from the
-> presence of the matching `ColumnSpec` on the column definition, and
+> Per column: `auto_increment` and `not_null` come from the presence of the
+> matching `ColumnSpec` on the column definition, and
 > `identity` from a `ColumnSpec::Identity`'s form, which also makes the column
 > `not_null` — PostgreSQL's own rule for an identity column, and the one the
 > derive holds the generated field to. An identity carrying sequence options
@@ -89,15 +89,12 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > from. A column
 > with no `ColumnType` yields
 > ``TransformError("table `<table>` column `<column>`: column type should
-> not be empty")``. The table's indexes then widen `unique`, never narrow
-> it: a column is unique when its definition carries
-> `ColumnSpec::UniqueKey`, or some unique index of the table covers that one
-> column and nothing else. The two spellings of one fact therefore agree —
-> a `ColumnSpec::UniqueKey` is no longer dropped on this path while the DDL
-> bridge keeps it as the index Postgres creates for it
-> (`codegen.ddl.tables`). Primary keys are collected
-> from `ColumnSpec::PrimaryKey` markers and extended with the column names
-> of any table-level primary-key index. Every column whose (possibly
+> not be empty")``. A key is the table's (`sql.ddl.create-table`), so `unique`
+> comes from the table: a column is unique when some unique key of the table
+> covers that one column and nothing else. The primary key's columns are the
+> table's primary key's (`get_primary_key()`), one column or a tuple, in key
+> order; a table has one, so there is no second source to merge and no
+> duplicate `PrimaryKey` variant to generate. Every column whose (possibly
 > array-inner) type is `ColumnType::Enum` registers an `ActiveEnum` in a
 > `BTreeMap` keyed by enum name, deduplicating across tables.
 >
@@ -113,7 +110,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > (`codegen.entity.collisions`); that every primary-key name is the name of a
 > column of its own table, else
 > ``TransformError("table `<table>`: primary key column `<column>` is not a
-> column of the table")``.
+> column of the table")``; and that a key has at most twelve columns, else
+> ``TransformError("table `<table>`: a primary key of <n> columns; an entity's
+> key has at most 12, the widest tuple its value can be")``. A wider key would
+> generate a `ValueType` tuple the key traits have no impl for
+> (`entity.traits.primary-key`), which the derive refuses by name
+> (`macros.derive.entity-model.primary-key`) and the expanded format would
+> hand the caller as a cascade of E0277s.
 >
 > Once every table has been read, the gate also checks that the schema is
 > closed under its own foreign keys: each relation's referenced table is a
@@ -707,7 +710,7 @@ plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
 build-time tool nothing links into a running application, so the cost of
 compiling the C parser falls on people generating entities and on nobody else.
 
-> [spec:pgorm:def:codegen.ddl+2]
+> [spec:pgorm:def:codegen.ddl+3]
 > `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
 > parses DDL text with `pg_query::parse` and returns one statement per
 > `CREATE TABLE`, in file order, with every other statement it read folded into
@@ -730,13 +733,11 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `pgorm-query` and rendered through their `Display`
 > (`sql.ddl.create-table`, `sql.ddl.type-enum`) MUST, when parsed back, generate
 > the same entity files as the statements themselves — with no asymmetry left
-> to document. There was one: a column carrying `ColumnSpec::UniqueKey`, which
-> the bridge preserves as the unique index Postgres creates for it
-> (`codegen.ddl.tables`) while `transform` discarded it on the statement path,
-> so the round trip gained a `unique` the statement path dropped. `transform`
-> now reads that spec (`codegen.entity.transform`) and the two paths agree.
+> to document. Both paths hold a key the same way, as the table's
+> (`sql.ddl.create-table`), so a key the statement declares and the key the
+> bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+4]
+> [spec:pgorm:req:codegen.ddl.unsupported+5]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -775,7 +776,16 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not
 > have, and a table or enum type declared twice — both are keyed by name
-> downstream, so a duplicate would otherwise overwrite in silence. A foreign
+> downstream, so a duplicate would otherwise overwrite in silence. So is a table
+> declaring more than one primary key, in each spelling PostgreSQL refuses
+> (`42P16`, *multiple primary keys for table are not allowed*): `PRIMARY KEY` on
+> two columns, on a column beside a table-level `PRIMARY KEY (...)`, as two table
+> constraints, or twice on one column. It is
+> ``TransformError("statement <n>: table `<t>` declares more than one primary
+> key")``. None of these is the composite key one `PRIMARY KEY (a, b)` declares,
+> and reading two of them as one — which the transform did, generating either a
+> composite key or a `PrimaryKey` enum with a variant twice over that did not
+> compile — would be the quiet reinterpretation this rule forbids. A foreign
 > key naming a table the file never creates, or a column that table does not
 > have, is refused too, but by the transform gate `entities_from_sql` runs
 > (`codegen.entity.transform`) rather than here: the bridge resolves one
@@ -836,7 +846,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+5]
+> [spec:pgorm:sem:codegen.ddl.tables+6]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -844,14 +854,15 @@ compiling the C parser falls on people generating entities and on nobody else.
 > rejection rather than a name quietly shortened to its last two parts. The
 > statement also carries its `IF NOT EXISTS` flag and one `ColumnDef` per
 > column definition, in declaration order. Column constraints set the matching
-> `ColumnSpec` —
-> `NOT NULL`, `NULL`, `PRIMARY KEY` — and a column-level `REFERENCES` becomes a
-> foreign key on that one column. A column-level `UNIQUE` becomes a one-column
-> table-level unique constraint (`IndexConstraint::unique`,
-> `sql.ddl.create-table`), which is what Postgres itself creates for it and
-> so the truthful form to bridge it as; `codegen.entity.transform` reads that
-> constraint and a `ColumnSpec::UniqueKey` alike, so the fact survives either
-> spelling. A primary-key column is `NOT NULL`
+> `ColumnSpec` — `NOT NULL`, `NULL` — and a column-level `REFERENCES` becomes a
+> foreign key on that one column. A key is the table's
+> (`sql.ddl.create-table`), so a column-level `PRIMARY KEY` becomes the
+> table's primary key over that one column, and a column-level `UNIQUE` a
+> one-column unique key: the keys Postgres itself creates for them, and so the
+> truthful forms to bridge them as. A second primary key in any spelling is
+> refused by name (`codegen.ddl.unsupported`) before it reaches the statement,
+> whose one primary-key slot would otherwise keep the later key and drop the
+> earlier in silence. A primary-key column is `NOT NULL`
 > whether or not the DDL spells it, which is Postgres' own rule: the entity
 > model reads nullability off the column alone, so an unstated `NOT NULL` would
 > otherwise generate an `Option` primary key.
@@ -865,7 +876,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`codegen.entity.transform`).
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+8]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+9]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity
@@ -878,8 +889,8 @@ compiling the C parser falls on people generating entities and on nobody else.
 > collation from an entity, `parse_schema`'s statements are where it is kept.
 >
 > Table-level `PRIMARY KEY` and `UNIQUE` constraints become the table's
-> primary-key and unique `IndexConstraint`s, keeping the constraint name and
-> `NULLS NOT DISTINCT`; a table-level `FOREIGN KEY` becomes a foreign key with
+> primary key and unique keys (`TableKey`), keeping the constraint name and,
+> on a unique key, `NULLS NOT DISTINCT`; a table-level `FOREIGN KEY` becomes a foreign key with
 > its columns, referenced table and referenced columns, and both forms keep the
 > constraint name. A foreign key whose two column lists differ in length is a
 > named rejection rather than a truncated key — the pairs are what the bridged
@@ -892,7 +903,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+5]
+> [spec:pgorm:sem:codegen.ddl.objects+6]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -901,8 +912,8 @@ compiling the C parser falls on people generating entities and on nobody else.
 > is where `transform` discovers enums; an enum type no column names contributes
 > nothing and is returned as no statement of its own.
 >
-> A unique `CREATE INDEX` is folded into its table as the unique constraint
-> that enforces the same uniqueness — an `IndexConstraint`
+> A unique `CREATE INDEX` is folded into its table as the unique key that
+> enforces the same uniqueness — a `TableKey<Unique>`
 > (`sql.ddl.create-table`) — keeping its name, its columns and
 > `NULLS NOT DISTINCT`; `codegen.entity.transform` then reads a single-column
 > unique key as that column's `unique` flag. A table constraint's key is

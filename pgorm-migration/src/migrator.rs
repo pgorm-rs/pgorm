@@ -362,12 +362,8 @@ pub trait MigratorTrait: Send {
 
         let stmt = Table::create(Self::migration_table_name())
             .if_not_exists()
-            .col(
-                ColumnDef::new(ledger::Column::Version)
-                    .text()
-                    .not_null()
-                    .primary_key(),
-            )
+            .col(ColumnDef::new(ledger::Column::Version).text().not_null())
+            .primary_key(ledger::Column::Version)
             .col(
                 ColumnDef::new(ledger::Column::AppliedAt)
                     .big_integer()

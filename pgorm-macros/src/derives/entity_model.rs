@@ -13,6 +13,12 @@ use syn::{
     parenthesized, punctuated::Punctuated, spanned::Spanned, token::Comma, token::Paren,
 };
 
+/// The most columns a primary key can have: `PrimaryKeyTrait::ValueType` is a
+/// tuple for a composite key, and its traits are implemented for tuples of 1
+/// through 12 parts.
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
+const MAX_KEY_ARITY: usize = 12;
+
 /// The field-level `#[pgorm(...)]` configuration of one model field.
 #[derive(Default)]
 struct FieldAttrs {
@@ -24,7 +30,8 @@ struct FieldAttrs {
     default_expr: Option<TokenStream>,
     select_as: Option<String>,
     save_as: Option<String>,
-    is_primary_key: bool,
+    /// Where this field's `primary_key` key was written, when it was.
+    primary_key: Option<Span>,
     nullable: bool,
     indexed: bool,
     unique: bool,
@@ -152,7 +159,11 @@ fn parse_field_attrs(
             } else if meta.path.is_ident("ignore") {
                 parsed.ignore = true;
             } else if meta.path.is_ident("primary_key") {
-                parsed.is_primary_key = true;
+                if parsed.primary_key.is_some() {
+                    return Err(meta
+                        .error("a field is one column of the key; `primary_key` is given twice"));
+                }
+                parsed.primary_key = Some(meta.path.span());
                 primary_key_types.push(field.ty.clone());
             } else if meta.path.is_ident("nullable") {
                 parsed.nullable = true;
@@ -173,7 +184,7 @@ fn parse_field_attrs(
 
 /// Refuse an identity beside anything else that would fill the column or let
 /// it be `NULL`, each a definition PostgreSQL rejects (42601).
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
 fn check_identity(attrs: &FieldAttrs, optional: bool) -> syn::Result<()> {
     let Some((_, span)) = attrs.identity else {
         return Ok(());
@@ -278,7 +289,7 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 // [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+6]
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+3]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
     let mut table_name = None;
@@ -351,6 +362,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     let mut primary_key_types: Punctuated<Type, Comma> = Punctuated::new();
     let mut auto_increment = true;
     let mut key_identities: Vec<bool> = Vec::new();
+    let mut key_spans: Vec<Span> = Vec::new();
     let mut serial_key_fields: Vec<Span> = Vec::new();
     if table_iden && let Some(table_name) = table_name {
         let table_field_name = Ident::new("Table", Span::call_site());
@@ -401,7 +413,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     default_expr,
                     select_as,
                     save_as,
-                    is_primary_key,
+                    primary_key,
                     mut nullable,
                     indexed,
                     unique,
@@ -440,7 +452,8 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     columns_json_key.push(quote! { Self::#field_name => #json_key });
                 }
 
-                if is_primary_key {
+                if let Some(span) = primary_key {
+                    key_spans.push(span);
                     primary_keys.push(quote! {
                         #variant_attrs
                         #field_name
@@ -522,6 +535,18 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     }
     if !columns_save_array_as.is_empty() {
         columns_save_array_as.push_punct(Comma::default());
+    }
+
+    if let Some(span) = key_spans.get(MAX_KEY_ARITY) {
+        return Err(syn::Error::new(
+            *span,
+            format!(
+                "a primary key has at most {MAX_KEY_ARITY} columns, the widest tuple a key \
+                 value can be; this is column {} of {}",
+                MAX_KEY_ARITY + 1,
+                key_spans.len(),
+            ),
+        ));
     }
 
     if primary_keys.len() > 1

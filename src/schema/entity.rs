@@ -4,7 +4,7 @@ use crate::{
 };
 use pgorm_query::{
     ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, IdentityGeneration, Index,
-    IndexConstraint, IndexCreateStatement, Name, SqlName, TableCreateStatement,
+    IndexCreateStatement, Name, SqlName, TableCreateStatement, TableKey,
     extension::{IntoTypeRef, Type, TypeCreateStatement},
 };
 use std::collections::HashSet;
@@ -238,7 +238,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+5]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+6]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,7 +257,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+5]
+// [spec:pgorm:sem:schema.from-entity+6]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -273,14 +273,20 @@ where
         stmt.col(&mut column_def);
     }
 
-    if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
-        let mut primary_keys = E::PrimaryKey::iter();
-        if let Some(first) = primary_keys.next() {
-            let mut key = IndexConstraint::primary_key(first);
-            for primary_key in primary_keys {
-                key = key.col(primary_key);
-            }
-            stmt.index(key.name(Name::runtime(format!("pk-{}", entity.to_string()))));
+    // A composite key is named `pk-{table}`; a one-column key keeps the name
+    // PostgreSQL derives, `{table}_pkey`.
+    let mut primary_keys = E::PrimaryKey::iter();
+    if let Some(first) = primary_keys.next() {
+        let key = TableKey::new(first).cols(primary_keys);
+        if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
+            stmt.primary_key(key.name(Name::runtime(format!("pk-{}", entity.to_string()))));
+        } else {
+            stmt.primary_key(key);
+        }
+    }
+    for column in E::Column::iter() {
+        if column.def().unique {
+            stmt.unique(column);
         }
     }
 
@@ -295,7 +301,7 @@ where
     stmt.take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+5]    column + primary-key projection
+// [spec:pgorm:sem:schema.from-entity+6]    column projection, and the serial family for a one-column key
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
@@ -304,9 +310,6 @@ where
     let mut column_def = ColumnDef::new_with_type(column, orm_column_def.col_type);
     if !orm_column_def.null {
         column_def.not_null();
-    }
-    if orm_column_def.unique {
-        column_def.unique_key();
     }
     let fills_itself = orm_column_def.default.is_some();
     match orm_column_def.default {
@@ -329,12 +332,11 @@ where
     // `DEFAULT` or an identity (42601). A composite key's generated part is
     // its column's identity, rendered above.
     if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY == 1
+        && E::PrimaryKey::auto_increment()
+        && !fills_itself
         && E::PrimaryKey::iter().any(|key| column.to_string() == key.into_column().to_string())
     {
-        if E::PrimaryKey::auto_increment() && !fills_itself {
-            column_def.auto_increment();
-        }
-        column_def.primary_key();
+        column_def.auto_increment();
     }
     column_def
 }
@@ -372,8 +374,8 @@ mod tests {
                     .decimal()
                     .not_null(),
             )
-            .index(
-                IndexConstraint::primary_key(cake_filling_price::Column::CakeId)
+            .primary_key(
+                TableKey::new(cake_filling_price::Column::CakeId)
                     .name(Name::runtime("pk-cake_filling_price"))
                     .col(cake_filling_price::Column::FillingId),
             )
@@ -425,15 +427,15 @@ mod tests {
                 ColumnDef::new(indexes::Column::IndexesId)
                     .integer()
                     .not_null()
-                    .auto_increment()
-                    .primary_key(),
+                    .auto_increment(),
             )
+            .primary_key(indexes::Column::IndexesId)
             .col(
                 ColumnDef::new(indexes::Column::UniqueAttr)
                     .integer()
-                    .not_null()
-                    .unique_key(),
+                    .not_null(),
             )
+            .unique(indexes::Column::UniqueAttr)
             .col(
                 ColumnDef::new(indexes::Column::Index1Attr)
                     .integer()
@@ -442,9 +444,9 @@ mod tests {
             .col(
                 ColumnDef::new(indexes::Column::Index2Attr)
                     .integer()
-                    .not_null()
-                    .unique_key(),
+                    .not_null(),
             )
+            .unique(indexes::Column::Index2Attr)
             .to_owned()
     }
 }

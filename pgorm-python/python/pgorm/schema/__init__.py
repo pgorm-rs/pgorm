@@ -11,7 +11,8 @@ from .._native import (
     drop_table as drop_table, rename_table as rename_table,
     rename_column as rename_column, truncate as truncate,
     add_column as add_column, modify_column as modify_column,
-    drop_column as drop_column, drop_index as drop_index,
+    drop_column as drop_column, add_primary_key as add_primary_key,
+    add_unique as add_unique, drop_index as drop_index,
     create_enum as create_enum, add_enum_value as add_enum_value,
     rename_enum as rename_enum, rename_enum_value as rename_enum_value,
     drop_enum as drop_enum,
@@ -24,6 +25,7 @@ __all__ = [
     "DataType", "ColumnDef", "DDL", "CreateTable", "CreateIndex", "EntitySchema",
     "create_table", "create_index", "from_entity", "drop_table", "rename_table",
     "rename_column", "truncate", "add_column", "modify_column", "drop_column",
-    "drop_index", "create_enum", "add_enum_value", "rename_enum",
+    "add_primary_key", "add_unique", "drop_index", "create_enum", "add_enum_value",
+    "rename_enum",
     "rename_enum_value", "drop_enum",
 ]

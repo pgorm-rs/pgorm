@@ -11,6 +11,8 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         ("schema.add_column", "pgorm_query::PendingTableAlter::add_column"),
         ("schema.modify_column", "pgorm_query::PendingTableAlter::modify_column"),
         ("schema.drop_column", "pgorm_query::PendingTableAlter::drop_column"),
+        ("schema.add_primary_key", "pgorm_query::PendingTableAlter::add_primary_key"),
+        ("schema.add_unique", "pgorm_query::PendingTableAlter::add_unique"),
         ("schema.create_index", "pgorm_query::IndexCreateStatement"),
         ("schema.drop_index", "pgorm_query::IndexDropStatement"),
         ("schema.create_enum", "pgorm_query::extension::TypeCreateStatement"),

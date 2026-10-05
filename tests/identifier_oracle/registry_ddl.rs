@@ -2,8 +2,8 @@
 //! how to add one.
 
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Comment, ForeignKey, Index, IndexColumn, IndexConstraint, IndexType,
-    Sequence, SequenceOption, Table, TableForeignKey, TypeName,
+    ColumnDef, ColumnType, Comment, ForeignKey, Index, IndexColumn, IndexType, Sequence,
+    SequenceOption, Table, TableForeignKey, TableKey, TypeName,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -132,69 +132,96 @@ pub fn sites() -> Vec<Site> {
             },
         },
         Site {
-            id: "ddl/create-table.index-constraint-name",
-            api: "TableCreateStatement::index(IndexConstraint::unique(..).name(Name))",
+            id: "ddl/create-table.key-name",
+            api: "TableCreateStatement::unique(TableKey::new(..).name(Name))",
             kinds: &["Constraint.conname"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::unique(fixed("c")).name(n_(n))))
+                    .unique(TableKey::new(fixed("c")).name(n_(n))))
             },
         },
         Site {
-            id: "ddl/create-table.index-constraint-column",
-            api: "TableCreateStatement::index(IndexConstraint::unique(Name))",
+            id: "ddl/create-table.unique-key-column",
+            api: "TableCreateStatement::unique(Name)",
             kinds: &["Constraint.keys[0]"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::unique(n_(n))))
+                    .unique(n_(n)))
             },
         },
         Site {
-            id: "ddl/create-table.index-constraint-next-column",
-            api: "TableCreateStatement::index(IndexConstraint::unique(..).col(Name))",
+            id: "ddl/create-table.key-next-column",
+            api: "TableCreateStatement::unique(TableKey::new(..).col(Name))",
             kinds: &["Constraint.keys[1]"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::unique(fixed("c")).col(n_(n))))
+                    .unique(TableKey::new(fixed("c")).col(n_(n))))
             },
         },
         Site {
-            id: "ddl/create-table.nulls-not-distinct-constraint-column",
-            api: "TableCreateStatement::index(IndexConstraint::unique_nulls_not_distinct(Name))",
+            id: "ddl/create-table.key-tuple-column",
+            api: "TableCreateStatement::unique((.., Name))",
+            kinds: &["Constraint.keys[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer())
+                    .unique((fixed("c"), n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-table.nulls-not-distinct-key-column",
+            api: "TableCreateStatement::unique(TableKey::new(Name).nulls_not_distinct())",
             kinds: &["Constraint.keys[0]"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::unique_nulls_not_distinct(n_(n))))
+                    .unique(TableKey::new(n_(n)).nulls_not_distinct()))
             },
         },
         Site {
-            id: "ddl/create-table.primary-key-constraint-column",
-            api: "TableCreateStatement::index(IndexConstraint::primary_key(Name))",
+            id: "ddl/create-table.primary-key-column",
+            api: "TableCreateStatement::primary_key(Name)",
             kinds: &["Constraint.keys[0]"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::primary_key(n_(n))))
+                    .primary_key(n_(n)))
             },
         },
         Site {
-            id: "ddl/create-table.index-constraint-include",
-            api: "TableCreateStatement::index(IndexConstraint::unique(..).include([Name]))",
+            id: "ddl/create-table.key-include",
+            api: "TableCreateStatement::unique(TableKey::new(..).include([Name]))",
             kinds: &["Constraint.including[0]"],
             policy: Quoted,
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer())
-                    .index(IndexConstraint::unique(fixed("c")).include([n_(n)])))
+                    .unique(TableKey::new(fixed("c")).include([n_(n)])))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-primary-key-column",
+            api: "TableAlterStatement::add_primary_key(Name)",
+            kinds: &["Constraint.keys[0]"],
+            policy: Quoted,
+            render: |n| sql(&Table::alter(fixed("t")).add_primary_key(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-table.add-unique-name",
+            api: "TableAlterStatement::add_unique(TableKey::new(..).name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t")).add_unique(TableKey::new(fixed("c")).name(n_(n))))
             },
         },
         Site {

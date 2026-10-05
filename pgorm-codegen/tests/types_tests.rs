@@ -17,10 +17,11 @@ use std::sync::Arc;
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("c_char", ColumnType::Char(Some(1))),
                 typed("c_string", ColumnType::String(StringLen::N(10))),
                 typed("c_text", ColumnType::Text),
@@ -84,7 +85,7 @@ fn column_rust_types_follow_the_mapping_table() {
 #[test]
 fn float_and_double_columns_suppress_the_eq_derive() {
     let no_floats = generate(
-        vec![table_with("sample", vec![serial_pk("id")])],
+        vec![keyed_with("sample", &["id"], vec![serial("id")])],
         Opts::default(),
     );
     assert_contains(
@@ -93,9 +94,10 @@ fn float_and_double_columns_suppress_the_eq_derive() {
     );
 
     let with_float = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
-            vec![serial_pk("id"), typed("ratio", ColumnType::Float)],
+            &["id"],
+            vec![serial("id"), typed("ratio", ColumnType::Float)],
         )],
         Opts::default(),
     );
@@ -106,9 +108,10 @@ fn float_and_double_columns_suppress_the_eq_derive() {
     );
 
     let with_double = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
-            vec![serial_pk("id"), typed("ratio", ColumnType::Double)],
+            &["id"],
+            vec![serial("id"), typed("ratio", ColumnType::Double)],
         )],
         Opts::default(),
     );
@@ -120,10 +123,11 @@ fn float_and_double_columns_suppress_the_eq_derive() {
 
     // through an array element type
     let with_float_array = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 ColumnDef::new(Name::runtime("ratios"))
                     .array(ColumnType::Float)
                     .not_null()
@@ -144,10 +148,11 @@ fn float_and_double_columns_suppress_the_eq_derive() {
 #[test]
 fn date_time_columns_map_to_prelude_aliases() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "moment",
+            &["id"],
             vec![
-                serial_pk("id"),
+                serial("id"),
                 typed("d", ColumnType::Date),
                 typed("t", ColumnType::Time),
                 typed("ts", ColumnType::Timestamp),
@@ -244,12 +249,10 @@ fn attribute_string_value(attr: &str) -> String {
 #[test]
 fn hostile_named_type_survives_the_compact_attribute() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
-            vec![
-                serial_pk("id"),
-                typed("odd", ColumnType::named(HOSTILE_NAME)),
-            ],
+            &["id"],
+            vec![serial("id"), typed("odd", ColumnType::named(HOSTILE_NAME))],
         )],
         Opts::default(),
     );
@@ -324,12 +327,10 @@ fn derived_entity_names_the_hostile_type_exactly() {
 #[test]
 fn hostile_named_type_survives_the_expanded_column_def() {
     let generated = generate(
-        vec![table_with(
+        vec![keyed_with(
             "sample",
-            vec![
-                serial_pk("id"),
-                typed("odd", ColumnType::named(HOSTILE_NAME)),
-            ],
+            &["id"],
+            vec![serial("id"), typed("odd", ColumnType::named(HOSTILE_NAME))],
         )],
         expanded(),
     );
@@ -379,9 +380,10 @@ fn column_conversion_rejects_an_unrespellable_named_type() {
 // type — no placeholder code, and no panic
 #[test]
 fn transform_rejects_column_type_outside_mapping() {
-    let unsupported = EntityTransformer::transform(vec![table_with(
+    let unsupported = EntityTransformer::transform(vec![keyed_with(
         "device",
-        vec![serial_pk("id"), typed("address", ColumnType::Inet)],
+        &["id"],
+        vec![serial("id"), typed("address", ColumnType::Inet)],
     )]);
 
     match unsupported {
@@ -427,12 +429,12 @@ fn expanded_pk_value_type_is_type_or_tuple() {
     );
 
     let text_key = generate(
-        vec![table_with(
+        vec![keyed_with(
             "setting",
+            &["key"],
             vec![
                 ColumnDef::new_with_type(Name::runtime("key"), ColumnType::Text)
                     .not_null()
-                    .primary_key()
                     .to_owned(),
             ],
         )],
@@ -447,8 +449,8 @@ fn expanded_pk_value_type_is_type_or_tuple() {
 // the key is still the caller's
 #[test]
 fn expanded_pk_auto_increment_reads_only_the_key() {
-    let auto_increment = |columns: Vec<ColumnDef>| {
-        let generated = generate(vec![table_with("ticket", columns)], expanded());
+    let auto_increment = |key: &[&str], columns: Vec<ColumnDef>| {
+        let generated = generate(vec![keyed_with("ticket", key, columns)], expanded());
         let file = norm(generated.file("ticket.rs"));
         if file.contains(&norm("fn auto_increment() -> bool { true }")) {
             true
@@ -460,7 +462,6 @@ fn expanded_pk_auto_increment_reads_only_the_key() {
     let code = || {
         ColumnDef::new_with_type(Name::runtime("code"), ColumnType::Text)
             .not_null()
-            .primary_key()
             .to_owned()
     };
     let serial_seq = ColumnDef::new(Name::runtime("seq"))
@@ -469,25 +470,26 @@ fn expanded_pk_auto_increment_reads_only_the_key() {
         .auto_increment()
         .to_owned();
 
-    assert!(!auto_increment(vec![code(), serial_seq]));
-    assert!(!auto_increment(vec![code()]));
-    assert!(auto_increment(vec![serial_pk("id")]));
+    assert!(!auto_increment(&["code"], vec![code(), serial_seq]));
+    assert!(!auto_increment(&["code"], vec![code()]));
+    assert!(auto_increment(&["id"], vec![serial("id")]));
 
     let tenant = ColumnDef::new(Name::runtime("tenant_id"))
         .integer()
         .not_null()
-        .primary_key()
         .to_owned();
     let generated_id = ColumnDef::new(Name::runtime("id"))
         .integer()
         .identity()
-        .primary_key()
         .to_owned();
-    assert!(!auto_increment(vec![tenant, generated_id.clone()]));
-    assert!(auto_increment(vec![generated_id]));
+    assert!(!auto_increment(
+        &["tenant_id", "id"],
+        vec![tenant, generated_id.clone()]
+    ));
+    assert!(auto_increment(&["id"], vec![generated_id]));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+8/test]    an identity is read off
+// [spec:pgorm:sem:codegen.entity.transform+9/test]    an identity is read off
 // the column definition as its form, and makes the column NOT NULL; one
 // carrying sequence options is refused, since an entity declares no options
 #[test]

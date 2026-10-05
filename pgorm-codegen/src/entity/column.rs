@@ -387,7 +387,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+8]
+// [spec:pgorm:sem:codegen.entity.transform+9]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 
@@ -420,17 +420,15 @@ impl TryFrom<&ColumnDef> for Column {
                 .get_column_spec()
                 .iter()
                 .any(|spec| matches!(spec, ColumnSpec::NotNull));
-        let unique = col_def
-            .get_column_spec()
-            .iter()
-            .any(|spec| matches!(spec, ColumnSpec::UniqueKey(_)));
+        // Uniqueness is a key of the table's, which the transform reads from
+        // the table's unique keys.
         let column = Self {
             name,
             col_type,
             auto_increment,
             identity,
             not_null,
-            unique,
+            unique: false,
         };
         column.validate()?;
         Ok(column)
@@ -608,26 +606,28 @@ mod tests {
         );
         assert_eq!(column.get_info().as_str(), "Column `id`: String, not_null");
 
-        let column = to_column(
+        // Uniqueness comes from the table's unique keys, which the transform
+        // reads; a column converted alone is set unique the way it sets one.
+        let mut column = to_column(
             ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
-                .unique_key()
                 .to_owned(),
         );
+        column.unique = true;
         assert_eq!(
             column.get_info().as_str(),
             "Column `id`: String, not_null, unique"
         );
 
-        let column = to_column(
+        let mut column = to_column(
             ColumnDef::new(Name::runtime("id"))
                 .string()
                 .not_null()
-                .unique_key()
                 .auto_increment()
                 .to_owned(),
         );
+        column.unique = true;
         assert_eq!(
             column.get_info().as_str(),
             "Column `id`: String, auto_increment, not_null, unique"
@@ -700,23 +700,12 @@ mod tests {
         let column = to_column(
             ColumnDef::new(Name::runtime("id"))
                 .string()
-                .unique_key()
-                .not_null()
-                .to_owned(),
-        );
-        assert!(column.unique);
-        assert!(column.not_null);
-
-        let column = to_column(
-            ColumnDef::new(Name::runtime("id"))
-                .string()
                 .auto_increment()
-                .unique_key()
                 .not_null()
                 .to_owned(),
         );
         assert!(column.auto_increment);
-        assert!(column.unique);
+        assert!(!column.unique);
         assert!(column.not_null);
     }
 }

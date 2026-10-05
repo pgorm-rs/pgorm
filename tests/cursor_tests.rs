@@ -962,12 +962,8 @@ async fn cursor_over_network_types() -> Result<(), Error> {
     let mac_col = alias("mac");
 
     let create = Table::create(Entity)
-        .col(
-            ColumnDef::new(Column::Id)
-                .integer()
-                .not_null()
-                .primary_key(),
-        )
+        .col(ColumnDef::new(Column::Id).integer().not_null())
+        .primary_key(Column::Id)
         .col(ColumnDef::new(Column::Label).string().not_null())
         .col(ColumnDef::new(ip_col).inet().not_null())
         .col(ColumnDef::new(mac_col).mac_address().not_null())

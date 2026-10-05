@@ -69,7 +69,6 @@ def column(definition):
         + " "
         + type_name
         + (" NOT NULL" if not definition["nullable"] else "")
-        + (" PRIMARY KEY" if definition["primary"] else "")
     )
 
 
@@ -104,13 +103,12 @@ def schema_node(name, i, d, enum_function=None):
     target = qualified(table.name, table.schema)
     match name:
         case "schema.create":
-            statement = (
-                "CREATE TABLE "
-                + target
-                + " ("
-                + join([column(item) for item in d["columns"]])
-                + ")"
-            )
+            # The primary columns, in order, are the table's one key.
+            key = [quote(item["name"]) for item in d["columns"] if item["primary"]]
+            elements = [column(item) for item in d["columns"]]
+            if key:
+                elements.append("PRIMARY KEY (" + join(key) + ")")
+            statement = "CREATE TABLE " + target + " (" + join(elements) + ")"
         case "schema.drop":
             statement = SQL(("DROP TABLE " + target,))
         case "schema.rename":

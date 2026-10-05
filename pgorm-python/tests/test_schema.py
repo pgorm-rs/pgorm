@@ -81,7 +81,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         model = p.Model('items "x"', {"id": p.Column("i32", primary_key=True), "name": p.Column("text")}, schema=self.namespace)
         importlib.reload(s)
         table = model.table
-        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").primary_key().auto_increment())
+        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").auto_increment()).primary_key("id")
         ddl = ddl.column(s.ColumnDef("name", "text").not_null().default("O'Brien \\ 雪"))
         ddl = ddl.column(s.ColumnDef("twice", "integer").generated(p.col("id") * 2)).check(p.col("id") > 0)
         ddl.inspect()
@@ -98,6 +98,12 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await connection.execute(s.add_column(table, s.ColumnDef("extra", "text").default("hello")))
             await connection.execute(s.add_column(table, s.ColumnDef("extra", "text"), if_not_exists=True))
             await connection.execute(s.modify_column(table, s.ColumnDef("extra", "varchar").not_null().default("changed")))
+            await connection.execute(s.add_unique(table, "extra", "name", name='unique "x"', nulls_not_distinct=True))
+            keyed = s.add_primary_key(table, "id")
+            self.assertTrue(keyed.inspect().sql.endswith('ADD PRIMARY KEY ("id")'), keyed.inspect().sql)
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(keyed)
+            self.assertEqual(refused.exception.sqlstate, "42P16")
             await connection.execute(s.rename_column(table, "extra", 'renamed "x"'))
             await connection.execute(s.drop_column(table, 'renamed "x"'))
             await connection.execute(s.drop_index(table, 'idx "雪"'))

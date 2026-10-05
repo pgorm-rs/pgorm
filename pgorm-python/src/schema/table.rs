@@ -6,7 +6,7 @@ use crate::{
     errors::ConstructionError, expressions, expressions::Compiled, identifiers::PyIdentifier,
     statements::PyTable,
 };
-use pgorm::pgorm_query::{IndexConstraint, Table, TableCreateStatement, TableName, Values};
+use pgorm::pgorm_query::{Table, TableCreateStatement, TableKey, TableName, Values};
 use pyo3::{prelude::*, types::PyTuple};
 
 pub(super) fn table_name(table: &PyTable) -> PyResult<TableName> {
@@ -47,13 +47,16 @@ impl PyCreateTable {
     }
 
     #[pyo3(signature=(first, *rest))]
+    // A table has one primary key: a later call replaces the key an earlier
+    // one declared, as the native builder's one slot does.
+    // [spec:pgorm:req:python.schema]
     fn primary_key(&self, first: &Bound<'_, PyAny>, rest: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        let mut key = IndexConstraint::primary_key(PyIdentifier::new(first)?.name());
+        let mut key = TableKey::new(PyIdentifier::new(first)?.name());
         for column in rest {
             key = key.col(PyIdentifier::new(&column)?.name());
         }
         let mut inner = self.inner.clone();
-        inner.index(key);
+        inner.primary_key(key);
         Ok(Self { inner })
     }
 
@@ -65,12 +68,10 @@ impl PyCreateTable {
         name: Option<&Bound<'_, PyAny>>,
         nulls_not_distinct: bool,
     ) -> PyResult<Self> {
-        let first = PyIdentifier::new(first)?.name();
-        let mut key = if nulls_not_distinct {
-            IndexConstraint::unique_nulls_not_distinct(first)
-        } else {
-            IndexConstraint::unique(first)
-        };
+        let mut key = TableKey::new(PyIdentifier::new(first)?.name());
+        if nulls_not_distinct {
+            key = key.nulls_not_distinct();
+        }
         for column in rest {
             key = key.col(PyIdentifier::new(&column)?.name());
         }
@@ -78,7 +79,7 @@ impl PyCreateTable {
             key = key.name(PyIdentifier::new(name)?.name());
         }
         let mut inner = self.inner.clone();
-        inner.index(key);
+        inner.unique(key);
         Ok(Self { inner })
     }
 
@@ -167,6 +168,52 @@ pub(super) fn modify_column(table: &PyTable, column: &PyColumnDef) -> PyResult<P
         inner: Statement::AlterTable(
             Table::alter(table_name(table)?).modify_column(column.inner.clone()),
         ),
+    })
+}
+
+/// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
+/// declares, added to a table that exists.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, first, *rest))]
+pub(super) fn add_primary_key(
+    table: &PyTable,
+    first: &Bound<'_, PyAny>,
+    rest: &Bound<'_, PyTuple>,
+) -> PyResult<PyDDL> {
+    let mut key = TableKey::new(PyIdentifier::new(first)?.name());
+    for column in rest {
+        key = key.col(PyIdentifier::new(&column)?.name());
+    }
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_primary_key(key)),
+    })
+}
+
+/// `ALTER TABLE ... ADD UNIQUE (...)`: the key `CreateTable.unique` declares,
+/// added to a table that exists.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, first, *rest, name=None, nulls_not_distinct=false))]
+pub(super) fn add_unique(
+    table: &PyTable,
+    first: &Bound<'_, PyAny>,
+    rest: &Bound<'_, PyTuple>,
+    name: Option<&Bound<'_, PyAny>>,
+    nulls_not_distinct: bool,
+) -> PyResult<PyDDL> {
+    let mut key = TableKey::new(PyIdentifier::new(first)?.name());
+    if nulls_not_distinct {
+        key = key.nulls_not_distinct();
+    }
+    for column in rest {
+        key = key.col(PyIdentifier::new(&column)?.name());
+    }
+    if let Some(name) = name {
+        key = key.name(PyIdentifier::new(name)?.name());
+    }
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_unique(key)),
     })
 }
 

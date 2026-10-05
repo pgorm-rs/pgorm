@@ -1,8 +1,8 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+10/test]
-// [spec:pgorm:req:sql.ddl.column-def+8/test]
+// [spec:pgorm:req:sql.ddl.create-table+11/test]
+// [spec:pgorm:req:sql.ddl.column-def+9/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
 fn create_1() {
@@ -13,16 +13,17 @@ fn create_1() {
                     .integer()
                     .not_null()
                     .auto_increment()
-                    .primary_key()
             )
+            .primary_key(Glyph::Id)
             .col(ColumnDef::new(Glyph::Aspect).double().not_null())
             .col(ColumnDef::new(Glyph::Image).text())
             .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
-            r#""id" serial NOT NULL PRIMARY KEY,"#,
+            r#""id" serial NOT NULL,"#,
             r#""aspect" double precision NOT NULL,"#,
-            r#""image" text"#,
+            r#""image" text,"#,
+            r#"PRIMARY KEY ("id")"#,
             r#")"#,
         ]
         .join(" ")
@@ -37,19 +38,20 @@ fn create_2() {
                 ColumnDef::new(Font::Id)
                     .integer()
                     .not_null()
-                    .primary_key()
                     .auto_increment()
             )
+            .primary_key(Font::Id)
             .col(ColumnDef::new(Font::Name).string().not_null())
             .col(ColumnDef::new(Font::Variant).string_len(255).not_null())
             .col(ColumnDef::new(Font::Language).string_len(255).not_null())
             .to_string(),
         [
             r#"CREATE TABLE "font" ("#,
-            r#""id" serial NOT NULL PRIMARY KEY,"#,
+            r#""id" serial NOT NULL,"#,
             r#""name" varchar NOT NULL,"#,
             r#""variant" varchar(255) NOT NULL,"#,
-            r#""language" varchar(255) NOT NULL"#,
+            r#""language" varchar(255) NOT NULL,"#,
+            r#"PRIMARY KEY ("id")"#,
             r#")"#,
         ]
         .join(" ")
@@ -65,9 +67,9 @@ fn create_3() {
                 ColumnDef::new(Char::Id)
                     .integer()
                     .not_null()
-                    .primary_key()
                     .auto_increment()
             )
+            .primary_key(Char::Id)
             .col(ColumnDef::new(Char::FontSize).integer().not_null())
             .col(ColumnDef::new(Char::Character).string_len(255).not_null())
             .col(ColumnDef::new(Char::SizeW).integer().not_null())
@@ -87,12 +89,13 @@ fn create_3() {
             .to_string(),
         [
             r#"CREATE TABLE IF NOT EXISTS "character" ("#,
-            r#""id" serial NOT NULL PRIMARY KEY,"#,
+            r#""id" serial NOT NULL,"#,
             r#""font_size" integer NOT NULL,"#,
             r#""character" varchar(255) NOT NULL,"#,
             r#""size_w" integer NOT NULL,"#,
             r#""size_h" integer NOT NULL,"#,
             r#""font_id" integer DEFAULT NULL,"#,
+            r#"PRIMARY KEY ("id"),"#,
             r#"CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#,
             r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
             r#"ON DELETE CASCADE ON UPDATE CASCADE"#,
@@ -288,10 +291,11 @@ fn create_15() {
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Image).json())
             .col(ColumnDef::new(Glyph::Aspect).json_binary())
-            .index(
-                IndexConstraint::unique_nulls_not_distinct(Glyph::Aspect)
+            .unique(
+                TableKey::new(Glyph::Aspect)
                     .name(Name::runtime("idx-glyph-aspect-image"))
                     .col(Glyph::Image)
+                    .nulls_not_distinct()
             )
             .to_string(),
         [
@@ -344,7 +348,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+6/test]
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -360,7 +364,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+6/test]
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -416,7 +420,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+6/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -443,6 +447,8 @@ fn alter_8() {
     );
 }
 
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a key is added as an action of its own,
+// after the column it keys
 #[test]
 fn alter_9() {
     // https://dbfiddle.uk/98Vd8pmn
@@ -453,9 +459,9 @@ fn alter_9() {
                     .integer()
                     .auto_increment()
                     .not_null()
-                    .unique_key()
-                    .primary_key()
             )
+            .add_unique(Glyph::Aspect)
+            .add_primary_key(Glyph::Aspect)
             .to_string(),
         [
             r#"ALTER TABLE "glyph""#,
@@ -478,13 +484,15 @@ fn alter_10() {
                     .integer()
                     .auto_increment()
                     .not_null()
-                    .unique_key()
-                    .primary_key()
             )
+            .add_unique(TableKey::new(Glyph::Aspect).name(Name::runtime("glyph_aspect_key")))
+            .add_primary_key(TableKey::new(Glyph::Aspect).name(Name::runtime("glyph_pkey")))
             .to_string(),
         [
             r#"ALTER TABLE "glyph""#,
-            r#"ADD COLUMN "aspect" serial NOT NULL UNIQUE PRIMARY KEY"#,
+            r#"ADD COLUMN "aspect" serial NOT NULL,"#,
+            r#"ADD CONSTRAINT "glyph_aspect_key" UNIQUE ("aspect"),"#,
+            r#"ADD CONSTRAINT "glyph_pkey" PRIMARY KEY ("aspect")"#,
         ]
         .join(" ")
     );
@@ -553,30 +561,31 @@ fn create_16() {
                     .integer()
                     .not_null()
                     .auto_increment()
-                    .primary_key()
             )
+            .primary_key(Glyph::Id)
             .col(ColumnDef::new(Glyph::Tokens).ltree())
             .to_string(),
         [
             r#"CREATE TABLE "glyph" ("#,
-            r#""id" serial NOT NULL PRIMARY KEY,"#,
-            r#""tokens" ltree"#,
+            r#""id" serial NOT NULL,"#,
+            r#""tokens" ltree,"#,
+            r#"PRIMARY KEY ("id")"#,
             r#")"#,
         ]
         .join(" ")
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+10/test]    a primary key is a table constraint, the one
-// spelling PostgreSQL has for it
+// [spec:pgorm:req:sql.ddl.create-table+11/test]    a primary key is a table constraint, the one
+// spelling it has here, whether built or converted from a tuple
 #[test]
 fn a_primary_key_is_a_table_constraint() {
     assert_eq!(
         Table::create(Glyph::Table)
             .col(ColumnDef::new(Glyph::Id).integer().not_null())
             .col(ColumnDef::new(Glyph::Image).string().not_null())
-            .index(
-                IndexConstraint::primary_key(Glyph::Id)
+            .primary_key(
+                TableKey::new(Glyph::Id)
                     .name(Name::runtime("pk-glyph"))
                     .col(Glyph::Image)
             )
@@ -592,7 +601,7 @@ fn a_primary_key_is_a_table_constraint() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+6/test]    a foreign key embeds by value, so the source
+// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a foreign key embeds by value, so the source
 // survives only where the call site cloned it
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
@@ -620,7 +629,7 @@ fn alter_embeds_its_foreign_key_by_value() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+8/test]    a generated column is stored, and the virtual
+// [spec:pgorm:req:sql.ddl.column-def+9/test]    a generated column is stored, and the virtual
 // spelling it no longer has a constructor for is one the grammar refuses
 #[test]
 fn generated_column_is_always_stored() {
@@ -647,15 +656,16 @@ fn generated_column_is_always_stored() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+8/test]    both identity forms render, and
+// [spec:pgorm:req:sql.ddl.column-def+9/test]    both identity forms render, and
 // the ALWAYS/BY DEFAULT choice is the only thing that differs between them
 #[test]
 fn identity_column_spells_both_generations() {
     assert_eq!(
         Table::create(Glyph::Table)
-            .col(ColumnDef::new(Glyph::Id).integer().identity().primary_key())
+            .col(ColumnDef::new(Glyph::Id).integer().identity())
+            .primary_key(Glyph::Id)
             .to_string(),
-        r#"CREATE TABLE "glyph" ( "id" integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY )"#
+        r#"CREATE TABLE "glyph" ( "id" integer GENERATED ALWAYS AS IDENTITY, PRIMARY KEY ("id") )"#
     );
 
     assert_eq!(
@@ -664,17 +674,17 @@ fn identity_column_spells_both_generations() {
                 ColumnDef::new(Glyph::Id)
                     .big_integer()
                     .identity_by_default()
-                    .primary_key()
             )
+            .primary_key(Glyph::Id)
             .to_string(),
-        r#"CREATE TABLE "glyph" ( "id" bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY )"#
+        r#"CREATE TABLE "glyph" ( "id" bigint GENERATED BY DEFAULT AS IDENTITY, PRIMARY KEY ("id") )"#
     );
 
     assert_eq!(IdentityGeneration::Always.keyword(), "ALWAYS");
     assert_eq!(IdentityGeneration::ByDefault.keyword(), "BY DEFAULT");
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+8/test]    identity is a clause of the
+// [spec:pgorm:req:sql.ddl.column-def+9/test]    identity is a clause of the
 // column, so it renders in insertion order among the other specs
 #[test]
 fn identity_renders_in_insertion_order() {
@@ -693,7 +703,7 @@ fn identity_renders_in_insertion_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+8/test]    the two `ALTER TABLE` positions:
+// [spec:pgorm:req:sql.ddl.column-def+9/test]    the two `ALTER TABLE` positions:
 // a new column carries the clause, an existing one takes the ADD GENERATED action
 #[test]
 fn identity_alters_both_ways() {
@@ -712,7 +722,7 @@ fn identity_alters_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+8/test]    identity and the serial family
+// [spec:pgorm:req:sql.ddl.column-def+9/test]    identity and the serial family
 // are two spellings of one idea, and asking for both renders SQL the grammar
 // takes but the server refuses — the boundary this rule documents rather than types
 #[test]

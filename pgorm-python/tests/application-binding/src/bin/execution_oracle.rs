@@ -24,11 +24,15 @@ async fn execute<C: ConnectionTrait>(db: &C, query: (String, Values)) -> Result<
 async fn runtime<C: ConnectionTrait>(db: &C) -> Result<Value> {
     let table = (Name::runtime("python_entities"), Name::runtime("runtime"));
     let ddl = Table::create(table.clone())
-        .col(ColumnDef::new_with_type(Name::runtime("id"), ColumnType::Integer).primary_key())
+        .col(ColumnDef::new_with_type(
+            Name::runtime("id"),
+            ColumnType::Integer,
+        ))
         .col(ColumnDef::new_with_type(
             Name::runtime("name"),
             ColumnType::Text,
         ))
+        .primary_key(Name::runtime("id"))
         .to_string();
     db.execute(&ddl, &[]).await?;
     let inserted = execute(
