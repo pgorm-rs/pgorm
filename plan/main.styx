@@ -9120,4 +9120,18 @@ children (
             }
         )
     }
+
+    {
+        id range-consumers-beyond-builtins
+        title "Ranges reach the consumers scope-range-types refused: arrays of ranges, created range types and multiranges, Python"
+        kind @feat
+        log (
+            {
+                at 2026-10-05T00:17:24.301434Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed when scope-range-types landed (6006221d), which built range values for PostgreSQL's six built-in range types and refused, by name, every consumer listed here. These items could use ranges; until now they only handle them. (1) Arrays of ranges: `Vec<Range<T>>` / `Vec<Multirange<T>>` have no NotU8, ValueType or TryGetable impl, so an entity field of `int4range[]` does not compile. Codegen refuses `int4range[]` for that reason. `Value::array([..])` already binds and renders one. Live-checked: `($1::int4range[])[3]` reads back through the bind path and the inline literal path alike. (2) Range types a schema creates over a subtype that is not one of the six (the PG docs' floatrange is `Range<f64>`). RangeType and RangeElement are closed to the built-ins, and a created type's name is unknown to the Rust type, so supporting this needs a tag that names the created type. (3) Multiranges a schema creates. tokio-postgres's TYPEINFO query joins pg_range on rngtypid, so it reports such a type (typtype 'm') as Kind::Simple, and pgorm refuses it in both directions (live-tested: slot_multirange). This needs a driver-side type lookup or an explicit subtype supplied by the caller. (4) Codegen refuses `CREATE TYPE ... AS RANGE` by name, and a column of a created range type is unsupported. (5) Python refuses ranges by name: the capability manifest lists range and multirange as unsupported, decode raises DecodeError, and PyValue::from_rust raises UnsupportedCapabilityError. Support needs a Python range class, new snapshot tags, type stubs and the wheel acceptance suites. (6) Expr has contains() for @> and contained() for <@, but no builder for && (only BinOper::Overlap through Expr::binary). An element-containment predicate needs its operand pinned with cast_as, because PostgreSQL types `r @> $1`'s $1 as the range. Spec homes: sql.value.range, exec.decode.range, exec.cursor.binding-range, sql.ddl.type-range, python.values."
+            }
+        )
+    }
 )
