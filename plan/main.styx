@@ -778,6 +778,13 @@ children (
                                 kind @note
                                 text "Filed from composite-key-writes (870d0916), whose survey note asked whether this belonged there; it is a pgorm-query surface addition, so it is its own node. Arbitrating an upsert on a composite key today reads OnConflict::column(tenant_id).and_columns([id]) (tests/composite_key_tests.rs upsert_on_the_whole_key); there is no OnConflict::columns([..]). The likely reason it was never added: ConflictTarget is non-empty by construction (pgorm-query/src/query/on_conflict.rs, column() at ~:288, and_columns() at ~:444 documents that an empty iterator leaves the target as it was), and a columns(iter) constructor over an arbitrary iterator could be handed nothing, which per [dec:pgorm:invalid-states-unrepresentable] must not construct an empty target. Options to weigh: a constructor over a non-empty shape (an array of length >= 1 via const generics, or (first, rest)), or an entity-level helper that names a PrimaryKey's columns (Insert::on_conflict_do_nothing already builds exactly that target internally, src/query/insert.rs). Acceptance: one call names a multi-column target; an empty one does not compile; the curated export earns its sql.surface line; a live upsert on a two-column key uses it."
                             }
+
+                            {
+                                at 2026-10-05T21:18:00.717399Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "composite-key-refusals (d982a21d) landed the key type this node's note asked for. pgorm-query's TableKey<K> (K = Primary | Unique) is a non-empty, ordered column tuple, built from one column, a tuple of one to twelve (IntoTableKey) or TableKey::new(first).cols(rest). It has no impl for anything that could be empty. The operator's decision on that node says the key type should also suit this node's ON CONFLICT target, which suggests OnConflict taking IntoTableKey<K> (any kind) for a one-call composite target. That reuses the non-emptiness by construction rather than a const-generic array."
+                            }
                         )
                     }
                 )
@@ -9338,6 +9345,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed when scope-merge landed (60175b87). That node built MERGE to the grammar PostgreSQL 15 and 16 share and refused the rest by name. (1) PostgreSQL 17's MERGE grammar, now the sql.scope Deferred entry \"MERGE's PostgreSQL 17 grammar\". All three parts were checked on a throwaway postgres:17 container (17.9). (a) WHEN NOT MATCHED BY SOURCE is a third arm kind, for target rows that no source row matched. It takes UPDATE, DELETE or DO NOTHING; INSERT there is 42601. It needs a third MergeArms slot with its own action type (UPDATE/DELETE/DO NOTHING over target columns only), and BY TARGET as the explicit spelling of today's not-matched arm. (b) RETURNING, with merge_action() naming the action each row took ('INSERT'/'UPDATE'/'DELETE'). It needs a returning slot on MergeStatement and a merge_action() function. merge_action() is valid only inside a MERGE's RETURNING, so a typed home for it is the open question. (c) MERGE as a CTE body. 17 accepts it even without RETURNING, but MERGE is still 42601 as an expression subquery. It needs a SubQueryStatement::MergeStatement arm and an IntoSubQueryStatement impl. CommonTableExpression::new is the only caller that needs it, and Expr::SubQuery would then admit a MERGE that the server refuses there. On 16 each part is 42601 or 0A000, and the builder cannot know which release it writes for (sql.ddl.column-def's VIRTUAL precedent), so the trigger is the test server moving to 17 or a decision to gate on the server version. (2) Python: pgorm-python exposes no MERGE (python.statements asks for SELECT/INSERT/UPDATE/DELETE with conflict handling), and a raw-SQL path already reaches it. A binding would need native objects for PendingMerge/MergeStatement, MergeUpdate, MergeInsert and the two action enums, capability-manifest entries, type stubs, and parity cases in checks/direct_builders.py. (3) The ORM is deliberately not listed. ON CONFLICT covers the upsert an entity layer issues, and MERGE on 16 has no RETURNING, which every model-returning write terminal needs. Once (1b) lands, a bulk \"sync this set\" terminal that reports per-row actions is the one ORM use worth weighing. Spec homes: sql.scope, sql.ast.merge, sql.render.merge, sql.ast, python.statements."
+            }
+        )
+    }
+
+    {
+        id python-application-check-names
+        title "The application-binding check passes again, its source fixtures naming what a pipeline can write"
+        kind @fix
+        log (
+            {
+                at 2026-10-05T21:18:00.640773Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by composite-key-edge-coverage (779159ca), and failing at 06c564f5 before any of its changes. pgorm-python/checks/entities.py fails at two steps. (1) Its cargo test --lib step: application-binding sources::tests::source_selection_matches_native_rust_projection names a source alias `runtime alias \"雪\"`. (2) registered_sources.py test_aliases_parameters_and_decode_failures names `notes \"雪\"`. Both are refused with \"cannot be written as a pipeline name: it contains a double quote or NUL byte, begins with `$`, or is `*`\". That refusal arrived in f48c6425 (pipeline identifiers no quoting can represent), and the fixtures were never updated, because nplan check runs only fmt and clippy over the application binding, never this script. The other steps pass when these two are skipped: registered_entities, registered_graphs, graph_oracle, registered_schema, registered_transactions, registered_execution plus execution_oracle parity and its mismatch rejection. So does the summary. Acceptance: the two fixtures use a hostile name a pipeline can spell, the refused name keeps a test asserting the refusal, and checks/entities.py runs green end to end through tests/with_postgres.py. Consider whether some platform should run this check, so it cannot rot unseen again."
             }
         )
     }
