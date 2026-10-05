@@ -729,6 +729,20 @@ children (
                             }
                         )
                     }
+
+                    {
+                        id on-conflict-columns
+                        title "A conflict target names a composite key in one call"
+                        kind @feat
+                        log (
+                            {
+                                at 2026-10-05T13:28:58.739977Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Filed from composite-key-writes (870d0916), whose survey note asked whether this belonged there; it is a pgorm-query surface addition, so it is its own node. Arbitrating an upsert on a composite key today reads OnConflict::column(tenant_id).and_columns([id]) (tests/composite_key_tests.rs upsert_on_the_whole_key); there is no OnConflict::columns([..]). The likely reason it was never added: ConflictTarget is non-empty by construction (pgorm-query/src/query/on_conflict.rs, column() at ~:288, and_columns() at ~:444 documents that an empty iterator leaves the target as it was), and a columns(iter) constructor over an arbitrary iterator could be handed nothing, which per [dec:pgorm:invalid-states-unrepresentable] must not construct an empty target. Options to weigh: a constructor over a non-empty shape (an array of length >= 1 via const generics, or (first, rest)), or an entity-level helper that names a PrimaryKey's columns (Insert::on_conflict_do_nothing already builds exactly that target internally, src/query/insert.rs). Acceptance: one call names a multi-column target; an empty one does not compile; the curated export earns its sql.surface line; a live upsert on a two-column key uses it."
+                            }
+                        )
+                    }
                 )
                 log (
                     {
