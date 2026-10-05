@@ -6568,6 +6568,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-10-05T05:50:20.680142Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final full campaign over HEAD, 2026-10-05. Run full-56a40e172601 at ce1183e4, on a clean tree with the extension rebuilt from that source (ad4fce06…; zero builds during the campaign), passed outright: 20000/20000 construction, 5000/5000 live, 500/500 invalid as expected rejections, 22/22 controls, and the compile suite passing its 72 cases. Coverage was 448/448 declared with none outstanding, and there were no findings or faults. Apart from revision and output path, its ledger entry (security/generative/runs/full-56a40e172601.json) is identical to the last authoritative run, full-4311ca278c80 at 2377cb16. The subject is not: the 36 commits between them include the prqlc fork becoming a declared git dependency (a9ce44e3). This makes it the first full run whose compile suite resolved the shipped fork rather than registry prqlc from the cargo cache. They also include the identifier-quoting fixes (967e9208, c30b42cd, 8d83e46a, c2e69c41) and the sequence, composite, range-type and MERGE builders. Timing: 1419 s in all (runtime 383 s, compile 992 s against 315 s and 459 s before; the compile cache was cold after the rebuild). The run started at 05:24:58Z with load average 3.9 and no compile running. A ten-second sampler shows the runtime class at load 3.3 to 7.7, driven by the campaign's own Docker VM and Python workers (no rustc). The only rustc it saw was the compile suite's own, from 05:32:32Z, after the live classes had finished. The power log records no sleep since 2026-10-04 20:22, and no program hit its two-second statement limit."
+                        after_done true
+                    }
                 )
             }
         )
