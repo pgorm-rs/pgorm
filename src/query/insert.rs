@@ -101,18 +101,41 @@ fn quoted_columns(names: &[String]) -> String {
     format!("{list} {verb}")
 }
 
+/// The row count an [`Insert`] holding exactly one model is built for: it comes
+/// from [`Insert::one`], and its returning terminals answer with one key and
+/// one model.
+// [spec:pgorm:sem:query.build.insert+5]
+#[derive(Debug, Clone, Copy)]
+pub struct OneRow;
+
+/// The row count an [`Insert`] of a batch is built for — any number of models,
+/// none included: it comes from [`Insert::many`], and from adding a model to
+/// any insert, and its returning terminals answer with a key and a model for
+/// every row written.
+// [spec:pgorm:sem:query.build.insert+5]
+#[derive(Debug, Clone, Copy)]
+pub struct ManyRows;
+
 /// Performs INSERT operations on a ActiveModel
+///
+/// `R` is the row count the builder holds, [`OneRow`] or [`ManyRows`], and it
+/// decides which returning terminals exist: `exec_returning_pk` and
+/// `exec_returning_model` answer for one row, `exec_returning_pks` and
+/// `exec_returning_models` for a batch. A batch cannot ask for one row's
+/// answer, so it cannot be handed whichever row came back last.
+// [spec:pgorm:sem:query.build.insert+5]
 #[derive(Debug)]
-pub struct Insert<A>
+pub struct Insert<A, R>
 where
     A: ActiveModelTrait,
 {
     pub(crate) query: InsertStatement,
     columns: InsertColumns,
     pub(crate) model: PhantomData<A>,
+    rows: PhantomData<R>,
 }
 
-impl<A> Default for Insert<A>
+impl<A> Default for Insert<A, ManyRows>
 where
     A: ActiveModelTrait,
 {
@@ -121,59 +144,11 @@ where
     }
 }
 
-// [spec:pgorm:sem:query.build.insert+4]
-impl<A> Insert<A>
+// [spec:pgorm:sem:query.build.insert+5]
+impl<A> Insert<A, OneRow>
 where
     A: ActiveModelTrait,
 {
-    pub(crate) fn new() -> Self {
-        Self {
-            query: InsertStatement::new()
-                .into_table(A::Entity::default().table_ref())
-                .or_default_values()
-                .to_owned(),
-            columns: InsertColumns::Unset,
-            model: PhantomData,
-        }
-    }
-
-    /// Whether the statement carries no column at all: either no model was
-    /// added, or every model added left every column `NotSet`.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
-    pub(crate) fn is_empty(&self) -> bool {
-        matches!(
-            self.columns,
-            InsertColumns::Unset | InsertColumns::Blank { .. }
-        )
-    }
-
-    /// Whether no model was ever added, as distinct from models that left every
-    /// column `NotSet`: nothing was asked for, so there is no row to write.
-    // [spec:pgorm:sem:query.build.insert+4]
-    pub(crate) fn has_no_models(&self) -> bool {
-        matches!(self.columns, InsertColumns::Unset)
-    }
-
-    /// The columns mismatch recorded while models were added, if any.
-    ///
-    /// [`add`](Self::add) returns `Self` so that calls chain, so a model whose
-    /// present columns disagree with the first model's is recorded rather than
-    /// reported there. Every execution path asks here and fails with the
-    /// resulting [`Error::Query`] before sending any SQL; callers that want the
-    /// error sooner can ask directly.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
-        match &self.columns {
-            InsertColumns::Mismatch {
-                first_only,
-                later_only,
-            } => Err(columns_mismatch_err(first_only, later_only)),
-            InsertColumns::Unset | InsertColumns::Blank { .. } | InsertColumns::Present(_) => {
-                Ok(())
-            }
-        }
-    }
-
     /// Insert one Model or ActiveModel
     ///
     /// Model
@@ -208,9 +183,15 @@ where
     where
         M: IntoActiveModel<A>,
     {
-        Self::new().add(m)
+        Self::new().push(m)
     }
+}
 
+// [spec:pgorm:sem:query.build.insert+5]
+impl<A> Insert<A, ManyRows>
+where
+    A: ActiveModelTrait,
+{
     /// Insert many Model or ActiveModel
     ///
     /// ```
@@ -239,17 +220,94 @@ where
     {
         Self::new().add_many(models)
     }
+}
 
-    /// Add a Model to Self
+// [spec:pgorm:sem:query.build.insert+5]
+impl<A, R> Insert<A, R>
+where
+    A: ActiveModelTrait,
+{
+    pub(crate) fn new() -> Self {
+        Self {
+            query: InsertStatement::new()
+                .into_table(A::Entity::default().table_ref())
+                .or_default_values()
+                .to_owned(),
+            columns: InsertColumns::Unset,
+            model: PhantomData,
+            rows: PhantomData,
+        }
+    }
+
+    /// The same statement and recorded columns, built for another row count.
+    fn into_rows<S>(self) -> Insert<A, S> {
+        Insert {
+            query: self.query,
+            columns: self.columns,
+            model: PhantomData,
+            rows: PhantomData,
+        }
+    }
+
+    /// Whether the statement carries no column at all: either no model was
+    /// added, or every model added left every column `NotSet`.
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
+    pub(crate) fn is_empty(&self) -> bool {
+        matches!(
+            self.columns,
+            InsertColumns::Unset | InsertColumns::Blank { .. }
+        )
+    }
+
+    /// Whether no model was ever added, as distinct from models that left every
+    /// column `NotSet`: nothing was asked for, so there is no row to write.
+    // [spec:pgorm:sem:query.build.insert+5]
+    pub(crate) fn has_no_models(&self) -> bool {
+        matches!(self.columns, InsertColumns::Unset)
+    }
+
+    /// The columns mismatch recorded while models were added, if any.
+    ///
+    /// [`add`](Self::add) returns the builder so that calls chain, so a model
+    /// whose present columns disagree with the first model's is recorded rather
+    /// than reported there. Every execution path of a batch asks here and
+    /// fails with the resulting [`Error::Query`] before sending any SQL;
+    /// callers that want the error sooner can ask directly.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
+        match &self.columns {
+            InsertColumns::Mismatch {
+                first_only,
+                later_only,
+            } => Err(columns_mismatch_err(first_only, later_only)),
+            InsertColumns::Unset | InsertColumns::Blank { .. } | InsertColumns::Present(_) => {
+                Ok(())
+            }
+        }
+    }
+
+    /// Add a Model to Self, which makes it a batch: an insert holding a
+    /// second model answers for every row it writes.
     ///
     /// A model whose present columns differ from those of the models already
     /// added contributes neither columns nor values; the disagreement is
     /// recorded and reported by [`ensure_uniform_columns`](Self::ensure_uniform_columns)
     /// and by every execution path.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:query.build.insert+4]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    // [spec:pgorm:sem:query.build.insert+5]
     #[allow(clippy::should_implement_trait)]
-    pub fn add<M>(mut self, m: M) -> Self
+    pub fn add<M>(self, m: M) -> Insert<A, ManyRows>
+    where
+        M: IntoActiveModel<A>,
+    {
+        self.push(m).into_rows()
+    }
+
+    /// Record one model's columns and values, keeping the row count the
+    /// builder was made for.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    // [spec:pgorm:sem:query.build.insert+5]
+    fn push<M>(mut self, m: M) -> Self
     where
         M: IntoActiveModel<A>,
     {
@@ -298,16 +356,17 @@ where
         self
     }
 
-    /// Add many Models to Self
-    pub fn add_many<M, I>(mut self, models: I) -> Self
+    /// Add many Models to Self, which makes it a batch
+    pub fn add_many<M, I>(self, models: I) -> Insert<A, ManyRows>
     where
         M: IntoActiveModel<A>,
         I: IntoIterator<Item = M>,
     {
+        let mut batch = self.into_rows::<ManyRows>();
         for model in models.into_iter() {
-            self = self.add(model);
+            batch = batch.push(model);
         }
-        self
+        batch
     }
 
     /// On conflict
@@ -362,8 +421,8 @@ where
     /// sending SQL. Distinct from
     /// [`OnConflict::do_nothing`](pgorm_query::OnConflict::do_nothing), which
     /// attaches an `ON CONFLICT` clause to a statement that does run.
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
-    pub fn on_empty_do_nothing(self) -> TryInsert<A>
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
+    pub fn on_empty_do_nothing(self) -> TryInsert<A, R>
     where
         A: ActiveModelTrait,
     {
@@ -393,8 +452,8 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (2, 'Orange') ON CONFLICT ("id") DO NOTHING"#,
     /// );
     /// ```
-    // [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
-    pub fn on_conflict_do_nothing(mut self) -> TryInsert<A>
+    // [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
+    pub fn on_conflict_do_nothing(mut self) -> TryInsert<A, R>
     where
         A: ActiveModelTrait,
     {
@@ -411,7 +470,7 @@ where
     }
 }
 
-impl<A> QueryTrait for Insert<A>
+impl<A, R> QueryTrait for Insert<A, R>
 where
     A: ActiveModelTrait,
 {
@@ -432,70 +491,72 @@ where
 
 /// Performs INSERT operations on a ActiveModel, will do nothing if input is empty.
 ///
-/// All functions works the same as if it is `Insert<A>`. Please refer to the
-/// `Insert<A>` page for more information
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
+/// All functions works the same as if it is `Insert<A, R>`, row count
+/// included. Please refer to the `Insert` page for more information
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
 #[derive(Debug)]
-pub struct TryInsert<A>
+pub struct TryInsert<A, R>
 where
     A: ActiveModelTrait,
 {
-    pub(crate) insert_struct: Insert<A>,
+    pub(crate) insert_struct: Insert<A, R>,
 }
 
-impl<A> Default for TryInsert<A>
+impl<A> Default for TryInsert<A, ManyRows>
 where
     A: ActiveModelTrait,
 {
     fn default() -> Self {
-        Self::new()
+        Self::from_insert(Insert::new())
     }
 }
 
 #[allow(missing_docs)]
-impl<A> TryInsert<A>
+impl<A> TryInsert<A, OneRow>
 where
     A: ActiveModelTrait,
 {
-    pub(crate) fn new() -> Self {
-        Self {
-            insert_struct: Insert::new(),
-        }
-    }
-
     pub fn one<M>(m: M) -> Self
     where
         M: IntoActiveModel<A>,
     {
-        Self::new().add(m)
+        Self::from_insert(Insert::one(m))
     }
+}
 
+#[allow(missing_docs)]
+impl<A> TryInsert<A, ManyRows>
+where
+    A: ActiveModelTrait,
+{
     pub fn many<M, I>(models: I) -> Self
     where
         M: IntoActiveModel<A>,
         I: IntoIterator<Item = M>,
     {
-        Self::new().add_many(models)
+        Self::from_insert(Insert::many(models))
     }
+}
 
+#[allow(missing_docs)]
+impl<A, R> TryInsert<A, R>
+where
+    A: ActiveModelTrait,
+{
     #[allow(clippy::should_implement_trait)]
-    pub fn add<M>(mut self, m: M) -> Self
+    pub fn add<M>(self, m: M) -> TryInsert<A, ManyRows>
     where
         M: IntoActiveModel<A>,
     {
-        self.insert_struct = self.insert_struct.add(m);
-        self
+        TryInsert::from_insert(self.insert_struct.add(m))
     }
 
-    pub fn add_many<M, I>(mut self, models: I) -> Self
+    pub fn add_many<M, I>(self, models: I) -> TryInsert<A, ManyRows>
     where
         M: IntoActiveModel<A>,
         I: IntoIterator<Item = M>,
     {
-        for model in models.into_iter() {
-            self.insert_struct = self.insert_struct.add(model);
-        }
-        self
+        TryInsert::from_insert(self.insert_struct.add_many(models))
     }
 
     pub fn on_conflict<T>(mut self, on_conflict: T) -> Self
@@ -506,8 +567,8 @@ where
         self
     }
 
-    // helper function for do_nothing in Insert<A>
-    pub fn from_insert(insert: Insert<A>) -> Self {
+    // helper function for do_nothing in Insert<A, R>
+    pub fn from_insert(insert: Insert<A, R>) -> Self {
         Self {
             insert_struct: insert,
         }
@@ -515,13 +576,13 @@ where
 
     /// The columns mismatch recorded while models were added, if any; see
     /// [`Insert::ensure_uniform_columns`].
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
     pub fn ensure_uniform_columns(&self) -> Result<(), Error> {
         self.insert_struct.ensure_uniform_columns()
     }
 }
 
-impl<A> QueryTrait for TryInsert<A>
+impl<A, R> QueryTrait for TryInsert<A, R>
 where
     A: ActiveModelTrait,
 {
@@ -544,12 +605,12 @@ mod tests {
     use pgorm_query::OnConflict;
 
     use crate::tests_cfg::cake::{self};
-    use crate::{ActiveValue, Insert, IntoActiveModel, QueryTrait, set};
+    use crate::{ActiveValue, Insert, IntoActiveModel, ManyRows, QueryTrait, set};
 
     #[test]
     fn insert_1() {
         assert_eq!(
-            Insert::<cake::ActiveModel>::new()
+            Insert::<cake::ActiveModel, ManyRows>::new()
                 .add(cake::ActiveModel {
                     id: ActiveValue::not_set(),
                     name: set("Apple Pie"),
@@ -563,7 +624,7 @@ mod tests {
     #[test]
     fn insert_2() {
         assert_eq!(
-            Insert::<cake::ActiveModel>::new()
+            Insert::<cake::ActiveModel, ManyRows>::new()
                 .add(cake::ActiveModel {
                     id: set(1),
                     name: set("Apple Pie"),
@@ -577,7 +638,7 @@ mod tests {
     #[test]
     fn insert_3() {
         assert_eq!(
-            Insert::<cake::ActiveModel>::new()
+            Insert::<cake::ActiveModel, ManyRows>::new()
                 .add(cake::Model {
                     id: 1,
                     name: "Apple Pie".to_owned(),
@@ -591,7 +652,7 @@ mod tests {
     #[test]
     fn insert_4() {
         assert_eq!(
-            Insert::<cake::ActiveModel>::new()
+            Insert::<cake::ActiveModel, ManyRows>::new()
                 .add_many([
                     cake::Model {
                         id: 1,
@@ -618,7 +679,7 @@ mod tests {
             id: set(2),
             name: set("Orange"),
         };
-        let insert = Insert::<cake::ActiveModel>::new().add_many([apple, orange]);
+        let insert = Insert::<cake::ActiveModel, ManyRows>::new().add_many([apple, orange]);
 
         assert!(insert.ensure_uniform_columns().is_err());
         assert_eq!(

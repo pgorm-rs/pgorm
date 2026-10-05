@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use pgorm_query::{AliasName, Expr, IntoColumnRef, SelectExpr, SelectStatement, SimpleExpr};
 
 /// Defines a structure to perform select operations
-// [spec:pgorm:req:query.build+1]
+// [spec:pgorm:req:query.build+2]
 #[derive(Clone, Debug)]
 pub struct Select<E>
 where

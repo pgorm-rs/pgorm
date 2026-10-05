@@ -38,10 +38,10 @@ where
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    the primary key comes from the
+// [spec:pgorm:sem:exec.crud.insert+6/test]    the primary key comes from the
 // RETURNING row in every case, including the client-supplied-key one that used
 // to be answered from a cached tuple
-// [spec:pgorm:sem:query.build.insert+4/test]    which is why the builder caches
+// [spec:pgorm:sem:query.build.insert+5/test]    which is why the builder caches
 // no primary key to answer from
 #[pgorm_macros::test]
 async fn manual_key_comes_from_returning() -> Result<(), Error> {
@@ -71,10 +71,10 @@ async fn manual_key_comes_from_returning() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    an `ON CONFLICT DO UPDATE` that
+// [spec:pgorm:sem:exec.crud.insert+6/test]    an `ON CONFLICT DO UPDATE` that
 // lands on an existing row reports *that* row's primary key, not the one the
 // insert asked for: answering `42` here would name a row that does not exist
-// [spec:pgorm:sem:exec.crud.try-insert+3/test]    and the `TryInsert` wrapper
+// [spec:pgorm:sem:exec.crud.try-insert+4/test]    and the `TryInsert` wrapper
 // reports it as `Inserted`, since a row really was written
 #[pgorm_macros::test]
 async fn upsert_reports_the_conflict_row_key() -> Result<(), Error> {
@@ -135,13 +135,13 @@ async fn upsert_reports_the_conflict_row_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    an empty RETURNING is
+// [spec:pgorm:sem:exec.crud.insert+6/test]    an empty RETURNING is
 // `RecordNotInserted` for a client-supplied key too, which is what an
 // `ON CONFLICT DO NOTHING` that skipped the row yields
-// [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsert` reads that as
+// [spec:pgorm:sem:exec.crud.try-insert+4/test]    `TryInsert` reads that as
 // `Conflicted`, and an insert with nothing to write as `Empty` without touching
 // the database
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    the empty-insert
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+5/test]    the empty-insert
 // failsafe is unchanged by the key resolution above
 #[pgorm_macros::test]
 async fn skipped_and_empty_inserts_are_unchanged() -> Result<(), Error> {
@@ -169,9 +169,9 @@ async fn skipped_and_empty_inserts_are_unchanged() -> Result<(), Error> {
         .await?;
     assert!(matches!(res, TryInsertResult::Conflicted), "got {res:?}");
 
-    let res = Insert::<manual_key::ActiveModel>::many(Vec::<manual_key::ActiveModel>::new())
+    let res = Insert::many(Vec::<manual_key::ActiveModel>::new())
         .on_empty_do_nothing()
-        .exec_returning_pk(&db)
+        .exec_returning_pks(&db)
         .await?;
     assert!(matches!(res, TryInsertResult::Empty), "got {res:?}");
 

@@ -1,7 +1,7 @@
 use crate::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Insert, IntoActiveModel, Iterable,
-    PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw, TryInsert,
-    error::*,
+    ManyRows, OneRow, PrimaryKeyToColumn, PrimaryKeyTrait, QueryResult, SelectModel, SelectorRaw,
+    TryInsert, error::*,
 };
 use pgorm_query::{InsertStatement, Query, SqlName};
 use tokio_postgres::types::ToSql;
@@ -13,8 +13,11 @@ use super::ValueHolder;
 pub type InsertedPrimaryKey<A> =
     <<<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType;
 
+/// The model an insert reports back.
+type InsertedModel<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::Model;
+
 /// The types of results for an INSERT operation
-// [spec:pgorm:sem:exec.crud.try-insert+3]
+// [spec:pgorm:sem:exec.crud.try-insert+4]
 #[derive(Debug)]
 pub enum TryInsertResult<T> {
     /// The INSERT statement did not have any value to insert
@@ -25,8 +28,8 @@ pub enum TryInsertResult<T> {
     Inserted(T),
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+3]
-impl<A> TryInsert<A>
+// [spec:pgorm:sem:exec.crud.try-insert+4]
+impl<A, R> TryInsert<A, R>
 where
     A: ActiveModelTrait,
 {
@@ -38,10 +41,11 @@ where
 
     /// Execute the insert and report how many rows it wrote.
     ///
-    /// No `RETURNING` clause is emitted. See [`Self::exec_returning_pk`] for the
-    /// inserted primary key and [`Self::exec_returning_model`] for the row.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    /// No `RETURNING` clause is emitted. See `exec_returning_pk` /
+    /// `exec_returning_pks` for the inserted primary keys and
+    /// `exec_returning_model` / `exec_returning_models` for the rows.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
     pub async fn exec<C>(self, db: &C) -> Result<TryInsertResult<u64>, Error>
     where
         C: ConnectionTrait,
@@ -60,9 +64,24 @@ where
         }
     }
 
+    /// A batch's answer: `Conflicted` when the conflict clause skipped every
+    /// row, otherwise the rows that were written.
+    fn batch_result<T>(conflict_clause: bool, rows: Vec<T>) -> TryInsertResult<Vec<T>> {
+        if rows.is_empty() && conflict_clause {
+            TryInsertResult::Conflicted
+        } else {
+            TryInsertResult::Inserted(rows)
+        }
+    }
+}
+
+// [spec:pgorm:sem:exec.crud.try-insert+4]
+impl<A> TryInsert<A, OneRow>
+where
+    A: ActiveModelTrait,
+{
     /// Execute the insert and return the inserted row's primary key.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
     pub async fn exec_returning_pk<C>(
         self,
         db: &C,
@@ -70,7 +89,6 @@ where
     where
         C: ConnectionTrait,
     {
-        self.ensure_uniform_columns()?;
         if self.insert_struct.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
@@ -83,23 +101,21 @@ where
     }
 
     /// Execute the insert and return the inserted row as a model.
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
     pub async fn exec_returning_model<C>(
         self,
         db: &C,
-    ) -> Result<TryInsertResult<<A::Entity as EntityTrait>::Model>, Error>
+    ) -> Result<TryInsertResult<InsertedModel<A>>, Error>
     where
-        <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
+        InsertedModel<A>: IntoActiveModel<A>,
         C: ConnectionTrait,
     {
-        self.ensure_uniform_columns()?;
         if self.insert_struct.is_empty() {
             return Ok(TryInsertResult::Empty);
         }
         let conflict_clause = self.has_conflict_clause();
-        let res = exec_insert_returning_model_opt::<A, C>(self.insert_struct.query, db).await;
-        match res {
+        let res = exec_insert_returning_models::<A, C>(self.insert_struct.query, db).await;
+        match res.map(|mut models| models.pop()) {
             Ok(Some(res)) => Ok(TryInsertResult::Inserted(res)),
             Ok(None) if conflict_clause => Ok(TryInsertResult::Conflicted),
             Ok(None) => Err(Error::RecordNotFound),
@@ -108,14 +124,62 @@ where
     }
 }
 
-impl<A> Insert<A>
+// [spec:pgorm:sem:exec.crud.try-insert+4]
+impl<A> TryInsert<A, ManyRows>
+where
+    A: ActiveModelTrait,
+{
+    /// Execute the insert and return the primary key of every row written, in
+    /// the order the database wrote them.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    pub async fn exec_returning_pks<C>(
+        self,
+        db: &C,
+    ) -> Result<TryInsertResult<Vec<InsertedPrimaryKey<A>>>, Error>
+    where
+        C: ConnectionTrait,
+    {
+        self.ensure_uniform_columns()?;
+        if self.insert_struct.is_empty() {
+            return Ok(TryInsertResult::Empty);
+        }
+        let conflict_clause = self.has_conflict_clause();
+        let keys = self.insert_struct.exec_returning_pks(db).await?;
+        Ok(Self::batch_result(conflict_clause, keys))
+    }
+
+    /// Execute the insert and return every row written as a model, in the
+    /// order the database wrote them.
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    pub async fn exec_returning_models<C>(
+        self,
+        db: &C,
+    ) -> Result<TryInsertResult<Vec<InsertedModel<A>>>, Error>
+    where
+        InsertedModel<A>: IntoActiveModel<A>,
+        C: ConnectionTrait,
+    {
+        self.ensure_uniform_columns()?;
+        if self.insert_struct.is_empty() {
+            return Ok(TryInsertResult::Empty);
+        }
+        let conflict_clause = self.has_conflict_clause();
+        let models = self.insert_struct.exec_returning_models(db).await?;
+        Ok(Self::batch_result(conflict_clause, models))
+    }
+}
+
+impl<A, R> Insert<A, R>
 where
     A: ActiveModelTrait,
 {
     /// Execute the insert and report how many rows it wrote.
     ///
-    /// No `RETURNING` clause is emitted. See [`Self::exec_returning_pk`] for the
-    /// inserted primary key and [`Self::exec_returning_model`] for the row.
+    /// No `RETURNING` clause is emitted. See `exec_returning_pk` /
+    /// `exec_returning_pks` for the inserted primary keys and
+    /// `exec_returning_model` / `exec_returning_models` for the rows.
     ///
     /// An insert to which no model was added writes nothing and reports `0`; a
     /// model that leaves every column `NotSet` asks for a row of database
@@ -125,9 +189,9 @@ where
     /// for the ones that disagree ([`Insert::add`]), and that is reported here
     /// as an error rather than as a smaller count — so a `0` means nothing was
     /// asked for, never that something was asked for and dropped.
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
-    // [spec:pgorm:sem:query.build.insert+4]
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:sem:query.build.insert+5]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
@@ -138,75 +202,118 @@ where
         }
         exec_insert_without_returning(self.query, db).await
     }
+}
 
+impl<A> Insert<A, OneRow>
+where
+    A: ActiveModelTrait,
+{
     /// Execute the insert and return the inserted row's primary key.
     ///
-    /// An insert to which no model was added has no row to report a key for and
-    /// fails with [`Error::RecordNotInserted`]. A batch whose models do not all
-    /// set the same columns ([`Insert::add`]) fails here too, before anything
-    /// is written.
-    // [spec:pgorm:sem:exec.crud.insert+5]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
-    // [spec:pgorm:sem:query.build.insert+4]
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
+    /// The builder holds exactly one model, so there is one row to answer for;
+    /// an `ON CONFLICT DO NOTHING` that skipped it fails with
+    /// [`Error::RecordNotInserted`].
+    // [spec:pgorm:sem:exec.crud.insert+6]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:sem:query.build.insert+5]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
     where
         C: ConnectionTrait,
     {
-        self.ensure_uniform_columns()?;
-        if self.has_no_models() {
-            return Err(Error::RecordNotInserted);
-        }
-        let mut query = self.query;
-        let returning =
-            Query::returning().exprs(<A::Entity as EntityTrait>::PrimaryKey::iter().map(|c| {
-                c.into_column()
-                    .select_as(c.into_column().into_returning_expr())
-            }));
-        query.returning(returning);
-        exec_insert_returning_pk::<A, _>(query, db).await
+        exec_insert_returning_pks::<A, _>(self.query, db)
+            .await?
+            .pop()
+            .ok_or(Error::RecordNotInserted)
     }
 
     /// Execute the insert and return the inserted row as a model.
     ///
-    /// An insert to which no model was added has no row to return and fails
-    /// with [`Error::RecordNotFound`]. A batch whose models do not all set the
-    /// same columns ([`Insert::add`]) fails here too, before anything is
-    /// written.
-    // [spec:pgorm:sem:exec.crud.insert-returning+2]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
-    // [spec:pgorm:sem:query.build.insert+4]
-    // [spec:pgorm:req:query.build.insert.uniform-columns+3]
-    pub async fn exec_returning_model<C>(
-        self,
-        db: &C,
-    ) -> Result<<A::Entity as EntityTrait>::Model, Error>
+    /// An `ON CONFLICT DO NOTHING` that skipped the row fails with
+    /// [`Error::RecordNotFound`].
+    // [spec:pgorm:sem:exec.crud.insert-returning+3]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:sem:query.build.insert+5]
+    pub async fn exec_returning_model<C>(self, db: &C) -> Result<InsertedModel<A>, Error>
     where
-        <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
+        InsertedModel<A>: IntoActiveModel<A>,
         C: ConnectionTrait,
     {
-        self.ensure_uniform_columns()?;
-        if self.has_no_models() {
-            return Err(Error::RecordNotFound);
-        }
-        exec_insert_returning_model_opt::<A, _>(self.query, db)
+        exec_insert_returning_models::<A, _>(self.query, db)
             .await?
+            .pop()
             .ok_or(Error::RecordNotFound)
     }
 }
 
-/// The key comes from the row the database wrote, never from the model that
-/// asked for it: a manually assigned key that an `ON CONFLICT DO UPDATE` did not
-/// land on names a row that does not exist.
-// [spec:pgorm:sem:exec.crud.insert+5]
-async fn exec_insert_returning_pk<A, C>(
-    statement: InsertStatement,
+impl<A> Insert<A, ManyRows>
+where
+    A: ActiveModelTrait,
+{
+    /// Execute the insert and return the primary key of every row written, in
+    /// the order the database wrote them — for `INSERT ... VALUES`, the order
+    /// the models were added.
+    ///
+    /// An insert to which no model was added writes nothing and returns no
+    /// key; a row an `ON CONFLICT DO NOTHING` skipped has no key to return. A
+    /// batch whose models do not all set the same columns ([`Insert::add`])
+    /// fails before anything is written.
+    // [spec:pgorm:sem:exec.crud.insert+6]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:sem:query.build.insert+5]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    pub async fn exec_returning_pks<C>(self, db: &C) -> Result<Vec<InsertedPrimaryKey<A>>, Error>
+    where
+        C: ConnectionTrait,
+    {
+        self.ensure_uniform_columns()?;
+        if self.has_no_models() {
+            return Ok(Vec::new());
+        }
+        exec_insert_returning_pks::<A, _>(self.query, db).await
+    }
+
+    /// Execute the insert and return every row written as a model, in the
+    /// order the database wrote them.
+    ///
+    /// An insert to which no model was added writes nothing and returns no
+    /// model. A batch whose models do not all set the same columns
+    /// ([`Insert::add`]) fails before anything is written.
+    // [spec:pgorm:sem:exec.crud.insert-returning+3]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:sem:query.build.insert+5]
+    // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    pub async fn exec_returning_models<C>(self, db: &C) -> Result<Vec<InsertedModel<A>>, Error>
+    where
+        InsertedModel<A>: IntoActiveModel<A>,
+        C: ConnectionTrait,
+    {
+        self.ensure_uniform_columns()?;
+        if self.has_no_models() {
+            return Ok(Vec::new());
+        }
+        exec_insert_returning_models::<A, _>(self.query, db).await
+    }
+}
+
+/// The keys come from the rows the database wrote, never from the models that
+/// asked for them: a manually assigned key that an `ON CONFLICT DO UPDATE` did
+/// not land on names a row that does not exist. They are read in the order the
+/// rows came back, which is the order they were written.
+// [spec:pgorm:sem:exec.crud.insert+6]
+async fn exec_insert_returning_pks<A, C>(
+    mut statement: InsertStatement,
     db: &C,
-) -> Result<InsertedPrimaryKey<A>, Error>
+) -> Result<Vec<InsertedPrimaryKey<A>>, Error>
 where
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
+    type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
+
+    statement.returning(Query::returning().exprs(PrimaryKey::<A>::iter().map(|c| {
+        c.into_column()
+            .select_as(c.into_column().into_returning_expr())
+    })));
     let (stmt, values) = statement.build();
     let values = values.into_iter().map(ValueHolder).collect::<Vec<_>>();
     let values = values
@@ -214,21 +321,21 @@ where
         .map(|x| x as _)
         .collect::<Vec<&(dyn ToSql + Sync)>>();
 
-    type PrimaryKey<A> = <<A as ActiveModelTrait>::Entity as EntityTrait>::PrimaryKey;
-
-    let mut rows = db.query_all(&stmt, &values).await?;
-    let row = match rows.pop() {
-        Some(row) => QueryResult { row },
-        None => return Err(Error::RecordNotInserted),
-    };
     let cols = PrimaryKey::<A>::iter()
         .map(|col| col.to_string())
         .collect::<Vec<_>>();
-    row.try_get_many("", cols.as_ref())
-        .map_err(|_| Error::UnpackInsertId)
+    db.query_all(&stmt, &values)
+        .await?
+        .into_iter()
+        .map(|row| {
+            QueryResult { row }
+                .try_get_many("", cols.as_ref())
+                .map_err(|_| Error::UnpackInsertId)
+        })
+        .collect()
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning+2]
+// [spec:pgorm:sem:exec.crud.insert-returning+3]
 async fn exec_insert_without_returning<C>(
     insert_statement: InsertStatement,
     db: &C,
@@ -247,16 +354,16 @@ where
     Ok(exec_result)
 }
 
-/// A missing `RETURNING` row is reported as `None` rather than an error, so
-/// callers that can tell an `ON CONFLICT` skip from a genuine miss decide which
-/// it was.
-// [spec:pgorm:sem:exec.crud.insert-returning+2]
-async fn exec_insert_returning_model_opt<A, C>(
+/// Every row the insert wrote, decoded as a model in the order the rows came
+/// back; none when the conflict clause skipped them all, so callers that can
+/// tell an `ON CONFLICT` skip from a genuine miss decide which it was.
+// [spec:pgorm:sem:exec.crud.insert-returning+3]
+async fn exec_insert_returning_models<A, C>(
     mut insert_statement: InsertStatement,
     db: &C,
-) -> Result<Option<<A::Entity as EntityTrait>::Model>, Error>
+) -> Result<Vec<InsertedModel<A>>, Error>
 where
-    <A::Entity as EntityTrait>::Model: IntoActiveModel<A>,
+    InsertedModel<A>: IntoActiveModel<A>,
     C: ConnectionTrait,
     A: ActiveModelTrait,
 {
@@ -266,7 +373,7 @@ where
     insert_statement.returning(returning);
     let (stmt, values) = insert_statement.build();
 
-    SelectorRaw::<SelectModel<<A::Entity as EntityTrait>::Model>>::from_statement(stmt, values)
-        .one_opt(db)
+    SelectorRaw::<SelectModel<InsertedModel<A>>>::from_statement(stmt, values)
+        .all(db)
         .await
 }

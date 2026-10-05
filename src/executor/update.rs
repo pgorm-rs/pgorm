@@ -23,7 +23,7 @@ where
     /// have no such row to fall back to and report
     /// [`Error::NothingToSet`](crate::Error::NothingToSet) instead.
     // [spec:pgorm:sem:exec.crud.update+7]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary+1]
     pub async fn exec_returning_model<C>(
         mut self,
         db: &C,
@@ -71,7 +71,7 @@ where
     /// `NotSet` fields, so a model read back from the database and handed
     /// straight to `set` contributes nothing.
     // [spec:pgorm:sem:exec.crud.update+7]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary+1]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
@@ -96,7 +96,7 @@ where
     /// that input identically, so which terminal you reach for cannot change
     /// whether the statement was sent.
     // [spec:pgorm:sem:exec.crud.update+7]
-    // [spec:pgorm:sem:exec.crud.exec-vocabulary]
+    // [spec:pgorm:sem:exec.crud.exec-vocabulary+1]
     pub async fn exec_returning_models<C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
     where
         C: ConnectionTrait,

@@ -1,7 +1,7 @@
 use crate::{
-    ActiveModelBehavior, ColumnTrait, Delete, DeleteMany, FromQueryResult, ModelTrait, NoColumns,
-    PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related, RelationBuilder, RelationTrait,
-    RelationType, Select, SelectGraph,
+    ActiveModelBehavior, ColumnTrait, Delete, DeleteMany, FromQueryResult, IntoPrimaryKey,
+    ModelTrait, NoColumns, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, Related,
+    RelationBuilder, RelationTrait, RelationType, Select, SelectGraph,
 };
 use pgorm_query::{IntoName, IntoTableName, IntoValueTuple, Name, TableName};
 pub use strum::IntoEnumIterator as Iterable;
@@ -62,7 +62,7 @@ pub trait EntityName: StaticName + Default {
 /// - Update: `update`, `update_*`
 /// - Delete: `delete`, `delete_*`
 // [spec:pgorm:def:entity.traits+2]
-// [spec:pgorm:req:entity.traits.crud+3]
+// [spec:pgorm:req:entity.traits.crud+4]
 pub trait EntityTrait: EntityName {
     #[allow(missing_docs)]
     type Model: ModelTrait<Entity = Self> + FromQueryResult;
@@ -215,14 +215,14 @@ pub trait EntityTrait: EntityName {
     /// # Panics
     ///
     /// Panics if arity of input values don't match arity of primary key
-    // [spec:pgorm:req:entity.traits.crud+3]
+    // [spec:pgorm:req:entity.traits.crud+4]
     fn find_by_id<T>(values: T) -> Select<Self>
     where
-        T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
+        T: IntoPrimaryKey<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
     {
         let mut select = Self::find();
         let mut keys = Self::PrimaryKey::iter();
-        for v in values.into().into_value_tuple() {
+        for v in values.into_primary_key().into_value_tuple() {
             if let Some(key) = keys.next() {
                 let col = key.into_column();
                 select = select.filter(col.eq(v));
@@ -278,11 +278,11 @@ pub trait EntityTrait: EntityName {
     /// Panics if arity of input values don't match arity of primary key
     fn delete_by_id<T>(values: T) -> DeleteMany<Self>
     where
-        T: Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
+        T: IntoPrimaryKey<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>,
     {
         let mut delete = Delete::many(Self::default());
         let mut keys = Self::PrimaryKey::iter();
-        for v in values.into().into_value_tuple() {
+        for v in values.into_primary_key().into_value_tuple() {
             if let Some(key) = keys.next() {
                 let col = key.into_column();
                 delete = delete.filter(col.eq(v));
@@ -401,7 +401,9 @@ mod tests {
 
         fn delete_by_id<T>(value: T)
         where
-            T: Into<<<hello::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType>,
+            T: IntoPrimaryKey<
+                <<hello::Entity as EntityTrait>::PrimaryKey as PrimaryKeyTrait>::ValueType,
+            >,
         {
             assert_eq!(
                 hello::Entity::delete_by_id(value).as_query().to_string(),

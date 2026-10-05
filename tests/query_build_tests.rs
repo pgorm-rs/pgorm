@@ -22,9 +22,9 @@ use pgorm::tests_cfg::{
 };
 use pgorm::{
     ActiveValue, ColumnTrait, Condition, Delete, DeleteMany, DeleteOne, EntityTrait, Error, Insert,
-    IntoActiveModel, Iterable, JoinType, Linked, ModelTrait, Order, QueryFilter, QueryOrder,
-    QuerySelect, QueryTrait, Related, RelationTrait, Select, StaticName, TryInsert, Update,
-    UpdateMany, UpdateOne,
+    IntoActiveModel, Iterable, JoinType, Linked, ManyRows, ModelTrait, OneRow, Order, QueryFilter,
+    QueryOrder, QuerySelect, QueryTrait, Related, RelationTrait, Select, StaticName, TryInsert,
+    Update, UpdateMany, UpdateOne,
 };
 use pretty_assertions::assert_eq;
 
@@ -49,7 +49,7 @@ where
         .limit(1)
 }
 
-// [spec:pgorm:req:query.build+1/test]    every builder in the inventory, each
+// [spec:pgorm:req:query.build+2/test]    every builder in the inventory, each
 // wrapping exactly one pgorm-query statement reachable through `QueryTrait`,
 // and the blanket `QuerySelect`/`QueryOrder`/`QueryFilter` surface
 #[test]
@@ -61,14 +61,15 @@ fn every_builder_wraps_one_statement() {
     );
     let _: SelectStatement = select.into_query();
 
-    let insert: Insert<cake::ActiveModel> = Insert::one(apple());
+    let insert: Insert<cake::ActiveModel, OneRow> = Insert::one(apple());
     assert_eq!(
         insert.as_query().to_string(),
         r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie')"#
     );
     let _: InsertStatement = insert.into_query();
 
-    let try_insert: TryInsert<cake::ActiveModel> = Insert::one(apple()).on_empty_do_nothing();
+    let try_insert: TryInsert<cake::ActiveModel, OneRow> =
+        Insert::one(apple()).on_empty_do_nothing();
     let _: InsertStatement = try_insert.into_query();
 
     let update_one: UpdateOne<cake::ActiveModel> =
@@ -935,7 +936,7 @@ fn relation_named_joins_match_the_long_spelling() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+4/test]    `Insert::new` renders a valid
+// [spec:pgorm:sem:query.build.insert+5/test]    `Insert::new` renders a valid
 // DEFAULT VALUES statement before any model is added, and `one`/`many` /
 // `add`/`add_many` take anything `IntoActiveModel`
 #[test]
@@ -951,7 +952,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 
     // A Model is converted to an ActiveModel on the way in.
-    let from_model = Insert::<cake::ActiveModel>::one(cake::Model {
+    let from_model = Insert::<cake::ActiveModel, OneRow>::one(cake::Model {
         id: 1,
         name: "Apple Pie".to_owned(),
     });
@@ -961,7 +962,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 
     assert_eq!(
-        Insert::<cake::ActiveModel>::many([
+        Insert::<cake::ActiveModel, ManyRows>::many([
             cake::Model {
                 id: 1,
                 name: "Apple Pie".to_owned(),
@@ -977,7 +978,7 @@ fn insert_new_is_a_default_values_statement() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+4/test]    `add` writes `Set` and
+// [spec:pgorm:sem:query.build.insert+5/test]    `add` writes `Set` and
 // `Unchanged` columns through `col.save_as` and omits `NotSet` ones entirely
 #[test]
 fn insert_add_omits_not_set_columns() {
@@ -1014,7 +1015,7 @@ fn insert_add_omits_not_set_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+4/test]    `on_conflict` attaches the given
+// [spec:pgorm:sem:query.build.insert+5/test]    `on_conflict` attaches the given
 // pgorm-query clause verbatim
 #[test]
 fn insert_on_conflict_is_attached_verbatim() {
@@ -1031,12 +1032,12 @@ fn insert_on_conflict_is_attached_verbatim() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    models sharing
+// [spec:pgorm:req:query.build.insert.uniform-columns+4/test]    models sharing
 // a presence bitmap merge into one multi-row VALUES list
 #[test]
 fn insert_many_shares_one_column_list() {
     assert_eq!(
-        Insert::<cake::ActiveModel>::many([
+        Insert::<cake::ActiveModel, ManyRows>::many([
             cake::ActiveModel {
                 id: ActiveValue::NotSet,
                 name: set("Apple"),
@@ -1052,13 +1053,13 @@ fn insert_many_shares_one_column_list() {
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    a model whose
+// [spec:pgorm:req:query.build.insert.uniform-columns+4/test]    a model whose
 // presence differs from the first one is recorded as a mismatch, naming the
 // column it does not share, and contributes nothing to the statement
 #[test]
 fn insert_many_rejects_mismatched_columns() {
     let mismatched = || {
-        Insert::<cake::ActiveModel>::many([
+        Insert::<cake::ActiveModel, ManyRows>::many([
             cake::ActiveModel {
                 id: ActiveValue::NotSet,
                 name: set("Apple"),
@@ -1085,7 +1086,7 @@ fn insert_many_rejects_mismatched_columns() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert+4/test]    a model with nothing set
+// [spec:pgorm:sem:query.build.insert+5/test]    a model with nothing set
 // contributes a default-values row rather than an arity-zero column and value
 // list, and one such row per model
 #[test]
@@ -1096,26 +1097,26 @@ fn all_not_set_model_renders_a_default_row() {
     };
 
     assert_eq!(
-        Insert::<cake::ActiveModel>::one(blank())
+        Insert::<cake::ActiveModel, OneRow>::one(blank())
             .as_query()
             .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT)"#
     );
 
     assert_eq!(
-        Insert::<cake::ActiveModel>::many([blank(), blank(), blank()])
+        Insert::<cake::ActiveModel, ManyRows>::many([blank(), blank(), blank()])
             .as_query()
             .to_string(),
         r#"INSERT INTO "cake" VALUES (DEFAULT), (DEFAULT), (DEFAULT)"#
     );
 }
 
-// [spec:pgorm:req:query.build.insert.uniform-columns+3/test]    a first model
+// [spec:pgorm:req:query.build.insert.uniform-columns+4/test]    a first model
 // that sets nothing is a column set like any other: a later model that sets a
 // column mismatches it
 #[test]
 fn insert_many_rejects_a_blank_first_model() {
-    let err = Insert::<cake::ActiveModel>::many([
+    let err = Insert::<cake::ActiveModel, ManyRows>::many([
         cake::ActiveModel {
             id: ActiveValue::NotSet,
             name: ActiveValue::NotSet,
@@ -1135,7 +1136,7 @@ fn insert_many_rejects_a_blank_first_model() {
     );
 }
 
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    `on_empty_do_nothing`
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+5/test]    `on_empty_do_nothing`
 // converts to `TryInsert` without touching the statement, while
 // `on_conflict_do_nothing` first attaches ON CONFLICT on the primary key
 #[test]

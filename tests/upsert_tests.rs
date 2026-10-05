@@ -22,8 +22,9 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    the primary key read from the last
-// RETURNING row of a batch, and RecordNotInserted when nothing is written
+// [spec:pgorm:sem:exec.crud.insert+6/test]    a batch's keys read from every
+// RETURNING row, those the conflict clause skipped having none, and no key at
+// all when it skipped every row
 pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error> {
     use insert_default::*;
 
@@ -35,12 +36,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
         ActiveModel { id: set(3) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec_returning_pk(db)
+    .exec_returning_pks(db)
     .await;
 
-    // [spec:pgorm:sem:exec.crud.insert+5] the key comes from the last
-    // RETURNING row of the batch.
-    assert_eq!(res?, 3);
+    assert_eq!(res?, [1, 2, 3]);
 
     let res = Insert::many([
         ActiveModel { id: set(1) },
@@ -49,10 +48,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
         ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec_returning_pk(db)
+    .exec_returning_pks(db)
     .await;
 
-    assert_eq!(res?, 4);
+    assert_eq!(res?, [4], "rows 1 to 3 conflicted and have no key");
 
     let res = Insert::many([
         ActiveModel { id: set(1) },
@@ -61,10 +60,10 @@ pub async fn create_insert_default(db: &DatabaseConnection) -> Result<(), Error>
         ActiveModel { id: set(4) },
     ])
     .on_conflict(on_conflict.clone())
-    .exec_returning_pk(db)
+    .exec_returning_pks(db)
     .await;
 
-    assert!(matches!(res, Err(Error::RecordNotInserted)));
+    assert_eq!(res?, Vec::<i32>::new());
 
     let res = Insert::many([
         ActiveModel { id: set(1) },

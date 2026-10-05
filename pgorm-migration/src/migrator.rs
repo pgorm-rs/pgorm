@@ -601,13 +601,13 @@ impl QueryTable for SelectStatement {
     }
 }
 
-impl<A> QueryTable for pgorm::Insert<A>
+impl<A, R> QueryTable for pgorm::Insert<A, R>
 where
     A: ActiveModelTrait,
 {
-    type Statement = pgorm::Insert<A>;
+    type Statement = pgorm::Insert<A, R>;
 
-    fn table_name(mut self, table_name: Name) -> pgorm::Insert<A> {
+    fn table_name(mut self, table_name: Name) -> pgorm::Insert<A, R> {
         pgorm::QueryTrait::query(&mut self).into_table(table_name);
         self
     }

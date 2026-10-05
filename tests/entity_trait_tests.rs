@@ -416,7 +416,7 @@ fn entity_name_defaults_and_table_ref() {
 // entity.traits.crud
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:req:entity.traits.crud+3/test]    the static CRUD surface: `find`
+// [spec:pgorm:req:entity.traits.crud+4/test]    the static CRUD surface: `find`
 // returns a fresh `Select`, `find_by_id` adds one equality filter per key column
 // in primary-key iteration order, and `insert` / `insert_many` / `update` /
 // `update_many` / `delete` / `delete_many` / `delete_by_id` build their
@@ -558,7 +558,7 @@ fn entity_crud_surface() {
     );
 }
 
-// [spec:pgorm:req:entity.traits.crud+3/test]    `find_by_id` panics with
+// [spec:pgorm:req:entity.traits.crud+4/test]    `find_by_id` panics with
 // `primary key arity mismatch` when more values arrive than the key has columns
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -566,7 +566,7 @@ fn find_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::find_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+3/test]    ...and in the other direction too,
+// [spec:pgorm:req:entity.traits.crud+4/test]    ...and in the other direction too,
 // when the key has more columns than values were supplied
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -574,7 +574,7 @@ fn find_by_id_panics_when_key_outnumbers_values() {
     let _ = too_few_values::Entity::find_by_id(1);
 }
 
-// [spec:pgorm:req:entity.traits.crud+3/test]    `delete_by_id` carries the same
+// [spec:pgorm:req:entity.traits.crud+4/test]    `delete_by_id` carries the same
 // guard as `find_by_id`, in both directions
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
@@ -582,7 +582,7 @@ fn delete_by_id_panics_when_values_outnumber_key() {
     let _ = too_many_values::Entity::delete_by_id((1, 2));
 }
 
-// [spec:pgorm:req:entity.traits.crud+3/test]
+// [spec:pgorm:req:entity.traits.crud+4/test]
 #[test]
 #[should_panic(expected = "primary key arity mismatch")]
 fn delete_by_id_panics_when_key_outnumbers_values() {
@@ -620,7 +620,7 @@ fn primary_key_value_type_errs_on_arity() {
     );
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    an insert whose `ValueType`
+// [spec:pgorm:sem:exec.crud.insert+6/test]    an insert whose `ValueType`
 // disagrees with the key column fails decoding the `RETURNING` row, with
 // `Error::UnpackInsertId` rather than a panic. There is no cached tuple to
 // reconstruct from, so the `Error::Type` the reconstruction used to raise is not
@@ -629,7 +629,7 @@ fn primary_key_value_type_errs_on_arity() {
 // [spec:pgorm:sem:exec.crud.update+7/test]    the no-op read reuses the
 // statement's own `WHERE` and never consults `ValueType`, so even a mistyped
 // key declaration re-reads the model successfully
-// [spec:pgorm:req:exec.crud.exec-vocabulary/test]    the two insert terminals
+// [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    the two insert terminals
 // differ exactly as their names say: a count needs no key and cannot fail on one
 #[pgorm_macros::test]
 async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
@@ -1005,7 +1005,7 @@ fn column_def_defaults_and_builders() {
 // entity.traits.primary-key
 // ---------------------------------------------------------------------------
 
-// [spec:pgorm:def:entity.traits.primary-key+4/test]    `PrimaryKeyArity::ARITY` is
+// [spec:pgorm:def:entity.traits.primary-key+5/test]    `PrimaryKeyArity::ARITY` is
 // 1 for any single scalar and matches the component count for tuples up to 12;
 // `auto_increment` reports whether the key is database-generated; and
 // `PrimaryKeyToColumn` maps variants to columns and back, with `from_column`

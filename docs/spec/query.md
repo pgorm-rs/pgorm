@@ -4,14 +4,14 @@ This chapter covers `src/query/`: the fluent builders that turn entities and
 ActiveModels into PostgreSQL statements (`select.rs`, `insert.rs`, `update.rs`,
 `delete.rs`, `join.rs`, `helper.rs`, `traits.rs`, `util.rs`) and
 the data-loader API (`loader.rs`). Rules are grouped under
-`[spec:pgorm:req:query.build+1]` and `[spec:pgorm:req:query.loader+1]`.
+`[spec:pgorm:req:query.build+2]` and `[spec:pgorm:req:query.loader+1]`.
 
 ## Query building
 
-> [spec:pgorm:req:query.build+1]
+> [spec:pgorm:req:query.build+2]
 > The query layer MUST provide fluent, owned-`self` builders for SELECT
 > (`Select<E>` and the projection typestates it moves through,
-> `query.build.modifiers`), INSERT (`Insert<A>`, `TryInsert<A>`), UPDATE
+> `query.build.modifiers`), INSERT (`Insert<A, R>`, `TryInsert<A, R>`), UPDATE
 > (`Update`, `UpdateOne<A>`, `UpdateMany<E>`) and DELETE (`Delete`,
 > `DeleteOne<A>`, `DeleteMany<E>`). Each builder wraps exactly one
 > pgorm-query statement (`SelectStatement`, `InsertStatement`,
@@ -364,26 +364,36 @@ builder is or what its rows decode into.
 INSERT building lives in `insert.rs`; the ActiveModel column rules below are
 what makes it total over partially-set models.
 
-> [spec:pgorm:sem:query.build.insert+4]
-> `Insert::<A>::new` targets `A::Entity`'s table and applies
+> [spec:pgorm:sem:query.build.insert+5]
+> `Insert::new` targets `A::Entity`'s table and applies
 > `or_default_values()`, so the statement stays renderable: `as_query()` on a
 > builder holding no model is valid SQL rather than a column-less
 > `INSERT INTO "t" ()`. `Insert::one` and `Insert::many` (and `add`/`add_many`)
 > accept anything implementing `IntoActiveModel<A>`, converting Models to
 > ActiveModels first.
 >
+> `Insert<A, R>` and `TryInsert<A, R>` carry the number of rows they are built
+> for as `R`: `OneRow` from `Insert::one`, `ManyRows` from `Insert::many`, from
+> `Default`, and from `add`/`add_many` on either — adding a model to one makes a
+> batch. `R` decides which returning terminals exist
+> (`exec.crud.exec-vocabulary`), so a batch has no one-row answer to give and
+> cannot be handed the last row's key as if it were the only one; a
+> `Insert::many` over one model is still a batch, answering with a `Vec` of
+> one. Every other method is shared, and `on_conflict`,
+> `on_empty_do_nothing` and `on_conflict_do_nothing` keep `R`.
+>
 > That rendered default-values row MUST NOT be written. "No model was ever
-> added" is a state the builder records, and all three of `Insert`'s terminals
-> read it and answer without a database round-trip: `exec` reports `Ok(0)` rows
-> affected, `exec_returning_pk` fails with `Error::RecordNotInserted` and
-> `exec_returning_model` with `Error::RecordNotFound` — each terminal's existing
-> answer for a statement that wrote no row, so the empty batch needs no outcome
-> of its own. The distinction MUST be the builder's own state and not a
+> added" is a state the builder records — reachable only on `ManyRows`, since
+> `Insert::one` adds its model — and every terminal of `Insert` reads it and
+> answers without a database round-trip: `exec` reports `Ok(0)` rows affected,
+> and `exec_returning_pks` and `exec_returning_models` an empty `Vec`, the
+> answer a batch gives for a statement that wrote no row, so the empty batch
+> needs no outcome of its own. The distinction MUST be the builder's own state and not a
 > predicate over the statement, which cannot carry it: an empty batch and an
 > explicitly supplied all-`NotSet` model both leave the value list empty, and
 > they are different requests. A caller who wants the empty batch reported
 > rather than inferred converts with `on_empty_do_nothing`
-> (`[spec:pgorm:sem:query.build.insert.empty-failsafe]`).
+> (`[spec:pgorm:sem:query.build.insert.empty-failsafe+5]`).
 >
 > `add` iterates every `A::Entity` column in order: `Set` and `Unchanged`
 > values are included (each value passed through `col.save_as(...)`, applying
@@ -402,10 +412,10 @@ what makes it total over partially-set models.
 > asked to write is not the key of the row the database wrote, and an
 > `ON CONFLICT DO UPDATE` landing on some other row made the difference
 > observable as a primary key that names no row. The key is now resolved from
-> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+5]`), so the builder has
+> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+6]`), so the builder has
 > nothing to remember.
 
-> [spec:pgorm:req:query.build.insert.uniform-columns+3]
+> [spec:pgorm:req:query.build.insert.uniform-columns+4]
 > All models added to a single `Insert` MUST have the same set of present
 > (`Set` or `Unchanged`) columns; rows with heterogeneous column sets are never
 > merged into a column union. The first model added records a per-column
@@ -422,13 +432,16 @@ what makes it total over partially-set models.
 >
 > `Insert::ensure_uniform_columns`, mirrored on `TryInsert`, reports the
 > recorded state as `Err(Error::Query(RuntimeError::Internal(..)))` whose message
-> names the offending columns on each side. Every execution path of both types
-> (`exec`, `exec_returning_pk`, `exec_returning_model`) asks it first and
-> fails with that error before any SQL is sent, so a mismatched batch leaves
-> the database untouched.
+> names the offending columns on each side. Every execution path of a batch,
+> on both types (`exec`, `exec_returning_pks`, `exec_returning_models`), asks it
+> first and fails with that error before any SQL is sent, so a mismatched batch
+> leaves the database untouched. `Insert<A, OneRow>` holds one model, so there
+> is nothing for its model to disagree with and its terminals have nothing to
+> ask; adding a second model makes it a batch.
 
-> [spec:pgorm:sem:query.build.insert.empty-failsafe+4]
-> `TryInsert<A>` wraps an `Insert<A>` and is the failsafe form:
+> [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
+> `TryInsert<A, R>` wraps an `Insert<A, R>` of the same row count and is the
+> failsafe form:
 > `Insert::on_empty_do_nothing()` converts without
 > altering the statement, while `Insert::on_conflict_do_nothing()` first
 > attaches `ON CONFLICT (<primary key columns>) DO NOTHING` and then converts.
@@ -445,10 +458,10 @@ what makes it total over partially-set models.
 > first model added — which always marks at least one column present — or one
 > of the two empty states: no model added at all (`Insert::many` over an empty
 > iterator), or only models that leave every column `NotSet`. `Insert`'s own
-> terminals hold those two apart (`[spec:pgorm:sem:query.build.insert]`), since
+> terminals hold those two apart (`[spec:pgorm:sem:query.build.insert+5]`), since
 > a blank model asks for a row of defaults and an empty batch asks for nothing.
-> `TryInsert` deliberately does not: all three of its execution paths (`exec`,
-> `exec_returning_pk`, `exec_returning_model`) read both as empty, so an
+> `TryInsert` deliberately does not: every one of its execution paths (`exec`
+> and its row type's returning terminals) reads both as empty, so an
 > all-`NotSet` model reports `TryInsertResult::Empty` on every path exactly as
 > an empty batch does, without sending any SQL and leaving the database
 > untouched — the failsafe answers for the whole of "nothing to write". A

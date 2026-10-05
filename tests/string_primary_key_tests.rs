@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    an empty `RETURNING` fails with
+// [spec:pgorm:sem:exec.crud.insert+6/test]    an empty `RETURNING` fails with
 // RecordNotInserted, for a client-supplied key exactly as for a generated one
 pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(), Error> {
     let repository = repository::Model {
@@ -55,7 +55,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
 
         assert_eq!(err.err(), Some(Error::RecordNotInserted));
 
-        // [spec:pgorm:req:exec.crud.exec-vocabulary/test]    `exec` asks for no
+        // [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    `exec` asks for no
         // key, so a skipped row is a count of zero rather than an error: the
         // terminal's name is the whole difference.
         let skipped = Insert::one(repository)
@@ -116,9 +116,9 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.insert+5/test]    a client-supplied primary key is
+// [spec:pgorm:sem:exec.crud.insert+6/test]    a client-supplied primary key is
 // answered from the RETURNING row like any other, not echoed back from the model
-// [spec:pgorm:sem:query.build.insert+4/test]    which is why `Insert::add` keeps
+// [spec:pgorm:sem:query.build.insert+5/test]    which is why `Insert::add` keeps
 // no primary-key value tuple to echo
 // [spec:pgorm:sem:exec.crud.update+7/test]    `UpdateOne::exec_returning_model`
 // returns the model

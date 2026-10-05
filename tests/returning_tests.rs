@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{TryInsertResult, ValueHolder, entity::prelude::*, types::ToSql};
+use pgorm::{ManyRows, OneRow, TryInsertResult, ValueHolder, entity::prelude::*, types::ToSql};
 pub use pgorm_query::{Expr, Query, QueryBuilder, Values};
 use serde_json::json;
 
@@ -188,7 +188,7 @@ fn bakery_model(name: &str, margin: f64) -> bakery::ActiveModel {
     }
 }
 
-// [spec:pgorm:sem:exec.crud.insert-returning+2/test]    `exec_returning_model`
+// [spec:pgorm:sem:exec.crud.insert-returning+3/test]    `exec_returning_model`
 // decodes a full-column RETURNING (and fails with RecordNotFound when the
 // insert matched nothing); `exec` reports rows affected
 #[pgorm_macros::test]
@@ -260,11 +260,11 @@ async fn insert_returning_modes() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:exec.crud.try-insert+3/test]    `TryInsertResult` across all
+// [spec:pgorm:sem:exec.crud.try-insert+4/test]    `TryInsertResult` across all
 // three executions: Empty without touching the database, Inserted on success,
 // Conflicted from a skipped `ON CONFLICT` insert, and any other error
 // propagating
-// [spec:pgorm:sem:query.build.insert.empty-failsafe+4/test]    the same three
+// [spec:pgorm:sem:query.build.insert.empty-failsafe+5/test]    the same three
 // entry points reading the one recorded empty state: an insert over an empty
 // iterator and an insert of an all-NotSet model both return Empty with the
 // database left untouched
@@ -298,7 +298,7 @@ async fn try_insert_result_variants() -> Result<(), Error> {
     assert!(matches!(
         Insert::many(empty())
             .on_empty_do_nothing()
-            .exec_returning_model(&db)
+            .exec_returning_models(&db)
             .await?,
         TryInsertResult::Empty
     ));
@@ -558,11 +558,12 @@ async fn exec_result_is_a_transparent_row_count() {
 /// terminal that is renamed, dropped, or changes shape fails the build. A live
 /// round trip would prove less — these are claims about the surface, not about
 /// the database.
-// [spec:pgorm:req:exec.crud.exec-vocabulary/test]    `exec` is a count on every
-// builder that has one; each returning form names what it yields
+// [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    `exec` is a count on
+// every builder that has one; each returning form names what it yields, one
+// for a single row and a `Vec` for a batch
 #[allow(dead_code)]
 async fn exec_terminals_name_their_shape<C: ConnectionTrait>(db: &C) -> Result<(), Error> {
-    let insert = || Insert::<bakery::ActiveModel>::one(bakery_model("Shape", 1.0));
+    let insert = || Insert::<bakery::ActiveModel, OneRow>::one(bakery_model("Shape", 1.0));
 
     let _rows: u64 = insert().exec(db).await?;
     let _pk: i32 = insert().exec_returning_pk(db).await?;
@@ -573,6 +574,19 @@ async fn exec_terminals_name_their_shape<C: ConnectionTrait>(db: &C) -> Result<(
     let _t_rows: TryInsertResult<u64> = try_insert().exec(db).await?;
     let _t_pk: TryInsertResult<i32> = try_insert().exec_returning_pk(db).await?;
     let _t_model: TryInsertResult<bakery::Model> = try_insert().exec_returning_model(db).await?;
+
+    let batch = || Insert::<bakery::ActiveModel, ManyRows>::many([bakery_model("Batch", 1.0)]);
+
+    let _b_rows: u64 = batch().exec(db).await?;
+    let _pks: Vec<i32> = batch().exec_returning_pks(db).await?;
+    let _models: Vec<bakery::Model> = batch().exec_returning_models(db).await?;
+
+    let try_batch = || batch().on_empty_do_nothing();
+
+    let _tb_rows: TryInsertResult<u64> = try_batch().exec(db).await?;
+    let _tb_pks: TryInsertResult<Vec<i32>> = try_batch().exec_returning_pks(db).await?;
+    let _tb_models: TryInsertResult<Vec<bakery::Model>> =
+        try_batch().exec_returning_models(db).await?;
 
     // `UpdateOne` offers only the model form: there is no count-shaped answer
     // to updating one keyed row, so there is no `exec` to misread as one.

@@ -36,7 +36,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key+4]
+// [spec:pgorm:def:entity.traits.primary-key+5]
 pub trait PrimaryKeyTrait: StaticName + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -47,7 +47,8 @@ pub trait PrimaryKeyTrait: StaticName + Iterable {
         + TryFromValueTuple
         + TryGetableMany
         + TryFromU64
-        + PrimaryKeyArity;
+        + PrimaryKeyArity
+        + IntoPrimaryKey<Self::ValueType>;
 
     /// Whether the database generates the whole key, so that an insert
     /// naming no key column still writes a row with one.
@@ -76,8 +77,142 @@ pub trait PrimaryKeyToColumn {
         Self: Sized;
 }
 
+/// A value that converts into a primary key's
+/// [`ValueType`](PrimaryKeyTrait::ValueType) part by part.
+///
+/// A one-column key takes anything that converts into its type, as `Into`
+/// would: `find_by_id("x")` against a `String` key. A composite key takes a
+/// tuple of the same arity whose every part converts into the key's part in
+/// that position, so `find_by_id((1, "x"))` reaches an `(i32, String)` key
+/// with no `"x".to_owned()` — `Into` cannot say that of a tuple, which would
+/// take an impl for every pair of tuple types. A tuple of the wrong arity has
+/// no impl, so the mismatch is a compile error:
+///
+/// ```compile_fail,E0277
+/// # use pgorm::{entity::*, tests_cfg::cake_filling};
+/// // `cake_filling`'s key is `(i32, i32)`.
+/// cake_filling::Entity::find_by_id((1, 2, 3));
+/// ```
+// [spec:pgorm:def:entity.traits.primary-key+5]
+pub trait IntoPrimaryKey<V> {
+    /// The key value, converted part by part.
+    fn into_primary_key(self) -> V;
+}
+
+impl<V, T> IntoPrimaryKey<V> for T
+where
+    V: crate::TryGetable,
+    T: Into<V>,
+{
+    fn into_primary_key(self) -> V {
+        self.into()
+    }
+}
+
+macro_rules! impl_into_pk {
+    ($(($value:ident, $part:ident, $index:tt)),+) => {
+        impl<$($value, $part,)+> IntoPrimaryKey<($($value,)+)> for ($($part,)+)
+        where
+            $($value: crate::TryGetableMany, $part: Into<$value>,)+
+        {
+            fn into_primary_key(self) -> ($($value,)+) {
+                ($(self.$index.into(),)+)
+            }
+        }
+    };
+}
+
+impl_into_pk!((V1, T1, 0));
+impl_into_pk!((V1, T1, 0), (V2, T2, 1));
+impl_into_pk!((V1, T1, 0), (V2, T2, 1), (V3, T3, 2));
+impl_into_pk!((V1, T1, 0), (V2, T2, 1), (V3, T3, 2), (V4, T4, 3));
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6),
+    (V8, T8, 7)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6),
+    (V8, T8, 7),
+    (V9, T9, 8)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6),
+    (V8, T8, 7),
+    (V9, T9, 8),
+    (V10, T10, 9)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6),
+    (V8, T8, 7),
+    (V9, T9, 8),
+    (V10, T10, 9),
+    (V11, T11, 10)
+);
+impl_into_pk!(
+    (V1, T1, 0),
+    (V2, T2, 1),
+    (V3, T3, 2),
+    (V4, T4, 3),
+    (V5, T5, 4),
+    (V6, T6, 5),
+    (V7, T7, 6),
+    (V8, T8, 7),
+    (V9, T9, 8),
+    (V10, T10, 9),
+    (V11, T11, 10),
+    (V12, T12, 11)
+);
+
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key+4]
+// [spec:pgorm:def:entity.traits.primary-key+5]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

@@ -39,7 +39,7 @@ explicit limitations.
 > `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
 > through `table_ref`, so a `Some` schema name qualifies every statement.
 
-> [spec:pgorm:req:entity.traits.crud+3]
+> [spec:pgorm:req:entity.traits.crud+4]
 > `EntityTrait` provides the static *read* surface (`src/entity/base_entity.rs`):
 > `find()` returns a fresh `Select<Self>`; `find_by_id(values)` builds on `find()` by
 > adding an equality filter per primary-key column, consuming the value tuple in
@@ -60,8 +60,14 @@ explicit limitations.
 >
 > `find_by_id` and `delete_by_id` MUST panic with `primary key arity mismatch` when the
 > number of supplied values differs from the primary key's arity, in either direction.
-> Values are accepted via `Into<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`, so
-> composite keys are passed as tuples.
+> A value of another arity than the key's `ValueType` does not compile, so the panic is
+> reached only through a hand-written `PrimaryKeyTrait` whose `ValueType` disagrees with
+> its own variants.
+> Values are accepted via `IntoPrimaryKey<<Self::PrimaryKey as PrimaryKeyTrait>::ValueType>`
+> (`entity.traits.primary-key`), so composite keys are passed as tuples whose parts
+> convert one by one: `find_by_id((1, "x"))` against an `(i32, String)` key, with no
+> `.to_owned()`. These two are the only APIs that take a key value; a cursor boundary
+> takes a value tuple over its order columns, not a key.
 
 > [spec:pgorm:def:entity.traits.column+6]
 > `ColumnTrait: StaticName + Iterable + FromStr` (`src/entity/column.rs`) describes one
@@ -156,12 +162,13 @@ explicit limitations.
 > spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
 > scalar and array comparisons of one column cannot disagree about its cast.
 
-> [spec:pgorm:def:entity.traits.primary-key+4]
+> [spec:pgorm:def:entity.traits.primary-key+5]
 > `PrimaryKeyTrait: StaticName + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
 > `Sized + Send + Debug + PartialEq + IntoValueTuple + TryFromValueTuple
-> + TryGetableMany + TryFromU64 + PrimaryKeyArity`; `auto_increment()` reports whether the
+> + TryGetableMany + TryFromU64 + PrimaryKeyArity + IntoPrimaryKey<Self::ValueType>`;
+> `auto_increment()` reports whether the
 > database generates the *whole* key, so an insert naming no key column still writes a row
 > with one: a one-column key the serial family (or the column's own default or identity)
 > fills, or a composite key every column of which is an identity. A composite key with one
@@ -171,6 +178,20 @@ explicit limitations.
 > and back (`from_column -> Option<Self>`). `PrimaryKeyArity` exposes a
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.
+>
+> `IntoPrimaryKey<V>` is the conversion a key value is taken through, part by part:
+> anything `Into<V>` for a one-column key (`V: TryGetable`), and for a composite key a
+> tuple of the same arity, 1 through 12, whose part `i` is `Into` the key's part `i`.
+> `Into` itself cannot carry this — `(i32, &str)` has no `Into<(i32, String)>`, and
+> std would need an impl per pair of tuple types — so a lookup against an
+> `(i32, String)` key used to need `"x".to_owned()` where the one-column key took
+> `"x"`. The two impl families cannot overlap: no tuple is `TryGetable`. A tuple of the
+> wrong arity has no impl, so it is a compile error rather than the runtime arity
+> panic. `ValueType` carries the bound itself, which every value type satisfies by
+> these impls, so generic code holding a `ValueType` can pass it where a key is taken.
+> The impls are one per arity, with no per-type expansion: `cargo check` of the
+> integration-test crate after touching the library took 53.3 s of user time before
+> them and 52.7 s after.
 
 > [spec:pgorm:def:entity.traits.model+3]
 > `ModelTrait: Clone + Send + Debug` (`src/entity/model.rs`) is the read-side row

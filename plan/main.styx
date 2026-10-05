@@ -675,12 +675,27 @@ children (
                         title "Composite-key lookups take borrowed parts, many-row inserts return every key, and every write path has a live test"
                         kind @feat
                         deps (composite-key-generated-column)
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T09:33:28.887066Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Survey 2026-10-05 at c24fea1e, three items. (1) find_by_id((1, \"x\")) does not compile against an (i32, String) key: From<({integer}, &str)> is missing, so callers must write \"x\".to_owned(). Single-column keys presumably accept &str, so check how they convert and give key tuples per-element Into conversion, for every lookup that takes a key value (find_by_id, delete_by_id, and any others), at every arity 1-12 without blowing up compile time. (2) Insert::many(..).exec_returning_pk returns only the last row's key, and no rule says so. Decide whether a many-row insert should return every key in insertion order (RETURNING gives them all) or say the limit plainly in exec.crud.insert. Prefer returning all of them if it doesn't break single-row callers' types. (3) Most composite write paths have no permanent live test. The survey proved these live only with probes it then deleted: insert returning the key tuple, insert_many, find_by_id/delete_by_id, ActiveModel update/delete (a half-NotSet key gives PrimaryKeyNotSet), upsert via OnConflict::column(A).and_columns([B]) DO UPDATE returning model and key plus on_conflict_do_nothing reporting Conflicted, load_one/load_many/load_many_via over a composite FK and a composite junction (including an empty bucket), find_related both directions, find_linked over 2 and 3 hops, and a composite-root graph resumed with after_with at arity 3. Land these as a permanent live test file. Also noted: there is no OnConflict::columns convenience. Consider whether it belongs here, or file it."
+                            }
+
+                            {
+                                at 2026-10-05T10:57:51.893551Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-05T13:28:02.338181Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }

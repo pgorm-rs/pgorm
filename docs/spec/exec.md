@@ -432,25 +432,32 @@ These rules capture what the code does today, including known gaps.
 > source graph's terminals through its own selector
 > (`[spec:pgorm:sem:query.graph.terminals+1]`).
 
-> [spec:pgorm:req:exec.crud.exec-vocabulary]
+> [spec:pgorm:req:exec.crud.exec-vocabulary+1]
 > A CRUD terminal's name MUST determine the shape of what it returns, so
 > that a reader of the call site needs no knowledge of which constructor
-> produced the builder. Exactly three terminal names exist, and each MUST
-> mean the same thing on every builder that offers it:
+> produced the builder. Exactly three terminal names exist, each in a
+> singular and a plural spelling, and each MUST mean the same thing on every
+> builder that offers it:
 >
 > - `exec` MUST emit no `RETURNING` clause and MUST return the rows-affected
 >   count as a bare `u64`.
 > - `exec_returning_pk` MUST return the inserted row's primary key, typed as
->   the entity's `PrimaryKey::ValueType`.
+>   the entity's `PrimaryKey::ValueType`; `exec_returning_pks` MUST return
+>   `Vec<ValueType>`, one key per row written.
 > - `exec_returning_model` MUST return exactly one `Model`;
 >   `exec_returning_models` MUST return `Vec<Model>`.
 >
-> The mapping is therefore total:
+> A builder offers the singular spelling only where it has exactly one row to
+> answer for, and the plural only where it may have any number: the name says
+> how many answers come back, and a batch cannot be asked for one. `Insert`
+> and `TryInsert` carry that count as their row type, `OneRow` or `ManyRows`
+> (`query.build.insert`). The mapping is therefore total:
 >
-> | Builder | `exec` | `exec_returning_pk` | model-returning |
+> | Builder | `exec` | key-returning | model-returning |
 > | --- | --- | --- | --- |
-> | `Insert<A>` | `u64` | `PrimaryKey::ValueType` | `exec_returning_model` → `Model` |
-> | `TryInsert<A>` | `TryInsertResult<u64>` | `TryInsertResult<ValueType>` | `exec_returning_model` → `TryInsertResult<Model>` |
+> | `Insert<A, OneRow>` | `u64` | `exec_returning_pk` → `ValueType` | `exec_returning_model` → `Model` |
+> | `Insert<A, ManyRows>` | `u64` | `exec_returning_pks` → `Vec<ValueType>` | `exec_returning_models` → `Vec<Model>` |
+> | `TryInsert<A, R>` | `TryInsertResult<u64>` | the `Insert<A, R>` shape in `TryInsertResult` | the `Insert<A, R>` shape in `TryInsertResult` |
 > | `UpdateOne<A>` | *absent* | *absent* | `exec_returning_model` → `Model` |
 > | `UpdateMany<E>` | `u64` | *absent* | `exec_returning_models` → `Vec<Model>` |
 > | `DeleteOne<A>` | `u64` | *absent* | *absent* |
@@ -459,6 +466,12 @@ These rules capture what the code does today, including known gaps.
 > `TryInsert`'s wrapper is the receiver type's contract, not a per-method
 > variation: every `TryInsert` terminal MUST wrap the corresponding `Insert`
 > terminal's shape in `TryInsertResult`.
+>
+> The batch spelling exists because the singular one, offered on every
+> insert, answered a batch with whichever row came back: `exec_returning_pk`
+> returned the last row's key — the only one read of the `RETURNING` rows it
+> had asked for — and `exec_returning_model` wrote every row and then failed
+> on the second one it was handed, since its one-row decode refused more.
 >
 > `UpdateOne` MUST NOT offer a bare `exec`. Updating one model by primary key
 > always reads the row back, so there is no count-shaped answer to give; a
@@ -470,16 +483,33 @@ These rules capture what the code does today, including known gaps.
 > on `UpdateMany`); the old `Insert::exec`, which returned a primary key
 > under a name that promised nothing, is `exec_returning_pk`.
 
-> [spec:pgorm:sem:exec.crud.insert+5]
-> `Insert::exec_returning_pk` appends a `RETURNING` clause of the entity's
-> primary-key columns and resolves the key (typed as the entity's
-> `PrimaryKey::ValueType`) from that clause and from nothing else. There is
-> exactly one mode: the statement runs through `query_all`, the **last**
-> returned row's primary-key columns are read by name, an empty result fails
-> with `Error::RecordNotInserted`, and a decode failure of the key columns
-> fails with `Error::UnpackInsertId`. This holds whether or not the caller
-> supplied the key: an entity whose key is not auto-increment MUST be answered
-> from the row the database wrote, exactly as an auto-increment one is.
+> [spec:pgorm:sem:exec.crud.insert+6]
+> `Insert::exec_returning_pk` and `exec_returning_pks` append a `RETURNING`
+> clause of the entity's primary-key columns and resolve the keys (typed as
+> the entity's `PrimaryKey::ValueType`) from that clause and from nothing
+> else. The statement runs through `query_all`, each returned row's
+> primary-key columns are read by name, and a decode failure of the key
+> columns fails with `Error::UnpackInsertId`. This holds whether or not the
+> caller supplied the key: an entity whose key is not auto-increment MUST be
+> answered from the row the database wrote, exactly as an auto-increment one
+> is, and a key part the database generated — an identity inside a composite
+> key (`macros.derive.entity-model.primary-key`) — comes back in the tuple
+> like any other part.
+>
+> `exec_returning_pk` exists on `Insert<A, OneRow>` alone, which holds one
+> model, so the statement writes at most one row: its key is the answer, and
+> no row — the conflict clause skipped it — fails with
+> `Error::RecordNotInserted`. `exec_returning_pks` exists on
+> `Insert<A, ManyRows>` and returns every row's key, in the order the rows
+> came back. For `INSERT ... VALUES` that is the order the models were added:
+> PostgreSQL's executor writes the `VALUES` rows in list order and emits each
+> `RETURNING` row as it writes it, which a live test pins with keys added out
+> of key order, though PostgreSQL's documentation makes no promise about the
+> order of `RETURNING` rows. A row the conflict clause skipped has no key, so
+> under `ON CONFLICT DO NOTHING` the keys are those of the rows written, still
+> in order, and no longer one per model; a batch every row of which was
+> skipped, and an insert no model was ever added to, return no key, which is
+> `Ok` — a batch asked for every key written and got them all.
 >
 > The client-supplied-key mode is deleted and MUST NOT return. It ran the
 > statement through `execute`, discarded the `RETURNING` rows it had already
@@ -501,22 +531,26 @@ These rules capture what the code does today, including known gaps.
 > "last insert id" named a MySQL affordance rather than the `RETURNING`ed
 > primary key this actually is.
 
-> [spec:pgorm:sem:exec.crud.insert-returning+2]
-> `Insert::exec_returning_model` appends a `RETURNING` clause of **all**
-> entity columns and decodes the inserted model through
-> `SelectorRaw::<SelectModel<Model>>::one_opt`; when no row comes back it
-> fails with `Error::RecordNotFound`. `Insert::exec`
-> appends no `RETURNING` clause and returns the rows-affected count as
-> `u64`.
+> [spec:pgorm:sem:exec.crud.insert-returning+3]
+> `Insert::exec_returning_model` and `exec_returning_models` append a
+> `RETURNING` clause of **all** entity columns and decode every returned row
+> through `SelectorRaw::<SelectModel<Model>>::all`, in the order the rows came
+> back (`exec.crud.insert`). `exec_returning_model`, on `Insert<A, OneRow>`,
+> answers with its one row and fails with `Error::RecordNotFound` when none
+> came back; `exec_returning_models`, on `Insert<A, ManyRows>`, answers with
+> every row, none included. `Insert::exec` appends no `RETURNING` clause and
+> returns the rows-affected count as `u64`.
 
-> [spec:pgorm:sem:exec.crud.try-insert+3]
-> `TryInsert::exec`, `exec_returning_pk`, and `exec_returning_model`
+> [spec:pgorm:sem:exec.crud.try-insert+4]
+> `TryInsert::exec` and the returning terminals of its row type
+> (`exec_returning_pk` and `exec_returning_model` on `OneRow`,
+> `exec_returning_pks` and `exec_returning_models` on `ManyRows`)
 > wrap the corresponding `Insert` executions in `TryInsertResult`. When
 > the underlying insert statement has no columns (e.g. `Insert::many`
 > over an empty iterator), they return `TryInsertResult::Empty` without
 > touching the database — the failsafe for empty batch inserts.
 >
-> All three otherwise report an insert that the conflict clause skipped
+> Each otherwise reports an insert that the conflict clause skipped
 > as `TryInsertResult::Conflicted`, each reading the signal its own
 > execution yields for "no row was written". `exec_returning_pk` maps a
 > `Error::RecordNotInserted`, which `exec.crud.insert` raises only when
@@ -526,8 +560,11 @@ These rules capture what the code does today, including known gaps.
 > `ON CONFLICT` clause, since neither signal can otherwise be attributed
 > to a conflict. Without such a clause those two keep the plain `Insert`
 > outcome, `TryInsertResult::Inserted(0)` and `Error::RecordNotFound`
-> respectively. Success becomes `TryInsertResult::Inserted(..)`; every
-> other error propagates.
+> respectively. The batch terminals read an empty `Vec` the same way: with an
+> `ON CONFLICT` clause it is `Conflicted`, the clause having skipped every
+> row, and without one it is `Inserted` of the empty `Vec`; a batch the clause
+> skipped only in part is `Inserted` of the rows written. Success becomes
+> `TryInsertResult::Inserted(..)`; every other error propagates.
 
 > [spec:pgorm:sem:exec.crud.update+7]
 > `UpdateMany::exec` executes the statement and returns the rows-affected
@@ -559,7 +596,7 @@ These rules capture what the code does today, including known gaps.
 > called.
 >
 > A `TryUpdate` escape valve — the `TryInsertResult::Empty`
-> (`[spec:pgorm:sem:exec.crud.try-insert+3]`) of updates, letting a caller
+> (`[spec:pgorm:sem:exec.crud.try-insert+4]`) of updates, letting a caller
 > take "nothing to set" as an outcome rather than an error — is deliberately
 > NOT provided. `TryInsert` exists because a conflict clause makes "no row
 > written" a routine result of a statement that was sent; nothing to set is
