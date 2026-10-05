@@ -108,7 +108,7 @@ impl Fixture {
 }
 
 /// The disposable server's `docker run` arguments, its default statement timeout the profile's.
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn container_args(name: &str, image: &str, settings: &Settings) -> Vec<String> {
     let mut args: Vec<String> = ["run", "--detach", "--name", name,
         "--label", "pgorm.sqlmap=disposable", "--network", "bridge", "--publish", "127.0.0.1::5432",
@@ -119,7 +119,7 @@ pub fn container_args(name: &str, image: &str, settings: &Settings) -> Vec<Strin
 }
 
 /// The session settings a fixture role runs under, the profile's statement timeout among them.
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn role_session(role: &str, statement_timeout_seconds: u64) -> String {
     [
         format!("ALTER ROLE {role} SET search_path = fixture, pg_catalog;"),

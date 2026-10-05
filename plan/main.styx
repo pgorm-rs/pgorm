@@ -8636,12 +8636,27 @@ children (
             {
                 id sqlmap-identifier-profile
                 title "sqlmap scans the identifier cases at the strength their boundaries need"
+                sealed true
                 log (
                     {
                         at 2026-09-24T18:44:29.523062Z
                         author "brendan@necessary.nu"
                         kind @blocker
                         text "The full profile pins sqlmap at level 3 / risk 2 (--answers extending=N holds the ceiling), and the recorded exemption evidence says of stored-identifier that \"only the level-5 clause-8 identifier boundary rewrites the slot into a truth context\". So part of the identifier gap may be sqlmap's configured strength rather than the instrument itself. Measure it: a third profile, scoped to the eleven identifier-position cases (pipeline-projection, schema, column, group, function, stored-identifier, graph-alias, table, alias, order, enum-ddl), at level 5 / risk 3 with every technique, run on a quiet machine (see memory: timing-sensitive runs; profile settings now genuinely reach the scanner since 77528abb). For each case-technique pair record detected or not across two runs. Schedule every pair whose control fires reliably; for those that still cannot, tighten the recorded exemption evidence to name the level-5 boundary that was tried. Report the before/after count of scheduled identifier pairs. Whether the new profile joins CI (and on what schedule) is decided from its measured runtime."
+                    }
+
+                    {
+                        at 2026-10-05T03:48:45.792304Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-05T03:49:29.250867Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

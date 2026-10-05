@@ -5,7 +5,7 @@ use std::path::Path;
 async fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("sqlmap-harness [--profile smoke|full] [--case ID] [--artifacts DIR] [--baseline-only] [--direct-regressions] [--python PATH]");
+        println!("sqlmap-harness [--profile smoke|full|identifiers] [--case ID] [--artifacts DIR] [--baseline-only] [--direct-regressions] [--python PATH]");
         return;
     }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");

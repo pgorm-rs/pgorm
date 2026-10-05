@@ -16,14 +16,14 @@ fn passing() -> Value {
            "falsified_exemptions": []})
 }
 
-// [spec:pgorm:req:security.sqlmap.ci/test]
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
 #[test]
 fn missing_report_is_explicitly_not_run() {
     let artifacts = scratch("missing");
     assert_eq!(verdict::profile_status("smoke", &artifacts).status, "not-run");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci/test]
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
 #[test]
 fn profile_status_requires_matching_complete_evidence() {
     let artifacts = scratch("evidence");
@@ -53,8 +53,8 @@ fn profile_status_requires_matching_complete_evidence() {
     }
 }
 
-// [spec:pgorm:req:security.sqlmap.ci/test]
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 #[test]
 fn exemptions_are_published_and_never_absorbed() {
     let artifacts = scratch("exemptions");
@@ -73,7 +73,7 @@ fn exemptions_are_published_and_never_absorbed() {
     assert_eq!(published["inapplicable"]["select-Q"], "REPLACE-only and never reflected here.");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci/test]
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
 #[test]
 fn a_failing_profile_still_publishes_its_exemptions() {
     let artifacts = scratch("failing");
@@ -86,8 +86,26 @@ fn a_failing_profile_still_publishes_its_exemptions() {
     assert!(summary.contains("- select-Q: "), "{summary}");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci/test]
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
 #[test]
 fn publish_refuses_an_unknown_profile() {
     assert!(verdict::publish("nonsense", &scratch("unknown")).is_err());
+}
+
+// [spec:pgorm:req:security.sqlmap.ci+1/test]
+#[test]
+fn identifiers_status_needs_no_direct_regressions() {
+    let artifacts = scratch("identifiers");
+    let mut document = passing();
+    document["profile"] = json!("identifiers");
+    document.as_object_mut().unwrap().remove("direct_regressions");
+    fs::write(artifacts.join("run/report.json"), document.to_string()).unwrap();
+    // Direct regressions belong to the full profile; the identifiers scan neither runs nor needs them.
+    let (passed, summary) = verdict::publish("identifiers", &artifacts).unwrap();
+    assert!(passed, "{summary}");
+    assert!(summary.starts_with("sqlmap / identifiers: PASS\n"), "{summary}");
+    // A full-profile report cannot stand in for it, nor it for the full profile.
+    assert_eq!(verdict::profile_status("full", &artifacts).status, "incomplete");
+    fs::write(artifacts.join("run/report.json"), passing().to_string()).unwrap();
+    assert_eq!(verdict::profile_status("identifiers", &artifacts).status, "incomplete");
 }

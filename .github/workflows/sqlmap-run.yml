@@ -14,7 +14,7 @@ jobs:
   scan:
     name: sqlmap / ${{ inputs.profile }}
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ inputs.profile == 'smoke' && 45 || 330 }}
+    timeout-minutes: ${{ inputs.profile == 'smoke' && 45 || inputs.profile == 'identifiers' && 90 || 330 }}
     env:
       SQLMAP_PROFILE: ${{ inputs.profile }}
       CARGO_TERM_COLOR: never
@@ -50,6 +50,7 @@ jobs:
           case "$SQLMAP_PROFILE" in
             smoke) deadline=30m; extra=() ;;
             full) deadline=300m; extra=(--direct-regressions) ;;
+            identifiers) deadline=60m; extra=() ;;
             *) exit 1 ;;
           esac
           timeout --signal=TERM --kill-after=60s "$deadline" \

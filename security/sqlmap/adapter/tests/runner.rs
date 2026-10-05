@@ -138,7 +138,7 @@ fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
     }
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
 fn profiles_keep_234_full_and_six_smoke() {
@@ -160,6 +160,61 @@ fn profiles_keep_234_full_and_six_smoke() {
     assert!(result::inventory(&manifest, &profile, &[]).is_err());
 }
 
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+#[test]
+fn identifiers_profile_schedules_what_level_five_reaches() {
+    let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
+    let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
+    let identifiers = &profiles["identifiers"];
+    assert_eq!((identifiers["level"].as_u64(), identifiers["risk"].as_u64()), (Some(5), Some(3)));
+    Settings::from_profile(identifiers).unwrap();
+    let ids = ["pipeline-projection", "schema", "column", "group", "function", "stored-identifier",
+        "graph-alias", "table", "alias", "order", "enum-ddl"];
+    assert_eq!(identifiers["cases"], json!(ids));
+    let inventory = result::inventory(&manifest, identifiers, &[]).unwrap();
+    // Measured twice at level 5 / risk 3: 28 controls fire, 38 do not (acceptance/2026-10-05-identifiers.md).
+    assert_eq!(inventory.work.len(), 28);
+    assert_eq!(inventory.exempt.len(), 38);
+    let scheduled = |inventory: &result::Inventory| -> Vec<String> {
+        let mut pairs: Vec<_> = inventory.work.iter().map(|(c, t)| format!("{}-{t}", c["id"].as_str().unwrap())).collect();
+        pairs.sort(); pairs
+    };
+    let mut expected: Vec<String> = ["pipeline-projection", "column", "group", "stored-identifier"].iter()
+        .flat_map(|c| ["E", "T"].map(|t| format!("{c}-{t}")))
+        .chain(["graph-alias", "table", "alias"].iter().flat_map(|c| ["B", "E", "U", "S", "T"].map(|t| format!("{c}-{t}"))))
+        .chain(["order-B", "order-E", "order-S", "order-T", "enum-ddl-S"].map(str::to_owned))
+        .collect();
+    expected.sort();
+    assert_eq!(scheduled(&inventory), expected);
+    // The same declarations hold the full profile at level 3 to the eight pairs that fire there.
+    let full = result::inventory(&manifest, &profiles["full"], &ids.map(str::to_owned)).unwrap();
+    assert_eq!(full.work.len(), 8);
+    let gated = full.exempt.iter().filter(|(_, _, e)| e["evidence"]["ceiling"] == 5).count();
+    assert_eq!(gated, 20);
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+#[test]
+fn ceilings_exempt_below_and_schedule_at_their_level() {
+    let mut gated = evidence(); gated["ceiling"] = json!(5);
+    let manifest = json!({"cases":[exempt_case(json!({"Q": exempt_entry(gated.clone())}))]});
+    for (level, work, exempt) in [(3, &["B"][..], 1), (4, &["B"], 1), (5, &["B", "Q"], 0)] {
+        let profile = json!({"cases":["a"],"techniques":["B","Q"],"level":level});
+        let inventory = result::inventory(&manifest, &profile, &[]).unwrap();
+        let scheduled: Vec<_> = inventory.work.iter().map(|(_, t)| t.as_str()).collect();
+        assert_eq!(scheduled, work, "level {level}");
+        assert_eq!(inventory.exempt.len(), exempt, "level {level}");
+    }
+    assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(gated)}))).is_ok());
+    for bad in [json!(1), json!(6), json!(0), json!("5"), json!(4.5), Value::Null] {
+        let mut broken = evidence(); broken["ceiling"] = bad.clone();
+        assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(broken)}))).is_err(), "ceiling {bad}");
+    }
+    // A profile that does not say its level cannot decide what a ceiling excuses.
+    let profile = json!({"cases":["a"],"techniques":["B","Q"]});
+    assert!(result::inventory(&json!({"cases":[exempt_case(json!({}))]}), &profile, &[]).is_err());
+}
+
 fn evidence() -> Value {
     json!({"kind":"no-boundary","payload":"inline_query.xml","where":[3],"clause":[1,2,3,8],
            "boundary":"the sole where=3 boundary carries an empty prefix and an empty suffix","contexts":"4"})
@@ -173,7 +228,7 @@ fn exempt_entry(evidence: Value) -> Value {
     json!({"reason":"REPLACE-only tests cannot escape the app's quoting at this injection point.","evidence":evidence})
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 #[test]
 fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(evidence())}))).is_ok());
@@ -196,7 +251,7 @@ fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(wide)}))).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 #[test]
 fn exemptions_naming_undeclared_techniques_are_refused() {
     for technique in ["U", "Z", "q"] {
@@ -208,12 +263,12 @@ fn exemptions_naming_undeclared_techniques_are_refused() {
     assert!(result::exemptions(&json!({"id":"a","techniques":["Q"],"inapplicable":[]})).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn exempted_pairs_leave_scheduled_work_and_never_pass() {
     let manifest = json!({"cases":[exempt_case(json!({"Q": exempt_entry(evidence())}))]});
-    let profile = json!({"cases":["a"],"techniques":["B","Q"]});
+    let profile = json!({"cases":["a"],"techniques":["B","Q"],"level":3});
     let inventory = result::inventory(&manifest, &profile, &[]).unwrap();
     assert_eq!(inventory.work.iter().map(|(_, t)| t.as_str()).collect::<Vec<_>>(), ["B"]);
     assert_eq!(inventory.exempt.len(), 1);
@@ -226,7 +281,7 @@ fn exempted_pairs_leave_scheduled_work_and_never_pass() {
     assert!(!result::aggregate(&expected, &inflated, &[], &[]));
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn a_detected_but_exempted_pair_fails_the_run() {
@@ -253,7 +308,7 @@ fn command_options_and_encoding_match_python() {
     assert_eq!(args, ["python3", "scanner.py", "--url", TARGET, "-p", "input", "--dbms", "PostgreSQL", "--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", "B", "--level", "3", "--risk", "2", "--threads", "1", "--retries", "0", "--timeout", "15", "--time-sec", "3", "--union-cols", "1-4", "--output-dir", "output/session", "--report-json", "output/scanner.json", "--answers", "extending=N,include=N,fuzzy=N", "-v", "2"]);
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+3/test]
 #[test]
 fn declared_settings_reach_scanner_and_fixture() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
@@ -332,6 +387,9 @@ fn cli_preserves_profile_subset_and_diagnostic_options() {
     assert_eq!(options.profile, "full"); assert_eq!(options.subset, vec!["select"]);
     assert!(options.baseline_only && options.direct_regressions);
     assert!(Options::parse(["--profile".into()].into_iter(), Path::new("/tmp")).is_err());
+    let identifiers = Options::parse(["--profile", "identifiers"].into_iter().map(str::to_owned), Path::new("/tmp")).unwrap();
+    assert_eq!(identifiers.profile, "identifiers");
+    assert!(Options::parse(["--profile", "nonsense"].into_iter().map(str::to_owned), Path::new("/tmp")).is_err());
 }
 
 /// Optional corpus check: reinterprets every retained Python scan, including failures.

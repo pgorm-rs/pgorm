@@ -13,8 +13,8 @@ pub struct Status {
     pub inapplicable: Map<String, Value>,
 }
 
-// [spec:pgorm:req:security.sqlmap.ci]
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.ci+1]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
     let bare = |status: &'static str, reason: &str| Status { status, reason: reason.into(), inapplicable: Map::new() };
     let bytes = match fs::read(artifacts.join("run/report.json")) {
@@ -60,10 +60,10 @@ pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
 /// Writes `ci-status.json` and `ci-summary.txt`, and reports whether the profile
 /// passed alongside the rendered summary. Echoing that summary anywhere else is
 /// the caller's business, so publishing stays free of ambient environment.
-// [spec:pgorm:req:security.sqlmap.ci]
+// [spec:pgorm:req:security.sqlmap.ci+1]
 pub fn publish(profile: &str, artifacts: &Path) -> Result<(bool, String)> {
-    if !["smoke", "full"].contains(&profile) {
-        return Err("profile must be smoke or full".into());
+    if !["smoke", "full", "identifiers"].contains(&profile) {
+        return Err("profile must be smoke, full or identifiers".into());
     }
     fs::create_dir_all(artifacts)?;
     let Status { status, reason, inapplicable } = profile_status(profile, artifacts);

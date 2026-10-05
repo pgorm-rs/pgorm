@@ -23,6 +23,10 @@ pub const PAYLOADS: [(&str, &str); 6] = [
     ("Q", "inline_query.xml"),
 ];
 const EVIDENCE_FIELDS: [&str; 6] = ["boundary", "clause", "contexts", "kind", "payload", "where"];
+/// The scanner level at which a boundary first reaches the context. Below it the pair is
+/// inapplicable; a profile at or above it schedules the pair, so the declaration cannot
+/// excuse a stronger scan from work it has been measured to reach.
+const CEILING_FIELD: &str = "ceiling";
 const EVIDENCE_KINDS: [&str; 2] = ["no-attachable-position", "no-boundary"];
 // Prose floors that refuse "n/a" without pretending to judge the argument itself.
 const REASON_CHARS: usize = 40;
@@ -153,7 +157,7 @@ pub fn verdict(control: &ScanResult, protected: &ScanResult, technique: &str, ba
 fn case_of(key: &str) -> Option<&str> { key.rsplit_once('-').map(|(case, _)| case) }
 
 /// A technique any retained control detected was never inapplicable for that case.
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn falsified(results: &BTreeMap<String, Value>, inapplicable: &BTreeMap<String, Value>) -> Vec<String> {
     let mut hits = Vec::new();
     for key in inapplicable.keys() {
@@ -189,7 +193,7 @@ fn strings(value: &Value) -> Result<Vec<String>, String> {
 }
 
 /// Declared inapplicability, refused unless it cites checkable scanner evidence.
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     let id = case["id"].as_str().ok_or("missing case id")?;
     let declared = match &case["inapplicable"] {
@@ -211,8 +215,12 @@ pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
         }
         let evidence = entry["evidence"].as_object()
             .ok_or(format!("inapplicable {pair} needs evidence fields {EVIDENCE_FIELDS:?}"))?;
-        if evidence.keys().map(String::as_str).collect::<BTreeSet<_>>() != EVIDENCE_FIELDS.into_iter().collect() {
+        if evidence.keys().map(String::as_str).filter(|k| *k != CEILING_FIELD).collect::<BTreeSet<_>>() != EVIDENCE_FIELDS.into_iter().collect() {
             return Err(format!("inapplicable {pair} needs evidence fields {EVIDENCE_FIELDS:?}"));
+        }
+        // sqlmap's levels run 1 to 5, and a ceiling of 1 would exempt the pair at no level at all.
+        if evidence.get(CEILING_FIELD).is_some_and(|c| c.as_u64().is_none_or(|n| !(2..=5).contains(&n))) {
+            return Err(format!("inapplicable {pair} has a ceiling that is not a scanner level from 2 to 5"));
         }
         if !EVIDENCE_KINDS.iter().any(|k| evidence["kind"] == *k) {
             return Err(format!("inapplicable {pair} has an unknown evidence kind"));
@@ -237,7 +245,7 @@ pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     Ok(out)
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result<Inventory, String> {
     let cases = manifest["cases"].as_array().ok_or("missing manifest cases")?;
     let mut by_id = BTreeMap::new();
@@ -256,6 +264,7 @@ pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result
         || techniques.iter().any(|t| !TECHNIQUES.iter().any(|(id, _)| id == t)) {
         return Err("empty, duplicated or unknown technique inventory".into());
     }
+    let level = profile["level"].as_u64().ok_or("profile must declare its scanner level")?;
     let mut inventory = Inventory::default();
     for id in selected {
         let case = by_id.get(&id).ok_or(format!("unknown case {id}"))?;
@@ -268,8 +277,9 @@ pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result
         let declared = exemptions(case)?;
         for technique in offered {
             match declared.get(&technique) {
-                Some(entry) => inventory.exempt.push((id.clone(), technique, entry.clone())),
-                None => inventory.work.push(((*case).clone(), technique)),
+                Some(entry) if entry["evidence"][CEILING_FIELD].as_u64().is_none_or(|ceiling| level < ceiling) =>
+                    inventory.exempt.push((id.clone(), technique, entry.clone())),
+                _ => inventory.work.push(((*case).clone(), technique)),
             }
         }
     }

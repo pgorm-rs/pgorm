@@ -4,7 +4,7 @@ use std::{fs, io::Write, path::PathBuf};
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let [profile, artifacts] = args.as_slice() else {
-        eprintln!("sqlmap-verdict <smoke|full> <artifact directory>");
+        eprintln!("sqlmap-verdict <smoke|full|identifiers> <artifact directory>");
         std::process::exit(1);
     };
     let (passed, summary) = match verdict::publish(profile, &PathBuf::from(artifacts)) {

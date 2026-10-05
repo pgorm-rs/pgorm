@@ -129,8 +129,8 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > revision requires a reviewed pin update and a fresh control/full-suite
 > run; an earlier report cannot stand for the new revision.
 
-> [spec:pgorm:req:security.sqlmap.profiles+2]
-> Version-controlled smoke and full profiles MUST declare their exact case
+> [spec:pgorm:req:security.sqlmap.profiles+3]
+> Version-controlled smoke, full and identifiers profiles MUST declare their exact case
 > ids, PostgreSQL DBMS selection, techniques, level/risk, request
 > concurrency, retry policy and time budgets, and the manifest MUST declare
 > each case's test parameter. The runner MUST apply every declared setting
@@ -152,6 +152,17 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 > pair the scanner detects. Declared-inapplicable pairs are excluded from
 > scheduled work, reported separately with their evidence, and MUST NOT be
 > counted as passes. Smoke is an explicitly smaller claim.
+> The identifiers profile scans the identifier-position cases at sqlmap's
+> highest level and risk, 5 and 3, with every technique. Some contexts are
+> unreachable at the full profile's level but reached by a higher-level
+> boundary. An exemption for such a context MUST carry a ceiling: the scanner
+> level at which that boundary first reaches it, as measured. The runner
+> MUST treat the pair as inapplicable only in a profile below its ceiling,
+> and MUST schedule it in a profile at or above it. An exemption without a
+> ceiling applies in every profile that schedules its case. On an
+> identifiers-profile case its evidence MUST name the level-5 boundaries that
+> were tried, so a stronger scan is never excused from work it has been
+> measured to reach.
 > Database and HTTP timeouts MUST allow the profile's expected time-control
 > delay, with a documented margin; an outer deadline still bounds the scan.
 > A profile whose time-control delay, database timeout, HTTP timeout and
@@ -214,9 +225,11 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 
 ## Integration and acceptance
 
-> [spec:pgorm:req:security.sqlmap.ci]
+> [spec:pgorm:req:security.sqlmap.ci+1]
 > CI MUST provide a bounded smoke job for relevant pull requests, a scheduled
-> full job and a manually invocable full job. All use the same local runner,
+> full job and a manually invocable full job. The identifiers profile runs
+> alongside the full profile on the same schedule and manual trigger, as its
+> own job with its own deadline and status. All use the same local runner,
 > profiles and verdict logic, retain artifacts on failure, and expose the
 > profile's status separately. Scanner work MUST stay out of the existing
 > pre-commit check budget. The job's permissions and services MUST be limited

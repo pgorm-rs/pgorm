@@ -31,3 +31,11 @@ jobs:
     uses: ./.github/workflows/sqlmap-run.yml
     with:
       profile: full
+  # Level 5 / risk 3 over the identifier-position cases. Measured at about 14
+  # minutes of scanning (56 scans, the slowest 45s), it rides the full profile's
+  # schedule as its own job and status; pull requests keep the smoke gate.
+  identifiers:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/sqlmap-run.yml
+    with:
+      profile: identifiers

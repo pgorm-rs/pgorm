@@ -51,13 +51,19 @@ fixture and must be replaced by a newly provisioned adapter.
 
 ## CI and evidence
 
-`.github/workflows/sqlmap.yml` runs smoke on relevant pull requests and full
-weekly or through **Run workflow**. Both call `sqlmap-run.yml`, which uses
-the same local runner and profiles. Smoke and full have separate check
-names. Fast runner tests do not need Docker or a live scanner.
+`.github/workflows/sqlmap.yml` runs smoke on relevant pull requests, and full
+and identifiers weekly or through **Run workflow**. All three call
+`sqlmap-run.yml`, which uses the same local runner and profiles, and each has
+its own check name. Fast runner tests do not need Docker or a live scanner.
 
-The scan deadlines are 30 minutes for smoke and 300 minutes for full, inside
-45/330-minute job limits. SIGTERM gives the runner time to stop its process
+The identifiers profile joined the schedule on its measured cost. Its 28
+scheduled pairs took 13.5 minutes of scanning in each of two measurement runs,
+and no single scan took longer than 45 seconds against its 300-second deadline.
+That is cheap enough to run every week beside the full profile. It is not
+cheap enough to add to every pull request, whose smoke gate scans three pairs.
+
+The scan deadlines are 30 minutes for smoke, 60 for identifiers and 300 for
+full, inside 45/90/330-minute job limits. SIGTERM gives the runner time to stop its process
 groups, clean up its fixture, and retain an incomplete report. Hitting a
 deadline fails the job. Scanner work stays outside the pre-commit checks.
 
@@ -80,8 +86,9 @@ evidence to durable storage before the CI retention window expires.
 A pass covers only the named, pinned manifest/profile. All scheduled scans
 must complete, all required vulnerable controls must be detected, every
 protected case must pass, and cleanup must succeed. Scanner silence is not
-proof that every possible ORM query is injection-free, and for identifier
-positions it is not evidence at all. See
+proof that every possible ORM query is injection-free. At an identifier
+position it is evidence only for a pair whose control fires at the profile's
+level, and most identifier pairs have no such control at level 3. See
 [Identifier positions](#identifier-positions-the-render-oracle).
 
 The [2026-09-09 acceptance attempt](acceptance/2026-09-09.md) completed all
@@ -104,7 +111,8 @@ Each case in `cases.json` carries an `inapplicable` map keyed by technique:
     "where": [3],                   /* qualifying <where> at this level/risk */
     "clause": [1, 2, 3, 8],         /* qualifying <clause> at this level/risk */
     "boundary": "<the boundary the context would need, and why it is absent>",
-    "contexts": "4"                 /* the CONTEXTS.md section that derives it */
+    "contexts": "4",                /* the CONTEXTS.md section that derives it */
+    "ceiling": 5                    /* optional: the level whose boundary reaches it */
   }
 }
 ```
@@ -116,20 +124,32 @@ boundaries serves `where=3` and it carries an empty prefix and suffix.
 `no-attachable-position` means a boundary does pair, but the control's grammar
 offers no slot the technique's vector can attach to.
 
+`ceiling` marks an exemption that holds only below a scanner level, because a
+boundary at that level was measured to reach the context. A profile below the
+ceiling treats the pair as inapplicable. A profile at or above it schedules the
+pair, and its control must then fire like any other. A declaration without a
+ceiling applies in every profile that schedules its case. On the eleven
+identifier cases, which the level-5 identifiers profile schedules, such a
+declaration's evidence names the level-5 boundaries that were tried and cites
+`where` values that qualify at level 5 / risk 3.
+
 Both runners refuse a declaration that omits a reason or any evidence field,
 carries a surplus field, cites a payload file that does not define the
-technique, or names a technique the case does not declare. A declared pair the
+technique, gives a ceiling that is not a scanner level from 2 to 5, or names a
+technique the case does not declare. A declared pair the
 scanner nonetheless detects is recorded in `falsified_exemptions` and fails the
 run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
 work, appear under `inapplicable` in the report and CI summary with their
 evidence, and are never counted as passes.
 
-Of 210 pairs, 93 are declared inapplicable (Q 35, U 17, E 12, T 12, B 11, S 6),
-leaving 117 scheduled. `schema`, `function`, `column`, `group`,
-`pipeline-projection` and `stored-identifier` have no scheduled technique left
-at all; the suite makes no detection claim about them, and their positions are
-covered by the identifier render oracle described below. Only CONTEXTS.md
-sections 7a and 7d are exempted. The section-7c control-shape cells are
+In the full profile, 93 of 210 pairs are declared inapplicable (Q 35, U 17,
+E 12, T 12, B 11, S 6), leaving 117 scheduled. Twenty of those 93 carry
+`ceiling` 5 (E 8, T 8, B 4). The identifiers profile schedules them alongside
+the eight identifier pairs that already fire at level 3: 28 of its 66 pairs,
+with 38 declared inapplicable. At level 3, `schema`, `function`, `column`,
+`group`, `pipeline-projection` and `stored-identifier` have no scheduled
+technique. At level 5, only `schema` and `function` have none. Only CONTEXTS.md
+sections 7a, 7d and 9 are exempted. The section-7c control-shape cells are
 reshaped to fire at level 3 — `insert` (INSERT … SELECT … WHERE),
 `update-value` (value in the WHERE), `cast` (CAST target inside a WHERE) and
 `enum` (an enum column filtered on the cast) now reach every scheduled
@@ -140,20 +160,40 @@ every boundary that closes a `"` below level 5 appends a comparison between two
 invented double-quoted identifiers. A technique whose tests carry no `<comment>`
 at level 3 — error-based and time-based — can only use that suffix, so it never
 produces a statement PostgreSQL will resolve, whatever the surrounding SQL.
+Level 5 adds two boundaries that change this, and CONTEXTS.md section 9
+records what each reaches. The clause-8 `"="[ORIGINAL]"` boundary turns a
+projected or sorted identifier into a self-comparison the payload can join.
+The clause-9 `" WHERE [RANDNUM]=[RANDNUM]` boundary opens a WHERE clause after a
+FROM or alias tail.
 
 ## Identifier positions: the render oracle
 
-The identifier positions this suite cannot reach are judged by a separate,
-structural instrument: the identifier render oracle
-(`tests/identifier_oracle_tests.rs`, specified in
+The identifiers profile scans the eleven identifier cases at sqlmap's highest
+strength, level 5 and risk 3. Measured twice
+([2026-10-05](acceptance/2026-10-05-identifiers.md)), 28 of their 66 controls
+fire there, and both runs agreed on every pair. For those 28, a clean protected
+route is the same kind of evidence it is anywhere else in this suite. The other
+38 are beyond this instrument at any level:
+
+- `schema` and `function`, all six techniques;
+- boolean, UNION and stacked queries at a leading projected identifier
+  (`column`, `group`, `pipeline-projection`, `stored-identifier`);
+- everything but stacked queries in the CREATE TABLE column definition
+  (`enum-ddl`);
+- UNION after ORDER BY (`order`);
+- inline queries in all eleven.
+
+Those positions are judged by a separate, structural instrument: the
+identifier render oracle (`tests/identifier_oracle/`, run by
+`tests/identifier_oracle_tests.rs` and specified as
+`[spec:pgorm:req:security.ident-oracle]` in
 [`docs/spec/ident-oracle.md`](../../docs/spec/ident-oracle.md)). It covers:
 
-- the six cases with no scheduled technique;
-- the cases scheduled for only some techniques (`graph-alias`, `table`,
-  `alias`, `order`, `enum-ddl`);
+- the 38 identifier pairs no sqlmap boundary reaches;
+- the identifier positions behind the 28 that sqlmap does reach;
 - every other public API that renders a caller-supplied name.
 
-Scanner silence says nothing about any of these positions. The oracle does
+Scanner silence says nothing about the first group. The oracle does
 not probe them with payloads. It renders each registered name position with a
 hostile-name corpus, parses the statement with libpg_query, and requires the
 name to come back as exactly the identifiers the position should produce,
@@ -161,7 +201,9 @@ with the rest of the parse tree unchanged. A live leg runs the nastiest names
 against a real server.
 
 That instrument, not this one, is where identifier-injection coverage is
-claimed. It has found defects this suite could not reach:
+claimed. The identifiers profile shows which identifier contexts a scanner can
+exploit. The oracle shows that pgorm never emits a name that leaves its
+identifier. It has found defects this suite could not reach:
 
 - keyword names read as grammar at type and function positions;
 - pipeline names beginning with `$`, which become placeholders or dollar

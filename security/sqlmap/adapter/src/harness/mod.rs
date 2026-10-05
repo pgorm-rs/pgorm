@@ -56,7 +56,7 @@ impl Options {
                 _ => return Err(format!("unknown option: {arg}").into()),
             }
         }
-        if !["smoke", "full"].contains(&options.profile.as_str()) { return Err("profile must be smoke or full".into()); }
+        if !["smoke", "full", "identifiers"].contains(&options.profile.as_str()) { return Err("profile must be smoke, full or identifiers".into()); }
         if !options.artifacts.is_absolute() { options.artifacts = std::env::current_dir()?.join(options.artifacts); }
         Ok(options)
     }
@@ -110,7 +110,7 @@ async fn scanner(pins: &Value, python: &str, cache: &Path, artifacts: &Path) -> 
 /// Every scan and fixture setting a profile declares, each of which reaches the scanner
 /// invocation or the fixture. Parsing refuses a field outside this set, so a profile
 /// cannot record a value the run would silently leave unapplied.
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub dbms: String,
@@ -176,7 +176,7 @@ pub fn target(base: &str, case: &Value, mode: &str) -> Result<String> {
     Ok(url.into())
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+2]
+// [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn scanner_args(python: &str, script: &Path, target: &str, technique: &str, settings: &Settings, case: &Value, output: &Path) -> Result<Vec<String>> {
     let mut args = vec![python.into(), script.to_string_lossy().into_owned(), "--url".into(), target.into(),
         "-p".into(), field(case)?.into(), "--dbms".into(), settings.dbms.clone()];

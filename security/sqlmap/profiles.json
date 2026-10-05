@@ -75,5 +75,38 @@
     "http_timeout_seconds": 15,
     "postgres_statement_timeout_seconds": 10,
     "timeout_margin": "10s database and 15s HTTP allow 3s control delays; 240s outer scan deadline"
+  },
+  "identifiers": {
+    "cases": [
+      "pipeline-projection",
+      "schema",
+      "column",
+      "group",
+      "function",
+      "stored-identifier",
+      "graph-alias",
+      "table",
+      "alias",
+      "order",
+      "enum-ddl"
+    ],
+    "techniques": [
+      "B",
+      "E",
+      "U",
+      "S",
+      "T",
+      "Q"
+    ],
+    "dbms": "PostgreSQL",
+    "level": 5,
+    "risk": 3,
+    "case_timeout_seconds": 300,
+    "concurrency": 1,
+    "retries": 0,
+    "time_sec": 3,
+    "http_timeout_seconds": 15,
+    "postgres_statement_timeout_seconds": 10,
+    "timeout_margin": "10s database and 15s HTTP allow 3s control delays; 300s outer scan deadline for the heavier level-5/risk-3 boundary catalogue"
   }
 }

@@ -1,9 +1,11 @@
 # sqlmap detection contexts — what each technique needs to catch a control
 
-Analysis only. Derived by reading the pinned scanner's payload/boundary
-definitions and the harness invocation, cross-referenced against the recorded
-`acceptance/2026-09-09.md` outcome (105 pass / 105 invalid-control). No files
-were changed and the scanner was not run.
+Sections 1–8 are analysis only. They were derived by reading the pinned
+scanner's payload/boundary definitions and the harness invocation,
+cross-referenced against the recorded `acceptance/2026-09-09.md` outcome
+(105 pass / 105 invalid-control); the scanner was not run for them. Section 9
+is measurement: the identifier cases scanned at level 5 / risk 3, which
+corrects several of the level-5 predictions made below.
 
 Authoritative sources read:
 - `target/sqlmap-cache/scanner/sqlmap-d486742eec47ba96940d35bf2dc176f60868efdd/data/xml/boundaries.xml`
@@ -44,7 +46,8 @@ boundary catalogue unmodified.
 4. **Boundary level ceiling** — `boundary.level ≤ 3` (`checks.py:409`). The
    `--answers extending=N` reply declines sqlmap's "extend to level 5/risk 3?"
    prompt (`checks.py:192`), so **level 3 is a hard ceiling on boundaries** —
-   every level-4 and level-5 boundary is unreachable in this suite.
+   every level-4 and level-5 boundary is unreachable in the full profile. (The
+   identifiers profile runs at level 5, where there is nothing to extend; §9.)
 5. **Clause intersection** — `test.clause ∩ boundary.clause ≠ ∅`, unless either
    side is `[0]` "Always" (`checks.py:416–421`).
 6. **Where intersection** — `test.where ∩ boundary.where ≠ ∅`
@@ -225,6 +228,12 @@ already ships boundaries for.
 | **T** time | **L3** in a WHERE context. **L≥4** for SET/VALUES. | Same as B/E rows. | mixed, as E-row. |
 | **Q** inline | **struct** — REPLACE cannot escape `'…'`; not reflected. | **struct** — REPLACE cannot escape `"…"`; not reflected. | **struct** — type/keyword/number positions are not reflected unquoted projections. |
 
+**Measured correction (§9).** The Class B column's level-5 predictions do
+not hold. At a leading projected identifier the clause-8 boundary rescues E and
+T, not B. At a bare FROM/alias tail the level-5 clause-9 boundary reaches B, E
+and T, which this table calls structural. Both are impossible at level 3, as
+the table says, and possible at level 5.
+
 **Evidence anchors for the cells:**
 
 - Class A / B / E / T reachable — ptype-2 WHERE boundary
@@ -332,16 +341,20 @@ tiers:
   `graph-alias` (`AS "x"`), and `order` (`ORDER BY "x"`): after closing the
   identifier you are in FROM/alias/ORDER-BY position, which has no truth slot to
   attach ` AND <inference>` / an error subquery / a timing subquery. Only set-op
-  (U, where legal) and statement-terminator (S) work. This is why these cases
-  structurally cap at "U,S" or "S".
+  (U, where legal) and statement-terminator (S) work at level 3. This is why
+  these cases cap at "U,S" or "S" there. *Measured (§9): not structural.* The
+  level-5 clause-9 boundary opens a WHERE after the FROM/alias tail, and the
+  level-5 clause-8 boundary makes the ORDER BY key a boolean expression, so B,
+  E and T fire on all four at level 5.
 - **Leading projected identifier** — `column`, `group`,
   `pipeline-projection`, `stored-identifier` (`SELECT "{input}" FROM items`):
   the injected name is a projected column that *depends on* the trailing
   `FROM items`. Commenting forward deletes the FROM (unresolved column error);
   appending a predicate makes `SELECT (text AND bool)` a type error; UNION/stacked
-  lose the FROM on the left statement. All six techniques fail, and only the
-  level-5 clause-8 identifier boundary would rescue B alone — so at the pinned
-  level 3 this context is a dead zone for *every* technique.
+  lose the FROM on the left statement. All six techniques fail at level 3, so at
+  the full profile's level this context is a dead zone for *every* technique.
+  *Measured (§9):* the level-5 clause-8 boundary writes `"c"="c" AND …`, which is
+  a boolean rather than a type error, and it rescues E and T, not B.
   The only faithful repair is to relocate the identifier to a **trailing** slot
   (the `table`/`order` shape), which changes the case's meaning.
 - **`schema`** (`FROM "{input}".items`): the trailing `.items` is bound to the
@@ -370,8 +383,11 @@ These would pass at `--level 4/5` but are refused here by `extending=N`:
   `insert`, note the arity wall in 7a still bites even at level 4 — so `insert`
   is effectively 7a, not merely level-gated.)
 - **leading-projected-identifier B** (`column`, `group`,
-  `pipeline-projection`, `stored-identifier`) — only via the level-5 clause-8
-  `"="[ORIGINAL]"` identifier boundary; U/S/T/Q remain 7a even there.
+  `pipeline-projection`, `stored-identifier`) — predicted reachable via the
+  level-5 clause-8 `"="[ORIGINAL]"` identifier boundary. *Measured (§9):* the
+  prediction was wrong both ways. That boundary leaves B undetected, because
+  the true page projects `t` where the original projected names, and it does
+  reach E and T.
 
 ### 7c. Reachable at level 3 today, just not with the current control shape
 
@@ -432,10 +448,10 @@ matter:
   deletes the `FROM items` the projected name resolves against; the suffix
   leaves `SELECT (text AND bool)`, a type error; the stacked variant loses its
   `FROM` on the first statement. Only the level-5 clause-8 `"="[ORIGINAL]"`
-  boundary rewrites the slot into `"c"="c" AND <inference>`, which does parse —
-  so B here is refused by the level ceiling, and relocating the identifier to a
-  trailing slot restores U and S but still not B, at the price of turning the
-  case into the `table`/`order` context.
+  boundary rewrites the slot into `"c"="c" AND <inference>`, which does parse.
+  This section predicted that rewrite would rescue B. *Measured (§9):* it rescues
+  E and T. B stays undetected because the true page no longer matches the
+  original one.
 - **CREATE TABLE column definition** (`enum-ddl`): a column-definition list has
   no truth slot and no set-operation position, so neither an `AND <inference>`
   nor a `UNION SELECT` can attach however the quote is closed. Only
@@ -484,3 +500,98 @@ nothing. The difference is the truth slot, not the identifier.
   outcomes are ground truth from the acceptance run and the *failing* cells
   (U, Q) are explained with high confidence; the precise boundary that carries
   each of those particular passes was not traced end-to-end.
+
+---
+
+## 9. Measured at level 5 / risk 3 — what the higher boundaries actually reach
+
+Sections 1–8 are analysis at the full profile's level 3 / risk 2, and several
+of their statements about level 5 were predictions. This section replaces those
+predictions with measurement. The `identifiers` profile in `profiles.json` scans
+the eleven identifier-position cases at level 5 / risk 3 with every technique;
+it was run twice over `e6bb4d1a`, with the profile added and the eleven cases'
+exemptions removed for the measurement, so all 66 case/technique pairs were
+scanned (`target/sqlmap-ci/ident-r1`,
+`target/sqlmap-ci/ident-r2`; the record is
+[`acceptance/2026-10-05-identifiers.md`](acceptance/2026-10-05-identifiers.md)).
+At level 5 `--answers extending=N` has nothing to decline, so every boundary in
+the catalogue is in play, including the level-4 and level-5 ones listed in §2.
+
+Detected in both runs (D), in neither (·). No pair differed between the two
+runs, and no protected route yielded a finding.
+
+| case | B | E | U | S | T | Q |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pipeline-projection` | · | D | · | · | D | · |
+| `column` | · | D | · | · | D | · |
+| `group` | · | D | · | · | D | · |
+| `stored-identifier` | · | D | · | · | D | · |
+| `schema` | · | · | · | · | · | · |
+| `function` | · | · | · | · | · | · |
+| `graph-alias` | D | D | D | D | D | · |
+| `table` | D | D | D | D | D | · |
+| `alias` | D | D | D | D | D | · |
+| `order` | D | D | · | D | D | · |
+| `enum-ddl` | · | · | · | D | · | · |
+
+Twenty-eight pairs fire. Eight of them (U and S on the three bare tails, S on
+`order` and on `enum-ddl`) already fire at level 3. The other twenty are reached
+by exactly two level-5 boundaries, and the request evidence names them:
+
+- **Clause 8, `"="[ORIGINAL]"`** (ptype 6, suffix ` AND "[ORIGINAL]"="[ORIGINAL]"`).
+  At a leading projected identifier it rewrites `SELECT "c" FROM items` into
+  `SELECT "c"="c" AND <payload> AND "c"="c" FROM items`. §5 and §7d said this
+  slot became `SELECT (text AND bool)`, a type error. It does not: `"c"="c"` is
+  itself a boolean, so the projection parses, keeps its `FROM items`, and
+  evaluates the payload. E (the error-forcing CAST raises `invalid input syntax
+  for type numeric`) and T (`pg_sleep`) both fire on `pipeline-projection`,
+  `column`, `group` and `stored-identifier`. B, which §7b expected this boundary
+  to rescue, does not: the true response projects `t` where the original page
+  projected names, and boolean-blind confirms only when the true page matches
+  the original. In `ORDER BY "c"` the same boundary makes the sort key a boolean
+  expression, and B (through the subquery-comment test), E and T fire on
+  `order`.
+- **Clause 9, `" WHERE [RANDNUM]=[RANDNUM]`** (ptype 4, comment suffix). At a bare
+  FROM or alias tail it closes the identifier and opens a WHERE clause, turning
+  `SELECT name FROM "x"` into `SELECT name FROM "x" WHERE n=n AND <payload>--`.
+  §7a called B/E/T on these tails structurally impossible at any level. They are
+  impossible below level 5, and B, E and T all fire on `graph-alias`, `table` and
+  `alias` at level 5.
+
+What still does not fire, and the server's own reason in the request evidence:
+
+- **Leading projection, B/U/S.** B as above. U and S carry their own comment,
+  which replaces every closer's suffix and deletes `FROM items` (`column "c" does
+  not exist`), at clause 8 and clause 9 alike.
+- **`schema`, all six.** Clause 8 is a syntax error between the schema and
+  `.items`; clause 9 and every commenting closer leave `FROM "schema"`, which is
+  not a relation.
+- **`function`, all six.** The slot is unquoted, so every double-quote closer
+  opens an unterminated quoted identifier, and the parenthesis and empty closers
+  leave `<expr>('Alice')` or an unknown column.
+- **`enum-ddl` B/E/U/T.** In a column-definition list clause 8 is a syntax error at
+  `=`, clause 9 at `WHERE`, a UNION at `UNION`. Only `");<statement>` attaches,
+  which is S.
+- **`order` U.** A UNION after ORDER BY is a syntax error at every closer.
+- **Q, all eleven.** Every level-4 and level-5 boundary is `where` 1 or 1,2, so
+  level 5 adds no REPLACE boundary; §4 stands unchanged.
+
+### How the manifest records this
+
+An exemption that holds only below level 5 carries `"ceiling": 5` in its
+evidence. The runner treats it as inapplicable in a profile below that level and
+schedules the pair in a profile at or above it, so the same declaration keeps the
+full profile honest at level 3 and makes the `identifiers` profile scan what
+level 5 reaches. The twenty pairs above carry `ceiling 5`. The thirty-eight that
+level 5 does not reach keep an exemption with no ceiling, and their evidence now
+names the level-5 boundaries that were tried and what PostgreSQL said to each.
+
+### What a timing run needs
+
+T and S confirm by sleeping three seconds. A first attempt at this measurement
+ran while another session compiled on the same machine; it lost `group-T`, whose
+control SQL is byte-identical to `column-T`, which passed, and the scanner logged
+"considerable lagging has been detected in connection response(s)". That attempt
+is not counted. Both counted runs were on an awake machine with no competing
+compile, and the one-minute load average read between 2.3 and 2.5 at the start
+and end of each.
