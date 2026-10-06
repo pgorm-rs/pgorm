@@ -9466,6 +9466,13 @@ children (
                         kind @note
                         text "Blocks every node that needs 18-only grammar: pg18-virtual-generated, pg18-temporal-keys, pg18-not-null-constraints, the WITH (OLD AS, NEW AS) half of pg18-returning-old-new, and pg18-security-baselines, so the oracle and the campaign parse with the grammar the server speaks. The pg_query crate (pgorm pins 6.2.0) bundles libpg_query 17-6.x. libpg_query 18.1.0 is released (2026-09-30, Postgres 18.6), but pg_query.rs's 18 release (PR pganalyze/pg_query.rs#79, built on libpg_query 18.0.0) is unmerged. Two routes: (1) fork pg_query.rs to necessary-nu, take PR #79's branch, bump the libpg_query submodule to 18.1.0 (note its breaking pg_query_fingerprint_opts signature change), prove it, and depend on it by git rev, as prqlc is (deny.toml's allow-git list, the prqlc pin tests' pattern, the detached workspaces' lockfiles), returning to crates.io when upstream releases; or (2) wait for upstream. Route 1 needs the operator's say-so: it adds a second forked git dependency, which deny.toml says must be a deliberate edit. Either way, pg_query is used by the sql! / prql! macros (pgorm-sql-macro), metrics fingerprinting (src/metric/fingerprint.rs, feature metrics-fingerprint), the pipeline's lexer census (src/pipeline/census.rs, pg_query::scan), the identifier oracle and the codegen DDL path. Acceptance: every one of those runs on the 18 grammar; the oracle and every pg_query-based test pass; sql.render.oracle's rationale text is updated; and an 18-only statement (a VIRTUAL column) parses in sql!."
                     }
+
+                    {
+                        at 2026-10-06T13:16:44.997308Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-06: \"fork https://github.com/pganalyze/pg_query.rs to necessary-nu, merge that PR, and bump the tag to 18.1.0.\" Route 1, the same pattern as the prqlc fork: necessary-nu/pg_query.rs, with a branch (pgorm/postgres-18, matching prqlc's pgorm/* branch naming) holding upstream main plus PR pganalyze/pg_query.rs#79 (\"Release 18.0.0\") merged, and the libpg_query submodule moved to tag 18.1.0 (Postgres 18.6; it carries the pg_query_normalize security fix GHSA-6ggm-xmc9-8ffg, so no interim 6.2.1 bump is needed). Proven in the fork first by its own suite, then adopted by pgorm as a git dependency at an exact rev, with deny.toml's allow-git list extended deliberately. Upstream's own 18 release replaces the fork when it ships."
+                    }
                 )
             }
 
