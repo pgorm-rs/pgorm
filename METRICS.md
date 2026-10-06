@@ -114,6 +114,18 @@ SELECT name FROM widget WHERE id = 1   -> f7678147685fe197
 
 `QueryFingerprint` renders through `Display` as libpg_query's canonical 16-character zero-padded hex, and `value()` hands back the same number as a `u64` — the cheaper key for a `HashMap` of counters.
 
+Fingerprints follow PostgreSQL 18's query-ID rules, so they group statements the way an 18 server's `pg_stat_statements` does: a schema qualifier is not part of a relation's identity, and an aliased relation is identified by its alias rather than its name.
+
+```text
+SELECT id FROM widget WHERE id = 1          -- same fingerprint as
+SELECT id FROM public.widget WHERE id = 1
+
+SELECT id FROM widget w WHERE id = 1        -- same fingerprint as
+SELECT id FROM gadget w WHERE id = 1        -- (the alias, not the table)
+```
+
+**Fingerprints changed with pgorm's move to PostgreSQL 18's parser** (libpg_query 18.1.0, which replaced libpg_query 17). Statements with an aliased or schema-qualified relation, every statement with a `RETURNING` clause, and `BEGIN`/`START TRANSACTION` with options now have different fingerprints from the ones earlier pgorm builds reported; other statements kept theirs, the three `widget` examples at the top of this section among them. A collector that stores fingerprints across that upgrade will see those statements under new identities.
+
 It is **off by default**, behind the `metrics-fingerprint` feature:
 
 ```toml
@@ -121,7 +133,7 @@ It is **off by default**, behind the `metrics-fingerprint` feature:
 pgorm = { version = "0.1", features = ["metrics-fingerprint"] }
 ```
 
-Without the feature pgorm pulls in no parser and `fingerprint()` is always `None`. The types and hook signatures are the same either way, so a collector compiles against both builds; enabling the feature changes an answer, not an API.
+Without the feature no statement is parsed for its identity and `fingerprint()` is always `None`. The types and hook signatures are the same either way, so a collector compiles against both builds; enabling the feature changes an answer, not an API.
 
 `fingerprint()` returns an `Option` and never fails a query. `None` means one of three things, and does not say which:
 
@@ -259,7 +271,7 @@ let instrumented = InstrumentedPool::new(pool, PrometheusMetrics::new());
 - **Static dispatch.** The collector is a generic parameter, not a trait object — no vtable lookup, and swapping implementations is a type change.
 - **What wrapping does cost**, on every operation and regardless of collector: two clock reads (`Instant::now()` plus `elapsed()`) and one boxed future per hook call, since `#[async_trait]` boxes each hook's future. `NoOpMetrics` elides the reporting work, not the timing or the box.
 - **Building a `QueryContext` costs nothing** beyond copying two borrowed fields — no parse, no allocation. The parse happens only if a collector calls `fingerprint()`, and then only the first time that statement text is seen.
-- **Not enabling `metrics-fingerprint` is free.** pgorm takes no dependency on `pg_query`, so nothing links libpg_query and nothing is compiled for it.
+- **Not enabling `metrics-fingerprint` is free.** No statement is parsed for its identity. libpg_query is linked either way — the paginator and the `sql!`/`prql!` macros parse with it — so the feature adds no dependency and no compile time.
 
 ## Production Deployment Tips
 

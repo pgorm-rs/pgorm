@@ -157,7 +157,7 @@ pub(super) fn build(
 /// column, as a table constraint beside a column's, or twice on one column.
 /// PostgreSQL refuses every such table (42P16), and none is a composite key:
 /// that is one `PRIMARY KEY (a, b)`.
-// [spec:pgorm:req:codegen.ddl.unsupported+5]
+// [spec:pgorm:req:codegen.ddl.unsupported+6]
 fn second_primary_key(table_name: &str, at: usize) -> Error {
     unresolved(
         format!("table `{table_name}` declares more than one primary key"),
@@ -167,7 +167,7 @@ fn second_primary_key(table_name: &str, at: usize) -> Error {
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+5]
+// [spec:pgorm:req:codegen.ddl.unsupported+6]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -306,6 +306,11 @@ fn column(
         }
         reject_constraint_features(constraint, &context, at)?;
         match constraint_type(constraint, &context, at)? {
+            // PostgreSQL 18 keeps a NOT NULL constraint's name in its
+            // catalog, and a column's NOT NULL has no name to carry it.
+            ConstrType::ConstrNotnull if !constraint.conname.is_empty() => {
+                return Err(on("a named NOT NULL constraint"));
+            }
             ConstrType::ConstrNotnull => not_null = true,
             ConstrType::ConstrNull => nullable = true,
             ConstrType::ConstrPrimary if primary_key => {
@@ -332,7 +337,7 @@ fn column(
                     at,
                 )?);
             }
-            other => return Err(on(constraint_kind(other))),
+            other => return Err(on(constraint_kind(constraint, other))),
         }
     }
     if not_null {
@@ -440,7 +445,11 @@ fn table_constraint(
                 constraint, target, &columns, &context, at,
             )?)))
         }
-        other => Err(on(constraint_kind(other))),
+        // A table-level NOT NULL (`[CONSTRAINT n] NOT NULL col [NOT VALID]`)
+        // is PostgreSQL 18's catalog constraint, which a column's NOT NULL
+        // cannot carry the name or validity of.
+        ConstrType::ConstrNotnull => Err(on("a table-level NOT NULL constraint")),
+        other => Err(on(constraint_kind(constraint, other))),
     }
 }
 
@@ -569,7 +578,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+5]
+// [spec:pgorm:req:codegen.ddl.unsupported+6]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -597,6 +606,21 @@ fn reject_constraint_features(
     if constraint.where_clause.is_some() {
         return Err(on("a partial constraint"));
     }
+    // PostgreSQL 18's temporal keys: a key whose last column is a range that
+    // may not overlap, and a foreign key matching on a period. A plain key or
+    // foreign key over the same columns would mean something else.
+    if constraint.without_overlaps {
+        return Err(on("a WITHOUT OVERLAPS key"));
+    }
+    if constraint.fk_with_period || constraint.pk_with_period {
+        return Err(on("a PERIOD foreign key"));
+    }
+    // Only a foreign key carries enforcement this early: the grammar sets it
+    // on every foreign key and leaves it unset on the keys that cannot be
+    // NOT ENFORCED.
+    if constraint.contype == ConstrType::ConstrForeign as i32 && !constraint.is_enforced {
+        return Err(on("a NOT ENFORCED constraint"));
+    }
     Ok(())
 }
 
@@ -606,11 +630,17 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+5]
-fn constraint_kind(kind: ConstrType) -> &'static str {
+// [spec:pgorm:req:codegen.ddl.unsupported+6]
+fn constraint_kind(constraint: &Constraint, kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",
         ConstrType::ConstrCheck => "a CHECK constraint",
+        // PostgreSQL 18 reads a bare `GENERATED ALWAYS AS (...)` as VIRTUAL
+        // too, so the grammar's kind is the answer, not the keyword's
+        // presence.
+        ConstrType::ConstrGenerated if constraint.generated_kind == "v" => {
+            "a VIRTUAL generated column"
+        }
         ConstrType::ConstrGenerated => "a GENERATED clause",
         ConstrType::ConstrIdentity => "an identity clause",
         ConstrType::ConstrExclusion => "an EXCLUDE constraint",
@@ -618,6 +648,8 @@ fn constraint_kind(kind: ConstrType) -> &'static str {
         | ConstrType::ConstrAttrNotDeferrable
         | ConstrType::ConstrAttrDeferred
         | ConstrType::ConstrAttrImmediate => "a deferrable constraint",
+        ConstrType::ConstrAttrNotEnforced => "a NOT ENFORCED constraint",
+        ConstrType::ConstrAttrEnforced => "an ENFORCED clause",
         _ => "an unrecognised constraint",
     }
 }

@@ -20,7 +20,7 @@ fn total<'brand>() -> Expr<'brand> {
 // [spec:pgorm:req:pipeline.errors+4/test]
 fn sql_of(pipeline: Pipeline) -> String {
     let (sql, _) = pipeline.into_sql().expect("pipeline compiles");
-    if let Err(err) = pg_query::parse(&sql) {
+    if let Err(err) = pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT) {
         panic!("PostgreSQL grammar rejected the emitted SQL: {err}\n  {sql}");
     }
     sql
@@ -140,7 +140,7 @@ fn string_literals_are_escaped() {
 /// by the server's own scanner — so an ordinary literal and an `E''` one are
 /// compared by what they denote rather than by how they were written.
 fn parsed_string(sql: &str) -> Option<String> {
-    let parsed = pg_query::parse(sql).ok()?;
+    let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT).ok()?;
     parsed.protobuf.nodes().into_iter().find_map(|node| {
         let pg_query::NodeRef::AConst(constant) = node.0 else {
             return None;
@@ -173,7 +173,8 @@ fn hostile_literals_stay_one_statement() {
     ];
     for payload in payloads {
         let sql = sql_of(Pipeline::from(INVOICE).filter(col(INVOICE, alias("note")).eq(payload)));
-        let parsed = pg_query::parse(&sql).expect("grammar accepts");
+        let parsed =
+            pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
         assert_eq!(
             parsed.protobuf.stmts.len(),
             1,
@@ -950,7 +951,7 @@ fn identifier_refusal_precedes_the_prqlc_call() {
 }
 
 fn parsed_select(sql: &str) -> pg_query::protobuf::SelectStmt {
-    let parsed = pg_query::parse(sql).expect("grammar accepts");
+    let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     let node = parsed.protobuf.stmts[0]
         .stmt
         .as_ref()
@@ -985,7 +986,7 @@ fn from_pipeline_binds_as_cte() {
     .sort(spent.desc())
     .into_sql()
     .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "WITH table_0 AS (SELECT customer_id, COALESCE(SUM(total), 0) AS spent FROM invoice \
@@ -1010,7 +1011,7 @@ fn join_pipeline_renumbers_embedded_params() {
         .select((col(CUSTOMER, alias("name")), spent))
         .into_sql()
         .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "WITH table_1 AS (SELECT name, id FROM customer WHERE active = $1), \
@@ -1033,7 +1034,7 @@ fn append_renders_union_all() {
         )
         .into_sql()
         .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "SELECT * FROM invoice WHERE total > $1 \
@@ -1119,7 +1120,7 @@ fn take_and_sort_survive_embedding() {
     .filter(CUSTOMER_ID.gt(1))
     .into_sql()
     .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "WITH table_0 AS (SELECT * FROM invoice WHERE total > $1 ORDER BY total DESC LIMIT 3) \
@@ -1143,7 +1144,7 @@ fn nested_embedding_renumbers_bindings_and_params() {
         )
         .into_sql()
         .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "WITH table_2 AS (SELECT * FROM customer WHERE id > $1), \
@@ -1373,7 +1374,7 @@ fn a_named_pipeline_joins_as_an_aliased_cte() {
         .select((col(EMPLOYEE, NAME), col(MANAGER, NAME).as_(alias("boss"))))
         .into_sql()
         .expect("pipeline compiles");
-    pg_query::parse(&sql).expect("grammar accepts");
+    pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     assert_eq!(
         sql,
         "WITH table_0 AS (SELECT * FROM employee WHERE level > $1) \
@@ -1461,7 +1462,7 @@ fn a_reserved_source_name_is_refused() {
 // [spec:pgorm:req:pipeline.params+4/test]
 fn sql_and_values_of(pipeline: Pipeline) -> (String, Values) {
     let (sql, values) = pipeline.into_sql().expect("pipeline compiles");
-    if let Err(err) = pg_query::parse(&sql) {
+    if let Err(err) = pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT) {
         panic!("PostgreSQL grammar rejected the emitted SQL: {err}\n  {sql}");
     }
     (sql, values)
@@ -1670,7 +1671,7 @@ fn nested_embedding_prunes_through_two_levels() {
 // [spec:pgorm:sem:pipeline.select-sources+4/test]
 fn sources_sql_of<T: SourceList>(selected: SelectedSources<T>) -> String {
     let (sql, _) = selected.into_sql().expect("select_sources compiles");
-    if let Err(err) = pg_query::parse(&sql) {
+    if let Err(err) = pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT) {
         panic!("PostgreSQL grammar rejected the emitted SQL: {err}\n  {sql}");
     }
     sql

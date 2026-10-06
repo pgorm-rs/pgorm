@@ -57,7 +57,27 @@ log = { version = "0.4.34", default-features = false }
 # `db-tokio-postgres` carries that `ToSql` impl and only this dependency edge
 # turns it on; `pgorm-query` takes the same crate without it.
 rust_decimal = { version = "1.43", features = ["db-tokio-postgres"], default-features = false }
-pg_query = "6.2.0"
+# libpg_query, the PostgreSQL server's own parser: the paginator reads raw
+# statements with it, `metrics-fingerprint` hashes with it, and the `sql!` /
+# `prql!` macros, codegen's DDL path and the render and identifier oracles all
+# parse with it, so every one of them speaks the grammar it carries.
+#
+# It is a git dependency on the fork's pgorm/postgres-18 branch, which is
+# upstream pg_query.rs 6.2.1 with upstream's unreleased 18.0.0 merged in
+# (pganalyze/pg_query.rs#79) and its libpg_query submodule at tag 18.1.0 —
+# PostgreSQL 18.6's grammar, the release the test server runs. crates.io's
+# pg_query still carries PostgreSQL 17's, which refuses every statement 18
+# added (a VIRTUAL generated column, a WITHOUT OVERLAPS key, a named NOT
+# NULL). A dependency rather than a `[patch.crates-io]` entry for the reason
+# prqlc's below is: a patch reaches only the workspace that declares it.
+# Upstream's own 18 release replaces the fork when it ships.
+#
+# The cost is the one prqlc's states — `cargo publish` refuses a git
+# dependency — and the revision is held the same way: pgorm-sql-macro,
+# pgorm-codegen and pgorm-query's oracle name the same commit, and
+# tests/fork_pin_tests.rs holds every declaration and every committed lockfile
+# to it.
+pg_query = { git = "https://github.com/necessary-nu/pg_query.rs.git", rev = "09ebc3a4c7f50f3682e890a8372b4c4c99382ed9" }
 pgorm-macros = { version = "0.2.0", path = "pgorm-macros", default-features = false, features = ["strum"] }
 pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro" }
 # The PRQL compiler behind pgorm::pipeline. Pure Rust but a heavyweight
@@ -94,7 +114,7 @@ pgorm-sql-macro = { version = "0.2.0", path = "pgorm-sql-macro" }
 # registry version, and giving it one would hand every crates.io consumer the
 # stock compiler this exists to avoid, so pgorm is not publishable to
 # crates.io while this stands. pgorm-sql-macro names the same revision, and
-# tests/prqlc_pin_tests.rs holds every declaration and every committed
+# tests/fork_pin_tests.rs holds every declaration and every committed
 # lockfile to it.
 prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee850b1d1e16c41285f6ae7ee7fbe19", default-features = false }
 pgorm-query.workspace = true

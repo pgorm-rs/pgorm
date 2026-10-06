@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+10]
+> [spec:pgorm:req:security.ident-oracle+11]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -71,9 +71,16 @@ the modules under `tests/identifier_oracle/`.
 > `TypeCast.type_name.names[i]` or `FuncCall.funcname[i]`. At every declared
 > position the value MUST equal the name's bytes.
 >
-> Nothing else in the tree may differ. With `location`, `stmt_location` and
-> `stmt_len` set aside, the parse tree MUST equal the tree of the same
-> statement rendered with a benign name, except at the declared positions.
+> Nothing else in the tree may differ. With every field that records a byte
+> offset set aside — `location`, a statement's `stmt_location` and
+> `stmt_len`, the offsets PostgreSQL 18's parse tree added beside them
+> (`rexpr_list_start` and `rexpr_list_end` on an `IN` list, `list_start` and
+> `list_end` on an array constructor, `arg_location`, `payload_location` and
+> `conninfo_location`), and a JSON table path's `name_location` — the parse
+> tree MUST equal the tree of the same statement rendered with a benign name,
+> except at the declared positions. An offset moves with the length of every
+> name before it, so it says nothing about structure; an offset field the
+> oracle did not set aside would fail every name of a different length.
 > The comparison is generic: both trees are the protobuf serialised to JSON,
 > walked in parallel, and they must agree on every key, every array length
 > and every other leaf. No per-site matcher is written, so a name that

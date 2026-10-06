@@ -36,7 +36,26 @@ pub const IDENTIFIER_BYTES: usize = NAMEDATALEN - 1;
 /// Fields that record where in the text a node was, not what it is. They
 /// differ between two renderings whose names differ in length, and carry no
 /// structure.
-const POSITION_KEYS: [&str; 3] = ["location", "stmt_location", "stmt_len"];
+///
+/// Every byte-offset field libpg_query's protobuf carries: the `location` of
+/// most nodes and a statement's extent, and the offsets PostgreSQL 18 added
+/// beside them — an `IN` list's bounds on `A_Expr`, an array constructor's
+/// bounds on `A_ArrayExpr` and `ArrayExpr`, the value of a `DefElem`, a
+/// `NOTIFY` payload and a subscription's connection string — plus a JSON
+/// table path's name.
+const POSITION_KEYS: [&str; 11] = [
+    "location",
+    "stmt_location",
+    "stmt_len",
+    "rexpr_list_start",
+    "rexpr_list_end",
+    "list_start",
+    "list_end",
+    "arg_location",
+    "payload_location",
+    "conninfo_location",
+    "name_location",
+];
 
 /// Node kinds that only wrap a value; a name's position is named by the node
 /// that holds the wrapper, not by the wrapper.
@@ -258,7 +277,8 @@ pub enum Seg {
 
 /// Parse `sql` and return its protobuf parse tree as JSON.
 pub fn parse_tree(sql: &str) -> Result<Json, String> {
-    let parsed = pg_query::parse(sql).map_err(|err| err.to_string())?;
+    let parsed =
+        pg_query::parse(sql, pg_query::ParserOptions::DEFAULT).map_err(|err| err.to_string())?;
     serde_json::to_value(&parsed.protobuf).map_err(|err| err.to_string())
 }
 
@@ -622,7 +642,7 @@ pub fn encoder_refuses(sql: &str) -> Result<(), String> {
     if frontend::query(sql, &mut buf).is_ok() {
         return Err(format!("the Query encoder accepted {}", show(sql)));
     }
-    if pg_query::parse(sql).is_ok() {
+    if pg_query::parse(sql, pg_query::ParserOptions::DEFAULT).is_ok() {
         return Err(format!("libpg_query parsed {}", show(sql)));
     }
     Ok(())

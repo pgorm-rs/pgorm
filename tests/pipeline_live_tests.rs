@@ -142,7 +142,7 @@ async fn seed(db: &impl ConnectionTrait) -> Seeded {
 }
 
 fn parsed_select(sql: &str) -> pg_query::protobuf::SelectStmt {
-    let parsed = pg_query::parse(sql).expect("grammar accepts");
+    let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT).expect("grammar accepts");
     let node = parsed.protobuf.stmts[0]
         .stmt
         .as_ref()

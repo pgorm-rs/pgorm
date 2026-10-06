@@ -63,7 +63,7 @@ known limitations.
 > identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
 > PostgreSQL has no type for. The verbatim rendering is sound exactly because the
 > text is a compile-time literal in the caller's source, unreachable from data;
-> `[spec:pgorm:def:sql.types.type-name+7]` is where that text rides — the
+> `[spec:pgorm:def:sql.types.type-name+8]` is where that text rides — the
 > `verbatim` flag of the ordinary cast node, not a shape of its own
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — and it keeps every
 > *identifier*-borne type name quoted
@@ -544,13 +544,15 @@ known limitations.
 
 ## Compile-time SQL validation
 
-> [spec:pgorm:def:macros.sql+3]
+> [spec:pgorm:def:macros.sql+4]
 > `pgorm-sql-macro` is a proc-macro crate exporting exactly two function-like macros:
 > `sql!`, specified here, and `prql!` (`[spec:pgorm:def:macros.prql]`). `sql!` takes one
 > string literal and nothing else. While the calling crate is being compiled, the
 > literal's text is handed to `pg_query::parse` — the Rust binding to libpg_query, the
-> PostgreSQL server's own parser, pinned to the same `6.2.0` the render oracle uses and
-> for the same reason (`[spec:pgorm:req:sql.render.oracle]`). A literal the grammar
+> PostgreSQL server's own parser, at the same revision the render oracle uses and for
+> the same reason (`[spec:pgorm:req:sql.render.oracle+1]`), so a literal is held to
+> PostgreSQL 18's grammar: a statement only 18 parses, such as a `VIRTUAL` generated
+> column, compiles. A literal the grammar
 > accepts expands to itself, byte for byte, as a `&'static str` usable in const
 > position; there is no wrapper type, no runtime check and no allocation, so the macro
 > is invisible in the generated code.
@@ -560,7 +562,7 @@ known limitations.
 > crate is a plain dependent and re-exports both as `pgorm::sql` and `pgorm::prql`,
 > unconditionally: the retired `sql-macro` feature only decided whether the name was in
 > scope — never whether anything was compiled, since `pg_query` is a plain dependency
-> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+5]` parses raw statements at
+> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+6]` parses raw statements at
 > runtime) and prqlc is a plain dependency by the same permanence posture
 > (`[spec:pgorm:def:pipeline.adapter+2]`) — and a gate that guards nothing is surface
 > without a state.

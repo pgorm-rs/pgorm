@@ -85,8 +85,8 @@ are inventoried in `pgorm/DEPENDENCIES.json`; full notice texts are in
 `pgorm/THIRD_PARTY_NOTICES.txt` and the wheel's license metadata. The inventory
 includes the entire locked Cargo graph, including build dependencies and
 platform-conditional packages, so it is a superset of any individual wheel.
-It identifies libpg_query, its PostgreSQL parser, protobuf-c and xxHash, and
-ring's bundled cryptography. System libraries and the Python interpreter are
+It identifies libpg_query, its PostgreSQL parser, upb, utf8_range and xxHash,
+and ring's bundled cryptography. System libraries and the Python interpreter are
 provided by the deployment environment; the link report identifies the
 extension's dynamic library dependencies.
 

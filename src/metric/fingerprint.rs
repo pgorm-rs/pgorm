@@ -14,7 +14,7 @@ use std::fmt;
 /// [`Display`](fmt::Display) renders libpg_query's canonical 16-character
 /// zero-padded hex form; [`value`](Self::value) is the same number as an
 /// integer, which is the cheaper key for aggregation.
-// [spec:pgorm:req:metric.fingerprint+1]
+// [spec:pgorm:req:metric.fingerprint+2]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct QueryFingerprint(u64);
 
@@ -46,7 +46,7 @@ impl fmt::Display for QueryFingerprint {
 /// its text and nothing else (`conn.sql-text`) — and `None` only for the two
 /// hooks that report a transaction verb (`"begin"`, `"rollback"`), where there
 /// is no statement to name.
-// [spec:pgorm:req:metric.fingerprint+1]
+// [spec:pgorm:req:metric.fingerprint+2]
 #[derive(Clone, Copy, Debug)]
 pub struct QueryContext<'a> {
     operation: &'a str,
@@ -108,8 +108,8 @@ impl fmt::Display for FingerprintSuffix {
     }
 }
 
-/// The memo behind [`QueryContext::fingerprint`], with libpg_query linked in.
-// [spec:pgorm:req:metric.fingerprint+1]    computation site and memoization
+/// The memo behind [`QueryContext::fingerprint`], parsing with libpg_query.
+// [spec:pgorm:req:metric.fingerprint+2]    computation site and memoization
 #[cfg(feature = "metrics-fingerprint")]
 mod memo {
     use super::QueryFingerprint;
@@ -144,9 +144,17 @@ mod memo {
             return *known;
         }
 
-        let computed = pg_query::fingerprint(sql)
-            .ok()
-            .map(|fingerprint| QueryFingerprint(fingerprint.value));
+        // The default options are PostgreSQL 18's query-ID rules: an alias
+        // stands for the relation it names and a schema qualifier is not
+        // part of the identity, so a fingerprint groups statements the way
+        // the server's own `pg_stat_statements` does.
+        let computed = pg_query::fingerprint(
+            sql,
+            pg_query::ParserOptions::DEFAULT,
+            pg_query::FingerprintOptions::DEFAULT,
+        )
+        .ok()
+        .map(|fingerprint| QueryFingerprint(fingerprint.value));
 
         let mut memo = memo.write().unwrap_or_else(PoisonError::into_inner);
         if memo.len() < CAPACITY {
@@ -157,14 +165,14 @@ mod memo {
     }
 }
 
-/// The stand-in for the memo when no parser is linked in.
-// [spec:pgorm:req:metric.fingerprint+1]    the feature-off answer
+/// The stand-in for the memo when fingerprints are not asked for.
+// [spec:pgorm:req:metric.fingerprint+2]    the feature-off answer
 #[cfg(not(feature = "metrics-fingerprint"))]
 mod memo {
     use super::QueryFingerprint;
 
-    /// Always `None`: without `metrics-fingerprint` there is nothing to parse
-    /// SQL with, and pgorm gains no dependency that could.
+    /// Always `None`: without `metrics-fingerprint` no statement is parsed for
+    /// its identity, so none costs a parse.
     pub(super) fn of(_sql: &str) -> Option<QueryFingerprint> {
         None
     }

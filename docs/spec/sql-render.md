@@ -40,17 +40,22 @@ an ideal Postgres renderer would emit.
 
 ## Render conformance
 
-> [spec:pgorm:req:sql.render.oracle]
+> [spec:pgorm:req:sql.render.oracle+1]
 > Every string `QueryBuilder` renders — through the `to_string()` path with
 > literals inlined, or through the `build()` path with `$N` placeholders — MUST
 > parse under the PostgreSQL grammar. The contract is enforced inside the test
 > suite by an oracle: pgorm-query carries a dev-dependency on `pg_query`, the
-> Rust binding to libpg_query (the PostgreSQL server's own parser), pinned to
-> the 6.x line. That line carries the PG17 grammar, which for every construct
-> this renderer emits is a superset of the PG16 grammar the live test server
-> speaks; the 5.x line carries PG16 exactly but does not build against a current
-> macOS SDK, whose `string.h` declares the `strchrnul` that libpg_query 16 also
-> defines.
+> Rust binding to libpg_query (the PostgreSQL server's own parser), at the one
+> revision of the necessary-nu fork every pgorm crate names (the root manifest
+> says what the fork carries, and `tests/fork_pin_tests.rs` holds the
+> declarations and lockfiles to it). That revision is upstream's unreleased
+> 18.0.0 on libpg_query 18.1.0, so the oracle parses with PostgreSQL 18.6's
+> grammar — the release the live test server runs. Oracle and server read one
+> grammar: a render the server would refuse is not passed by a newer parser,
+> and a render only 18 accepts (a `VIRTUAL` generated column, a
+> `WITHOUT OVERLAPS` key) is not refused by an older one. crates.io's
+> `pg_query` carries PostgreSQL 17's grammar; upstream's own 18 release
+> replaces the fork when it ships.
 >
 > The oracle is `pgorm-query/tests/postgres/oracle.rs`. `assert_parses` feeds a
 > string to the parser and fails with the parser's message and a caret at the

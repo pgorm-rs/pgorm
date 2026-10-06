@@ -2,7 +2,7 @@
 
 use pgorm_sql_macro::sql;
 
-// [spec:pgorm:def:macros.sql+3/test]    the expansion is the literal, in const position
+// [spec:pgorm:def:macros.sql+4/test]    the expansion is the literal, in const position
 #[test]
 fn expansion_is_the_literal_unchanged() {
     const QUERY: &str = sql!("SELECT id, name FROM cake WHERE id = $1");
@@ -14,7 +14,7 @@ fn expansion_is_the_literal_unchanged() {
     );
 }
 
-// [spec:pgorm:def:macros.sql+3/test]    a `&'static str`, so it outlives any frame
+// [spec:pgorm:def:macros.sql+4/test]    a `&'static str`, so it outlives any frame
 #[test]
 fn expansion_is_a_static_str() {
     fn keep(query: &'static str) -> &'static str {
@@ -60,5 +60,29 @@ fn misapplied_type_modifiers_pass() {
     assert_eq!(
         sql!("CREATE TABLE t (amount money(12, 2))"),
         "CREATE TABLE t (amount money(12, 2))"
+    );
+}
+
+// [spec:pgorm:def:macros.sql+4/test]    the grammar is PostgreSQL 18's: statements
+// only 18 parses compile, where PostgreSQL 17's grammar refused every one
+#[test]
+fn postgres_18_grammar_is_accepted() {
+    assert_eq!(
+        sql!("CREATE TABLE t (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)"),
+        "CREATE TABLE t (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)"
+    );
+    assert_eq!(
+        sql!(
+            "CREATE TABLE t (id int, during tstzrange, PRIMARY KEY (id, during WITHOUT OVERLAPS))"
+        ),
+        "CREATE TABLE t (id int, during tstzrange, PRIMARY KEY (id, during WITHOUT OVERLAPS))"
+    );
+    assert_eq!(
+        sql!("CREATE TABLE t (id int, CONSTRAINT id_present NOT NULL id NO INHERIT)"),
+        "CREATE TABLE t (id int, CONSTRAINT id_present NOT NULL id NO INHERIT)"
+    );
+    assert_eq!(
+        sql!("UPDATE t SET a = a + 1 RETURNING WITH (OLD AS o, NEW AS n) o.a, n.a"),
+        "UPDATE t SET a = a + 1 RETURNING WITH (OLD AS o, NEW AS n) o.a, n.a"
     );
 }

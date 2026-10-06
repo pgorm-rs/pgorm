@@ -301,7 +301,7 @@ fn a_column_collation_rides_on_the_statement() {
     assert_eq!(collations(&rendered), expected);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -331,7 +331,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -365,7 +365,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -392,6 +392,61 @@ fn unsupported_column_clauses_are_named() {
     assert_error(
         "CREATE TABLE t (id int REFERENCES u);",
         "unsupported DDL: REFERENCES without a column list on column `t`.`id` at statement 1",
+    );
+}
+
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    what PostgreSQL 18's grammar
+// added and the entity model cannot hold yet is named, not read as the older
+// shape each one resembles
+#[test]
+fn postgres_18_constraints_are_named() {
+    // A bare GENERATED is VIRTUAL in PostgreSQL 18, as the keyword is.
+    for generated in ["(a * 2) VIRTUAL", "(a * 2)"] {
+        assert_error(
+            &format!("CREATE TABLE t (a int, b int GENERATED ALWAYS AS {generated});"),
+            "unsupported DDL: a VIRTUAL generated column on column `t`.`b` at statement 1",
+        );
+    }
+    for key in ["PRIMARY KEY", "UNIQUE"] {
+        assert_error(
+            &format!(
+                "CREATE TABLE t (id int, during tstzrange, {key} (id, during WITHOUT OVERLAPS));"
+            ),
+            "unsupported DDL: a WITHOUT OVERLAPS key on table `t` at statement 1",
+        );
+    }
+    assert_error(
+        "CREATE TABLE t (id int, during tstzrange,
+            FOREIGN KEY (id, PERIOD during) REFERENCES u (id, PERIOD during));",
+        "unsupported DDL: a PERIOD foreign key on table `t` at statement 1",
+    );
+    assert_error(
+        "CREATE TABLE t (id int CONSTRAINT id_present NOT NULL);",
+        "unsupported DDL: a named NOT NULL constraint on column `t`.`id` at statement 1",
+    );
+    for not_null in [
+        "NOT NULL id",
+        "CONSTRAINT id_present NOT NULL id",
+        "CONSTRAINT id_present NOT NULL id NOT VALID",
+    ] {
+        assert_error(
+            &format!("CREATE TABLE t (id int, {not_null});"),
+            "unsupported DDL: a table-level NOT NULL constraint on table `t` at statement 1",
+        );
+    }
+    assert_error(
+        "CREATE TABLE t (u_id int, FOREIGN KEY (u_id) REFERENCES u (id) NOT ENFORCED);",
+        "unsupported DDL: a NOT ENFORCED constraint on table `t` at statement 1",
+    );
+    assert_error(
+        "CREATE TABLE t (u_id int REFERENCES u (id) NOT ENFORCED);",
+        "unsupported DDL: a NOT ENFORCED constraint on column `t`.`u_id` at statement 1",
+    );
+    // An unnamed NOT NULL and an enforced foreign key are what they always were.
+    assert!(parse_schema("CREATE TABLE t (id int NOT NULL);").is_ok());
+    assert!(
+        parse_schema("CREATE TABLE t (u_id int, FOREIGN KEY (u_id) REFERENCES u (id) ENFORCED);")
+            .is_ok()
     );
 }
 
@@ -432,7 +487,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -503,7 +558,7 @@ fn a_unique_index_folds_into_its_constraint() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -513,7 +568,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -535,7 +590,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a table declaring a second
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a table declaring a second
 // primary key is named in every spelling PostgreSQL refuses (42P16), rather
 // than read as the composite key one `PRIMARY KEY (a, b)` declares
 #[test]
@@ -553,7 +608,7 @@ fn a_second_primary_key_is_named() {
     assert!(parse_schema("CREATE TABLE t (a int, b int, PRIMARY KEY (a, b));").is_ok());
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+5/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+6/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]

@@ -39,7 +39,7 @@ pub fn looks_like_statement(sql: &str) -> bool {
 /// Run `sql` through the PostgreSQL grammar, returning the parser's diagnostic on
 /// rejection.
 pub fn parses(sql: &str) -> Result<(), String> {
-    match pg_query::parse(sql) {
+    match pg_query::parse(sql, pg_query::ParserOptions::DEFAULT) {
         Ok(_) => Ok(()),
         Err(err) => Err(diagnostic(sql, &err.to_string())),
     }
@@ -49,7 +49,7 @@ pub fn parses(sql: &str) -> Result<(), String> {
 ///
 /// # Panics
 /// Panics when the PostgreSQL grammar rejects `sql`.
-// [spec:pgorm:req:sql.render.oracle]
+// [spec:pgorm:req:sql.render.oracle+1]
 pub fn assert_parses(sql: &str) {
     if let Err(report) = parses(sql) {
         panic!("{report}");
@@ -63,7 +63,7 @@ pub fn assert_parses(sql: &str) {
 /// # Panics
 /// Panics when the grammar accepts `sql`.
 pub fn assert_rejected(sql: &str) -> String {
-    match pg_query::parse(sql) {
+    match pg_query::parse(sql, pg_query::ParserOptions::DEFAULT) {
         Ok(_) => panic!(
             "oracle pin is stale: PostgreSQL now accepts this render, so the pin \
              should become an ordinary conformance assertion\n  {sql}"
@@ -97,8 +97,8 @@ pub fn assert_query_eq(built: &str, expected: &str) {
 /// # Panics
 /// Panics when the PostgreSQL grammar rejects `sql`.
 pub fn parsed_nodes(sql: &str, kind: &str) -> Vec<serde_json::Value> {
-    let parsed =
-        pg_query::parse(sql).unwrap_or_else(|err| panic!("{}", diagnostic(sql, &err.to_string())));
+    let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
+        .unwrap_or_else(|err| panic!("{}", diagnostic(sql, &err.to_string())));
     let tree = serde_json::to_value(&parsed.protobuf).expect("a parse tree serialises");
     let mut found = Vec::new();
     collect_nodes(&unwrapped(tree), kind, &mut found);

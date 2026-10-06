@@ -737,7 +737,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+5]
+> [spec:pgorm:req:codegen.ddl.unsupported+6]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -772,6 +772,24 @@ compiling the C parser falls on people generating entities and on nobody else.
 > a column.
 > Type spellings outside the vocabulary are named the same way
 > (`codegen.ddl.types`).
+>
+> The file is read with PostgreSQL 18's grammar (`codegen.ddl`), which
+> accepts constraint shapes earlier releases refused. Each resembles a shape
+> the bridge does read, so reading it as that shape would be the quiet
+> reinterpretation this rule forbids, and each is named instead until the
+> entity model can hold it: a `VIRTUAL` generated column — `a VIRTUAL
+> generated column`, which a bare `GENERATED ALWAYS AS (...)` is too, since 18
+> reads it as `VIRTUAL` — where a `STORED` one stays `a GENERATED clause`; a
+> primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
+> which is not the plain key over the same columns; a foreign key matching on
+> a `PERIOD` (`a PERIOD foreign key`); a `NOT ENFORCED` foreign key or column
+> attribute (`a NOT ENFORCED constraint`), and an explicit column-level
+> `ENFORCED` (`an ENFORCED clause`), as the column-level deferrability
+> attributes are refused whether or not they state the default; a column
+> `NOT NULL` with a constraint name (`a named NOT NULL constraint`), whose
+> name 18 keeps in its catalog and a column's `NOT NULL` cannot carry; and a
+> table-level `NOT NULL` constraint, named or not and `NOT VALID` or not
+> (`a table-level NOT NULL constraint`).
 >
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not

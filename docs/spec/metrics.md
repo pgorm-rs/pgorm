@@ -61,7 +61,7 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Query identity
 
-> [spec:pgorm:req:metric.fingerprint+1]
+> [spec:pgorm:req:metric.fingerprint+2]
 > `QueryContext` is what a query hook is told about the statement it reports
 > on: `operation()` — one of the seven `ConnectionTrait` method names, or
 > `"begin"` / `"commit"` / `"rollback"` for a failed transaction round trip —,
@@ -75,10 +75,22 @@ chooses to construct, so unused metrics cost nothing.
 > in their literals or their whitespace share one; statements differing in
 > shape do not.
 >
+> The fingerprint MUST follow PostgreSQL 18's query-ID rules, libpg_query
+> 18's default, so that it groups statements the way the 18 server's own
+> query IDs do: a schema qualifier is not part of a relation's identity, and
+> an aliased relation is identified by its alias rather than its name. Those
+> rules changed between releases, so a fingerprint is stable across a
+> parser upgrade only where they did not: with libpg_query 18.1.0, the
+> fingerprints of statements with an aliased or schema-qualified relation,
+> of every statement with `RETURNING`, and of `BEGIN` with options all moved
+> from what libpg_query 17 gave them. A collector that stores fingerprints
+> across that upgrade sees those statements under new identities.
+>
 > `fingerprint()` MUST NOT fail the query path, and so returns an `Option`
 > whose `None` covers three cases without distinguishing them: the
-> off-by-default `metrics-fingerprint` feature is not enabled, so no parser is
-> linked in; the statement carries no text to parse; or libpg_query rejected
+> off-by-default `metrics-fingerprint` feature is not enabled, so no
+> statement is parsed for its identity; the statement carries no text to
+> parse; or libpg_query rejected
 > the text it was given. The last is not an error — raw SQL the server accepts
 > may still be text this parser will not reduce to a tree. Such a statement
 > executes normally and is reported normally; only its identity is missing. An
@@ -95,7 +107,9 @@ chooses to construct, so unused metrics cost nothing.
 > per-call ones (an `IN` list whose arity follows the input, a generated
 > script), which are better re-parsed than retained forever.
 >
-> Without the feature pgorm gains no dependency at all, and the public shape is
+> Without the feature no statement is parsed for metrics — libpg_query is
+> linked either way, for the paginator and the macros, so the feature adds no
+> dependency — and the public shape is
 > unchanged: both types still exist, the hooks still take a context, and
 > `fingerprint()` is simply always `None`. A collector therefore compiles
 > against either build, and enabling the feature changes no API — only an

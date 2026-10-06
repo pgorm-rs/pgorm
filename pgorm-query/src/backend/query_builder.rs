@@ -46,7 +46,7 @@ macro_rules! truncate_to_microsecond {
 }
 
 // [spec:pgorm:def:sql.render+1]
-// [spec:pgorm:req:sql.render.oracle] (the renderer whose every output the oracle in
+// [spec:pgorm:req:sql.render.oracle+1] (the renderer whose every output the oracle in
 // pgorm-query/tests/postgres/oracle.rs holds to the libpg_query grammar)
 #[derive(Debug, Clone, Copy)]
 pub struct QueryBuilder;

@@ -9474,6 +9474,7 @@ children (
                 id pg-query-18
                 title "pgorm parses with PostgreSQL 18's grammar: pg_query on libpg_query 18.1.0"
                 kind @build
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.228906Z
@@ -9487,6 +9488,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator 2026-10-06: \"fork https://github.com/pganalyze/pg_query.rs to necessary-nu, merge that PR, and bump the tag to 18.1.0.\" Route 1, the same pattern as the prqlc fork: necessary-nu/pg_query.rs, with a branch (pgorm/postgres-18, matching prqlc's pgorm/* branch naming) holding upstream main plus PR pganalyze/pg_query.rs#79 (\"Release 18.0.0\") merged, and the libpg_query submodule moved to tag 18.1.0 (Postgres 18.6; it carries the pg_query_normalize security fix GHSA-6ggm-xmc9-8ffg, so no interim 6.2.1 bump is needed). Proven in the fork first by its own suite, then adopted by pgorm as a git dependency at an exact rev, with deny.toml's allow-git list extended deliberately. Upstream's own 18 release replaces the fork when it ships."
+                    }
+
+                    {
+                        at 2026-10-06T14:32:06.002604Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-06T16:50:30.93194Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -9518,6 +9533,13 @@ children (
                         kind @note
                         text "The sql.ddl rules (docs/spec/sql-ddl.md) currently refuse VIRTUAL generated columns because \"the builder cannot know which release it is writing for\", and name the shape a future addition takes. With 18 as the target, the builder can write it. Add VIRTUAL beside STORED on ColumnSpec::Generated (or its successor). Check live what 18 refuses for a virtual column (indexes on it, a user-defined type, a volatile expression and so on). Cover the entity derive (#[pgorm(generated...)] or equivalent), schema-gen, codegen's DDL path (parse_schema needs pg-query-18) and Python if it exposes generated columns. Note PostgreSQL 18's default: a bare GENERATED ALWAYS AS (...) is now VIRTUAL, where 17 required STORED. pgorm must always render the kind explicitly so it never depends on the server default."
                     }
+
+                    {
+                        at 2026-10-06T15:36:13.737569Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pg-query-18 landed the 18 grammar. Two places now wait on this node: pgorm-query/tests/postgres/table.rs generated_column_is_always_stored, whose tripwire asserted the oracle refuses VIRTUAL, now asserts the oracle accepts it (the refusal is only the missing constructor, per sql.ddl.column-def+9's text, which this node revises); and codegen's DDL bridge refuses a VIRTUAL column by name (\"a VIRTUAL generated column\", codegen.ddl.unsupported+6), including a bare GENERATED ALWAYS AS (...), which 18 reads as VIRTUAL (Constraint.generated_kind \"v\"). Replace that refusal with the reading when the entity model can hold it."
+                    }
                 )
             }
 
@@ -9533,6 +9555,13 @@ children (
                         kind @note
                         text "PostgreSQL 18 adds temporal keys. PRIMARY KEY / UNIQUE (a, b, valid_at WITHOUT OVERLAPS), where the last column is a range or multirange and the key is enforced by a GiST index, which needs btree_gist for scalar columns. FOREIGN KEY (a, PERIOD valid_at) REFERENCES t (a, PERIOD valid_at). These interact with TableKey<K> (pgorm-query/src/table/key.rs, d982a21d), a non-empty ordered column list. Only the last column may be WITHOUT OVERLAPS, so put that in the type, not in a per-column flag that could land in the middle. Ranges exist end to end since 6006221d. The extension requirement (CREATE EXTENSION btree_gist) is already buildable (sql.ddl.extension). Needs pg-query-18 for the oracle and codegen. Check each refusal live and record SQLSTATEs."
                     }
+
+                    {
+                        at 2026-10-06T15:36:13.810589Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pg-query-18 landed the 18 grammar. Codegen's DDL bridge refuses both shapes by name until this node builds them (codegen.ddl.unsupported+6, pgorm-codegen/src/sql_schema/table.rs reject_constraint_features): Constraint.without_overlaps -> \"a WITHOUT OVERLAPS key\", fk_with_period/pk_with_period -> \"a PERIOD foreign key\". It also refuses a NOT ENFORCED foreign key (is_enforced false at table level, CONSTR_ATTR_NOT_ENFORCED at column level), which 18 added too and no node owns yet."
+                    }
                 )
             }
 
@@ -9547,6 +9576,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "PostgreSQL 18 makes NOT NULL a real catalog constraint. It can be named (CONSTRAINT n NOT NULL), added NOT VALID and validated later (ALTER TABLE ... VALIDATE CONSTRAINT), and marked NO INHERIT. pg_query 6.2.0 refuses this grammar (verified), so it needs pg-query-18. Cover CREATE (column-level and table-level NOT NULL col), ALTER TABLE ADD ... NOT NULL ... NOT VALID and VALIDATE, and whether codegen's DDL path should read a named NOT NULL. Check live what 18 refuses (NOT VALID on a column at create, NO INHERIT on a partition) and how a named NOT NULL shows in pg_constraint."
+                    }
+
+                    {
+                        at 2026-10-06T15:36:13.87624Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pg-query-18 landed the 18 grammar. Codegen's DDL bridge now refuses by name what this node would read (codegen.ddl.unsupported+6): a column NOT NULL with a constraint name (\"a named NOT NULL constraint\", previously accepted with the name dropped) and any table-level NOT NULL, named or not, NOT VALID or not (\"a table-level NOT NULL constraint\"; ConstrNotnull with keys). A column-level NOT NULL NO INHERIT was already refused as \"a NO INHERIT constraint\"."
                     }
                 )
             }

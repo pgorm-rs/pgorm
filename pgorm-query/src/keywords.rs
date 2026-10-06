@@ -36,17 +36,19 @@ pub(crate) enum Category {
 
 use Category::{ColName, Reserved, TypeFuncName};
 
-/// Every keyword PostgreSQL 17.7 does not classify `UNRESERVED`, in byte
+/// Every keyword PostgreSQL 18.6 does not classify `UNRESERVED`, in byte
 /// order, copied from its `src/include/parser/kwlist.h`.
 ///
-/// 17.7 is the release of the libpg_query pgorm links (`pg_query` 6.2), so
-/// the list the policy reads is the one the parser-backed tests judge it by,
-/// and the test that pins it to that scanner fails when the linked parser
-/// moves to another release. The set is the same in PostgreSQL 18 and 19;
-/// PostgreSQL 16 lacks the SQL/JSON words 17 added and leaves `json`
-/// unreserved, and quoting a word an older server does not reserve names the
-/// same object. A word a later release restricts is an ordinary name here
-/// until the list is copied again.
+/// 18.6 is the release of the libpg_query pgorm links (libpg_query 18.1.0,
+/// through the pg_query fork the root manifest names), so the list the policy
+/// reads is the one the parser-backed tests judge it by, and the test that
+/// pins it to that scanner fails when the linked parser moves to another
+/// release. The set is the same in PostgreSQL 17 and 19: the four words 18
+/// added (`enforced`, `objects`, `period`, `virtual`) are unreserved, as was
+/// the `recheck` it dropped. PostgreSQL 16 lacks the SQL/JSON words 17 added
+/// and leaves `json` unreserved, and quoting a word an older server does not
+/// reserve names the same object. A word a later release restricts is an
+/// ordinary name here until the list is copied again.
 const KEYWORDS: &[(&str, Category)] = &[
     ("all", Reserved),
     ("analyse", Reserved),
@@ -334,13 +336,13 @@ mod tests {
         }
     }
 
-    // [spec:pgorm:def:sql.types.type-name+7/test]    the list is the linked
+    // [spec:pgorm:def:sql.types.type-name+8/test]    the list is the linked
     // parser's, both ways: every entry scans as its category, and every
     // keyword the scanner restricts is an entry
     #[test]
     fn keywords_are_the_linked_scanners() {
-        const COPIED_FROM: i32 = 170_007;
-        let version = pg_query::parse("SELECT 1")
+        const COPIED_FROM: i32 = 180_006;
+        let version = pg_query::parse("SELECT 1", pg_query::ParserOptions::DEFAULT)
             .expect("parses")
             .protobuf
             .version;

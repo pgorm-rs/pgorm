@@ -14,7 +14,7 @@ use crate::oracle;
 pub(crate) fn validate(literal: &LitStr) -> Result<(), Error> {
     let sql = literal.value();
 
-    match pg_query::parse(&sql) {
+    match pg_query::parse(&sql, pg_query::ParserOptions::DEFAULT) {
         Ok(_) => Ok(()),
         Err(error) => Err(rejection(literal, &sql, &oracle::parser_message(&error))),
     }

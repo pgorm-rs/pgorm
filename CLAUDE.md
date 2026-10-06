@@ -33,6 +33,8 @@ pgorm is a fork of SeaORM focused entirely on PostgreSQL support. It uses tokio-
 
 `pgorm::pipeline` (in-crate module, always compiled) is a PRQL-shaped composable query frontend: relation-to-relation transforms compiled through prqlc's PL AST to PostgreSQL SQL, with bound parameters minted by a per-pipeline binder (branded lifetimes make cross-pipeline placeholder mixing a compile error) and terminals landing on the ordinary decode paths. prqlc (pure Rust) is a plain, exact-pinned dependency.
 
+Two dependencies are git forks pinned by exact rev, because a `[patch]` table reaches only the workspace declaring it: prqlc (`necessary-nu/prql`) and pg_query (`necessary-nu/pg_query.rs`, branch `pgorm/postgres-18`: upstream's unreleased 18.0.0 on libpg_query 18.1.0, so every parse in pgorm uses PostgreSQL 18.6's grammar). Each is declared at the same rev in every manifest that names it, allowed in `deny.toml`'s `allow-git`, and held there, with every committed lockfile including the detached workspaces under `security/` and `pgorm-python/`, by `tests/fork_pin_tests.rs`. Moving a fork's rev means editing every declaration and re-resolving every lockfile (`cargo metadata --manifest-path <dir>/Cargo.toml` re-locks one minimally). crates.io refuses git dependencies, so pgorm is not publishable there while they stand.
+
 There is no CLI crate: the inherited `pgorm-cli` was retired (it targeted sqlx/sea-schema and a migration surface this fork dropped). Entity generation is available as a library through `pgorm-codegen`; a starter migration-crate template lives at `pgorm-migration/template/migration/`.
 
 ### Core Components
@@ -100,7 +102,7 @@ let conn = pool.get().await?; // records connection acquisition
 
 `NoOpMetrics` and `LoggingMetrics` ship in-tree. Custom backends implement the `MetricsCollector` trait (async, `Clone + Send + Sync + 'static`, seven hooks, no defaults) rather than hand-rolling a wrapper.
 
-The two query hooks take a `QueryContext<'_>` — `operation()`, `sql()`, and `fingerprint()` — instead of a bare operation name. `fingerprint()` is libpg_query's constants-normalized query identity and requires the off-by-default `metrics-fingerprint` feature; without it pgorm takes no `pg_query` dependency and the answer is always `None`.
+The two query hooks take a `QueryContext<'_>` — `operation()`, `sql()`, and `fingerprint()` — instead of a bare operation name. `fingerprint()` is libpg_query's constants-normalized query identity, grouped by PostgreSQL 18's query-ID rules (an alias stands for its relation, schema qualifiers are ignored), and requires the off-by-default `metrics-fingerprint` feature; without it no statement is parsed for metrics and the answer is always `None` (pg_query is linked either way, for the paginator and the macros).
 
 Note that `begin()` on an `InstrumentedConnection` returns a plain `DatabaseTransaction` — wrap it in `InstrumentedTransaction::new` to keep per-statement metrics inside the transaction.
 

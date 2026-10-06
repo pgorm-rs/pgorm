@@ -530,7 +530,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Column type vocabulary
 
-> [spec:pgorm:def:sql.types.type-name+7]
+> [spec:pgorm:def:sql.types.type-name+8]
 > `TypeName` (`pgorm-query/src/types.rs`) is the structured spelling of a
 > type in cast or column-type position: `schema: Option<Name>`,
 > `name: Name`, `array: bool`, and a private `verbatim`. Rendering
@@ -545,9 +545,9 @@ including panic semantics and quirks inherited from sea-query.
 > restricted keywords are PostgreSQL's `COL_NAME`, `TYPE_FUNC_NAME` and
 > `RESERVED` categories — the set PostgreSQL's own `quote_ident()` quotes —
 > embedded from the `kwlist.h` of the release the linked libpg_query
-> carries, 17.7. A test pins the embedded list against that scanner in both
+> carries, 18.6. A test pins the embedded list against that scanner in both
 > directions, and fails when the linked parser moves; the restricted set is
-> unchanged in PostgreSQL 18 and 19, and PostgreSQL 16 differs only in
+> unchanged from PostgreSQL 17 and in 19, and PostgreSQL 16 differs only in
 > leaving `json` unrestricted. A restricted keyword written bare is not a
 > name. In a type position `select` is a syntax error, and in a function
 > position the shape of the statement changes: `not(1)` is a boolean NOT,

@@ -59,7 +59,14 @@ allow-wildcard-paths = true
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# The prqlc fork is the one dependency not resolved from crates.io. Listing it
-# here is what makes it a reviewed exception instead of an unremarked git
-# dependency: adding a second fork has to be a deliberate edit to this file.
-allow-git = ["https://github.com/necessary-nu/prql"]
+# Two forks are the dependencies not resolved from crates.io: prqlc
+# (necessary-nu/prql, the compiler behind pgorm::pipeline and `prql!`) and
+# pg_query (necessary-nu/pg_query.rs, PostgreSQL 18's grammar ahead of
+# upstream's release). Listing each here is what makes it a reviewed exception
+# instead of an unremarked git dependency, so adding a fork has to be a
+# deliberate edit to this file. The second was one: the operator's decision of
+# 2026-10-06 to parse with PostgreSQL 18's grammar through a fork of
+# pg_query.rs (plan node pg-query-18). The root Cargo.toml says what each fork
+# carries, and tests/fork_pin_tests.rs holds every declaration and lockfile to
+# one revision of each.
+allow-git = ["https://github.com/necessary-nu/prql", "https://github.com/necessary-nu/pg_query.rs"]

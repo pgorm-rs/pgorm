@@ -99,7 +99,8 @@ fn compile(literal: &LitStr) -> Result<String, Error> {
 // [spec:pgorm:req:macros.prql.reject]    the emitted SQL must pass the oracle
 // [spec:pgorm:sem:macros.prql.census]
 fn census(literal: &LitStr, sql: &str) -> Result<BTreeSet<i64>, Error> {
-    let parsed = pg_query::parse(sql).map_err(|error| oracle_rejection(literal, sql, &error))?;
+    let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
+        .map_err(|error| oracle_rejection(literal, sql, &error))?;
     let tree = serde_json::to_value(&parsed.protobuf).map_err(|error| {
         Error::new(
             literal.span(),

@@ -122,9 +122,9 @@ async def lock(manifest, *, timeout=1800):
 
     Offline: the batch depends on the checkout under test by path, and every
     other crate it reaches has to be the one already fetched for that
-    checkout. prqlc arrives through pgorm's own git dependency — a batch is
-    its own workspace, so a patch table in any other manifest would not reach
-    it.
+    checkout. prqlc and pg_query arrive through pgorm's own git dependencies
+    — a batch is its own workspace, so a patch table in any other manifest
+    would not reach it.
     """
     await process.run(
         "cargo",

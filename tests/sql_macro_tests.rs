@@ -29,7 +29,7 @@ const SCHEMA: &str = sql!(
      INSERT INTO cake (id, name) VALUES (1, 'Chocolate'), (2, 'Lemon');"
 );
 
-// [spec:pgorm:def:macros.sql+3/test]    the literal reaches the server unchanged
+// [spec:pgorm:def:macros.sql+4/test]    the literal reaches the server unchanged
 // [spec:pgorm:sem:macros.sql.script/test]    a validated script through `batch_execute`
 #[pgorm_macros::test]
 async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
@@ -57,7 +57,7 @@ async fn checked_literal_drives_selector_raw() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:macros.sql+3/test]    the same literal bound as a prepared statement
+// [spec:pgorm:def:macros.sql+4/test]    the same literal bound as a prepared statement
 #[pgorm_macros::test]
 async fn checked_literal_drives_query_raw() -> Result<(), Error> {
     let ctx = TestContext::new("sql_macro_query_raw").await;
@@ -99,6 +99,44 @@ async fn checked_literal_can_still_fail_at_runtime() -> Result<(), Error> {
         .await
         .expect_err("the grammar has no catalog; the server does");
 
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:def:macros.sql+4/test]    a statement only PostgreSQL 18's grammar
+// parses compiles and runs: the macro and the server read the same release
+#[pgorm_macros::test]
+async fn postgres_18_grammar_reaches_the_server() -> Result<(), Error> {
+    let ctx = TestContext::new("sql_macro_postgres_18").await;
+    let db = ctx.db.get().await?;
+
+    db.batch_execute(sql!(
+        "CREATE TABLE slice (a int NOT NULL, doubled int GENERATED ALWAYS AS (a * 2) VIRTUAL);
+         INSERT INTO slice (a) VALUES (21);"
+    ))
+    .await?;
+
+    let mut stream = Box::pin(
+        db.query_raw(
+            sql!(
+                "SELECT doubled, attgenerated::text FROM slice, pg_attribute
+                 WHERE attrelid = 'slice'::regclass AND attname = 'doubled'"
+            ),
+            NO_PARAMS,
+        )
+        .await?,
+    );
+    let row = stream.try_next().await?.ok_or(Error::RecordNotFound)?;
+    assert_eq!(row.get::<_, i32>(0), 42);
+    assert_eq!(
+        row.get::<_, &str>(1),
+        "v",
+        "the column is virtual, not stored"
+    );
+
+    drop(stream);
     drop(db);
     ctx.delete().await;
 

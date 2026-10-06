@@ -417,7 +417,7 @@ bound parameter is held to.
 > implement the trait, and paginates instead through its own inherent
 > `paginate(db, page_size) -> Result<Paginator, Error>` and
 > `count(db) -> Result<u64, Error>`
-> (`[spec:pgorm:sem:exec.paginator.raw+5]`). The distinction is carried by
+> (`[spec:pgorm:sem:exec.paginator.raw+6]`). The distinction is carried by
 > the type rather than by a `Result` on every call site: a builder-backed
 > caller has no failure to handle and is not made to write one, and a raw
 > caller cannot reach a page without having handled theirs.
@@ -472,12 +472,13 @@ bound parameter is held to.
 > stream ends at the first empty page and yields the error (then ends)
 > if any fetch fails.
 
-> [spec:pgorm:sem:exec.paginator.raw+5]
+> [spec:pgorm:sem:exec.paginator.raw+6]
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
-> same `pg_query` 6.2.0 the render oracle and `sql!` use
-> (`[spec:pgorm:req:sql.render.oracle]`, `[spec:pgorm:def:macros.sql+1]`)
-> — and MUST NOT decide it by inspecting the statement's text. The
+> same `pg_query` revision, on PostgreSQL 18's grammar, that the render
+> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+1]`,
+> `[spec:pgorm:def:macros.sql+4]`) — and MUST NOT decide it by inspecting
+> the statement's text. The
 > statement is accepted only when it parses, holds exactly one statement,
 > and that statement is a `SelectStmt` carrying no `INTO` clause. A
 > `WITH ... SELECT` therefore qualifies: PostgreSQL hangs the `WITH`
@@ -489,7 +490,12 @@ bound parameter is held to.
 >
 > An accepted statement is taken at the extent the parser reports for it,
 > which excludes any terminating `;` that a subquery position would
-> refuse, and is then paired with its bind values as a `SqlTemplate`
+> refuse. PostgreSQL 18's parser starts that extent at the statement's
+> first token, so whitespace and comments leading the statement are not
+> carried into the wrapper: they lie outside the statement, as the `;`
+> does. A comment trailing the statement lies inside its extent and is
+> carried. The extent is then paired
+> with its bind values as a `SqlTemplate`
 > (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
 > and placed in relation position as
 > `FromItem::Template(fragment, "sub_statement")`

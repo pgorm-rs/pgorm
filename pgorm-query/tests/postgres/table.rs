@@ -630,7 +630,7 @@ fn alter_embeds_its_foreign_key_by_value() {
 }
 
 // [spec:pgorm:req:sql.ddl.column-def+9/test]    a generated column is stored, and the virtual
-// spelling it no longer has a constructor for is one the grammar refuses
+// spelling has no constructor even now the oracle's grammar is PostgreSQL 18's, which accepts it
 #[test]
 fn generated_column_is_always_stored() {
     assert_eq!(
@@ -644,15 +644,16 @@ fn generated_column_is_always_stored() {
         r#"CREATE TABLE "glyph" ( "aspect" integer GENERATED ALWAYS AS ("id" * 2) STORED )"#
     );
 
-    // Why there is no non-stored spelling to ask for: PostgreSQL's own parser
-    // rejects it, so the render that used to emit it could only ever fail at
-    // the server.
+    // The refusal was the grammar's until PostgreSQL 18, whose parser the
+    // oracle now links: VIRTUAL parses, so the spelling waits only on a
+    // constructor, which plan node `pg18-virtual-generated` builds. Until it
+    // does, a render of it cannot come from this builder.
     assert!(
         crate::oracle::parses(
             r#"CREATE TABLE "glyph" ( "aspect" integer GENERATED ALWAYS AS ("id" * 2) VIRTUAL )"#
         )
-        .is_err(),
-        "the grammar accepts VIRTUAL, so this refusal wants revisiting"
+        .is_ok(),
+        "the oracle parses with PostgreSQL 18's grammar, which accepts VIRTUAL"
     );
 }
 

@@ -38,17 +38,25 @@ def notice_paths(package, root):
 
 def texts_for(package, root, supplements):
     texts = []
+    directory = Path(package["manifest_path"]).parent
     for path in notice_paths(package, root):
         data = path.read_bytes()
-        texts.append((path.name, data))
+        # The path inside the package, so a crate vendoring several projects'
+        # LICENSE files names which is which.
+        name = (
+            path.relative_to(directory) if path.is_relative_to(directory) else path.name
+        )
+        texts.append((str(name), data))
     for entry in supplements.get(f"{package['name']}@{package['version']}", []):
         data = (root / "pgorm-python/licenses" / entry["file"]).read_bytes()
         if digest(data) != entry["sha256"]:
             raise RuntimeError("supplemental license hash differs: " + entry["file"])
         texts.append((entry["source"], data))
     if package["name"] == "pg_query":
+        # xxHash carries its license only in its header; upb and utf8_range
+        # ship LICENSE files the walk above already found.
         native = Path(package["manifest_path"]).parent / "libpg_query/vendor"
-        for relative in ("protobuf-c/protobuf-c.h", "xxhash/xxhash.h"):
+        for relative in ("xxhash/xxhash.h",):
             header = (native / relative).read_bytes()
             texts.append(
                 (
@@ -103,18 +111,19 @@ def generate(root):
     components = [
         {
             "name": "libpg_query",
-            "revision": "7be1aed1f1f968a36cf541319f71e845850f0381",
-            "owner": "pg_query@6.2.0",
+            "revision": "c1546e7e97edc93fe8474d7a59881e91fbf48cfc",
+            "owner": "pg_query@18.0.0",
             "license": "BSD-3-Clause",
         },
         {
             "name": "PostgreSQL parser",
-            "version": "17.7",
-            "owner": "pg_query@6.2.0",
+            "version": "18.6",
+            "owner": "pg_query@18.0.0",
             "license": "PostgreSQL",
         },
-        {"name": "protobuf-c", "owner": "pg_query@6.2.0", "license": "BSD-2-Clause"},
-        {"name": "xxHash", "owner": "pg_query@6.2.0", "license": "BSD-2-Clause"},
+        {"name": "upb", "owner": "pg_query@18.0.0", "license": "BSD-3-Clause"},
+        {"name": "utf8_range", "owner": "pg_query@18.0.0", "license": "MIT"},
+        {"name": "xxHash", "owner": "pg_query@18.0.0", "license": "BSD-2-Clause"},
         {
             "name": "ring native cryptography (including BoringSSL and fiat code)",
             "owner": "ring@0.17.14",

@@ -65,7 +65,7 @@ def check_wheel(path: Path) -> None:
                 assert notice["sha256"] in notices
         assert {
             component["name"] for component in dependencies["bundled_native_components"]
-        } >= {"libpg_query", "PostgreSQL parser", "protobuf-c", "xxHash"}
+        } >= {"libpg_query", "PostgreSQL parser", "upb", "utf8_range", "xxHash"}
         metadata = wheel.read(
             next(name for name in names if name.endswith(".dist-info/METADATA"))
         ).decode()

@@ -52,7 +52,7 @@ const COUNT_SUBQUERY_ALIAS: &str = "sub_query";
 
 /// The statement for one page and the values to bind to it.
 // [spec:pgorm:sem:exec.paginator.fetch+3]
-// [spec:pgorm:sem:exec.paginator.raw+5] (one shape for a built source and a raw one)
+// [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
 fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
     let mut query = query.clone();
@@ -63,7 +63,7 @@ fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, 
 /// The statement counting every row the paginator pages over, and the values to
 /// bind to it.
 // [spec:pgorm:sem:exec.paginator.count]
-// [spec:pgorm:sem:exec.paginator.raw+5] (one shape for a built source and a raw one)
+// [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
 fn count_of(query: &SelectStatement) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
     let mut counted = query.clone();
@@ -339,7 +339,7 @@ where
     /// # }
     /// ```
     // [spec:pgorm:req:exec.paginator.page-size+2]
-    // [spec:pgorm:sem:exec.paginator.raw+5]
+    // [spec:pgorm:sem:exec.paginator.raw+6]
     pub fn paginate<'db, C>(
         self,
         db: &'db C,
@@ -362,7 +362,7 @@ where
     ///
     /// The counterpart of [`PaginatorTrait::count`], fallible for the same
     /// reason [`paginate`](SelectorRaw::paginate) is.
-    // [spec:pgorm:sem:exec.paginator.raw+5]
+    // [spec:pgorm:sem:exec.paginator.raw+6]
     pub async fn count<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
@@ -392,7 +392,7 @@ const RAW_SUBQUERY_ALIAS: &str = "sub_statement";
 /// Both checks answer to the caller that asked for the paginator, so the
 /// refusal is returned to `paginate` rather than stored for a later reader to
 /// replay.
-// [spec:pgorm:sem:exec.paginator.raw+5]
+// [spec:pgorm:sem:exec.paginator.raw+6]
 fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, Error> {
     // Both refusals are the caller's own statement being unusable, which is
     // the vocabulary their other query failures already arrive in.
@@ -413,7 +413,7 @@ fn wrap_raw_select(stmt: &str, values: Vec<Value>) -> Result<SelectStatement, Er
 /// A marker census failure, reported in the paginator's voice: the caller asked
 /// to page a statement, so the reason names the statement and its bind values
 /// rather than a template and its substitutions.
-// [spec:pgorm:sem:exec.paginator.raw+5]
+// [spec:pgorm:sem:exec.paginator.raw+6]
 fn marker_report(error: QueryError) -> String {
     let supplied = |count: usize| {
         if count == 1 {
@@ -441,13 +441,15 @@ fn marker_report(error: QueryError) -> String {
 }
 
 /// The one row-returning `SELECT` in `stmt`, at the extent libpg_query reports
-/// for it — which excludes any terminating `;` a subquery position would refuse.
+/// for it — which runs from the statement's first token, past any leading
+/// whitespace or comment, and excludes any terminating `;` a subquery position
+/// would refuse.
 ///
 /// A `WITH ... SELECT` qualifies: PostgreSQL hangs the `WITH` clause off the
 /// `SelectStmt` itself rather than making it a statement of its own.
-// [spec:pgorm:sem:exec.paginator.raw+5]
+// [spec:pgorm:sem:exec.paginator.raw+6]
 fn single_select(stmt: &str) -> Result<&str, String> {
-    let parsed = pg_query::parse(stmt).map_err(|error| {
+    let parsed = pg_query::parse(stmt, pg_query::ParserOptions::DEFAULT).map_err(|error| {
         format!(
             "cannot paginate a raw statement PostgreSQL rejects: {}",
             parser_message(&error)
@@ -480,8 +482,9 @@ fn single_select(stmt: &str) -> Result<&str, String> {
     }
 }
 
-/// The slice of `sql` that `raw` covers. `stmt_len` is zero for a statement
-/// running to the end of the input with nothing terminating it.
+/// The slice of `sql` that `raw` covers. `stmt_location` is the statement's
+/// first token, and `stmt_len` is zero for a statement running to the end of
+/// the input with nothing terminating it.
 fn extent<'sql>(sql: &'sql str, raw: &RawStmt) -> Result<&'sql str, String> {
     let start = usize::try_from(raw.stmt_location).unwrap_or(0);
     let end = match usize::try_from(raw.stmt_len) {
@@ -542,7 +545,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:exec.paginator.raw+5/test]    a caller's statement reaches
+// [spec:pgorm:sem:exec.paginator.raw+6/test]    a caller's statement reaches
 // the wrapper with its non-marker text untouched, whatever token forms it is
 // made of; its markers renumber into the wrapper's own parameter space with
 // the right values behind them; and a census the supplied values cannot
@@ -664,6 +667,26 @@ mod tests {
                 ]
                 .concat()
             );
+        }
+    }
+
+    // [spec:pgorm:sem:exec.paginator.raw+6/test]    the statement is taken
+    // from its first token: what leads it is not carried into the wrapper,
+    // and a terminating `;` is left behind with it
+    #[test]
+    fn the_extent_starts_at_the_first_token() {
+        for stmt in [
+            "  /* leading */ SELECT 1 AS n ;  ",
+            "-- leading\n\tSELECT 1 AS n;",
+        ] {
+            let query = wrapped(stmt, Vec::new());
+            for (sql, _) in [paged(stmt, &query), counted(stmt, &query)] {
+                assert!(
+                    sql.contains("FROM (SELECT 1 AS n"),
+                    "{stmt:?} was not wrapped at its own extent: {sql:?}"
+                );
+                assert!(!sql.contains("leading"), "{stmt:?} carried in {sql:?}");
+            }
         }
     }
 

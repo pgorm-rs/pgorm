@@ -1,21 +1,4 @@
 {
-  "pg_query@6.2.0": [
-    {
-      "file": "pg_query-MIT.txt",
-      "source": "https://raw.githubusercontent.com/pganalyze/pg_query.rs/0e382742b36ee9592438c6791b91ce14f32f6233/LICENSE",
-      "sha256": "39fac7e7daa7cf3173d96f9e8a167f980b93b90386b83c342de70db3bc7bbb68"
-    },
-    {
-      "file": "libpg_query-BSD.txt",
-      "source": "https://raw.githubusercontent.com/pganalyze/libpg_query/7be1aed1f1f968a36cf541319f71e845850f0381/LICENSE",
-      "sha256": "f9352c20940619a380a5e9f23cebe34d8f797cfbd747fc236a7a3e5fc8ef9b41"
-    },
-    {
-      "file": "PostgreSQL-COPYRIGHT.txt",
-      "source": "https://raw.githubusercontent.com/postgres/postgres/REL_17_7/COPYRIGHT",
-      "sha256": "5ed3ce5c9373dff7f98b1fae7a6c7ccd98df7d734d46d24c1bcebf1240be8307"
-    }
-  ],
   "prqlc@0.13.14": [
     {
       "file": "PRQL-APACHE.txt",
