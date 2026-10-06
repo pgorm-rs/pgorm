@@ -1294,6 +1294,21 @@ children (
                     }
                 )
             }
+
+            {
+                id codegen-column-expressions
+                title "Codegen reads a column's expressions: a DEFAULT and a generated column of either kind"
+                kind @feat
+                deps (pg18-virtual-generated)
+                log (
+                    {
+                        at 2026-10-06T19:26:59.220945Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while landing pg18-virtual-generated: the entity model now holds a generated column of either kind (ColumnDefault::Generated; #[pgorm(generated_stored = \"<rust expr>\")] / generated_virtual), but codegen's DDL bridge still refuses both, as it refuses DEFAULT and CHECK (codegen.ddl.unsupported+7: \"a GENERATED clause\" for STORED, \"a VIRTUAL generated column\" for VIRTUAL or a bare GENERATED ALWAYS AS, which 18 reads as virtual). The cause is one gap, not three: the bridge has no reader from PostgreSQL's expression tree. parse_schema's TableCreateStatement needs a SimpleExpr, and SimpleExpr::Raw takes only &'static str, so runtime DDL text cannot ride it; the entity writer needs Rust source spelling the expression, and it cannot print one from a SimpleExpr because FunctionCall's fields are pub(crate). Build a closed-subset reader (ColumnRef, A_Const, A_Expr operators mapped onto BinOper, FuncCall, TypeCast, NullTest, BoolExpr) into a codegen-owned representation that lowers both to a SimpleExpr for the statement and to Rust builder source for the entity, naming anything outside the subset as a refusal. Use it for a column DEFAULT (ColumnDef::default / default_expr) and GENERATED (ColumnDef::generated / generated_stored | generated_virtual, the kind from Constraint.generated_kind 's' / 'v'). Acceptance: a round trip from DDL through generated entity source, compiled, and Schema::create_table_from_entity back to equivalent DDL, checked live on 18. CHECK stays refused, since the entity model holds no CHECK."
+                    }
+                )
+            }
         )
     }
 
