@@ -9410,12 +9410,27 @@ children (
         id python-application-check-names
         title "The application-binding check passes again, its source fixtures naming what a pipeline can write"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-05T21:18:00.640773Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by composite-key-edge-coverage (779159ca), and failing at 06c564f5 before any of its changes. pgorm-python/checks/entities.py fails at two steps. (1) Its cargo test --lib step: application-binding sources::tests::source_selection_matches_native_rust_projection names a source alias `runtime alias \"雪\"`. (2) registered_sources.py test_aliases_parameters_and_decode_failures names `notes \"雪\"`. Both are refused with \"cannot be written as a pipeline name: it contains a double quote or NUL byte, begins with `$`, or is `*`\". That refusal arrived in f48c6425 (pipeline identifiers no quoting can represent), and the fixtures were never updated, because nplan check runs only fmt and clippy over the application binding, never this script. The other steps pass when these two are skipped: registered_entities, registered_graphs, graph_oracle, registered_schema, registered_transactions, registered_execution plus execution_oracle parity and its mismatch rejection. So does the summary. Acceptance: the two fixtures use a hostile name a pipeline can spell, the refused name keeps a test asserting the refusal, and checks/entities.py runs green end to end through tests/with_postgres.py. Consider whether some platform should run this check, so it cannot rot unseen again."
+            }
+
+            {
+                at 2026-10-06T12:15:55.576732Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-06T12:22:29.683239Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

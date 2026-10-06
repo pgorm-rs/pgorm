@@ -885,6 +885,7 @@ assertions (
     {id composite-key-refusals, kind @complete, author "brendan@necessary.nu", at 2026-10-05T19:06:49.235085Z}
     {id composite-key-edge-coverage, kind @complete, author "brendan@necessary.nu", at 2026-10-05T21:16:37.554772Z}
     {id on-conflict-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:15:11.139777Z}
+    {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
 )
 
 impl_evidence (

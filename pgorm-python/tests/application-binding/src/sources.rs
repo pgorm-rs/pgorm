@@ -64,20 +64,37 @@ mod tests {
                 })?;
                 assert_eq!((actual.sql, actual.values), expected);
             }
-            let alias = Name::runtime("runtime alias \"雪\"");
+            const WRITTEN: &str = "runtime alias '雪'; -- $1";
+            let alias = Name::runtime(WRITTEN);
             let expr: pl::Expr<'_> = alias.clone().into();
             let (sql, _) = pl::Pipeline::from(pl::named_runtime(A, Name::runtime("a")))
                 .derive(pl::col(Name::runtime("a"), Name::runtime("id")).as_runtime(alias))
                 .filter(expr.gt(1i64))
                 .into_sql()
                 .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;
-            let token = pl::alias("runtime alias \"雪\"");
+            let token = pl::alias(WRITTEN);
             let (expected, _) = pl::Pipeline::from(A.named("a"))
                 .derive(pl::col(Name::runtime("a"), Name::runtime("id")).as_(token))
                 .filter(token.gt(1i64))
                 .into_sql()
                 .map_err(|error| pyo3::exceptions::PyRuntimeError::new_err(error.to_string()))?;
             assert_eq!(sql, expected);
+            assert!(sql.contains("\"runtime alias '雪'; -- $1\""), "{sql}");
+
+            const REFUSED: &str = "runtime alias \"雪\"";
+            let refused = pl::Pipeline::from(pl::named_runtime(A, Name::runtime("a")))
+                .derive(
+                    pl::col(Name::runtime("a"), Name::runtime("id"))
+                        .as_runtime(Name::runtime(REFUSED)),
+                )
+                .into_sql();
+            assert!(
+                matches!(
+                    refused,
+                    Err(pl::PipelineError::UnquotableIdentifier(ref name)) if name == REFUSED
+                ),
+                "{refused:?}"
+            );
             Ok(())
         })
     }

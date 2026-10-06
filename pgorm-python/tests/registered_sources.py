@@ -92,7 +92,14 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
 
     # [spec:pgorm:req:python.pipeline/test]
     async def test_aliases_parameters_and_decode_failures(self):
-        alias = 'notes "雪"'
+        alias = "notes '雪'; -- $1"
+        refused = 'notes "雪"'
+        with self.assertRaisesRegex(
+            p.ConstructionError, "cannot be written as a pipeline name"
+        ):
+            self.joined(alias=refused).select_sources(
+                pl.sources("app.TwoSources"), qualifiers=["accounts", refused]
+            ).inspect()
         query = self.joined(alias=alias).filter_with(
             lambda b: pl.col(alias, "body") == b.bind("second")
         )

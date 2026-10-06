@@ -59,7 +59,12 @@ macOS arm64 and Linux x86-64 with CPython 3.14.4. Its macOS job uses the
 [`macos-15` arm64 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners);
 the Linux job uses Ubuntu 24.04. Each job checks its actual architecture,
 provisions an owned PostgreSQL cluster and retains packages and test evidence
-as review artifacts. Failed jobs retain their partial evidence.
+as review artifacts. Failed jobs retain their partial evidence. A third job
+runs the [application checker](ENTITIES.md) on Linux and retains its wheel and
+report from `target/python-entities`. The workflow runs on pushes to `main` and
+pull requests that touch Rust, Cargo or `pgorm-python` files, and weekly, so a
+change elsewhere in the workspace that breaks a downstream application binding
+is caught without anyone running the checker by hand.
 
 Configuring a CI job does not establish a passing result. Add a combination to
 `support.json`'s tested matrix only after its distribution checker has passed.
