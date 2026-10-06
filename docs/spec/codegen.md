@@ -435,7 +435,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `timestamp` is; mapping it to the instant type would claim a time zone the
 > column does not carry, and would disagree with the inference table's
 > `DateTime`→`Timestamp` direction
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+6]`).
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`).
 >
 > There is no option selecting between date/time crates, and codegen MUST NOT
 > offer one. jiff is the single temporal crate pgorm models PostgreSQL with,
@@ -737,7 +737,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+6]
+> [spec:pgorm:req:codegen.ddl.unsupported+7]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -773,13 +773,22 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Type spellings outside the vocabulary are named the same way
 > (`codegen.ddl.types`).
 >
+> A generated column is refused for the reason a `DEFAULT` and a `CHECK` are,
+> not because the entity model lacks it — an entity declares either kind
+> (`entity.traits.column-def`) — but because the bridge reads no column
+> expression: the statement it builds carries a `SimpleExpr`, and the entity
+> it writes carries Rust source spelling one, and neither has a reader from
+> PostgreSQL's expression tree yet. Each kind is named as written, so the
+> refusal says which the file declared: `a GENERATED clause` for a `STORED`
+> column, and `a VIRTUAL generated column` for a virtual one, which a bare
+> `GENERATED ALWAYS AS (...)` is too, since 18 reads it as `VIRTUAL` — the
+> grammar's kind is the answer, never the keyword's presence.
+>
 > The file is read with PostgreSQL 18's grammar (`codegen.ddl`), which
 > accepts constraint shapes earlier releases refused. Each resembles a shape
 > the bridge does read, so reading it as that shape would be the quiet
 > reinterpretation this rule forbids, and each is named instead until the
-> entity model can hold it: a `VIRTUAL` generated column — `a VIRTUAL
-> generated column`, which a bare `GENERATED ALWAYS AS (...)` is too, since 18
-> reads it as `VIRTUAL` — where a `STORED` one stays `a GENERATED clause`; a
+> entity model can hold it: a
 > primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
 > which is not the plain key over the same columns; a foreign key matching on
 > a `PERIOD` (`a PERIOD foreign key`); a `NOT ENFORCED` foreign key or column
@@ -894,7 +903,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`codegen.entity.transform`).
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+9]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+10]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity

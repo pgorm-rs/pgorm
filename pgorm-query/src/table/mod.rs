@@ -14,6 +14,7 @@ use crate::types::{IntoName, IntoTableName};
 mod alter;
 mod column;
 mod column_collation;
+mod column_generated;
 mod column_identity;
 mod create;
 mod drop;
@@ -24,6 +25,7 @@ mod truncate;
 
 pub use alter::*;
 pub use column::*;
+pub use column_generated::GeneratedKind;
 pub use create::*;
 pub use drop::*;
 pub use interval::*;

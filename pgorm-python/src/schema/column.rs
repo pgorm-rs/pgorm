@@ -1,6 +1,6 @@
 use super::types::PyDataType;
-use crate::{expressions, identifiers::PyIdentifier};
-use pgorm::pgorm_query::ColumnDef;
+use crate::{errors::ConstructionError, expressions, identifiers::PyIdentifier};
+use pgorm::pgorm_query::{ColumnDef, GeneratedKind};
 use pyo3::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -52,9 +52,18 @@ impl PyColumnDef {
         inner.check(expressions::require_expr(condition)?.inner);
         Ok(Self { inner })
     }
-    fn generated(&self, expression: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn generated(&self, expression: &Bound<'_, PyAny>, kind: &str) -> PyResult<Self> {
+        let kind = match kind {
+            "stored" => GeneratedKind::Stored,
+            "virtual" => GeneratedKind::Virtual,
+            _ => {
+                return Err(ConstructionError::new_err(
+                    "a generated column is 'stored' or 'virtual'",
+                ));
+            }
+        };
         let mut inner = self.inner.clone();
-        inner.generated(expressions::require_expr(expression)?.inner);
+        inner.generated(expressions::require_expr(expression)?.inner, kind);
         Ok(Self { inner })
     }
 }

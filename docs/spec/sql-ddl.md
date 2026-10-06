@@ -133,7 +133,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > options with it, as a second `raw_suffix()` replaces the first; the unique
 > keys are a list `unique()` appends to. A column has no key clause of its own
 > — `ColumnDef` has no `primary_key()` or `unique_key()` and `ColumnSpec` no
-> key arm (`[spec:pgorm:req:sql.ddl.column-def+9]`) — so a key is declared on
+> key arm (`[spec:pgorm:req:sql.ddl.column-def+10]`) — so a key is declared on
 > the table and only there, and keys always render after the columns, one
 > form per concept. Two primary keys therefore have no representation
 > (`[dec:pgorm:invalid-states-unrepresentable]`); the live suite holds a table
@@ -172,17 +172,17 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+9]
+> [spec:pgorm:req:sql.ddl.column-def+10]
 > `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
 > and an ordered list of `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
-> `Check(SimpleExpr)`, `Generated { expr }`,
+> `Check(SimpleExpr)`, `Generated { expr, kind }`,
 > `Identity(IdentityGeneration, Option<SequenceOptions>)`, `RawSuffix(&'static str)`,
 > `Comment(String)`),
 > populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
-> `not_null()`, `default(v)`, `check(expr)`, `identity()`, `identity_by_default()`,
-> `identity_with(generation, options)`, `raw_suffix(s)`, etc.).
+> `not_null()`, `default(v)`, `check(expr)`, `generated(expr, kind)`, `identity()`,
+> `identity_by_default()`, `identity_with(generation, options)`, `raw_suffix(s)`, etc.).
 >
 > A column carries no key. A primary or unique key is the table's, a tuple of
 > one or more columns declared on the table
@@ -196,16 +196,40 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
 > (`[spec:pgorm:req:sql.render.collate]`), then each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
-> `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>)
-> STORED`, `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
-> `RawSuffix` verbatim. A generated column is always stored and
-> `generated(expr)` takes no flag saying otherwise: `VIRTUAL` is a syntax
-> error on every PostgreSQL before 18, the builder cannot know which release
-> it is writing for, and rendering is infallible — there is no error channel
-> to refuse through, so the refusal is that the spec carries no `stored`
-> field and the non-stored column has no constructor
-> (`[dec:pgorm:invalid-states-unrepresentable]`). The `ColumnSpec::Generated
-> { expr, stored }` shape and the `VIRTUAL` render MUST NOT return.
+> `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
+> `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
+> `RawSuffix` verbatim.
+>
+> A generated column is one of PostgreSQL's two kinds, `GeneratedKind::Stored`
+> (computed when the row is written, kept on disk) or `GeneratedKind::Virtual`
+> (computed when the row is read, PostgreSQL 18's addition), and
+> `GeneratedKind::keyword` gives the `STORED` / `VIRTUAL` word. The kind MUST
+> always be written: PostgreSQL 17 refuses a generated column that names
+> neither keyword, and 18 reads one that names neither as `VIRTUAL`, so a
+> render that left it to the server would change kind with the release. That
+> is why `generated(expr, kind)` takes the kind as an argument with no
+> default — a one-argument `generated(expr)` does not compile — and why the
+> kind is a closed pair rather than a `stored: bool`, whose `false` read
+> backwards and once stood for a render no release before 18 parsed
+> (`[dec:pgorm:invalid-states-unrepresentable]`); that flag MUST NOT return.
+> pgorm targets PostgreSQL 18, the release the oracle parses with and the
+> live server runs (`[spec:pgorm:req:sql.render.oracle+1]`), so a virtual
+> column is no longer a render the builder has to keep from 17.
+>
+> What the server refuses around a generated column is the server's
+> knowledge, not the column's, and the live suite holds each refusal by
+> SQLSTATE: for either kind, an expression that is not immutable (`42P17`),
+> one that reads another generated column (`42P17`) or a whole row
+> (`42P17`), one holding a subquery (`0A000`), a `DEFAULT` or an identity
+> beside it (`42601`), and a generated column as a partition key (`42P17`);
+> for a virtual column, an index on it or on an expression reading it, a
+> primary key, a unique key and a foreign key (each `0A000`), a user-defined
+> or domain type — an enum or composite included (`0A000`) — and a
+> user-defined function in its expression (`0A000`). A stored column takes
+> an index and a key, and a `NOT NULL` or `CHECK` on either kind is enforced
+> (`23502`, `23514`). A row writes neither kind: an insert or update that
+> supplies a value other than `DEFAULT` is refused (`428C9`).
+>
 > `AutoIncrement` produces no keyword; instead it replaces the type spelling
 > with the serial family, which `ColumnType::serial_spelling` defines over the
 > integer trio alone — `SmallInteger`→`smallserial`, `Integer`→`serial`,
@@ -255,9 +279,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > One boundary is deliberate: identity's exclusivity with `Default`,
 > `Generated` and `AutoIncrement` is documented rather than typed. Those are four *separate explicit calls* a
-> caller has to write, not a flag the API offers — unlike the `stored: false`
-> that `Generated` used to advertise, nothing here presents the invalid
-> combination as a choice — and collapsing them into one slot would move
+> caller has to write, not a flag the API offers — nothing here presents the
+> invalid combination as a choice — and collapsing them into one slot would move
 > `DEFAULT` out of the insertion-ordered spec list this same rule fixes, which
 > is a contract every interleaved render depends on. The combinations therefore
 > render, the grammar accepts them, and the server refuses each by name; the
@@ -342,7 +365,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > ](cols)…` with the key's `INCLUDE` and deferrability, the table-level
 > spelling of `[spec:pgorm:req:sql.ddl.create-table+12]` after `ADD`. They are
 > how a key is added to a table that exists, now that a column carries none
-> (`[spec:pgorm:req:sql.ddl.column-def+9]`): the `ADD COLUMN … UNIQUE` and
+> (`[spec:pgorm:req:sql.ddl.column-def+10]`): the `ADD COLUMN … UNIQUE` and
 > `ADD UNIQUE ("c")` a column's key spec used to render are this, one key at a
 > time. Whether the table already has a primary key is the server's
 > knowledge, not the builder's; a second is refused there (`42P16`).
@@ -616,7 +639,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > alike (`[spec:pgorm:req:sql.ddl.alter-table+7]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
 > `unique_key_deferrability(d)` and `primary_key_deferrability(d)` — are gone
-> with the column keys (`[spec:pgorm:req:sql.ddl.column-def+9]`), and the
+> with the column keys (`[spec:pgorm:req:sql.ddl.column-def+10]`), and the
 > clause has one position it can be written in, the one PostgreSQL's grammar
 > puts it.
 >
@@ -876,7 +899,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The options are one vocabulary for every position that takes them, a
 > standalone sequence's and an identity column's
-> (`[spec:pgorm:req:sql.ddl.column-def+9]`): `SequenceOption` is `IncrementBy`,
+> (`[spec:pgorm:req:sql.ddl.column-def+10]`): `SequenceOption` is `IncrementBy`,
 > `MinValue` / `NoMinValue`, `MaxValue` / `NoMaxValue`, `StartWith`, `Cache`
 > and `Cycle` / `NoCycle`, each number an `i64` written as an integer literal,
 > `i64::MIN` and `i64::MAX` included. `SequenceOptions` holds one or more of

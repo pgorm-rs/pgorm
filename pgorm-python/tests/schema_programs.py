@@ -13,7 +13,8 @@ def programs(p):
             .column(p.ColumnDef("amount", p.DataType("numeric", precision=12, scale=3)))
             .primary_key('id "x"').unique("name", name='unique "x"', nulls_not_distinct=True)
             .check(p.col('id "x"') > 0).if_not_exists(),
-        "generated": base.column(p.ColumnDef("twice", "integer").generated(p.col('id "x"') * 2)),
+        "generated": base.column(p.ColumnDef("twice", "integer").generated(p.col('id "x"') * 2, "stored")),
+        "generated_virtual": base.column(p.ColumnDef("next", "integer").generated(p.col('id "x"') + 1, "virtual")),
         "column_specs": p.CreateTable(table).column(p.ColumnDef("id", "bigint").auto_increment())
             .column(p.ColumnDef("n", "integer").null().check(p.col("n") > 0)).primary_key("id").unique("n"),
         "index": p.CreateIndex(table, "name", name='index "x"').column('id "x"', descending=True)

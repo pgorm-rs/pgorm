@@ -12,7 +12,7 @@ pub(crate) mod column_def;
 pub use column_def::*;
 
 /// Defines a Column for an Entity
-// [spec:pgorm:req:entity.traits.column-def+1]
+// [spec:pgorm:req:entity.traits.column-def+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDef {
     pub(crate) col_type: ColumnType,

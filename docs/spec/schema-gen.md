@@ -8,14 +8,15 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+6]
+> [spec:pgorm:sem:schema.from-entity+7]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
 > the declared `ColumnType` (with `Enum { name, .. }` rewritten to a named
 > type reference naming the Postgres enum), `NOT NULL` unless the column is
 > nullable, plus the column's default — a
-> `DEFAULT` expression or a `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`,
+> `DEFAULT` expression, a `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY` or a
+> `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }` of the kind it declares,
 > whichever its definition holds (`entity.traits.column-def`) — and its
 > comment. A key is the table's (`sql.ddl.create-table`): the entity's
 > primary key becomes the table's, and each `unique` column a one-column
@@ -25,8 +26,9 @@ executes SQL.
 > one-column key is left unnamed, so PostgreSQL names it `{table}_pkey`, and
 > its column is drawn from the serial family when
 > `E::PrimaryKey::auto_increment()` is true and the column holds no default of
-> its own: PostgreSQL refuses `serial` beside a `DEFAULT` or an identity
-> (42601), and a key filled by either is generated already. A composite key
+> its own: PostgreSQL refuses `serial` beside a `DEFAULT`, an identity or a
+> generation expression (42601), and a key filled by any of them is generated
+> already. A composite key
 > (arity > 1) is named `pk-{table}`, and no column of it is drawn from the
 > serial family whatever
 > `auto_increment()` says: a composite key's generated column is the one whose

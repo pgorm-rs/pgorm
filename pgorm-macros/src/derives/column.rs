@@ -7,7 +7,7 @@ use syn::{Data, DataEnum, Fields, LitStr, Variant};
 /// Variant-level `#[pgorm(...)]` keys a `Column` enum may carry. `column_name` is the
 /// override this derive reads; `table_name` rides on the `Table` variant
 /// `DeriveEntityModel` generates for `table_iden`, which has no column name at all.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 const COLUMN_VARIANT_KEYS: [&str; 2] = ["column_name", "table_name"];
 
 /// Derive a Column name for an enum type

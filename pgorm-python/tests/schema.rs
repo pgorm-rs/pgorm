@@ -1,7 +1,7 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Expr, Index, IndexOrder, IndexType, IntoName, Name, StringLen, Table,
-    TableKey, TableName, TypeName, Values, extension::Type,
+    ColumnDef, ColumnType, Expr, GeneratedKind, Index, IndexOrder, IndexType, IntoName, Name,
+    StringLen, Table, TableKey, TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -57,9 +57,18 @@ fn programs() -> BTreeMap<&'static str, String> {
         ("table", full),
         (
             "generated",
+            base.clone()
+                .col(
+                    ColumnDef::new_with_type(a("twice"), ColumnType::Integer)
+                        .generated(Expr::col(a("id \"x\"")).mul(2i64), GeneratedKind::Stored),
+                )
+                .to_string(),
+        ),
+        (
+            "generated_virtual",
             base.col(
-                ColumnDef::new_with_type(a("twice"), ColumnType::Integer)
-                    .generated(Expr::col(a("id \"x\"")).mul(2i64)),
+                ColumnDef::new_with_type(a("next"), ColumnType::Integer)
+                    .generated(Expr::col(a("id \"x\"")).add(1i64), GeneratedKind::Virtual),
             )
             .to_string(),
         ),

@@ -50,7 +50,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+14]
+> [spec:pgorm:req:sql.surface+15]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -118,7 +118,8 @@ today, including panicking edges and deliberate failsafes.
 > and MERGE lacks (`sql.ast`); `IntoKeyColumns`, the non-empty column tuple
 > — one column or a tuple of one to twelve — that a table key is built from
 > and an `ON CONFLICT` target names a key with (`sql.ddl.create-table`,
-> `sql.ast.on-conflict`). An
+> `sql.ast.on-conflict`); `GeneratedKind`, which of PostgreSQL's two kinds a
+> generated column is, stored or virtual (`sql.ddl.column-def`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a

@@ -7,7 +7,7 @@ use syn::{
 
 /// The refusal for a `#[pgorm(...)]` key none of a derive's arms read, spanned at the
 /// key and naming it, so a typo is diagnosed rather than dropped.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 pub(crate) fn unknown_pgorm_key(meta: &ParseNestedMeta<'_>) -> syn::Error {
     let name = match meta.path.get_ident() {
         Some(ident) => ident.to_string(),
@@ -18,7 +18,7 @@ pub(crate) fn unknown_pgorm_key(meta: &ParseNestedMeta<'_>) -> syn::Error {
 
 /// Accept a key this derive recognises but does not read, consuming its `= value` when
 /// it carries one so the parse stream advances past it; refuse anything else.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 pub(crate) fn skip_known_key(meta: &ParseNestedMeta<'_>, known: &[&str]) -> syn::Result<()> {
     if !known.iter().any(|key| meta.path.is_ident(key)) {
         return Err(unknown_pgorm_key(meta));
@@ -39,8 +39,8 @@ pub(crate) const PROJECTION_FIELD_KEYS: [&str; 3] = ["from_col", "from_expr", "s
 /// `DeriveActiveModel` read only `enum_name` (and `ignore`, through `field_not_ignored`)
 /// out of the set, but the composite derive re-runs both over the same input, so each
 /// has to recognise the whole vocabulary or a legal entity model would stop compiling.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
-pub(crate) const MODEL_FIELD_KEYS: [&str; 16] = [
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
+pub(crate) const MODEL_FIELD_KEYS: [&str; 18] = [
     "auto_increment",
     "column_name",
     "column_type",
@@ -48,6 +48,8 @@ pub(crate) const MODEL_FIELD_KEYS: [&str; 16] = [
     "default_expr",
     "default_value",
     "enum_name",
+    "generated_stored",
+    "generated_virtual",
     "identity",
     "identity_by_default",
     "ignore",

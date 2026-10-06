@@ -16,7 +16,7 @@ use syn::{
 /// The most columns a primary key can have: `PrimaryKeyTrait::ValueType` is a
 /// tuple for a composite key, and its traits are implemented for tuples of 1
 /// through 12 parts.
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
 const MAX_KEY_ARITY: usize = 12;
 
 /// The field-level `#[pgorm(...)]` configuration of one model field.
@@ -41,6 +41,9 @@ struct FieldAttrs {
     /// The identity this field declared, as the builder call it becomes, and
     /// where.
     identity: Option<(Identity, Span)>,
+    /// The generated column this field declared: its kind, its expression,
+    /// and where the key was written.
+    generated: Option<(Generated, TokenStream, Span)>,
 }
 
 /// Which of PostgreSQL's two identity forms a field declared.
@@ -62,10 +65,30 @@ impl Identity {
     }
 }
 
+/// Which of PostgreSQL's two kinds of generated column a field declared.
+#[derive(Clone, Copy, PartialEq)]
+enum Generated {
+    /// `generated_stored`: `GENERATED ALWAYS AS (..) STORED`.
+    Stored,
+    /// `generated_virtual`: `GENERATED ALWAYS AS (..) VIRTUAL`.
+    Virtual,
+}
+
+impl Generated {
+    /// The `ColumnDef` builder call that declares this kind over `expr`.
+    fn builder(self, expr: &TokenStream) -> TokenStream {
+        let kind = match self {
+            Self::Stored => quote! { Stored },
+            Self::Virtual => quote! { Virtual },
+        };
+        quote! { .generated(#expr, pgorm::pgorm_query::GeneratedKind::#kind) }
+    }
+}
+
 /// `column_name` carries the name derived before any attribute is read, which an
 /// explicit `column_name` key overrides. `auto_increment` and `primary_key_types`
 /// are entity-wide and accumulate across every field.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 fn parse_field_attrs(
     field: &Field,
     column_name: Option<String>,
@@ -77,7 +100,7 @@ fn parse_field_attrs(
         ..Default::default()
     };
 
-    // search for #[pgorm(primary_key, auto_increment = false, column_type = "String(Some(255))", default_value = "new user", default_expr = "gen_random_uuid()", column_name = "name", enum_name = "Name", nullable, indexed, unique)]
+    // search for #[pgorm(primary_key, auto_increment = false, column_type = "String(Some(255))", default_value = "new user", default_expr = "gen_random_uuid()", generated_stored = "Expr::col(Column::A).mul(2)", column_name = "name", enum_name = "Name", nullable, indexed, unique)]
     for attr in field.attrs.iter() {
         if !attr.path().is_ident("pgorm") {
             continue;
@@ -115,6 +138,27 @@ fn parse_field_attrs(
                     Identity::ByDefault
                 };
                 parsed.identity = Some((identity, meta.path.span()));
+            } else if meta.path.is_ident("generated_stored")
+                || meta.path.is_ident("generated_virtual")
+            {
+                if parsed.generated.is_some() {
+                    return Err(meta.error(
+                        "a column is generated one way: `generated_stored` or \
+                         `generated_virtual`, once",
+                    ));
+                }
+                let kind = if meta.path.is_ident("generated_stored") {
+                    Generated::Stored
+                } else {
+                    Generated::Virtual
+                };
+                let span = meta.path.span();
+                let lit = meta.value()?.parse()?;
+                let Lit::Str(litstr) = lit else {
+                    return Err(meta.error(format!("Invalid generated expression {:?}", lit)));
+                };
+                let expr: TokenStream = syn::parse_str(&litstr.value())?;
+                parsed.generated = Some((kind, expr, span));
             } else if meta.path.is_ident("comment") {
                 parsed.comment = Some(meta.value()?.parse::<Lit>()?);
             } else if meta.path.is_ident("default_value") {
@@ -184,7 +228,7 @@ fn parse_field_attrs(
 
 /// Refuse an identity beside anything else that would fill the column or let
 /// it be `NULL`, each a definition PostgreSQL rejects (42601).
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
 fn check_identity(attrs: &FieldAttrs, optional: bool) -> syn::Result<()> {
     let Some((_, span)) = attrs.identity else {
         return Ok(());
@@ -199,6 +243,31 @@ fn check_identity(attrs: &FieldAttrs, optional: bool) -> syn::Result<()> {
         return Ok(());
     };
     Err(syn::Error::new(span, conflict))
+}
+
+/// Refuse a generated column beside anything else that would fill it, and a
+/// virtual one where PostgreSQL cannot index it: the first are definitions it
+/// rejects as conflicting (42601), the second as unsupported (0A000).
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+7]
+fn check_generated(attrs: &FieldAttrs) -> syn::Result<()> {
+    let Some((kind, _, span)) = &attrs.generated else {
+        return Ok(());
+    };
+    let conflict = if attrs.identity.is_some() {
+        "a column takes an identity or a generation expression, not both; PostgreSQL refuses the pair"
+    } else if attrs.default_value.is_some() || attrs.default_expr.is_some() {
+        "a column takes a default or a generation expression, not both; PostgreSQL refuses the pair"
+    } else if attrs.auto_increment.is_some() {
+        "a generated column already says how it is filled; drop `auto_increment`"
+    } else if *kind == Generated::Virtual
+        && (attrs.primary_key.is_some() || attrs.unique || attrs.indexed)
+    {
+        "a VIRTUAL generated column cannot be keyed or indexed, which PostgreSQL does not \
+         support; declare it `generated_stored`"
+    } else {
+        return Ok(());
+    };
+    Err(syn::Error::new(*span, conflict))
 }
 
 /// Advances past whatever an unrecognised `#[serde(..)]` parameter carries —
@@ -286,10 +355,10 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 
 /// Method to derive an Model
 // [spec:pgorm:sem:macros.derive.entity-model+5]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+6]
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+7]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
     let mut table_name = None;
@@ -361,7 +430,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     let mut primary_keys: Punctuated<_, Comma> = Punctuated::new();
     let mut primary_key_types: Punctuated<Type, Comma> = Punctuated::new();
     let mut auto_increment = true;
-    let mut key_identities: Vec<bool> = Vec::new();
+    let mut key_generated: Vec<bool> = Vec::new();
     let mut key_spans: Vec<Span> = Vec::new();
     let mut serial_key_fields: Vec<Span> = Vec::new();
     if table_iden && let Some(table_name) = table_name {
@@ -404,6 +473,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     &mut primary_key_types,
                 )?;
                 check_identity(&attrs, unwrap_option(&field.ty).is_some())?;
+                check_generated(&attrs)?;
                 let FieldAttrs {
                     sql_type,
                     column_name,
@@ -420,6 +490,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     ignore,
                     auto_increment: field_auto_increment,
                     identity,
+                    generated,
                 } = attrs;
 
                 if let Some(enum_name) = enum_name {
@@ -458,7 +529,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                         #variant_attrs
                         #field_name
                     });
-                    key_identities.push(identity.is_some());
+                    key_generated.push(identity.is_some() || generated.is_some());
                     if let Some((true, span)) = field_auto_increment {
                         serial_key_fields.push(span);
                     }
@@ -520,6 +591,10 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     let builder = identity.builder();
                     match_row = quote! { #match_row #builder };
                 }
+                if let Some((kind, expr, _)) = generated {
+                    let builder = kind.builder(&expr);
+                    match_row = quote! { #match_row #builder };
+                }
                 // match_row = quote! { #match_row.comment() };
                 columns_trait.push(match_row);
             }
@@ -561,9 +636,10 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
 
     let primary_key = {
         // The database generates the whole key: every key column is an
-        // identity, or the key is one column the serial family fills.
-        let auto_increment = if key_identities.contains(&true) {
-            !key_identities.contains(&false)
+        // identity or a generated column, or the key is one column the serial
+        // family fills.
+        let auto_increment = if key_generated.contains(&true) {
+            !key_generated.contains(&false)
         } else {
             auto_increment && primary_keys.len() == 1
         };

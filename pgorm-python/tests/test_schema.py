@@ -56,7 +56,8 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.drop_table(p.Table("test", alias="t")),
             lambda: s.create_index(p.Table("test"), "v").method("gin); SELECT 1 --"),
             lambda: s.ColumnDef("", "text"),
-            lambda: s.ColumnDef("v", "text").generated("raw SQL"),
+            lambda: s.ColumnDef("v", "text").generated("raw SQL", "stored"),
+            lambda: s.ColumnDef("v", "integer").generated(p.col("id"), "persisted"),
             lambda: s.create_enum("mood", ["a\0b"]),
             lambda: s.create_enum("mood", ["雪" * 22]),
             lambda: s.add_enum_value("mood", "v", before="a", after="b"),
@@ -83,14 +84,15 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         table = model.table
         ddl = s.create_table(table).column(s.ColumnDef("id", "integer").auto_increment()).primary_key("id")
         ddl = ddl.column(s.ColumnDef("name", "text").not_null().default("O'Brien \\ 雪"))
-        ddl = ddl.column(s.ColumnDef("twice", "integer").generated(p.col("id") * 2)).check(p.col("id") > 0)
+        ddl = ddl.column(s.ColumnDef("twice", "integer").generated(p.col("id") * 2, "stored"))
+        ddl = ddl.column(s.ColumnDef("next", "integer").generated(p.col("id") + 1, "virtual")).check(p.col("id") > 0)
         ddl.inspect()
         count = await self.pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM information_schema.tables WHERE table_schema = $1", [self.namespace]))
         self.assertEqual(count["n"], 0)
         await self.pool.execute(ddl)
         await self.pool.execute(ddl.if_not_exists())
-        inserted = await self.pool.fetch_one(p.insert(table).default_values().returning(p.col("id"), p.col("name"), p.col("twice")))
-        self.assertEqual(dict(inserted), {"id": 1, "name": "O'Brien \\ 雪", "twice": 2})
+        inserted = await self.pool.fetch_one(p.insert(table).default_values().returning(p.col("id"), p.col("name"), p.col("twice"), p.col("next")))
+        self.assertEqual(dict(inserted), {"id": 1, "name": "O'Brien \\ 雪", "twice": 2, "next": 2})
         async with self.pool.connection() as connection:
             index = s.create_index(table, "name", name='idx "雪"').column("id", descending=True).nulls_not_distinct()
             await connection.execute(index)

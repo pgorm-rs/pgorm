@@ -37,7 +37,9 @@ if __name__ == "__main__":
 ```
 
 Builder methods return new objects. `ColumnDef` supports nullability, defaults,
-auto increment, check constraints and stored generated expressions. Keys are
+auto increment, check constraints and generated expressions, whose kind is
+always named: `.generated(expr, "stored")` or `.generated(expr, "virtual")`,
+since PostgreSQL 17 requires `STORED` and 18 reads a bare one as `VIRTUAL`. Keys are
 the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
 which a later call replaces, and `CreateTable.unique(*columns, name=...,
 nulls_not_distinct=...)` adds a unique key, so a table cannot be written with

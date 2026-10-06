@@ -238,7 +238,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+6]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+7]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,7 +257,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+6]
+// [spec:pgorm:sem:schema.from-entity+7]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -301,7 +301,7 @@ where
     stmt.take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+6]    column projection, and the serial family for a one-column key
+// [spec:pgorm:sem:schema.from-entity+7]    column projection, and the serial family for a one-column key
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
@@ -322,6 +322,9 @@ where
         Some(ColumnDefault::Identity(IdentityGeneration::ByDefault)) => {
             column_def.identity_by_default();
         }
+        Some(ColumnDefault::Generated(expr, kind)) => {
+            column_def.generated(expr, kind);
+        }
         None => {}
     }
     if let Some(comment) = orm_column_def.comment {
@@ -329,8 +332,8 @@ where
     }
     // Only a one-column key is drawn from the serial family, and only when the
     // column names no fill of its own: PostgreSQL refuses `serial` beside a
-    // `DEFAULT` or an identity (42601). A composite key's generated part is
-    // its column's identity, rendered above.
+    // `DEFAULT`, an identity or a generation expression (42601). A composite
+    // key's generated part is its column's identity, rendered above.
     if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY == 1
         && E::PrimaryKey::auto_increment()
         && !fills_itself

@@ -555,7 +555,12 @@ fn sweep_table_ddl_shapes() {
             .col(
                 ColumnDef::new(Glyph::Aspect)
                     .integer()
-                    .generated(Expr::val(1)),
+                    .generated(Expr::val(1), GeneratedKind::Stored),
+            )
+            .col(
+                ColumnDef::new(Glyph::Tokens)
+                    .integer()
+                    .generated(Expr::col(Glyph::Id).add(1), GeneratedKind::Virtual),
             )
             .to_string(),
         Table::alter(Glyph::Table)

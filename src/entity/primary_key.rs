@@ -36,7 +36,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key+5]
+// [spec:pgorm:def:entity.traits.primary-key+6]
 pub trait PrimaryKeyTrait: StaticName + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -93,7 +93,7 @@ pub trait PrimaryKeyToColumn {
 /// // `cake_filling`'s key is `(i32, i32)`.
 /// cake_filling::Entity::find_by_id((1, 2, 3));
 /// ```
-// [spec:pgorm:def:entity.traits.primary-key+5]
+// [spec:pgorm:def:entity.traits.primary-key+6]
 pub trait IntoPrimaryKey<V> {
     /// The key value, converted part by part.
     fn into_primary_key(self) -> V;
@@ -212,7 +212,7 @@ impl_into_pk!(
 );
 
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key+5]
+// [spec:pgorm:def:entity.traits.primary-key+6]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

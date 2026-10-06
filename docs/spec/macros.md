@@ -74,7 +74,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+4]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+5]`).
 >
 > The `json_key()` arm is the one place the derive reads an attribute outside the
 > `#[pgorm(...)]` namespace: the key is the field's own name, put through
@@ -95,7 +95,7 @@ known limitations.
 > have a primary key column. See <https://github.com/pgorm-rs/pgorm/issues/485> for
 > details."
 
-> [spec:pgorm:syn:macros.derive.entity-model.attrs+2]
+> [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
 > Struct-level `#[pgorm(...)]` keys recognised by `DeriveEntityModel`: `table_name = Lit`,
 > `schema_name = Lit`, `comment = Lit`, bare `table_iden`, and `rename_all = "style"`
 > (case styles per the strum-derived list: `camelCase`, `PascalCase`, `kebab-case`,
@@ -108,7 +108,8 @@ known limitations.
 > Field-level keys: bare `primary_key`, `nullable`, `indexed`, `unique`, `ignore`,
 > `identity`, `identity_by_default`;
 > `auto_increment = bool`; `column_type = "ColumnType expr"`; `column_name = "string"`;
-> `enum_name = "Ident"`; `default_value = Lit`; `default_expr = "expr"`; `comment = Lit`;
+> `enum_name = "Ident"`; `default_value = Lit`; `default_expr = "expr"`;
+> `generated_stored = "expr"`; `generated_virtual = "expr"`; `comment = Lit`;
 > `select_as = "sql type"`; `save_as = "sql type"`. String-typed keys reject non-string
 > literals with an `Invalid <key> ...` error.
 >
@@ -148,7 +149,7 @@ known limitations.
 > Fields that are already clean snake_case get no attribute, and their SQL name falls out
 > of `DeriveColumn`'s default (snake_case of the variant).
 
-> [spec:pgorm:sem:macros.derive.entity-model.column-def+6]
+> [spec:pgorm:sem:macros.derive.entity-model.column-def+7]
 > Each `def()` arm builds `ColumnTypeTrait::def(<column type>)`. The column type is the
 > parsed `column_type` attribute if present; otherwise it is inferred by matching the
 > field's Rust type structurally — against the `syn::Type`, never against a
@@ -189,8 +190,29 @@ known limitations.
 > An `Option<T>` wrapper — a bare, single-segment `Option` with exactly one type
 > argument — is unwrapped one level to `T` and forces `nullable`. Modifier calls are
 > then chained in order: `.nullable()`, `.indexed()`, `.unique()`,
-> `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`), and
-> `.identity()` or `.identity_by_default()` (from the key of the same name).
+> `.default_value(lit)`, `.comment(lit)`, `.default(expr)` (from `default_expr`),
+> `.identity()` or `.identity_by_default()` (from the key of the same name), and
+> `.generated(expr, GeneratedKind::Stored)` or `.generated(expr, GeneratedKind::Virtual)`
+> (from `generated_stored` / `generated_virtual`).
+>
+> A generated column's expression is a Rust expression, as `default_expr`'s is,
+> written in the entity's own module, so it names the row's columns as `Column`
+> variants: `generated_stored = "Expr::col(Column::Price).mul(Expr::col(Column::Quantity))"`.
+> The kind is in the key's name and has no default, for the reason the builder's
+> `generated` takes it as an argument (`[spec:pgorm:req:sql.ddl.column-def+10]`).
+> Each combination PostgreSQL refuses for a generated column MUST be a compile error
+> spanned at the field's generated key: both keys, or one twice ("a column is generated
+> one way"); a generated key beside `identity` or `identity_by_default` ("both identity
+> and generation expression specified", 42601), beside `default_value` or `default_expr`
+> ("both default and generation expression specified", 42601), or beside
+> `auto_increment` on the same field, since serial is a default (42601) and the key
+> already says how the column is filled; and `generated_virtual` on a field that is
+> `primary_key`, `unique` or `indexed`, each of which PostgreSQL refuses on a virtual
+> column (0A000) and accepts on a stored one. What the server knows and the derive
+> does not stays the server's: a virtual column over a user-defined or domain type,
+> an enum included (0A000) — a `column_type` override or a `ValueType` decides the
+> type — and an expression that is not immutable or reads another generated column
+> (42P17).
 >
 > The parallel `ArrayType` table that `DeriveValueType` reads
 > (`[spec:pgorm:sem:macros.derive.value-type+3]`) is matched the same way and carries the
@@ -205,15 +227,19 @@ known limitations.
 > `DeriveValueType` too: a newtype over one of the four refused types is the same
 > compile error.
 
-> [spec:pgorm:sem:macros.derive.entity-model.primary-key+4]
+> [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
 > its type to `PrimaryKeyTrait::ValueType` — a bare type for a single key, a tuple for
 > composite keys. `auto_increment()` reports whether the database generates the whole
-> key (`entity.traits.primary-key`). When no key field declares an identity it returns
+> key (`entity.traits.primary-key`). When no key field declares an identity or a
+> generated column it returns
 > true only when there is exactly one primary key column and no field set
 > `auto_increment = false` (the flag defaults to true and is shared: a `false` on any
 > field flips it globally). When some key field does, it returns true exactly when every
-> key field does, whatever the flag says.
+> key field does, whatever the flag says: a stored generated column
+> (`generated_stored`, `macros.derive.entity-model.column-def`) is computed by the
+> database as an identity is drawn by it, so a key made of such columns is generated
+> whole, and a key holding one beside a supplied column is not.
 >
 > A column the database generates inside a composite key — `id` in the multi-tenant
 > `(tenant_id, id)` — is declared on its own field: `identity` for
@@ -461,7 +487,7 @@ known limitations.
 > attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+6]`, falling back to
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`, falling back to
 > `<T as ValueType>::column_type()`/`array_type()` — and inheriting that rule's refusal
 > of `i8`, `u32`, `u64` and `char` on the `ColumnType` side. Attribute errors propagate: a
 > non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a

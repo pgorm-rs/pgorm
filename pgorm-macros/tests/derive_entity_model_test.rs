@@ -266,6 +266,29 @@ mod single_identity {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// Both kinds of generated column, a nullable one, and a stored one as the
+/// whole key: the database computes the key, so `auto_increment()` is true.
+mod generated_columns {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "generated_columns")]
+    pub struct Model {
+        #[pgorm(primary_key, generated_stored = "Expr::col(Column::Base).mul(10)")]
+        pub id: i32,
+        pub base: i32,
+        #[pgorm(generated_virtual = "Expr::col(Column::Base).add(1)")]
+        pub next: i32,
+        #[pgorm(generated_virtual = "Expr::col(Column::Base).mul(2)", nullable)]
+        pub doubled: Option<i32>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// No `table_name`, so no `Entity` struct is generated: the entity module is
 /// hand-finished and `DeriveEntityModel` contributes only `Column`,
 /// `PrimaryKey`, `Model` and `ActiveModel`.
@@ -321,7 +344,7 @@ mod serde_keys {
 }
 
 // [spec:pgorm:sem:macros.derive.entity-model+5/test]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    struct-level table_name / schema_name / comment
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3/test]    struct-level table_name / schema_name / comment
 #[test]
 fn struct_attributes_drive_entity_and_entity_name() {
     // (3) `table_name` present, so `pub struct Entity;` plus a hand-rolled
@@ -455,7 +478,7 @@ fn json_key_reports_the_serde_key() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    `table_iden` adds a Table variant
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3/test]    `table_iden` adds a Table variant
 #[test]
 fn table_iden_variant_is_skipped_by_enum_iter() {
     // The variant exists...
@@ -468,14 +491,14 @@ fn table_iden_variant_is_skipped_by_enum_iter() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    the Table variant has no column def
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3/test]    the Table variant has no column def
 #[test]
 #[should_panic(expected = "Table cannot be used as a column")]
 fn table_iden_variant_has_no_column_def() {
     let _ = filling::Column::Table.def();
 }
 
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+2/test]    field-level keys
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+3/test]    field-level keys
 #[test]
 fn field_level_attributes_shape_the_column_defs() {
     use pgorm::ColumnTypeTrait;
@@ -510,7 +533,7 @@ fn field_level_attributes_shape_the_column_defs() {
     assert_eq!(filling::Column::Plain.def(), ColumnType::Integer.def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+6/test]    the Rust-type inference table
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+7/test]    the Rust-type inference table
 #[test]
 fn column_types_inferred_from_rust_type_name() {
     use pgorm::ColumnTypeTrait;
@@ -543,7 +566,7 @@ fn column_types_inferred_from_rust_type_name() {
     assert_eq!(C::Tea.def(), ColumnType::String(StringLen::N(1)).def());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.column-def+6/test]    explicit column_type wins
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+7/test]    explicit column_type wins
 #[test]
 fn an_explicit_column_type_overrides_the_inferred_one() {
     // `name: String` would infer `string(None)`; the attribute pins `Text`.
@@ -583,7 +606,7 @@ fn sql_column_names_are_pinned_only_when_needed() {
     assert_eq!(renamed::Column::SecondName.to_string(), "explicit");
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5/test]
 #[test]
 fn primary_key_value_type_and_auto_increment() {
     // A single key contributes a bare type...
@@ -603,7 +626,7 @@ fn primary_key_value_type_and_auto_increment() {
     assert!(!shared_auto_increment::PrimaryKey::auto_increment());
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    an identity
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5/test]    an identity
 // column inside a composite key: its def carries the identity, the other key
 // column's does not, and the key is not generated whole
 #[test]
@@ -624,7 +647,7 @@ fn identity_inside_a_composite_key() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    the key is
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5/test]    the key is
 // generated whole when every key column is an identity, whatever its arity and
 // whatever a non-key field says about `auto_increment`
 #[test]
@@ -641,7 +664,38 @@ fn every_identity_key_column_generates_the_key() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+4/test]    what DerivePrimaryKey itself emits
+// [spec:pgorm:sem:macros.derive.entity-model.column-def+7/test]    each generated key
+// becomes the column's generation expression of its kind, after the modifiers it
+// sits beside, and a stored generated column alone in the key generates the key
+#[test]
+fn generated_keys_carry_their_kind() {
+    use generated_columns::Column;
+    use pgorm::pgorm_query::GeneratedKind;
+
+    assert!(generated_columns::PrimaryKey::auto_increment());
+    assert_eq!(
+        Column::Id.def(),
+        ColumnType::Integer
+            .def()
+            .generated(Expr::col(Column::Base).mul(10), GeneratedKind::Stored)
+    );
+    assert_eq!(Column::Base.def(), ColumnType::Integer.def());
+    assert_eq!(
+        Column::Next.def(),
+        ColumnType::Integer
+            .def()
+            .generated(Expr::col(Column::Base).add(1), GeneratedKind::Virtual)
+    );
+    assert_eq!(
+        Column::Doubled.def(),
+        ColumnType::Integer
+            .def()
+            .nullable()
+            .generated(Expr::col(Column::Base).mul(2), GeneratedKind::Virtual)
+    );
+}
+
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5/test]    what DerivePrimaryKey itself emits
 #[test]
 fn derive_primary_key_emits_iden_and_mapping() {
     // `StaticName` maps the variant to its snake_case name, or a `column_name`

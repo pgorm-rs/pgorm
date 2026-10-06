@@ -113,22 +113,38 @@ explicit limitations.
 > enum was dropped and `ColumnTypeTrait` (`def()`, `get_enum_name()`) bridges a
 > `ColumnType` or existing `ColumnDef` into a `ColumnDef`.
 
-> [spec:pgorm:req:entity.traits.column-def+1]
+> [spec:pgorm:req:entity.traits.column-def+2]
 > `ColumnDef` (`src/entity/column.rs`) carries a column's definition attributes:
 > `col_type: ColumnType`, `null`, `unique`, `indexed`, `default`, and
 > `comment: Option<String>`. `ColumnTypeTrait::def()` MUST initialise a definition
 > as non-null, non-unique, non-indexed, with no default and no comment. Builder methods
 > flip individual attributes: `unique()`, `indexed()`, `null()` / `nullable()` (aliases),
 > `comment(v)`, `default_value(T: Into<Value>)`, `default(T: Into<SimpleExpr>)`
-> (the latter accepting arbitrary expressions), and `identity()` /
-> `identity_by_default()` (`GENERATED ALWAYS` / `BY DEFAULT AS IDENTITY`).
+> (the latter accepting arbitrary expressions), `identity()` /
+> `identity_by_default()` (`GENERATED ALWAYS` / `BY DEFAULT AS IDENTITY`), and
+> `generated(expr, kind)` (`GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`, the
+> kind a `GeneratedKind` that is always stated, `[spec:pgorm:req:sql.ddl.column-def+10]`).
 > `get_column_type()` and `is_null()` expose the type and nullability for introspection.
 >
-> `default` is one slot, `Option<ColumnDefault>`, holding either a default expression
-> or an identity form and never both: PostgreSQL refuses a column declaring both (42601,
-> "both default and identity specified"), so a definition holding both would describe
-> no table. The builders writing it replace whatever it held. There is no sequence-option
-> form: an entity declares which form generates a column, not how its sequence counts.
+> `default` is one slot, `Option<ColumnDefault>`, holding a default expression, an
+> identity form or a generation expression and its kind, never two: PostgreSQL refuses
+> a column declaring any pair (42601, "both default and identity specified", "both
+> default and generation expression specified", "both identity and generation
+> expression specified"), so a definition holding two would describe no table. The
+> builders writing it replace whatever it held. There is no sequence-option form: an
+> entity declares which form generates a column, not how its sequence counts.
+>
+> A generated column is read like any other — a model holds its computed value,
+> `RETURNING` included — and written by nobody. Nothing in the write paths treats it
+> specially: a model writes it by leaving it `NotSet`, and an insert carrying a value
+> for it (`Set` or `Unchanged`, both of which an insert writes) or an update that
+> `Set`s it is refused by the server (`428C9`), exactly as a value for a
+> `GENERATED ALWAYS` identity column is. The two kinds
+> behave alike there; they differ in what the schema can say about them, since
+> PostgreSQL refuses a virtual column that is `unique` or `indexed` (`0A000`) — a
+> refusal the derive makes at compile time
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
+> definition meets when its schema is created.
 
 > [spec:pgorm:sem:entity.traits.column.enum-cast+4]
 > Enum-typed columns are transparently cast at the SQL boundary
@@ -162,7 +178,7 @@ explicit limitations.
 > spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
 > scalar and array comparisons of one column cannot disagree about its cast.
 
-> [spec:pgorm:def:entity.traits.primary-key+5]
+> [spec:pgorm:def:entity.traits.primary-key+6]
 > `PrimaryKeyTrait: StaticName + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
@@ -170,8 +186,9 @@ explicit limitations.
 > + TryGetableMany + TryFromU64 + PrimaryKeyArity + IntoPrimaryKey<Self::ValueType>`;
 > `auto_increment()` reports whether the
 > database generates the *whole* key, so an insert naming no key column still writes a row
-> with one: a one-column key the serial family (or the column's own default or identity)
-> fills, or a composite key every column of which is an identity. A composite key with one
+> with one: a one-column key the serial family (or the column's own default, identity or
+> generation expression) fills, or a composite key every column of which is an identity or
+> a stored generated column. A composite key with one
 > generated column — `(tenant_id, id)`, `id` an identity — reports false, because the
 > caller still supplies `tenant_id`; the generated part is that column's fact, carried by
 > its `ColumnDef` (`entity.traits.column-def`). `PrimaryKeyToColumn` maps key variants to columns (`into_column`)

@@ -9526,6 +9526,7 @@ children (
                 title "A generated column can be VIRTUAL as well as STORED"
                 kind @feat
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.451209Z
@@ -9539,6 +9540,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "pg-query-18 landed the 18 grammar. Two places now wait on this node: pgorm-query/tests/postgres/table.rs generated_column_is_always_stored, whose tripwire asserted the oracle refuses VIRTUAL, now asserts the oracle accepts it (the refusal is only the missing constructor, per sql.ddl.column-def+9's text, which this node revises); and codegen's DDL bridge refuses a VIRTUAL column by name (\"a VIRTUAL generated column\", codegen.ddl.unsupported+6), including a bare GENERATED ALWAYS AS (...), which 18 reads as VIRTUAL (Constraint.generated_kind \"v\"). Replace that refusal with the reading when the entity model can hold it."
+                    }
+
+                    {
+                        at 2026-10-06T17:11:37.727854Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-06T19:26:22.580736Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
