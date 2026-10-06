@@ -9657,4 +9657,18 @@ children (
             }
         )
     }
+
+    {
+        id python-typing-check-symlinked-tmp
+        title "The typing checker's installed-package check passes when the temporary directory sits behind a symlink"
+        kind @fix
+        log (
+            {
+                at 2026-10-06T14:15:01.552943Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by pg18-test-server (84d97a35) while re-recording pgorm-python's acceptance on PostgreSQL 18, and unrelated to the server version. pgorm-python/checks/typing.py installed_metadata() resolves the package root (`root = Path(pgorm.__file__).resolve().parent`) and then asserts `Path(_native.__file__).parent == root` without resolving the native module's path. distribution.py installs each wheel into a venv under tempfile's directory. On macOS that is $TMPDIR=/var/folders/..., reached through the /var -> /private/var symlink, so the two paths differ by the prefix and the assertion fails before any typing runs. Reproduced in a fresh venv from the same wheel: the native module's parent is /var/folders/.../site-packages/pgorm while root is /private/var/folders/.../site-packages/pgorm. The failure surfaced as the distribution phase of checks/acceptance.py failing on 2026-10-06. The stderr is not captured into distribution.log, so the log shows only CalledProcessError. CI's macOS job passes because its runner's temporary directory is not behind a symlink, and the 2026-10-06 acceptance record ran with TMPDIR set to its resolved path (pgorm-python/ACCEPTANCE.md says so). Fix: resolve the native module's path before comparing (`Path(_native.__file__).resolve().parent == root`). Consider also surfacing the child's stderr when the metadata program fails. Acceptance: checks/acceptance.py passes through tests/with_postgres.py under macOS's default TMPDIR, and ACCEPTANCE.md's TMPDIR paragraph is removed."
+            }
+        )
+    }
 )
