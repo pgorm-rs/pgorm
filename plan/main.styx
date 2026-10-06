@@ -9382,26 +9382,13 @@ children (
         id range-consumers-beyond-builtins
         title "Ranges reach the consumers scope-range-types refused: arrays of ranges, created range types and multiranges, Python"
         kind @feat
+        deps (pg18-test-server)
         log (
             {
                 at 2026-10-05T00:17:24.301434Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed when scope-range-types landed (6006221d), which built range values for PostgreSQL's six built-in range types and refused, by name, every consumer listed here. These items could use ranges; until now they only handle them. (1) Arrays of ranges: `Vec<Range<T>>` / `Vec<Multirange<T>>` have no NotU8, ValueType or TryGetable impl, so an entity field of `int4range[]` does not compile. Codegen refuses `int4range[]` for that reason. `Value::array([..])` already binds and renders one. Live-checked: `($1::int4range[])[3]` reads back through the bind path and the inline literal path alike. (2) Range types a schema creates over a subtype that is not one of the six (the PG docs' floatrange is `Range<f64>`). RangeType and RangeElement are closed to the built-ins, and a created type's name is unknown to the Rust type, so supporting this needs a tag that names the created type. (3) Multiranges a schema creates. tokio-postgres's TYPEINFO query joins pg_range on rngtypid, so it reports such a type (typtype 'm') as Kind::Simple, and pgorm refuses it in both directions (live-tested: slot_multirange). This needs a driver-side type lookup or an explicit subtype supplied by the caller. (4) Codegen refuses `CREATE TYPE ... AS RANGE` by name, and a column of a created range type is unsupported. (5) Python refuses ranges by name: the capability manifest lists range and multirange as unsupported, decode raises DecodeError, and PyValue::from_rust raises UnsupportedCapabilityError. Support needs a Python range class, new snapshot tags, type stubs and the wheel acceptance suites. (6) Expr has contains() for @> and contained() for <@, but no builder for && (only BinOper::Overlap through Expr::binary). An element-containment predicate needs its operand pinned with cast_as, because PostgreSQL types `r @> $1`'s $1 as the range. Spec homes: sql.value.range, exec.decode.range, exec.cursor.binding-range, sql.ddl.type-range, python.values."
-            }
-        )
-    }
-
-    {
-        id merge-beyond-pg16
-        title "MERGE reaches what scope-merge refused by name: PostgreSQL 17's BY SOURCE arms, RETURNING and CTE body, and Python"
-        kind @feat
-        log (
-            {
-                at 2026-10-05T02:02:07.525086Z
-                author "brendan@necessary.nu"
-                kind @note
-                text "Filed when scope-merge landed (60175b87). That node built MERGE to the grammar PostgreSQL 15 and 16 share and refused the rest by name. (1) PostgreSQL 17's MERGE grammar, now the sql.scope Deferred entry \"MERGE's PostgreSQL 17 grammar\". All three parts were checked on a throwaway postgres:17 container (17.9). (a) WHEN NOT MATCHED BY SOURCE is a third arm kind, for target rows that no source row matched. It takes UPDATE, DELETE or DO NOTHING; INSERT there is 42601. It needs a third MergeArms slot with its own action type (UPDATE/DELETE/DO NOTHING over target columns only), and BY TARGET as the explicit spelling of today's not-matched arm. (b) RETURNING, with merge_action() naming the action each row took ('INSERT'/'UPDATE'/'DELETE'). It needs a returning slot on MergeStatement and a merge_action() function. merge_action() is valid only inside a MERGE's RETURNING, so a typed home for it is the open question. (c) MERGE as a CTE body. 17 accepts it even without RETURNING, but MERGE is still 42601 as an expression subquery. It needs a SubQueryStatement::MergeStatement arm and an IntoSubQueryStatement impl. CommonTableExpression::new is the only caller that needs it, and Expr::SubQuery would then admit a MERGE that the server refuses there. On 16 each part is 42601 or 0A000, and the builder cannot know which release it writes for (sql.ddl.column-def's VIRTUAL precedent), so the trigger is the test server moving to 17 or a decision to gate on the server version. (2) Python: pgorm-python exposes no MERGE (python.statements asks for SELECT/INSERT/UPDATE/DELETE with conflict handling), and a raw-SQL path already reaches it. A binding would need native objects for PendingMerge/MergeStatement, MergeUpdate, MergeInsert and the two action enums, capability-manifest entries, type stubs, and parity cases in checks/direct_builders.py. (3) The ORM is deliberately not listed. ON CONFLICT covers the upsert an entity layer issues, and MERGE on 16 has no RETURNING, which every model-returning write terminal needs. Once (1b) lands, a bulk \"sync this set\" terminal that reports per-row actions is the one ORM use worth weighing. Spec homes: sql.scope, sql.ast.merge, sql.render.merge, sql.ast, python.statements."
             }
         )
     }
@@ -9445,6 +9432,206 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed 2026-10-06 from the sql.scope Deferred entry \"Composite attribute alteration\" that scope-composite-types recorded (55c23657, docs/spec/sql-ast.md). ALTER TYPE ... ADD ATTRIBUTE, DROP ATTRIBUTE [IF EXISTS], ALTER ATTRIBUTE ... TYPE and RENAME ATTRIBUTE ... TO each take CASCADE / RESTRICT to carry the change into typed tables. That is four TypeAlterOpt variants, two of them carrying the CompositeAttribute the create already renders, plus a behaviour slot, plus a list, since ADD, DROP and ALTER chain comma-separated in one statement where TypeAlterStatement holds exactly one option today. The entry records why it waited: nothing in pgorm reads a composite value (sql.ddl.type-composite), so a type that changes shape has no reader to keep in step. Building it graduates the entry from sql.scope (bump, repin). Attribute names are caller-named identifiers and must be registered in the identifier render oracle."
+            }
+        )
+    }
+
+    {
+        id postgres-18
+        title "pgorm is tested on PostgreSQL 18 and builds what 17 and 18 added to its typed surface"
+        kind @feat
+        children (
+            {
+                id pg18-test-server
+                title "The test server, CI and the docs that name a PostgreSQL version move from 16 to 18"
+                kind @test
+                log (
+                    {
+                        at 2026-10-06T12:50:41.291093Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The survey (2026-10-06) ran the whole workspace against PostgreSQL 18.6: 1676/1676 pass unchanged. Move the local pgorm-test container to postgres:18 (latest 18.x; keep port 54329 so DATABASE_URL in .env/.env.local is unchanged) and update every doc naming the version: CLAUDE.md's testing setup, pgorm-python/DISTRIBUTION.md:30, ACCEPTANCE.md:29,66, and any README. CI: .github/workflows/python.yml installs postgresql-16 / postgresql@16 and sets PGORM_TEST_PG_BIN in both jobs. Move both to 18, checking that the apt (PGDG on ubuntu-24.04) and brew package names exist for 18, and confirm a passing run (the workflow first ran on c1bd2f85). Acceptance: full nextest, doctests (pgorm-query --all-features and pgorm, run alone), pgorm-python's suite and the application check (pgorm-python/checks/entities.py via tests/with_postgres.py) all pass on 18. sqlmap and the campaign are pg18-security-baselines, not this node."
+                    }
+                )
+            }
+
+            {
+                id pg-query-18
+                title "pgorm parses with PostgreSQL 18's grammar: pg_query on libpg_query 18.1.0"
+                kind @build
+                log (
+                    {
+                        at 2026-10-06T12:50:41.228906Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Blocks every node that needs 18-only grammar: pg18-virtual-generated, pg18-temporal-keys, pg18-not-null-constraints, the WITH (OLD AS, NEW AS) half of pg18-returning-old-new, and pg18-security-baselines, so the oracle and the campaign parse with the grammar the server speaks. The pg_query crate (pgorm pins 6.2.0) bundles libpg_query 17-6.x. libpg_query 18.1.0 is released (2026-09-30, Postgres 18.6), but pg_query.rs's 18 release (PR pganalyze/pg_query.rs#79, built on libpg_query 18.0.0) is unmerged. Two routes: (1) fork pg_query.rs to necessary-nu, take PR #79's branch, bump the libpg_query submodule to 18.1.0 (note its breaking pg_query_fingerprint_opts signature change), prove it, and depend on it by git rev, as prqlc is (deny.toml's allow-git list, the prqlc pin tests' pattern, the detached workspaces' lockfiles), returning to crates.io when upstream releases; or (2) wait for upstream. Route 1 needs the operator's say-so: it adds a second forked git dependency, which deny.toml says must be a deliberate edit. Either way, pg_query is used by the sql! / prql! macros (pgorm-sql-macro), metrics fingerprinting (src/metric/fingerprint.rs, feature metrics-fingerprint), the pipeline's lexer census (src/pipeline/census.rs, pg_query::scan), the identifier oracle and the codegen DDL path. Acceptance: every one of those runs on the 18 grammar; the oracle and every pg_query-based test pass; sql.render.oracle's rationale text is updated; and an 18-only statement (a VIRTUAL column) parses in sql!."
+                    }
+                )
+            }
+
+            {
+                id pg18-security-baselines
+                title "sqlmap and the generative campaign pin PostgreSQL 18 and their acceptance is re-recorded on it"
+                kind @test
+                deps (pg18-test-server pg-query-18)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.346302Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Pins: security/sqlmap/pins.json:10 (postgres:16.13-bookworm digest); security/generative/src/pgorm_campaign/fixtures.py:13 (the same image), asserted in security/generative/tests/test_campaign_report.py:25,92. Re-pin both to the latest postgres:18.x-bookworm by digest, then re-run and record a full sqlmap profile, the identifiers profile and the full generative campaign on 18, in the existing acceptance formats. Older acceptance records stay as history, since they describe the server they ran on. These are timing-sensitive full runs: one at a time, on a quiet and awake machine, with no cleaner loop running (memory: timing-sensitive-runs). Depends on pg-query-18 so the campaign's compile suite and the oracle parse with the 18 grammar."
+                    }
+                )
+            }
+
+            {
+                id pg18-virtual-generated
+                title "A generated column can be VIRTUAL as well as STORED"
+                kind @feat
+                deps (pg18-test-server pg-query-18)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.451209Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The sql.ddl rules (docs/spec/sql-ddl.md) currently refuse VIRTUAL generated columns because \"the builder cannot know which release it is writing for\", and name the shape a future addition takes. With 18 as the target, the builder can write it. Add VIRTUAL beside STORED on ColumnSpec::Generated (or its successor). Check live what 18 refuses for a virtual column (indexes on it, a user-defined type, a volatile expression and so on). Cover the entity derive (#[pgorm(generated...)] or equivalent), schema-gen, codegen's DDL path (parse_schema needs pg-query-18) and Python if it exposes generated columns. Note PostgreSQL 18's default: a bare GENERATED ALWAYS AS (...) is now VIRTUAL, where 17 required STORED. pgorm must always render the kind explicitly so it never depends on the server default."
+                    }
+                )
+            }
+
+            {
+                id pg18-temporal-keys
+                title "A table key can end WITHOUT OVERLAPS and a foreign key can reference a PERIOD"
+                kind @feat
+                deps (pg18-test-server pg-query-18)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.503406Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 18 adds temporal keys. PRIMARY KEY / UNIQUE (a, b, valid_at WITHOUT OVERLAPS), where the last column is a range or multirange and the key is enforced by a GiST index, which needs btree_gist for scalar columns. FOREIGN KEY (a, PERIOD valid_at) REFERENCES t (a, PERIOD valid_at). These interact with TableKey<K> (pgorm-query/src/table/key.rs, d982a21d), a non-empty ordered column list. Only the last column may be WITHOUT OVERLAPS, so put that in the type, not in a per-column flag that could land in the middle. Ranges exist end to end since 6006221d. The extension requirement (CREATE EXTENSION btree_gist) is already buildable (sql.ddl.extension). Needs pg-query-18 for the oracle and codegen. Check each refusal live and record SQLSTATEs."
+                    }
+                )
+            }
+
+            {
+                id pg18-not-null-constraints
+                title "A NOT NULL constraint can be named, NOT VALID and NO INHERIT"
+                kind @feat
+                deps (pg18-test-server pg-query-18)
+                log (
+                    {
+                        at 2026-10-06T12:50:55.269602Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 18 makes NOT NULL a real catalog constraint. It can be named (CONSTRAINT n NOT NULL), added NOT VALID and validated later (ALTER TABLE ... VALIDATE CONSTRAINT), and marked NO INHERIT. pg_query 6.2.0 refuses this grammar (verified), so it needs pg-query-18. Cover CREATE (column-level and table-level NOT NULL col), ALTER TABLE ADD ... NOT NULL ... NOT VALID and VALIDATE, and whether codegen's DDL path should read a named NOT NULL. Check live what 18 refuses (NOT VALID on a column at create, NO INHERIT on a partition) and how a named NOT NULL shows in pg_constraint."
+                    }
+                )
+            }
+
+            {
+                id pg18-returning-old-new
+                title "RETURNING names a row's old and new values, and can rename them"
+                kind @feat
+                deps (pg18-test-server pg-query-18)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.399041Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Survey: in PostgreSQL 18, RETURNING can name a row's old and new values. A quoted \"old\".\"balance\" / \"new\".\"balance\" through the existing ColumnRef::TableColumn already returns correct before/after values on 18.6, verified live. Two things are missing. First, a typed spelling, so the special OLD/NEW relations are not just a table named \"old\"; decide whether a typed Old/New reference is clearer than quoting, and check whether quoting changes meaning when a real table is named old. Second, the RETURNING WITH (OLD AS o, NEW AS n) rename clause, which is 18-only grammar and needs pg-query-18. Applies to INSERT ... ON CONFLICT DO UPDATE, UPDATE, DELETE and MERGE (MERGE's RETURNING is in merge-beyond-pg16), so check each live. Consider whether the ORM's update/insert returning paths should use it, and file that as a follow-up if so."
+                    }
+                )
+            }
+
+            {
+                id pg18-uuid-functions
+                title "uuidv7() and uuidv4() are typed functions, usable as a column default"
+                kind @feat
+                deps (pg18-test-server)
+                log (
+                    {
+                        at 2026-10-06T12:50:55.323928Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 18 adds uuidv7() (time-ordered) and uuidv4() (an alias of gen_random_uuid()), plus uuid_extract_timestamp and uuid_extract_version, which work on v7. They are reachable today through Func::named(\"uuidv7\") (parses under pg_query 6.2.0 and runs on 18.6, verified), so the typed form is about discoverability and use as a column default: a Func::uuidv7() / uuidv4() and the way an entity or ColumnDef sets one as a default (default_expr), with live tests that a v7 default orders by creation time."
+                    }
+                )
+            }
+
+            {
+                id pg17-set-expression
+                title "ALTER COLUMN can SET and DROP a generated column's expression"
+                kind @feat
+                deps (pg18-test-server)
+                log (
+                    {
+                        at 2026-10-06T12:50:55.383448Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 17 adds ALTER TABLE ... ALTER COLUMN c SET EXPRESSION AS (expr), which rewrites a stored generated column's values, and DROP EXPRESSION [IF EXISTS] (present since 13), which turns a generated column into a plain one. pgorm-query/src/table/alter.rs has neither (survey grep). 17 grammar, so it parses with pg_query 6.2.0 and does not wait on pg-query-18. Add both to the ALTER builder with live tests: SET EXPRESSION recomputes existing rows, DROP EXPRESSION keeps values, and each is refused on a non-generated column (record the SQLSTATEs). If pg18-virtual-generated lands first, cover the virtual case too, which needs no table rewrite."
+                    }
+                )
+            }
+
+            {
+                id pg17-sql-json
+                title "SQL/JSON query functions and JSON_TABLE are typed: JSON_QUERY, JSON_VALUE, JSON_EXISTS, JSON_TABLE, and the JSON constructors"
+                kind @feat
+                deps (pg18-test-server)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.556394Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 17's SQL/JSON: JSON_QUERY, JSON_VALUE and JSON_EXISTS (with PASSING, RETURNING, wrapper and quotes behaviour, ON EMPTY / ON ERROR), JSON_TABLE as a FROM item (COLUMNS, PATH, NESTED, ORDINALITY, EXISTS columns), and the constructors JSON(), JSON_SCALAR(), JSON_SERIALIZE(). pgorm-query's JSON support today is operators only (pgorm-query/src/expr_json.rs, sql.ast.expr.json). The constructors parse as ordinary calls and are reachable through Func::named; the query functions and JSON_TABLE are not, since Func::named cannot spell their clauses. These are 17 grammar, which pg_query 6.2.0 already parses (verified), so this does not wait on pg-query-18. JSON path strings are values and must be bound, never interpolated (check whether PostgreSQL accepts a bound path; if a path must be a literal, render it through the value pipeline's literal escaping and say so in the rule). Operator scope reading: \"support it all\", so build it. If it turns out large, split JSON_TABLE into its own node."
+                    }
+                )
+            }
+
+            {
+                id pg19-test-server
+                title "After PostgreSQL 19's general release, the test server moves to 19 and what it adds is surveyed"
+                kind @test
+                deps (pg18-security-baselines)
+                log (
+                    {
+                        at 2026-10-06T12:50:41.611182Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "PostgreSQL 19's GA is planned for 2026-10-29 (RC1 2026-10-15). Do not start before GA. Then move the test server and every pin to 19, survey 19's final release notes against pgorm's typed surface as was done for 17/18 (beta 4 reverted SQL/PGQ, FOR PORTION OF, partition MERGE/SPLIT, the pg_get_*_ddl functions and online checksum changes, so check what actually shipped), check whether libpg_query and pg_query.rs have a 19 grammar, and file what it finds as nodes."
+                    }
+                )
+            }
+
+            {
+                id merge-beyond-pg16
+                title "MERGE reaches what scope-merge refused by name: PostgreSQL 17's BY SOURCE arms, RETURNING and CTE body, and Python"
+                kind @feat
+                deps (pg18-test-server)
+                log (
+                    {
+                        at 2026-10-05T02:02:07.525086Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed when scope-merge landed (60175b87). That node built MERGE to the grammar PostgreSQL 15 and 16 share and refused the rest by name. (1) PostgreSQL 17's MERGE grammar, now the sql.scope Deferred entry \"MERGE's PostgreSQL 17 grammar\". All three parts were checked on a throwaway postgres:17 container (17.9). (a) WHEN NOT MATCHED BY SOURCE is a third arm kind, for target rows that no source row matched. It takes UPDATE, DELETE or DO NOTHING; INSERT there is 42601. It needs a third MergeArms slot with its own action type (UPDATE/DELETE/DO NOTHING over target columns only), and BY TARGET as the explicit spelling of today's not-matched arm. (b) RETURNING, with merge_action() naming the action each row took ('INSERT'/'UPDATE'/'DELETE'). It needs a returning slot on MergeStatement and a merge_action() function. merge_action() is valid only inside a MERGE's RETURNING, so a typed home for it is the open question. (c) MERGE as a CTE body. 17 accepts it even without RETURNING, but MERGE is still 42601 as an expression subquery. It needs a SubQueryStatement::MergeStatement arm and an IntoSubQueryStatement impl. CommonTableExpression::new is the only caller that needs it, and Expr::SubQuery would then admit a MERGE that the server refuses there. On 16 each part is 42601 or 0A000, and the builder cannot know which release it writes for (sql.ddl.column-def's VIRTUAL precedent), so the trigger is the test server moving to 17 or a decision to gate on the server version. (2) Python: pgorm-python exposes no MERGE (python.statements asks for SELECT/INSERT/UPDATE/DELETE with conflict handling), and a raw-SQL path already reaches it. A binding would need native objects for PendingMerge/MergeStatement, MergeUpdate, MergeInsert and the two action enums, capability-manifest entries, type stubs, and parity cases in checks/direct_builders.py. (3) The ORM is deliberately not listed. ON CONFLICT covers the upsert an entity layer issues, and MERGE on 16 has no RETURNING, which every model-returning write terminal needs. Once (1b) lands, a bulk \"sync this set\" terminal that reports per-row actions is the one ORM use worth weighing. Spec homes: sql.scope, sql.ast.merge, sql.render.merge, sql.ast, python.statements."
+                    }
+
+                    {
+                        at 2026-10-06T12:50:55.435479Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "2026-10-06: moved under postgres-18 with a dep on pg18-test-server. This node's PostgreSQL 17 grammar (WHEN NOT MATCHED BY SOURCE, RETURNING with merge_action(), MERGE as a CTE body) becomes directly live-testable once the test server is 18, and pg_query 6.2.0 already parses it (17 grammar, verified by the survey), so it does not wait on pg-query-18. The Python-binding half is unchanged."
+                    }
+                )
+            }
+        )
+        log (
+            {
+                at 2026-10-06T12:50:41.172836Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-06: \"move the test server to the latest version of postgres and ensure we support it all.\" The latest released version is 18 (18.6). 19 is at beta 4, with RC1 on 2026-10-15 and GA planned for 2026-10-29, and beta 4 reverted several features, so the target is 18 now and pg19-test-server follows GA. The operator chose this over keeping 16 and adding a second 17+ server, which means nothing proves 16 or 17 compatibility afterwards and 18 becomes the de facto floor. A survey on 2026-10-06 (Sonnet, read-only, its own PostgreSQL 18.6 container) found:\n\n(A) The whole workspace passes on 18.6 unchanged, 1676/1676, so the move is pins and docs rather than fixes. Doctests, pgorm-python, sqlmap and the campaign were not run on 18.\n\n(B) Pin sites: .github/workflows/python.yml (postgresql-16 / postgresql@16 and PGORM_TEST_PG_BIN in both jobs), security/sqlmap/pins.json:10 (postgres:16.13-bookworm digest) and the acceptance records citing 16.13, security/generative/src/pgorm_campaign/fixtures.py:13 (the same image) with its asserting tests (test_campaign_report.py:25,92), pgorm-python/DISTRIBUTION.md:30 and ACCEPTANCE.md:29,66, and the local pgorm-test container (postgres:16, port 54329).\n\n(C) pg_query 6.2.0 embeds libpg_query 17-6.x, the PostgreSQL 17 grammar. Verified live: 18-only syntax fails to parse — VIRTUAL generated columns, named NOT NULL with NOT VALID / NO INHERIT, WITHOUT OVERLAPS keys, FOREIGN KEY ... PERIOD — which would refuse it in sql!, codegen's parse_schema and the identifier oracle. libpg_query 18.0.0 (May) and 18.1.0 (2026-09-30, Postgres 18.6 plus a fix for an out-of-bounds bug in pg_query_normalize, GHSA-6ggm-xmc9-8ffg) are released. pg_query.rs's upgrade, PR pganalyze/pg_query.rs#79 \"Release 18.0.0\", is open and unmerged; it was re-requested for review on 2026-10-01. pgorm calls parse, scan and fingerprint, not normalize.\n\n(D) Features: MERGE's 17 additions, already filed as merge-beyond-pg16 and moved here. RETURNING OLD/NEW already works through quoted \"old\".\"col\" (verified live); the WITH (OLD AS o, NEW AS n) rename does not. VIRTUAL generated columns; WITHOUT OVERLAPS and PERIOD; named, NOT VALID and NO INHERIT NOT NULL; uuidv7()/uuidv4(), reachable today through Func::named; ALTER COLUMN SET/DROP EXPRESSION; SQL/JSON's JSON_TABLE and JSON_QUERY/VALUE/EXISTS, whose COLUMNS / PATH / ON ERROR grammar Func::named cannot express. COPY's 17/18 changes are out of scope per sql.scope (COPY belongs to the driver surface). The restricted-keyword list is unchanged in 18.\n\n\"Support it all\" is read as building every in-scope item. The SQL/JSON node is therefore built, not left as a scope question, unless the operator says otherwise."
             }
         )
     }
