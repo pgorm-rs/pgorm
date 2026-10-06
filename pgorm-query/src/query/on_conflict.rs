@@ -1,4 +1,6 @@
-use crate::{Condition, ConditionHolder, IntoCondition, IntoName, Name, SimpleExpr};
+use crate::{
+    Condition, ConditionHolder, IntoCondition, IntoKeyColumns, IntoName, Name, SimpleExpr,
+};
 
 /// A complete `ON CONFLICT` clause.
 ///
@@ -59,7 +61,7 @@ use crate::{Condition, ConditionHolder, IntoCondition, IntoName, Name, SimpleExp
 ///
 /// OnConflict::do_nothing().update_column(Glyph::Aspect);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 // The arbiter-less form genuinely carries nothing, so the size gap is the
 // shape of the clause rather than a payload to box away.
 #[allow(clippy::large_enum_variant)]
@@ -86,7 +88,7 @@ pub enum OnConflict {
 /// each is reached through a builder of its own:
 /// [`OnConflict::column`] and [`OnConflict::expr`] begin an inference target,
 /// [`OnConflict::constraint`] names a constraint.
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictArbiter {
     /// `(..) [WHERE ..]`: the index inference specification, from which the
@@ -98,7 +100,7 @@ pub enum ConflictArbiter {
 }
 
 /// One entry of a conflict target.
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictElement {
     /// A column, as in `ON CONFLICT ("id")`.
@@ -111,20 +113,29 @@ pub enum ConflictElement {
 /// specification a conflict is matched against, and the optional partial-index
 /// predicate narrowing it.
 ///
-/// Non-empty by construction — [`OnConflict::column`] and [`OnConflict::expr`]
-/// take the first entry and every extension adds one — so `ON CONFLICT ()`,
-/// which the PostgreSQL grammar rejects, has no value to build. The predicate
-/// lives here rather than beside the action because `ON CONFLICT WHERE ..` with
-/// no target is rejected too.
+/// Non-empty by construction — [`OnConflict::column`], [`OnConflict::columns`]
+/// and [`OnConflict::expr`] take at least the first entry and every extension
+/// adds one — so `ON CONFLICT ()`, which the PostgreSQL grammar rejects, has no
+/// value to build. The predicate lives here rather than beside the action
+/// because `ON CONFLICT WHERE ..` with no target is rejected too.
 ///
-/// There is no constructor taking a list, because a list can be empty:
+/// [`OnConflict::columns`] takes a tuple rather than a list, because a list can
+/// be empty:
 ///
-/// ```compile_fail,E0599
+/// ```compile_fail,E0277
 /// use pgorm_query::{tests_cfg::*, *};
 ///
 /// OnConflict::columns([Glyph::Id, Glyph::Aspect]);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+///
+/// and the empty tuple is no target at all:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::*;
+///
+/// OnConflict::columns(());
+/// ```
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictTarget {
     pub(crate) first: ConflictElement,
@@ -133,7 +144,7 @@ pub struct ConflictTarget {
 }
 
 /// One assignment of a `DO UPDATE SET`.
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAssignment {
     /// Take the column's value from the row that failed to insert:
@@ -155,7 +166,7 @@ pub enum ConflictAssignment {
 ///
 /// OnConflict::column(Glyph::Id).update_columns::<Glyph, _>([]);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictAssignments {
     pub(crate) first: ConflictAssignment,
@@ -166,7 +177,7 @@ pub struct ConflictAssignments {
 ///
 /// Only `Update` carries a filter, because PostgreSQL accepts `WHERE` only
 /// after `DO UPDATE SET ..`.
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAction {
     /// `DO NOTHING`.
@@ -211,7 +222,7 @@ pub enum ConflictAction {
 ///     .values_panic([1.into()])
 ///     .on_conflict(OnConflict::constraint(Name::runtime("glyph_aspect_key")));
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictConstraint {
     name: Name,
@@ -222,7 +233,7 @@ pub struct ConflictConstraint {
 /// [`InsertStatement::on_conflict`](crate::InsertStatement::on_conflict) takes
 /// anything that converts into an [`OnConflict`], so a chain ending here is
 /// passed as it stands.
-// [spec:pgorm:req:sql.ast.on-conflict+2]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictUpdate {
     arbiter: ConflictArbiter,
@@ -290,6 +301,40 @@ impl OnConflict {
         C: IntoName,
     {
         ConflictTarget::new(ConflictElement::Column(column.into_name()))
+    }
+
+    /// A conflict target over a key's columns in one call: one column, or a
+    /// tuple of one to twelve, as a table key is written
+    /// ([`IntoKeyColumns`]). This is the spelling of an upsert arbitrated by a
+    /// composite key; [`and_columns`](ConflictTarget::and_columns) extends a
+    /// target whose columns are a computed list.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::insert()
+    ///     .into_table(Glyph::Table)
+    ///     .columns([Glyph::Id, Glyph::Aspect, Glyph::Image])
+    ///     .values_panic([1.into(), 2.into(), 3.into()])
+    ///     .on_conflict(OnConflict::columns((Glyph::Id, Glyph::Aspect)).update_column(Glyph::Image))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"INSERT INTO "glyph" ("id", "aspect", "image") VALUES (1, 2, 3)"#,
+    ///         r#"ON CONFLICT ("id", "aspect") DO UPDATE SET "image" = "excluded"."image""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ast.on-conflict+3]
+    pub fn columns<T>(columns: T) -> ConflictTarget
+    where
+        T: IntoKeyColumns,
+    {
+        let (first, rest) = columns.into_key_columns();
+        ConflictTarget::new(ConflictElement::Column(first)).and_columns(rest)
     }
 
     /// Begin a conflict target at `expr`, for a conflict arbitrated by an

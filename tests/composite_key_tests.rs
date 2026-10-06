@@ -619,6 +619,8 @@ async fn active_model_writes_need_the_whole_key() -> Result<(), Error> {
 
 // [spec:pgorm:sem:exec.crud.insert+6/test]    an upsert arbitrated by the whole
 // composite key reports the key and the model of the row it updated
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]    the one-call composite target
+// arbitrates the two-column key live
 // [spec:pgorm:sem:query.build.insert.empty-failsafe+5/test]
 // `on_conflict_do_nothing` names every key column, so a duplicate of the whole
 // key is Conflicted
@@ -634,8 +636,7 @@ async fn upsert_on_the_whole_key() -> Result<(), Error> {
         name: set(name),
     };
     let whole_key = || {
-        OnConflict::column(author::Column::TenantId)
-            .and_columns([author::Column::Id])
+        OnConflict::columns((author::Column::TenantId, author::Column::Id))
             .update_column(author::Column::Name)
     };
 

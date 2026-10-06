@@ -79,7 +79,7 @@ use std::marker::PhantomData;
 ///
 /// TableKey::<Unique>::new(Glyph::Id).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+11]
+// [spec:pgorm:req:sql.ddl.create-table+12]
 #[derive(Debug, Clone)]
 pub struct TableKey<K> {
     pub(crate) name: Option<Name>,
@@ -91,13 +91,13 @@ pub struct TableKey<K> {
 }
 
 /// The kind of the table's one primary key: [`TableKey<Primary>`].
-// [spec:pgorm:req:sql.ddl.create-table+11]
+// [spec:pgorm:req:sql.ddl.create-table+12]
 #[derive(Debug, Clone, Copy)]
 pub struct Primary;
 
 /// The kind of a unique key, of which a table has any number:
 /// [`TableKey<Unique>`].
-// [spec:pgorm:req:sql.ddl.create-table+11]
+// [spec:pgorm:req:sql.ddl.create-table+12]
 #[derive(Debug, Clone, Copy)]
 pub struct Unique;
 
@@ -108,13 +108,9 @@ impl<K> TableKey<K> {
     where
         C: IntoName,
     {
-        Self::over(vec![column.into_name()])
-    }
-
-    fn over(columns: Vec<Name>) -> Self {
         Self {
             name: None,
-            columns,
+            columns: vec![column.into_name()],
             include: Vec::new(),
             deferrability: None,
             nulls_not_distinct: false,
@@ -217,15 +213,47 @@ impl TableKey<Unique> {
     }
 }
 
-/// A value that converts into a [`TableKey`] of kind `K`: one column, a tuple
-/// of one to twelve columns, or a key already built.
+/// One column, or a tuple of one to twelve columns: the non-empty, ordered
+/// column list that a [`TableKey`] and an `ON CONFLICT` target are both
+/// written as.
 ///
-/// A tuple is a key's columns in order, so `(Glyph::Id, Glyph::Aspect)` is the
-/// key `("id", "aspect")`. There is no impl for an empty tuple, a slice or a
-/// `Vec`, which could be empty and `PRIMARY KEY ()` is a syntax error; a
-/// computed list is [`TableKey::new`] over its first column and
-/// [`cols`](TableKey::cols) over the rest.
-// [spec:pgorm:req:sql.ddl.create-table+11]
+/// A tuple is the columns in order, so `(Glyph::Id, Glyph::Aspect)` is
+/// `("id", "aspect")` wherever it is taken —
+/// [`TableCreateStatement::primary_key`](crate::TableCreateStatement::primary_key)
+/// through [`IntoTableKey`], and
+/// [`OnConflict::columns`](crate::OnConflict::columns). There is no impl for an
+/// empty tuple, a slice or a `Vec`, which could be empty, and the conversion
+/// hands back the first column apart from the rest, so no impl can produce an
+/// empty list either: `PRIMARY KEY ()` and `ON CONFLICT ()` are both syntax
+/// errors. A computed list starts at its first column and extends from there,
+/// with [`TableKey::cols`] or
+/// [`ConflictTarget::and_columns`](crate::ConflictTarget::and_columns).
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::*;
+///
+/// Table::create(Name::runtime("t")).primary_key(());
+/// ```
+// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ast.on-conflict+3]
+pub trait IntoKeyColumns {
+    /// The first column, and the rest in order.
+    fn into_key_columns(self) -> (Name, Vec<Name>);
+}
+
+impl<C> IntoKeyColumns for C
+where
+    C: IntoName,
+{
+    fn into_key_columns(self) -> (Name, Vec<Name>) {
+        (self.into_name(), Vec::new())
+    }
+}
+
+/// A value that converts into a [`TableKey`] of kind `K`: any
+/// [`IntoKeyColumns`] — one column or a tuple of one to twelve — or a key
+/// already built, which is how a key carrying a name or options is passed.
+// [spec:pgorm:req:sql.ddl.create-table+12]
 pub trait IntoTableKey<K> {
     /// The key.
     fn into_table_key(self) -> TableKey<K>;
@@ -237,42 +265,44 @@ impl<K> IntoTableKey<K> for TableKey<K> {
     }
 }
 
-impl<K, C> IntoTableKey<K> for C
+impl<K, T> IntoTableKey<K> for T
 where
-    C: IntoName,
+    T: IntoKeyColumns,
 {
     fn into_table_key(self) -> TableKey<K> {
-        TableKey::new(self)
+        let (first, rest) = self.into_key_columns();
+        TableKey::new(first).cols(rest)
     }
 }
 
-macro_rules! impl_into_table_key {
-    ( $($C:ident : $N:tt),+ $(,)? ) => {
-        impl<K, $($C),+> IntoTableKey<K> for ( $($C,)+ )
+macro_rules! impl_into_key_columns {
+    ( $C0:ident : $N0:tt $(, $C:ident : $N:tt)* $(,)? ) => {
+        impl<$C0 $(, $C)*> IntoKeyColumns for ( $C0, $($C,)* )
         where
-            $($C: IntoName),+
+            $C0: IntoName,
+            $($C: IntoName),*
         {
-            fn into_table_key(self) -> TableKey<K> {
-                TableKey::over(vec![ $(self.$N.into_name()),+ ])
+            fn into_key_columns(self) -> (Name, Vec<Name>) {
+                (self.$N0.into_name(), vec![ $(self.$N.into_name()),* ])
             }
         }
     };
 }
 
 #[rustfmt::skip]
-mod impl_into_table_key {
+mod impl_into_key_columns {
     use super::*;
 
-    impl_into_table_key!(C0:0);
-    impl_into_table_key!(C0:0, C1:1);
-    impl_into_table_key!(C0:0, C1:1, C2:2);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9, C10:10);
-    impl_into_table_key!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9, C10:10, C11:11);
+    impl_into_key_columns!(C0:0);
+    impl_into_key_columns!(C0:0, C1:1);
+    impl_into_key_columns!(C0:0, C1:1, C2:2);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9, C10:10);
+    impl_into_key_columns!(C0:0, C1:1, C2:2, C3:3, C4:4, C5:5, C6:6, C7:7, C8:8, C9:9, C10:10, C11:11);
 }

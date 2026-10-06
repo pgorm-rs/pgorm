@@ -50,7 +50,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+13]
+> [spec:pgorm:req:sql.surface+14]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -115,7 +115,10 @@ today, including panicking edges and deliberate failsafes.
 > its first arm, the actions each kind of arm takes, and the assignments an
 > update writes and the row an insert writes (`sql.ast.merge`);
 > `IntoSubQueryStatement`, the conversion the four nesting statements share
-> and MERGE lacks (`sql.ast`). An
+> and MERGE lacks (`sql.ast`); `IntoKeyColumns`, the non-empty column tuple
+> — one column or a tuple of one to twelve — that a table key is built from
+> and an `ON CONFLICT` target names a key with (`sql.ddl.create-table`,
+> `sql.ast.on-conflict`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -779,7 +782,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## ON CONFLICT
 
-> [spec:pgorm:req:sql.ast.on-conflict+2]
+> [spec:pgorm:req:sql.ast.on-conflict+3]
 > `OnConflict` (attached with `InsertStatement::on_conflict`, which accepts
 > anything converting into one) MUST be one of exactly two shapes:
 > `AnyDoNothing`, carrying nothing, for the arbiter-less clause PostgreSQL
@@ -804,6 +807,22 @@ today, including panicking edges and deliberate failsafes.
 > on the target because `ON CONFLICT WHERE ..` with no target is rejected too.
 > `and_where`, `and_where_option` and `cond_where` MUST fold into that filter
 > through the same merge `sql.ast.condition.holder` specifies.
+>
+> `OnConflict::columns` MUST name a whole key's columns in one call. It takes
+> an `IntoKeyColumns`, the conversion a table key is built from
+> (`[spec:pgorm:req:sql.ddl.create-table+12]`): one column or a tuple of one
+> to twelve, in order, so `OnConflict::columns((a, b))` is the target
+> `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
+> declares the key it arbitrates on. The conversion hands back the first
+> column apart from the rest and has no impl for an empty tuple, a slice or a
+> `Vec`, so an empty target does not compile; a target whose columns are a
+> computed list starts at `column` and extends with `and_columns`. The target
+> takes the columns and not a `TableKey`, whose name, `INCLUDE`,
+> `NULLS NOT DISTINCT` and deferrability an inference target has no place
+> for, and which it would therefore drop. A column named twice is not
+> refused: inference matches an index by its set of columns, so the server
+> arbitrates `ON CONFLICT (a, b, a)` on the key `(a, b)` as it does
+> `(a, b)`, where a table key naming a column twice is refused (`42701`).
 >
 > `OnConflict::constraint(name)` MUST yield a `ConflictConstraint`, which holds
 > the name and nothing else and whose only methods are the transitions to an

@@ -1292,7 +1292,7 @@ fn insert_10() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]
 #[test]
 #[allow(clippy::approx_constant)]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
@@ -1530,7 +1530,7 @@ fn insert_on_conflict_9() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]
 #[test]
 #[allow(clippy::approx_constant)]
 fn insert_on_conflict_do_nothing() {
@@ -1554,7 +1554,7 @@ fn insert_on_conflict_do_nothing() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 #[test]
 #[allow(clippy::approx_constant)]
@@ -1575,7 +1575,7 @@ fn insert_on_conflict_bare_do_nothing() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 #[test]
 fn insert_on_conflict_both_filters() {

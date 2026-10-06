@@ -86,7 +86,7 @@ fn slot_key() -> Name {
 /// NOTHING` writes nothing. The name is mixed-case, so it is found only
 /// because it is quoted: bare, it folds to `slotkey`, which the table does
 /// not have.
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]    against a live server: the named constraint
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]    against a live server: the named constraint
 // arbitrates both actions, and the update's filter still applies
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 // [spec:pgorm:req:sql.scope+11/test]
@@ -125,7 +125,7 @@ async fn the_named_constraint_arbitrates(db: &DatabaseConnection) -> Result<(), 
 /// The row below collides with the primary key and not with `"SlotKey"`.
 /// Naming `"SlotKey"` does not swallow it, where the arbiter-less clause —
 /// any constraint — does.
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]    against a live server: only the named
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]    against a live server: only the named
 // constraint arbitrates
 // [spec:pgorm:req:sql.scope+11/test]
 async fn a_conflict_on_another_constraint_is_raised(db: &DatabaseConnection) -> Result<(), Error> {
@@ -145,7 +145,7 @@ async fn a_conflict_on_another_constraint_is_raised(db: &DatabaseConnection) -> 
 /// Named, it swallows an overlapping row under `DO NOTHING`, and refuses
 /// `DO UPDATE` outright (`42809`), because an exclusion conflict has no one
 /// row to update.
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]    against a live server: an exclusion
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]    against a live server: an exclusion
 // constraint arbitrates DO NOTHING only, and only by name
 // [spec:pgorm:req:sql.scope+11/test]
 async fn an_exclusion_constraint_takes_only_do_nothing(
@@ -186,7 +186,7 @@ async fn an_exclusion_constraint_takes_only_do_nothing(
 /// at all (`42704`); a check constraint has no index (`42809`); and a
 /// deferrable key cannot say whether a row conflicts while its check may be
 /// pending (`55000`).
-// [spec:pgorm:req:sql.ast.on-conflict+2/test]    against a live server: a name that is not
+// [spec:pgorm:req:sql.ast.on-conflict+3/test]    against a live server: a name that is not
 // an arbiter is refused, never reinterpreted
 // [spec:pgorm:req:sql.scope+11/test]
 async fn what_is_not_an_arbiter_is_refused(db: &DatabaseConnection) -> Result<(), Error> {

@@ -771,6 +771,7 @@ children (
                         id on-conflict-columns
                         title "A conflict target names a composite key in one call"
                         kind @feat
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T13:28:58.739977Z
@@ -784,6 +785,27 @@ children (
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "composite-key-refusals (d982a21d) landed the key type this node's note asked for. pgorm-query's TableKey<K> (K = Primary | Unique) is a non-empty, ordered column tuple, built from one column, a tuple of one to twelve (IntoTableKey) or TableKey::new(first).cols(rest). It has no impl for anything that could be empty. The operator's decision on that node says the key type should also suit this node's ON CONFLICT target, which suggests OnConflict taking IntoTableKey<K> (any kind) for a one-call composite target. That reuses the non-emptiness by construction rather than a const-generic array."
+                            }
+
+                            {
+                                at 2026-10-05T22:24:59.395289Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-05T22:34:20.144563Z
+                                author "brendan@necessary.nu"
+                                kind @decision
+                                text "Shape chosen 2026-10-06: OnConflict::columns(impl IntoKeyColumns) -> ConflictTarget. IntoKeyColumns is a new public trait in pgorm-query/src/table/key.rs, for one IntoName column or a tuple of 1 to 12. Its method returns (first, rest), so no impl, downstream ones included, can yield an empty list. IntoTableKey<K> is now a blanket over IntoKeyColumns, plus TableKey<K> itself, so the tuple machinery is shared, not copied. The target does not take IntoTableKey<Unique> directly. A TableKey carries a name, INCLUDE, NULLS NOT DISTINCT and deferrability, which an inference target cannot render and would silently drop. A deferrable key is refused as an arbiter anyway (55000). OnConflict::column(c) stays as the one-column start, and ConflictTarget::and_columns(iter) stays for computed lists, so the ConflictArbiter/ConflictConstraint typestate is unchanged. An empty target does not compile: arrays, (), slices and Vec are not IntoKeyColumns (compile_fail E0277). Repeated columns are not refused, because the server accepts them (see table-key-distinct-columns). The ORM's own helper, Insert::on_conflict_do_nothing, builds from PrimaryKey::iter(), a computed list, so it keeps column(first).and_columns(rest)."
+                            }
+
+                            {
+                                at 2026-10-06T12:15:11.139777Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }
@@ -812,6 +834,13 @@ children (
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Found while landing composite-key-refusals (d982a21d): TableKey still accepts a repeated column, e.g. .primary_key((a, a)) or TableKey::new(a).col(a), which PostgreSQL refuses with 42701 (column appears twice in key; verify live, for unique and primary, inline and ALTER ADD). Decide between making it unrepresentable or refused per [dec:pgorm:invalid-states-unrepresentable] (check how TableKey's other invariants are kept and what is cheap at tuple-conversion time), and dropping or deduplicating it, which is a silent reinterpretation and probably wrong. The same question applies to the ON CONFLICT target if on-conflict-columns adopts TableKey's shape first: a repeated inference column there may be accepted by the server, so check before sharing the rule."
+                            }
+
+                            {
+                                at 2026-10-05T22:05:12.970275Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Checked live on PostgreSQL 16.15 while landing on-conflict-columns, 2026-10-06. The server ACCEPTS a repeated column in an ON CONFLICT inference target. Inference matches an index by its column set, so repeats collapse: against PRIMARY KEY (a, b), ON CONFLICT (a, b, a) DO UPDATE and ON CONFLICT (b, a, b) DO NOTHING both arbitrate the key. Against UNIQUE (a), ON CONFLICT (a, a) and (a, a, a) arbitrate it too. ON CONFLICT (a, a) against PRIMARY KEY (a, b) is refused, but with 42P10 (no matching constraint) because {a} is not {a, b}, not because of the repeat. So the distinct-columns rule must NOT be shared with the conflict target: refusing a repeat there would be stricter than the server. on-conflict-columns gave the target a sibling trait, IntoKeyColumns, which TableKey's IntoTableKey is now built on, rather than TableKey itself. If this node enforces distinctness at tuple-conversion time, it belongs in the IntoTableKey/TableKey layer, not in IntoKeyColumns, or OnConflict::columns inherits it. The table-key side is confirmed too: PRIMARY KEY (a, a) gives 42701 \"column \\\"a\\\" appears twice in primary key constraint\", and UNIQUE (a, b, a) gives 42701 \"... appears twice in unique constraint\" (both inline in CREATE TABLE; ALTER ADD not yet checked)."
                             }
                         )
                     }

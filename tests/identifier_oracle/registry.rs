@@ -606,6 +606,19 @@ fn query_sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "query/insert.on-conflict.target-key",
+            api: "OnConflict::columns((Name, Name))",
+            kinds: &["IndexElem.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::insert()
+                    .into_table(fixed("t"))
+                    .columns([fixed("c")])
+                    .values_panic([1.into()])
+                    .on_conflict(OnConflict::columns((fixed("c"), n_(n))).do_nothing()))
+            },
+        },
+        Site {
             id: "query/insert.on-conflict.update-column",
             api: "ConflictTarget::update_column(Name)",
             kinds: &["ResTarget.name", "ColumnRef.fields[1]"],

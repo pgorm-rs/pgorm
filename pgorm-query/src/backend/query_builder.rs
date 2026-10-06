@@ -1708,7 +1708,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+11]
+    // [spec:pgorm:req:sql.ddl.create-table+12]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1731,7 +1731,7 @@ impl QueryBuilder {
             first = false;
         });
 
-        // [spec:pgorm:req:sql.ddl.create-table+11]
+        // [spec:pgorm:req:sql.ddl.create-table+12]
         if let Some(key) = &create.primary_key {
             if !first {
                 write!(sql, ", ").unwrap();
@@ -1937,7 +1937,7 @@ impl QueryBuilder {
     /// `prepare_index_create_statement` puts it after. The key alone has
     /// deferrability to write, and its columns are plain names: it has no
     /// entry that could carry an ordering, an operator class or an expression.
-    // [spec:pgorm:req:sql.ddl.create-table+11]
+    // [spec:pgorm:req:sql.ddl.create-table+12]
     pub(super) fn prepare_table_key<K>(
         &self,
         keyword: &str,
