@@ -9789,4 +9789,18 @@ children (
             }
         )
     }
+
+    {
+        id constraint-drop-rename
+        title "A constraint of any kind is dropped and renamed by name, not through drop_foreign_key"
+        kind @feat
+        log (
+            {
+                at 2026-10-06T23:47:49.264763Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by pg18-not-null-constraints (0bb4ac00). PostgreSQL 18 records a NOT NULL constraint under a name, and pgorm-query now names, validates and alters one by name (ColumnDef::not_null_named, NotNullConstraint::name, TableAlterStatement::validate_constraint and alter_constraint). Dropping one by name, though, is TableAlterStatement::drop_foreign_key(name): the builder's only DROP CONSTRAINT, named for one constraint kind, rendering the generic DROP CONSTRAINT \"name\" that drops a NOT NULL, CHECK, unique or primary key alike (checked live on 18.6: DROP CONSTRAINT on a named NOT NULL drops it; on a primary-key column's NOT NULL, or on a child's inherited copy, it is refused 42P16). ALTER TABLE ... RENAME CONSTRAINT a TO b has no builder at all; PostgreSQL takes RENAME only as a statement's sole action, as it does RENAME COLUMN (ColumnRenameStatement). Decide: a drop_constraint(name) replacing drop_foreign_key outright (no shim; and whether ForeignKeyDropStatement goes with it), with IF EXISTS and CASCADE if sql.scope wants them, and a Table::rename_constraint(table, from, to) statement; Python has neither. Check live what each refuses (an inherited constraint 42P16, a missing name 42704, IF EXISTS's notice) and register the names in the identifier oracle."
+            }
+        )
+    }
 )
