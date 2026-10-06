@@ -2,8 +2,8 @@
 //! how to add one.
 
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Comment, ForeignKey, Index, IndexColumn, IndexType, Sequence,
-    SequenceOption, Table, TableForeignKey, TableKey, TypeName,
+    ColumnDef, ColumnType, Comment, ConstraintChange, ForeignKey, Index, IndexColumn, IndexType,
+    NotNullConstraint, Sequence, SequenceOption, Table, TableForeignKey, TableKey, TypeName,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -44,6 +44,16 @@ pub fn sites() -> Vec<Site> {
             kinds: &["ColumnDef.colname"],
             policy: Quoted,
             render: |n| sql(Table::create(fixed("t")).col(ColumnDef::new(n_(n)).integer())),
+        },
+        Site {
+            id: "ddl/create-table.column-not-null-name",
+            api: "ColumnDef::not_null_named(Name)",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer().not_null_named(n_(n))))
+            },
         },
         Site {
             id: "ddl/create-table.column-type-named",
@@ -345,6 +355,59 @@ pub fn sites() -> Vec<Site> {
             kinds: &["AlterTableCmd.name"],
             policy: Quoted,
             render: |n| sql(&Table::alter(fixed("t")).drop_foreign_key(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-table.modify-column-not-null-named",
+            api: "TableAlterStatement::modify_column(ColumnDef::new(Name).not_null_named(..))",
+            kinds: &["Constraint.keys[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .modify_column(ColumnDef::new(n_(n)).not_null_named(fixed("nn"))))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.modify-column-not-null-name",
+            api: "TableAlterStatement::modify_column(ColumnDef::not_null_named(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .modify_column(ColumnDef::new(fixed("c")).not_null_named(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-not-null-column",
+            api: "TableAlterStatement::add_not_null(NotNullConstraint::new(Name))",
+            kinds: &["Constraint.keys[0]"],
+            policy: Quoted,
+            render: |n| sql(&Table::alter(fixed("t")).add_not_null(NotNullConstraint::new(n_(n)))),
+        },
+        Site {
+            id: "ddl/alter-table.add-not-null-name",
+            api: "TableAlterStatement::add_not_null(NotNullConstraint::new(..).name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .add_not_null(NotNullConstraint::new(fixed("c")).name(n_(n)).not_valid()))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.validate-constraint",
+            api: "TableAlterStatement::validate_constraint(Name)",
+            kinds: &["AlterTableCmd.name"],
+            policy: Quoted,
+            render: |n| sql(&Table::alter(fixed("t")).validate_constraint(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-table.alter-constraint",
+            api: "TableAlterStatement::alter_constraint(Name, ..)",
+            kinds: &["AtalterConstraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t")).alter_constraint(n_(n), ConstraintChange::NoInherit))
+            },
         },
         Site {
             id: "ddl/alter-table.add-foreign-key-name",

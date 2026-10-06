@@ -4,7 +4,7 @@ use crate::{RangeType, SequenceOptions, expr::*, types::*};
 use std::sync::Arc;
 
 /// Specification of a table column
-// [spec:pgorm:req:sql.ddl.column-def+10]
+// [spec:pgorm:req:sql.ddl.column-def+11]
 #[derive(Debug, Clone)]
 pub struct ColumnDef {
     pub(crate) table: Option<TableName>,
@@ -12,7 +12,7 @@ pub struct ColumnDef {
     pub(crate) types: Option<ColumnType>,
     /// The collation written after the type, `COLLATE "name"`: one slot and
     /// not a spec, because PostgreSQL refuses a second `COLLATE` on a column.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub(crate) collation: Option<Collation>,
     pub(crate) spec: Vec<ColumnSpec>,
 }
@@ -184,7 +184,7 @@ impl ColumnType {
     /// The `serial` spelling this type is replaced by when the column carries
     /// [`ColumnSpec::AutoIncrement`], or `None` when Postgres has no serial
     /// form for it.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub fn serial_spelling(&self) -> Option<&'static str> {
         match self {
             ColumnType::SmallInteger => Some("smallserial"),
@@ -199,7 +199,17 @@ impl ColumnType {
 #[derive(Debug, Clone)]
 pub enum ColumnSpec {
     Null,
-    NotNull,
+    /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: the column's one not-null
+    /// constraint, whose name PostgreSQL 18 records in its catalog — derived
+    /// when `name` is `None` — and which a child table inherits unless
+    /// `no_inherit`. Set by [`ColumnDef::not_null`],
+    /// [`ColumnDef::not_null_named`] and [`ColumnDef::not_null_no_inherit`],
+    /// which share the one spec a column holds.
+    // [spec:pgorm:req:sql.ddl.column-def+11]
+    NotNull {
+        name: Option<Name>,
+        no_inherit: bool,
+    },
     Default(SimpleExpr),
     AutoIncrement,
     /// `CHECK (<expr>)`. It carries no deferrability: PostgreSQL never defers
@@ -208,7 +218,7 @@ pub enum ColumnSpec {
     /// `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`: a column computed
     /// from the others in its row, and which of PostgreSQL's two kinds it is,
     /// always written out.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     Generated {
         expr: SimpleExpr,
         kind: GeneratedKind,
@@ -216,7 +226,7 @@ pub enum ColumnSpec {
     /// `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY` — PostgreSQL's
     /// standard-SQL replacement for the serial family — and the options of the
     /// sequence it owns, written in parentheses after it when there are any.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     Identity(IdentityGeneration, Option<SequenceOptions>),
     /// Verbatim SQL appended after the column's own clauses.
     RawSuffix(&'static str),
@@ -242,7 +252,7 @@ pub enum ColumnSpec {
 /// or the other, never both and never neither, so the choice is a closed pair
 /// rather than a `bool` that reads backwards at the call site
 /// (`[dec:pgorm:invalid-states-unrepresentable]`).
-// [spec:pgorm:req:sql.ddl.column-def+10]
+// [spec:pgorm:req:sql.ddl.column-def+11]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdentityGeneration {
     /// `GENERATED ALWAYS AS IDENTITY`.
@@ -255,7 +265,7 @@ impl IdentityGeneration {
     /// The keyword PostgreSQL spells this form with — `ALWAYS` or
     /// `BY DEFAULT`, the words `information_schema.columns.identity_generation`
     /// reports it under.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub const fn keyword(self) -> &'static str {
         match self {
             Self::Always => "ALWAYS",
@@ -291,12 +301,6 @@ impl ColumnDef {
             collation: None,
             spec: Vec::new(),
         }
-    }
-
-    /// Set column not null
-    pub fn not_null(&mut self) -> &mut Self {
-        self.spec.push(ColumnSpec::NotNull);
-        self
     }
 
     /// Set column null
@@ -348,7 +352,7 @@ impl ColumnDef {
     /// and cannot be overwritten by accident. `auto_increment` stays because it
     /// is what the entity derive's `auto_increment` attribute means today;
     /// prefer `identity` in new schemas.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub fn auto_increment(&mut self) -> &mut Self {
         self.spec.push(ColumnSpec::AutoIncrement);
         self
@@ -378,7 +382,7 @@ impl ColumnDef {
     ///
     /// The sequence's own options — `START WITH`, `INCREMENT BY`, `CACHE` and
     /// the rest — are [`identity_with`](Self::identity_with)'s.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub fn identity(&mut self) -> &mut Self {
         self.spec
             .push(ColumnSpec::Identity(IdentityGeneration::Always, None));
@@ -409,7 +413,7 @@ impl ColumnDef {
     ///     r#"CREATE TABLE "glyph" ( "id" bigint GENERATED BY DEFAULT AS IDENTITY NOT NULL )"#,
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub fn identity_by_default(&mut self) -> &mut Self {
         self.spec
             .push(ColumnSpec::Identity(IdentityGeneration::ByDefault, None));

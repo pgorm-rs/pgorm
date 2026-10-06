@@ -419,7 +419,7 @@ impl TryFrom<&ColumnDef> for Column {
             || col_def
                 .get_column_spec()
                 .iter()
-                .any(|spec| matches!(spec, ColumnSpec::NotNull));
+                .any(|spec| matches!(spec, ColumnSpec::NotNull { .. }));
         // Uniqueness is a key of the table's, which the transform reads from
         // the table's unique keys.
         let column = Self {

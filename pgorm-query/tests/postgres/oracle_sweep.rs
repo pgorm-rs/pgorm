@@ -517,7 +517,7 @@ fn sweep_merge_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    table DDL
 // [spec:pgorm:req:sql.ddl.create-table+12/test]
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -570,6 +570,51 @@ fn sweep_table_ddl_shapes() {
             .set_expression(Glyph::Aspect, Expr::col(Glyph::Id).add(1))
             .drop_expression(Glyph::Tokens)
             .drop_expression_if_exists(Glyph::Image)
+            .to_string(),
+        Table::create(Glyph::Table)
+            .col(
+                ColumnDef::new(Glyph::Id)
+                    .integer()
+                    .not_null_named(Name::runtime("id_present")),
+            )
+            .col(
+                ColumnDef::new(Glyph::Aspect)
+                    .integer()
+                    .not_null_no_inherit(),
+            )
+            .col(
+                ColumnDef::new(Glyph::Image)
+                    .text()
+                    .default("x")
+                    .not_null_no_inherit()
+                    .not_null_named(Name::runtime("image_present")),
+            )
+            .to_string(),
+        Table::alter(Glyph::Table)
+            .add_column(
+                ColumnDef::new(Name::runtime("added"))
+                    .integer()
+                    .not_null_named(Name::runtime("added_present"))
+                    .default(0),
+            )
+            .add_not_null(NotNullConstraint::new(Glyph::Aspect))
+            .add_not_null(
+                NotNullConstraint::new(Glyph::Image)
+                    .name(Name::runtime("image_present"))
+                    .no_inherit()
+                    .not_valid(),
+            )
+            .validate_constraint(Name::runtime("image_present"))
+            .alter_constraint(Name::runtime("image_present"), ConstraintChange::Inherit)
+            .alter_constraint(Name::runtime("added_present"), ConstraintChange::NoInherit)
+            .to_string(),
+        Table::alter(Glyph::Table)
+            .modify_column(
+                ColumnDef::new(Glyph::Aspect)
+                    .big_integer()
+                    .not_null_named(Name::runtime("aspect_present"))
+                    .not_null_no_inherit(),
+            )
             .to_string(),
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).big_integer())

@@ -39,7 +39,11 @@ if __name__ == "__main__":
 Builder methods return new objects. `ColumnDef` supports nullability, defaults,
 auto increment, check constraints and generated expressions, whose kind is
 always named: `.generated(expr, "stored")` or `.generated(expr, "virtual")`,
-since PostgreSQL 17 requires `STORED` and 18 reads a bare one as `VIRTUAL`. Keys are
+since PostgreSQL 17 requires `STORED` and 18 reads a bare one as `VIRTUAL`.
+`.not_null(name=None, no_inherit=False)` is the column's one `NOT NULL`
+constraint, which PostgreSQL 18 records by name — the one given, or one it
+derives — and which a table that inherits this one takes unless
+`no_inherit=True`. Keys are
 the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
 which a later call replaces, and `CreateTable.unique(*columns, name=...,
 nulls_not_distinct=...)` adds a unique key, so a table cannot be written with
@@ -56,14 +60,20 @@ options. `nulls_not_distinct()` also selects uniqueness and requires PostgreSQL
 index name.
 
 Table changes use `add_column`, `modify_column`, `drop_column`, `rename_column`,
-`set_expression`, `drop_expression`, `rename_table`, `truncate` and
-`drop_table`. Each returns a ready native DDL statement. A `modify_column`
+`set_expression`, `drop_expression`, `add_not_null`, `validate_constraint`,
+`alter_constraint`, `rename_table`, `truncate` and `drop_table`. Each returns a ready native DDL statement. A `modify_column`
 definition selects Rust's corresponding type, nullability and default changes;
 a generated column's expression is changed by `set_expression(table, column,
 expr)`, which the rows already written take, and removed by
 `drop_expression(table, column, if_exists=False)`, which leaves a stored column
-plain with its values. Database validation and privileges still apply; these
-APIs do not introspect the database or compute migrations.
+plain with its values. `add_not_null(table, column, name=None,
+no_inherit=False, not_valid=False)` adds a `NOT NULL` constraint over a column
+that exists; with `not_valid=True` the rows already there are left unchecked
+until `validate_constraint(table, name)` checks them, while new rows are held
+to it at once. `alter_constraint(table, name, "inherit" | "no_inherit")`
+changes whether a `NOT NULL` constraint passes to inheriting tables. Database
+validation and privileges still apply; these APIs do not introspect the
+database or compute migrations.
 
 `DataType` accepts the closed built-in names listed in
 `p.capabilities()["schema_policy"]["column_types"]`. `length=` applies to char,

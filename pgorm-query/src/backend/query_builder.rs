@@ -18,6 +18,8 @@ mod case;
 mod collate;
 #[path = "query_builder_composite.rs"]
 mod composite;
+#[path = "query_builder_constraint.rs"]
+mod constraint;
 #[path = "query_builder_cte.rs"]
 mod cte;
 #[path = "query_builder_generated.rs"]
@@ -1443,7 +1445,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1557,7 +1559,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    // [spec:pgorm:req:sql.ddl.alter-table+9]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1621,10 +1623,21 @@ impl QueryBuilder {
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " DROP NOT NULL").unwrap();
                             }
-                            ColumnSpec::NotNull => {
+                            ColumnSpec::NotNull {
+                                name: None,
+                                no_inherit: false,
+                            } => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
+                            }
+                            // [spec:pgorm:req:sql.ddl.alter-table+9]
+                            ColumnSpec::NotNull { name, no_inherit } => {
+                                let mut constraint =
+                                    NotNullConstraint::new(column_def.name.clone());
+                                constraint.name.clone_from(name);
+                                constraint.no_inherit = *no_inherit;
+                                self.prepare_add_not_null(&constraint, sql);
                             }
                             ColumnSpec::Default(v) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
@@ -1636,7 +1649,7 @@ impl QueryBuilder {
                             ColumnSpec::Generated { .. } => {}
                             // `ALTER TABLE` spells identity as an action on the
                             // column, not as a clause of it.
-                            // [spec:pgorm:req:sql.ddl.column-def+10]
+                            // [spec:pgorm:req:sql.ddl.column-def+11]
                             ColumnSpec::Identity(generation, options) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1668,7 +1681,7 @@ impl QueryBuilder {
                         Mode::TableAlter,
                     );
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+8]
+                // [spec:pgorm:req:sql.ddl.alter-table+9]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1682,6 +1695,15 @@ impl QueryBuilder {
                 }
                 TableAlterOption::DropExpression { column, if_exists } => {
                     self.prepare_drop_expression(column, *if_exists, sql);
+                }
+                TableAlterOption::AddNotNull(constraint) => {
+                    self.prepare_add_not_null(constraint, sql);
+                }
+                TableAlterOption::ValidateConstraint(name) => {
+                    self.prepare_validate_constraint(name, sql);
+                }
+                TableAlterOption::AlterConstraint { name, change } => {
+                    self.prepare_alter_constraint(name, *change, sql);
                 }
             }
             false
@@ -1701,7 +1723,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    // [spec:pgorm:req:sql.ddl.alter-table+9]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1783,7 +1805,9 @@ impl QueryBuilder {
     fn prepare_column_spec(&self, column_spec: &ColumnSpec, sql: &mut dyn SqlWriter) {
         match column_spec {
             ColumnSpec::Null => write!(sql, "NULL").unwrap(),
-            ColumnSpec::NotNull => write!(sql, "NOT NULL").unwrap(),
+            ColumnSpec::NotNull { name, no_inherit } => {
+                self.prepare_not_null(name.as_ref(), *no_inherit, sql)
+            }
             ColumnSpec::Default(value) => {
                 write!(sql, "DEFAULT ").unwrap();
                 self.prepare_simple_expr(value, sql);
@@ -1794,7 +1818,7 @@ impl QueryBuilder {
             ColumnSpec::AutoIncrement => {}
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr, kind } => self.prepare_generated_column(expr, *kind, sql),
-            // [spec:pgorm:req:sql.ddl.column-def+10]
+            // [spec:pgorm:req:sql.ddl.column-def+11]
             ColumnSpec::Identity(generation, options) => {
                 write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap();
                 self.prepare_identity_options(options.as_ref(), sql);

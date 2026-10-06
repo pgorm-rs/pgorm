@@ -27,10 +27,21 @@ impl PyColumnDef {
         self.inner.get_column_name()
     }
 
-    fn not_null(&self) -> Self {
+    /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: the column's one not-null
+    /// constraint, named and kept from inheriting tables as the native
+    /// `not_null_named` and `not_null_no_inherit` set it.
+    // [spec:pgorm:req:python.schema]
+    #[pyo3(signature=(*, name=None, no_inherit=false))]
+    fn not_null(&self, name: Option<&Bound<'_, PyAny>>, no_inherit: bool) -> PyResult<Self> {
         let mut inner = self.inner.clone();
         inner.not_null();
-        Self { inner }
+        if let Some(name) = name {
+            inner.not_null_named(PyIdentifier::new(name)?.name());
+        }
+        if no_inherit {
+            inner.not_null_no_inherit();
+        }
+        Ok(Self { inner })
     }
     fn null(&self) -> Self {
         let mut inner = self.inner.clone();

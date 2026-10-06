@@ -118,7 +118,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > written inside the one it constrains — and has no rendering of its own, no
 > `Display` and no build path, because PostgreSQL spells it only inside a
 > table statement; `ALTER TABLE` adds the same type
-> (`[spec:pgorm:req:sql.ddl.alter-table+8]`). Its readers are `get_name()`,
+> (`[spec:pgorm:req:sql.ddl.alter-table+9]`). Its readers are `get_name()`,
 > `get_columns()`, `get_include()` and `get_deferrability()`. Its columns,
 > not the key, are what an `ON CONFLICT` target naming the key takes:
 > `OnConflict::columns` accepts the same `IntoKeyColumns`, and no `TableKey`,
@@ -133,7 +133,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > options with it, as a second `raw_suffix()` replaces the first; the unique
 > keys are a list `unique()` appends to. A column has no key clause of its own
 > — `ColumnDef` has no `primary_key()` or `unique_key()` and `ColumnSpec` no
-> key arm (`[spec:pgorm:req:sql.ddl.column-def+10]`) — so a key is declared on
+> key arm (`[spec:pgorm:req:sql.ddl.column-def+11]`) — so a key is declared on
 > the table and only there, and keys always render after the columns, one
 > form per concept. Two primary keys therefore have no representation
 > (`[dec:pgorm:invalid-states-unrepresentable]`); the live suite holds a table
@@ -172,16 +172,17 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+10]
+> [spec:pgorm:req:sql.ddl.column-def+11]
 > `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
-> and an ordered list of `ColumnSpec`s (`Null`, `NotNull`, `Default(SimpleExpr)`, `AutoIncrement`,
+> and an ordered list of `ColumnSpec`s (`Null`, `NotNull { name, no_inherit }`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `Check(SimpleExpr)`, `Generated { expr, kind }`,
 > `Identity(IdentityGeneration, Option<SequenceOptions>)`, `RawSuffix(&'static str)`,
 > `Comment(String)`),
 > populated by the fluent typed setters
 > (`integer()`, `string_len(n)`, `timestamp_with_time_zone()`, `interval()`,
 > `vector()`, `enumeration()`, `array(elem)`, `cidr()`, `ltree()`, ...,
-> `not_null()`, `default(v)`, `check(expr)`, `generated(expr, kind)`, `identity()`,
+> `not_null()`, `not_null_named(name)`, `not_null_no_inherit()`, `default(v)`,
+> `check(expr)`, `generated(expr, kind)`, `identity()`,
 > `identity_by_default()`, `identity_with(generation, options)`, `raw_suffix(s)`, etc.).
 >
 > A column carries no key. A primary or unique key is the table's, a tuple of
@@ -191,14 +192,54 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `primary_key()` or their deferrability variants: a key on a column was the
 > spelling that let one table hold two primary keys, and adding a key to a
 > table that exists is `ALTER TABLE`'s `add_primary_key` / `add_unique`
-> (`[spec:pgorm:req:sql.ddl.alter-table+8]`), not a column's.
+> (`[spec:pgorm:req:sql.ddl.alter-table+9]`), not a column's.
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
-> (`[spec:pgorm:req:sql.render.collate]`), then each spec in insertion order: `NULL`, `NOT NULL`, `DEFAULT <expr>`,
+> (`[spec:pgorm:req:sql.render.collate]`), then each spec in insertion order: `NULL`,
+> `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`, `DEFAULT <expr>`,
 > `CHECK (<expr>)`, `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
+>
+> A column's `NOT NULL` is a catalog constraint in PostgreSQL 18 — a
+> `pg_constraint` row of kind `n`, recorded under the name the column gives it
+> or else under `<table>_<column>_not_null` — and a column has exactly one: the
+> server makes one constraint of repeated `NOT NULL` clauses and refuses two
+> that name it differently (`XX000` between a column's own clauses, `42601`
+> between a column's and a table-level one) or disagree on `NO INHERIT`
+> (`42601`). So `NotNull` carries the constraint's `name` and `no_inherit`,
+> and a column holds at most one `NotNull` spec: `not_null()`,
+> `not_null_named(name)` and `not_null_no_inherit()` each set that one spec,
+> the first of them putting it in the list where it is called and the rest
+> changing it where it stands. `.not_null().default(1).not_null_named(n)`
+> therefore renders `CONSTRAINT "n" NOT NULL DEFAULT 1`, a later name replaces
+> an earlier, and `not_null()` on a column that already refuses nulls changes
+> nothing, so neither refusal has a render to come from
+> (`[dec:pgorm:invalid-states-unrepresentable]`). The plain `not_null()` stays
+> the spelling of the unnamed constraint, which is the common case, and the
+> named form always carries a name, so each state has one spelling. `NO
+> INHERIT` keeps the constraint from a table created `INHERITS` this one; a
+> partitioned table's constraint always reaches its partitions, so the server
+> refuses `NO INHERIT` there (`0A000`) and accepts it on a partition. `NOT
+> VALID` has no column-level spelling — the grammar refuses it in `CREATE
+> TABLE` and `ADD COLUMN` alike (`42601`) — and so no setter: a not-null
+> constraint is added `NOT VALID` by `ALTER TABLE`'s `add_not_null`
+> (`[spec:pgorm:req:sql.ddl.alter-table+9]`). A `NOT NULL` is never deferrable
+> (`42601` on a column, `0A000` at table level) nor `[NOT] ENFORCED` (likewise).
+> The constraint is dropped by a modified column's `Null` spec, `ALTER COLUMN
+> "c" DROP NOT NULL`, whatever its name, and by `DROP CONSTRAINT "name"`;
+> either is refused for a primary-key column and for a child's inherited copy
+> (`42P16`).
+>
+> `CREATE TABLE` has no table-level `NOT NULL "c"`, PostgreSQL 18's other
+> spelling of the same constraint. It creates the constraint the column's
+> clause creates, under the same derived name, and the column's clause carries
+> the name and `NO INHERIT` it would. Its one addition, `NOT VALID`, describes
+> nothing there: the live suite's server creates a table-level `NOT NULL c NOT
+> VALID` valid (`convalidated`), a new table having no rows to leave
+> unchecked. So the concept has one form in `CREATE TABLE`, as a key does
+> (`[spec:pgorm:req:sql.ddl.create-table+12]`).
 >
 > A generated column is one of PostgreSQL's two kinds, `GeneratedKind::Stored`
 > (computed when the row is written, kept on disk) or `GeneratedKind::Virtual`
@@ -335,15 +376,16 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Multirange(t)`→ its multirange (`int4multirange` through
 > `tstzmultirange`).
 
-> [spec:pgorm:req:sql.ddl.alter-table+8]
+> [spec:pgorm:req:sql.ddl.alter-table+9]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey`, `DropForeignKey`, `AddPrimaryKey`, `AddUnique`,
-> `SetExpression` and `DropExpression` (with an `if_exists` flag). Both the
+> `SetExpression`, `DropExpression` (with an `if_exists` flag), `AddNotNull`,
+> `ValidateConstraint` and `AlterConstraint`. Both the
 > table and a first option are structural rather than checked:
 > `Table::alter(table)` yields a `PendingTableAlter`, which is a named table and
 > nothing more — it implements no build path and cannot render — and each of
-> its eleven action methods consumes it
+> its fourteen action methods consumes it
 > and returns the statement, whose own methods append the rest. PostgreSQL parses
 > neither `ALTER TABLE "font"` nor `ALTER TABLE ADD COLUMN ...`, and neither MUST
 > be constructible (`[dec:pgorm:invalid-states-unrepresentable]`); the
@@ -366,7 +408,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > ](cols)…` with the key's `INCLUDE` and deferrability, the table-level
 > spelling of `[spec:pgorm:req:sql.ddl.create-table+12]` after `ADD`. They are
 > how a key is added to a table that exists, now that a column carries none
-> (`[spec:pgorm:req:sql.ddl.column-def+10]`): the `ADD COLUMN … UNIQUE` and
+> (`[spec:pgorm:req:sql.ddl.column-def+11]`): the `ADD COLUMN … UNIQUE` and
 > `ADD UNIQUE ("c")` a column's key spec used to render are this, one key at a
 > time. Whether the table already has a primary key is the server's
 > knowledge, not the builder's; a second is refused there (`42P16`).
@@ -397,11 +439,55 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > DROP NOT NULL` (for `Null`), `SET NOT NULL`, `SET DEFAULT <expr>`,
 > `CHECK (<expr>)` or the
 > `Extra` string, comma-separated. `AutoIncrement`, `Generated` and `Comment`
-> specs are ignored in modify.
+> specs are ignored in modify. `SET NOT NULL` is the plain `NotNull`'s: it
+> has no place for a name or `NO INHERIT`, so a modified column whose
+> `NOT NULL` carries either writes the table-level action that does,
+> `ADD [CONSTRAINT "name" ]NOT NULL "c"[ NO INHERIT]`, as `add_not_null`
+> would. The two differ over a constraint that is still `NOT VALID`: `SET NOT
+> NULL` validates the one it finds, keeping its name, where the `ADD` is
+> refused (`55000`).
+>
+> `add_not_null(constraint)`, on both types, takes a `NotNullConstraint`:
+> PostgreSQL 18's table-level `NOT NULL`, over one column the constructor
+> takes (`NotNullConstraint::new(c)`; the grammar refuses `NOT NULL a, b` and
+> `NOT NULL (a)`, `42601`), with by-value `name(n)`, `no_inherit()` and
+> `not_valid()` and the readers `get_column()`, `get_name()`, `is_no_inherit()`
+> and `is_not_valid()`. It renders `ADD [CONSTRAINT "name" ]NOT NULL "c"[ NO
+> INHERIT][ NOT VALID]` and is the one spelling with a place for `NOT VALID`,
+> which leaves the rows already there unchecked while holding new rows at once
+> (`23502`); `convalidated` stays false until `validate_constraint` checks
+> them. Without `NOT VALID` a null already there refuses the action (`23502`).
+> A column has one not-null constraint (`[spec:pgorm:req:sql.ddl.column-def+11]`),
+> so the action against a column that has one does nothing where the one there
+> already says as much — the same name or none, the same `NO INHERIT`, and
+> valid where this one is — and is refused (`55000`) where it does not: a
+> different name, a different `NO INHERIT`, or a valid constraint over one
+> still `NOT VALID`. What the column has is the server's knowledge, as is
+> whether the column exists (`42703`) and whether the table is partitioned,
+> where `NO INHERIT` is refused (`0A000`); `add_primary_key` over a column
+> whose constraint is still `NOT VALID` is refused as well (`55000`).
+>
+> `validate_constraint(name)` renders `VALIDATE CONSTRAINT "name"`: the rows a
+> `NOT VALID` foreign key, `CHECK` or `NOT NULL` constraint skipped, checked
+> now and refused as the insert would have been (`23502` for a null). It is
+> the server's knowledge which kind a name holds: any other kind is refused
+> (`42809`), a name the table has no constraint under too (`42704`), and a
+> constraint already valid is left as it is. `alter_constraint(name, change)`
+> renders `ALTER CONSTRAINT "name" <change>` for a `ConstraintChange`:
+> `Inherit` (`INHERIT`), under which a `NOT NULL` passes to inheriting tables
+> again and each child lacking it takes it, and `NoInherit` (`NO INHERIT`),
+> under which it is kept from them from then on, each child keeping its copy
+> as its own (`conislocal`). Both are PostgreSQL 18's and apply to a `NOT
+> NULL` alone: a `CHECK`, key or foreign key named there is refused (`42809`),
+> as is `NO INHERIT` on a partitioned table's (`0A000`). Each change is a
+> closed choice rather than a flag, so an `ALTER CONSTRAINT` that changes
+> nothing has no value to be built from
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Renaming a constraint,
+> `RENAME CONSTRAINT`, which a `NOT NULL` takes like any other, is not built.
 >
 > A generated column's expression is changed by an action of its own, not by
 > a modified column's `Generated` spec, which would carry a kind PostgreSQL
-> cannot change (`[spec:pgorm:req:sql.ddl.column-def+10]`) and so describe an
+> cannot change (`[spec:pgorm:req:sql.ddl.column-def+11]`) and so describe an
 > alteration no statement makes. `set_expression(column, expr)`, on both
 > `PendingTableAlter` and `TableAlterStatement`, renders `ALTER COLUMN "c" SET
 > EXPRESSION AS (<expr>)` (PostgreSQL 17): the column keeps its kind and the
@@ -631,7 +717,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`:
 > an embedded key constrains the table it sits inside and MUST NOT name
 > another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+8]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+9]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
@@ -666,10 +752,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > it on its `TableKey`, whose `deferrability(d)` sets it
 > (`[spec:pgorm:req:sql.ddl.create-table+12]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
-> alike (`[spec:pgorm:req:sql.ddl.alter-table+8]`). A column carries no key
+> alike (`[spec:pgorm:req:sql.ddl.alter-table+9]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
 > `unique_key_deferrability(d)` and `primary_key_deferrability(d)` — are gone
-> with the column keys (`[spec:pgorm:req:sql.ddl.column-def+10]`), and the
+> with the column keys (`[spec:pgorm:req:sql.ddl.column-def+11]`), and the
 > clause has one position it can be written in, the one PostgreSQL's grammar
 > puts it.
 >
@@ -929,7 +1015,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The options are one vocabulary for every position that takes them, a
 > standalone sequence's and an identity column's
-> (`[spec:pgorm:req:sql.ddl.column-def+10]`): `SequenceOption` is `IncrementBy`,
+> (`[spec:pgorm:req:sql.ddl.column-def+11]`): `SequenceOption` is `IncrementBy`,
 > `MinValue` / `NoMinValue`, `MaxValue` / `NoMaxValue`, `StartWith`, `Cache`
 > and `Cycle` / `NoCycle`, each number an `i64` written as an integer literal,
 > `i64::MIN` and `i64::MAX` included. `SequenceOptions` holds one or more of

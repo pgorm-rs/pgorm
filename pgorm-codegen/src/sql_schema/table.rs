@@ -48,7 +48,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 }
 
 /// Bridge one `CREATE TABLE` into the statement the transformer reads.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
@@ -76,6 +76,7 @@ pub(super) fn build(
     let mut primary_key: Option<TableKey<Primary>> = None;
     let mut foreign_keys: Vec<ForeignKeyCreateStatement> = Vec::new();
     let mut unique_keys: Vec<TableKey<Unique>> = Vec::new();
+    let mut not_nulls: Vec<(String, NotNull)> = Vec::new();
 
     // A second primary key is refused rather than handed to the statement,
     // whose one slot would keep the later key and drop the earlier in silence.
@@ -86,7 +87,7 @@ pub(super) fn build(
     for element in &stmt.table_elts {
         match &element.node {
             Some(NodeEnum::ColumnDef(def)) => {
-                let mut column = column(def, &target, &table_name, at, enums, &column_comments)?;
+                let mut column = column(def, &target, &table_name, at, enums)?;
                 if column.primary_key {
                     declare(TableKey::new(Name::runtime(column.name.as_str())))?;
                 }
@@ -99,6 +100,9 @@ pub(super) fn build(
                     TableConstraint::Primary(key) => declare(*key)?,
                     TableConstraint::Unique(key) => unique_keys.push(*key),
                     TableConstraint::ForeignKey(foreign_key) => foreign_keys.push(*foreign_key),
+                    TableConstraint::NotNull(column, not_null) => {
+                        not_nulls.push((column, not_null))
+                    }
                 }
             }
             Some(NodeEnum::TableLikeClause(_)) => {
@@ -125,6 +129,18 @@ pub(super) fn build(
         }
     }
 
+    // A table-level NOT NULL is the column's own constraint, which PostgreSQL
+    // creates whichever spelling declared it, so it joins the column's.
+    for (constrained, not_null) in not_nulls {
+        let Some(column) = columns.iter_mut().find(|column| column.name == constrained) else {
+            return Err(unresolved(
+                format!("table `{table_name}` has no column `{constrained}`"),
+                at,
+            ));
+        };
+        column.declare_not_null(not_null, &table_name, at)?;
+    }
+
     // A primary-key column is NOT NULL by Postgres' own rule, spelled out or
     // not; the entity model reads nullability off the column alone.
     let keyed = |name: &str| {
@@ -134,11 +150,9 @@ pub(super) fn build(
                 .any(|column| column.to_string() == name)
         })
     };
-    for mut column in columns {
-        if !column.not_null && keyed(&column.name) {
-            column.def.not_null();
-        }
-        create.col(column.def);
+    for column in columns {
+        let implied = keyed(&column.name);
+        create.col(column.finish(implied, &column_comments));
     }
 
     if let Some(key) = primary_key {
@@ -157,7 +171,7 @@ pub(super) fn build(
 /// column, as a table constraint beside a column's, or twice on one column.
 /// PostgreSQL refuses every such table (42P16), and none is a composite key:
 /// that is one `PRIMARY KEY (a, b)`.
-// [spec:pgorm:req:codegen.ddl.unsupported+7]
+// [spec:pgorm:req:codegen.ddl.unsupported+8]
 fn second_primary_key(table_name: &str, at: usize) -> Error {
     unresolved(
         format!("table `{table_name}` declares more than one primary key"),
@@ -167,7 +181,7 @@ fn second_primary_key(table_name: &str, at: usize) -> Error {
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+7]
+// [spec:pgorm:req:codegen.ddl.unsupported+8]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -213,7 +227,7 @@ fn reject_table_features(
 /// A `RangeVar` as the table name a DDL statement targets. Postgres has no
 /// cross-database reference to render, so a catalog-qualified name is refused
 /// rather than quietly reduced to its schema and table.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableName, Error> {
     let table = Name::runtime(relation.relname.as_str());
     match (relation.catalogname.as_str(), relation.schemaname.as_str()) {
@@ -231,20 +245,103 @@ fn table_target(relation: &RangeVar, context: &str, at: usize) -> Result<TableNa
 struct Column {
     name: String,
     def: ColumnDef,
-    not_null: bool,
+    not_null: Option<NotNull>,
+    nullable: bool,
+    identity: bool,
     primary_key: bool,
     unique_key: Option<TableKey<Unique>>,
     foreign_key: Option<ForeignKeyCreateStatement>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+/// A `NOT NULL` constraint as declared, at column or table level: the name it
+/// was given, if any, and whether it is kept from inheriting tables.
+#[derive(Default)]
+struct NotNull {
+    name: Option<String>,
+    no_inherit: bool,
+}
+
+impl NotNull {
+    fn of(constraint: &Constraint) -> Self {
+        Self {
+            name: Some(constraint.conname.clone()).filter(|name| !name.is_empty()),
+            no_inherit: constraint.is_no_inherit,
+        }
+    }
+}
+
+impl Column {
+    /// Join a declared `NOT NULL` to the column's. PostgreSQL makes one
+    /// constraint of every `NOT NULL` a column has, keeping the one name any
+    /// of them gives, and refuses two that name it differently or disagree on
+    /// `NO INHERIT` (42601); so does this.
+    // [spec:pgorm:sem:codegen.ddl.tables+7]
+    fn declare_not_null(
+        &mut self,
+        declared: NotNull,
+        table_name: &str,
+        at: usize,
+    ) -> Result<(), Error> {
+        let context = format!("column `{table_name}`.`{}`", self.name);
+        let Some(existing) = &mut self.not_null else {
+            self.not_null = Some(declared);
+            return Ok(());
+        };
+        if existing.no_inherit != declared.no_inherit {
+            return Err(unresolved(
+                format!("{context} declares NOT NULL both with and without NO INHERIT"),
+                at,
+            ));
+        }
+        match (&existing.name, declared.name) {
+            (Some(kept), Some(other)) if *kept != other => Err(unresolved(
+                format!("{context} names its NOT NULL constraint both `{kept}` and `{other}`"),
+                at,
+            )),
+            (Some(_), _) | (None, None) => Ok(()),
+            (None, named) => {
+                existing.name = named;
+                Ok(())
+            }
+        }
+    }
+
+    /// The finished column definition: its `NOT NULL` — declared, or implied
+    /// by an identity or by `implied` — or else its `NULL`, then its comment.
+    // [spec:pgorm:sem:codegen.ddl.tables+7]
+    fn finish(mut self, implied: bool, comments: &BTreeMap<String, (usize, String)>) -> ColumnDef {
+        match self.not_null {
+            Some(NotNull { name, no_inherit }) => {
+                self.def.not_null();
+                if let Some(name) = name {
+                    self.def.not_null_named(Name::runtime(name));
+                }
+                if no_inherit {
+                    self.def.not_null_no_inherit();
+                }
+            }
+            None if self.identity || implied => {
+                self.def.not_null();
+            }
+            None if self.nullable => {
+                self.def.null();
+            }
+            None => {}
+        }
+        if let Some((_, comment)) = comments.get(&self.name) {
+            self.def.comment(comment.as_str());
+        }
+        self.def
+    }
+}
+
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn column(
     def: &PgColumnDef,
     target: &TableName,
     table_name: &str,
     at: usize,
     enums: &Enums,
-    comments: &BTreeMap<String, (usize, String)>,
 ) -> Result<Column, Error> {
     let column_name = def.colname.as_str();
     if column_name.is_empty() {
@@ -286,11 +383,16 @@ fn column(
         column.collate(collation(clause, &context, at)?);
     }
 
-    let mut not_null = def.is_not_null;
-    let mut nullable = false;
-    let mut primary_key = false;
-    let mut unique_key = None;
-    let mut foreign_key = None;
+    let mut built = Column {
+        name: column_name.to_owned(),
+        def: column,
+        not_null: def.is_not_null.then(NotNull::default),
+        nullable: false,
+        identity: false,
+        primary_key: false,
+        unique_key: None,
+        foreign_key: None,
+    };
     for node in &def.constraints {
         let Some(NodeEnum::Constraint(constraint)) = &node.node else {
             return Err(on("a column constraint"));
@@ -298,38 +400,35 @@ fn column(
         if constraint_type(constraint, &context, at)? == ConstrType::ConstrIdentity {
             // An identity column is NOT NULL whether or not it says so.
             match identity(constraint, &context, at)? {
-                IdentityGeneration::Always => column.identity(),
-                IdentityGeneration::ByDefault => column.identity_by_default(),
+                IdentityGeneration::Always => built.def.identity(),
+                IdentityGeneration::ByDefault => built.def.identity_by_default(),
             };
-            not_null = true;
+            built.identity = true;
             continue;
         }
         reject_constraint_features(constraint, &context, at)?;
         match constraint_type(constraint, &context, at)? {
-            // PostgreSQL 18 keeps a NOT NULL constraint's name in its
-            // catalog, and a column's NOT NULL has no name to carry it.
-            ConstrType::ConstrNotnull if !constraint.conname.is_empty() => {
-                return Err(on("a named NOT NULL constraint"));
+            ConstrType::ConstrNotnull => {
+                built.declare_not_null(NotNull::of(constraint), table_name, at)?;
             }
-            ConstrType::ConstrNotnull => not_null = true,
-            ConstrType::ConstrNull => nullable = true,
-            ConstrType::ConstrPrimary if primary_key => {
+            ConstrType::ConstrNull => built.nullable = true,
+            ConstrType::ConstrPrimary if built.primary_key => {
                 return Err(second_primary_key(table_name, at));
             }
-            ConstrType::ConstrPrimary => primary_key = true,
+            ConstrType::ConstrPrimary => built.primary_key = true,
             // A column's UNIQUE is a one-column unique key: a key is the
             // table's, and Postgres implements this one as that key.
             ConstrType::ConstrUnique => {
-                unique_key = Some(unique(
+                built.unique_key = Some(unique(
                     constraint,
                     key(constraint, Name::runtime(column_name)),
                 ));
             }
             ConstrType::ConstrForeign => {
-                if foreign_key.is_some() {
+                if built.foreign_key.is_some() {
                     return Err(on("a second REFERENCES clause"));
                 }
-                foreign_key = Some(references(
+                built.foreign_key = Some(references(
                     constraint,
                     target,
                     &[column_name.to_owned()],
@@ -340,28 +439,13 @@ fn column(
             other => return Err(on(constraint_kind(constraint, other))),
         }
     }
-    if not_null {
-        column.not_null();
-    } else if nullable {
-        column.null();
-    }
-    if let Some((_, comment)) = comments.get(column_name) {
-        column.comment(comment.as_str());
-    }
-    Ok(Column {
-        name: column_name.to_owned(),
-        def: column.take(),
-        not_null,
-        primary_key,
-        unique_key,
-        foreign_key,
-    })
+    Ok(built)
 }
 
 /// The form of a column's `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY`.
 /// Sequence options are refused: an entity declares which form generates the
 /// column, not how its sequence counts.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn identity(
     constraint: &Constraint,
     context: &str,
@@ -386,7 +470,7 @@ fn identity(
 /// A column's `COLLATE` clause as the collation it names: bare, or qualified
 /// by one schema. A catalog-qualified name is a cross-database reference
 /// Postgres does not implement, so it is refused as a table's would be.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn collation(clause: &CollateClause, context: &str, at: usize) -> Result<Collation, Error> {
     match types::idents(&clause.collname).as_deref() {
         Some([name]) => Ok(Name::runtime(name.as_str()).into_collation()),
@@ -405,9 +489,10 @@ enum TableConstraint {
     Primary(Box<TableKey<Primary>>),
     Unique(Box<TableKey<Unique>>),
     ForeignKey(Box<ForeignKeyCreateStatement>),
+    NotNull(String, NotNull),
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn table_constraint(
     constraint: &Constraint,
     target: &TableName,
@@ -445,17 +530,24 @@ fn table_constraint(
                 constraint, target, &columns, &context, at,
             )?)))
         }
-        // A table-level NOT NULL (`[CONSTRAINT n] NOT NULL col [NOT VALID]`)
-        // is PostgreSQL 18's catalog constraint, which a column's NOT NULL
-        // cannot carry the name or validity of.
-        ConstrType::ConstrNotnull => Err(on("a table-level NOT NULL constraint")),
+        // `[CONSTRAINT n] NOT NULL col [NO INHERIT] [NOT VALID]`: the
+        // column's constraint, declared at table level. A `CREATE TABLE`
+        // creates it valid whatever it says, its table having no rows to
+        // check, so `NOT VALID` here describes nothing the catalog keeps.
+        ConstrType::ConstrNotnull => match types::idents(&constraint.keys).as_deref() {
+            Some([column]) => Ok(TableConstraint::NotNull(
+                column.clone(),
+                NotNull::of(constraint),
+            )),
+            _ => Err(on("a NOT NULL constraint over other than one column")),
+        },
         other => Err(on(constraint_kind(constraint, other))),
     }
 }
 
 /// A `PRIMARY KEY` or `UNIQUE` constraint begun at its first column, under the
 /// name it was declared with.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn key<K>(constraint: &Constraint, first: Name) -> TableKey<K> {
     let key = TableKey::new(first);
     if constraint.conname.is_empty() {
@@ -467,7 +559,7 @@ fn key<K>(constraint: &Constraint, first: Name) -> TableKey<K> {
 
 /// A unique key with the `NULLS NOT DISTINCT` its constraint was declared
 /// with, which only a unique key can carry.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn unique(constraint: &Constraint, key: TableKey<Unique>) -> TableKey<Unique> {
     if constraint.nulls_not_distinct {
         key.nulls_not_distinct()
@@ -478,7 +570,7 @@ fn unique(constraint: &Constraint, key: TableKey<Unique>) -> TableKey<Unique> {
 
 /// A foreign key over `columns` of `target`, with the referenced table, columns
 /// and actions the constraint declares.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn references(
     constraint: &Constraint,
     target: &TableName,
@@ -551,7 +643,7 @@ fn references(
 
 /// A referential action code. `NO ACTION` is Postgres' default and carries no
 /// entity meaning, so it reads as no action declared.
-// [spec:pgorm:sem:codegen.ddl.tables+6]
+// [spec:pgorm:sem:codegen.ddl.tables+7]
 fn action(
     code: &str,
     clause: &str,
@@ -578,7 +670,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+7]
+// [spec:pgorm:req:codegen.ddl.unsupported+8]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -588,7 +680,9 @@ fn reject_constraint_features(
     if constraint.deferrable || constraint.initdeferred {
         return Err(on("a deferrable constraint"));
     }
-    if constraint.is_no_inherit {
+    // A NOT NULL kept from inheriting tables is the column's constraint all
+    // the same, and its NO INHERIT rides on the statement.
+    if constraint.is_no_inherit && constraint.contype != ConstrType::ConstrNotnull as i32 {
         return Err(on("a NO INHERIT constraint"));
     }
     if !constraint.including.is_empty() {
@@ -630,7 +724,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+7]
+// [spec:pgorm:req:codegen.ddl.unsupported+8]
 fn constraint_kind(constraint: &Constraint, kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

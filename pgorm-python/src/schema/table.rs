@@ -6,7 +6,9 @@ use crate::{
     errors::ConstructionError, expressions, expressions::Compiled, identifiers::PyIdentifier,
     statements::PyTable,
 };
-use pgorm::pgorm_query::{Table, TableCreateStatement, TableKey, TableName, Values};
+use pgorm::pgorm_query::{
+    ConstraintChange, NotNullConstraint, Table, TableCreateStatement, TableKey, TableName, Values,
+};
 use pyo3::{prelude::*, types::PyTuple};
 
 pub(super) fn table_name(table: &PyTable) -> PyResult<TableName> {
@@ -262,5 +264,71 @@ pub(super) fn drop_expression(
     };
     Ok(PyDDL {
         inner: Statement::AlterTable(ready),
+    })
+}
+
+/// `ALTER TABLE ... ADD [CONSTRAINT ...] NOT NULL ... [NO INHERIT] [NOT VALID]`:
+/// a not-null constraint over one column, the spelling that can leave the rows
+/// already there for `validate_constraint` to check.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, column, *, name=None, no_inherit=false, not_valid=false))]
+pub(super) fn add_not_null(
+    table: &PyTable,
+    column: &Bound<'_, PyAny>,
+    name: Option<&Bound<'_, PyAny>>,
+    no_inherit: bool,
+    not_valid: bool,
+) -> PyResult<PyDDL> {
+    let mut constraint = NotNullConstraint::new(PyIdentifier::new(column)?.name());
+    if let Some(name) = name {
+        constraint = constraint.name(PyIdentifier::new(name)?.name());
+    }
+    if no_inherit {
+        constraint = constraint.no_inherit();
+    }
+    if not_valid {
+        constraint = constraint.not_valid();
+    }
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_not_null(constraint)),
+    })
+}
+
+/// `ALTER TABLE ... VALIDATE CONSTRAINT ...`: the rows a `NOT VALID`
+/// constraint skipped, checked now.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+pub(super) fn validate_constraint(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
+    Ok(PyDDL {
+        inner: Statement::AlterTable(
+            Table::alter(table_name(table)?).validate_constraint(PyIdentifier::new(name)?.name()),
+        ),
+    })
+}
+
+/// `ALTER TABLE ... ALTER CONSTRAINT ... <change>`, the change named as the
+/// native `ConstraintChange` variant is.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+pub(super) fn alter_constraint(
+    table: &PyTable,
+    name: &Bound<'_, PyAny>,
+    change: &str,
+) -> PyResult<PyDDL> {
+    let change = match change {
+        "inherit" => ConstraintChange::Inherit,
+        "no_inherit" => ConstraintChange::NoInherit,
+        _ => {
+            return Err(ConstructionError::new_err(
+                "a constraint change is 'inherit' or 'no_inherit'",
+            ));
+        }
+    };
+    Ok(PyDDL {
+        inner: Statement::AlterTable(
+            Table::alter(table_name(table)?)
+                .alter_constraint(PyIdentifier::new(name)?.name(), change),
+        ),
     })
 }

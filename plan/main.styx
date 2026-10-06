@@ -9600,6 +9600,7 @@ children (
                 title "A NOT NULL constraint can be named, NOT VALID and NO INHERIT"
                 kind @feat
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:55.269602Z
@@ -9613,6 +9614,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "pg-query-18 landed the 18 grammar. Codegen's DDL bridge now refuses by name what this node would read (codegen.ddl.unsupported+6): a column NOT NULL with a constraint name (\"a named NOT NULL constraint\", previously accepted with the name dropped) and any table-level NOT NULL, named or not, NOT VALID or not (\"a table-level NOT NULL constraint\"; ConstrNotnull with keys). A column-level NOT NULL NO INHERIT was already refused as \"a NO INHERIT constraint\"."
+                    }
+
+                    {
+                        at 2026-10-06T21:18:14.450685Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-06T23:46:07.969248Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

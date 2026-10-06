@@ -15,7 +15,7 @@ use super::{ColumnDef, ColumnSpec};
 /// [`IdentityGeneration`](crate::IdentityGeneration) is one
 /// (`[dec:pgorm:invalid-states-unrepresentable]`): there is no third kind,
 /// and a flag reads backwards at the call site.
-// [spec:pgorm:req:sql.ddl.column-def+10]
+// [spec:pgorm:req:sql.ddl.column-def+11]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GeneratedKind {
     /// `STORED`: computed when the row is inserted or updated, and kept like
@@ -31,7 +31,7 @@ pub enum GeneratedKind {
 
 impl GeneratedKind {
     /// The keyword PostgreSQL spells this kind with — `STORED` or `VIRTUAL`.
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub const fn keyword(self) -> &'static str {
         match self {
             Self::Stored => "STORED",
@@ -88,7 +88,7 @@ impl ColumnDef {
     /// an identity (`42601`). A row cannot write the column either: an insert
     /// or update that supplies a value other than `DEFAULT` is refused
     /// (`428C9`).
-    // [spec:pgorm:req:sql.ddl.column-def+10]
+    // [spec:pgorm:req:sql.ddl.column-def+11]
     pub fn generated<T>(&mut self, expr: T, kind: GeneratedKind) -> &mut Self
     where
         T: Into<SimpleExpr>,

@@ -275,7 +275,7 @@ fn flags(col: &ColumnDef) -> Flags {
     let mut flags = Flags::default();
     for spec in col.get_column_spec() {
         match spec {
-            ColumnSpec::NotNull => flags.not_null = true,
+            ColumnSpec::NotNull { .. } => flags.not_null = true,
             ColumnSpec::AutoIncrement => flags.auto_increment = true,
             ColumnSpec::Default(_) => flags.default = true,
             ColumnSpec::Identity(generation, _) => flags.identity = Some(*generation),

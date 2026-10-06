@@ -61,6 +61,8 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.create_enum("mood", ["a\0b"]),
             lambda: s.create_enum("mood", ["雪" * 22]),
             lambda: s.add_enum_value("mood", "v", before="a", after="b"),
+            lambda: s.alter_constraint(p.Table("test"), "c", "deferrable"),
+            lambda: s.add_not_null(p.Table("test", alias="t"), "c"),
         ):
             with self.subTest(action=action), self.assertRaises(p.PgOrmError):
                 action()
@@ -131,6 +133,37 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             renamed = p.Table('renamed "table"', schema=self.namespace)
             await connection.execute(s.drop_table(renamed))
             await connection.execute(s.drop_table(renamed, if_exists=True))
+
+    # [spec:pgorm:req:python.schema/test]
+    async def test_not_null_constraints_by_name(self):
+        table = p.Table('kept "x"', schema=self.namespace)
+        quoted = f'{self.quoted}."kept ""x"""'
+        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").not_null(name='id "present"'))
+        await self.pool.execute(ddl.column(s.ColumnDef("note", "text")))
+        await self.pool.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (1, NULL)"))
+        catalog = p.RawSQL(
+            "SELECT conname::text AS name, convalidated AS valid, connoinherit AS no_inherit "
+            "FROM pg_constraint WHERE conrelid = $1::text::regclass AND contype = 'n' ORDER BY conname",
+            [quoted],
+        )
+        async with self.pool.connection() as connection:
+            await connection.execute(s.add_not_null(table, "note", name="note present", not_valid=True))
+            rows = [dict(row) for row in await connection.fetch_all(catalog)]
+            self.assertEqual(rows, [
+                {"name": 'id "present"', "valid": True, "no_inherit": False},
+                {"name": "note present", "valid": False, "no_inherit": False},
+            ])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(s.validate_constraint(table, "note present"))
+            self.assertEqual(refused.exception.sqlstate, "23502")
+            await connection.execute(p.RawSQL(f"UPDATE {quoted} SET note = ''"))
+            await connection.execute(s.validate_constraint(table, "note present"))
+            await connection.execute(s.alter_constraint(table, 'id "present"', "no_inherit"))
+            rows = [dict(row) for row in await connection.fetch_all(catalog)]
+            self.assertEqual(rows, [
+                {"name": 'id "present"', "valid": True, "no_inherit": True},
+                {"name": "note present", "valid": True, "no_inherit": False},
+            ])
 
     # [spec:pgorm:req:python.schema/test]
     async def test_qualified_enum_arrays_and_label_escaping(self):

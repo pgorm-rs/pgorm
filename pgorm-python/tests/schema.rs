@@ -1,7 +1,8 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Expr, GeneratedKind, Index, IndexOrder, IndexType, IntoName, Name,
-    StringLen, Table, TableKey, TableName, TypeName, Values, extension::Type,
+    ColumnDef, ColumnType, ConstraintChange, Expr, GeneratedKind, Index, IndexOrder, IndexType,
+    IntoName, Name, NotNullConstraint, StringLen, Table, TableKey, TableName, TypeName, Values,
+    extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -175,8 +176,54 @@ fn programs() -> BTreeMap<&'static str, String> {
         ),
         (
             "drop_expression_if_exists",
-            Table::alter(table)
+            Table::alter(table.clone())
                 .drop_expression_if_exists(a("twice"))
+                .to_string(),
+        ),
+        (
+            "not_null_named",
+            Table::create(table.clone())
+                .col(
+                    ColumnDef::new_with_type(a("extra"), ColumnType::Text)
+                        .not_null_named(a("present \"x\""))
+                        .not_null_no_inherit(),
+                )
+                .col(ColumnDef::new_with_type(a("kept"), ColumnType::Text).not_null_no_inherit())
+                .to_string(),
+        ),
+        (
+            "add_not_null",
+            Table::alter(table.clone())
+                .add_not_null(NotNullConstraint::new(a("extra")))
+                .to_string(),
+        ),
+        (
+            "add_not_null_named",
+            Table::alter(table.clone())
+                .add_not_null(
+                    NotNullConstraint::new(a("extra"))
+                        .name(a("present \"x\""))
+                        .no_inherit()
+                        .not_valid(),
+                )
+                .to_string(),
+        ),
+        (
+            "validate_constraint",
+            Table::alter(table.clone())
+                .validate_constraint(a("present \"x\""))
+                .to_string(),
+        ),
+        (
+            "alter_constraint_inherit",
+            Table::alter(table.clone())
+                .alter_constraint(a("present \"x\""), ConstraintChange::Inherit)
+                .to_string(),
+        ),
+        (
+            "alter_constraint_no_inherit",
+            Table::alter(table)
+                .alter_constraint(a("present \"x\""), ConstraintChange::NoInherit)
                 .to_string(),
         ),
         (

@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+12/test]
-// [spec:pgorm:req:sql.ddl.column-def+10/test]
+// [spec:pgorm:req:sql.ddl.column-def+11/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
 fn create_1() {
@@ -348,7 +348,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -364,7 +364,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -420,7 +420,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -447,7 +447,7 @@ fn alter_8() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a key is added as an action of its own,
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a key is added as an action of its own,
 // after the column it keys
 #[test]
 fn alter_9() {
@@ -601,7 +601,7 @@ fn a_primary_key_is_a_table_constraint() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a foreign key embeds by value, so the source
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a foreign key embeds by value, so the source
 // survives only where the call site cloned it
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
@@ -629,7 +629,7 @@ fn alter_embeds_its_foreign_key_by_value() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+10/test]    a generated column writes its kind
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    a generated column writes its kind
 // whichever it is, so neither render leans on the server's default, which 17 and
 // 18 disagree about
 #[test]
@@ -666,7 +666,7 @@ fn generated_column_writes_its_kind() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a generated column's expression is
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a generated column's expression is
 // set with its `AS` and dropped with or without `IF EXISTS`, each its own action
 // beside the statement's others
 #[test]
@@ -698,7 +698,123 @@ fn expression_actions_render_on_their_own() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+10/test]    both identity forms render, and
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    a column's NOT NULL is one
+// constraint: named or kept from children where it first stands, never twice
+#[test]
+fn column_not_null_is_one_constraint() {
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).integer().not_null())
+            .col(
+                ColumnDef::new(Glyph::Aspect)
+                    .integer()
+                    .not_null_named(Name::runtime("aspect_present"))
+            )
+            .col(ColumnDef::new(Glyph::Image).text().not_null_no_inherit())
+            .to_string(),
+        [
+            r#"CREATE TABLE "glyph" ( "id" integer NOT NULL,"#,
+            r#""aspect" integer CONSTRAINT "aspect_present" NOT NULL,"#,
+            r#""image" text NOT NULL NO INHERIT )"#,
+        ]
+        .join(" ")
+    );
+    let column = ColumnDef::new(Glyph::Id)
+        .integer()
+        .not_null()
+        .default(1)
+        .not_null_named(Name::runtime("first"))
+        .not_null()
+        .not_null_no_inherit()
+        .not_null_named(Name::runtime("second"))
+        .to_owned();
+    assert_eq!(
+        Table::create(Glyph::Table).col(column.clone()).to_string(),
+        r#"CREATE TABLE "glyph" ( "id" integer CONSTRAINT "second" NOT NULL NO INHERIT DEFAULT 1 )"#
+    );
+    let not_nulls: Vec<_> = column
+        .get_column_spec()
+        .iter()
+        .filter_map(|spec| match spec {
+            ColumnSpec::NotNull { name, no_inherit } => {
+                Some((name.as_ref().map(|name| name.to_string()), *no_inherit))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(not_nulls, [(Some("second".to_owned()), true)]);
+}
+
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a NOT NULL is added at table
+// level, validated and altered by name
+#[test]
+fn not_null_actions_render_on_their_own() {
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .add_not_null(NotNullConstraint::new(Glyph::Aspect))
+            .to_string(),
+        r#"ALTER TABLE "glyph" ADD NOT NULL "aspect""#
+    );
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .add_not_null(
+                NotNullConstraint::new(Glyph::Aspect)
+                    .not_valid()
+                    .no_inherit()
+                    .name(Name::runtime("aspect_present"))
+            )
+            .validate_constraint(Name::runtime("aspect_present"))
+            .alter_constraint(Name::runtime("aspect_present"), ConstraintChange::Inherit)
+            .alter_constraint(Name::runtime("image_present"), ConstraintChange::NoInherit)
+            .to_string(),
+        [
+            r#"ALTER TABLE "glyph" ADD CONSTRAINT "aspect_present" NOT NULL "aspect" NO INHERIT NOT VALID,"#,
+            r#"VALIDATE CONSTRAINT "aspect_present","#,
+            r#"ALTER CONSTRAINT "aspect_present" INHERIT,"#,
+            r#"ALTER CONSTRAINT "image_present" NO INHERIT"#,
+        ]
+        .join(" ")
+    );
+    let constraint = NotNullConstraint::new(Glyph::Aspect)
+        .name(Name::runtime("aspect_present"))
+        .not_valid();
+    assert_eq!(constraint.get_column().to_string(), "aspect");
+    assert_eq!(
+        constraint
+            .get_name()
+            .map(|name| name.to_string())
+            .as_deref(),
+        Some("aspect_present")
+    );
+    assert!(constraint.is_not_valid());
+    assert!(!constraint.is_no_inherit());
+}
+
+// [spec:pgorm:req:sql.ddl.alter-table+9/test]    a modified column's plain NOT
+// NULL is SET, and its named or NO INHERIT one is added, which SET cannot say
+#[test]
+fn modified_named_not_null_is_added() {
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .modify_column(ColumnDef::new(Glyph::Aspect).not_null())
+            .modify_column(
+                ColumnDef::new(Glyph::Image)
+                    .text()
+                    .not_null_named(Name::runtime("image_present"))
+            )
+            .modify_column(ColumnDef::new(Glyph::Tokens).not_null_no_inherit())
+            .to_string(),
+        [
+            r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" SET NOT NULL,"#,
+            r#"ALTER COLUMN "image" TYPE text,"#,
+            r#"ADD CONSTRAINT "image_present" NOT NULL "image","#,
+            r#"ADD NOT NULL "tokens" NO INHERIT"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    both identity forms render, and
 // the ALWAYS/BY DEFAULT choice is the only thing that differs between them
 #[test]
 fn identity_column_spells_both_generations() {
@@ -726,7 +842,7 @@ fn identity_column_spells_both_generations() {
     assert_eq!(IdentityGeneration::ByDefault.keyword(), "BY DEFAULT");
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+10/test]    identity is a clause of the
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    identity is a clause of the
 // column, so it renders in insertion order among the other specs
 #[test]
 fn identity_renders_in_insertion_order() {
@@ -745,7 +861,7 @@ fn identity_renders_in_insertion_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+10/test]    the two `ALTER TABLE` positions:
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    the two `ALTER TABLE` positions:
 // a new column carries the clause, an existing one takes the ADD GENERATED action
 #[test]
 fn identity_alters_both_ways() {
@@ -764,7 +880,7 @@ fn identity_alters_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+10/test]    identity and the serial family
+// [spec:pgorm:req:sql.ddl.column-def+11/test]    identity and the serial family
 // are two spellings of one idea, and asking for both renders SQL the grammar
 // takes but the server refuses — the boundary this rule documents rather than types
 #[test]

@@ -33,6 +33,13 @@ def programs(p):
         "set_expression": p.set_expression(table, "twice", p.col('id "x"') * 3),
         "drop_expression": p.drop_expression(table, "twice"),
         "drop_expression_if_exists": p.drop_expression(table, "twice", if_exists=True),
+        "not_null_named": p.CreateTable(table).column(p.ColumnDef("extra", "text").not_null(name='present "x"', no_inherit=True))
+            .column(p.ColumnDef("kept", "text").not_null(no_inherit=True)),
+        "add_not_null": p.add_not_null(table, "extra"),
+        "add_not_null_named": p.add_not_null(table, "extra", name='present "x"', no_inherit=True, not_valid=True),
+        "validate_constraint": p.validate_constraint(table, 'present "x"'),
+        "alter_constraint_inherit": p.alter_constraint(table, 'present "x"', "inherit"),
+        "alter_constraint_no_inherit": p.alter_constraint(table, 'present "x"', "no_inherit"),
         "enum": p.create_enum(kind, ["", "O'Brien \\ 雪", "busy"]),
         "enum_before": p.add_enum_value(kind, "new", before="busy"),
         "enum_after": p.add_enum_value(kind, "new", after="busy"),

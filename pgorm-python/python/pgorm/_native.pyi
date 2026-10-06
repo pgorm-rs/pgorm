@@ -12,6 +12,10 @@ from ._schema import (
     drop_index as drop_index, create_enum as create_enum, add_enum_value as add_enum_value,
     rename_enum as rename_enum, rename_enum_value as rename_enum_value, drop_enum as drop_enum,
 )
+from ._schema_constraints import (
+    add_not_null as add_not_null, validate_constraint as validate_constraint,
+    alter_constraint as alter_constraint,
+)
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
 from ._pipeline_sources import SourceSelection as SourceSelection, SelectedSources as SelectedSources

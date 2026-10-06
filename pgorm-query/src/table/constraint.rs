@@ -1,0 +1,136 @@
+//! Constraints `ALTER TABLE` adds, validates and alters by name: a table-level
+//! `NOT NULL`, and the changes `ALTER CONSTRAINT` makes to one that exists.
+
+use crate::types::{IntoName, Name};
+
+/// A `NOT NULL` constraint added to a table that exists:
+/// `ADD [CONSTRAINT "name" ]NOT NULL "column"[ NO INHERIT][ NOT VALID]`.
+///
+/// It is PostgreSQL 18's table-level spelling of the constraint a column
+/// declares with [`ColumnDef::not_null`](crate::ColumnDef::not_null), over one
+/// column, which the constructor takes. Only this spelling can be added
+/// `NOT VALID`: the column-level clause has no place for it (`42601`), and a
+/// `CREATE TABLE` creates every not-null constraint valid whatever it says,
+/// since the new table has no rows to check. So this is what
+/// [`TableAlterStatement::add_not_null`](crate::TableAlterStatement::add_not_null)
+/// takes, and `CREATE TABLE` has no table-level `NOT NULL`: the column's own
+/// clause carries the same constraint, its name and its `NO INHERIT` included.
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// assert_eq!(
+///     Table::alter(Glyph::Table)
+///         .add_not_null(
+///             NotNullConstraint::new(Glyph::Aspect)
+///                 .name(Name::runtime("glyph_aspect_present"))
+///                 .not_valid(),
+///         )
+///         .to_string(),
+///     r#"ALTER TABLE "glyph" ADD CONSTRAINT "glyph_aspect_present" NOT NULL "aspect" NOT VALID"#,
+/// );
+/// ```
+// [spec:pgorm:req:sql.ddl.alter-table+9]
+#[derive(Debug, Clone)]
+pub struct NotNullConstraint {
+    pub(crate) column: Name,
+    pub(crate) name: Option<Name>,
+    pub(crate) no_inherit: bool,
+    pub(crate) not_valid: bool,
+}
+
+impl NotNullConstraint {
+    /// A `NOT NULL` over `column`, unnamed, inherited and checked against the
+    /// rows already there.
+    pub fn new<C>(column: C) -> Self
+    where
+        C: IntoName,
+    {
+        Self {
+            column: column.into_name(),
+            name: None,
+            no_inherit: false,
+            not_valid: false,
+        }
+    }
+
+    /// Name the constraint: `CONSTRAINT "name" NOT NULL ...`. Unnamed,
+    /// PostgreSQL derives `<table>_<column>_not_null`.
+    #[must_use]
+    pub fn name<N>(mut self, name: N) -> Self
+    where
+        N: IntoName,
+    {
+        self.name = Some(name.into_name());
+        self
+    }
+
+    /// Keep the constraint from the tables that inherit this one:
+    /// `NO INHERIT`. The server refuses it on a partitioned table (`0A000`),
+    /// and over a column whose inheritable `NOT NULL` already exists
+    /// (`55000`).
+    #[must_use]
+    pub fn no_inherit(mut self) -> Self {
+        self.no_inherit = true;
+        self
+    }
+
+    /// Add the constraint without checking the rows already there:
+    /// `NOT VALID`. New rows are held to it at once (`23502`), and
+    /// [`validate_constraint`](crate::TableAlterStatement::validate_constraint)
+    /// checks the rest later.
+    #[must_use]
+    pub fn not_valid(mut self) -> Self {
+        self.not_valid = true;
+        self
+    }
+
+    /// The column the constraint holds to.
+    pub fn get_column(&self) -> &Name {
+        &self.column
+    }
+
+    /// The constraint's name, if it was given one.
+    pub fn get_name(&self) -> Option<&Name> {
+        self.name.as_ref()
+    }
+
+    /// Whether the constraint is kept from inheriting tables.
+    pub fn is_no_inherit(&self) -> bool {
+        self.no_inherit
+    }
+
+    /// Whether the rows already there are left unchecked.
+    pub fn is_not_valid(&self) -> bool {
+        self.not_valid
+    }
+}
+
+/// What `ALTER CONSTRAINT "name" ...` changes about a constraint that exists.
+///
+/// The server alone knows which kind of constraint a name holds, and each
+/// change applies to one kind, so asking another kind for it is refused there
+/// (`42809`).
+// [spec:pgorm:req:sql.ddl.alter-table+9]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintChange {
+    /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
+    /// each child that lacks one taking it.
+    Inherit,
+    /// `NO INHERIT`: a `NOT NULL` constraint is kept from inheriting tables
+    /// from now on. Each child keeps the copy it already has, as its own. A
+    /// partitioned table's constraint cannot be kept from its partitions
+    /// (`0A000`).
+    NoInherit,
+}
+
+impl ConstraintChange {
+    /// The words this change is written with, after the constraint's name.
+    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    pub(crate) fn clause(self) -> &'static str {
+        match self {
+            Self::Inherit => "INHERIT",
+            Self::NoInherit => "NO INHERIT",
+        }
+    }
+}

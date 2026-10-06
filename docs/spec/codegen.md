@@ -737,13 +737,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+7]
+> [spec:pgorm:req:codegen.ddl.unsupported+8]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
-> / `COMMENT ON COLUMN` — with a column's `COLLATE` clause, which the bridged
-> statement carries and the entity, like a comment, does not
-> (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
+> / `COMMENT ON COLUMN` — with a column's `COLLATE` clause and a `NOT NULL`
+> constraint's name and `NO INHERIT`, which the bridged statement carries and
+> the entity, like a comment, does not (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
 > skipped, never quietly reinterpreted. A construct outside the subset is
 > ``TransformError("unsupported DDL: <what> at statement <n>")``; a construct
 > inside it that this schema cannot resolve is
@@ -761,7 +761,8 @@ compiling the C parser falls on people generating entities and on nobody else.
 > tables; column
 > `DEFAULT`, `CHECK`, `GENERATED`,
 > `STORAGE` and `COMPRESSION` clauses, and an identity's sequence options; table-level `CHECK`
-> and `EXCLUDE` constraints, deferrable and `NO INHERIT` constraints, `INCLUDE`
+> and `EXCLUDE` constraints, deferrable constraints, `NO INHERIT` on any
+> constraint but a `NOT NULL`, `INCLUDE`
 > columns, constraint index and storage options, and `MATCH` clauses;
 > `REFERENCES` without a referenced column list, which no catalog is present to
 > resolve; index `WHERE`, `INCLUDE`, `CONCURRENTLY`, `COLLATE`, operator
@@ -794,11 +795,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > a `PERIOD` (`a PERIOD foreign key`); a `NOT ENFORCED` foreign key or column
 > attribute (`a NOT ENFORCED constraint`), and an explicit column-level
 > `ENFORCED` (`an ENFORCED clause`), as the column-level deferrability
-> attributes are refused whether or not they state the default; a column
-> `NOT NULL` with a constraint name (`a named NOT NULL constraint`), whose
-> name 18 keeps in its catalog and a column's `NOT NULL` cannot carry; and a
-> table-level `NOT NULL` constraint, named or not and `NOT VALID` or not
-> (`a table-level NOT NULL constraint`).
+> attributes are refused whether or not they state the default. 18's `NOT
+> NULL` constraint is read, not named: its name and `NO INHERIT`, from a
+> column's clause or a table-level `NOT NULL c`, are the column's
+> (`codegen.ddl.tables`).
 >
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not
@@ -812,7 +812,15 @@ compiling the C parser falls on people generating entities and on nobody else.
 > key")``. None of these is the composite key one `PRIMARY KEY (a, b)` declares,
 > and reading two of them as one — which the transform did, generating either a
 > composite key or a `PrimaryKey` enum with a variant twice over that did not
-> compile — would be the quiet reinterpretation this rule forbids. A foreign
+> compile — would be the quiet reinterpretation this rule forbids. So are two
+> `NOT NULL` clauses on one column that PostgreSQL refuses to make one
+> constraint of (`42601`), between which a bridge keeping either would choose
+> in silence: two names, ``TransformError("statement <n>: column `<t>`.`<c>`
+> names its NOT NULL constraint both `<a>` and `<b>`")``, or a disagreement on
+> `NO INHERIT`, ``TransformError("statement <n>: column `<t>`.`<c>` declares
+> NOT NULL both with and without NO INHERIT")``; and so is a table-level `NOT
+> NULL` naming a column its table does not have, as a column comment naming
+> one is. A foreign
 > key naming a table the file never creates, or a column that table does not
 > have, is refused too, but by the transform gate `entities_from_sql` runs
 > (`codegen.entity.transform`) rather than here: the bridge resolves one
@@ -873,7 +881,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+6]
+> [spec:pgorm:sem:codegen.ddl.tables+7]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -903,7 +911,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`codegen.entity.transform`).
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+10]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+11]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity
@@ -914,6 +922,25 @@ compiling the C parser falls on people generating entities and on nobody else.
 > schema that already exists. Emitting it would mean an entity attribute and
 > a schema-generation arm of its own, and until a caller needs to declare a
 > collation from an entity, `parse_schema`'s statements are where it is kept.
+>
+> A column's `NOT NULL` is PostgreSQL 18's catalog constraint, and its name
+> and `NO INHERIT` become the column's (`ColumnDef::not_null_named`,
+> `not_null_no_inherit`, `[spec:pgorm:req:sql.ddl.column-def+11]`), whether
+> the column's clause declares them or a table-level `[CONSTRAINT n] NOT NULL
+> c [NO INHERIT]` does: the server creates the same constraint from either,
+> and `sql.ddl.column-def` gives the column the one spelling. They ride on the
+> statement and stop there, as a collation does: the entity reads only that
+> the column refuses nulls, which is all a query of it needs, and a generated
+> entity is the image of a schema that already exists. The bridge makes one
+> constraint of a column's `NOT NULL` clauses as the server does — the name
+> any of them gives is kept, and a primary key's or identity's implied `NOT
+> NULL` takes the one declared — and refuses the pairs the server refuses
+> (`codegen.ddl.unsupported`). A table-level `NOT VALID` is dropped, being a
+> clause the server ignores in `CREATE TABLE`: the live suite shows such a
+> constraint created valid, there being no rows to leave unchecked. And a
+> column declared `NULL` that a table-level `NOT NULL` names refuses nulls,
+> as the server creates it: the `NULL` states no constraint, only the
+> default.
 >
 > Table-level `PRIMARY KEY` and `UNIQUE` constraints become the table's
 > primary key and unique keys (`TableKey`), keeping the constraint name and,
