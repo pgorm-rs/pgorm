@@ -225,3 +225,42 @@ pub(super) fn drop_column(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<
         ),
     })
 }
+
+/// `ALTER TABLE ... ALTER COLUMN ... SET EXPRESSION AS (...)`: a generated
+/// column's new expression, which the rows already written take.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+pub(super) fn set_expression(
+    table: &PyTable,
+    name: &Bound<'_, PyAny>,
+    expression: &Bound<'_, PyAny>,
+) -> PyResult<PyDDL> {
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).set_expression(
+            PyIdentifier::new(name)?.name(),
+            expressions::require_expr(expression)?.inner,
+        )),
+    })
+}
+
+/// `ALTER TABLE ... ALTER COLUMN ... DROP EXPRESSION [IF EXISTS]`: a stored
+/// generated column made plain, keeping its values.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, name, *, if_exists=false))]
+pub(super) fn drop_expression(
+    table: &PyTable,
+    name: &Bound<'_, PyAny>,
+    if_exists: bool,
+) -> PyResult<PyDDL> {
+    let pending = Table::alter(table_name(table)?);
+    let column = PyIdentifier::new(name)?.name();
+    let ready = if if_exists {
+        pending.drop_expression_if_exists(column)
+    } else {
+        pending.drop_expression(column)
+    };
+    Ok(PyDDL {
+        inner: Statement::AlterTable(ready),
+    })
+}

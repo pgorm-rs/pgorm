@@ -106,6 +106,21 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.DatabaseError) as refused:
                 await connection.execute(keyed)
             self.assertEqual(refused.exception.sqlstate, "42P16")
+            await connection.execute(s.set_expression(table, "twice", p.col("id") * 10))
+            changed = await connection.fetch_one(p.RawSQL(f'SELECT twice, next FROM {self.quoted}."items ""x"""'))
+            self.assertEqual(dict(changed), {"twice": 10, "next": 2})
+            for virtual in (
+                s.set_expression(table, "next", p.col("id") + 100),
+                s.drop_expression(table, "next", if_exists=True),
+            ):
+                with self.assertRaises(p.DatabaseError) as refused_virtual:
+                    await connection.execute(virtual)
+                self.assertEqual(refused_virtual.exception.sqlstate, "0A000")
+            await connection.execute(s.drop_expression(table, "twice"))
+            await connection.execute(s.drop_expression(table, "twice", if_exists=True))
+            with self.assertRaises(p.DatabaseError) as plain:
+                await connection.execute(s.drop_expression(table, "twice"))
+            self.assertEqual(plain.exception.sqlstate, "55000")
             await connection.execute(s.rename_column(table, "extra", 'renamed "x"'))
             await connection.execute(s.drop_column(table, 'renamed "x"'))
             await connection.execute(s.drop_index(table, 'idx "雪"'))

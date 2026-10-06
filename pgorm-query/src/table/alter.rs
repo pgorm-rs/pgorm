@@ -1,5 +1,5 @@
 use crate::{
-    ColumnDef, IntoColumnDef, IntoTableKey, Primary, TableForeignKey, TableKey, Unique,
+    ColumnDef, IntoColumnDef, IntoTableKey, Primary, SimpleExpr, TableForeignKey, TableKey, Unique,
     backend::QueryBuilder, types::*,
 };
 
@@ -17,7 +17,7 @@ use crate::{
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+7]
+// [spec:pgorm:req:sql.ddl.alter-table+8]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -79,7 +79,7 @@ impl PendingTableAlter {
     }
 
     /// Give the table its primary key: `ADD PRIMARY KEY (…)`.
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub fn add_primary_key<K>(self, key: K) -> TableAlterStatement
     where
         K: IntoTableKey<Primary>,
@@ -88,12 +88,49 @@ impl PendingTableAlter {
     }
 
     /// Add a unique key to the table: `ADD UNIQUE (…)`.
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub fn add_unique<K>(self, key: K) -> TableAlterStatement
     where
         K: IntoTableKey<Unique>,
     {
         self.with(TableAlterOption::AddUnique(key.into_table_key()))
+    }
+
+    /// Recompute a generated column from a new expression:
+    /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`. See
+    /// [`TableAlterStatement::set_expression`].
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn set_expression<C, E>(self, column: C, expr: E) -> TableAlterStatement
+    where
+        C: IntoName,
+        E: Into<SimpleExpr>,
+    {
+        self.with(TableAlterOption::SetExpression {
+            column: column.into_name(),
+            expr: expr.into(),
+        })
+    }
+
+    /// Make a stored generated column a plain one that keeps its values:
+    /// `ALTER COLUMN "c" DROP EXPRESSION`. See
+    /// [`TableAlterStatement::drop_expression`].
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn drop_expression<C>(self, column: C) -> TableAlterStatement
+    where
+        C: IntoName,
+    {
+        self.with(TableAlterOption::drop_expression(column, false))
+    }
+
+    /// `ALTER COLUMN "c" DROP EXPRESSION IF EXISTS`, which leaves a column
+    /// that is not generated as it is. See
+    /// [`TableAlterStatement::drop_expression_if_exists`].
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn drop_expression_if_exists<C>(self, column: C) -> TableAlterStatement
+    where
+        C: IntoName,
+    {
+        self.with(TableAlterOption::drop_expression(column, true))
     }
 }
 
@@ -133,7 +170,7 @@ impl PendingTableAlter {
 /// let mut alter = Table::alter(Font::Table).drop_column(Font::Name).to_owned();
 /// let moved: TableAlterStatement = alter.take();
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+7]
+// [spec:pgorm:req:sql.ddl.alter-table+8]
 // [spec:pgorm:req:sql.ast+2]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
@@ -156,7 +193,7 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+7]
+// [spec:pgorm:req:sql.ddl.alter-table+8]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
@@ -169,6 +206,21 @@ pub enum TableAlterOption {
     AddPrimaryKey(TableKey<Primary>),
     /// `ADD [CONSTRAINT "name"] UNIQUE [NULLS NOT DISTINCT] (…)`.
     AddUnique(TableKey<Unique>),
+    /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`: a generated column's new
+    /// expression. Whether the column is generated is the server's knowledge;
+    /// it refuses one that is not (`55000`).
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    SetExpression {
+        column: Name,
+        expr: SimpleExpr,
+    },
+    /// `ALTER COLUMN "c" DROP EXPRESSION[ IF EXISTS]`: a stored generated
+    /// column made plain, keeping its values.
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    DropExpression {
+        column: Name,
+        if_exists: bool,
+    },
 }
 
 impl TableAlterOption {
@@ -177,6 +229,13 @@ impl TableAlterOption {
             column: column_def.into_column_def(),
             if_not_exists,
         })
+    }
+
+    fn drop_expression<C: IntoName>(column: C, if_exists: bool) -> Self {
+        Self::DropExpression {
+            column: column.into_name(),
+            if_exists,
+        }
     }
 }
 
@@ -390,7 +449,7 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub fn add_primary_key<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Primary>,
@@ -400,12 +459,103 @@ impl TableAlterStatement {
 
     /// Add a unique key to the table: `ADD UNIQUE (…)`, the key a table
     /// declares with [`TableCreateStatement::unique`](crate::TableCreateStatement::unique).
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub fn add_unique<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Unique>,
     {
         self.add_alter_option(TableAlterOption::AddUnique(key.into_table_key()))
+    }
+
+    /// Recompute a generated column from a new expression:
+    /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`.
+    ///
+    /// The column keeps its kind and every existing row takes the new value.
+    /// A [stored](crate::GeneratedKind::Stored) column is rewritten to hold
+    /// it, a [virtual](crate::GeneratedKind::Virtual) one is not, since it
+    /// computes on read. The expression is held to what a generated column's
+    /// is (immutable, reading no other generated column: `42P17`), and a
+    /// column that is not generated, an identity included, is refused
+    /// (`55000`). So is a virtual column whose table has a `CHECK` constraint
+    /// or belongs to a publication (`0A000`).
+    ///
+    /// This is the one way to change a generated column's expression:
+    /// [`modify_column`](Self::modify_column) writes no
+    /// [`generated`](crate::ColumnDef::generated) spec, since a kind it
+    /// carried could not be honoured.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let table = Table::alter(Glyph::Table)
+    ///     .set_expression(Glyph::Aspect, Expr::col(Glyph::Id).mul(3))
+    ///     .drop_expression(Glyph::Tokens)
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     table.to_string(),
+    ///     [
+    ///         r#"ALTER TABLE "glyph""#,
+    ///         r#"ALTER COLUMN "aspect" SET EXPRESSION AS ("id" * 3),"#,
+    ///         r#"ALTER COLUMN "tokens" DROP EXPRESSION"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn set_expression<C, E>(&mut self, column: C, expr: E) -> &mut Self
+    where
+        C: IntoName,
+        E: Into<SimpleExpr>,
+    {
+        self.add_alter_option(TableAlterOption::SetExpression {
+            column: column.into_name(),
+            expr: expr.into(),
+        })
+    }
+
+    /// Make a stored generated column a plain one:
+    /// `ALTER COLUMN "c" DROP EXPRESSION`.
+    ///
+    /// Every row keeps the value it was last computed to, and from then on
+    /// the column is written like any other. PostgreSQL refuses it for a
+    /// [virtual](crate::GeneratedKind::Virtual) column, which has no stored
+    /// values to keep (`0A000`), and for a column that is not generated
+    /// (`55000`) — unless the action says
+    /// [`IF EXISTS`](Self::drop_expression_if_exists).
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn drop_expression<C>(&mut self, column: C) -> &mut Self
+    where
+        C: IntoName,
+    {
+        self.add_alter_option(TableAlterOption::drop_expression(column, false))
+    }
+
+    /// `ALTER COLUMN "c" DROP EXPRESSION IF EXISTS`: as
+    /// [`drop_expression`](Self::drop_expression), except that a column that
+    /// is not generated is left as it is, with a notice, rather than refused.
+    /// A virtual column is refused either way (`0A000`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Table::alter(Glyph::Table)
+    ///         .drop_expression_if_exists(Glyph::Aspect)
+    ///         .to_string(),
+    ///     r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" DROP EXPRESSION IF EXISTS"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
+    pub fn drop_expression_if_exists<C>(&mut self, column: C) -> &mut Self
+    where
+        C: IntoName,
+    {
+        self.add_alter_option(TableAlterOption::drop_expression(column, true))
     }
 
     fn add_alter_option(&mut self, alter_option: TableAlterOption) -> &mut Self {

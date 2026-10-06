@@ -157,7 +157,27 @@ fn programs() -> BTreeMap<&'static str, String> {
         ),
         (
             "drop_column",
-            Table::alter(table).drop_column(a("extra")).to_string(),
+            Table::alter(table.clone())
+                .drop_column(a("extra"))
+                .to_string(),
+        ),
+        (
+            "set_expression",
+            Table::alter(table.clone())
+                .set_expression(a("twice"), Expr::col(a("id \"x\"")).mul(3i64))
+                .to_string(),
+        ),
+        (
+            "drop_expression",
+            Table::alter(table.clone())
+                .drop_expression(a("twice"))
+                .to_string(),
+        ),
+        (
+            "drop_expression_if_exists",
+            Table::alter(table)
+                .drop_expression_if_exists(a("twice"))
+                .to_string(),
         ),
         (
             "enum",

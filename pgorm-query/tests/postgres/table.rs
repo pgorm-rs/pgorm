@@ -348,7 +348,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+7/test]
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -364,7 +364,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+7/test]
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -420,7 +420,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -447,7 +447,7 @@ fn alter_8() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a key is added as an action of its own,
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a key is added as an action of its own,
 // after the column it keys
 #[test]
 fn alter_9() {
@@ -601,7 +601,7 @@ fn a_primary_key_is_a_table_constraint() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+7/test]    a foreign key embeds by value, so the source
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a foreign key embeds by value, so the source
 // survives only where the call site cloned it
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
@@ -663,6 +663,38 @@ fn generated_column_writes_its_kind() {
             )
             .to_string(),
         r#"ALTER TABLE "glyph" ADD COLUMN "aspect" integer GENERATED ALWAYS AS ("id" + 1) VIRTUAL"#
+    );
+}
+
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    a generated column's expression is
+// set with its `AS` and dropped with or without `IF EXISTS`, each its own action
+// beside the statement's others
+#[test]
+fn expression_actions_render_on_their_own() {
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .set_expression(Glyph::Aspect, Expr::col(Glyph::Id).mul(3))
+            .to_string(),
+        r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" SET EXPRESSION AS ("id" * 3)"#
+    );
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .drop_expression(Glyph::Aspect)
+            .to_string(),
+        r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" DROP EXPRESSION"#
+    );
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .drop_expression_if_exists(Glyph::Aspect)
+            .add_column(ColumnDef::new(Glyph::Tokens).integer())
+            .set_expression(Glyph::Image, Expr::val("x"))
+            .to_string(),
+        [
+            r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" DROP EXPRESSION IF EXISTS,"#,
+            r#"ADD COLUMN "tokens" integer,"#,
+            r#"ALTER COLUMN "image" SET EXPRESSION AS ('x')"#,
+        ]
+        .join(" ")
     );
 }
 

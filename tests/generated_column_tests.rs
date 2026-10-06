@@ -7,7 +7,10 @@
 //! server settles is what each kind is once the table exists — the catalog's
 //! `attgenerated` says `s` or `v`, which is the whole point of writing the
 //! keyword rather than leaving it to a release whose default changed — and
-//! what it refuses around a column of each kind.
+//! what it refuses around a column of each kind. The same holds for the
+//! `ALTER TABLE` actions that change a generated column afterwards: what
+//! `SET EXPRESSION` does to the rows already written, and what
+//! `DROP EXPRESSION` leaves behind.
 
 pub mod common;
 pub use common::{TestContext, setup::*};
@@ -344,6 +347,226 @@ async fn server_refusals_around_generated_columns() -> Result<(), Error> {
         )
         .await;
     }
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A table with a plain column, a stored generated column and a virtual one,
+/// holding the rows `base` 1 and 2.
+async fn reading_table(db: &DatabaseConnection) -> Result<(), Error> {
+    let create = Table::create(Name::runtime("reading"))
+        .col(ColumnDef::new(Name::runtime("base")).integer().not_null())
+        .col(ColumnDef::new(Name::runtime("kept")).integer().generated(
+            Expr::col(Name::runtime("base")).mul(2),
+            GeneratedKind::Stored,
+        ))
+        .col(
+            ColumnDef::new(Name::runtime("computed"))
+                .integer()
+                .generated(
+                    Expr::col(Name::runtime("base")).add(1),
+                    GeneratedKind::Virtual,
+                ),
+        )
+        .to_string();
+    db.batch_execute(&create).await?;
+    db.batch_execute("INSERT INTO reading (base) VALUES (1), (2)")
+        .await
+}
+
+/// The file the table's rows live in: a statement that rewrites the table
+/// gives it a new one.
+async fn relfilenode(db: &DatabaseConnection, table: &str) -> Result<u32, Error> {
+    let row = db
+        .query_one(
+            "SELECT relfilenode FROM pg_class WHERE oid = $1::text::regclass",
+            &[&table],
+        )
+        .await?;
+    Ok(row.get(0))
+}
+
+/// `kept` and `computed` for each row, in `base` order.
+async fn derived_values(db: &DatabaseConnection) -> Result<Vec<(i32, i32)>, Error> {
+    let rows = db
+        .query_all("SELECT kept, computed FROM reading ORDER BY base", &[])
+        .await?;
+    Ok(rows.iter().map(|row| (row.get(0), row.get(1))).collect())
+}
+
+/// A new expression reaches the rows already written, for either kind: the
+/// stored column's table is rewritten to hold the new values, and the virtual
+/// column's is left alone, since it computes on read. Neither changes kind.
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    SET EXPRESSION recomputes existing
+// rows, rewriting the table for a stored column and not for a virtual one
+#[pgorm_macros::test]
+async fn set_expression_recomputes_existing_rows() -> Result<(), Error> {
+    let ctx = TestContext::new("generated_set_expression").await;
+    let db = ctx.db.get().await?;
+    reading_table(&db).await?;
+    assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3)]);
+
+    let before = relfilenode(&db, "reading").await?;
+    let stored = Table::alter(Name::runtime("reading"))
+        .set_expression(
+            Name::runtime("kept"),
+            Expr::col(Name::runtime("base")).mul(10),
+        )
+        .to_string();
+    assert_eq!(
+        stored,
+        r#"ALTER TABLE "reading" ALTER COLUMN "kept" SET EXPRESSION AS ("base" * 10)"#
+    );
+    db.batch_execute(&stored).await?;
+    let rewritten = relfilenode(&db, "reading").await?;
+    assert_ne!(
+        rewritten, before,
+        "a stored column's new values are written"
+    );
+    assert_eq!(derived_values(&db).await?, [(10, 2), (20, 3)]);
+
+    db.batch_execute(
+        &Table::alter(Name::runtime("reading"))
+            .set_expression(
+                Name::runtime("computed"),
+                Expr::col(Name::runtime("base")).mul(100),
+            )
+            .to_string(),
+    )
+    .await?;
+    assert_eq!(
+        relfilenode(&db, "reading").await?,
+        rewritten,
+        "a virtual column has nothing to rewrite"
+    );
+    assert_eq!(derived_values(&db).await?, [(10, 100), (20, 200)]);
+    assert_eq!(
+        generated_kinds(&db, "reading").await?,
+        [
+            ("base".to_owned(), String::new()),
+            ("kept".to_owned(), "s".to_owned()),
+            ("computed".to_owned(), "v".to_owned()),
+        ]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// Dropping a stored column's expression leaves each row the value it was
+/// last computed to, and the column plain: a later row writes its own value.
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    DROP EXPRESSION keeps a stored
+// column's values and leaves it writable
+#[pgorm_macros::test]
+async fn drop_expression_keeps_stored_values() -> Result<(), Error> {
+    let ctx = TestContext::new("generated_drop_expression").await;
+    let db = ctx.db.get().await?;
+    reading_table(&db).await?;
+
+    let dropped = Table::alter(Name::runtime("reading"))
+        .drop_expression(Name::runtime("kept"))
+        .to_string();
+    assert_eq!(
+        dropped,
+        r#"ALTER TABLE "reading" ALTER COLUMN "kept" DROP EXPRESSION"#
+    );
+    db.batch_execute(&dropped).await?;
+    assert_eq!(
+        generated_kinds(&db, "reading").await?[1],
+        ("kept".to_owned(), String::new())
+    );
+    assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3)]);
+
+    db.batch_execute("INSERT INTO reading (base, kept) VALUES (3, 99)")
+        .await?;
+    assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3), (99, 4)]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// Each expression action is refused where it means nothing, by the
+/// SQLSTATE the rule records: either action on a column that is not
+/// generated (`55000`), unless the drop says `IF EXISTS`; a drop on a virtual
+/// column, `IF EXISTS` or not (`0A000`); a new expression a generated column
+/// could not have been created with (`42P17`); and a new expression for a
+/// virtual column once the table has a `CHECK` constraint (`0A000`), where a
+/// stored column's still goes through.
+// [spec:pgorm:req:sql.ddl.alter-table+8/test]    the refusals of SET and DROP
+// EXPRESSION, by SQLSTATE, and IF EXISTS passing over a plain column
+#[pgorm_macros::test]
+async fn expression_actions_refused_by_sqlstate() -> Result<(), Error> {
+    let ctx = TestContext::new("generated_expression_refusals").await;
+    let db = ctx.db.get().await?;
+    reading_table(&db).await?;
+
+    let alter = || Table::alter(Name::runtime("reading"));
+    let refused = async |sql: String, state: &SqlState| {
+        let error = db.batch_execute(&sql).await.expect_err(&sql);
+        refused_with(&error, state);
+    };
+
+    refused(
+        alter()
+            .set_expression(Name::runtime("base"), Expr::val(1))
+            .to_string(),
+        &SqlState::OBJECT_NOT_IN_PREREQUISITE_STATE,
+    )
+    .await;
+    refused(
+        alter().drop_expression(Name::runtime("base")).to_string(),
+        &SqlState::OBJECT_NOT_IN_PREREQUISITE_STATE,
+    )
+    .await;
+    db.batch_execute(
+        &alter()
+            .drop_expression_if_exists(Name::runtime("base"))
+            .to_string(),
+    )
+    .await?;
+
+    for computed in [
+        alter()
+            .drop_expression(Name::runtime("computed"))
+            .to_string(),
+        alter()
+            .drop_expression_if_exists(Name::runtime("computed"))
+            .to_string(),
+    ] {
+        refused(computed, &SqlState::FEATURE_NOT_SUPPORTED).await;
+    }
+
+    refused(
+        alter()
+            .set_expression(Name::runtime("kept"), Expr::col(Name::runtime("computed")))
+            .to_string(),
+        &SqlState::INVALID_OBJECT_DEFINITION,
+    )
+    .await;
+    assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3)]);
+
+    db.batch_execute("ALTER TABLE reading ADD CHECK (base > 0)")
+        .await?;
+    db.batch_execute(
+        &alter()
+            .set_expression(
+                Name::runtime("kept"),
+                Expr::col(Name::runtime("base")).mul(3),
+            )
+            .to_string(),
+    )
+    .await?;
+    refused(
+        alter()
+            .set_expression(Name::runtime("computed"), Expr::col(Name::runtime("base")))
+            .to_string(),
+        &SqlState::FEATURE_NOT_SUPPORTED,
+    )
+    .await;
 
     drop(db);
     ctx.delete().await;

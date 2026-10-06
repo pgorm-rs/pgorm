@@ -56,10 +56,14 @@ options. `nulls_not_distinct()` also selects uniqueness and requires PostgreSQL
 index name.
 
 Table changes use `add_column`, `modify_column`, `drop_column`, `rename_column`,
-`rename_table`, `truncate` and `drop_table`. Each returns a ready native DDL
-statement. A `modify_column` definition selects Rust's corresponding type,
-nullability and default changes. Database validation and privileges still apply;
-these APIs do not introspect the database or compute migrations.
+`set_expression`, `drop_expression`, `rename_table`, `truncate` and
+`drop_table`. Each returns a ready native DDL statement. A `modify_column`
+definition selects Rust's corresponding type, nullability and default changes;
+a generated column's expression is changed by `set_expression(table, column,
+expr)`, which the rows already written take, and removed by
+`drop_expression(table, column, if_exists=False)`, which leaves a stored column
+plain with its values. Database validation and privileges still apply; these
+APIs do not introspect the database or compute migrations.
 
 `DataType` accepts the closed built-in names listed in
 `p.capabilities()["schema_policy"]["column_types"]`. `length=` applies to char,

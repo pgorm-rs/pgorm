@@ -20,6 +20,8 @@ mod collate;
 mod composite;
 #[path = "query_builder_cte.rs"]
 mod cte;
+#[path = "query_builder_generated.rs"]
+mod generated;
 #[path = "query_builder_grouping.rs"]
 mod grouping;
 #[path = "query_builder_merge.rs"]
@@ -1555,7 +1557,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1666,7 +1668,7 @@ impl QueryBuilder {
                         Mode::TableAlter,
                     );
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+7]
+                // [spec:pgorm:req:sql.ddl.alter-table+8]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1674,6 +1676,12 @@ impl QueryBuilder {
                 TableAlterOption::AddUnique(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("UNIQUE", key, sql);
+                }
+                TableAlterOption::SetExpression { column, expr } => {
+                    self.prepare_set_expression(column, expr, sql);
+                }
+                TableAlterOption::DropExpression { column, if_exists } => {
+                    self.prepare_drop_expression(column, *if_exists, sql);
                 }
             }
             false
@@ -1693,7 +1701,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+7]
+    // [spec:pgorm:req:sql.ddl.alter-table+8]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1904,24 +1912,6 @@ impl QueryBuilder {
         write!(sql, "CHECK (").unwrap();
         self.prepare_simple_expr(check, sql);
         write!(sql, ")").unwrap();
-    }
-
-    /// Translate the generated column into SQL statement
-    ///
-    /// The kind is written whichever it is: PostgreSQL 17 refuses a generated
-    /// column without `STORED`, and 18 reads one without either keyword as
-    /// `VIRTUAL`, so leaving it to the server would make the column's kind
-    /// depend on the release (`[spec:pgorm:req:sql.ddl.column-def+10]`).
-    // [spec:pgorm:req:sql.ddl.column-def+10]
-    pub(crate) fn prepare_generated_column(
-        &self,
-        gen_: &SimpleExpr,
-        kind: GeneratedKind,
-        sql: &mut dyn SqlWriter,
-    ) {
-        write!(sql, "GENERATED ALWAYS AS (").unwrap();
-        self.prepare_simple_expr(gen_, sql);
-        write!(sql, ") {}", kind.keyword()).unwrap();
     }
 
     /// Translate IF NOT EXISTS expression in [`TableCreateStatement`].

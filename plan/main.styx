@@ -9652,12 +9652,27 @@ children (
                 title "ALTER COLUMN can SET and DROP a generated column's expression"
                 kind @feat
                 deps (pg18-test-server)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:55.383448Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "PostgreSQL 17 adds ALTER TABLE ... ALTER COLUMN c SET EXPRESSION AS (expr), which rewrites a stored generated column's values, and DROP EXPRESSION [IF EXISTS] (present since 13), which turns a generated column into a plain one. pgorm-query/src/table/alter.rs has neither (survey grep). 17 grammar, so it parses with pg_query 6.2.0 and does not wait on pg-query-18. Add both to the ALTER builder with live tests: SET EXPRESSION recomputes existing rows, DROP EXPRESSION keeps values, and each is refused on a non-generated column (record the SQLSTATEs). If pg18-virtual-generated lands first, cover the virtual case too, which needs no table rewrite."
+                    }
+
+                    {
+                        at 2026-10-06T19:27:21.267546Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-06T21:04:49.227031Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

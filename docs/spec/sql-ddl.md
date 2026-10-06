@@ -118,7 +118,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > written inside the one it constrains — and has no rendering of its own, no
 > `Display` and no build path, because PostgreSQL spells it only inside a
 > table statement; `ALTER TABLE` adds the same type
-> (`[spec:pgorm:req:sql.ddl.alter-table+7]`). Its readers are `get_name()`,
+> (`[spec:pgorm:req:sql.ddl.alter-table+8]`). Its readers are `get_name()`,
 > `get_columns()`, `get_include()` and `get_deferrability()`. Its columns,
 > not the key, are what an `ON CONFLICT` target naming the key takes:
 > `OnConflict::columns` accepts the same `IntoKeyColumns`, and no `TableKey`,
@@ -191,7 +191,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `primary_key()` or their deferrability variants: a key on a column was the
 > spelling that let one table hold two primary keys, and adding a key to a
 > table that exists is `ALTER TABLE`'s `add_primary_key` / `add_unique`
-> (`[spec:pgorm:req:sql.ddl.alter-table+7]`), not a column's.
+> (`[spec:pgorm:req:sql.ddl.alter-table+8]`), not a column's.
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
@@ -335,14 +335,15 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Multirange(t)`→ its multirange (`int4multirange` through
 > `tstzmultirange`).
 
-> [spec:pgorm:req:sql.ddl.alter-table+7]
+> [spec:pgorm:req:sql.ddl.alter-table+8]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
-> `AddForeignKey`, `DropForeignKey`, `AddPrimaryKey` and `AddUnique`. Both the
+> `AddForeignKey`, `DropForeignKey`, `AddPrimaryKey`, `AddUnique`,
+> `SetExpression` and `DropExpression` (with an `if_exists` flag). Both the
 > table and a first option are structural rather than checked:
 > `Table::alter(table)` yields a `PendingTableAlter`, which is a named table and
 > nothing more — it implements no build path and cannot render — and each of
-> its eight action methods consumes it
+> its eleven action methods consumes it
 > and returns the statement, whose own methods append the rest. PostgreSQL parses
 > neither `ALTER TABLE "font"` nor `ALTER TABLE ADD COLUMN ...`, and neither MUST
 > be constructible (`[dec:pgorm:invalid-states-unrepresentable]`); the
@@ -397,6 +398,35 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `CHECK (<expr>)` or the
 > `Extra` string, comma-separated. `AutoIncrement`, `Generated` and `Comment`
 > specs are ignored in modify.
+>
+> A generated column's expression is changed by an action of its own, not by
+> a modified column's `Generated` spec, which would carry a kind PostgreSQL
+> cannot change (`[spec:pgorm:req:sql.ddl.column-def+10]`) and so describe an
+> alteration no statement makes. `set_expression(column, expr)`, on both
+> `PendingTableAlter` and `TableAlterStatement`, renders `ALTER COLUMN "c" SET
+> EXPRESSION AS (<expr>)` (PostgreSQL 17): the column keeps its kind and the
+> rows already written take the new value — a stored column's table is
+> rewritten to hold it (its `relfilenode` changes) and a virtual column's is
+> not, since it computes on read. The `AS` is always written, `SET EXPRESSION
+> (<expr>)` being a syntax error (`42601`), and the column and expression are
+> both arguments, so neither half is missing from a built action.
+> `drop_expression(column)` renders `ALTER COLUMN "c" DROP EXPRESSION` and
+> `drop_expression_if_exists(column)` the same with ` IF EXISTS`: a stored
+> column becomes a plain one that keeps each row's last computed value and is
+> written like any other from then on.
+>
+> Whether the column is generated, and which kind, is the server's knowledge,
+> and the live suite holds each refusal by SQLSTATE: either action on a column
+> that is not generated, an identity included, is refused (`55000`), except
+> that `DROP EXPRESSION IF EXISTS` passes over it with a notice; `DROP
+> EXPRESSION` on a virtual column is refused, `IF EXISTS` or not (`0A000`),
+> having no stored values to keep; `SET EXPRESSION` on a virtual column is
+> refused while its table has any `CHECK` constraint or belongs to a
+> publication (`0A000`), where a stored column's goes through; and a new
+> expression is held to what a generated column's is at creation —
+> immutable, reading no other generated column (`42P17`), holding no
+> subquery (`0A000`), of the column's type (`42804`). Both actions combine
+> with the statement's others in one `ALTER TABLE`.
 
 > [spec:pgorm:req:sql.ddl.drop-rename-truncate+4]
 > `TableDropStatement` accumulates multiple `TableName`s and MUST render
@@ -601,7 +631,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`:
 > an embedded key constrains the table it sits inside and MUST NOT name
 > another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+7]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+8]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
@@ -636,7 +666,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > it on its `TableKey`, whose `deferrability(d)` sets it
 > (`[spec:pgorm:req:sql.ddl.create-table+12]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
-> alike (`[spec:pgorm:req:sql.ddl.alter-table+7]`). A column carries no key
+> alike (`[spec:pgorm:req:sql.ddl.alter-table+8]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
 > `unique_key_deferrability(d)` and `primary_key_deferrability(d)` — are gone
 > with the column keys (`[spec:pgorm:req:sql.ddl.column-def+10]`), and the
