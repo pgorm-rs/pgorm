@@ -13,7 +13,7 @@ import tempfile
 import time
 import uuid
 
-IMAGE = "postgres:16.13-bookworm@sha256:472efd9a66f2b2f1a5aeb18b28de74332e6ef88c2b93a1a5d812fb6db67a5f60"
+IMAGE = "postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
 
 
 def run(*command, input=None):
@@ -38,11 +38,14 @@ def certificates(root):
 
 
 def enable_tls(name, root):
+    # The image's data directory depends on its release (18 keeps it under
+    # /var/lib/postgresql/18/docker), so ask the server where it is.
+    data = run("docker", "exec", name, "psql", "-At", "-U", "postgres", "-d", "pgorm_python",
+               "-c", "SHOW data_directory")
     for filename in ("server.crt", "server.key"):
-        run("docker", "cp", str(root / filename), f"{name}:/var/lib/postgresql/data/{filename}")
-    run("docker", "exec", name, "chown", "postgres:postgres",
-        "/var/lib/postgresql/data/server.crt", "/var/lib/postgresql/data/server.key")
-    run("docker", "exec", name, "chmod", "600", "/var/lib/postgresql/data/server.key")
+        run("docker", "cp", str(root / filename), f"{name}:{data}/{filename}")
+    run("docker", "exec", name, "chown", "postgres:postgres", f"{data}/server.crt", f"{data}/server.key")
+    run("docker", "exec", name, "chmod", "600", f"{data}/server.key")
     run("docker", "exec", "-i", name, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "pgorm_python",
         input="ALTER SYSTEM SET ssl = 'on';\n"
               "ALTER SYSTEM SET ssl_cert_file = 'server.crt';\n"

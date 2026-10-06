@@ -26,7 +26,7 @@ PGORM_TEST_PG_BIN=/path/to/postgresql/bin \
   target/python-dev/bin/python pgorm-python/checks/acceptance.py
 ```
 
-The PostgreSQL 16 wrapper creates a disposable cluster and CA, supplies
+The PostgreSQL 18 wrapper creates a disposable cluster and CA, supplies
 `PGORM_TEST_DSN` and `PGORM_TEST_CA`, and removes its cluster afterward. The
 Docker-based `tests/with_postgres.py` wrapper accepts the same command. An
 existing test database can supply those variables directly; it must allow
@@ -62,15 +62,22 @@ silently accept a mismatched report.
 
 ## Recorded result and limits
 
-The complete checker passed locally on 2026-09-10 with CPython 3.14.4 and the GIL,
-macOS 26.5.1 arm64, and PostgreSQL 16. The run included 23 native binding tests,
+The complete checker passed locally on 2026-10-06 with CPython 3.14.4 and the GIL,
+macOS 26.5.1 arm64, and PostgreSQL 18.6 (the Docker wrapper's
+`postgres:18.6-bookworm`). The run included 24 native binding tests,
 eight application Rust tests, 28 direct-builder query programs, registered
-application checks and 110 standalone Python tests on each of two installations
+application checks and 111 standalone Python tests on each of two installations
 (direct wheel and source-derived wheel). Both installations passed strict
 package/example typing, installed signature checks and 13 expected invalid
 typing cases. The generated application also passed its package typing and
 four expected invalid cases. The default Rust workspace build and nspec
-validation passed.
+validation passed. It replaces the 2026-09-10 record, the same checker against
+PostgreSQL 16.
+
+The run set `TMPDIR` to its resolved path. Under macOS's default temporary
+directory, reached through the `/var` → `/private/var` symlink, the typing
+checker's installed-package check compares the native module's unresolved
+directory with the resolved package root and fails before any typing runs.
 
 These results establish the tested combination recorded in
 [support.json](support.json). The configured macOS 15 and Linux CI jobs still

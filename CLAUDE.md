@@ -71,6 +71,16 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 `connect_with(config, tls, manager: ManagerConfig, build)` is the general entry point the other three delegate to, and the only route to TLS (any `MakeTlsConnect<Socket>` connector — `tokio-postgres-rustls`, `tokio-postgres-openssl`), to a `RecyclingMethod` other than `Fast`, or to a non-default `StatementCacheSize`. `ManagerConfig`, `RecyclingMethod`, `StatementCacheSize`, `PoolBuilder`, `NoTls`, `Socket`, `MakeTlsConnect` and `TlsConnect` are all re-exported from `pgorm`, so calling it needs no direct dependency on `pgorm-pool` or `tokio-postgres`. `DatabasePool` still has no public constructor beside it.
 
 ### Testing Setup
+The tests target PostgreSQL 18, and nothing tests an older release. The local server is the docker container `pgorm-test`, created as:
+
+```sh
+docker volume create pgorm-test-18-data
+docker run -d --name pgorm-test -p 54329:5432 -e POSTGRES_PASSWORD=postgres \
+  -v pgorm-test-18-data:/var/lib/postgresql postgres:18
+```
+
+so `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329`. The 18 image keeps its data under `/var/lib/postgresql/18/docker`, so a volume mounts at `/var/lib/postgresql`, not the `.../data` older images used, and a data directory from another major release cannot be reused. The same release runs everywhere else: CI's Python jobs install PostgreSQL 18 (the PostgreSQL apt repository on Ubuntu 24.04, `postgresql@18` on macOS), and pgorm-python's Docker wrapper (`pgorm-python/tests/with_postgres.py`) pins `postgres:18.6-bookworm` by digest.
+
 Tests use a common setup pattern in `tests/common/setup/mod.rs` that:
 - Creates a throwaway database per test, named after the test, dropping any prior copy first (`DROP DATABASE ... WITH (FORCE)`)
 - Connects to the `postgres` maintenance database to do so, then returns a pool for the new database

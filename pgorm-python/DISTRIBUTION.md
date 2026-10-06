@@ -27,7 +27,7 @@ python pgorm-python/checks/distribution.py
 ```
 
 The supplied database must allow creating and dropping the test tables and
-schemas. For a disposable local cluster, use the PostgreSQL 16 binaries:
+schemas. For a disposable local cluster, use the PostgreSQL 18 binaries:
 
 ```sh
 export PGORM_TEST_PG_BIN="/path/to/postgresql/bin"
@@ -58,7 +58,9 @@ The [Python workflow](../.github/workflows/python.yml) runs the checker for
 macOS arm64 and Linux x86-64 with CPython 3.14.4. Its macOS job uses the
 [`macos-15` arm64 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners);
 the Linux job uses Ubuntu 24.04. Each job checks its actual architecture,
-provisions an owned PostgreSQL cluster and retains packages and test evidence
+provisions an owned PostgreSQL 18 cluster (`postgresql@18` from Homebrew on
+macOS; on Linux `postgresql-18` from the PostgreSQL project's apt repository,
+since Ubuntu 24.04's archive stops at 16) and retains packages and test evidence
 as review artifacts. Failed jobs retain their partial evidence. A third job
 runs the [application checker](ENTITIES.md) on Linux and retains its wheel and
 report from `target/python-entities`. The workflow runs on pushes to `main` and

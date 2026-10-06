@@ -9445,12 +9445,27 @@ children (
                 id pg18-test-server
                 title "The test server, CI and the docs that name a PostgreSQL version move from 16 to 18"
                 kind @test
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.291093Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "The survey (2026-10-06) ran the whole workspace against PostgreSQL 18.6: 1676/1676 pass unchanged. Move the local pgorm-test container to postgres:18 (latest 18.x; keep port 54329 so DATABASE_URL in .env/.env.local is unchanged) and update every doc naming the version: CLAUDE.md's testing setup, pgorm-python/DISTRIBUTION.md:30, ACCEPTANCE.md:29,66, and any README. CI: .github/workflows/python.yml installs postgresql-16 / postgresql@16 and sets PGORM_TEST_PG_BIN in both jobs. Move both to 18, checking that the apt (PGDG on ubuntu-24.04) and brew package names exist for 18, and confirm a passing run (the workflow first ran on c1bd2f85). Acceptance: full nextest, doctests (pgorm-query --all-features and pgorm, run alone), pgorm-python's suite and the application check (pgorm-python/checks/entities.py via tests/with_postgres.py) all pass on 18. sqlmap and the campaign are pg18-security-baselines, not this node."
+                    }
+
+                    {
+                        at 2026-10-06T13:18:40.857614Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-06T14:14:25.161626Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

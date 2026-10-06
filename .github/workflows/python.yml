@@ -66,14 +66,30 @@ jobs:
       - name: Linux native build and PostgreSQL tools
         if: runner.os == 'Linux'
         run: |
+          # Ubuntu 24.04's own archive stops at PostgreSQL 16, so 18 comes
+          # from the PostgreSQL project's apt repository, set up as
+          # https://www.postgresql.org/download/linux/ubuntu/ documents, its
+          # signing key held to the published fingerprint before apt trusts it.
+          key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo install -d "$(dirname "$key")"
+          sudo curl --fail --silent --show-error --location --output "$key" \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          fingerprint=$(GNUPGHOME="$(mktemp -d)" gpg --show-keys --with-colons "$key" \
+            | awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')
+          test "$fingerprint" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          . /etc/os-release
+          printf '%s\n' 'Types: deb' 'URIs: https://apt.postgresql.org/pub/repos/apt' \
+            "Suites: ${VERSION_CODENAME}-pgdg" "Architectures: $(dpkg --print-architecture)" \
+            'Components: main' "Signed-By: $key" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.sources
           sudo apt-get update
-          sudo apt-get install --yes clang libclang-dev postgresql-16 openssl
-          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/16/bin' >> "$GITHUB_ENV"
+          sudo apt-get install --yes clang libclang-dev postgresql-18 openssl
+          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
       - name: macOS native build and PostgreSQL tools
         if: runner.os == 'macOS'
         run: |
-          brew install llvm postgresql@16 openssl@3
-          echo "PGORM_TEST_PG_BIN=$(brew --prefix postgresql@16)/bin" >> "$GITHUB_ENV"
+          brew install llvm postgresql@18 openssl@3
+          echo "PGORM_TEST_PG_BIN=$(brew --prefix postgresql@18)/bin" >> "$GITHUB_ENV"
           echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
           echo "$(brew --prefix openssl@3)/bin" >> "$GITHUB_PATH"
       - name: Build and verify wheel and source distribution
@@ -108,9 +124,22 @@ jobs:
           python -m pip install 'uv==0.11.9' 'maturin==1.15.0'
           rustup toolchain install 1.97.1 --profile minimal
           rustup default 1.97.1
+          # The distribution job's PostgreSQL apt setup; its comment says why.
+          key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo install -d "$(dirname "$key")"
+          sudo curl --fail --silent --show-error --location --output "$key" \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          fingerprint=$(GNUPGHOME="$(mktemp -d)" gpg --show-keys --with-colons "$key" \
+            | awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')
+          test "$fingerprint" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          . /etc/os-release
+          printf '%s\n' 'Types: deb' 'URIs: https://apt.postgresql.org/pub/repos/apt' \
+            "Suites: ${VERSION_CODENAME}-pgdg" "Architectures: $(dpkg --print-architecture)" \
+            'Components: main' "Signed-By: $key" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.sources
           sudo apt-get update
-          sudo apt-get install --yes clang libclang-dev postgresql-16 openssl
-          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/16/bin' >> "$GITHUB_ENV"
+          sudo apt-get install --yes clang libclang-dev postgresql-18 openssl
+          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
       - name: Build, install and exercise the application wheel
         run: |
           python pgorm-python/tests/with_local_postgres.py \

@@ -4,7 +4,7 @@ A fork of [SeaORM](https://github.com/SeaQL/sea-orm) focused entirely on Postgre
 
 ## Primary differences with SeaORM
 
-- Supports ONLY Postgres
+- Supports ONLY Postgres; the test suite runs against PostgreSQL 18 and no older release
 - Uses deadpool for the database pool
 - Uses tokio-postgres for the Postgres engine (i.e. no sqlx functionality)
 - More effective use of statements (you pass the arguments with the statement so it is prepared properly)
