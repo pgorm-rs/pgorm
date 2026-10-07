@@ -319,6 +319,13 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             ),
             ("ipnetwork", "inet", "192.0.2.1/24"),
             ("mac_address", "macaddr", bytes.fromhex("001122334455")),
+            ("int4range", "int4range", p.Range(1, 5)),
+            ("numrange", "numrange", p.Range(Decimal("0.50"), None, "(]")),
+            (
+                "tstzmultirange",
+                "tstzmultirange",
+                p.Multirange([p.Range(dt.datetime(2026, 9, 9, tzinfo=dt.timezone.utc), None)]),
+            ),
         ]
         ddl = ", ".join(f'"{kind}" {sql_type}' for kind, sql_type, _ in cases)
         await self.pool.execute(p.RawSQL(f"CREATE TABLE python_models.wire ({ddl})"))

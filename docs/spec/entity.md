@@ -652,7 +652,7 @@ explicit limitations.
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
 > `ForeignKeyAction`, `Func`, `Arc`), with the range vocabulary a field of a range
 > column is written in — `Range`, `Multirange` and `RangeType`
-> (`[spec:pgorm:def:sql.value.range+1]`) — so a generated entity's
+> (`[spec:pgorm:def:sql.value.range+2]`) — so a generated entity's
 > `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
 > the glob. A file that also imports `std::ops::Range` by name keeps its
 > own: an explicit import shadows a glob.

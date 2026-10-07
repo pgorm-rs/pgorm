@@ -23,7 +23,7 @@ fn read<T: for<'a> FromSql<'a>>(row: &Row, index: usize) -> PyResult<Option<T>> 
     )))
 }
 
-fn typed<T: for<'a> FromSql<'a>>(
+pub(super) fn typed<T: for<'a> FromSql<'a>>(
     row: &Row,
     index: usize,
     array: bool,
@@ -59,10 +59,8 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
             })
         };
     }
-    if matches!(ty.kind(), Kind::Range(_) | Kind::Multirange(_)) {
-        return Err(DecodeError::new_err(format!(
-            "column {index} is a range or multirange, which the Python binding does not decode"
-        )));
+    if let Some(inner) = super::ranges::value(row, index, ty, array)? {
+        return PyValue::from_rust(inner);
     }
     if matches!(ty.kind(), Kind::Enum(_)) {
         let inner = typed::<EnumLabel>(row, index, array, ArrayType::String, |v| {

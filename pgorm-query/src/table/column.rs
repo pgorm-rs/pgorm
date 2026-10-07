@@ -101,11 +101,11 @@ pub enum ColumnType {
     /// One of the built-in range types, `int4range` through `tstzrange`. A
     /// range type created by `CREATE TYPE ... AS RANGE` is
     /// [`Named`](Self::Named), as every other created type is.
-    // [spec:pgorm:def:sql.value.range+1]
+    // [spec:pgorm:def:sql.value.range+2]
     Range(RangeType),
     /// The multirange over one of the built-in range types,
     /// `int4multirange` through `tstzmultirange`.
-    // [spec:pgorm:def:sql.value.range+1]
+    // [spec:pgorm:def:sql.value.range+2]
     Multirange(RangeType),
 }
 

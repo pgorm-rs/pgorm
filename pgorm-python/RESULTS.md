@@ -78,6 +78,7 @@ pgorm's `TryGetable`. Conversions then use the public `Value` conversion path.
 | inet/cidr; macaddr | ipnetwork / string; mac_address / six bytes |
 | enum | enum / label, qualified `TypeName` retained |
 | supported scalar array | array / list, including nullable elements |
+| int4range … tstzrange; int4multirange … tstzmultirange | the range type's name / `pgorm.Range`, `pgorm.Multirange` |
 | pgvector `vector`, when installed in PostgreSQL | vector / list of f32 values |
 
 PostgreSQL stores a timestamptz instant without its input timezone; decoded
@@ -89,8 +90,12 @@ when decoded, integers beyond i64/u64, and nesting beyond 64 levels are
 rejected. JSON object ordering/whitespace are not retained.
 
 Arrays must have at most one dimension and lower bound 1; an empty array and
-an SQL NULL array remain distinct. Multi-dimensional/non-default-bound arrays,
-domains, composites, ranges, intervals and unlisted types raise `DecodeError`,
+an SQL NULL array remain distinct. A range type a schema created over one of
+the six built-in subtypes decodes as the built-in over that subtype; a range
+over another subtype, and a multirange a schema created, raise `DecodeError`.
+A range's numeric bound is held to the exactness a numeric column is.
+Multi-dimensional/non-default-bound arrays,
+domains, composites, intervals and unlisted types raise `DecodeError`,
 including typed NULLs of unsupported types. A query/decode error never becomes
 an empty list, `None`, or stream exhaustion. Server errors retain SQLSTATE;
 local cardinality errors have no PostgreSQL SQLSTATE.

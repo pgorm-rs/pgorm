@@ -126,6 +126,7 @@ class Value:
     def items(self, /) -> list[Value] | None: ...
     def snapshot(self, /) -> dict[str, Any]: ...
 
+from ._ranges import Range as Range, Multirange as Multirange
 from ._query_types import (
     Identifier as Identifier, Direction as Direction, Nulls as Nulls,
     Compiled as Compiled, LikePattern as LikePattern,

@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{ArrayType, Value};
 use pgorm_python::values::{PyTypeName, PyValue};
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.values/test]
+// [spec:pgorm:req:python.values+1/test]
 #[test]
 fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     Python::initialize();
@@ -73,7 +73,7 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values/test]
+// [spec:pgorm:req:python.values+1/test]
 // [spec:pgorm:req:python.value-tags/test]
 #[test]
 fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
@@ -112,25 +112,50 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:def:sql.value.range+1/test]    a range or multirange is refused where a Rust value
-// would become a Python one, NULL or not
+// [spec:pgorm:def:sql.value.range+2/test]    a range or multirange reaches Python as a
+// `pgorm.Range` or `pgorm.Multirange`, tagged with its range type, and converts back unchanged
+// [spec:pgorm:req:python.values+1/test]
 #[test]
-fn rust_ranges_are_refused_by_name() -> PyResult<()> {
+fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     use pgorm::pgorm_query::{Multirange, Range, RangeType};
+    use pgorm_python::values::PyRange;
+    use std::ops::Bound;
 
     Python::initialize();
     Python::attach(|py| {
-        for inner in [
-            Value::from(Range::from(1..5)),
-            Value::Range(RangeType::Date, None),
-            Value::from(Multirange::<i64>::default()),
+        let null_lower = Value::Range(
+            RangeType::Int4,
+            Some(Box::new(Range::new(
+                Bound::Included(Value::Int(None)),
+                Bound::Excluded(Value::Int(Some(5))),
+            ))),
+        );
+        for (inner, kind) in [
+            (Value::from(Range::from(1..5)), "int4range"),
+            (Value::from(Range::<i64>::Empty), "int8range"),
+            (Value::Range(RangeType::Date, None), "daterange"),
+            (
+                Value::from(
+                    [Range::from(1i64..3), Range::Empty]
+                        .into_iter()
+                        .collect::<Multirange<i64>>(),
+                ),
+                "int8multirange",
+            ),
         ] {
-            let error = PyValue::from_rust(inner).err().ok_or_else(|| {
-                pyo3::exceptions::PyAssertionError::new_err("a range reached Python")
-            })?;
-            assert_eq!(error.get_type(py).name()?, "UnsupportedCapabilityError");
-            assert!(error.to_string().contains("range and multirange"));
+            let value = Py::new(py, PyValue::from_rust(inner.clone())?)?;
+            let value = value.bind(py);
+            assert_eq!(value.getattr("kind")?.extract::<String>()?, kind);
+            let python = value.getattr("value")?;
+            let back = py.get_type::<PyValue>().call1((python, kind))?;
+            assert_eq!(back.extract::<PyRef<'_, PyValue>>()?.rust_value(), &inner);
         }
+        // A NULL bound is no bound: it reaches Python as an unbounded side.
+        let unbounded = Py::new(py, PyValue::from_rust(null_lower)?)?;
+        let range = unbounded.bind(py).getattr("value")?;
+        assert!(range.is_exact_instance_of::<PyRange>());
+        assert!(range.getattr("lower_inf")?.extract::<bool>()?);
+        assert_eq!(range.getattr("bounds")?.extract::<String>()?, "()");
         Ok(())
     })
 }

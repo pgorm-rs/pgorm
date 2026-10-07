@@ -5,6 +5,63 @@ use crate::UnsupportedCapabilityError;
 
 // [spec:pgorm:req:python.capabilities]
 fn manifest() -> Value {
+    let scalar_kinds = [
+        "bool",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "u32",
+        "f32",
+        "f64",
+        "text",
+        "bytes",
+        "decimal",
+        "uuid",
+        "json",
+        "date",
+        "time",
+        "datetime",
+        "datetime_utc",
+        "ipnetwork",
+        "mac_address",
+        "vector",
+    ]
+    .into_iter()
+    .chain(crate::values::range_kind_names())
+    .collect::<Vec<_>>();
+    let column_types = [
+        "char",
+        "varchar",
+        "text",
+        "smallint",
+        "integer",
+        "bigint",
+        "real",
+        "double",
+        "numeric",
+        "boolean",
+        "date",
+        "time",
+        "timestamp",
+        "timestamptz",
+        "interval",
+        "bytea",
+        "bit",
+        "varbit",
+        "money",
+        "json",
+        "jsonb",
+        "uuid",
+        "vector",
+        "cidr",
+        "inet",
+        "macaddr",
+        "ltree",
+    ]
+    .into_iter()
+    .chain(crate::values::range_kind_names())
+    .collect::<Vec<_>>();
     let mut manifest = json!({
         "schema_version": 1,
         "package_version": env!("CARGO_PKG_VERSION"),
@@ -24,6 +81,7 @@ fn manifest() -> Value {
             "value.json": {"rust_api": "pgorm::pgorm_query::Value::Json", "features": ["with-json"]},
             "value.null": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
             "value.snapshot": {"rust_api": "pgorm_python::values::PyValue", "features": []},
+            "value.range": {"rust_api": "pgorm::pgorm_query::{Range, Multirange, Value::Range, Value::Multirange}", "features": []},
             "type_name": {"rust_api": "pgorm::pgorm_query::TypeName", "features": []},
             "model.declare": {"rust_api": "pgorm::pgorm_query::{NamedTable, Value}", "features": [], "python_convenience": true},
             "model.column": {"rust_api": "pgorm::pgorm_query::{Expr, SimpleExpr, Value}", "features": [], "python_convenience": true},
@@ -33,7 +91,7 @@ fn manifest() -> Value {
             "model.delete": {"rust_api": "pgorm::pgorm_query::DeleteStatement", "features": [], "python_convenience": true},
             "model.records": {"rust_api": "pgorm::ConnectionTrait::{query_all, query_one} / pgorm_python::results", "features": ["runtime-tokio"], "python_convenience": true}
         },
-        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(["enum", "array"]).collect::<Vec<_>>(),
+        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(crate::values::range_kind_names()).chain(["enum", "array"]).collect::<Vec<_>>(),
         "value_policy": {
             "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
             "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",
@@ -58,7 +116,8 @@ fn manifest() -> Value {
             "numeric": "exact 96-bit Decimal coefficient and scale 0–28; other values rejected",
             "json": "serde_json i64/u64/f64; numeric value loss and nesting beyond 64 rejected",
             "arrays": "one dimension, lower bound 1, nullable elements; other shapes rejected",
-            "unsupported": ["domain", "composite", "range", "multirange", "interval", "timetz", "bit", "money"],
+            "ranges": "the six built-in range types and their multiranges, a range type a schema created over one of their subtypes reading as the built-in; other subtypes and created multiranges rejected",
+            "unsupported": ["domain", "composite", "interval", "timetz", "bit", "money"],
             "stream": "one pull at a time over bounded driver buffers; owns connection until EOF or close"
         },
         "entity_policy": {
@@ -95,7 +154,7 @@ fn manifest() -> Value {
             "declarations": "Python metadata over native runtime statements; no compiled entity derives or hooks",
             "field_identity": "declared Python field keys become native projection aliases",
             "values": "declared native Value tags, exact nullability and qualified enum/array identity",
-            "scalar_kinds": ["bool", "i8", "i16", "i32", "i64", "u32", "f32", "f64", "text", "bytes", "decimal", "uuid", "json", "date", "time", "datetime", "datetime_utc", "ipnetwork", "mac_address", "vector"],
+            "scalar_kinds": scalar_kinds,
             "enum": "schema-qualified TypeName required", "array_dimensions": 1,
             "writes": "missing mapping entry is omitted; None is SQL NULL; Value.json(None) is JSON null",
             "one": "strict dynamic Record cardinality; explicit limit selects a first row",
@@ -133,7 +192,7 @@ fn manifest() -> Value {
             "runtime_ddl": true, "automatic_ddl": false,
             "registered_entity_ddl": "real Schema methods for a compiled entity; registrations.entities lists available types",
             "index_methods": ["btree", "hash", "gin", "gist", "spgist", "brin"],
-            "column_types": ["char", "varchar", "text", "smallint", "integer", "bigint", "real", "double", "numeric", "boolean", "date", "time", "timestamp", "timestamptz", "interval", "bytea", "bit", "varbit", "money", "json", "jsonb", "uuid", "vector", "cidr", "inet", "macaddr", "ltree"],
+            "column_types": column_types,
             "named_type": "TypeName retains schema qualification; DataType.array retains element identity",
             "type_changes": "native driver caches type metadata; close and recreate application pools after altering existing enum labels or type names",
             "unsupported": ["runtime foreign-key construction", "schema introspection", "automatic migrations", "raw column options", "partial or expression indexes", "concurrent indexes"]

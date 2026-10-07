@@ -231,7 +231,7 @@ async fn drop_and_rename_reach_a_range(db: &DatabaseConnection) -> Result<(), Er
 
 /// A table column takes each built-in range and multirange type by its
 /// catalogue name.
-// [spec:pgorm:def:sql.value.range+1/test]
+// [spec:pgorm:def:sql.value.range+2/test]
 async fn a_column_takes_a_builtin_range_type(db: &DatabaseConnection) -> Result<(), Error> {
     let kinds = [
         RangeType::Int4,

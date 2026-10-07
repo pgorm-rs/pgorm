@@ -91,7 +91,10 @@ database or compute migrations.
 `DataType` accepts the closed built-in names listed in
 `p.capabilities()["schema_policy"]["column_types"]`. `length=` applies to char,
 varchar, bit, varbit and vector; varbit requires it. `numeric` accepts
-`precision=1..1000` with optional `scale=0..1000`. A `p.TypeName` references an
+`precision=1..1000` with optional `scale=0..1000`. The six built-in range types
+and their multiranges are named as PostgreSQL names them, `int4range` through
+`tstzmultirange`, the column type a `without_overlaps` key ends with.
+A `p.TypeName` references an
 existing named type with full schema identity. `.array()` retains that element
 type. A type usable in DDL is not necessarily decodable as a dynamic `Record`;
 the separate `result_policy` lists result conversion support.

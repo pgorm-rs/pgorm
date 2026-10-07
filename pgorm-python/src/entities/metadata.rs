@@ -45,6 +45,8 @@ impl InputKind {
                     schema: schema.as_ref().map(|s| s.to_string()),
                 });
             }
+            ColumnType::Range(range) => range.range_type_name(),
+            ColumnType::Multirange(range) => range.multirange_type_name(),
             ColumnType::Array(member) => return Self::Array(Box::new(Self::from_column(member))),
             _ => return Self::Explicit,
         };
@@ -240,5 +242,60 @@ impl EntityInfo {
             "primary_keys": self.primary_keys,
             "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete"],
             "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::values::PyRange;
+    use pgorm::pgorm_query::{ArrayType, Range, RangeType};
+    use std::sync::Arc;
+
+    // [spec:pgorm:req:python.entities/test]    a range column hints its range kind, so a
+    // registered entity's range field takes a `pgorm.Range` as its value
+    #[test]
+    fn range_columns_hint_their_range_kind() -> PyResult<()> {
+        let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
+        assert_eq!(
+            describe(ColumnType::Range(RangeType::Int4)),
+            json!({"kind": "int4range"})
+        );
+        assert_eq!(
+            describe(ColumnType::Multirange(RangeType::TimestampTz)),
+            json!({"kind": "tstzmultirange"})
+        );
+        assert_eq!(
+            describe(ColumnType::Array(Arc::new(ColumnType::Range(
+                RangeType::Date
+            )))),
+            json!({"kind": "array", "element": {"kind": "daterange"}})
+        );
+
+        Python::initialize();
+        Python::attach(|py| {
+            let range = Py::new(
+                py,
+                PyRange::bounds(
+                    Some(1i32.into_pyobject(py)?.into_any().unbind()),
+                    true,
+                    None,
+                    false,
+                ),
+            )?;
+            let value = InputKind::from_column(&ColumnType::Range(RangeType::Int4))
+                .coerce(range.bind(py).as_any())?;
+            assert_eq!(value.rust_value(), &Value::from(Range::from(1i32..)));
+            let spans = pyo3::types::PyList::new(py, [range])?;
+            let array = InputKind::from_column(&ColumnType::Array(Arc::new(ColumnType::Range(
+                RangeType::Int4,
+            ))))
+            .coerce(spans.as_any())?;
+            assert!(matches!(
+                array.rust_value(),
+                Value::Array(ArrayType::Range(RangeType::Int4), Some(_))
+            ));
+            Ok(())
+        })
     }
 }

@@ -81,15 +81,6 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         for query in ("SELECT 1 AS n, 2 AS n", "SELECT interval '1 day' AS n", "SELECT NULL::interval AS n"):
             with self.subTest(query=query), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_optional(p.RawSQL(query))
-        # A range is refused by name, NULL or not: the binding has no range type.
-        for query in (
-            "SELECT int4range(1, 5) AS n",
-            "SELECT NULL::tstzrange AS n",
-            "SELECT '{[1,2)}'::int4multirange AS n",
-        ):
-            with self.subTest(query=query), self.assertRaises(p.DecodeError) as caught:
-                await self.pool.fetch_optional(p.RawSQL(query))
-            self.assertIn("range or multirange", str(caught.exception))
         self.assertTrue(await self.pool.ping())
 
     # [spec:pgorm:req:python.results/test]

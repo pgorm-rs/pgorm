@@ -73,12 +73,13 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > explicitly before execution. Runtime-generated compositions within those
 > capabilities MUST NOT invoke rustc, Cargo, Maturin or a code-generation build.
 
-> [spec:pgorm:req:python.values]
+> [spec:pgorm:req:python.values+1]
 > Conversions MUST preserve supported Rust value variants and nullability in
 > both directions. The conversion table MUST cover booleans, signed and
 > unsigned integer bounds, floating-point values including signed zero and
 > non-finite values, strings, bytes, Decimal, UUID, JSON, date/time values,
-> arrays and qualified enums where the corresponding Rust feature exists.
+> arrays, qualified enums, and the built-in ranges and multiranges where the
+> corresponding Rust feature exists.
 > Python bool MUST NOT silently select the integer path. Integer overflow,
 > unsupported types and ambiguous conversions MUST raise explicit exceptions;
 > values MUST NOT silently stringify, wrap, truncate or become NULL.

@@ -9,7 +9,7 @@ use pyo3::{
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use super::{json, temporal};
+use super::{json, ranges, temporal};
 use crate::errors::{ConstructionError, DecodeError};
 
 pub(super) fn infer(data: &Bound<'_, PyAny>) -> PyResult<ArrayType> {
@@ -72,7 +72,7 @@ fn strict<'a, 'py, T: pyo3::type_object::PyTypeInfo>(
     }
 }
 
-// [spec:pgorm:req:python.values]
+// [spec:pgorm:req:python.values+1]
 pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Value> {
     let value = match kind {
         ArrayType::Bool => Value::Bool(Some(strict::<PyBool>(data)?.extract()?)),
@@ -117,6 +117,10 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
                 .collect::<PyResult<Vec<_>>>()?;
             Value::Vector(Some(Box::new(Vector::from(values))))
         }
+        ArrayType::Range(range) => {
+            Value::Range(*range, Some(Box::new(ranges::read(data, *range)?)))
+        }
+        ArrayType::Multirange(range) => ranges::multirange_from_python(data, *range)?,
         _ => temporal::from_python(data, kind)?,
     };
     Ok(value)
@@ -233,6 +237,14 @@ pub(super) fn to_python(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
                     .collect::<PyResult<Vec<_>>>()?;
                 Ok(PyList::new(py, items)?.into_any().unbind())
             })
+            .transpose(),
+        Value::Range(_, value) => value
+            .as_deref()
+            .map(|range| Ok(Py::new(py, ranges::write(py, range)?)?.into_any()))
+            .transpose(),
+        Value::Multirange(_, value) => value
+            .as_deref()
+            .map(|multirange| ranges::multirange_to_python(py, multirange))
             .transpose(),
         _ => temporal::to_python(py, value),
     };

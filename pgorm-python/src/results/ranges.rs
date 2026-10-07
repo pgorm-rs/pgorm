@@ -1,0 +1,155 @@
+//! Range and multirange columns: the wire format read through
+//! `postgres_protocol`, each bound by the same codec a scalar of the subtype
+//! is read with, so a numeric bound is held to the same exactness.
+
+use std::ops::Bound;
+
+use jiff::{
+    Timestamp,
+    civil::{Date, DateTime},
+};
+use pgorm::pgorm_query::{ArrayType, Multirange, Range, RangeType, Value};
+use postgres_protocol::types::{self as wire, RangeBound};
+use pyo3::PyResult;
+use tokio_postgres::{
+    Row,
+    types::{FromSql, Kind, Type},
+};
+
+use super::{codecs::ExactDecimal, decode::typed};
+use crate::errors::DecodeError;
+
+type CodecError = Box<dyn std::error::Error + Send + Sync>;
+
+/// A range over a subtype `T` reads: a built-in range, or a range type a
+/// schema created over the same subtype.
+#[derive(Debug)]
+struct RangeCodec<T>(Range<T>);
+
+impl<'a, T: FromSql<'a>> FromSql<'a> for RangeCodec<T> {
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
+        match ty.kind() {
+            Kind::Range(subtype) => read_range(subtype, raw).map(Self),
+            _ => Err("expected a PostgreSQL range".into()),
+        }
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(ty.kind(), Kind::Range(subtype) if T::accepts(subtype))
+    }
+}
+
+/// A multirange: a count, then each range length-prefixed.
+#[derive(Debug)]
+struct MultirangeCodec<T>(Multirange<T>);
+
+impl<'a, T: FromSql<'a>> FromSql<'a> for MultirangeCodec<T> {
+    fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
+        let Kind::Multirange(subtype) = ty.kind() else {
+            return Err("expected a PostgreSQL multirange".into());
+        };
+        let mut raw = raw;
+        let count = usize::try_from(read_i32(&mut raw)?)?;
+        let ranges = (0..count)
+            .map(|_| {
+                let len = usize::try_from(read_i32(&mut raw)?)?;
+                let (range, rest) = raw.split_at_checked(len).ok_or("invalid message size")?;
+                raw = rest;
+                read_range(subtype, range)
+            })
+            .collect::<Result<Multirange<T>, CodecError>>()?;
+        if !raw.is_empty() {
+            return Err("invalid message size".into());
+        }
+        Ok(Self(ranges))
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(ty.kind(), Kind::Multirange(subtype) if T::accepts(subtype))
+    }
+}
+
+fn read_i32(raw: &mut &[u8]) -> Result<i32, CodecError> {
+    let (head, rest) = raw.split_first_chunk::<4>().ok_or("invalid message size")?;
+    *raw = rest;
+    Ok(i32::from_be_bytes(*head))
+}
+
+/// The empty flag is the empty range and nothing else; a NULL bound is a
+/// malformed message, never no bound.
+fn read_range<'a, T: FromSql<'a>>(subtype: &Type, raw: &'a [u8]) -> Result<Range<T>, CodecError> {
+    let bound = |bound: RangeBound<Option<&'a [u8]>>| -> Result<Bound<T>, CodecError> {
+        Ok(match bound {
+            RangeBound::Inclusive(Some(raw)) => Bound::Included(T::from_sql(subtype, raw)?),
+            RangeBound::Exclusive(Some(raw)) => Bound::Excluded(T::from_sql(subtype, raw)?),
+            RangeBound::Unbounded => Bound::Unbounded,
+            RangeBound::Inclusive(None) | RangeBound::Exclusive(None) => {
+                return Err("a range bound is NULL".into());
+            }
+        })
+    };
+    Ok(match wire::range_from_sql(raw)? {
+        wire::Range::Empty => Range::Empty,
+        wire::Range::Nonempty(lower, upper) => Range::new(bound(lower)?, bound(upper)?),
+    })
+}
+
+/// The built-in range type over `subtype`, which a range type a schema
+/// created over the same subtype reads as.
+fn range_type(subtype: &Type) -> Option<RangeType> {
+    Some(match *subtype {
+        Type::INT4 => RangeType::Int4,
+        Type::INT8 => RangeType::Int8,
+        Type::NUMERIC => RangeType::Numeric,
+        Type::DATE => RangeType::Date,
+        Type::TIMESTAMP => RangeType::Timestamp,
+        Type::TIMESTAMPTZ => RangeType::TimestampTz,
+        _ => return None,
+    })
+}
+
+/// A range or multirange column, or an array of either, as a tagged value;
+/// `None` for a column of any other type.
+// [spec:pgorm:req:python.results]
+pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult<Option<Value>> {
+    let (subtype, multi) = match ty.kind() {
+        Kind::Range(subtype) => (subtype, false),
+        Kind::Multirange(subtype) => (subtype, true),
+        _ => return Ok(None),
+    };
+    let Some(range) = range_type(subtype) else {
+        return Err(DecodeError::new_err(format!(
+            "column {index} ranges over `{subtype}`, which none of the built-in range types does"
+        )));
+    };
+    macro_rules! decode {
+        ($rust:ty, $bound:expr) => {
+            if multi {
+                typed::<MultirangeCodec<$rust>>(
+                    row,
+                    index,
+                    array,
+                    ArrayType::Multirange(range),
+                    |v| Value::Multirange(range, v.map(|v| Box::new(v.0.map($bound)))),
+                )
+            } else {
+                typed::<RangeCodec<$rust>>(row, index, array, ArrayType::Range(range), |v| {
+                    Value::Range(range, v.map(|v| Box::new(v.0.map($bound))))
+                })
+            }
+        };
+    }
+    match range {
+        RangeType::Int4 => decode!(i32, |v| Value::Int(Some(v))),
+        RangeType::Int8 => decode!(i64, |v| Value::BigInt(Some(v))),
+        RangeType::Numeric => decode!(ExactDecimal, |v: ExactDecimal| Value::Decimal(Some(
+            Box::new(v.0)
+        ))),
+        RangeType::Date => decode!(Date, |v| Value::Date(Some(Box::new(v)))),
+        RangeType::Timestamp => decode!(DateTime, |v| Value::DateTime(Some(Box::new(v)))),
+        RangeType::TimestampTz => decode!(Timestamp, |v| Value::DateTimeWithTimeZone(Some(
+            Box::new(v)
+        ))),
+    }
+    .map(Some)
+}

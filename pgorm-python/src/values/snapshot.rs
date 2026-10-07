@@ -1,9 +1,11 @@
-use pgorm::pgorm_query::Value;
+use std::ops::Bound;
+
+use pgorm::pgorm_query::{Range, RangeType, Value};
 use pyo3::PyResult;
 use serde_json::{Value as Json, json};
 
 use super::{
-    PyValue,
+    PyValue, ranges,
     types::{Tag, is_null},
 };
 
@@ -77,12 +79,45 @@ fn payload(value: &PyValue) -> PyResult<Json> {
                 })
                 .transpose()?
         ),
-        // `PyValue::from_rust` refuses these, so a value never holds one; the
-        // refusal is repeated rather than a payload invented.
-        Value::Range(..) | Value::Multirange(..) => {
-            return Err(crate::UnsupportedCapabilityError::new_err(
-                super::UNSUPPORTED_RANGE,
-            ));
-        }
+        Value::Range(range, value) => match value {
+            Some(value) => range_payload(*range, value)?,
+            None => Json::Null,
+        },
+        Value::Multirange(range, value) => match value {
+            Some(value) => Json::Array(
+                value
+                    .iter()
+                    .map(|value| range_payload(*range, value))
+                    .collect::<PyResult<_>>()?,
+            ),
+            None => Json::Null,
+        },
     })
+}
+
+/// `{"empty": true}`, or each bound's own payload (`null` for no bound) and
+/// the two brackets.
+fn range_payload(range: RangeType, value: &Range<Value>) -> PyResult<Json> {
+    let Range::Bounds { lower, upper } = value else {
+        return Ok(json!({"empty": true}));
+    };
+    let bound = |bound: &Bound<Value>| -> PyResult<(Json, bool)> {
+        Ok(match bound {
+            Bound::Included(inner) | Bound::Excluded(inner) => (
+                payload(&PyValue {
+                    inner: inner.clone(),
+                    tag: Tag::Scalar(ranges::element(range)),
+                })?,
+                matches!(bound, Bound::Included(_)),
+            ),
+            Bound::Unbounded => (Json::Null, false),
+        })
+    };
+    let ((lower, open), (upper, close)) = (bound(lower)?, bound(upper)?);
+    let bounds = format!(
+        "{}{}",
+        if open && !lower.is_null() { '[' } else { '(' },
+        if close && !upper.is_null() { ']' } else { ')' }
+    );
+    Ok(json!({"lower": lower, "upper": upper, "bounds": bounds}))
 }

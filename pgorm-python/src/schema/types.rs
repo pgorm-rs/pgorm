@@ -120,11 +120,9 @@ impl PyDataType {
             "inet" => ColumnType::Inet,
             "macaddr" => ColumnType::MacAddr,
             "ltree" => ColumnType::LTree,
-            _ => {
-                return Err(UnsupportedCapabilityError::new_err(
-                    "unsupported DDL column type",
-                ));
-            }
+            kind => crate::values::range_column_type(kind).ok_or_else(|| {
+                UnsupportedCapabilityError::new_err("unsupported DDL column type")
+            })?,
         };
         Ok(Self { inner })
     }

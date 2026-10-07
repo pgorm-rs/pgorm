@@ -48,6 +48,7 @@ supplying a different kind with that value raises `ConstructionError`.
 | `vector` | `Vector` | list/tuple of exact `f32` values; returns a list |
 | `array` | `Array` | `Value.array(element_kind, list_or_tuple_or_none)` |
 | `enum` | `String` plus `TypeName` | `Value(label_or_none, type_name)` |
+| `int4range` … `tstzmultirange` | `Range`, `Multirange` | `pgorm.Range`, `pgorm.Multirange`; see [Ranges](#ranges) |
 
 Every scalar supports `Value.null(kind)` or `Value(None, kind)`. These are
 typed SQL NULL values. `Value.json(None)` creates JSON null; it has
@@ -98,6 +99,47 @@ These are Rust value representation limits. PostgreSQL may impose additional
 limits when binding a value to a particular database type; the execution API
 reports a database/conversion error. A native `u64`, for example, is not a
 claim that PostgreSQL has an unsigned 64-bit integer column type.
+
+## Ranges
+
+`pgorm.Range` and `pgorm.Multirange` are immutable Python values for
+PostgreSQL's six built-in range types and their multiranges. A range is
+`Range(lower, upper, bounds="[)")` or `Range.empty()`; `None` on a side is
+no bound, and a side with no bound includes nothing, so its bracket is always
+`(` or `)`. `Range()` is every value and differs from `Range.empty()`. A
+multirange is `Multirange(iterable_of_ranges)`, a sequence.
+
+```python
+from decimal import Decimal
+from pgorm import Multirange, Range, Value
+
+span = Value(Range(1, 5), "int4range")
+open_ended = Value(Range(Decimal("0.50"), None, "(]"), "numrange")
+nothing = Value(Range.empty(), "daterange")
+sets = Value(Multirange([Range(1, 3), Range(5, 8)]), "int8multirange")
+missing = Value.null("tstzrange")
+spans = Value.array("int4range", [Range(1, 3), None])
+```
+
+| Kind | Bounds |
+| --- | --- |
+| `int4range`, `int4multirange` | `i32` |
+| `int8range`, `int8multirange` | `i64` |
+| `numrange`, `nummultirange` | `decimal` |
+| `daterange`, `datemultirange` | `date` |
+| `tsrange`, `tsmultirange` | `datetime` |
+| `tstzrange`, `tstzmultirange` | `datetime_utc` |
+
+The kind is always explicit: a range's element type is not inferred. Each bound
+converts exactly as a scalar of its element kind does, with the same limits.
+Equality is structural, as in Rust; the server canonicalises a discrete range,
+so `Range(1, 5, "[]")` written to an `int4range` reads back as `Range(1, 6)`,
+and stores a multirange sorted and merged. Result columns of these types, and
+of a range type a schema created over one of these subtypes, decode to the same
+values; a range over another subtype, and a multirange a schema created, raise
+`DecodeError`. A snapshot's `data` for a range is `{"empty": true}` or
+`{"lower": ..., "upper": ..., "bounds": "[)"}`, each bound in its element
+kind's own encoding and `null` for no bound; a multirange's is a list of them.
 
 ## Inspection and equality
 

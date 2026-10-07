@@ -59,15 +59,16 @@ macro_rules! scalar_kinds {
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
             match kind {
                 $(ArrayType::$variant => $name,)+
-                ArrayType::Range(_) => "range",
-                ArrayType::Multirange(_) => "multirange",
+                ArrayType::Range(ty) => ty.range_type_name(),
+                ArrayType::Multirange(ty) => ty.multirange_type_name(),
             }
         }
 
         pub fn parse_scalar(name: &str) -> PyResult<ArrayType> {
             match name {
                 $($name => Ok(ArrayType::$variant),)+
-                _ => Err(ConstructionError::new_err("unknown scalar value kind")),
+                _ => super::ranges::parse(name)
+                    .ok_or_else(|| ConstructionError::new_err("unknown scalar value kind")),
             }
         }
 

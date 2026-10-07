@@ -9425,6 +9425,30 @@ children (
                 id python-ranges
                 title "Python reads, writes and builds with the built-in ranges and multiranges: a Range class, tagged values, decoded columns, stubs"
                 kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-10-07T11:10:51.888539Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T11:19:17.720063Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+
+                    {
+                        at 2026-10-07T11:22:37.449817Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Range classes are native (pgorm.Range, pgorm.Multirange registered in _native, typed in _ranges.pyi), not pure Python: the value conversion reads and builds them without importing the package that loads the extension, which also lets the binding's Rust tests round-trip them under an embedded interpreter. Kinds are the PostgreSQL type names (int4range … tstzmultirange), so a range slots into the existing Value / Value.null / Value.array / snapshot tag mechanism with no new constructor. Python's Expr does NOT gain contains/contained/overlaps: _expressions.pyi's Expr stub sits at the 50-function density cap (adding them was refused by the gate), and a class's stub cannot be split across sibling files, so a range predicate is RawSQL with bound range values (tested). A future way to reach them would be a generic binary-operator method replacing several of Expr's one-operator methods, or a module-level function family in its own stub."
+                        after_done true
+                    }
+                )
             }
         )
         log (

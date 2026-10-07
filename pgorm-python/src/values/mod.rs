@@ -1,7 +1,9 @@
 //! Owned Python values backed by pgorm's tagged Rust Value representation.
 
+mod classes;
 mod convert;
 mod json;
+mod ranges;
 mod snapshot;
 mod temporal;
 mod types;
@@ -10,11 +12,13 @@ use pgorm::pgorm_query::Value;
 use pyo3::{prelude::*, types::PyList};
 
 use crate::errors::ConstructionError;
+pub use classes::{PyMultirange, PyRange};
+pub(crate) use ranges::{column_type as range_column_type, kind_names as range_kind_names};
 pub use types::PyTypeName;
 pub(crate) use types::SCALAR_NAMES;
 use types::Tag;
 
-// [spec:pgorm:req:python.values]
+// [spec:pgorm:req:python.values+1]
 // [spec:pgorm:req:python.value-tags]
 /// Immutable owned Rust value plus qualified enum/array identity.
 #[pyclass(name = "Value", module = "pgorm", frozen, eq, from_py_object)]
@@ -26,16 +30,7 @@ pub struct PyValue {
 
 impl PyValue {
     /// Wrap a Rust value without changing its variant or payload.
-    ///
-    /// A range or multirange is refused here, where a Rust value first becomes
-    /// a Python one: the binding has no Python range type, no tag for one and
-    /// no snapshot encoding, so it cannot hand the value over or carry it.
     pub fn from_rust(inner: Value) -> PyResult<Self> {
-        if matches!(inner, Value::Range(..) | Value::Multirange(..)) {
-            return Err(crate::UnsupportedCapabilityError::new_err(
-                UNSUPPORTED_RANGE,
-            ));
-        }
         Ok(Self {
             tag: types::rust_tag(&inner),
             inner,
@@ -217,11 +212,6 @@ impl PyValue {
     }
 }
 
-/// Why a range or multirange value is refused: the binding declares both
-/// unsupported in its capability manifest.
-const UNSUPPORTED_RANGE: &str =
-    "range and multirange values are not supported by the Python binding";
-
 fn construction_error(error: PyErr) -> PyErr {
     Python::attach(|py| {
         if error.is_instance_of::<ConstructionError>(py) {
@@ -235,5 +225,7 @@ fn construction_error(error: PyErr) -> PyErr {
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyValue>()?;
     module.add_class::<PyTypeName>()?;
+    module.add_class::<PyRange>()?;
+    module.add_class::<PyMultirange>()?;
     Ok(())
 }

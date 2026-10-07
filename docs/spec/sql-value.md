@@ -22,7 +22,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)`,
 > `MacAddress(Box<MacAddress>)`, and the two range carriers of
-> `[spec:pgorm:def:sql.value.range+1]`,
+> `[spec:pgorm:def:sql.value.range+2]`,
 > `Range(RangeType, Option<Box<Range<Value>>>)` and
 > `Multirange(RangeType, Option<Box<Multirange<Value>>>)`, which carry their
 > range type beside the payload as `Array` carries its element type.
@@ -188,7 +188,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Ranges
 
-> [spec:pgorm:def:sql.value.range+1]
+> [spec:pgorm:def:sql.value.range+2]
 > A range value is `Range<T>`, an enum of two shapes: `Empty`, and
 > `Bounds { lower, upper }` with each bound a `std::ops::Bound<T>` —
 > `Included`, `Excluded` or `Unbounded`. The empty range is a value of its
@@ -261,15 +261,29 @@ including panic semantics and quirks inherited from sea-query.
 > binds and decodes through `Range<T>`, because the wire format of a range is
 > its subtype's; a range over any other subtype has no Rust type here.
 >
-> The Python binding refuses ranges, by name: its capability manifest lists
-> `range` and `multirange` as unsupported, a range column fails to decode
-> with an error saying so, and a Rust value becoming a Python one —
-> `PyValue::from_rust`, through which a registered entity's fields and a
-> compiled statement's parameters pass — is refused with
-> `UnsupportedCapabilityError`. A Python range would need a range class the
-> standard library does not have, new tags in the versioned value
-> snapshot, type stubs and the acceptance suites over a built wheel: a
-> binding surface of its own rather than an arm of this one.
+> The Python binding carries the six and their multiranges
+> (`[spec:pgorm:req:python.values+1]`). A range is `pgorm.Range(lower, upper,
+> bounds="[)")` or `pgorm.Range.empty()`, and a multirange
+> `pgorm.Multirange(ranges)`: immutable native classes holding Python bound
+> values, `None` on a side being no bound, so that side's bracket is always
+> `(` or `)`. Their value kinds are the type names — `int4range` through
+> `tstzrange`, `int4multirange` through `tstzmultirange` — which tag a
+> `Value`, its typed `NULL`, an array's elements and a snapshot alike; each
+> bound converts as a scalar of the subtype's kind does, with that kind's
+> limits, and the kind is never inferred. A snapshot writes a range as
+> `{"empty": true}` or its two bounds' own payloads (`null` for no bound) and
+> its brackets. A range or multirange column, or an array of either,
+> decodes to them through `postgres_protocol`'s range reader and the
+> subtype's own codec, a numeric bound held to the exactness a numeric column
+> is, and a range type a schema created over one of the six subtypes reads
+> as the built-in over it, as `Range<T>` does here. A range over another
+> subtype and a multirange a schema created are `DecodeError`s, the first
+> naming its subtype, until `created-range-types` and `created-multiranges`
+> give them a Rust type. A registered entity's range field converts both
+> ways through `PyValue::from_rust`, its column hinting the kind, and the
+> schema builder's `DataType` names the twelve types. Python's `Expr` has no
+> containment or overlap operator: its stub is at the function-density cap,
+> and a range predicate is written in `RawSQL` with a bound range.
 
 ## Value tuples
 
@@ -657,7 +671,7 @@ including panic semantics and quirks inherited from sea-query.
 > names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`,
 > `LTree`, and `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
-> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+1]`); a
+> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+2]`); a
 > range type a schema creates is `Named`, as every other created type is.
 > `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
