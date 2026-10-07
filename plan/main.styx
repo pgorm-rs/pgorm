@@ -6809,6 +6809,14 @@ children (
                         text "Final full campaign over HEAD, 2026-10-05. Run full-56a40e172601 at ce1183e4, on a clean tree with the extension rebuilt from that source (ad4fce06…; zero builds during the campaign), passed outright: 20000/20000 construction, 5000/5000 live, 500/500 invalid as expected rejections, 22/22 controls, and the compile suite passing its 72 cases. Coverage was 448/448 declared with none outstanding, and there were no findings or faults. Apart from revision and output path, its ledger entry (security/generative/runs/full-56a40e172601.json) is identical to the last authoritative run, full-4311ca278c80 at 2377cb16. The subject is not: the 36 commits between them include the prqlc fork becoming a declared git dependency (a9ce44e3). This makes it the first full run whose compile suite resolved the shipped fork rather than registry prqlc from the cargo cache. They also include the identifier-quoting fixes (967e9208, c30b42cd, 8d83e46a, c2e69c41) and the sequence, composite, range-type and MERGE builders. Timing: 1419 s in all (runtime 383 s, compile 992 s against 315 s and 459 s before; the compile cache was cold after the rebuild). The run started at 05:24:58Z with load average 3.9 and no compile running. A ten-second sampler shows the runtime class at load 3.3 to 7.7, driven by the campaign's own Docker VM and Python workers (no rustc). The only rustc it saw was the compile suite's own, from 05:32:32Z, after the live classes had finished. The power log records no sleep since 2026-10-04 20:22, and no program hit its two-second statement limit."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-07T15:21:42.500153Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Full campaign on PostgreSQL 18.6, 2026-10-07. Run full-8ad7cfb319ef at e2b92232, on a clean tree with the extension rebuilt from that source (native 2e479026…, source 1b66cab1…; zero builds during the campaign), passed outright: 20000/20000 construction, 5000/5000 live, 500/500 invalid as expected rejections, 22/22 controls, and the compile suite passing its 74 cases (72 before; 779159ca added entity-relation-composite and codegen-composite-foreign-key). Coverage was 448/448 declared with none outstanding, and there were no findings or faults. Apart from revision and output path, its ledger entry (security/generative/runs/full-8ad7cfb319ef.json) is identical to full-56a40e172601 at ce1183e4. This is the first full run on 18: the fixture is postgres:18.6-bookworm@sha256:afc7e2d4… (image sha256:1f1c66e0…, PostgreSQL 18.6 Debian 18.6-1.pgdg12+2), with the same recorded settings as on 16.13 (UTF8, C collation and ctype, UTC, search_path fixture, 2s statement / 500ms lock / 5s idle-in-transaction deadlines, restricted campaign role) and its data volume mounted at /var/lib/postgresql, where the 18 image requires it (e2b92232). The 46 commits since ce1183e4 include the move to PostgreSQL 18's grammar (28fa2f64) and the constructs 17 and 18 added (VIRTUAL generated columns, named and NOT VALID NOT NULL, NOT ENFORCED, temporal keys, RETURNING old/new, MERGE's 17 forms, SQL/JSON and JSON_TABLE, uuidv7, ranges from Python); the campaign reaches them only through what its matrix already covered, and the matrix, profiles and grammar are unchanged since ce1183e4. Timing: 798 s in all (runtime 413 s, compile 343 s, invalid 23 s, construction 16 s, control 1.5 s; 383 s and 992 s of 1419 s before, when the compile cache was cold). The run started at 15:05:40Z at load 4.0 with no compile and no disk cleaner running. A ten-second sampler shows the live classes at up to 8.2 (15:10:53Z), driven by the campaign's own Docker VM and Python workers with no rustc; the only rustc it saw was the compile suite's own, from 15:13:25Z, after the live classes had finished. The power log records no sleep since 12:48Z, and no program hit its two-second statement limit (no 57014 or statement-timeout cancellation in the run's artifacts)."
+                        after_done true
+                    }
                 )
             }
         )
@@ -9586,6 +9594,7 @@ children (
                 title "sqlmap and the generative campaign pin PostgreSQL 18 and their acceptance is re-recorded on it"
                 kind @test
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.346302Z
@@ -9613,6 +9622,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sqlmap on PostgreSQL 18.6, 2026-10-07, at e2b92232 (clean tree, source 748d6644…). Full profile target/sqlmap-ci/full-1007, 14:20–14:53Z: PASS, 117/117 controls detected, 93 declared inapplicable, 0 protected findings, 0 falsified exemptions, direct regressions 17/17, 234 scans; control medians B 1.3 s, E 0.7 s, U 1.4 s, S/T 31.2 s (16.13: 1.6/0.7/1.8/31.9/31.8). Identifiers profile target/sqlmap-ci/ident-1007, 14:53–15:05Z: PASS, 28/28, 38 inapplicable, 0 findings, 56 scans, 681 s scanning (812 on 16.13), slowest scan 43.5 s. Both started below load 5 with no cleaner running; no sleep in either window (power log quiet from 12:48Z). The full run saw compiles that were not its own (9 rustc at 14:39Z, 1–4 from 14:47–14:51Z) and a load peak of 9.4 at 14:50:47Z; every timing control fired regardless. Nothing in the harness, manifest, profiles or fixture SQL needed a new expectation on 18 beyond the data mount. Recorded in security/sqlmap/acceptance/2026-10-07.md. Before the first scan, an orphaned pgorm-sqlmap-adapter from an earlier harness run (PID 79477, parent 1, 29 days old, listening on 127.0.0.1:60057) was stopped with SIGTERM."
+                    }
+
+                    {
+                        at 2026-10-07T15:21:42.556257Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Full generative campaign on PostgreSQL 18.6, 2026-10-07: full-8ad7cfb319ef at e2b92232 passed outright (20000/5000/500/22, compile suite 74 cases, coverage 448/448, no findings or faults), its ledger identical to full-56a40e172601's apart from revision and output path; detail on generative.acceptance. All three acceptance runs this node asked for passed on 18 at their first counted attempt, none voided: no sleep in any run window, every run started below load 5 with no cleaner running. The only 16-to-18 change any of them needed was the data mount in e2b92232."
+                    }
+
+                    {
+                        at 2026-10-07T15:21:42.614443Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
