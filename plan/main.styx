@@ -9808,6 +9808,28 @@ children (
                         kind @note
                         text "Found by pg18-not-enforced (cdcc02d6). PostgreSQL 18 lets a foreign key be NOT ENFORCED: recorded, never checked, with no referential triggers, so its ON DELETE / ON UPDATE actions never fire. pgorm-query now writes one (TableForeignKey::enforcement, ConstraintChange::Enforced / NotEnforced, sql.ddl.enforcement), but codegen still refuses it (\"a NOT ENFORCED constraint\", codegen.ddl.unsupported+9) because the entity model cannot hold it: RelationDef has on_delete, on_update and fk_name and no enforcement, DeriveRelation has no attribute for it, and Schema::create_table_from_entity turns every owned relation into an enforced foreign key, so a schema regenerated from a generated entity would enforce what the source did not, and load_one, which errors on an unmatched key, would meet the orphans a NOT ENFORCED key admits. Deferrability is in the same position (codegen refuses a deferrable constraint and RelationDef has none). Decide whether an entity relation carries its key's constraint attributes (enforcement, and deferrability with it) and what load_one / load_many and the graph should do over a relation whose key is not enforced; then a RelationDef field and DeriveRelation attribute, the From<RelationDef> for ForeignKeyCreateStatement mapping, codegen's reader and writer, the generative campaign's emitters, and Python's registered entities."
                     }
+
+                    {
+                        at 2026-10-07T02:56:59.169301Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found while landing pg18-temporal-keys (d33e0801): the DDL bridge refuses a NOT ENFORCED foreign key, but EntityTransformer::transform, which takes caller-built TableCreateStatements, reads one as a plain relation without a word (TableForeignKey::get_enforcement is never consulted). pg18-temporal-keys made the gate refuse a WITHOUT OVERLAPS key and a PERIOD foreign key in a caller-built statement (refuse_temporal_constraints, codegen.entity.transform+10), for the same reason the bridge refuses them; a NOT ENFORCED foreign key belongs beside them until this node lets the entity hold it."
+                    }
+                )
+            }
+
+            {
+                id entity-temporal-keys
+                title "An entity can declare a key WITHOUT OVERLAPS and a relation matching on a PERIOD, so codegen can read them"
+                kind @feat
+                deps (pg18-temporal-keys)
+                log (
+                    {
+                        at 2026-10-07T02:56:36.865486Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by pg18-temporal-keys (d33e0801). PostgreSQL 18's temporal keys: a primary or unique key ending `c WITHOUT OVERLAPS` (a range or multirange compared for overlap, enforced by a GiST index as an exclusion: an overlap is 23P01, an empty period 23514, btree_gist needed for scalar columns) and a foreign key `FOREIGN KEY (a, PERIOD p) REFERENCES t (a, PERIOD q)` (the child's period covered by the union of the matching parents' periods; ON DELETE / ON UPDATE NO ACTION only, every other action 0A000). pgorm-query writes both (TableKey::without_overlaps, TableForeignKey / ForeignKeyCreateStatement::period; sql.ddl.create-table+14, sql.ddl.foreign-key+8) and Python's key builders take without_overlaps=. Codegen keeps refusing both by name (codegen.ddl.unsupported+10, \"a WITHOUT OVERLAPS key\", \"a PERIOD foreign key\"), and EntityTransformer::transform now refuses them in a caller-built statement (codegen.entity.transform+10), because the entity model matches by equality alone: DeriveEntityModel's primary_key / unique attributes, PrimaryKeyTrait and find_by_id, the ActiveModel's key for update and delete, RelationDef's from/to columns joined by equality in load_one / load_many and the graph, and Schema::create_table_from_entity's key and foreign-key output. Decide what a temporal key means to the ORM (is find_by_id over (id, period) an equality lookup, or a point-in-time lookup by containment? what do update and delete by primary key do when the period is part of the identity?), whether a relation can carry a PERIOD pair and how the loaders and the graph join over it (containment or overlap, `@>` / `&&`, rather than equality), and then the derive attributes, schema generation (which must also say how btree_gist gets created, or document it), codegen's reader and writer, the generative campaign's emitters, and Python's registered entities. entity-relation-not-enforced is the same kind of gap and may share the attribute design."
+                    }
                 )
             }
         )
