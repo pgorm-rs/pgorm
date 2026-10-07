@@ -12,6 +12,7 @@
 use crate::types::{IntoName, IntoTableName};
 
 mod alter;
+mod check;
 mod column;
 mod column_collation;
 mod column_generated;
@@ -26,9 +27,10 @@ mod rename;
 mod truncate;
 
 pub use alter::*;
+pub use check::{Check, IntoCheck};
 pub use column::*;
 pub use column_generated::GeneratedKind;
-pub use constraint::{ConstraintChange, NotNullConstraint};
+pub use constraint::{ConstraintChange, Enforcement, NotNullConstraint};
 pub use create::*;
 pub use drop::*;
 pub use interval::*;

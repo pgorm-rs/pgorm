@@ -516,8 +516,8 @@ fn sweep_merge_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+12/test]
-// [spec:pgorm:req:sql.ddl.alter-table+9/test]
+// [spec:pgorm:req:sql.ddl.create-table+13/test]
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -615,6 +615,41 @@ fn sweep_table_ddl_shapes() {
                     .not_null_named(Name::runtime("aspect_present"))
                     .not_null_no_inherit(),
             )
+            .to_string(),
+        Table::create(Glyph::Table)
+            .col(
+                ColumnDef::new(Glyph::Aspect).integer().check(
+                    Check::new(Expr::col(Glyph::Aspect).gt(0))
+                        .name(Name::runtime("aspect_positive"))
+                        .enforcement(Enforcement::NotEnforced),
+                ),
+            )
+            .col(ColumnDef::new(Glyph::Id).integer())
+            .check(Check::new(Expr::col(Glyph::Aspect).lt(100)).enforcement(Enforcement::Enforced))
+            .foreign_key(
+                ForeignKey::create(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
+                    .deferrability(Deferrability::DeferrableInitiallyDeferred)
+                    .enforcement(Enforcement::NotEnforced)
+                    .to_owned(),
+            )
+            .to_string(),
+        Table::alter(Glyph::Table)
+            .add_check(Expr::col(Glyph::Aspect).gt(0))
+            .add_check(
+                Check::new(Expr::col(Glyph::Aspect).lt(100))
+                    .name(Name::runtime("aspect_small"))
+                    .enforcement(Enforcement::NotEnforced),
+            )
+            .add_foreign_key(
+                TableForeignKey::new(Glyph::Table, Glyph::Id, Font::Table, Font::Id)
+                    .enforcement(Enforcement::Enforced)
+                    .to_owned(),
+            )
+            .modify_column(
+                ColumnDef::new(Glyph::Tokens).check(Expr::col(Glyph::Tokens).is_not_null()),
+            )
+            .alter_constraint(Name::runtime("glyph_font"), ConstraintChange::Enforced)
+            .alter_constraint(Name::runtime("glyph_font"), ConstraintChange::NotEnforced)
             .to_string(),
         Table::alter(Glyph::Table)
             .modify_column(ColumnDef::new(Glyph::Aspect).big_integer())

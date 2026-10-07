@@ -1,5 +1,6 @@
 //! Constraints `ALTER TABLE` adds, validates and alters by name: a table-level
-//! `NOT NULL`, and the changes `ALTER CONSTRAINT` makes to one that exists.
+//! `NOT NULL`, whether a constraint is enforced, and the changes
+//! `ALTER CONSTRAINT` makes to one that exists.
 
 use crate::types::{IntoName, Name};
 
@@ -30,7 +31,7 @@ use crate::types::{IntoName, Name};
 ///     r#"ALTER TABLE "glyph" ADD CONSTRAINT "glyph_aspect_present" NOT NULL "aspect" NOT VALID"#,
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+9]
+// [spec:pgorm:req:sql.ddl.alter-table+10]
 #[derive(Debug, Clone)]
 pub struct NotNullConstraint {
     pub(crate) column: Name,
@@ -106,12 +107,52 @@ impl NotNullConstraint {
     }
 }
 
+/// Whether the server holds rows to a constraint: PostgreSQL 18's `ENFORCED`
+/// and `NOT ENFORCED`.
+///
+/// A foreign key takes it through
+/// [`TableForeignKey::enforcement`](crate::TableForeignKey::enforcement) and a
+/// `CHECK` through [`Check::enforcement`](crate::Check::enforcement). Nothing
+/// else can: PostgreSQL refuses either word on a primary key, a unique key or a
+/// `NOT NULL` (`0A000` at table level, `42601` on a column), so
+/// [`TableKey`](crate::TableKey) and the not-null spellings have no method for
+/// it.
+///
+/// A closed pair rather than a flag, as
+/// [`Deferrability`](crate::Deferrability) is a closed choice: unset, the
+/// clause renders nothing and the server's default, `ENFORCED`, holds, so
+/// [`Enforced`](Self::Enforced) renders only because a caller said it.
+// [spec:pgorm:req:sql.ddl.enforcement]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Enforcement {
+    /// `ENFORCED`: every row written is checked, as by default.
+    Enforced,
+    /// `NOT ENFORCED`: the constraint is recorded and never checked. It is
+    /// never valid, a foreign key's `ON DELETE` and `ON UPDATE` actions never
+    /// fire, and `VALIDATE CONSTRAINT` refuses it (`55000`); a foreign key is
+    /// enforced again with
+    /// [`ConstraintChange::Enforced`](crate::ConstraintChange::Enforced).
+    NotEnforced,
+}
+
+impl Enforcement {
+    /// The clause this state renders as, with the space that separates it
+    /// from the constraint it follows.
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    pub(crate) fn clause(self) -> &'static str {
+        match self {
+            Self::Enforced => " ENFORCED",
+            Self::NotEnforced => " NOT ENFORCED",
+        }
+    }
+}
+
 /// What `ALTER CONSTRAINT "name" ...` changes about a constraint that exists.
 ///
 /// The server alone knows which kind of constraint a name holds, and each
 /// change applies to one kind, so asking another kind for it is refused there
 /// (`42809`).
-// [spec:pgorm:req:sql.ddl.alter-table+9]
+// [spec:pgorm:req:sql.ddl.alter-table+10]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {
     /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
@@ -122,15 +163,27 @@ pub enum ConstraintChange {
     /// partitioned table's constraint cannot be kept from its partitions
     /// (`0A000`).
     NoInherit,
+    /// `ENFORCED`: a foreign key is checked again, every row already there
+    /// included — one that breaks it refuses the statement (`23503`) — and
+    /// is valid once it passes. A `CHECK`'s enforcement cannot be altered
+    /// (`42809`).
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    Enforced,
+    /// `NOT ENFORCED`: a foreign key is no longer checked, and is no longer
+    /// valid.
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    NotEnforced,
 }
 
 impl ConstraintChange {
     /// The words this change is written with, after the constraint's name.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::Inherit => "INHERIT",
             Self::NoInherit => "NO INHERIT",
+            Self::Enforced => "ENFORCED",
+            Self::NotEnforced => "NOT ENFORCED",
         }
     }
 }

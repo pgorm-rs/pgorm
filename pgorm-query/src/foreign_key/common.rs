@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::{Enforcement, types::*};
 
 /// Specification of a foreign key
 ///
@@ -13,7 +13,7 @@ use crate::types::*;
 /// referencing and referenced sides cannot disagree in length — a mismatch the
 /// grammar accepts and parse analysis rejects, and so one no parser oracle can
 /// catch. Further pairs are appended with [`TableForeignKey::col`].
-// [spec:pgorm:req:sql.ddl.foreign-key+6]
+// [spec:pgorm:req:sql.ddl.foreign-key+7]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<Name>,
@@ -24,6 +24,7 @@ pub struct TableForeignKey {
     pub(crate) on_delete: Option<ForeignKeyAction>,
     pub(crate) on_update: Option<ForeignKeyAction>,
     pub(crate) deferrability: Option<Deferrability>,
+    pub(crate) enforcement: Option<Enforcement>,
 }
 
 /// Foreign key on update & on delete actions
@@ -101,6 +102,7 @@ impl TableForeignKey {
             on_delete: None,
             on_update: None,
             deferrability: None,
+            enforcement: None,
         }
     }
 
@@ -142,6 +144,14 @@ impl TableForeignKey {
         self
     }
 
+    /// Say whether the server holds rows to this key
+    /// (`[spec:pgorm:req:sql.ddl.enforcement]`), replacing any already set.
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    pub fn enforcement(&mut self, enforcement: Enforcement) -> &mut Self {
+        self.enforcement = Some(enforcement);
+        self
+    }
+
     /// Retarget this key at `table`, as an embedding into a `CREATE TABLE` does
     pub(crate) fn retarget(&mut self, table: TableName) {
         self.table = table;
@@ -174,5 +184,10 @@ impl TableForeignKey {
 
     pub fn get_on_update(&self) -> Option<ForeignKeyAction> {
         self.on_update
+    }
+
+    /// Whether the server enforces this key, if the caller said.
+    pub fn get_enforcement(&self) -> Option<Enforcement> {
+        self.enforcement
     }
 }

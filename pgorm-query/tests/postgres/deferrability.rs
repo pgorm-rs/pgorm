@@ -15,7 +15,7 @@ const STATES: [(Deferrability, &str); 3] = [
 
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    a primary or unique key carries the clause
 // after its column list and INCLUDE
-// [spec:pgorm:req:sql.ddl.create-table+12/test]
+// [spec:pgorm:req:sql.ddl.create-table+13/test]
 #[test]
 fn a_table_key_carries_its_deferrability() {
     for (deferrability, text) in STATES {
@@ -69,7 +69,7 @@ fn a_table_key_carries_its_deferrability() {
 
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    `ALTER TABLE` adds a key as
 // `ADD UNIQUE (…)` / `ADD PRIMARY KEY (…)`, the clause after it
-// [spec:pgorm:req:sql.ddl.alter-table+9/test]
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]
 #[test]
 fn an_added_key_carries_its_deferrability() {
     let sql = Table::alter(Glyph::Table)

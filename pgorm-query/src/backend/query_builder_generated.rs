@@ -9,8 +9,8 @@ impl QueryBuilder {
     /// The kind is written whichever it is: PostgreSQL 17 refuses a generated
     /// column without `STORED`, and 18 reads one without either keyword as
     /// `VIRTUAL`, so leaving it to the server would make the column's kind
-    /// depend on the release (`[spec:pgorm:req:sql.ddl.column-def+11]`).
-    // [spec:pgorm:req:sql.ddl.column-def+11]
+    /// depend on the release (`[spec:pgorm:req:sql.ddl.column-def+12]`).
+    // [spec:pgorm:req:sql.ddl.column-def+12]
     pub(crate) fn prepare_generated_column(
         &self,
         gen_: &SimpleExpr,
@@ -24,7 +24,7 @@ impl QueryBuilder {
 
     /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`. The `AS` is not
     /// optional: `SET EXPRESSION (<expr>)` is a syntax error (`42601`).
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_set_expression(
         &self,
         column: &Name,
@@ -39,7 +39,7 @@ impl QueryBuilder {
     }
 
     /// `ALTER COLUMN "c" DROP EXPRESSION[ IF EXISTS]`.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_drop_expression(
         &self,
         column: &Name,

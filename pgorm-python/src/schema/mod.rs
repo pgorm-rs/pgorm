@@ -45,6 +45,7 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(table::add_primary_key, module)?)?;
     module.add_function(wrap_pyfunction!(table::add_unique, module)?)?;
     module.add_function(wrap_pyfunction!(table::add_not_null, module)?)?;
+    module.add_function(wrap_pyfunction!(table::add_check, module)?)?;
     module.add_function(wrap_pyfunction!(table::validate_constraint, module)?)?;
     module.add_function(wrap_pyfunction!(table::alter_constraint, module)?)?;
     Ok(())

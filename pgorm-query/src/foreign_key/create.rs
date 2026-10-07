@@ -1,4 +1,6 @@
-use crate::{Deferrability, ForeignKeyAction, QueryBuilder, TableForeignKey, types::*};
+use crate::{
+    Deferrability, Enforcement, ForeignKeyAction, QueryBuilder, TableForeignKey, types::*,
+};
 
 /// Create a foreign key constraint for an existing table
 ///
@@ -98,7 +100,7 @@ use crate::{Deferrability, ForeignKeyAction, QueryBuilder, TableForeignKey, type
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+6]
+// [spec:pgorm:req:sql.ddl.foreign-key+7]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
@@ -175,6 +177,36 @@ impl ForeignKeyCreateStatement {
     /// ```
     pub fn deferrability(&mut self, deferrability: Deferrability) -> &mut Self {
         self.foreign_key.deferrability(deferrability);
+        self
+    }
+
+    /// Say whether the server holds rows to this key: `NOT ENFORCED` records
+    /// it and checks nothing (`[spec:pgorm:req:sql.ddl.enforcement]`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let foreign_key = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
+    ///     .name(Name::runtime("FK_character_font"))
+    ///     .deferrability(Deferrability::DeferrableInitiallyDeferred)
+    ///     .enforcement(Enforcement::NotEnforced)
+    ///     .to_string();
+    ///
+    /// assert_eq!(
+    ///     foreign_key,
+    ///     [
+    ///         r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_font""#,
+    ///         r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
+    ///         r#"DEFERRABLE INITIALLY DEFERRED NOT ENFORCED"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    pub fn enforcement(&mut self, enforcement: Enforcement) -> &mut Self {
+        self.foreign_key.enforcement(enforcement);
         self
     }
 

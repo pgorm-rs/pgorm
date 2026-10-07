@@ -11,7 +11,7 @@ use pgorm::{
 use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
 use pgorm_codegen::{Error, WriterOutput};
 use pgorm_query::extension::Type;
-use pgorm_query::{ColumnSpec, ColumnType, TableName};
+use pgorm_query::{ColumnSpec, ColumnType, Enforcement, TableName};
 
 const SCHEMA: &str = include_str!("sql/schema.sql");
 
@@ -145,7 +145,7 @@ fn enum_type_reaches_the_generated_active_enum() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a foreign key keeps its columns
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a foreign key keeps its columns
 // and its declared actions
 #[test]
 fn foreign_keys_keep_their_columns_and_actions() {
@@ -157,7 +157,7 @@ fn foreign_keys_keep_their_columns_and_actions() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a table-level composite primary
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a table-level composite primary
 // key plus two foreign keys is read as a junction table
 #[test]
 fn composite_key_junction_becomes_conjunct_relations() {
@@ -193,7 +193,7 @@ fn unique_index_marks_its_column_unique() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a column-level UNIQUE becomes the
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a column-level UNIQUE becomes the
 // table-level unique constraint Postgres creates for it, which is where the entity model
 // reads unique
 #[test]
@@ -206,7 +206,7 @@ fn column_unique_constraint_marks_the_column() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a schema-qualified name is kept
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a schema-qualified name is kept
 // as the schema-qualified table name the statement targets
 #[test]
 fn schema_qualified_table_names_are_kept() {
@@ -255,7 +255,7 @@ fn comments_are_folded_into_their_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a column's COLLATE clause becomes its
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a column's COLLATE clause becomes its
 // collation, bare or qualified, and the entity generated from it is the one the
 // uncollated table generates
 #[test]
@@ -301,7 +301,7 @@ fn a_column_collation_rides_on_the_statement() {
     assert_eq!(collations(&rendered), expected);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -331,7 +331,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -365,7 +365,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -395,7 +395,7 @@ fn unsupported_column_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    what PostgreSQL 18's grammar
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    what PostgreSQL 18's grammar
 // added and the entity model cannot hold yet is named, not read as the older
 // shape each one resembles
 #[test]
@@ -435,7 +435,42 @@ fn postgres_18_constraints_are_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a NOT NULL constraint's name and
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    an explicit ENFORCED on a column's
+// REFERENCES rides on the statement, and the entity is the plain key's
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    an ENFORCED anywhere else is
+// named, as PostgreSQL refuses it there
+#[test]
+fn an_explicit_enforced_rides_on_the_statement() {
+    let parent = "CREATE TABLE u (id int PRIMARY KEY);";
+    let enforced = format!(
+        "{parent} CREATE TABLE t (id int PRIMARY KEY, u_id int REFERENCES u (id) ENFORCED);"
+    );
+    let tables = parse_schema(&enforced).expect("schema should parse");
+    let foreign_keys = tables[1].get_foreign_key_create_stmts();
+    assert_eq!(
+        foreign_keys
+            .iter()
+            .map(|key| key.get_foreign_key().get_enforcement())
+            .collect::<Vec<_>>(),
+        [Some(Enforcement::Enforced)]
+    );
+    let rendered = format!("{};", tables[1]);
+    assert!(
+        rendered.contains(r#"REFERENCES "u" ("id") ENFORCED"#),
+        "{rendered}"
+    );
+
+    let plain =
+        format!("{parent} CREATE TABLE t (id int PRIMARY KEY, u_id int REFERENCES u (id));");
+    assert_eq!(from_sql(&enforced).files, from_sql(&plain).files);
+
+    assert_error(
+        "CREATE TABLE t (id int NOT NULL ENFORCED);",
+        "unsupported DDL: an ENFORCED clause on column `t`.`id` at statement 1",
+    );
+}
+
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a NOT NULL constraint's name and
 // NO INHERIT ride on the statement, from the column or the table, and the
 // entity generated from it is the one the plain NOT NULL generates
 #[test]
@@ -508,7 +543,7 @@ fn a_not_null_constraint_rides_on_the_statement() {
     assert_eq!(from_sql(declared).files, from_sql(plain).files);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    two NOT NULL clauses on one
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    two NOT NULL clauses on one
 // column that PostgreSQL would refuse to make one constraint of are refused
 #[test]
 fn conflicting_not_null_constraints_are_refused() {
@@ -574,7 +609,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -645,7 +680,7 @@ fn a_unique_index_folds_into_its_constraint() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -655,7 +690,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -677,7 +712,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a table declaring a second
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a table declaring a second
 // primary key is named in every spelling PostgreSQL refuses (42P16), rather
 // than read as the composite key one `PRIMARY KEY (a, b)` declares
 #[test]
@@ -695,7 +730,7 @@ fn a_second_primary_key_is_named() {
     assert!(parse_schema("CREATE TABLE t (a int, b int, PRIMARY KEY (a, b));").is_ok());
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+8/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+9/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]
@@ -858,7 +893,7 @@ fn an_array_or_modified_range_is_refused() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    an identity inside a composite
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    an identity inside a composite
 // key is carried, not refused, and the generated entity declares it on its
 // column and compiles: the key is not generated whole, the column is
 // [spec:pgorm:sem:codegen.entity.compact.attrs+4/test]    `identity` follows
@@ -882,7 +917,7 @@ fn composite_key_identity_generates_a_compiling_entity() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    `BY DEFAULT` keeps its form, an
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    `BY DEFAULT` keeps its form, an
 // identity column is NOT NULL unasked, and the expanded format chains the
 // builder and answers `auto_increment()` for the key alone
 // [spec:pgorm:sem:codegen.entity.pk+1/test]    a key every column of which is
@@ -921,7 +956,7 @@ fn identity_forms_reach_both_formats() {
     assert_contains(&pair, "fn auto_increment() -> bool { true }");
 }
 
-// [spec:pgorm:sem:codegen.ddl.tables+7/test]    a table-level FOREIGN KEY over two
+// [spec:pgorm:sem:codegen.ddl.tables+8/test]    a table-level FOREIGN KEY over two
 // columns is bridged as one key pairing them in order, and the entities
 // generated from it compile, the owning side's relation and the target's
 // inverse each joining on both pairs

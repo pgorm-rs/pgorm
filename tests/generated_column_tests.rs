@@ -74,7 +74,7 @@ async fn generated_kinds(
 
 /// Each kind lands in the catalog as itself: the column written `STORED` is
 /// stored and the one written `VIRTUAL` virtual, and both compute from the row.
-// [spec:pgorm:req:sql.ddl.column-def+11/test]    each kind reaches the catalog as
+// [spec:pgorm:req:sql.ddl.column-def+12/test]    each kind reaches the catalog as
 // written, so neither column's kind is the server's default
 #[pgorm_macros::test]
 async fn each_kind_reaches_the_catalog() -> Result<(), Error> {
@@ -219,7 +219,7 @@ async fn entity_generated_columns_compute_on_write() -> Result<(), Error> {
 /// the rule records: a virtual column takes no index, key or user-defined type,
 /// and neither kind takes a volatile expression, another generated column, or
 /// a `DEFAULT` beside it. A stored column takes the key a virtual one cannot.
-// [spec:pgorm:req:sql.ddl.column-def+11/test]    the refusals around each kind,
+// [spec:pgorm:req:sql.ddl.column-def+12/test]    the refusals around each kind,
 // by SQLSTATE
 #[pgorm_macros::test]
 async fn server_refusals_around_generated_columns() -> Result<(), Error> {
@@ -399,7 +399,7 @@ async fn derived_values(db: &DatabaseConnection) -> Result<Vec<(i32, i32)>, Erro
 /// A new expression reaches the rows already written, for either kind: the
 /// stored column's table is rewritten to hold the new values, and the virtual
 /// column's is left alone, since it computes on read. Neither changes kind.
-// [spec:pgorm:req:sql.ddl.alter-table+9/test]    SET EXPRESSION recomputes existing
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]    SET EXPRESSION recomputes existing
 // rows, rewriting the table for a stored column and not for a virtual one
 #[pgorm_macros::test]
 async fn set_expression_recomputes_existing_rows() -> Result<(), Error> {
@@ -458,7 +458,7 @@ async fn set_expression_recomputes_existing_rows() -> Result<(), Error> {
 
 /// Dropping a stored column's expression leaves each row the value it was
 /// last computed to, and the column plain: a later row writes its own value.
-// [spec:pgorm:req:sql.ddl.alter-table+9/test]    DROP EXPRESSION keeps a stored
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]    DROP EXPRESSION keeps a stored
 // column's values and leaves it writable
 #[pgorm_macros::test]
 async fn drop_expression_keeps_stored_values() -> Result<(), Error> {
@@ -496,7 +496,7 @@ async fn drop_expression_keeps_stored_values() -> Result<(), Error> {
 /// could not have been created with (`42P17`); and a new expression for a
 /// virtual column once the table has a `CHECK` constraint (`0A000`), where a
 /// stored column's still goes through.
-// [spec:pgorm:req:sql.ddl.alter-table+9/test]    the refusals of SET and DROP
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]    the refusals of SET and DROP
 // EXPRESSION, by SQLSTATE, and IF EXISTS passing over a plain column
 #[pgorm_macros::test]
 async fn expression_actions_refused_by_sqlstate() -> Result<(), Error> {

@@ -199,7 +199,7 @@ known limitations.
 > written in the entity's own module, so it names the row's columns as `Column`
 > variants: `generated_stored = "Expr::col(Column::Price).mul(Expr::col(Column::Quantity))"`.
 > The kind is in the key's name and has no default, for the reason the builder's
-> `generated` takes it as an argument (`[spec:pgorm:req:sql.ddl.column-def+11]`).
+> `generated` takes it as an argument (`[spec:pgorm:req:sql.ddl.column-def+12]`).
 > Each combination PostgreSQL refuses for a generated column MUST be a compile error
 > spanned at the field's generated key: both keys, or one twice ("a column is generated
 > one way"); a generated key beside `identity` or `identity_by_default` ("both identity

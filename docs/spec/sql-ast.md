@@ -50,7 +50,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+16]
+> [spec:pgorm:req:sql.surface+17]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -122,7 +122,10 @@ today, including panicking edges and deliberate failsafes.
 > generated column is, stored or virtual (`sql.ddl.column-def`);
 > `NotNullConstraint` and `ConstraintChange`, a `NOT NULL` constraint added at
 > table level and what `ALTER CONSTRAINT` changes about one that exists
-> (`sql.ddl.alter-table`). An
+> (`sql.ddl.alter-table`); `Check` and `IntoCheck`, a `CHECK` constraint and
+> the conversion an expression takes into one (`sql.ddl.create-table`), and
+> `Enforcement`, whether a foreign key or `CHECK` is enforced
+> (`sql.ddl.enforcement`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -814,7 +817,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `OnConflict::columns` MUST name a whole key's columns in one call. It takes
 > an `IntoKeyColumns`, the conversion a table key is built from
-> (`[spec:pgorm:req:sql.ddl.create-table+12]`): one column or a tuple of one
+> (`[spec:pgorm:req:sql.ddl.create-table+13]`): one column or a tuple of one
 > to twelve, in order, so `OnConflict::columns((a, b))` is the target
 > `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
 > declares the key it arbitrates on. The conversion hands back the first

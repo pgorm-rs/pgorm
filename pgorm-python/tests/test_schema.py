@@ -166,6 +166,38 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             ])
 
     # [spec:pgorm:req:python.schema/test]
+    async def test_not_enforced_constraints(self):
+        table = p.Table('checked "x"', schema=self.namespace)
+        quoted = f'{self.quoted}."checked ""x"""'
+        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").check(p.col("id") > 0, name="positive", not_enforced=True))
+        await self.pool.execute(ddl.column(s.ColumnDef("parent", "integer")).check(p.col("id") < 100, name="small"))
+        catalog = p.RawSQL(
+            "SELECT conname::text AS name, conenforced AS enforced, convalidated AS valid "
+            "FROM pg_constraint WHERE conrelid = $1::text::regclass ORDER BY conname",
+            [quoted],
+        )
+        async with self.pool.connection() as connection:
+            await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1, 5)"))
+            await connection.execute(s.add_check(table, p.col("parent") < 0, name="negative parent", not_enforced=True))
+            await connection.execute(p.RawSQL(f"CREATE UNIQUE INDEX ON {quoted} (id)"))
+            await connection.execute(p.RawSQL(
+                f"ALTER TABLE {quoted} ADD CONSTRAINT parent_key FOREIGN KEY (parent) REFERENCES {quoted} (id) NOT ENFORCED"
+            ))
+            with self.assertRaises(p.DatabaseError) as orphan:
+                await connection.execute(s.alter_constraint(table, "parent_key", "enforced"))
+            self.assertEqual(orphan.exception.sqlstate, "23503")
+            with self.assertRaises(p.DatabaseError) as check:
+                await connection.execute(s.alter_constraint(table, "positive", "enforced"))
+            self.assertEqual(check.exception.sqlstate, "42809")
+            rows = [dict(row) for row in await connection.fetch_all(catalog)]
+            self.assertEqual(rows, [
+                {"name": "negative parent", "enforced": False, "valid": False},
+                {"name": "parent_key", "enforced": False, "valid": False},
+                {"name": "positive", "enforced": False, "valid": False},
+                {"name": "small", "enforced": True, "valid": True},
+            ])
+
+    # [spec:pgorm:req:python.schema/test]
     async def test_qualified_enum_arrays_and_label_escaping(self):
         # A same-named public type must not capture a qualified column reference.
         shadow_name = 'Mood shadow ' + uuid4().hex[:8]

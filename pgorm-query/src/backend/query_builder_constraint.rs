@@ -6,7 +6,7 @@ use super::*;
 impl QueryBuilder {
     /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: a column's not-null
     /// constraint, the clause `CREATE TABLE` and `ADD COLUMN` write it with.
-    // [spec:pgorm:req:sql.ddl.column-def+11]
+    // [spec:pgorm:req:sql.ddl.column-def+12]
     pub(crate) fn prepare_not_null(
         &self,
         name: Option<&Name>,
@@ -24,7 +24,7 @@ impl QueryBuilder {
     /// table-level spelling, and the only one with a place for `NOT VALID`.
     /// A modified column's named or `NO INHERIT` constraint is written this
     /// way too, as `SET NOT NULL` can carry neither.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_add_not_null(
         &self,
         constraint: &NotNullConstraint,
@@ -43,14 +43,14 @@ impl QueryBuilder {
     }
 
     /// `VALIDATE CONSTRAINT "name"`.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_validate_constraint(&self, name: &Name, sql: &mut dyn SqlWriter) {
         write!(sql, "VALIDATE CONSTRAINT ").unwrap();
         name.prepare(sql.as_writer());
     }
 
     /// `ALTER CONSTRAINT "name" <change>`.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_alter_constraint(
         &self,
         name: &Name,
@@ -64,7 +64,7 @@ impl QueryBuilder {
 
     /// `CONSTRAINT "name" `, when the constraint has a name; nothing when the
     /// server is to derive one.
-    fn prepare_constraint_name(&self, name: Option<&Name>, sql: &mut dyn SqlWriter) {
+    pub(super) fn prepare_constraint_name(&self, name: Option<&Name>, sql: &mut dyn SqlWriter) {
         if let Some(name) = name {
             write!(sql, "CONSTRAINT ").unwrap();
             name.prepare(sql.as_writer());

@@ -123,7 +123,7 @@ explicit limitations.
 > (the latter accepting arbitrary expressions), `identity()` /
 > `identity_by_default()` (`GENERATED ALWAYS` / `BY DEFAULT AS IDENTITY`), and
 > `generated(expr, kind)` (`GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`, the
-> kind a `GeneratedKind` that is always stated, `[spec:pgorm:req:sql.ddl.column-def+11]`).
+> kind a `GeneratedKind` that is always stated, `[spec:pgorm:req:sql.ddl.column-def+12]`).
 > `get_column_type()` and `is_null()` expose the type and nullability for introspection.
 >
 > `default` is one slot, `Option<ColumnDefault>`, holding a default expression, an

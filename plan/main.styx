@@ -9756,12 +9756,27 @@ children (
                 title "A foreign key or CHECK constraint can be NOT ENFORCED"
                 kind @feat
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T17:09:02.787063Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while landing pg-query-18, outside the postgres-18 survey: PostgreSQL 18 adds ENFORCED / NOT ENFORCED to FOREIGN KEY and CHECK constraints (a NOT ENFORCED constraint is recorded in pg_constraint, conenforced false, and not checked). pgorm-query's constraint builders cannot spell it, and codegen's DDL bridge now refuses it by name (codegen.ddl.unsupported+6: \"a NOT ENFORCED constraint\" for a table-level foreign key with Constraint.is_enforced false or a column-level CONSTR_ATTR_NOT_ENFORCED attribute, \"an ENFORCED clause\" for an explicit column-level ENFORCED). Build the clause on the foreign-key and CHECK builders (table-level, column-level and ALTER TABLE ADD CONSTRAINT), check live what 18 refuses (NOT ENFORCED on a primary or unique key, and whether ALTER CONSTRAINT ... ENFORCED validates), record the SQLSTATEs, and replace the codegen refusal with the reading once the entity model can hold it."
+                    }
+
+                    {
+                        at 2026-10-06T23:48:11.779127Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T01:09:00.747535Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -43,11 +43,14 @@ since PostgreSQL 17 requires `STORED` and 18 reads a bare one as `VIRTUAL`.
 `.not_null(name=None, no_inherit=False)` is the column's one `NOT NULL`
 constraint, which PostgreSQL 18 records by name — the one given, or one it
 derives — and which a table that inherits this one takes unless
-`no_inherit=True`. Keys are
+`no_inherit=True`. `.check(condition, name=None, not_enforced=False)` adds a
+`CHECK`; `not_enforced=True` is PostgreSQL 18's `NOT ENFORCED`, recorded and
+never checked. Keys are
 the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
 which a later call replaces, and `CreateTable.unique(*columns, name=...,
 nulls_not_distinct=...)` adds a unique key, so a table cannot be written with
-two primary keys. `CreateTable` also supports checks and `if_not_exists`. Use
+two primary keys. `CreateTable` also supports `check(condition, name=None,
+not_enforced=False)` and `if_not_exists`. Use
 unqualified `p.col(...)` expressions
 inside checks and generated columns. Table targets must be `p.Table` without
 an alias; `schema=` retains the qualified identifier.
@@ -60,8 +63,9 @@ options. `nulls_not_distinct()` also selects uniqueness and requires PostgreSQL
 index name.
 
 Table changes use `add_column`, `modify_column`, `drop_column`, `rename_column`,
-`set_expression`, `drop_expression`, `add_not_null`, `validate_constraint`,
-`alter_constraint`, `rename_table`, `truncate` and `drop_table`. Each returns a ready native DDL statement. A `modify_column`
+`set_expression`, `drop_expression`, `add_not_null`, `add_check`,
+`validate_constraint`, `alter_constraint`, `rename_table`, `truncate` and
+`drop_table`. Each returns a ready native DDL statement. A `modify_column`
 definition selects Rust's corresponding type, nullability and default changes;
 a generated column's expression is changed by `set_expression(table, column,
 expr)`, which the rows already written take, and removed by
@@ -70,8 +74,12 @@ plain with its values. `add_not_null(table, column, name=None,
 no_inherit=False, not_valid=False)` adds a `NOT NULL` constraint over a column
 that exists; with `not_valid=True` the rows already there are left unchecked
 until `validate_constraint(table, name)` checks them, while new rows are held
-to it at once. `alter_constraint(table, name, "inherit" | "no_inherit")`
-changes whether a `NOT NULL` constraint passes to inheriting tables. Database
+to it at once. `add_check(table, condition, name=None, not_enforced=False)`
+adds a `CHECK` to a table that exists. `alter_constraint(table, name,
+"inherit" | "no_inherit")` changes whether a `NOT NULL` constraint passes to
+inheriting tables, and `alter_constraint(table, name, "enforced" |
+"not_enforced")` whether a foreign key is enforced; enforcing one checks the
+rows already there. Database
 validation and privileges still apply; these APIs do not introspect the
 database or compute migrations.
 

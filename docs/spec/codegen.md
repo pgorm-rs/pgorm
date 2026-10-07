@@ -737,7 +737,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+8]
+> [spec:pgorm:req:codegen.ddl.unsupported+9]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -792,10 +792,16 @@ compiling the C parser falls on people generating entities and on nobody else.
 > entity model can hold it: a
 > primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
 > which is not the plain key over the same columns; a foreign key matching on
-> a `PERIOD` (`a PERIOD foreign key`); a `NOT ENFORCED` foreign key or column
-> attribute (`a NOT ENFORCED constraint`), and an explicit column-level
-> `ENFORCED` (`an ENFORCED clause`), as the column-level deferrability
-> attributes are refused whether or not they state the default. 18's `NOT
+> a `PERIOD` (`a PERIOD foreign key`); and a `NOT ENFORCED` foreign key or
+> column attribute (`a NOT ENFORCED constraint`). That one the bridged
+> statement could carry (`sql.ddl.enforcement`) and the entity cannot: a
+> foreign key that is not enforced admits rows that break it, and the
+> relation an entity reads it as has no way to say so, so schema generation
+> from that entity would create the key enforced, and a load would meet the
+> orphans the relation promises are absent. An explicit `ENFORCED` is
+> refused (`an ENFORCED clause`) everywhere PostgreSQL refuses it — after a
+> column's `NOT NULL`, key or `DEFAULT` — and read on a column's
+> `REFERENCES`, where it states the default (`codegen.ddl.tables`). 18's `NOT
 > NULL` constraint is read, not named: its name and `NO INHERIT`, from a
 > column's clause or a table-level `NOT NULL c`, are the column's
 > (`codegen.ddl.tables`).
@@ -881,7 +887,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+7]
+> [spec:pgorm:sem:codegen.ddl.tables+8]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -911,7 +917,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`codegen.entity.transform`).
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+11]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+12]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity
@@ -925,7 +931,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 >
 > A column's `NOT NULL` is PostgreSQL 18's catalog constraint, and its name
 > and `NO INHERIT` become the column's (`ColumnDef::not_null_named`,
-> `not_null_no_inherit`, `[spec:pgorm:req:sql.ddl.column-def+11]`), whether
+> `not_null_no_inherit`, `[spec:pgorm:req:sql.ddl.column-def+12]`), whether
 > the column's clause declares them or a table-level `[CONSTRAINT n] NOT NULL
 > c [NO INHERIT]` does: the server creates the same constraint from either,
 > and `sql.ddl.column-def` gives the column the one spelling. They ride on the
@@ -949,7 +955,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > constraint name. A foreign key whose two column lists differ in length is a
 > named rejection rather than a truncated key — the pairs are what the bridged
 > statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and
-> Postgres itself rejects the mismatch at parse analysis.
+> Postgres itself rejects the mismatch at parse analysis. An explicit
+> `ENFORCED` on a column's `REFERENCES` becomes the foreign key's
+> `Enforcement::Enforced`, riding on the statement as said; the entity is the
+> plain key's, which is what it is. At table level the parse tree marks every
+> foreign key enforced whether or not the clause is written, so there is
+> nothing to tell apart and nothing is carried.
 > Referential actions map `RESTRICT`, `CASCADE`, `SET NULL` and
 > `SET DEFAULT` onto `ForeignKeyAction`. `NO ACTION` reads as no action
 > declared: the grammar fills that same code in when a foreign key declares

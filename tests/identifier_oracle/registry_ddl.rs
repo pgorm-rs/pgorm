@@ -2,8 +2,9 @@
 //! how to add one.
 
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Comment, ConstraintChange, ForeignKey, Index, IndexColumn, IndexType,
-    NotNullConstraint, Sequence, SequenceOption, Table, TableForeignKey, TableKey, TypeName,
+    Check, ColumnDef, ColumnType, Comment, ConstraintChange, Enforcement, Expr, ForeignKey, Index,
+    IndexColumn, IndexType, NotNullConstraint, Sequence, SequenceOption, Table, TableForeignKey,
+    TableKey, TypeName,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -53,6 +54,34 @@ pub fn sites() -> Vec<Site> {
             render: |n| {
                 sql(Table::create(fixed("t"))
                     .col(ColumnDef::new(fixed("c")).integer().not_null_named(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/create-table.column-check-name",
+            api: "ColumnDef::check(Check::new(..).name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(
+                    ColumnDef::new(fixed("c"))
+                        .integer()
+                        .check(Check::new(Expr::col(fixed("c")).gt(0)).name(n_(n))),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-table.check-name",
+            api: "TableCreateStatement::check(Check::new(..).name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer())
+                    .check(
+                        Check::new(Expr::col(fixed("c")).gt(0))
+                            .name(n_(n))
+                            .enforcement(Enforcement::NotEnforced),
+                    ))
             },
         },
         Site {
@@ -391,6 +420,16 @@ pub fn sites() -> Vec<Site> {
             render: |n| {
                 sql(&Table::alter(fixed("t"))
                     .add_not_null(NotNullConstraint::new(fixed("c")).name(n_(n)).not_valid()))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-check-name",
+            api: "TableAlterStatement::add_check(Check::new(..).name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .add_check(Check::new(Expr::col(fixed("c")).gt(0)).name(n_(n))))
             },
         },
         Site {

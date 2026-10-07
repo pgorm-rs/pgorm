@@ -1,5 +1,5 @@
 use super::{
-    column::PyColumnDef,
+    column::{self, PyColumnDef},
     statement::{PyDDL, Statement},
 };
 use crate::{
@@ -85,9 +85,15 @@ impl PyCreateTable {
         Ok(Self { inner })
     }
 
-    fn check(&self, condition: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(signature=(condition, *, name=None, not_enforced=false))]
+    fn check(
+        &self,
+        condition: &Bound<'_, PyAny>,
+        name: Option<&Bound<'_, PyAny>>,
+        not_enforced: bool,
+    ) -> PyResult<Self> {
         let mut inner = self.inner.clone();
-        inner.check(expressions::require_expr(condition)?.inner);
+        inner.check(column::check(condition, name, not_enforced)?);
         Ok(Self { inner })
     }
 
@@ -295,6 +301,26 @@ pub(super) fn add_not_null(
     })
 }
 
+/// `ALTER TABLE ... ADD [CONSTRAINT ...] CHECK (...) [NOT ENFORCED]`: the
+/// constraint `CreateTable.check` declares, added to a table that exists.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, condition, *, name=None, not_enforced=false))]
+pub(super) fn add_check(
+    table: &PyTable,
+    condition: &Bound<'_, PyAny>,
+    name: Option<&Bound<'_, PyAny>>,
+    not_enforced: bool,
+) -> PyResult<PyDDL> {
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_check(column::check(
+            condition,
+            name,
+            not_enforced,
+        )?)),
+    })
+}
+
 /// `ALTER TABLE ... VALIDATE CONSTRAINT ...`: the rows a `NOT VALID`
 /// constraint skipped, checked now.
 // [spec:pgorm:req:python.schema]
@@ -319,9 +345,11 @@ pub(super) fn alter_constraint(
     let change = match change {
         "inherit" => ConstraintChange::Inherit,
         "no_inherit" => ConstraintChange::NoInherit,
+        "enforced" => ConstraintChange::Enforced,
+        "not_enforced" => ConstraintChange::NotEnforced,
         _ => {
             return Err(ConstructionError::new_err(
-                "a constraint change is 'inherit' or 'no_inherit'",
+                "a constraint change is 'inherit', 'no_inherit', 'enforced' or 'not_enforced'",
             ));
         }
     };

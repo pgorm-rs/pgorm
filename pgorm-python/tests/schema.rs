@@ -1,8 +1,8 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, ConstraintChange, Expr, GeneratedKind, Index, IndexOrder, IndexType,
-    IntoName, Name, NotNullConstraint, StringLen, Table, TableKey, TableName, TypeName, Values,
-    extension::Type,
+    Check, ColumnDef, ColumnType, ConstraintChange, Enforcement, Expr, GeneratedKind, Index,
+    IndexOrder, IndexType, IntoName, Name, NotNullConstraint, StringLen, Table, TableKey,
+    TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -222,8 +222,50 @@ fn programs() -> BTreeMap<&'static str, String> {
         ),
         (
             "alter_constraint_no_inherit",
-            Table::alter(table)
+            Table::alter(table.clone())
                 .alter_constraint(a("present \"x\""), ConstraintChange::NoInherit)
+                .to_string(),
+        ),
+        (
+            "check_named",
+            Table::create(table.clone())
+                .col(
+                    ColumnDef::new_with_type(a("n"), ColumnType::Integer).check(
+                        Check::new(Expr::col(a("n")).gt(0i64))
+                            .name(a("positive \"x\""))
+                            .enforcement(Enforcement::NotEnforced),
+                    ),
+                )
+                .check(Check::new(Expr::col(a("n")).lt(100i64)).name(a("small \"x\"")))
+                .check(Check::new(Expr::col(a("n")).ne(7i64)).enforcement(Enforcement::NotEnforced))
+                .to_string(),
+        ),
+        (
+            "add_check",
+            Table::alter(table.clone())
+                .add_check(
+                    Check::new(Expr::col(a("n")).gt(0i64))
+                        .name(a("positive \"x\""))
+                        .enforcement(Enforcement::NotEnforced),
+                )
+                .to_string(),
+        ),
+        (
+            "add_check_plain",
+            Table::alter(table.clone())
+                .add_check(Expr::col(a("n")).gt(0i64))
+                .to_string(),
+        ),
+        (
+            "alter_constraint_enforced",
+            Table::alter(table.clone())
+                .alter_constraint(a("fk \"x\""), ConstraintChange::Enforced)
+                .to_string(),
+        ),
+        (
+            "alter_constraint_not_enforced",
+            Table::alter(table)
+                .alter_constraint(a("fk \"x\""), ConstraintChange::NotEnforced)
                 .to_string(),
         ),
         (

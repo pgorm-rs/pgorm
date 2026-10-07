@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+16]
-// [spec:pgorm:req:sql.surface+16/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+17]
+// [spec:pgorm:req:sql.surface+17/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -743,11 +743,12 @@ pub use sequence::{
     SequenceDropStatement, SequenceOption, SequenceOptions, SequenceRenameStatement, SequenceType,
 };
 pub use table::{
-    AddColumnOption, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType, ConstraintChange,
-    GeneratedKind, IdentityGeneration, IntervalPrecision, IntervalSpec, IntoColumnDef,
-    IntoKeyColumns, IntoTableKey, NotNullConstraint, PendingTableAlter, PgInterval, Primary,
-    StringLen, Table, TableAlterOption, TableAlterStatement, TableCreateStatement, TableDropOpt,
-    TableDropStatement, TableKey, TableRenameStatement, TableTruncateStatement, Unique,
+    AddColumnOption, Check, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType,
+    ConstraintChange, Enforcement, GeneratedKind, IdentityGeneration, IntervalPrecision,
+    IntervalSpec, IntoCheck, IntoColumnDef, IntoKeyColumns, IntoTableKey, NotNullConstraint,
+    PendingTableAlter, PgInterval, Primary, StringLen, Table, TableAlterOption,
+    TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement, TableKey,
+    TableRenameStatement, TableTruncateStatement, Unique,
 };
 
 // Rendering: the sink a statement is written into, and the two entry points

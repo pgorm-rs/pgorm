@@ -1,6 +1,6 @@
 use crate::{
-    ColumnDef, ColumnSpec, Comment, CommentStatement, IntoColumnDef, IntoTableKey, Primary,
-    QueryBuilder, SimpleExpr, TableKey, Unique, foreign_key::*, types::*,
+    Check, ColumnDef, ColumnSpec, Comment, CommentStatement, IntoCheck, IntoColumnDef,
+    IntoTableKey, Primary, QueryBuilder, TableKey, Unique, foreign_key::*, types::*,
 };
 
 /// Create a table
@@ -76,7 +76,7 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
@@ -86,7 +86,7 @@ pub struct TableCreateStatement {
     pub(crate) unique_keys: Vec<TableKey<Unique>>,
     pub(crate) foreign_keys: Vec<ForeignKeyCreateStatement>,
     pub(crate) if_not_exists: bool,
-    pub(crate) check: Vec<SimpleExpr>,
+    pub(crate) check: Vec<Check>,
     pub(crate) comment: Option<String>,
     pub(crate) raw_suffix: Option<&'static str>,
 }
@@ -139,8 +139,37 @@ impl TableCreateStatement {
         self
     }
 
-    pub fn check(&mut self, value: SimpleExpr) -> &mut Self {
-        self.check.push(value);
+    /// Add a table-level `CHECK (<expr>)`, after the ones already added.
+    ///
+    /// An expression is the unnamed, enforced constraint; a [`Check`] names it
+    /// or says it is `NOT ENFORCED` (`[spec:pgorm:req:sql.ddl.enforcement]`).
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Table::create(Glyph::Table)
+    ///         .col(ColumnDef::new(Glyph::Aspect).integer())
+    ///         .check(Expr::col(Glyph::Aspect).gt(0))
+    ///         .check(
+    ///             Check::new(Expr::col(Glyph::Aspect).lt(100))
+    ///                 .name(Name::runtime("aspect_small"))
+    ///                 .enforcement(Enforcement::NotEnforced),
+    ///         )
+    ///         .to_string(),
+    ///     [
+    ///         r#"CREATE TABLE "glyph" ( "aspect" integer, CHECK ("aspect" > 0),"#,
+    ///         r#"CONSTRAINT "aspect_small" CHECK ("aspect" < 100) NOT ENFORCED )"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ddl.create-table+13]
+    pub fn check<C>(&mut self, check: C) -> &mut Self
+    where
+        C: IntoCheck,
+    {
+        self.check.push(check.into_check());
         self
     }
 
@@ -179,7 +208,7 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub fn primary_key<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Primary>,
@@ -212,7 +241,7 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub fn unique<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Unique>,
@@ -300,13 +329,13 @@ impl TableCreateStatement {
     }
 
     /// The table's primary key, if it declares one.
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub fn get_primary_key(&self) -> Option<&TableKey<Primary>> {
         self.primary_key.as_ref()
     }
 
     /// The table's unique keys, in the order they were added.
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub fn get_unique_keys(&self) -> &[TableKey<Unique>] {
         &self.unique_keys
     }

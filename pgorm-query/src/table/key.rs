@@ -79,7 +79,7 @@ use std::marker::PhantomData;
 ///
 /// TableKey::<Unique>::new(Glyph::Id).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 #[derive(Debug, Clone)]
 pub struct TableKey<K> {
     pub(crate) name: Option<Name>,
@@ -91,13 +91,13 @@ pub struct TableKey<K> {
 }
 
 /// The kind of the table's one primary key: [`TableKey<Primary>`].
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 #[derive(Debug, Clone, Copy)]
 pub struct Primary;
 
 /// The kind of a unique key, of which a table has any number:
 /// [`TableKey<Unique>`].
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 #[derive(Debug, Clone, Copy)]
 pub struct Unique;
 
@@ -234,7 +234,7 @@ impl TableKey<Unique> {
 ///
 /// Table::create(Name::runtime("t")).primary_key(());
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 // [spec:pgorm:req:sql.ast.on-conflict+3]
 pub trait IntoKeyColumns {
     /// The first column, and the rest in order.
@@ -253,7 +253,7 @@ where
 /// A value that converts into a [`TableKey`] of kind `K`: any
 /// [`IntoKeyColumns`] — one column or a tuple of one to twelve — or a key
 /// already built, which is how a key carrying a name or options is passed.
-// [spec:pgorm:req:sql.ddl.create-table+12]
+// [spec:pgorm:req:sql.ddl.create-table+13]
 pub trait IntoTableKey<K> {
     /// The key.
     fn into_table_key(self) -> TableKey<K>;

@@ -1445,7 +1445,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+11]
+    // [spec:pgorm:req:sql.ddl.column-def+12]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1559,7 +1559,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1631,7 +1631,7 @@ impl QueryBuilder {
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
                             }
-                            // [spec:pgorm:req:sql.ddl.alter-table+9]
+                            // [spec:pgorm:req:sql.ddl.alter-table+10]
                             ColumnSpec::NotNull { name, no_inherit } => {
                                 let mut constraint =
                                     NotNullConstraint::new(column_def.name.clone());
@@ -1645,11 +1645,17 @@ impl QueryBuilder {
                                 write!(sql, " SET DEFAULT ").unwrap();
                                 self.prepare_simple_expr(v, sql);
                             }
-                            ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
+                            // A modified column's CHECK is a constraint the
+                            // table gains, which ALTER TABLE spells as an ADD.
+                            // [spec:pgorm:req:sql.ddl.alter-table+10]
+                            ColumnSpec::Check(check) => {
+                                write!(sql, "ADD ").unwrap();
+                                self.prepare_check_constraint(check, sql);
+                            }
                             ColumnSpec::Generated { .. } => {}
                             // `ALTER TABLE` spells identity as an action on the
                             // column, not as a clause of it.
-                            // [spec:pgorm:req:sql.ddl.column-def+11]
+                            // [spec:pgorm:req:sql.ddl.column-def+12]
                             ColumnSpec::Identity(generation, options) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1681,7 +1687,7 @@ impl QueryBuilder {
                         Mode::TableAlter,
                     );
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+9]
+                // [spec:pgorm:req:sql.ddl.alter-table+10]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1698,6 +1704,10 @@ impl QueryBuilder {
                 }
                 TableAlterOption::AddNotNull(constraint) => {
                     self.prepare_add_not_null(constraint, sql);
+                }
+                TableAlterOption::AddCheck(check) => {
+                    write!(sql, "ADD ").unwrap();
+                    self.prepare_check_constraint(check, sql);
                 }
                 TableAlterOption::ValidateConstraint(name) => {
                     self.prepare_validate_constraint(name, sql);
@@ -1723,7 +1733,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+9]
+    // [spec:pgorm:req:sql.ddl.alter-table+10]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1738,7 +1748,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1761,7 +1771,7 @@ impl QueryBuilder {
             first = false;
         });
 
-        // [spec:pgorm:req:sql.ddl.create-table+12]
+        // [spec:pgorm:req:sql.ddl.create-table+13]
         if let Some(key) = &create.primary_key {
             if !first {
                 write!(sql, ", ").unwrap();
@@ -1818,7 +1828,7 @@ impl QueryBuilder {
             ColumnSpec::AutoIncrement => {}
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr, kind } => self.prepare_generated_column(expr, *kind, sql),
-            // [spec:pgorm:req:sql.ddl.column-def+11]
+            // [spec:pgorm:req:sql.ddl.column-def+12]
             ColumnSpec::Identity(generation, options) => {
                 write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap();
                 self.prepare_identity_options(options.as_ref(), sql);
@@ -1931,11 +1941,17 @@ impl QueryBuilder {
         self.prepare_table_name(&truncate.table, sql);
     }
 
-    /// Translate the check constraint into SQL statement
-    pub(crate) fn prepare_check_constraint(&self, check: &SimpleExpr, sql: &mut dyn SqlWriter) {
+    /// `[CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]`, the
+    /// same at column level, at table level and after `ALTER TABLE`'s `ADD`.
+    // [spec:pgorm:req:sql.ddl.enforcement]
+    pub(crate) fn prepare_check_constraint(&self, check: &Check, sql: &mut dyn SqlWriter) {
+        self.prepare_constraint_name(check.name.as_ref(), sql);
         write!(sql, "CHECK (").unwrap();
-        self.prepare_simple_expr(check, sql);
+        self.prepare_simple_expr(&check.expr, sql);
         write!(sql, ")").unwrap();
+        if let Some(enforcement) = check.enforcement {
+            write!(sql, "{}", enforcement.clause()).unwrap();
+        }
     }
 
     /// Translate IF NOT EXISTS expression in [`TableCreateStatement`].
@@ -1957,7 +1973,7 @@ impl QueryBuilder {
     /// `prepare_index_create_statement` puts it after. The key alone has
     /// deferrability to write, and its columns are plain names: it has no
     /// entry that could carry an ordering, an operator class or an expression.
-    // [spec:pgorm:req:sql.ddl.create-table+12]
+    // [spec:pgorm:req:sql.ddl.create-table+13]
     pub(super) fn prepare_table_key<K>(
         &self,
         keyword: &str,
@@ -2130,7 +2146,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+6]
+    // [spec:pgorm:req:sql.ddl.foreign-key+7]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -2142,7 +2158,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+6]
+    // [spec:pgorm:req:sql.ddl.foreign-key+7]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2202,6 +2218,11 @@ impl QueryBuilder {
         // [spec:pgorm:req:sql.ddl.deferrability+4]
         if let Some(deferrability) = create.foreign_key.deferrability {
             write!(sql, "{}", deferrability.clause()).unwrap();
+        }
+
+        // [spec:pgorm:req:sql.ddl.enforcement]
+        if let Some(enforcement) = create.foreign_key.enforcement {
+            write!(sql, "{}", enforcement.clause()).unwrap();
         }
     }
 

@@ -1,6 +1,6 @@
 use super::types::PyDataType;
 use crate::{errors::ConstructionError, expressions, identifiers::PyIdentifier};
-use pgorm::pgorm_query::{ColumnDef, GeneratedKind};
+use pgorm::pgorm_query::{Check, ColumnDef, Enforcement, GeneratedKind};
 use pyo3::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -58,9 +58,16 @@ impl PyColumnDef {
         inner.default(expressions::coerce(value)?.inner);
         Ok(Self { inner })
     }
-    fn check(&self, condition: &Bound<'_, PyAny>) -> PyResult<Self> {
+    // [spec:pgorm:req:python.schema]
+    #[pyo3(signature=(condition, *, name=None, not_enforced=false))]
+    fn check(
+        &self,
+        condition: &Bound<'_, PyAny>,
+        name: Option<&Bound<'_, PyAny>>,
+        not_enforced: bool,
+    ) -> PyResult<Self> {
         let mut inner = self.inner.clone();
-        inner.check(expressions::require_expr(condition)?.inner);
+        inner.check(check(condition, name, not_enforced)?);
         Ok(Self { inner })
     }
     fn generated(&self, expression: &Bound<'_, PyAny>, kind: &str) -> PyResult<Self> {
@@ -77,4 +84,22 @@ impl PyColumnDef {
         inner.generated(expressions::require_expr(expression)?.inner, kind);
         Ok(Self { inner })
     }
+}
+
+/// A `CHECK` over `condition`, named and `NOT ENFORCED` as asked: what
+/// `ColumnDef.check`, `CreateTable.check` and `add_check` each build.
+// [spec:pgorm:req:python.schema]
+pub(super) fn check(
+    condition: &Bound<'_, PyAny>,
+    name: Option<&Bound<'_, PyAny>>,
+    not_enforced: bool,
+) -> PyResult<Check> {
+    let mut check = Check::new(expressions::require_expr(condition)?.inner);
+    if let Some(name) = name {
+        check = check.name(PyIdentifier::new(name)?.name());
+    }
+    if not_enforced {
+        check = check.enforcement(Enforcement::NotEnforced);
+    }
+    Ok(check)
 }

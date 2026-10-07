@@ -13,8 +13,8 @@ from ._schema import (
     rename_enum as rename_enum, rename_enum_value as rename_enum_value, drop_enum as drop_enum,
 )
 from ._schema_constraints import (
-    add_not_null as add_not_null, validate_constraint as validate_constraint,
-    alter_constraint as alter_constraint,
+    add_not_null as add_not_null, add_check as add_check,
+    validate_constraint as validate_constraint, alter_constraint as alter_constraint,
 )
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver

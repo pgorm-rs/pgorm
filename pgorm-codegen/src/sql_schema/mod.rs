@@ -59,7 +59,7 @@ type Enums = BTreeMap<EnumIdentity, Vec<String>>;
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
 // [spec:pgorm:def:codegen.ddl+3]
-// [spec:pgorm:req:codegen.ddl.unsupported+8]
+// [spec:pgorm:req:codegen.ddl.unsupported+9]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
         .map_err(|err| Error::TransformError(format!("schema SQL did not parse: {err}")))?;
@@ -79,13 +79,13 @@ pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<Writ
 }
 
 /// A construct the bridge does not carry into the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+8]
+// [spec:pgorm:req:codegen.ddl.unsupported+9]
 fn unsupported(what: impl Display, at: usize) -> Error {
     Error::TransformError(format!("unsupported DDL: {what} at statement {at}"))
 }
 
 /// A construct the bridge understands but cannot resolve in this schema.
-// [spec:pgorm:req:codegen.ddl.unsupported+8]
+// [spec:pgorm:req:codegen.ddl.unsupported+9]
 fn unresolved(problem: impl Display, at: usize) -> Error {
     Error::TransformError(format!("statement {at}: {problem}"))
 }
@@ -102,7 +102,7 @@ struct Collected<'a> {
 
 /// Sort every statement in the file into the four the bridge reads, refusing
 /// anything else by name.
-// [spec:pgorm:req:codegen.ddl.unsupported+8]
+// [spec:pgorm:req:codegen.ddl.unsupported+9]
 fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Error> {
     let mut collected = Collected::default();
     for (index, raw) in parsed.stmts.iter().enumerate() {
@@ -212,7 +212,7 @@ fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
 
 /// The SQL a statement the bridge does not read was written as, named the way
 /// its author wrote it.
-// [spec:pgorm:req:codegen.ddl.unsupported+8]
+// [spec:pgorm:req:codegen.ddl.unsupported+9]
 fn statement_kind(node: &NodeEnum) -> &'static str {
     match node {
         NodeEnum::AlterTableStmt(_) => "ALTER TABLE",

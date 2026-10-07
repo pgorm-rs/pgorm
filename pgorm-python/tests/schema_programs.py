@@ -40,6 +40,13 @@ def programs(p):
         "validate_constraint": p.validate_constraint(table, 'present "x"'),
         "alter_constraint_inherit": p.alter_constraint(table, 'present "x"', "inherit"),
         "alter_constraint_no_inherit": p.alter_constraint(table, 'present "x"', "no_inherit"),
+        "check_named": p.CreateTable(table)
+            .column(p.ColumnDef("n", "integer").check(p.col("n") > 0, name='positive "x"', not_enforced=True))
+            .check(p.col("n") < 100, name='small "x"').check(p.col("n") != 7, not_enforced=True),
+        "add_check": p.add_check(table, p.col("n") > 0, name='positive "x"', not_enforced=True),
+        "add_check_plain": p.add_check(table, p.col("n") > 0),
+        "alter_constraint_enforced": p.alter_constraint(table, 'fk "x"', "enforced"),
+        "alter_constraint_not_enforced": p.alter_constraint(table, 'fk "x"', "not_enforced"),
         "enum": p.create_enum(kind, ["", "O'Brien \\ 雪", "busy"]),
         "enum_before": p.add_enum_value(kind, "new", before="busy"),
         "enum_after": p.add_enum_value(kind, "new", after="busy"),
