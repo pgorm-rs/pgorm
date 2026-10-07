@@ -9899,6 +9899,21 @@ children (
                     }
                 )
             }
+
+            {
+                id orm-merge-sync
+                title "Weigh an entity terminal that syncs a set of rows with MERGE and reports each row's action"
+                kind @feat
+                deps (merge-beyond-pg16)
+                log (
+                    {
+                        at 2026-10-07T06:23:42.070125Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by merge-beyond-pg16 (c5acfcaa), from that node's original note: \"Once RETURNING lands, a bulk 'sync this set' terminal that reports per-row actions is the one ORM use worth weighing.\" It has landed: MERGE takes a RETURNING list, returning_action() writes merge_action() ('INSERT' / 'UPDATE' / 'DELETE' per row), and WHEN NOT MATCHED BY SOURCE reaches the target rows a source set did not mention. No ORM path emits MERGE (sql.ast.merge+1): the upsert an entity layer writes is ON CONFLICT.\n\nThe candidate is an entity terminal that makes a table (or the rows a filter selects) match a set of models in one statement: insert the new, update the changed, and optionally delete the target rows the set did not mention (a BY SOURCE arm, which then needs the filter in its condition so it does not delete outside the selected rows), returning each row's model and its action. Questions to settle: whether it is worth it beside ON CONFLICT plus a delete; the source relation (a VALUES list needs every value cast, since a source value is assigned to no column, sql.render.placeholder-typing, and the live suite already holds 42883 / 42725 for an uncast one), and the size limit that implies; how the per-row action decodes beside the model (merge_action() is text, and RETURNING * is the source's columns followed by the target's, so the list must name the target's columns qualified, a bare name both relations have being 42702); concurrency (MERGE takes no ON CONFLICT arbiter, so PostgreSQL documents a concurrent insert of the same key as a unique violation, 23505, where ON CONFLICT would arbitrate it); the name in the exec vocabulary (exec.crud.exec-vocabulary); and Python's registered entities."
+                    }
+                )
+            }
         )
         log (
             {
