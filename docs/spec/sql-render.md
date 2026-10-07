@@ -602,12 +602,20 @@ an ideal Postgres renderer would emit.
 > unrepresentable per `sql.ast.on-conflict`, which is the only guard available
 > since `sql.render.oracle` cannot see it.
 
-> [spec:pgorm:req:sql.render.returning+1]
+> [spec:pgorm:req:sql.render.returning+2]
 > A returning clause on INSERT, UPDATE, or DELETE MUST render as the final
-> clause ` RETURNING ` followed by `*` (`ReturningClause::All`), a
+> clause ` RETURNING `, then, when the clause renames either version of the
+> written row, `WITH (`, the renames comma-separated with `OLD AS "o"` before
+> `NEW AS "n"` whichever was named first, and `) `; then `*`, a
 > comma-separated list of column refs, or a comma-separated list of
-> expressions. There is no pre-source emission point: PostgreSQL spells the
-> returned rows in exactly one position, so the renderer has exactly one.
+> expressions. A clause renaming neither writes no `WITH`. A version's column
+> (`ColumnRef::RowColumn`) renders the version's keyword bare, `.`, and the
+> quoted column (`old."col"`), and every column of a version
+> (`ColumnRef::RowAsterisk`) the keyword and `.*`. The keyword is written
+> bare because it is the relation's name rather than a caller's: quoting it
+> would parse the same (`sql.ast.returning`). There is no pre-source
+> emission point: PostgreSQL spells the returned rows in exactly one
+> position, so the renderer has exactly one.
 
 > [spec:pgorm:req:sql.render.update-delete+3]
 > Each half MUST open with the statement's carried WITH clause when it has one

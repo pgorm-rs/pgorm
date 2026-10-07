@@ -50,7 +50,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+17]
+> [spec:pgorm:req:sql.surface+18]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -123,9 +123,10 @@ today, including panicking edges and deliberate failsafes.
 > `NotNullConstraint` and `ConstraintChange`, a `NOT NULL` constraint added at
 > table level and what `ALTER CONSTRAINT` changes about one that exists
 > (`sql.ddl.alter-table`); `Check` and `IntoCheck`, a `CHECK` constraint and
-> the conversion an expression takes into one (`sql.ddl.create-table`), and
+> the conversion an expression takes into one (`sql.ddl.create-table`),
 > `Enforcement`, whether a foreign key or `CHECK` is enforced
-> (`sql.ddl.enforcement`). An
+> (`sql.ddl.enforcement`), and `ReturningRow`, which version of a written
+> row a RETURNING reference reads (`sql.ast.returning`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -877,15 +878,62 @@ today, including panicking edges and deliberate failsafes.
 
 ## RETURNING
 
-> [spec:pgorm:def:sql.ast.returning]
-> `ReturningClause` expresses PostgreSQL's `RETURNING` and has three forms:
-> `All` (`RETURNING *`), `Columns(Vec<ColumnRef>)`, and
-> `Exprs(Vec<SimpleExpr>)`. The `Returning` helper (obtained from
-> `Query::returning()`) constructs them via `all()`, `column(..)`,
+> [spec:pgorm:def:sql.ast.returning+1]
+> `ReturningClause` expresses PostgreSQL's `RETURNING`: a list, and the names
+> the list reads a written row's two versions by. The list has three forms:
+> every column of the target (`RETURNING *`), column references, and
+> expressions. The `Returning` helper (obtained from `Query::returning()`)
+> constructs a clause in one of them via `all()`, `column(..)`,
 > `columns(..)`, `expr(..)`, and `exprs(..)`. Insert, update, and delete
 > statements accept a clause through `returning(..)`, with shorthands
 > `returning_col(..)` and `returning_all()`; `SelectStatement` has no RETURNING
 > support. Each call replaces any previously set clause.
+>
+> PostgreSQL 18 lets the list read the row as it was before the write and as
+> the statement left it, through the special relations `old` and `new`.
+> `ReturningRow` (`Old`, `New`) names them, and paired with a column or with
+> `Asterisk` it converts into the `RowColumn` and `RowAsterisk` forms of
+> `ColumnRef` (`sql.types.column-ref`), so `(ReturningRow::Old, col)` stands
+> wherever a column reference does. The forms are their own, not a table
+> called `old`. A table-qualified `"old"."col"` parses to the same reference,
+> because a quoted lower-case name is the name the keyword folds to, but the
+> AST would then say a table. The live suite holds what each statement
+> answers on PostgreSQL 18.6:
+>
+> - `UPDATE`: `old` is the row before the update, `new` the row after it.
+> - `DELETE`: `new` reads NULL in every column.
+> - `INSERT`, with `VALUES` or `SELECT`: `old` reads NULL in every column,
+>   except for a row that `ON CONFLICT DO UPDATE` updated, whose `old` is the
+>   row as it stood. A row that `DO NOTHING` skipped, or that the update's
+>   `WHERE` filtered out, returns nothing.
+> - A target column named bare reads the new row, as it did before 18.
+>
+> The names resolve in a RETURNING list and nowhere else: in a `SET` value,
+> a `WHERE` condition or a `SELECT`, `old` names no relation (`42P01`). The
+> builder does not refuse a version reference there, because refusing it
+> would take an expression type of RETURNING's own; the server refuses it
+> instead.
+>
+> `old` and `new` are scoped like any relation name, so a relation of the
+> statement called `old` or `new` takes the name: the target table, its
+> alias, or a `FROM` or `USING` item. The server then resolves `old."col"` to
+> that relation without complaint. On a target called `old`, both versions'
+> references read the new row; on a `FROM` item called `new`, `new."col"`
+> reads that item's column. The builder could tell this from intent only by
+> walking every expression of the list, so it does not try. The rename is
+> the cure. `ReturningClause::old_as(name)` and `new_as(name)` write
+> `RETURNING WITH (OLD AS "name", NEW AS "name")`. A renamed version answers
+> only to its new name (the keyword then names nothing, `42P01`), so the list
+> reads it through an ordinary qualifier, `(name, col)`, which an `alias`
+> token makes one value with the declaration. A new name that clashes with
+> one of the statement's relations is refused (`42712`) rather than taken, so
+> a rename is loud where the default names are silent. Each version holds at
+> most one name and the last call wins, so naming `OLD` twice (`42601`)
+> cannot be built, and the `WITH` list renders only when it names something,
+> so the empty `WITH ()` (`42601`) cannot either. The server refuses one name
+> given to both versions (`42712`). The names are caller-supplied
+> identifiers, quoted like every other name and registered with the
+> identifier oracle (`security.ident-oracle`).
 
 ## UPDATE and DELETE statements
 

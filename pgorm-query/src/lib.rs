@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+17]
-// [spec:pgorm:req:sql.surface+17/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+18]
+// [spec:pgorm:req:sql.surface+18/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -682,7 +682,7 @@ pub mod tests_cfg;
 // way arrives through the public re-exports below.
 pub(crate) use backend::Oper;
 pub(crate) use prepare::Write;
-pub(crate) use query::{ConditionHolder, InsertValueSource, JoinExpr, LockClause};
+pub(crate) use query::{ConditionHolder, InsertValueSource, JoinExpr, LockClause, ReturningItems};
 pub(crate) use types::{JoinKind, JoinOn};
 
 // Names: what an identifier position holds, and the conversions into it —
@@ -715,8 +715,8 @@ pub use query::{
     FrameCurrentRow, FrameExclusion, FrameFollowing, FramePreceding, FrameStart, FrameType,
     Grouping, GroupingElement, GroupingSets, InsertStatement, IntoCondition, IntoSubQueryStatement,
     LockBehavior, LockType, OrderedStatement, OverStatement, Overriding, Query,
-    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, Search, SearchOrder,
-    SelectExpr, SelectStatement, SimpleCaseStatement, SubQueryStatement, UnionType,
+    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, ReturningRow, Search,
+    SearchOrder, SelectExpr, SelectStatement, SimpleCaseStatement, SubQueryStatement, UnionType,
     UpdateStatement, WindowSelectType, WindowStatement, WithClause,
 };
 pub use query::{

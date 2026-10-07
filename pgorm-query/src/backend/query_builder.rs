@@ -668,6 +668,12 @@ impl QueryBuilder {
                 table.prepare(sql.as_writer());
                 write!(sql, ".*").unwrap();
             }
+            // [spec:pgorm:req:sql.render.returning+2] the relation's keyword, bare
+            ColumnRef::RowColumn(row, column) => {
+                write!(sql, "{}.", row.keyword()).unwrap();
+                column.prepare(sql.as_writer());
+            }
+            ColumnRef::RowAsterisk(row) => write!(sql, "{}.*", row.keyword()).unwrap(),
         };
     }
 
@@ -1252,13 +1258,30 @@ impl QueryBuilder {
     }
 
     /// Hook to insert "RETURNING" statements.
-    // [spec:pgorm:req:sql.render.returning+1]
+    // [spec:pgorm:req:sql.render.returning+2]
     fn prepare_returning(&self, returning: &Option<ReturningClause>, sql: &mut dyn SqlWriter) {
         if let Some(returning) = returning {
             write!(sql, " RETURNING ").unwrap();
-            match &returning {
-                ReturningClause::All => write!(sql, "*").unwrap(),
-                ReturningClause::Columns(cols) => {
+            let renames = [("OLD", &returning.old), ("NEW", &returning.new)];
+            let mut renames = renames
+                .iter()
+                .filter_map(|(row, name)| name.as_ref().map(|name| (row, name)))
+                .peekable();
+            if renames.peek().is_some() {
+                write!(sql, "WITH (").unwrap();
+                renames.fold(true, |first, (row, name)| {
+                    if !first {
+                        write!(sql, ", ").unwrap();
+                    }
+                    write!(sql, "{row} AS ").unwrap();
+                    name.prepare(sql.as_writer());
+                    false
+                });
+                write!(sql, ") ").unwrap();
+            }
+            match &returning.items {
+                ReturningItems::All => write!(sql, "*").unwrap(),
+                ReturningItems::Columns(cols) => {
                     cols.iter().fold(true, |first, column_ref| {
                         if !first {
                             write!(sql, ", ").unwrap()
@@ -1267,7 +1290,7 @@ impl QueryBuilder {
                         false
                     });
                 }
-                ReturningClause::Exprs(exprs) => {
+                ReturningItems::Exprs(exprs) => {
                     exprs.iter().fold(true, |first, expr| {
                         if !first {
                             write!(sql, ", ").unwrap()

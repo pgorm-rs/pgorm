@@ -3,7 +3,8 @@ use crate::oracle::{assert_eq, assert_eq_unparsed};
 use pgorm_query::error::{Error, TemplateError};
 use std::sync::Arc;
 
-// [spec:pgorm:def:sql.types.column-ref/test]    the five forms and what `IntoColumnRef` maps onto them
+// [spec:pgorm:def:sql.types.column-ref+1/test]    the seven forms and what `IntoColumnRef` maps onto
+// them
 #[test]
 fn into_column_ref_maps_every_form() {
     assert_eq!(
@@ -27,12 +28,21 @@ fn into_column_ref_maps_every_form() {
         (Glyph::Table, Asterisk).into_column_ref(),
         ColumnRef::TableAsterisk(Glyph::Table.into_name())
     );
+    assert_eq!(
+        (ReturningRow::Old, Glyph::Id).into_column_ref(),
+        ColumnRef::RowColumn(ReturningRow::Old, Glyph::Id.into_name())
+    );
+    assert_eq!(
+        (ReturningRow::New, Asterisk).into_column_ref(),
+        ColumnRef::RowAsterisk(ReturningRow::New)
+    );
 
     // An existing ColumnRef passes through unchanged.
     assert_eq!(ColumnRef::Asterisk.into_column_ref(), ColumnRef::Asterisk);
 }
 
-// [spec:pgorm:def:sql.types.column-ref/test]    each form is renderable
+// [spec:pgorm:def:sql.types.column-ref+1/test]    each table form is renderable; the two version
+// forms render in `returning.rs`, the one list that resolves them
 #[test]
 fn every_column_ref_form_renders() {
     assert_eq!(

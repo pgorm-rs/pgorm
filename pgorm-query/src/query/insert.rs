@@ -1,7 +1,7 @@
 use crate::{
-    AnyWithClause, IntoSubQueryStatement, OnConflict, QueryStatementBuilder, ReturningClause,
-    SelectStatement, SimpleExpr, SubQueryStatement, Values, backend::QueryBuilder, error::*,
-    prepare::*, types::*,
+    AnyWithClause, IntoSubQueryStatement, OnConflict, QueryStatementBuilder, Returning,
+    ReturningClause, SelectStatement, SimpleExpr, SubQueryStatement, Values, backend::QueryBuilder,
+    error::*, prepare::*, types::*,
 };
 use inherent::inherent;
 
@@ -389,7 +389,7 @@ impl InsertStatement {
     where
         C: IntoColumnRef,
     {
-        self.returning(ReturningClause::Columns(vec![col.into_column_ref()]))
+        self.returning(Returning.column(col))
     }
 
     /// RETURNING expressions all columns.
@@ -412,7 +412,7 @@ impl InsertStatement {
     /// );
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
-        self.returning(ReturningClause::All)
+        self.returning(Returning.all())
     }
 
     /// Insert with default values if columns and values are not supplied.

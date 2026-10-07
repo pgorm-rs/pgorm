@@ -1,5 +1,5 @@
 use crate::{
-    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, ReturningClause,
+    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, Returning, ReturningClause,
     SubQueryStatement, backend::QueryBuilder, expr::*, prepare::*, query::condition::*, types::*,
     value::*,
 };
@@ -315,7 +315,7 @@ impl UpdateStatement {
     where
         C: IntoColumnRef,
     {
-        self.returning(ReturningClause::Columns(vec![col.into_column_ref()]))
+        self.returning(Returning.column(col))
     }
 
     /// RETURNING expressions all columns.
@@ -339,7 +339,7 @@ impl UpdateStatement {
     /// );
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
-        self.returning(ReturningClause::All)
+        self.returning(Returning.all())
     }
 
     /// Get column values

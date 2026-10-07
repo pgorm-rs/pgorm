@@ -9652,12 +9652,27 @@ children (
                 title "RETURNING names a row's old and new values, and can rename them"
                 kind @feat
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.399041Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Survey: in PostgreSQL 18, RETURNING can name a row's old and new values. A quoted \"old\".\"balance\" / \"new\".\"balance\" through the existing ColumnRef::TableColumn already returns correct before/after values on 18.6, verified live. Two things are missing. First, a typed spelling, so the special OLD/NEW relations are not just a table named \"old\"; decide whether a typed Old/New reference is clearer than quoting, and check whether quoting changes meaning when a real table is named old. Second, the RETURNING WITH (OLD AS o, NEW AS n) rename clause, which is 18-only grammar and needs pg-query-18. Applies to INSERT ... ON CONFLICT DO UPDATE, UPDATE, DELETE and MERGE (MERGE's RETURNING is in merge-beyond-pg16), so check each live. Consider whether the ORM's update/insert returning paths should use it, and file that as a follow-up if so."
+                    }
+
+                    {
+                        at 2026-10-07T03:21:29.155498Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T04:52:44.725158Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

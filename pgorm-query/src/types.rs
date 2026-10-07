@@ -14,7 +14,7 @@ pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
     // [spec:pgorm:req:sql.render.ident-quoting+7]
-    // [spec:pgorm:req:security.ident-oracle+11] (the quoting every registered
+    // [spec:pgorm:req:security.ident-oracle+12] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
@@ -132,7 +132,7 @@ impl fmt::Debug for dyn SqlName {
 }
 
 /// Column references
-// [spec:pgorm:def:sql.types.column-ref]
+// [spec:pgorm:def:sql.types.column-ref+1]
 // [spec:pgorm:def:sql.ast.keywords+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
@@ -141,9 +141,16 @@ pub enum ColumnRef {
     SchemaTableColumn(Name, Name, Name),
     Asterisk,
     TableAsterisk(Name),
+    /// A column of a written row's old or new version, `old."col"`, which
+    /// only a RETURNING list resolves.
+    // [spec:pgorm:def:sql.ast.returning+1]
+    RowColumn(crate::ReturningRow, Name),
+    /// Every column of a written row's old or new version, `old.*`.
+    // [spec:pgorm:def:sql.ast.returning+1]
+    RowAsterisk(crate::ReturningRow),
 }
 
-// [spec:pgorm:def:sql.types.column-ref]
+// [spec:pgorm:def:sql.types.column-ref+1]
 pub trait IntoColumnRef {
     fn into_column_ref(self) -> ColumnRef;
 }

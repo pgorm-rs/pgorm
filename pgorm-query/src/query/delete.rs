@@ -1,6 +1,7 @@
 use crate::{
-    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, ReturningClause, SimpleExpr,
-    SubQueryStatement, backend::QueryBuilder, prepare::*, query::condition::*, types::*, value::*,
+    AnyWithClause, IntoSubQueryStatement, QueryStatementBuilder, Returning, ReturningClause,
+    SimpleExpr, SubQueryStatement, backend::QueryBuilder, prepare::*, query::condition::*,
+    types::*, value::*,
 };
 use inherent::inherent;
 
@@ -232,7 +233,7 @@ impl DeleteStatement {
     where
         C: IntoColumnRef,
     {
-        self.returning(ReturningClause::Columns(vec![col.into_column_ref()]))
+        self.returning(Returning.column(col))
     }
 
     /// RETURNING expressions all columns.
@@ -254,7 +255,7 @@ impl DeleteStatement {
     /// );
     /// ```
     pub fn returning_all(&mut self) -> &mut Self {
-        self.returning(ReturningClause::All)
+        self.returning(Returning.all())
     }
 }
 

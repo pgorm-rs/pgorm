@@ -420,12 +420,16 @@ including panic semantics and quirks inherited from sea-query.
 > a token no projection declares still compiles, and the server reports the
 > unknown column exactly as it would for a mistyped string.
 
-> [spec:pgorm:def:sql.types.column-ref]
-> `ColumnRef` has five forms: `Column(Name)`, `TableColumn(Name,
-> Name)`, `SchemaTableColumn(Name, Name, Name)`, `Asterisk` and
-> `TableAsterisk(Name)`. `IntoColumnRef` maps a bare name to `Column`, a
-> 2-tuple to `TableColumn`, a 3-tuple to `SchemaTableColumn`, the `Asterisk`
-> unit type to `Asterisk`, and `(name, Asterisk)` to `TableAsterisk`.
+> [spec:pgorm:def:sql.types.column-ref+1]
+> `ColumnRef` has seven forms: `Column(Name)`, `TableColumn(Name,
+> Name)`, `SchemaTableColumn(Name, Name, Name)`, `Asterisk`,
+> `TableAsterisk(Name)`, and the two that read a version of a written row in
+> a RETURNING list, `RowColumn(ReturningRow, Name)` and
+> `RowAsterisk(ReturningRow)` (`sql.ast.returning`). `IntoColumnRef` maps a
+> bare name to `Column`, a 2-tuple to `TableColumn`, a 3-tuple to
+> `SchemaTableColumn`, the `Asterisk` unit type to `Asterisk`, `(name,
+> Asterisk)` to `TableAsterisk`, `(ReturningRow, name)` to `RowColumn`, and
+> `(ReturningRow, Asterisk)` to `RowAsterisk`.
 
 > [spec:pgorm:def:sql.types.table-ref+4]
 > Table references are split by position, so that a reference which names no

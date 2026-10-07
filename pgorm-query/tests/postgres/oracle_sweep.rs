@@ -371,7 +371,7 @@ fn sweep_window_function_shapes() {
 // [spec:pgorm:req:sql.render.oracle+1/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert+2/test]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
-// [spec:pgorm:req:sql.render.returning+1/test]
+// [spec:pgorm:req:sql.render.returning+2/test]
 #[test]
 fn sweep_insert_shapes() {
     let insert = || {

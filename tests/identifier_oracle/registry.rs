@@ -31,7 +31,8 @@
 use pgorm::pgorm_query::{
     Asterisk, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable, JoinType,
     LockType, MatchedAction, MergeInsert, MergeUpdate, Name, OnConflict, Order, Query,
-    RecursiveWithClause, Search, SearchOrder, SqlTemplate, TypeName, WindowStatement, WithClause,
+    RecursiveWithClause, ReturningRow, Search, SearchOrder, SqlTemplate, TypeName, WindowStatement,
+    WithClause,
 };
 
 use super::oracle::{
@@ -733,6 +734,42 @@ fn query_sites() -> Vec<Site> {
                     .table(fixed("t"))
                     .value(fixed("c"), 1)
                     .returning_col(n_(n)))
+            },
+        },
+        Site {
+            id: "query/returning.old-as",
+            api: "ReturningClause::old_as(Name)",
+            kinds: &["ReturningOption.value"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::update()
+                    .table(fixed("t"))
+                    .value(fixed("c"), 1)
+                    .returning(Query::returning().all().old_as(n_(n))))
+            },
+        },
+        Site {
+            id: "query/returning.new-as",
+            api: "ReturningClause::new_as(Name)",
+            kinds: &["ReturningOption.value"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::update()
+                    .table(fixed("t"))
+                    .value(fixed("c"), 1)
+                    .returning(Query::returning().all().new_as(n_(n))))
+            },
+        },
+        Site {
+            id: "query/returning.row-column",
+            api: "Returning::column((ReturningRow, Name)) — the column part",
+            kinds: &["ColumnRef.fields[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::update()
+                    .table(fixed("t"))
+                    .value(fixed("c"), 1)
+                    .returning(Query::returning().column((ReturningRow::Old, n_(n)))))
             },
         },
         // -- DELETE --------------------------------------------------------
