@@ -9833,4 +9833,25 @@ children (
             }
         )
     }
+
+    {
+        id constraint-not-valid
+        title "A foreign key or CHECK can be added NOT VALID, and a CHECK can be NO INHERIT"
+        kind @feat
+        log (
+            {
+                at 2026-10-07T01:10:17.283536Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by pg18-not-null-constraints (0bb4ac00) and pg18-not-enforced (cdcc02d6). TableAlterStatement::validate_constraint(name) now renders VALIDATE CONSTRAINT, and a NOT NULL can be added NOT VALID (NotNullConstraint::not_valid), but a foreign key (TableForeignKey) and a CHECK (Check, added with add_check) have no not_valid, so the builder can validate a constraint only something else added NOT VALID. Checked live on 18.6: ADD ... FOREIGN KEY ... NOT VALID and ADD ... CHECK ... NOT VALID leave convalidated false and hold new rows at once; in CREATE TABLE the server ignores NOT VALID and creates the constraint valid, as it does for a NOT NULL, so the clause belongs on the ALTER TABLE ADD path only (a type-level split like NotNullConstraint's, not a flag CREATE TABLE renders and the server drops); a NOT ENFORCED constraint is never valid whatever it says, and VALIDATE refuses it (55000). Separately, CHECK (...) NO INHERIT (pre-18) has no spelling on Check; it is refused on a partitioned table. Neither is PostgreSQL 18's, which is why both stayed outside those nodes. Decide the shape (NOT VALID only where ADD renders it), check live what each refuses, and give Python the same."
+            }
+
+            {
+                at 2026-10-07T01:10:41.714115Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "SQLSTATEs checked on 18.6 when filing: a CHECK added NOT VALID over a breaking row is accepted (convalidated false) and refuses a new breaking row (23514); CHECK (...) NO INHERIT on a partitioned table is refused 42P16 (\"cannot add NO INHERIT constraint to partitioned table\"), where a NOT NULL's NO INHERIT there is 0A000."
+            }
+        )
+    }
 )
