@@ -789,7 +789,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## ON CONFLICT
 
-> [spec:pgorm:req:sql.ast.on-conflict+3]
+> [spec:pgorm:req:sql.ast.on-conflict+4]
 > `OnConflict` (attached with `InsertStatement::on_conflict`, which accepts
 > anything converting into one) MUST be one of exactly two shapes:
 > `AnyDoNothing`, carrying nothing, for the arbiter-less clause PostgreSQL
@@ -817,7 +817,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `OnConflict::columns` MUST name a whole key's columns in one call. It takes
 > an `IntoKeyColumns`, the conversion a table key is built from
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`): one column or a tuple of one
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`): one column or a tuple of one
 > to twelve, in order, so `OnConflict::columns((a, b))` is the target
 > `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
 > declares the key it arbitrates on. The conversion hands back the first
@@ -861,7 +861,13 @@ today, including panicking edges and deliberate failsafes.
 > which is what separates the named clause from the arbiter-less one. An
 > exclusion constraint arbitrates `DO NOTHING` and refuses `DO UPDATE`
 > (`42809`); it is also the one arbiter that only a name reaches, because
-> inference looks for a unique index and finds none (`42P10`). A deferrable
+> inference looks for a unique index and finds none (`42P10`). PostgreSQL
+> 18's temporal key, a primary or unique key ending `WITHOUT OVERLAPS`
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`), is enforced as one and
+> arbitrates as one, which the live suite holds: `OnConflict::columns` over
+> its columns, period included, finds nothing to infer (`42P10`), and its
+> name takes `DO NOTHING`, an overlapping row being the conflict, and refuses
+> `DO UPDATE` (`42809`). A deferrable
 > constraint is refused as an arbiter (`55000`, `sql.ddl.deferrability`); a
 > check constraint has no index to arbitrate by (`42809`); and a unique index
 > made by `CREATE UNIQUE INDEX` is not a constraint at all, so its name is

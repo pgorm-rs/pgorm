@@ -9578,6 +9578,7 @@ children (
                 title "A table key can end WITHOUT OVERLAPS and a foreign key can reference a PERIOD"
                 kind @feat
                 deps (pg18-test-server pg-query-18)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.503406Z
@@ -9591,6 +9592,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "pg-query-18 landed the 18 grammar. Codegen's DDL bridge refuses both shapes by name until this node builds them (codegen.ddl.unsupported+6, pgorm-codegen/src/sql_schema/table.rs reject_constraint_features): Constraint.without_overlaps -> \"a WITHOUT OVERLAPS key\", fk_with_period/pk_with_period -> \"a PERIOD foreign key\". It also refuses a NOT ENFORCED foreign key (is_enforced false at table level, CONSTR_ATTR_NOT_ENFORCED at column level), which 18 added too and no node owns yet."
+                    }
+
+                    {
+                        at 2026-10-07T01:12:05.317894Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T02:55:53.087666Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -8,14 +8,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+9]
+// [spec:pgorm:sem:codegen.entity.transform+10]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+9]
+    // [spec:pgorm:sem:codegen.entity.transform+10]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+1]
@@ -31,6 +31,7 @@ impl EntityTransformer {
         for table_create in table_create_stmts.into_iter() {
             let ident = TableIdent::of(table_create.get_table_name());
             let table_name = ident.to_string();
+            refuse_temporal_constraints(&table_create, &table_name)?;
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
                 .get_unique_keys()
                 .iter()
@@ -296,7 +297,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+9]
+// [spec:pgorm:sem:codegen.entity.transform+10]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -312,6 +313,37 @@ pub(crate) fn resolve_reference<'a>(
         .filter(|candidate| candidate.table == reference.table);
     let only = by_name.next()?;
     by_name.next().is_none().then_some(only)
+}
+
+/// A temporal key or foreign key has no entity form: an entity's key and its
+/// relations match by equality alone. A key ending `WITHOUT OVERLAPS` read as
+/// its other columns would claim they are unique when they are not, and a
+/// `PERIOD` foreign key read as its other pairs would join rows in no period
+/// of each other's — so either is refused, never read without its period.
+// [spec:pgorm:sem:codegen.entity.transform+10]
+fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
+    let temporal_key = table
+        .get_primary_key()
+        .is_some_and(|key| key.get_without_overlaps().is_some())
+        || table
+            .get_unique_keys()
+            .iter()
+            .any(|key| key.get_without_overlaps().is_some());
+    if temporal_key {
+        return Err(Error::TransformError(format!(
+            "table `{name}`: an entity cannot hold a WITHOUT OVERLAPS key"
+        )));
+    }
+    let period_foreign_key = table
+        .get_foreign_key_create_stmts()
+        .iter()
+        .any(|create| create.get_foreign_key().get_period().is_some());
+    if period_foreign_key {
+        return Err(Error::TransformError(format!(
+            "table `{name}`: an entity cannot hold a PERIOD foreign key"
+        )));
+    }
+    Ok(())
 }
 
 /// One table per bare name. Two tables that share one would be written to a
@@ -342,7 +374,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+9]
+// [spec:pgorm:sem:codegen.entity.transform+10]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {

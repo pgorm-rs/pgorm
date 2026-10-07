@@ -76,7 +76,7 @@ use crate::{
 /// ```
 ///
 /// [`comments()`]: TableCreateStatement::comments
-// [spec:pgorm:req:sql.ddl.create-table+13]
+// [spec:pgorm:req:sql.ddl.create-table+14]
 #[derive(Debug, Clone)]
 pub struct TableCreateStatement {
     pub(crate) table: TableName,
@@ -164,7 +164,7 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub fn check<C>(&mut self, check: C) -> &mut Self
     where
         C: IntoCheck,
@@ -208,7 +208,7 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub fn primary_key<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Primary>,
@@ -241,7 +241,7 @@ impl TableCreateStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub fn unique<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Unique>,
@@ -329,13 +329,13 @@ impl TableCreateStatement {
     }
 
     /// The table's primary key, if it declares one.
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub fn get_primary_key(&self) -> Option<&TableKey<Primary>> {
         self.primary_key.as_ref()
     }
 
     /// The table's unique keys, in the order they were added.
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub fn get_unique_keys(&self) -> &[TableKey<Unique>] {
         &self.unique_keys
     }

@@ -79,7 +79,7 @@ use std::marker::PhantomData;
 ///
 /// TableKey::<Unique>::new(Glyph::Id).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+13]
+// [spec:pgorm:req:sql.ddl.create-table+14]
 #[derive(Debug, Clone)]
 pub struct TableKey<K> {
     pub(crate) name: Option<Name>,
@@ -87,17 +87,20 @@ pub struct TableKey<K> {
     pub(crate) include: Vec<Name>,
     pub(crate) deferrability: Option<Deferrability>,
     pub(crate) nulls_not_distinct: bool,
+    /// The `WITHOUT OVERLAPS` column, kept apart from `columns` so it is
+    /// always the last one written.
+    pub(crate) without_overlaps: Option<Name>,
     kind: PhantomData<K>,
 }
 
 /// The kind of the table's one primary key: [`TableKey<Primary>`].
-// [spec:pgorm:req:sql.ddl.create-table+13]
+// [spec:pgorm:req:sql.ddl.create-table+14]
 #[derive(Debug, Clone, Copy)]
 pub struct Primary;
 
 /// The kind of a unique key, of which a table has any number:
 /// [`TableKey<Unique>`].
-// [spec:pgorm:req:sql.ddl.create-table+13]
+// [spec:pgorm:req:sql.ddl.create-table+14]
 #[derive(Debug, Clone, Copy)]
 pub struct Unique;
 
@@ -114,6 +117,7 @@ impl<K> TableKey<K> {
             include: Vec::new(),
             deferrability: None,
             nulls_not_distinct: false,
+            without_overlaps: None,
             kind: PhantomData,
         }
     }
@@ -176,14 +180,86 @@ impl<K> TableKey<K> {
         self
     }
 
+    /// End the key with `column WITHOUT OVERLAPS`, PostgreSQL 18's temporal
+    /// key (`[spec:pgorm:req:sql.ddl.create-table+14]`), replacing any such
+    /// column already set.
+    ///
+    /// The key's other columns are compared for equality and this one, a range
+    /// or multirange, for overlap: two rows may share the other columns only
+    /// while their periods do not overlap, so `[2020-01-01,2020-02-01)` and
+    /// `[2020-02-01,2020-03-01)`, which only touch, are both admitted where an
+    /// overlap is refused (`23P01`, the key being enforced by a GiST index as
+    /// an exclusion constraint is). An empty range is refused too (`23514`).
+    ///
+    /// The column is held apart from the key's other columns and written after
+    /// all of them, whatever order the calls come in, because PostgreSQL takes
+    /// `WITHOUT OVERLAPS` on the last column alone (`42601`); and a key starts
+    /// at its first column, so the period is never the only one, which
+    /// PostgreSQL refuses as well (`42601`).
+    ///
+    /// ```
+    /// use pgorm_query::*;
+    ///
+    /// let table = Table::create(Name::runtime("booking"))
+    ///     .col(ColumnDef::new(Name::runtime("room_id")).integer())
+    ///     .col(ColumnDef::new_with_type(
+    ///         Name::runtime("during"),
+    ///         ColumnType::Range(RangeType::TimestampTz),
+    ///     ))
+    ///     .primary_key(
+    ///         TableKey::new(Name::runtime("room_id"))
+    ///             .without_overlaps(Name::runtime("during"))
+    ///             .name(Name::runtime("booking_pkey")),
+    ///     )
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     table.to_string(),
+    ///     [
+    ///         r#"CREATE TABLE "booking" ("#,
+    ///         r#""room_id" integer,"#,
+    ///         r#""during" tstzrange,"#,
+    ///         r#"CONSTRAINT "booking_pkey" PRIMARY KEY ("room_id", "during" WITHOUT OVERLAPS)"#,
+    ///         r#")"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// The server has two requirements a key cannot see: the column must be a
+    /// range or multirange (`42804`), and a scalar column beside it needs a
+    /// GiST operator class, which the `btree_gist` extension provides
+    /// (`42704` without it). Such a key is no unique index, so an `ON
+    /// CONFLICT` cannot infer it from its columns (`42P10`); named with
+    /// [`OnConflict::constraint`](crate::OnConflict::constraint) it arbitrates
+    /// `DO NOTHING` and refuses `DO UPDATE` (`42809`), as an exclusion
+    /// constraint does.
+    // [spec:pgorm:req:sql.ddl.create-table+14]
+    #[must_use]
+    pub fn without_overlaps<C>(mut self, column: C) -> Self
+    where
+        C: IntoName,
+    {
+        self.without_overlaps = Some(column.into_name());
+        self
+    }
+
     /// The constraint's name, if it was given one.
     pub fn get_name(&self) -> Option<&Name> {
         self.name.as_ref()
     }
 
-    /// The key columns, in order. Never empty.
+    /// The key columns compared for equality, in order. Never empty, and
+    /// without the `WITHOUT OVERLAPS` column, which
+    /// [`get_without_overlaps`](Self::get_without_overlaps) reads.
     pub fn get_columns(&self) -> &[Name] {
         &self.columns
+    }
+
+    /// The column the key ends `WITHOUT OVERLAPS`, if it is a temporal key.
+    // [spec:pgorm:req:sql.ddl.create-table+14]
+    pub fn get_without_overlaps(&self) -> Option<&Name> {
+        self.without_overlaps.as_ref()
     }
 
     /// The `INCLUDE` columns, in order.
@@ -234,8 +310,8 @@ impl TableKey<Unique> {
 ///
 /// Table::create(Name::runtime("t")).primary_key(());
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+13]
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 pub trait IntoKeyColumns {
     /// The first column, and the rest in order.
     fn into_key_columns(self) -> (Name, Vec<Name>);
@@ -253,7 +329,7 @@ where
 /// A value that converts into a [`TableKey`] of kind `K`: any
 /// [`IntoKeyColumns`] — one column or a tuple of one to twelve — or a key
 /// already built, which is how a key carrying a name or options is passed.
-// [spec:pgorm:req:sql.ddl.create-table+13]
+// [spec:pgorm:req:sql.ddl.create-table+14]
 pub trait IntoTableKey<K> {
     /// The key.
     fn into_table_key(self) -> TableKey<K>;

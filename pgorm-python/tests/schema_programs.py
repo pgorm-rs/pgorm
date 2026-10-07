@@ -29,6 +29,11 @@ def programs(p):
         "modify_column": p.modify_column(table, p.ColumnDef("extra", "varchar").not_null().default("hello")),
         "add_primary_key": p.add_primary_key(table, 'id "x"', "name"),
         "add_unique": p.add_unique(table, "name", 'id "x"', name='unique "x"', nulls_not_distinct=True),
+        "temporal_keys": base.column(p.ColumnDef('during "x"', p.TypeName("tstzrange")))
+            .primary_key('id "x"', without_overlaps='during "x"')
+            .unique("name", 'id "x"', name='unique "x"', nulls_not_distinct=True, without_overlaps='during "x"'),
+        "add_primary_key_temporal": p.add_primary_key(table, 'id "x"', without_overlaps='during "x"'),
+        "add_unique_temporal": p.add_unique(table, "name", without_overlaps='during "x"'),
         "drop_column": p.drop_column(table, "extra"),
         "set_expression": p.set_expression(table, "twice", p.col('id "x"') * 3),
         "drop_expression": p.drop_expression(table, "twice"),

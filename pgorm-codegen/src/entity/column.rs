@@ -387,7 +387,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+9]
+// [spec:pgorm:sem:codegen.entity.transform+10]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 

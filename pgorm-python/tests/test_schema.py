@@ -166,6 +166,30 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             ])
 
     # [spec:pgorm:req:python.schema/test]
+    async def test_temporal_keys(self):
+        table = p.Table('booked "x"', schema=self.namespace)
+        quoted = f'{self.quoted}."booked ""x"""'
+        await self.pool.execute(p.RawSQL(f"CREATE EXTENSION btree_gist SCHEMA {self.quoted}"))
+        ddl = s.create_table(table).column(s.ColumnDef("room", "integer"))
+        ddl = ddl.column(s.ColumnDef("during", p.TypeName("daterange")))
+        await self.pool.execute(ddl.primary_key("room", without_overlaps="during"))
+        await self.pool.execute(s.add_unique(table, "room", name="room period", nulls_not_distinct=True, without_overlaps="during"))
+        catalog = p.RawSQL(
+            "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint "
+            "WHERE conrelid = $1::text::regclass AND conperiod ORDER BY conname",
+            [quoted],
+        )
+        rows = [row["definition"] for row in await self.pool.fetch_all(catalog)]
+        self.assertEqual(rows, [
+            "PRIMARY KEY (room, during WITHOUT OVERLAPS)",
+            "UNIQUE NULLS NOT DISTINCT (room, during WITHOUT OVERLAPS)",
+        ])
+        await self.pool.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (1, '[2020-01-01,2020-02-01)'), (1, '[2020-02-01,2020-03-01)')"))
+        with self.assertRaises(p.DatabaseError) as overlap:
+            await self.pool.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (1, '[2020-01-15,2020-02-15)')"))
+        self.assertEqual(overlap.exception.sqlstate, "23P01")
+
+    # [spec:pgorm:req:python.schema/test]
     async def test_not_enforced_constraints(self):
         table = p.Table('checked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."checked ""x"""'

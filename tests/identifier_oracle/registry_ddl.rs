@@ -248,6 +248,27 @@ pub fn sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "ddl/create-table.key-without-overlaps",
+            api: "TableCreateStatement::primary_key(TableKey::new(..).without_overlaps(Name))",
+            kinds: &["Constraint.keys[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer())
+                    .primary_key(TableKey::new(fixed("c")).without_overlaps(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-unique-without-overlaps",
+            api: "TableAlterStatement::add_unique(TableKey::new(..).without_overlaps(Name))",
+            kinds: &["Constraint.keys[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .add_unique(TableKey::new(fixed("c")).without_overlaps(n_(n))))
+            },
+        },
+        Site {
             id: "ddl/alter-table.add-primary-key-column",
             api: "TableAlterStatement::add_primary_key(Name)",
             kinds: &["Constraint.keys[0]"],
@@ -324,6 +345,36 @@ pub fn sites() -> Vec<Site> {
                         fixed("r"),
                         n_(n),
                     )))
+            },
+        },
+        Site {
+            id: "ddl/create-table.foreign-key-period",
+            api: "TableCreateStatement::foreign_key(ForeignKey::create(..).period(Name, ..))",
+            kinds: &["Constraint.fk_attrs[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer())
+                    .foreign_key(
+                        ForeignKey::create(fixed("t"), fixed("c"), fixed("r"), fixed("rc"))
+                            .period(n_(n), fixed("rp"))
+                            .to_owned(),
+                    ))
+            },
+        },
+        Site {
+            id: "ddl/create-table.foreign-key-ref-period",
+            api: "TableCreateStatement::foreign_key(ForeignKey::create(..).period(.., Name))",
+            kinds: &["Constraint.pk_attrs[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Table::create(fixed("t"))
+                    .col(ColumnDef::new(fixed("c")).integer())
+                    .foreign_key(
+                        ForeignKey::create(fixed("t"), fixed("c"), fixed("r"), fixed("rc"))
+                            .period(fixed("p"), n_(n))
+                            .to_owned(),
+                    ))
             },
         },
         // -- ALTER TABLE ---------------------------------------------------
@@ -457,6 +508,19 @@ pub fn sites() -> Vec<Site> {
                 sql(&Table::alter(fixed("t")).add_foreign_key(
                     TableForeignKey::new(fixed("t"), fixed("c"), fixed("r"), fixed("rc"))
                         .name(n_(n))
+                        .to_owned(),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/alter-table.add-foreign-key-period",
+            api: "TableAlterStatement::add_foreign_key(TableForeignKey::new(..).period(Name, ..))",
+            kinds: &["Constraint.fk_attrs[1]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t")).add_foreign_key(
+                    TableForeignKey::new(fixed("t"), fixed("c"), fixed("r"), fixed("rc"))
+                        .period(n_(n), fixed("rp"))
                         .to_owned(),
                 ))
             },

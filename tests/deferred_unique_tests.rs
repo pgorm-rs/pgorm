@@ -94,7 +94,7 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
 /// clause, refuses the first half of the swap on the spot.
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
-// [spec:pgorm:req:sql.ddl.create-table+13/test]
+// [spec:pgorm:req:sql.ddl.create-table+14/test]
 // [spec:pgorm:req:sql.scope+11/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
@@ -140,7 +140,7 @@ async fn a_deferred_unique_key_admits_a_transient_duplicate(
 /// named, so `SET CONSTRAINTS` has a name to reach it by.
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: SET CONSTRAINTS moves
 // a deferrable key's check
-// [spec:pgorm:req:sql.ddl.create-table+13/test]
+// [spec:pgorm:req:sql.ddl.create-table+14/test]
 async fn set_constraints_immediate_fires_the_check_early(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {

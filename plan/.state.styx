@@ -892,6 +892,7 @@ assertions (
     {id pg17-set-expression, kind @complete, author "brendan@necessary.nu", at 2026-10-06T21:04:49.227031Z}
     {id pg18-not-null-constraints, kind @complete, author "brendan@necessary.nu", at 2026-10-06T23:46:07.969248Z}
     {id pg18-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-07T01:09:00.747535Z}
+    {id pg18-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-07T02:55:53.087666Z}
 )
 
 impl_evidence (

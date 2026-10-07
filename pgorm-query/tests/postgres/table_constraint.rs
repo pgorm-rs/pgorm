@@ -54,7 +54,7 @@ fn contype(node: &serde_json::Value) -> ConstrType {
     ConstrType::try_from(code as i32).expect("a known constraint type")
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+13/test]    a column or a tuple of them converts into a
+// [spec:pgorm:req:sql.ddl.create-table+14/test]    a column or a tuple of them converts into a
 // key of either kind, which renders as the table constraint it names, its columns plain names
 #[test]
 fn every_key_renders_as_its_table_constraint() {
@@ -146,7 +146,7 @@ fn every_key_renders_as_its_table_constraint() {
     assert_eq!(converted.get_columns().len(), 12);
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+13/test]    a name, INCLUDE and deferrability ride on
+// [spec:pgorm:req:sql.ddl.create-table+14/test]    a name, INCLUDE and deferrability ride on
 // any key, in the grammar's order
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]
 #[test]
@@ -190,7 +190,7 @@ fn a_key_takes_a_name_include_and_deferrability() {
     assert_eq!(constraint_node(&sql)["conname"], "", "{sql}");
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+13/test]    the primary key is one slot a later call
+// [spec:pgorm:req:sql.ddl.create-table+14/test]    the primary key is one slot a later call
 // replaces, so a table renders one PRIMARY KEY however often it is declared; the unique keys
 // append, and every key follows the columns, the primary key first
 #[test]
@@ -250,4 +250,73 @@ fn one_primary_key_and_any_unique_keys() {
     assert_eq!(unique, [vec!["image"], vec!["aspect", "image"]]);
 
     assert!(Table::create(Glyph::Table).get_primary_key().is_none());
+}
+
+// [spec:pgorm:req:sql.ddl.create-table+14/test]    a key ending WITHOUT OVERLAPS writes that
+// column last, after every other key column whatever order the calls come in, and beside a
+// name, NULLS NOT DISTINCT, INCLUDE and deferrability in the grammar's order
+#[test]
+fn a_temporal_key_ends_without_overlaps() {
+    let sql = table(|t| {
+        t.primary_key(
+            TableKey::new(Glyph::Id)
+                .without_overlaps(Glyph::Image)
+                .col(Glyph::Aspect),
+        )
+    });
+    assert!(
+        sql.ends_with(r#""image" text, PRIMARY KEY ("id", "aspect", "image" WITHOUT OVERLAPS) )"#),
+        "{sql}"
+    );
+    let node = constraint_node(&sql);
+    assert_eq!(contype(&node), ConstrType::ConstrPrimary);
+    assert_eq!(names(&node["keys"]), ["id", "aspect", "image"]);
+    assert_eq!(node["without_overlaps"], true, "{sql}");
+
+    let key = TableKey::new(Glyph::Id)
+        .without_overlaps(Glyph::Aspect)
+        .without_overlaps(Glyph::Image)
+        .name(Name::runtime("glyph_period"))
+        .nulls_not_distinct()
+        .include([Glyph::Aspect])
+        .deferrability(Deferrability::DeferrableInitiallyDeferred);
+    let sql = table(|t| t.unique(key.clone()));
+    assert!(
+        sql.ends_with(
+            r#""image" text, CONSTRAINT "glyph_period" UNIQUE NULLS NOT DISTINCT ("id", "image" WITHOUT OVERLAPS) INCLUDE ("aspect") DEFERRABLE INITIALLY DEFERRED )"#
+        ),
+        "a later column replaces the earlier: {sql}"
+    );
+    let node = constraint_node(&sql);
+    assert_eq!(names(&node["keys"]), ["id", "image"]);
+    assert_eq!(node["without_overlaps"], true);
+    assert_eq!(node["nulls_not_distinct"], true);
+    assert_eq!(names(&node["including"]), ["aspect"]);
+    assert_eq!(node["initdeferred"], true, "{sql}");
+
+    assert_eq!(
+        key.get_columns()
+            .iter()
+            .map(|name| name.to_string())
+            .collect::<Vec<_>>(),
+        ["id"],
+        "the equality columns, without the period"
+    );
+    assert_eq!(
+        key.get_without_overlaps().map(|name| name.to_string()),
+        Some("image".to_owned())
+    );
+    assert!(
+        TableKey::<Unique>::new(Glyph::Id)
+            .get_without_overlaps()
+            .is_none()
+    );
+
+    // ALTER TABLE adds the same key, in the same spelling after ADD.
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .add_primary_key(TableKey::new(Glyph::Id).without_overlaps(Glyph::Image))
+            .to_string(),
+        r#"ALTER TABLE "glyph" ADD PRIMARY KEY ("id", "image" WITHOUT OVERLAPS)"#
+    );
 }

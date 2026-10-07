@@ -157,6 +157,40 @@ fn programs() -> BTreeMap<&'static str, String> {
                 .to_string(),
         ),
         (
+            "temporal_keys",
+            Table::create(table.clone())
+                .col(ColumnDef::new_with_type(a("id \"x\""), ColumnType::Integer).not_null())
+                .col(ColumnDef::new_with_type(
+                    a("during \"x\""),
+                    ColumnType::Enum {
+                        name: a("tstzrange").into_name(),
+                        schema: None,
+                        variants: vec![],
+                    },
+                ))
+                .primary_key(TableKey::new(a("id \"x\"")).without_overlaps(a("during \"x\"")))
+                .unique(
+                    TableKey::new(a("name"))
+                        .col(a("id \"x\""))
+                        .name(a("unique \"x\""))
+                        .nulls_not_distinct()
+                        .without_overlaps(a("during \"x\"")),
+                )
+                .to_string(),
+        ),
+        (
+            "add_primary_key_temporal",
+            Table::alter(table.clone())
+                .add_primary_key(TableKey::new(a("id \"x\"")).without_overlaps(a("during \"x\"")))
+                .to_string(),
+        ),
+        (
+            "add_unique_temporal",
+            Table::alter(table.clone())
+                .add_unique(TableKey::new(a("name")).without_overlaps(a("during \"x\"")))
+                .to_string(),
+        ),
+        (
             "drop_column",
             Table::alter(table.clone())
                 .drop_column(a("extra"))

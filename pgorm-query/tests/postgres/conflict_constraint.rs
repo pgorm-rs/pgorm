@@ -28,7 +28,7 @@ fn action(clause: &serde_json::Value) -> OnConflictAction {
     OnConflictAction::try_from(code as i32).expect("a known action")
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+3/test]    a named constraint is an arbiter of its own,
+// [spec:pgorm:req:sql.ast.on-conflict+4/test]    a named constraint is an arbiter of its own,
 // with no column list and no predicate
 // [spec:pgorm:req:sql.render.on-conflict+2/test]    ` ON CONSTRAINT ` and the quoted name
 #[test]
@@ -53,7 +53,7 @@ fn a_named_constraint_arbitrates_do_nothing() {
     assert!(infer.get("where_clause").is_none(), "{sql}");
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+3/test]    both update transitions start from the named
+// [spec:pgorm:req:sql.ast.on-conflict+4/test]    both update transitions start from the named
 // arbiter, and the update keeps its own filter
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 #[test]
@@ -90,7 +90,7 @@ fn a_named_constraint_arbitrates_do_update() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+3/test]    the arbiter a clause holds is the one it was
+// [spec:pgorm:req:sql.ast.on-conflict+4/test]    the arbiter a clause holds is the one it was
 // built from, inferred or named
 #[test]
 fn the_clause_holds_its_arbiter() {
@@ -127,7 +127,7 @@ fn inferred_columns(sql: &str) -> Vec<String> {
         .collect()
 }
 
-// [spec:pgorm:req:sql.ast.on-conflict+3/test]    one call names a composite key, every column in
+// [spec:pgorm:req:sql.ast.on-conflict+4/test]    one call names a composite key, every column in
 // order, as the target the step-by-step chain builds
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 #[test]

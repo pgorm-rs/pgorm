@@ -171,7 +171,7 @@ pub(super) fn build(
 /// column, as a table constraint beside a column's, or twice on one column.
 /// PostgreSQL refuses every such table (42P16), and none is a composite key:
 /// that is one `PRIMARY KEY (a, b)`.
-// [spec:pgorm:req:codegen.ddl.unsupported+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+10]
 fn second_primary_key(table_name: &str, at: usize) -> Error {
     unresolved(
         format!("table `{table_name}` declares more than one primary key"),
@@ -181,7 +181,7 @@ fn second_primary_key(table_name: &str, at: usize) -> Error {
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+10]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -681,7 +681,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+10]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -712,8 +712,11 @@ fn reject_constraint_features(
         return Err(on("a partial constraint"));
     }
     // PostgreSQL 18's temporal keys: a key whose last column is a range that
-    // may not overlap, and a foreign key matching on a period. A plain key or
-    // foreign key over the same columns would mean something else.
+    // may not overlap, and a foreign key matching on a period. The bridged
+    // statement could carry either, and the entity cannot: its key and its
+    // relations match by equality alone, so read as the other columns either
+    // would claim a uniqueness or a join the schema does not have, and schema
+    // generation from the entity would create the plain key.
     if constraint.without_overlaps {
         return Err(on("a WITHOUT OVERLAPS key"));
     }
@@ -738,7 +741,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+10]
 fn constraint_kind(constraint: &Constraint, kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

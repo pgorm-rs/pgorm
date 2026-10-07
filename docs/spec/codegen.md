@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+9]
+> [spec:pgorm:sem:codegen.entity.transform+10]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -116,7 +116,18 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > generate a `ValueType` tuple the key traits have no impl for
 > (`entity.traits.primary-key`), which the derive refuses by name
 > (`macros.derive.entity-model.primary-key`) and the expanded format would
-> hand the caller as a cascade of E0277s.
+> hand the caller as a cascade of E0277s. A statement the caller built may
+> also hold what the DDL bridge refuses before any statement is built, and two
+> of those the reads above would drop without a word: a primary or unique key
+> ending `WITHOUT OVERLAPS`, whose `get_columns()` is its equality columns
+> alone, and a foreign key matching on a `PERIOD`, whose pairs are its
+> equality pairs alone (`sql.ddl.create-table`, `sql.ddl.foreign-key`). Read
+> so, the first would make its other columns the table's key or a unique
+> column, and the second a relation that joins a row to every period of the
+> row it references, for the reasons `codegen.ddl.unsupported` gives; so each
+> is refused, ``TransformError("table `<table>`: an entity cannot hold a
+> WITHOUT OVERLAPS key")`` and ``TransformError("table `<table>`: an entity
+> cannot hold a PERIOD foreign key")``.
 >
 > Once every table has been read, the gate also checks that the schema is
 > closed under its own foreign keys: each relation's referenced table is a
@@ -737,7 +748,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+9]
+> [spec:pgorm:req:codegen.ddl.unsupported+10]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE INDEX`; and `COMMENT ON TABLE`
@@ -793,12 +804,20 @@ compiling the C parser falls on people generating entities and on nobody else.
 > primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
 > which is not the plain key over the same columns; a foreign key matching on
 > a `PERIOD` (`a PERIOD foreign key`); and a `NOT ENFORCED` foreign key or
-> column attribute (`a NOT ENFORCED constraint`). That one the bridged
-> statement could carry (`sql.ddl.enforcement`) and the entity cannot: a
-> foreign key that is not enforced admits rows that break it, and the
-> relation an entity reads it as has no way to say so, so schema generation
-> from that entity would create the key enforced, and a load would meet the
-> orphans the relation promises are absent. An explicit `ENFORCED` is
+> column attribute (`a NOT ENFORCED constraint`). Each of the three the
+> bridged statement could carry (`sql.ddl.create-table`, `sql.ddl.foreign-key`,
+> `sql.ddl.enforcement`) and the entity cannot. An entity's primary key, its
+> unique columns and its relations match by equality alone, so a temporal key
+> read as its other columns would claim them unique — `find_by_id` expecting
+> one row of a room that has one per period — and read with its period as one
+> more equal column would admit the overlaps it refuses; a `PERIOD` foreign
+> key read as its other pairs would join a booking to the room's every
+> period, and read with its period as a pair would match a booking only to a
+> period equal to its own; and schema generation from either entity would
+> create the plain key. A foreign key that is not enforced admits rows that
+> break it, and the relation an entity reads it as has no way to say so, so
+> schema generation from that entity would create the key enforced, and a
+> load would meet the orphans the relation promises are absent. An explicit `ENFORCED` is
 > refused (`an ENFORCED clause`) everywhere PostgreSQL refuses it — after a
 > column's `NOT NULL`, key or `DEFAULT` — and read on a column's
 > `REFERENCES`, where it states the default (`codegen.ddl.tables`). 18's `NOT

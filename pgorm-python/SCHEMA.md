@@ -49,7 +49,12 @@ never checked. Keys are
 the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
 which a later call replaces, and `CreateTable.unique(*columns, name=...,
 nulls_not_distinct=...)` adds a unique key, so a table cannot be written with
-two primary keys. `CreateTable` also supports `check(condition, name=None,
+two primary keys. Either takes `without_overlaps=column`, PostgreSQL 18's
+temporal key: the column, a range or multirange, is written last as `column
+WITHOUT OVERLAPS`, and two rows may then share the other columns only while
+their periods do not overlap. Its GiST index needs the `btree_gist` extension
+for the other columns. `add_primary_key` and `add_unique` take the same
+keywords. `CreateTable` also supports `check(condition, name=None,
 not_enforced=False)` and `if_not_exists`. Use
 unqualified `p.col(...)` expressions
 inside checks and generated columns. Table targets must be `p.Table` without

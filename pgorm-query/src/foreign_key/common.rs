@@ -12,8 +12,10 @@ use crate::{Enforcement, types::*};
 /// The two column lists are one list of pairs rather than two lists, so the
 /// referencing and referenced sides cannot disagree in length — a mismatch the
 /// grammar accepts and parse analysis rejects, and so one no parser oracle can
-/// catch. Further pairs are appended with [`TableForeignKey::col`].
-// [spec:pgorm:req:sql.ddl.foreign-key+7]
+/// catch. Further pairs are appended with [`TableForeignKey::col`], and a
+/// temporal key's `PERIOD` pair, which closes both lists, is set with
+/// [`TableForeignKey::period`].
+// [spec:pgorm:req:sql.ddl.foreign-key+8]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<Name>,
@@ -21,6 +23,9 @@ pub struct TableForeignKey {
     pub(crate) ref_table: TableName,
     pub(crate) first: (Name, Name),
     pub(crate) rest: Vec<(Name, Name)>,
+    /// The `PERIOD` pair, kept apart from the others so it is always the last
+    /// one written, on both sides at once.
+    pub(crate) period: Option<(Name, Name)>,
     pub(crate) on_delete: Option<ForeignKeyAction>,
     pub(crate) on_update: Option<ForeignKeyAction>,
     pub(crate) deferrability: Option<Deferrability>,
@@ -99,6 +104,7 @@ impl TableForeignKey {
             ref_table: ref_table.into_table_name(),
             first: (column.into_name(), ref_column.into_name()),
             rest: Vec::new(),
+            period: None,
             on_delete: None,
             on_update: None,
             deferrability: None,
@@ -123,6 +129,20 @@ impl TableForeignKey {
         S: IntoName,
     {
         self.rest.push((column.into_name(), ref_column.into_name()));
+        self
+    }
+
+    /// Match `column` to `ref_column` as periods — `PERIOD` on both sides,
+    /// PostgreSQL 18's temporal foreign key — replacing any such pair already
+    /// set; [`ForeignKeyCreateStatement::period`](crate::ForeignKeyCreateStatement::period)
+    /// says what it means.
+    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    pub fn period<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
+    where
+        C: IntoName,
+        S: IntoName,
+    {
+        self.period = Some((column.into_name(), ref_column.into_name()));
         self
     }
 
@@ -157,9 +177,18 @@ impl TableForeignKey {
         self.table = table;
     }
 
-    /// The mapped pairs in declaration order, of which there is at least one
+    /// The pairs matched for equality in declaration order, of which there is
+    /// at least one. The `PERIOD` pair is not among them:
+    /// [`get_period`](Self::get_period) reads it.
     pub fn columns(&self) -> impl Iterator<Item = &(Name, Name)> {
         std::iter::once(&self.first).chain(self.rest.iter())
+    }
+
+    /// The `(column, referenced column)` pair matched as periods, if this is a
+    /// temporal foreign key.
+    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    pub fn get_period(&self) -> Option<&(Name, Name)> {
+        self.period.as_ref()
     }
 
     pub fn get_table(&self) -> &TableName {

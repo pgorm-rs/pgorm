@@ -61,7 +61,7 @@ use crate::{
 ///
 /// OnConflict::do_nothing().update_column(Glyph::Aspect);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 // The arbiter-less form genuinely carries nothing, so the size gap is the
 // shape of the clause rather than a payload to box away.
 #[allow(clippy::large_enum_variant)]
@@ -88,7 +88,7 @@ pub enum OnConflict {
 /// each is reached through a builder of its own:
 /// [`OnConflict::column`] and [`OnConflict::expr`] begin an inference target,
 /// [`OnConflict::constraint`] names a constraint.
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictArbiter {
     /// `(..) [WHERE ..]`: the index inference specification, from which the
@@ -100,7 +100,7 @@ pub enum ConflictArbiter {
 }
 
 /// One entry of a conflict target.
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictElement {
     /// A column, as in `ON CONFLICT ("id")`.
@@ -135,7 +135,7 @@ pub enum ConflictElement {
 ///
 /// OnConflict::columns(());
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictTarget {
     pub(crate) first: ConflictElement,
@@ -144,7 +144,7 @@ pub struct ConflictTarget {
 }
 
 /// One assignment of a `DO UPDATE SET`.
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAssignment {
     /// Take the column's value from the row that failed to insert:
@@ -166,7 +166,7 @@ pub enum ConflictAssignment {
 ///
 /// OnConflict::column(Glyph::Id).update_columns::<Glyph, _>([]);
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictAssignments {
     pub(crate) first: ConflictAssignment,
@@ -177,7 +177,7 @@ pub struct ConflictAssignments {
 ///
 /// Only `Update` carries a filter, because PostgreSQL accepts `WHERE` only
 /// after `DO UPDATE SET ..`.
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConflictAction {
     /// `DO NOTHING`.
@@ -222,7 +222,7 @@ pub enum ConflictAction {
 ///     .values_panic([1.into()])
 ///     .on_conflict(OnConflict::constraint(Name::runtime("glyph_aspect_key")));
 /// ```
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictConstraint {
     name: Name,
@@ -233,7 +233,7 @@ pub struct ConflictConstraint {
 /// [`InsertStatement::on_conflict`](crate::InsertStatement::on_conflict) takes
 /// anything that converts into an [`OnConflict`], so a chain ending here is
 /// passed as it stands.
-// [spec:pgorm:req:sql.ast.on-conflict+3]
+// [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConflictUpdate {
     arbiter: ConflictArbiter,
@@ -328,7 +328,7 @@ impl OnConflict {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.on-conflict+3]
+    // [spec:pgorm:req:sql.ast.on-conflict+4]
     pub fn columns<T>(columns: T) -> ConflictTarget
     where
         T: IntoKeyColumns,

@@ -7,7 +7,8 @@ use crate::{
     statements::PyTable,
 };
 use pgorm::pgorm_query::{
-    ConstraintChange, NotNullConstraint, Table, TableCreateStatement, TableKey, TableName, Values,
+    ConstraintChange, NotNullConstraint, Table, TableCreateStatement, TableKey, TableName, Unique,
+    Values,
 };
 use pyo3::{prelude::*, types::PyTuple};
 
@@ -48,38 +49,32 @@ impl PyCreateTable {
         Self { inner }
     }
 
-    #[pyo3(signature=(first, *rest))]
+    #[pyo3(signature=(first, *rest, without_overlaps=None))]
     // A table has one primary key: a later call replaces the key an earlier
     // one declared, as the native builder's one slot does.
     // [spec:pgorm:req:python.schema]
-    fn primary_key(&self, first: &Bound<'_, PyAny>, rest: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        let mut key = TableKey::new(PyIdentifier::new(first)?.name());
-        for column in rest {
-            key = key.col(PyIdentifier::new(&column)?.name());
-        }
+    fn primary_key(
+        &self,
+        first: &Bound<'_, PyAny>,
+        rest: &Bound<'_, PyTuple>,
+        without_overlaps: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let key = key_columns(first, rest, without_overlaps)?;
         let mut inner = self.inner.clone();
         inner.primary_key(key);
         Ok(Self { inner })
     }
 
-    #[pyo3(signature=(first, *rest, name=None, nulls_not_distinct=false))]
+    #[pyo3(signature=(first, *rest, name=None, nulls_not_distinct=false, without_overlaps=None))]
     fn unique(
         &self,
         first: &Bound<'_, PyAny>,
         rest: &Bound<'_, PyTuple>,
         name: Option<&Bound<'_, PyAny>>,
         nulls_not_distinct: bool,
+        without_overlaps: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let mut key = TableKey::new(PyIdentifier::new(first)?.name());
-        if nulls_not_distinct {
-            key = key.nulls_not_distinct();
-        }
-        for column in rest {
-            key = key.col(PyIdentifier::new(&column)?.name());
-        }
-        if let Some(name) = name {
-            key = key.name(PyIdentifier::new(name)?.name());
-        }
+        let key = unique_key(first, rest, name, nulls_not_distinct, without_overlaps)?;
         let mut inner = self.inner.clone();
         inner.unique(key);
         Ok(Self { inner })
@@ -179,20 +174,55 @@ pub(super) fn modify_column(table: &PyTable, column: &PyColumnDef) -> PyResult<P
     })
 }
 
-/// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
-/// declares, added to a table that exists.
-// [spec:pgorm:req:python.schema]
-#[pyfunction]
-#[pyo3(signature=(table, first, *rest))]
-pub(super) fn add_primary_key(
-    table: &PyTable,
+/// A key over `first` and `rest`, in order, ending `without_overlaps WITHOUT
+/// OVERLAPS` when one is given: the period column is the native key's own
+/// last slot, so it is written after every other column.
+fn key_columns<K>(
     first: &Bound<'_, PyAny>,
     rest: &Bound<'_, PyTuple>,
-) -> PyResult<PyDDL> {
+    without_overlaps: Option<&Bound<'_, PyAny>>,
+) -> PyResult<TableKey<K>> {
     let mut key = TableKey::new(PyIdentifier::new(first)?.name());
     for column in rest {
         key = key.col(PyIdentifier::new(&column)?.name());
     }
+    if let Some(period) = without_overlaps {
+        key = key.without_overlaps(PyIdentifier::new(period)?.name());
+    }
+    Ok(key)
+}
+
+/// A unique key: [`key_columns`], with the unique kind's name and
+/// `NULLS NOT DISTINCT`.
+fn unique_key(
+    first: &Bound<'_, PyAny>,
+    rest: &Bound<'_, PyTuple>,
+    name: Option<&Bound<'_, PyAny>>,
+    nulls_not_distinct: bool,
+    without_overlaps: Option<&Bound<'_, PyAny>>,
+) -> PyResult<TableKey<Unique>> {
+    let mut key = key_columns(first, rest, without_overlaps)?;
+    if nulls_not_distinct {
+        key = key.nulls_not_distinct();
+    }
+    if let Some(name) = name {
+        key = key.name(PyIdentifier::new(name)?.name());
+    }
+    Ok(key)
+}
+
+/// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
+/// declares, added to a table that exists.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, first, *rest, without_overlaps=None))]
+pub(super) fn add_primary_key(
+    table: &PyTable,
+    first: &Bound<'_, PyAny>,
+    rest: &Bound<'_, PyTuple>,
+    without_overlaps: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDDL> {
+    let key = key_columns(first, rest, without_overlaps)?;
     Ok(PyDDL {
         inner: Statement::AlterTable(Table::alter(table_name(table)?).add_primary_key(key)),
     })
@@ -202,24 +232,16 @@ pub(super) fn add_primary_key(
 /// added to a table that exists.
 // [spec:pgorm:req:python.schema]
 #[pyfunction]
-#[pyo3(signature=(table, first, *rest, name=None, nulls_not_distinct=false))]
+#[pyo3(signature=(table, first, *rest, name=None, nulls_not_distinct=false, without_overlaps=None))]
 pub(super) fn add_unique(
     table: &PyTable,
     first: &Bound<'_, PyAny>,
     rest: &Bound<'_, PyTuple>,
     name: Option<&Bound<'_, PyAny>>,
     nulls_not_distinct: bool,
+    without_overlaps: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyDDL> {
-    let mut key = TableKey::new(PyIdentifier::new(first)?.name());
-    if nulls_not_distinct {
-        key = key.nulls_not_distinct();
-    }
-    for column in rest {
-        key = key.col(PyIdentifier::new(&column)?.name());
-    }
-    if let Some(name) = name {
-        key = key.name(PyIdentifier::new(name)?.name());
-    }
+    let key = unique_key(first, rest, name, nulls_not_distinct, without_overlaps)?;
     Ok(PyDDL {
         inner: Statement::AlterTable(Table::alter(table_name(table)?).add_unique(key)),
     })

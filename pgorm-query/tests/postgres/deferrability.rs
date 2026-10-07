@@ -15,7 +15,7 @@ const STATES: [(Deferrability, &str); 3] = [
 
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    a primary or unique key carries the clause
 // after its column list and INCLUDE
-// [spec:pgorm:req:sql.ddl.create-table+13/test]
+// [spec:pgorm:req:sql.ddl.create-table+14/test]
 #[test]
 fn a_table_key_carries_its_deferrability() {
     for (deferrability, text) in STATES {

@@ -64,7 +64,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+13]
+> [spec:pgorm:req:sql.ddl.create-table+14]
 > `TableCreateStatement` composes a table name, ordered `ColumnDef`s (`col()`,
 > which stamps the table ref onto each column), the table's keys — one primary
 > key (`primary_key()`) and any number of unique keys (`unique()`), each a
@@ -85,9 +85,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > unique keys in the order they were added, then foreign-key clauses (in
 > `Mode::Creation`, i.e. without `ALTER TABLE`/`ADD`), then the `CHECK`
 > constraints in the order they were added, all comma-separated. A key renders as `[CONSTRAINT "name"
-> ]PRIMARY KEY (cols)` or `[CONSTRAINT "name" ]UNIQUE [NULLS NOT DISTINCT
-> ](cols)`, then `[ INCLUDE (names)][ <deferrability>]`, the columns and the
-> included names each quoted like every other identifier.
+> ]PRIMARY KEY (cols[, "period" WITHOUT OVERLAPS])` or `[CONSTRAINT "name"
+> ]UNIQUE [NULLS NOT DISTINCT ](cols[, "period" WITHOUT OVERLAPS])`, then `[
+> INCLUDE (names)][ <deferrability>]`, the columns and the included names each
+> quoted like every other identifier.
 > `get_primary_key()` reads the primary key back, and `get_unique_keys()` the
 > unique keys in the order they were added.
 >
@@ -108,8 +109,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `is_nulls_not_distinct()`: PostgreSQL refuses it on a primary key (`42601`),
 > so the primary form has no method to carry it, which a `compile_fail` doctest
 > holds. The table-constraint grammar takes a key of plain column names,
-> `INCLUDE`, `NULLS NOT DISTINCT` on a unique key, and deferrability, and
-> nothing else: the live suite shows a non-unique kind, a `DESC`/`ASC` entry,
+> `INCLUDE`, `NULLS NOT DISTINCT` on a unique key, deferrability, and, from
+> PostgreSQL 18, `WITHOUT OVERLAPS` on the last column, and nothing else: the
+> live suite shows a non-unique kind, a `DESC`/`ASC` entry,
 > an operator class, a `COLLATE`, an expression entry, a `WHERE` predicate and
 > a `USING` access method each refused as a syntax error, and `PRIMARY KEY
 > NULLS NOT DISTINCT` likewise. `TableKey` has no method for any of them, and
@@ -119,11 +121,43 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Display` and no build path, because PostgreSQL spells it only inside a
 > table statement; `ALTER TABLE` adds the same type
 > (`[spec:pgorm:req:sql.ddl.alter-table+10]`). Its readers are `get_name()`,
-> `get_columns()`, `get_include()` and `get_deferrability()`. Its columns,
+> `get_columns()`, `get_include()`, `get_deferrability()` and
+> `get_without_overlaps()`. Its columns,
 > not the key, are what an `ON CONFLICT` target naming the key takes:
 > `OnConflict::columns` accepts the same `IntoKeyColumns`, and no `TableKey`,
 > whose name and options an inference target cannot carry
-> (`[spec:pgorm:req:sql.ast.on-conflict+3]`).
+> (`[spec:pgorm:req:sql.ast.on-conflict+4]`).
+>
+> Either kind may be PostgreSQL 18's temporal key: `without_overlaps(c)` ends
+> it `"c" WITHOUT OVERLAPS`, a later call replacing the column, and
+> `get_without_overlaps()` reads it back. The key's other columns are
+> compared for equality and that one, a range or multirange, for overlap, so
+> two rows may share the other columns only while their periods do not
+> overlap. The live suite holds what it means: an overlapping period for one
+> key is refused as the exclusion the key is enforced as (`23P01`, by a GiST
+> index), periods that only touch, `[2020-01-01,2020-02-01)` and
+> `[2020-02-01,2020-03-01)`, are both admitted, and an empty period is refused
+> (`23514`), where the plain key over the same columns, the control, admits
+> the overlap. PostgreSQL takes `WITHOUT OVERLAPS` on the last column alone
+> and refuses a key it is the only column of (both `42601`), so the column is
+> not a flag on an entry of the list, which could stand anywhere in it, but a
+> slot of its own written after every other column whatever order the calls
+> come in, and the key's first column, which its constructor takes, is never
+> it (`[dec:pgorm:invalid-states-unrepresentable]`). `get_columns()` is the
+> equality columns alone. Everything else a key carries combines with it, and
+> the live suite shows each meaning what it means on a plain key: a name,
+> `INCLUDE`, deferrability — a deferred temporal key holds an overlap between
+> statements and refuses it at `COMMIT` (`23P01`) — and the unique kind's
+> `NULLS NOT DISTINCT`, under which two rows with no value and one period
+> conflict where the plain temporal key admits both. `NOT ENFORCED` it
+> refuses as on any key (`0A000`), and a key has none to set
+> (`[spec:pgorm:req:sql.ddl.enforcement]`). Two requirements are the
+> server's knowledge, which a key naming columns cannot see: the column must
+> be a range or multirange (`42804`), and a scalar column beside it needs a
+> GiST operator class, which the `btree_gist` extension gives
+> (`[spec:pgorm:req:sql.ddl.extension+5]`; `42704` without it). A temporal key
+> is no unique index, which is what an `ON CONFLICT` arbiter by inference
+> needs (`[spec:pgorm:req:sql.ast.on-conflict+4]`).
 >
 > A table has one primary key, and PostgreSQL refuses a second in every
 > spelling (`42P16`, *multiple primary keys for table are not allowed*): on two
@@ -199,7 +233,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A column carries no key. A primary or unique key is the table's, a tuple of
 > one or more columns declared on the table
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`), so `ColumnSpec` has no
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`), so `ColumnSpec` has no
 > `UniqueKey` or `PrimaryKey` arm and `ColumnDef` no `unique_key()`,
 > `primary_key()` or their deferrability variants: a key on a column was the
 > spelling that let one table hold two primary keys, and adding a key to a
@@ -212,7 +246,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`, `DEFAULT <expr>`,
 > `[CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]` — `check(c)`
 > takes the `IntoCheck` a table's `check()` does
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`) —
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`) —
 > `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
@@ -254,7 +288,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > nothing there: the live suite's server creates a table-level `NOT NULL c NOT
 > VALID` valid (`convalidated`), a new table having no rows to leave
 > unchecked. So the concept has one form in `CREATE TABLE`, as a key does
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`).
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`).
 >
 > A generated column is one of PostgreSQL's two kinds, `GeneratedKind::Stored`
 > (computed when the row is written, kept on disk) or `GeneratedKind::Virtual`
@@ -414,14 +448,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > takes `Into<TableForeignKey>` by value, as `add_column` takes
 > `IntoColumnDef`: an embedder consumes what it embeds, and a borrow that
 > silently cloned would be the third reuse-outcome
-> `[spec:pgorm:req:sql.ddl.create-table+13]` rules out.
+> `[spec:pgorm:req:sql.ddl.create-table+14]` rules out.
 >
 > `add_primary_key` and `add_unique`, on both types, take the key a table
 > declares when it is created — any `IntoTableKey` of their kind, a column, a
 > tuple or a built `TableKey` — by value, and render `ADD [CONSTRAINT "name"
 > ]PRIMARY KEY (cols)…` / `ADD [CONSTRAINT "name" ]UNIQUE [NULLS NOT DISTINCT
 > ](cols)…` with the key's `INCLUDE` and deferrability, the table-level
-> spelling of `[spec:pgorm:req:sql.ddl.create-table+13]` after `ADD`. They are
+> spelling of `[spec:pgorm:req:sql.ddl.create-table+14]` after `ADD`. They are
 > how a key is added to a table that exists, now that a column carries none
 > (`[spec:pgorm:req:sql.ddl.column-def+12]`): the `ADD COLUMN … UNIQUE` and
 > `ADD UNIQUE ("c")` a column's key spec used to render are this, one key at a
@@ -486,7 +520,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > whose constraint is still `NOT VALID` is refused as well (`55000`).
 >
 > `add_check(c)`, on both types, takes any `IntoCheck`
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`) and renders `ADD
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`) and renders `ADD
 > [CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]`: the rows
 > already there are checked and one that breaks the condition refuses the
 > action (`23514`), unless the constraint is `NOT ENFORCED`, which holds no
@@ -638,7 +672,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `is_unique_key()` and `kind()` read it back. There is no primary-key kind,
 > because PostgreSQL spells `PRIMARY KEY` only as a table constraint and never
 > as `CREATE INDEX`; the primary key is the table's `TableKey`
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`), and so the standalone
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`), and so the standalone
 > renderer has no primary key to be handed. `IntoIndexColumn` accepts an
 > iden, an `(iden, IndexOrder)` pair, or an `IndexColumn` built outright, and
 > nothing else: the MySQL prefix-length forms
@@ -681,7 +715,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > An `IndexCreateStatement` renders only as `CREATE INDEX`: it does not
 > convert into the `TableKey` a table declares
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`), which is a type of its own
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`), which is a type of its own
 > because nearly everything this statement carries — the `Plain` kind, an
 > expression or ordered entry, an operator class, the predicate, the access
 > method — is a syntax error in a table constraint. The split runs both
@@ -711,7 +745,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+7]
+> [spec:pgorm:req:sql.ddl.foreign-key+8]
 > `TableForeignKey` holds the owning and referenced table names, a non-empty
 > list of `(column, referenced column)` pairs, an optional constraint name, and
 > optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
@@ -734,14 +768,54 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > them would be a promise the name does not keep
 > (`[spec:pgorm:req:sql.ast+2]`). A second copy is `.to_owned()`.
 >
+> A foreign key may be PostgreSQL 18's temporal one: `period(column,
+> ref_column)`, on `TableForeignKey` and `ForeignKeyCreateStatement`, closes
+> both column lists with `PERIOD`, a later call replacing the pair, and
+> `get_period()` reads it back; `columns()`, `get_columns()` and
+> `get_ref_columns()` are the pairs matched for equality alone. Those still
+> match by equality, and the referencing row's period, a range or multirange,
+> must be covered by the union of the periods of the referenced rows that
+> match them. The live suite holds what it means: a child period spanning two
+> adjacent parent rows is admitted, one running past them or naming no parent
+> is refused (`23503`), and so is deleting a parent row a child's period
+> needs; the plain foreign key over the same pairs, the control, is refused
+> outright (`42830`), `PERIOD` being the only way to reference a key ending
+> `WITHOUT OVERLAPS` (`[spec:pgorm:req:sql.ddl.create-table+14]`). PostgreSQL
+> takes `PERIOD` on the last column of each list alone and refuses a list it
+> is the only column of (both `42601`), and refuses it on one side without
+> the other (`42830`). So the pair is a slot of its own, written last on both
+> sides whatever order the calls come in, one call writes both sides, and the
+> constructor's pair always precedes it
+> (`[dec:pgorm:invalid-states-unrepresentable]`). That the referenced key is
+> temporal (`42830`) and the two periods share a type (`42804`) is the
+> server's knowledge.
+>
+> PostgreSQL 18 runs a temporal foreign key's referential actions as `NO
+> ACTION` alone: `CASCADE`, `SET NULL`, `SET DEFAULT` and `RESTRICT` are each
+> refused, on delete and on update (`0A000`, *unsupported ON DELETE action for
+> foreign key constraint using PERIOD*), where `NO ACTION` said outright is
+> taken, as the live suite holds. The builder can write the refused pair, by
+> choice. Ruling it out by type takes a second foreign-key type, one with no
+> action to set, through every embedder, reader and `ALTER TABLE` option
+> that takes the one type now; and a setter chain over `&mut` cannot move a
+> key from one type to the other partway, so that type would need a
+> constructor taking all six names, or a by-value change of type that could
+> carry an action set before it. The server refuses the pair in the statement
+> that creates the key, and the refusal is a release's limit rather than the
+> grammar's: the SQL standard defines the actions on a temporal key, and
+> PostgreSQL leaves them to a later release, as they need the `UPDATE` /
+> `DELETE ... FOR PORTION OF` that was withdrawn from 19 before its release.
+> Deferrability and enforcement a temporal key takes as a plain one does.
+>
 > `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability+4]`,
 > which unique and primary keys share. The foreign key is the case with a use
 > an ORM meets — rows that reference each other, which only a check deferred
 > to `COMMIT` lets a transaction insert.
 >
 > The standalone statement MUST render `ALTER TABLE <from> ADD [CONSTRAINT
-> "name" ]FOREIGN KEY (cols) REFERENCES <to> (ref-cols)[ ON DELETE <action>]
-> [ ON UPDATE <action>][ <deferrability>][ <enforcement>]`; inside `CREATE TABLE` the same clause renders
+> "name" ]FOREIGN KEY (cols[, PERIOD "period"]) REFERENCES <to> (ref-cols[,
+> PERIOD "ref-period"])[ ON DELETE <action>][ ON UPDATE <action>][
+> <deferrability>][ <enforcement>]`; inside `CREATE TABLE` the same clause renders
 > without the `ALTER TABLE`/`ADD` prefix, and inside `ALTER TABLE` options
 > only the `ALTER TABLE` prefix is dropped. On the `CREATE TABLE` path the key
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`:
@@ -751,7 +825,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`). `ForeignKeyDropStatement` MUST
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`). `ForeignKeyDropStatement` MUST
 > render `ALTER TABLE <table> DROP CONSTRAINT "name"`; both halves are taken by
 > `ForeignKey::drop(table, name)` and neither has a setter, for the same reason.
 > It holds the constraint name
@@ -778,9 +852,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The one enum qualifies every constraint the builder spells that PostgreSQL
 > lets defer. A foreign key carries it as a field
-> (`[spec:pgorm:req:sql.ddl.foreign-key+7]`). A primary or unique key carries
+> (`[spec:pgorm:req:sql.ddl.foreign-key+8]`). A primary or unique key carries
 > it on its `TableKey`, whose `deferrability(d)` sets it
-> (`[spec:pgorm:req:sql.ddl.create-table+13]`): it follows the key's column
+> (`[spec:pgorm:req:sql.ddl.create-table+14]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
 > alike (`[spec:pgorm:req:sql.ddl.alter-table+10]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
@@ -832,8 +906,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is the server's default, so a builder emitting it would assert a choice the
 > caller did not make, and `Enforced` renders only because a caller said it.
 >
-> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+7]`)
-> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+13]`),
+> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+8]`)
+> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+14]`),
 > and nothing else can, because nothing else takes it: PostgreSQL refuses
 > `[NOT] ENFORCED` on a primary key, a unique key, a `NOT NULL` and an
 > `EXCLUDE` at table level (`0A000`, "... constraints cannot be marked NOT

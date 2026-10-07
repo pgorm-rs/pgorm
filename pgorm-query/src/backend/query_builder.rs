@@ -1748,7 +1748,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1771,7 +1771,7 @@ impl QueryBuilder {
             first = false;
         });
 
-        // [spec:pgorm:req:sql.ddl.create-table+13]
+        // [spec:pgorm:req:sql.ddl.create-table+14]
         if let Some(key) = &create.primary_key {
             if !first {
                 write!(sql, ", ").unwrap();
@@ -1973,7 +1973,8 @@ impl QueryBuilder {
     /// `prepare_index_create_statement` puts it after. The key alone has
     /// deferrability to write, and its columns are plain names: it has no
     /// entry that could carry an ordering, an operator class or an expression.
-    // [spec:pgorm:req:sql.ddl.create-table+13]
+    /// A temporal key's `WITHOUT OVERLAPS` column closes the list.
+    // [spec:pgorm:req:sql.ddl.create-table+14]
     pub(super) fn prepare_table_key<K>(
         &self,
         keyword: &str,
@@ -1998,6 +1999,12 @@ impl QueryBuilder {
             name.prepare(sql.as_writer());
             false
         });
+        // [spec:pgorm:req:sql.ddl.create-table+14]
+        if let Some(period) = &key.without_overlaps {
+            write!(sql, ", ").unwrap();
+            period.prepare(sql.as_writer());
+            write!(sql, " WITHOUT OVERLAPS").unwrap();
+        }
         write!(sql, ")").unwrap();
 
         if !key.include.is_empty() {
@@ -2146,7 +2153,7 @@ impl QueryBuilder {
     // FOREIGN KEY
 
     /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+7]
+    // [spec:pgorm:req:sql.ddl.foreign-key+8]
     pub(crate) fn prepare_foreign_key_drop_statement(
         &self,
         drop: &ForeignKeyDropStatement,
@@ -2158,7 +2165,7 @@ impl QueryBuilder {
         drop.name.prepare(sql.as_writer());
     }
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+7]
+    // [spec:pgorm:req:sql.ddl.foreign-key+8]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2189,6 +2196,11 @@ impl QueryBuilder {
             col.prepare(sql.as_writer());
             false
         });
+        // [spec:pgorm:req:sql.ddl.foreign-key+8]
+        if let Some((period, _)) = &create.foreign_key.period {
+            write!(sql, ", PERIOD ").unwrap();
+            period.prepare(sql.as_writer());
+        }
         write!(sql, ")").unwrap();
 
         write!(sql, " REFERENCES ").unwrap();
@@ -2203,6 +2215,10 @@ impl QueryBuilder {
             col.prepare(sql.as_writer());
             false
         });
+        if let Some((_, ref_period)) = &create.foreign_key.period {
+            write!(sql, ", PERIOD ").unwrap();
+            ref_period.prepare(sql.as_writer());
+        }
         write!(sql, ")").unwrap();
 
         if let Some(foreign_key_action) = &create.foreign_key.on_delete {

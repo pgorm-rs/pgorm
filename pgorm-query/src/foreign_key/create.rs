@@ -100,7 +100,7 @@ use crate::{
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+7]
+// [spec:pgorm:req:sql.ddl.foreign-key+8]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
@@ -138,6 +138,65 @@ impl ForeignKeyCreateStatement {
         S: IntoName,
     {
         self.foreign_key.col(column, ref_column);
+        self
+    }
+
+    /// Match `column` to `ref_column` as periods, closing both column lists
+    /// with `PERIOD`: PostgreSQL 18's temporal foreign key
+    /// (`[spec:pgorm:req:sql.ddl.foreign-key+8]`). A later call replaces the
+    /// pair.
+    ///
+    /// The other pairs still match by equality, and the referencing row's
+    /// period, a range or multirange, must be covered by the union of the
+    /// periods of the referenced rows that match them: a child row may span
+    /// two adjacent parent rows, and is refused (`23503`) where no parent row
+    /// covers part of it, or its period is empty. The referenced key must be a
+    /// temporal one, ending in the same column
+    /// [`WITHOUT OVERLAPS`](crate::TableKey::without_overlaps) (`42830`
+    /// otherwise, as it is for a plain foreign key onto such a key).
+    ///
+    /// The pair is held apart from the others and written last, whatever
+    /// order the calls come in, because PostgreSQL takes `PERIOD` on the last
+    /// column alone (`42601`); one call writes both sides, which PostgreSQL
+    /// refuses to mix (`42830`); and the constructor's pair comes before it,
+    /// so `PERIOD` is never the only column (`42601`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::*;
+    ///
+    /// let foreign_key = ForeignKey::create(
+    ///     Name::runtime("booking"),
+    ///     Name::runtime("room_id"),
+    ///     Name::runtime("room"),
+    ///     Name::runtime("id"),
+    /// )
+    /// .period(Name::runtime("during"), Name::runtime("valid_at"))
+    /// .to_string();
+    ///
+    /// assert_eq!(
+    ///     foreign_key,
+    ///     [
+    ///         r#"ALTER TABLE "booking" ADD"#,
+    ///         r#"FOREIGN KEY ("room_id", PERIOD "during")"#,
+    ///         r#"REFERENCES "room" ("id", PERIOD "valid_at")"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// PostgreSQL 18 runs a temporal key's referential action as `NO ACTION`
+    /// only, and refuses any other [`ForeignKeyAction`] on it, `ON DELETE` or
+    /// `ON UPDATE` (`0A000`); deferrability and
+    /// [`enforcement`](Self::enforcement) it takes as a plain key does.
+    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    pub fn period<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
+    where
+        C: IntoName,
+        S: IntoName,
+    {
+        self.foreign_key.period(column, ref_column);
         self
     }
 
