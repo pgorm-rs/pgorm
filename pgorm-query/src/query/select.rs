@@ -1,6 +1,6 @@
 use crate::{
     AnyWithClause, FunctionCall, GroupingElement, IntoSubQueryStatement, QueryStatementBuilder,
-    SubQueryStatement, WindowStatement,
+    SubQueryStatement, WindowFunction, WindowStatement,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
@@ -561,10 +561,11 @@ impl SelectStatement {
     /// );
     /// ```
     ///
-    /// PostgreSQL admits `OVER` only after a function call, so a column
+    /// PostgreSQL admits `OVER` only after a function call — a
+    /// [`FunctionCall`], or one of the SQL/JSON aggregates — so a column
     /// reference is not a windowed expression and does not typecheck as one:
     ///
-    /// ```compile_fail,E0308
+    /// ```compile_fail,E0277
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// Query::select()
@@ -574,8 +575,11 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+5]
-    pub fn expr_window(&mut self, func: FunctionCall, window: WindowStatement) -> &mut Self {
+    // [spec:pgorm:def:sql.ast.window-statement+6]
+    pub fn expr_window<F>(&mut self, func: F, window: WindowStatement) -> &mut Self
+    where
+        F: WindowFunction,
+    {
         self.expr(SelectExpr {
             expr: func.into(),
             alias: None,
@@ -605,14 +609,10 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+5]
-    pub fn expr_window_as<A>(
-        &mut self,
-        func: FunctionCall,
-        window: WindowStatement,
-        alias: A,
-    ) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+6]
+    pub fn expr_window_as<F, A>(&mut self, func: F, window: WindowStatement, alias: A) -> &mut Self
     where
+        F: WindowFunction,
         A: IntoName,
     {
         self.expr(SelectExpr {
@@ -644,9 +644,10 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+5]
-    pub fn expr_window_name<W>(&mut self, func: FunctionCall, window: W) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+6]
+    pub fn expr_window_name<F, W>(&mut self, func: F, window: W) -> &mut Self
     where
+        F: WindowFunction,
         W: IntoName,
     {
         self.expr(SelectExpr {
@@ -675,14 +676,10 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+5]
-    pub fn expr_window_name_as<W, A>(
-        &mut self,
-        func: FunctionCall,
-        window: W,
-        alias: A,
-    ) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+6]
+    pub fn expr_window_name_as<F, W, A>(&mut self, func: F, window: W, alias: A) -> &mut Self
     where
+        F: WindowFunction,
         A: IntoName,
         W: IntoName,
     {

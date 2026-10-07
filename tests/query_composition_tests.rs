@@ -128,7 +128,7 @@ struct PriceBracket {
 // `FromQueryResult` struct through every terminal the ORM owns
 // [spec:pgorm:sem:query.build.with.attach+1/test]
 // [spec:pgorm:sem:exec.crud.selector-entry+2/test]
-// [spec:pgorm:sem:sql.render.placeholder-typing/test]    the anchor's cast is what makes the
+// [spec:pgorm:sem:sql.render.placeholder-typing+1/test]    the anchor's cast is what makes the
 // recursion typecheck at all
 #[pgorm_macros::test]
 pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
@@ -194,7 +194,7 @@ pub async fn recursive_cte_decodes_all_one_and_stream() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:sql.render.placeholder-typing/test]    the caller obligation has teeth: an
+// [spec:pgorm:sem:sql.render.placeholder-typing+1/test]    the caller obligation has teeth: an
 // unannotated anchor placeholder resolves to `text` and the server refuses the recursion
 #[pgorm_macros::test]
 pub async fn recursive_cte_anchor_needs_a_cast() -> Result<(), Error> {

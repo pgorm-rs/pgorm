@@ -51,7 +51,7 @@ use crate::expr::SimpleExpr;
 ///     r#"SELECT SUM("size_w") OVER (  ORDER BY "font_size" ASC GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW ) FROM "character""#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.window-statement+5]
+// [spec:pgorm:def:sql.ast.window-statement+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameType {
     /// Offsets are values, compared against the ordering column: every peer of
@@ -178,7 +178,7 @@ use sealed::EndsAtCurrentRow;
 /// // No frame ends at `UNBOUNDED PRECEDING`.
 /// FrameType::Rows.unbounded_preceding().and_unbounded_preceding();
 /// ```
-// [spec:pgorm:def:sql.ast.window-statement+5]
+// [spec:pgorm:def:sql.ast.window-statement+6]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameStart<S> {
     r#type: FrameType,
@@ -265,7 +265,7 @@ impl<S: EndsAtCurrentRow> From<FrameStart<S>> for FrameClause {
 /// Built from a [`FrameStart`], either by giving it an end or by letting a
 /// preceding or current-row start stand alone, so every frame this type holds
 /// is one PostgreSQL's grammar admits.
-// [spec:pgorm:def:sql.ast.window-statement+5]
+// [spec:pgorm:def:sql.ast.window-statement+6]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameClause {
     pub(crate) r#type: FrameType,
@@ -321,7 +321,7 @@ impl FrameClause {
 
 /// The rows an `EXCLUDE` clause removes from a frame, each relative to the
 /// current row and its peers — the rows its window's `ORDER BY` ties with it.
-// [spec:pgorm:def:sql.ast.window-statement+5]
+// [spec:pgorm:def:sql.ast.window-statement+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameExclusion {
     /// `EXCLUDE CURRENT ROW` — the current row, but not its peers.

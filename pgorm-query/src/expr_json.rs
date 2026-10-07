@@ -7,6 +7,7 @@
 //! duplicate would only be a second name for the same node.
 
 use super::*;
+use crate::{JsonInput, JsonTest, SqlJson};
 
 /// Gather a JSON path or key list into the single `text[]` parameter the
 /// operators demand.
@@ -43,7 +44,7 @@ impl Expr {
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" -> 'a'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn get_json_field<T>(self, right: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -72,7 +73,7 @@ impl Expr {
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" ->> 'a'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn cast_json_field<T>(self, right: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -116,7 +117,7 @@ impl Expr {
     /// );
     /// assert_eq!(values.0.len(), 1);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn get_json_path<S, I>(self, path: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -147,7 +148,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE ("user_data" #>> ARRAY ['a','b']) = 'x'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn cast_json_path<S, I>(self, path: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -187,7 +188,7 @@ impl Expr {
     /// let (sql, values) = query.build();
     /// assert_eq!(sql, r#"SELECT "id" FROM "character" WHERE "user_data" ? $1"#);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn has_json_key<S>(self, key: S) -> SimpleExpr
     where
         S: Into<String>,
@@ -232,7 +233,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE "user_data" ?| ARRAY []::text[]"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn has_any_json_keys<S, I>(self, keys: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -269,12 +270,95 @@ impl Expr {
     /// assert_eq!(sql, r#"SELECT "id" FROM "character" WHERE "user_data" ?& $1"#);
     /// assert_eq!(values.0.len(), 1);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json]
+    // [spec:pgorm:req:sql.ast.expr.json+1]
     pub fn has_all_json_keys<S, I>(self, keys: I) -> SimpleExpr
     where
         S: Into<String>,
         I: IntoIterator<Item = S>,
     {
         self.bin_op(BinOper::HasAllJsonKeys, text_array(keys))
+    }
+
+    /// Mark this expression as JSON text for an SQL/JSON position:
+    /// `FORMAT JSON`.
+    ///
+    /// A `text` value then embeds as the JSON it spells, and a `bytea` value
+    /// is read as UTF-8 JSON, which unmarked it cannot be.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .expr(Func::json_object().entry("doc", Expr::col(Char::Character).format_json()))
+    ///         .from(Char::Table)
+    ///         .to_string(),
+    ///     r#"SELECT JSON_OBJECT('doc'::text : "character" FORMAT JSON) FROM "character""#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    pub fn format_json(self) -> JsonInput {
+        JsonInput {
+            expr: self.into(),
+            format_json: true,
+        }
+    }
+
+    /// Express the SQL/JSON predicate `IS JSON`: whether the operand — `text`,
+    /// `json`, `jsonb` or `bytea` — is JSON of the tested kind.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::Character).is_json(JsonKind::Object.with_unique_keys()))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "id" FROM "character" WHERE ("character" IS JSON OBJECT WITH UNIQUE KEYS)"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    pub fn is_json<T>(self, test: T) -> SimpleExpr
+    where
+        T: Into<JsonTest>,
+    {
+        SqlJson::Is {
+            operand: self.into(),
+            test: test.into(),
+            negated: false,
+        }
+        .into()
+    }
+
+    /// Express `IS NOT JSON`, the negation of [`Expr::is_json`]: like it, `NULL`
+    /// for a `NULL` operand.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// assert_eq!(
+    ///     Query::select()
+    ///         .column(Char::Id)
+    ///         .from(Char::Table)
+    ///         .and_where(Expr::col(Char::Character).is_not_json(JsonKind::Value))
+    ///         .to_string(),
+    ///     r#"SELECT "id" FROM "character" WHERE ("character" IS NOT JSON)"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    pub fn is_not_json<T>(self, test: T) -> SimpleExpr
+    where
+        T: Into<JsonTest>,
+    {
+        SqlJson::Is {
+            operand: self.into(),
+            test: test.into(),
+            negated: true,
+        }
+        .into()
     }
 }

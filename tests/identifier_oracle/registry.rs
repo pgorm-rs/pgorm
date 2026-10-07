@@ -907,6 +907,37 @@ fn query_sites() -> Vec<Site> {
                 )
             },
         },
+        // -- SQL/JSON ---------------------------------------------------------
+        Site {
+            id: "query/json-exists.passing",
+            api: "JsonExists::passing(value, Name)",
+            kinds: &["JsonArgument.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Func::json_exists(Expr::col(fixed("c")), "$").passing(1, n_(n))))
+            },
+        },
+        Site {
+            id: "query/json-value.passing",
+            api: "JsonValue::passing(value, Name)",
+            kinds: &["JsonArgument.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Func::json_value(Expr::col(fixed("c")), "$").passing(1, n_(n))))
+            },
+        },
+        Site {
+            id: "query/json-query.passing",
+            api: "JsonQuery::passing(value, Name)",
+            kinds: &["JsonArgument.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Func::json_query(Expr::col(fixed("c")), "$").passing(1, n_(n))))
+            },
+        },
     ]
 }
 

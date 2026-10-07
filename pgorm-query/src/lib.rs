@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+19]
-// [spec:pgorm:req:sql.surface+19/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+20]
+// [spec:pgorm:req:sql.surface+20/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -650,7 +650,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+12]
+// [spec:pgorm:req:sql.scope+13]
 mod backend;
 mod comment;
 pub mod error;
@@ -659,6 +659,7 @@ pub mod extension;
 mod foreign_key;
 mod func;
 mod index;
+mod json;
 mod key;
 mod keywords;
 mod prepare;
@@ -697,6 +698,11 @@ pub use types::{FromItem, IntoFromItem, IntoNamedTable, IntoTableName, JoinType,
 // the two trees themselves.
 pub use expr::{Expr, SimpleExpr, Subscript};
 pub use func::{Func, FuncArgMod, Function, FunctionCall};
+pub use json::{
+    JsonArray, JsonArrayAgg, JsonArrayQuery, JsonExists, JsonExistsBehavior, JsonInput, JsonKind,
+    JsonObject, JsonObjectAgg, JsonParse, JsonQuery, JsonQueryBehavior, JsonSerialize, JsonTest,
+    JsonValue, JsonValueBehavior, SqlJson,
+};
 pub use types::{BinOper, IntoLikeExpr, Keyword, LikeExpr, SubQueryOper, UnOper};
 
 // Values: what a bound parameter carries, and the conversions in and out.
@@ -717,7 +723,7 @@ pub use query::{
     LockBehavior, LockType, OrderedStatement, OverStatement, Overriding, Query,
     QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, ReturningRow, Search,
     SearchOrder, SelectExpr, SelectStatement, SimpleCaseStatement, SubQueryStatement, UnionType,
-    UpdateStatement, WindowSelectType, WindowStatement, WithClause,
+    UpdateStatement, WindowFunction, WindowSelectType, WindowStatement, WithClause,
 };
 pub use query::{
     ConflictAction, ConflictArbiter, ConflictAssignment, ConflictAssignments, ConflictConstraint,

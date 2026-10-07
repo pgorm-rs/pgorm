@@ -125,7 +125,7 @@ async fn a_plain_group_by_is_the_control(db: &DatabaseConnection) -> Result<(), 
 // [spec:pgorm:def:sql.ast.select.grouping/test]    against a live server: ROLLUP groups by each
 // prefix
 // [spec:pgorm:req:sql.render.grouping/test]
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn rollup_adds_the_prefix_subtotals(db: &DatabaseConnection) -> Result<(), Error> {
     let query = grouped(|q| q.group_by_element(GroupingElement::rollup([region(), product()])));
 
@@ -206,7 +206,7 @@ async fn grouping_sets_group_by_exactly_the_sets_named(
 /// (NULL, pear) group and the NULL region's subtotal, both from the data,
 /// and the grand total, which drops the column. `GROUPING(region)` is 0 for
 /// the first two and 1 for the last — the distinction `IS NULL` cannot make.
-// [spec:pgorm:def:sql.ast.func+6/test]    against a live server: GROUPING() reads which columns
+// [spec:pgorm:def:sql.ast.func+7/test]    against a live server: GROUPING() reads which columns
 // a row's set left out
 async fn grouping_tells_subtotal_null_from_data_null(db: &DatabaseConnection) -> Result<(), Error> {
     let query = Query::select()

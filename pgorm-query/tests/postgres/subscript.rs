@@ -168,7 +168,7 @@ fn unparenthesised_computed_bases_do_not_parse() {
 
 // [spec:pgorm:req:sql.render.subscript/test]    parameters number in textual order: the base,
 // then each bound
-// [spec:pgorm:def:sql.render.precedence+7/test]    a subscript is an atom under an operator
+// [spec:pgorm:def:sql.render.precedence+8/test]    a subscript is an atom under an operator
 #[test]
 fn subscripts_bind_and_compose_as_atoms() {
     let array = Expr::val(vec![1, 2, 3]).cast_as_type(TypeName::new(Name::runtime("int4")).array());

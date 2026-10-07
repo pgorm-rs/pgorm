@@ -55,7 +55,7 @@ fn frame_options(sql: &str) -> i64 {
     window_def(sql)["frame_options"].as_i64().expect("a frame")
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    a preceding or current-row start stands alone,
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    a preceding or current-row start stands alone,
 // and each start offers the ends that may follow it
 // [spec:pgorm:req:sql.render.window+5/test]    the mode, then the start alone or `BETWEEN start
 // AND end`, each held to libpg_query's `frameOptions`
@@ -132,7 +132,7 @@ fn each_admitted_pairing_renders_its_frame() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    each exclusion is a method of the finished
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    each exclusion is a method of the finished
 // frame, a lone start included
 // [spec:pgorm:req:sql.render.window+5/test]    ` EXCLUDE …` after the bounds
 #[test]
@@ -177,7 +177,7 @@ fn each_exclusion_renders_after_the_bounds() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    an offset is any expression: a bound value,
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    an offset is any expression: a bound value,
 // a cast, arithmetic
 // [spec:pgorm:req:sql.render.window+5/test]    the offset renders through the expression path,
 // `$N` when bound

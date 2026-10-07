@@ -147,7 +147,7 @@ an ideal Postgres renderer would emit.
 > `CAST($1::text AS tea)` reaches an enum through Postgres' text I/O
 > conversion, exactly as the unpinned form did.
 
-> [spec:pgorm:sem:sql.render.placeholder-typing]
+> [spec:pgorm:sem:sql.render.placeholder-typing+1]
 > Every `SimpleExpr::Value` renders as a `$n` placeholder
 > (`sql.render.param-vs-inline`), and PostgreSQL types a placeholder from the
 > context it appears in. A placeholder in a position that supplies *no* context
@@ -165,10 +165,13 @@ an ideal Postgres renderer would emit.
 > integer fails `22021` (`invalid byte sequence for encoding "UTF8"`) because the
 > driver wrote `int4` bytes where the server asked for `text`.
 >
-> pgorm-query annotates a placeholder in exactly one place — the operand of a
-> cast, per `sql.render.cast-param-type` — and MUST NOT guess a type anywhere
-> else: the renderer has no catalog and no expression typing, so any other
-> annotation would be a guess that silently changes what the statement means.
+> pgorm-query annotates a placeholder in exactly two places — the operand of a
+> cast, per `sql.render.cast-param-type`, and a value in an SQL/JSON position
+> that gives it no type, per `sql.render.sql-json` — and MUST NOT guess a type
+> anywhere else. Neither is a guess: the type written is the value's own, in a
+> position that accepts it as it is. Anywhere else the renderer has no catalog
+> and no expression typing, so an annotation would be a guess that silently
+> changes what the statement means.
 > Supplying the context is therefore the caller's obligation, and it has two
 > spellings: annotate the value with `Expr::val(v).cast_as("<type>")`, which
 > renders `CAST($n::<pin> AS <type>)` and gives the position a type; or, where the
@@ -310,13 +313,14 @@ an ideal Postgres renderer would emit.
 > pattern as a value, then ` ESCAPE ` and the escape character as an inline
 > constant — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+7]
+> [spec:pgorm:def:sql.render.precedence+8]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
 > `Column`, `Tuple`, `Constant`, `FunctionCall`, `Value`, `Keyword`, `Case`,
-> `SimpleCase`, `Subscript`, `Collate`, `Grouping`, `LikePattern`, `AsEnum`, or
-> `SubQuery` (all but the first two are already self-wrapping — a
+> `SimpleCase`, `Subscript`, `Collate`, `Grouping`, `LikePattern`, `AsEnum`,
+> `SqlJson` (`sql.render.sql-json`) or `SubQuery` (all but the first two are
+> already self-wrapping — a
 > `Subscript` either binds tighter than every operator or wraps its own base,
 > per `sql.render.subscript`; a `Collate` wraps itself, per
 > `sql.render.collate`, because `COLLATE` binds tighter than every binary
@@ -501,6 +505,66 @@ an ideal Postgres renderer would emit.
 > refuse: per `sql.ast.func` whether a clause is meaningful on a given
 > function is PostgreSQL's determination, and a renderer that second-guessed
 > it would reject valid calls on functions this enum does not enumerate.
+
+> [spec:pgorm:req:sql.render.sql-json]
+> A `SimpleExpr::SqlJson` MUST render as an atom: each function form in its
+> own call parentheses, and `IS JSON` inside parentheses of its own —
+> `("data" IS JSON OBJECT WITH UNIQUE KEYS)` — as `CASE` takes, so
+> `sql.render.precedence` never places one. Inside them, the operand of
+> `IS [NOT] JSON` is parenthesised when it is an operator expression, because
+> `NOT`, `AND` and `OR` bind looser than `IS`.
+>
+> The query functions render `JSON_EXISTS(` / `JSON_VALUE(` / `JSON_QUERY(`,
+> the context item, `, `, the path, then ` PASSING v AS "name"` (further
+> pairs comma-separated), ` RETURNING <type>`, `JSON_QUERY`'s one shaping
+> clause (` WITH UNCONDITIONAL WRAPPER`, ` WITH CONDITIONAL WRAPPER` or
+> ` OMIT QUOTES`), then ` <behaviour> ON EMPTY` and ` <behaviour> ON ERROR`,
+> each clause only when set and always in this order, the grammar's. The path
+> MUST render as `CAST(<path> AS jsonpath)` with the path a `text` value
+> pushed through `push_param_source_typed`: under `build()` that is
+> `CAST($n::text AS jsonpath)`, a bound parameter whose type is the one the
+> driver writes, and under `to_string()` the escaped literal. A behaviour
+> renders `NULL`, `ERROR`, `TRUE`, `FALSE`, `UNKNOWN`, `EMPTY ARRAY`,
+> `EMPTY OBJECT` or `DEFAULT <literal>`. The `DEFAULT` value MUST render
+> inline under both paths, through `value_to_string` — the literal escaping
+> of `sql.render.string-escape` and `sql.render.value-literals` — because the
+> server refuses a parameter there (`42804`). It is the one value of an
+> SQL/JSON expression that is never bound, and since it is a `Value` rather
+> than an expression, nothing but an escaped literal can reach that position.
+>
+> The constructors render `JSON_OBJECT(k : v, …[ ABSENT ON NULL][ WITH UNIQUE
+> KEYS][ RETURNING t])`, `JSON_ARRAY(v, …[ NULL ON NULL][ RETURNING t])`,
+> `JSON_ARRAY(<select>[ RETURNING t])`, `JSON_OBJECTAGG(k : v[ ABSENT ON
+> NULL][ WITH UNIQUE KEYS][ RETURNING t])`, `JSON_ARRAYAGG(v[ ORDER BY …][
+> NULL ON NULL][ RETURNING t])`, `JSON(v[ WITH UNIQUE KEYS])`,
+> `JSON_SCALAR(v)` and `JSON_SERIALIZE(v[ RETURNING t])`; an aggregate's
+> ` FILTER (WHERE …)` follows its parentheses as a `FunctionCall`'s does
+> (`sql.render.func-mods`). A clause with nothing before it between the
+> parentheses has no leading space, so `JSON_OBJECT(RETURNING jsonb)` and the
+> empty `JSON_OBJECT()` and `JSON_ARRAY()` render as PostgreSQL writes them.
+> An object member MUST render `key : value`, not `key VALUE value`: the
+> `VALUE` form takes only a `c_expr` as its key, which a typed placeholder
+> `$1::text` is not (`42601`). A JSON input's ` FORMAT JSON` follows its
+> expression — before `JSON_ARRAYAGG`'s `ORDER BY`, the other order being
+> `42601`.
+>
+> A value in a position that gives it no type — a context item, a `PASSING`
+> value, an object key or value, an array element, an aggregate's operands, the
+> operand of `JSON()`, `JSON_SCALAR()`, `JSON_SERIALIZE()` and `IS JSON` —
+> MUST render followed by `::<its type>` under both paths: `$1::int4` bound
+> and `5::int4` inline, the type being `Value::source_type_name`'s, and
+> `jsonb` for a `Value::Json`, which has none of its own but is JSON in every
+> such position. PostgreSQL otherwise types these parameters `text` or cannot
+> type them at all (`42P18` in `JSON_OBJECT` and `JSON_OBJECTAGG`), and the
+> type is what the JSON means: `JSON_SCALAR($1::int4)` is the number `5` where
+> a `text` parameter is the string `"5"`, and a `jsonb` member nests where a
+> `text` one is a string. Annotating the inline literal too is what keeps
+> `to_string()` building the JSON `build()` does — an untyped `'{"b":1}'`
+> would embed as a string. This is the second place a placeholder carries a
+> type, beside a cast's operand (`sql.render.cast-param-type`), and it is no
+> guess: the type is the value's own, in a position that accepts any type
+> (`sql.render.placeholder-typing`). An expression other than a value is
+> written as it is, and carries its own type.
 
 > [spec:pgorm:req:sql.render.subquery+2]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,

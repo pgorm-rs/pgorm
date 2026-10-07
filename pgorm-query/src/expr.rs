@@ -4,7 +4,7 @@
 //!
 //! [`SimpleExpr`] is the expression common among select fields, where clauses and many other places.
 
-use crate::{error::Result, func::*, query::*, template::SqlTemplate, types::*, value::*};
+use crate::{SqlJson, error::Result, func::*, query::*, template::SqlTemplate, types::*, value::*};
 
 #[path = "expr_collate.rs"]
 mod collate;
@@ -20,7 +20,7 @@ mod subscript;
 pub use subscript::Subscript;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr+5]
+// [spec:pgorm:def:sql.ast.expr+6]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -33,7 +33,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr+5]
+// [spec:pgorm:def:sql.ast.expr+6]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -71,6 +71,9 @@ pub enum SimpleExpr {
     /// The right operand of a `LIKE` / `ILIKE`: a pattern and the optional
     /// `ESCAPE` character, which the grammar admits only as a pattern's tail.
     LikePattern(LikeExpr),
+    /// An SQL/JSON function, constructor or `IS JSON` predicate.
+    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    SqlJson(Box<SqlJson>),
 }
 
 pub(crate) mod private {

@@ -94,7 +94,7 @@ fn word() -> Expr {
 // [spec:pgorm:req:sql.ast.expr.collate/test]    against a live server: ORDER BY sorts by the
 // collation its key names
 // [spec:pgorm:req:sql.render.collate/test]
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn the_same_values_sort_by_the_collation_named(
     db: &DatabaseConnection,
     linguistic: &str,
@@ -135,7 +135,7 @@ async fn the_same_values_sort_by_the_collation_named(
 /// server cannot create one, and says so.
 // [spec:pgorm:req:sql.ast.expr.collate/test]    against a live server: equality answers by a
 // nondeterministic collation
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn a_nondeterministic_collation_equates_distinct_bytes(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -179,7 +179,7 @@ async fn a_nondeterministic_collation_equates_distinct_bytes(
 // [spec:pgorm:req:sql.ddl.column-def+12/test]    against a live server: a column compares by the
 // collation it was declared with
 // [spec:pgorm:req:sql.ddl.alter-table+10/test]    the retype carries the collation
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn a_collated_column_compares_by_its_collation(
     db: &DatabaseConnection,
     linguistic: &str,
@@ -244,7 +244,7 @@ async fn a_collated_column_compares_by_its_collation(
 /// `"C"`, as an unquoted `C` would not be either.
 // [spec:pgorm:req:sql.ast.expr.collate/test]    against a live server: an unknown collation is
 // refused, and the name is matched case-sensitively
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn an_unknown_collation_is_refused(db: &DatabaseConnection) -> Result<(), Error> {
     for name in ["no_such_collation", "c"] {
         let query = Query::select()

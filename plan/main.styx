@@ -9742,6 +9742,7 @@ children (
                 title "SQL/JSON query functions and JSON_TABLE are typed: JSON_QUERY, JSON_VALUE, JSON_EXISTS, JSON_TABLE, and the JSON constructors"
                 kind @feat
                 deps (pg18-test-server)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:41.556394Z
@@ -9762,6 +9763,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "2026-10-07: JSON_TABLE split into its own node, pg17-json-table, as the operator's note allowed: it is a FROM item rather than an expression, with its own column grammar and literal-only paths, and the rest of SQL/JSON is one coherent commit without it. This node keeps the query functions, the constructors, IS JSON and the operator-replacement verdict; sql.scope records JSON_TABLE as deferred until pg17-json-table lands. Python's binding is filed as python-sql-json."
+                    }
+
+                    {
+                        at 2026-10-07T08:05:57.948667Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T08:39:18.440693Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

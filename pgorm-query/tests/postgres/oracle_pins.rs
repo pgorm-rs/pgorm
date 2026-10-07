@@ -39,7 +39,7 @@ fn window_frame_offset_renders_spaced() {
 // rejection it used to be pinned to is proved by the `compile_fail` doctest on
 // `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:def:sql.ast.window-statement+5/test]
+// [spec:pgorm:def:sql.ast.window-statement+6/test]
 // [spec:pgorm:req:sql.render.window+5/test]
 #[test]
 fn over_attaches_only_to_function_calls() {

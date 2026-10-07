@@ -113,11 +113,11 @@ fn one_day() -> SimpleExpr {
 /// only itself, where `ROWS 1 PRECEDING` would reach the third regardless.
 /// The offset is an expression — a cast to `interval` — which the `u32`
 /// offsets could not spell, and it answers the same bound as inlined.
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: a RANGE offset is
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: a RANGE offset is
 // a distance in the ordering column's values, an interval over a timestamp
 // [spec:pgorm:req:sql.render.window+5/test]    the offset renders through the expression path,
 // bound and inlined alike
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn an_interval_offset_measures_time(db: &DatabaseConnection) -> Result<(), Error> {
     let by_time = framed(
         "at",
@@ -154,7 +154,7 @@ async fn an_interval_offset_measures_time(db: &DatabaseConnection) -> Result<(),
 /// A numeric offset over a numeric column: `RANGE BETWEEN 0.5 PRECEDING AND
 /// 0.5 FOLLOWING` holds each level and those within half a unit of it, so the
 /// two close readings see each other and the two far ones see only themselves.
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: a numeric offset
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: a numeric offset
 // over a numeric ordering column
 async fn a_numeric_offset_measures_value_distance(db: &DatabaseConnection) -> Result<(), Error> {
     let half = Decimal::new(5, 1);
@@ -181,10 +181,10 @@ async fn a_numeric_offset_measures_value_distance(db: &DatabaseConnection) -> Re
 /// readings 2 and 3 tie. `CURRENT ROW` drops the row, `GROUP` the row and its
 /// peer, `TIES` the peer but not the row, and `NO OTHERS` nothing — the same
 /// answer as no clause at all. Four options, four different columns of sums.
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: each exclusion
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: each exclusion
 // removes the rows it names relative to the current row's peers
 // [spec:pgorm:req:sql.render.window+5/test]    ` EXCLUDE …` renders after the frame's bounds
-// [spec:pgorm:req:sql.scope+12/test]
+// [spec:pgorm:req:sql.scope+13/test]
 async fn each_exclusion_removes_its_own_rows(db: &DatabaseConnection) -> Result<(), Error> {
     let whole = || {
         FrameType::Rows
@@ -228,7 +228,7 @@ async fn each_exclusion_removes_its_own_rows(db: &DatabaseConnection) -> Result<
 /// `bigint`. One group back from either tied reading reaches the grade-1 row
 /// and both of the pair; with `EXCLUDE CURRENT ROW` the pair each lose only
 /// themselves, and the first reading's frame is empty, so its sum is NULL.
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: GROUPS takes the
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: GROUPS takes the
 // widened offsets, bound or inlined, and an exclusion
 async fn a_groups_frame_takes_a_bound_offset(db: &DatabaseConnection) -> Result<(), Error> {
     let back_one = framed("grade", FrameType::Groups.preceding(1).and_current_row());
@@ -270,7 +270,7 @@ fn refused_with(error: &Error, state: &SqlState) {
 /// builder cannot know that column's type, so these are the server's
 /// refusals: an integer offset under `RANGE` over a timestamp has no distance
 /// to mean (`0A000`), and an interval under `ROWS` is no count (`42804`).
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: an offset type the
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: an offset type the
 // ordering column's type does not pair with is refused
 async fn an_offset_of_the_wrong_type_is_refused(db: &DatabaseConnection) -> Result<(), Error> {
     let integer_over_time = framed("at", FrameType::Range.preceding(1).and_current_row());
@@ -292,7 +292,7 @@ async fn an_offset_of_the_wrong_type_is_refused(db: &DatabaseConnection) -> Resu
 /// orders by two columns, or by none, gives it nothing to measure (`42P20`).
 /// The unbounded `RANGE` frame measures nothing and is the control: it is
 /// admitted over the same two-column ordering.
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    against a live server: a RANGE offset
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    against a live server: a RANGE offset
 // needs exactly one ORDER BY column
 async fn a_range_offset_needs_one_ordering_column(db: &DatabaseConnection) -> Result<(), Error> {
     let over = |window: &mut WindowStatement| {

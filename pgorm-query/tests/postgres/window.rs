@@ -5,7 +5,7 @@ fn counted() -> FunctionCall {
     Func::count(Expr::col(Char::Id))
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    PARTITION BY accumulates from all four entry
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    PARTITION BY accumulates from all four entry
 // points
 // [spec:pgorm:req:sql.render.window+5/test]    an inline window renders ` OVER ( … )`
 #[test]
@@ -39,7 +39,7 @@ fn window_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    ORDER BY comes from the shared
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    ORDER BY comes from the shared
 // `OrderedStatement` trait
 // [spec:pgorm:req:sql.render.window+5/test]    ` PARTITION BY … ORDER BY …`
 #[test]
@@ -86,7 +86,7 @@ fn window_2() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    a lone start is a whole frame, and
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    a lone start is a whole frame, and
 // `and_*` gives one an end, for either frame type
 // [spec:pgorm:req:sql.render.window+5/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
 // the start bound alone
@@ -202,7 +202,7 @@ fn window_4() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    all three frame modes render, GROUPS
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    all three frame modes render, GROUPS
 // included, and an offset means the same to the renderer in each
 #[test]
 fn every_frame_mode_renders_its_keyword() {
@@ -236,7 +236,7 @@ fn every_frame_mode_renders_its_keyword() {
     }
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    `WindowSelectType::Name` references a window
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    `WindowSelectType::Name` references a window
 // declared at statement level with `SelectStatement::window`
 // [spec:pgorm:req:sql.render.window+5/test]    a named reference renders ` OVER "name"` and its
 // declaration ` WINDOW "name" AS ( … )`
@@ -275,7 +275,7 @@ fn window_5() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    the statement holds at most one named window:
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    the statement holds at most one named window:
 // a second `window()` call replaces the first
 #[test]
 fn window_6() {
@@ -300,7 +300,7 @@ fn window_6() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+5/test]    `take()` moves the contents out and leaves the
+// [spec:pgorm:def:sql.ast.window-statement+6/test]    `take()` moves the contents out and leaves the
 // builder empty
 #[test]
 fn window_7() {

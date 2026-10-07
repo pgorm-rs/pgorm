@@ -100,7 +100,7 @@ fn a_compound_operand_is_parenthesised() {
 
 // [spec:pgorm:req:sql.render.collate/test]    a collated operand is an atom under every
 // operator, including the two `b_expr` positions that have no COLLATE of their own
-// [spec:pgorm:def:sql.render.precedence+7/test]
+// [spec:pgorm:def:sql.render.precedence+8/test]
 #[test]
 fn a_collated_operand_is_an_atom() {
     let sql = select(image().collate(c()).lt("b"));

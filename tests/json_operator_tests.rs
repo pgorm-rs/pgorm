@@ -76,7 +76,7 @@ async fn ids(db: &impl ConnectionTrait, filter: pgorm::pgorm_query::SimpleExpr) 
         .collect()
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    against a live server: a path and a
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    against a live server: a path and a
 // key list each travel as one `text[]` parameter and select what the operator
 // says they should, composed through an entity-level filter
 #[pgorm_macros::test]
@@ -150,7 +150,7 @@ pub async fn json_path_and_key_operators_round_trip() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    against a live server: `?|` is false
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    against a live server: `?|` is false
 // and `?&` true over an empty key list, so neither needs the constant fall-back
 // `sql.ast.expr.in` has to synthesise, and the statement text does not change
 #[pgorm_macros::test]
@@ -218,7 +218,7 @@ pub async fn empty_key_lists_carry_vacuous_truth() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    against a live server: the `?` family
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    against a live server: the `?` family
 // is defined on `jsonb` and nowhere else, so `->>`'s text result has no `?` —
 // a rejection the syntax-only oracle cannot see, because both forms parse.
 // The same statement also proves the rendered `?` survives the wire: parameters

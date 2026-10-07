@@ -22,6 +22,7 @@ mod render;
 mod returning;
 mod schema;
 mod sequence;
+mod sql_json;
 mod subscript;
 mod table;
 mod table_constraint;

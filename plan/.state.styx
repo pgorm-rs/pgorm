@@ -896,6 +896,7 @@ assertions (
     {id pg18-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-07T04:52:44.725158Z}
     {id merge-beyond-pg16, kind @complete, author "brendan@necessary.nu", at 2026-10-07T06:22:45.178693Z}
     {id pg18-uuid-functions, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:03:19.869642Z}
+    {id pg17-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:39:18.440693Z}
 )
 
 impl_evidence (

@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+19]
+> [spec:pgorm:req:sql.surface+20]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -127,8 +127,16 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ddl.alter-table`); `Check` and `IntoCheck`, a `CHECK` constraint and
 > the conversion an expression takes into one (`sql.ddl.create-table`),
 > `Enforcement`, whether a foreign key or `CHECK` is enforced
-> (`sql.ddl.enforcement`), and `ReturningRow`, which version of a written
-> row a RETURNING reference reads (`sql.ast.returning`). An
+> (`sql.ddl.enforcement`), `ReturningRow`, which version of a written
+> row a RETURNING reference reads (`sql.ast.returning`), and SQL/JSON
+> (`sql.ast.expr.sql-json`): `SqlJson`, the expression node's payload;
+> `JsonExists`, `JsonValue` and `JsonQuery`, the three query functions, with
+> `JsonExistsBehavior`, `JsonValueBehavior` and `JsonQueryBehavior`, what each
+> answers on an empty or failed path; `JsonObject`, `JsonArray`,
+> `JsonArrayQuery`, `JsonObjectAgg`, `JsonArrayAgg`, `JsonParse` and
+> `JsonSerialize`, the constructors; `JsonInput`, an operand with or without
+> `FORMAT JSON`; `JsonKind` and `JsonTest`, what `IS JSON` tests; and
+> `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -169,7 +177,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+12]
+> [spec:pgorm:req:sql.scope+13]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -205,6 +213,14 @@ today, including panicking edges and deliberate failsafes.
 >   what the composite's DDL was built without: nothing in the ORM reads a
 >   composite value (`sql.ddl.type-composite`), so a type that changes shape
 >   has no reader to keep in step.
+>
+> - **`JSON_TABLE`.** PostgreSQL's SQL/JSON table function, a FROM item that
+>   turns a JSON document into rows (`COLUMNS`, `PATH`, `NESTED PATH`,
+>   `FOR ORDINALITY`, `EXISTS` columns, `ON ERROR`). The rest of SQL/JSON is
+>   built (`sql.ast.expr.sql-json`); this waits on a new `FromItem` kind with
+>   its own non-empty column list and the column names and path names it
+>   quotes, and on its paths, which the server takes only as literals. Filed as
+>   its own node, `pg17-json-table`.
 >
 > **Out of scope** — not the builder's job:
 >
@@ -465,7 +481,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+5]
+> [spec:pgorm:def:sql.ast.expr+6]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
@@ -474,7 +490,8 @@ today, including panicking edges and deliberate failsafes.
 > searched and simple forms of `sql.ast.case`), `Subscript` (an array
 > subscript or slice, `sql.ast.expr.subscript`), `Grouping` (the
 > `GROUPING()` of `sql.ast.select.grouping`), `Constant` (inlined literal),
-> and `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`). `SqlTemplate` holds a template with `$1`-style splices
+> `LikePattern` (a `LIKE` pattern with its optional `ESCAPE`), and `SqlJson`
+> (an SQL/JSON function, constructor or `IS JSON`, `sql.ast.expr.sql-json`). `SqlTemplate` holds a template with `$1`-style splices
 > (`$$` escaping a literal `$`) already resolved against the expressions it
 > substitutes; its segments are private and its only constructor is
 > `SqlTemplate::new`, which returns `Result`, so the AST cannot hold a template
@@ -493,7 +510,8 @@ today, including panicking edges and deliberate failsafes.
 > `Expr::any`, `Expr::some`, and `Expr::all` wrap a `SelectStatement` in
 > `EXISTS(...)`, `ANY(...)`, `SOME(...)`, and `ALL(...)` respectively.
 > `From` conversions lift `Value`-convertible Rust primitives, `FunctionCall`,
-> `ColumnRef`, `Keyword`, `CaseStatement`, `SimpleCaseStatement`, and finished
+> `ColumnRef`, `Keyword`, `CaseStatement`, `SimpleCaseStatement`, each SQL/JSON
+> builder, and finished
 > `Expr` builders into
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
@@ -587,13 +605,23 @@ today, including panicking edges and deliberate failsafes.
 > functions: `Func::any`/`some`/`all` render SQL only in that position, and are
 > the escape hatch for the operators these two do not name.
 
-> [spec:pgorm:req:sql.ast.expr.json]
+> [spec:pgorm:req:sql.ast.expr.json+1]
 > `Expr` MUST provide the JSON *operator* vocabulary as typed combinators:
 > field access `get_json_field` (`->`) and `cast_json_field` (`->>`), path
 > access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), and key existence
 > `has_json_key` (`?`), `has_any_json_keys` (`?|`) and `has_all_json_keys`
 > (`?&`). They live in a child module of `expr` rather than in `Expr`'s main
 > block, as the membership family does.
+>
+> PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
+> and the constructors — are the neighbouring vocabulary,
+> `[spec:pgorm:def:sql.ast.expr.sql-json]`, and replace none of these. The
+> replacement was weighed operator by operator on PostgreSQL 18.6 and refused
+> on both counts it needed: a GIN `jsonb_ops` index serves `?`, `?|` and `?&`
+> and no index serves `JSON_EXISTS`; an expression index on `->>` or its cast
+> is not matched by `JSON_VALUE`; and the answers differ (string array
+> elements under `?`, a failed cast that raises, an object or a boolean under
+> `->>`). That rule holds the evidence and says which to reach for when.
 >
 > The boundary is operators, not functions. PostgreSQL's `jsonb_*` calls —
 > `jsonb_set`, `jsonb_build_object`, `jsonb_array_elements`, `jsonb_typeof` and
@@ -1150,7 +1178,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+5]
+> [spec:pgorm:def:sql.ast.window-statement+6]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, and the `OverStatement` trait's
 > `partition_by_columns`), ORDER BY expressions (shared
@@ -1219,10 +1247,14 @@ today, including panicking edges and deliberate failsafes.
 >
 > PostgreSQL accepts `OVER` only after a function call, so all four
 > `expr_window*` constructors MUST take the windowed expression as a
-> `FunctionCall` rather than anything convertible to `SimpleExpr` (per
+> `WindowFunction` rather than anything convertible to `SimpleExpr` (per
 > `[dec:pgorm:invalid-states-unrepresentable]`): a windowed column reference,
 > arithmetic expression, `CASE` or `CAST` does not typecheck, so the AST with
-> no valid rendering has no constructor. `SelectExpr`'s expression and window
+> no valid rendering has no constructor. `WindowFunction` is sealed and
+> implemented by the three things the grammar puts before `OVER`: a
+> `FunctionCall`, and the SQL/JSON aggregates `JsonArrayAgg` and
+> `JsonObjectAgg` (`sql.ast.expr.sql-json`), which are calls in the grammar
+> but carry clauses a `FunctionCall` cannot. `SelectExpr`'s expression and window
 > are therefore read-only after construction — `expr()` and `window()` read
 > them, `SelectExpr::new`/`new_as` build the windowless forms, and the four
 > constructors are the only source of a windowed one — so the pairing cannot
@@ -1295,7 +1327,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+6]
+> [spec:pgorm:def:sql.ast.func+7]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -1394,8 +1426,178 @@ today, including panicking edges and deliberate failsafes.
 > `FunctionCall` never has to consider a cast. Nor is `GROUPING`: the
 > grammar spells it as an expression of its own, so `Func::grouping` returns
 > the `Grouping` of `sql.ast.select.grouping` rather than a `FunctionCall`.
+> Nor are SQL/JSON's functions, for the same reason: `Func::json_exists`,
+> `json_value`, `json_query`, `json_object`, `json_array`, `json_array_query`,
+> `json_objectagg`, `json_arrayagg`, `json`, `json_scalar` and
+> `json_serialize` return the builders of `sql.ast.expr.sql-json`
+> (`func_json.rs`).
 >
 > `Func::named(name)` calls an arbitrary function by identifier
 > (`Function::Named`). A `FunctionCall` converts into
 > `SimpleExpr::FunctionCall`, and can serve as a FROM item through
 > `SelectStatement::from_function`.
+
+## SQL/JSON
+
+> [spec:pgorm:def:sql.ast.expr.sql-json]
+> PostgreSQL's SQL/JSON — the query functions `JSON_EXISTS`, `JSON_VALUE` and
+> `JSON_QUERY`, the constructors `JSON_OBJECT`, `JSON_ARRAY` (over values or
+> over a one-column query), `JSON_OBJECTAGG`, `JSON_ARRAYAGG`, `JSON()`,
+> `JSON_SCALAR()` and `JSON_SERIALIZE()`, and the `IS [NOT] JSON` predicate —
+> is one expression node, `SimpleExpr::SqlJson(Box<SqlJson>)`, whose `SqlJson`
+> enum has a variant per form. They are not `FunctionCall`s: their clauses
+> (`PASSING`, `RETURNING`, wrapper and quotes behaviour, `ON EMPTY` /
+> `ON ERROR`, `ON NULL`, `WITH UNIQUE KEYS`, `FORMAT JSON`) are grammar between
+> the parentheses, which `Func::named`'s argument list cannot spell. Each form
+> is built by a `Func` constructor returning its own builder, as `Func::grouping`
+> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+7]`): `json_exists`,
+> `json_value` and `json_query` take a context item and a path; `json_object()`
+> and `json_array()` start empty; `json_array_query(select)`,
+> `json_objectagg(key, value)`, `json_arrayagg(value)`, `json(input)` and
+> `json_serialize(input)` take their operands; `json_scalar(expr)`, which has
+> no clause at all, returns the `SimpleExpr` directly. `IS JSON` is
+> `Expr::is_json(test)` and `Expr::is_not_json(test)`, where a `JsonTest` is a
+> `JsonKind` (`Value`, `Scalar`, `Array`, `Object`), optionally
+> `.with_unique_keys()`. The builders' fields are crate-private, so a value of
+> each form holds only what its builder could set.
+>
+> **Paths are values.** The path of the three query functions is any
+> `Into<String>` and is bound, never written into the statement's text
+> (`sql.render.sql-json`); PostgreSQL accepts a parameter there. Where the
+> server's grammar demands a literal instead — `JSON_TABLE`'s paths
+> (`sql.scope`) — the path is a literal escaped by the value pipeline, not
+> interpolated.
+>
+> **A JSON input** — a context item, a `PASSING` value, a constructor's value,
+> the operand of `JSON()` and `JSON_SERIALIZE()` — is a `JsonInput`: any
+> expression, and whether it is marked `FORMAT JSON`, which
+> `Expr::format_json()` sets. `FORMAT JSON` makes a `text` value embed as the
+> JSON it spells rather than as a JSON string, and lets a `bytea` value be read
+> as JSON at all (unmarked, the server cannot cast `bytea` to `jsonb`). PostgreSQL
+> reads JSON only as UTF-8, so `ENCODING UTF8` is never written: it is
+> refused on a `text` value (`42804`) and changes nothing on `bytea`. A
+> non-string operand marked `FORMAT JSON` is refused (`42804`); the builder
+> does not know an expression's type, so that check is the server's.
+>
+> **`PASSING`** names a path variable: `passing(value, name)` binds `value`
+> as `$name`. The name is an identifier, quoted like every other
+> (`security.ident-oracle`), so the path's `$name` matches it exactly as
+> written — a quoted name does not fold. PostgreSQL accepts a name given
+> twice and a variable the path never reads; a variable the path reads and no
+> `PASSING` names fails when the path is evaluated.
+>
+> **Behaviours are typed per function**, because the set each takes differs
+> and the server refuses the rest (`42601`, "invalid ON ERROR behavior"):
+>
+> - `JSON_EXISTS` takes only `ON ERROR`, a `JsonExistsBehavior` — `True`,
+>   `False`, `Unknown`, `Error`. Finding nothing is `false`, not an error, so it
+>   has no `ON EMPTY` (`42601`), and it has no `RETURNING` (`42601`).
+> - `JSON_VALUE` takes `on_empty` and `on_error`, each a `JsonValueBehavior` —
+>   `Null`, `Error`, `Default(Value)`.
+> - `JSON_QUERY` takes `on_empty` and `on_error`, each a `JsonQueryBehavior` —
+>   those three, `EmptyArray` and `EmptyObject`. `EMPTY` alone means
+>   `EMPTY ARRAY` and is not a second spelling here.
+>
+> Each behaviour is a slot a later call replaces, and `ON EMPTY` always renders
+> before `ON ERROR`, so neither the reversed order nor a repeated clause
+> (`42601`) can be built. Without a behaviour the server answers `false`
+> (`JSON_EXISTS`) or `NULL`. A `Default` holds a `Value`, not an expression:
+> PostgreSQL admits only a constant, a function call or an operator expression
+> there and refuses a parameter (`42804`, "can only specify a constant,
+> non-aggregate function, or operator expression for DEFAULT"), so the value
+> is written as an escaped literal (`sql.render.sql-json`), and the server
+> converts it to the `RETURNING` type — failing at parse time when it cannot
+> (`22P02` for `'abc'` as `integer`; `42846` for an `integer` default to
+> `jsonb`).
+>
+> **`JSON_QUERY`'s result shaping** is one slot: `with_wrapper()` (`WITH
+> UNCONDITIONAL WRAPPER`, always an array), `with_conditional_wrapper()`
+> (`WITH CONDITIONAL WRAPPER`, an array only when the path finds several
+> items — one item, scalar or not, comes back as it is) and `omit_quotes()`
+> (`OMIT QUOTES`, a scalar string without its quotes). The last call wins,
+> because PostgreSQL refuses `OMIT QUOTES` beside either wrapper (`42601`,
+> "SQL/JSON QUOTES behavior must not be specified when WITH WRAPPER is used").
+> The defaults `WITHOUT WRAPPER` and `KEEP QUOTES` are never spelled, since an
+> absent clause says them; without a wrapper, a path finding several items is
+> an error. An unquoted string must still be a value of the returned type —
+> `x` is `text` but no `jsonb`, so it fails and `ON ERROR` decides.
+> `JSON_VALUE` has neither clause (`42601`).
+>
+> **`RETURNING`** takes a `ColumnType`, the type vocabulary a column is
+> declared in, on every form that has one: `JSON_VALUE` (default `text`),
+> `JSON_QUERY` (default `jsonb`), the four constructors and two aggregates
+> (default `json`) and `JSON_SERIALIZE` (default `text`; only a string type or
+> `bytea`, `42804` otherwise). `JSON()` and `JSON_SCALAR()` take none
+> (`42601`) and return `json`. The `FORMAT JSON [ENCODING UTF8]` a `RETURNING`
+> may carry is not built: the output is UTF-8 JSON text either way, and a
+> `bytea` result is the same bytes with or without it (live-checked);
+> `JSON_VALUE` refuses it outright.
+>
+> **`ON NULL` and `UNIQUE KEYS`** each have the one spelling that differs from
+> PostgreSQL's default, so each state has exactly one: an object keeps a
+> `NULL` member unless `absent_on_null()`, an array drops a `NULL` element
+> unless `null_on_null()`, and keys may repeat unless `with_unique_keys()`
+> (then a repeat is `22030`). `JSON_OBJECT` and `JSON_OBJECTAGG` take the
+> first and third, `JSON_ARRAY` and `JSON_ARRAYAGG` the second, `JSON()` and
+> `IS JSON` only the third. The query form of `JSON_ARRAY` takes neither
+> (`42601`) and always drops `NULL`s, so it is its own builder,
+> `JsonArrayQuery`, with only `returning`; its query must have one column
+> (`42601`), which the builder cannot see through `*`. An object's key may
+> not be `NULL` (`22004`).
+>
+> **The aggregates** take `filter(cond)`, the `FILTER (WHERE ..)` of
+> `sql.ast.func`, replacing on a second call. `JSON_ARRAYAGG` takes
+> `order_by(expr, order)`, accumulating; `JSON_OBJECTAGG` takes no `ORDER BY`
+> and neither takes `DISTINCT` (each `42601`), so neither is offered. Over no
+> rows each returns `NULL`. Both are window functions too: `expr_window` and
+> its siblings take any `WindowFunction` (`sql.ast.window-statement`).
+>
+> **What 18.6 does that the builder records but does not paper over:**
+> `JSON_SERIALIZE` over a `jsonb` operand returns the one-byte text `\x01`
+> rather than the document (a `json` or `text` operand serializes correctly),
+> so a caller casts `jsonb` to `json` first; and `JSON_VALUE` renders a JSON
+> boolean as `t`/`f`, where `->>` renders `true`/`false`.
+>
+> **The JSON operators stay, and replace nothing.** The operator decision of
+> 2026-10-06 was to replace an operator of `sql.ast.expr.json` only where the
+> SQL/JSON form has the same semantics and the same index use. Measured on
+> PostgreSQL 18.6 over 200,000 rows with a GIN `jsonb_ops` index, a GIN
+> `jsonb_path_ops` index and expression indexes on `(data->>'k')` and
+> `((data->>'k')::int)` — and held by the live suite over 2,000 rows with
+> sequential scans disabled, so a plan uses an index whenever one can serve
+> it — none qualifies:
+>
+> - `?`, `?|` and `?&` are served by the `jsonb_ops` index (a bitmap index
+>   scan; dropping it leaves a sequential scan, `jsonb_path_ops` serving none
+>   of them). `JSON_EXISTS` is never index-served — a sequential scan even with
+>   `enable_seqscan` off, under both opclasses — because it is not an
+>   operator an opclass can index. `@?` and `@@` with a jsonpath are, by both.
+>   The semantics differ as well: `?` matches a top-level string array
+>   element and a top-level string (`'["a"]' ? 'a'` and `'"a"' ? 'a'` are
+>   true, `JSON_EXISTS(.., '$.a')` false for both), while lax `JSON_EXISTS`
+>   unwraps an array that `?` does not (`'[{"a":1}]'` is false under `?`, true
+>   under `$.a`).
+> - `->>` and `#>>` and their casts are served by expression indexes on
+>   those exact expressions, which `JSON_VALUE` does not match, with or
+>   without `RETURNING` (a sequential scan, forced or not). `JSON_VALUE` can be
+>   indexed itself — an expression index on `JSON_VALUE(data, '$.k' RETURNING
+>   int)` serves a query with that path as a constant or as a parameter under
+>   a custom plan, though not under a generic one, exactly as an index on
+>   `data->>'k'` serves `data->>$1`. The semantics differ: `(data->>'k')::int`
+>   raises on a value that does not convert (`22P02`) where `JSON_VALUE`
+>   follows `ON ERROR` (default `NULL`); a path reaching an object or array
+>   gives `->>` its text and `JSON_VALUE` an error (`2203F`, `NULL` by
+>   default); a JSON boolean is `true` under `->>` and `t` under
+>   `JSON_VALUE`. A missing key is `NULL` under both.
+> - `->` and `#>` agree with `JSON_QUERY` on what they find, but are matched
+>   by their own expression indexes alone, and `JSON_QUERY` without a wrapper
+>   errors where a lax path finds several items.
+>
+> So: reach for the operators where an index should serve the predicate or
+> the projection — key existence under `jsonb_ops`, a field under an
+> expression index — and for SQL/JSON where its semantics are the point: a
+> conversion that must not raise (`RETURNING` with `ON ERROR`), a filter or
+> wildcard path (`$.tags[*] ? (@ == $tag)`), a `json` operand (the `?` family
+> is `jsonb`-only, `42883`), building JSON, or an index created on the
+> SQL/JSON expression itself. Containment, which both families can say, is
+> `@>` (`sql.ast.expr.operators`), served by either opclass.

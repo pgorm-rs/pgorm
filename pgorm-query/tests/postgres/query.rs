@@ -17,7 +17,7 @@ fn select_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.expr+5/test]
+// [spec:pgorm:def:sql.ast.expr+6/test]
 #[test]
 fn select_2() {
     assert_eq!(
@@ -2019,7 +2019,7 @@ fn cast_json_field_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    a path of any depth is one `text[]`
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    a path of any depth is one `text[]`
 // parameter, so the statement text does not vary with it
 #[test]
 fn json_path_operators_take_one_text_array() {
@@ -2047,7 +2047,7 @@ fn json_path_operators_take_one_text_array() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    the existence family's three lexemes,
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    the existence family's three lexemes,
 // and the single-key form's text operand
 #[test]
 fn json_key_existence_operators_render() {
@@ -2082,7 +2082,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+7/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+8/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2110,7 +2110,7 @@ fn json_existence_drops_parens_under_and() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.json/test]    an empty key list is not special-cased:
+// [spec:pgorm:req:sql.ast.expr.json+1/test]    an empty key list is not special-cased:
 // it is a typed empty array, and the statement text is the same at every cardinality
 #[test]
 fn empty_json_key_list_is_typed_array() {
@@ -2222,7 +2222,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+7/test]
+// [spec:pgorm:def:sql.render.precedence+8/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
