@@ -9780,6 +9780,21 @@ children (
                     }
                 )
             }
+
+            {
+                id entity-relation-not-enforced
+                title "An entity relation can say its foreign key is NOT ENFORCED, so codegen can read one"
+                kind @feat
+                deps (pg18-not-enforced)
+                log (
+                    {
+                        at 2026-10-07T01:09:33.583206Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by pg18-not-enforced (cdcc02d6). PostgreSQL 18 lets a foreign key be NOT ENFORCED: recorded, never checked, with no referential triggers, so its ON DELETE / ON UPDATE actions never fire. pgorm-query now writes one (TableForeignKey::enforcement, ConstraintChange::Enforced / NotEnforced, sql.ddl.enforcement), but codegen still refuses it (\"a NOT ENFORCED constraint\", codegen.ddl.unsupported+9) because the entity model cannot hold it: RelationDef has on_delete, on_update and fk_name and no enforcement, DeriveRelation has no attribute for it, and Schema::create_table_from_entity turns every owned relation into an enforced foreign key, so a schema regenerated from a generated entity would enforce what the source did not, and load_one, which errors on an unmatched key, would meet the orphans a NOT ENFORCED key admits. Deferrability is in the same position (codegen refuses a deferrable constraint and RelationDef has none). Decide whether an entity relation carries its key's constraint attributes (enforcement, and deferrability with it) and what load_one / load_many and the graph should do over a relation whose key is not enforced; then a RelationDef field and DeriveRelation attribute, the From<RelationDef> for ForeignKeyCreateStatement mapping, codegen's reader and writer, the generative campaign's emitters, and Python's registered entities."
+                    }
+                )
+            }
         )
         log (
             {
