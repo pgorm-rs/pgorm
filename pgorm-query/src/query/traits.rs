@@ -93,27 +93,12 @@ pub trait QueryStatementBuilder: Debug + Display {
 /// Conversion of a statement into the [`SubQueryStatement`] that a common
 /// table expression and an expression subquery hold.
 ///
-/// Rendering and nesting are separate capabilities, because not every
-/// statement that renders also nests. The four statements that PostgreSQL
-/// nests (SELECT, INSERT, UPDATE and DELETE) implement this trait.
-/// [`MergeStatement`](crate::MergeStatement) renders like the others but
-/// cannot be nested: the server refuses `MERGE` as a CTE body (`0A000`) and
-/// as an expression subquery (`42601`). So a MERGE does not convert, and a
-/// common table expression cannot be built around one:
-///
-/// ```compile_fail,E0277
-/// use pgorm_query::{tests_cfg::*, *};
-///
-/// let merge = Query::merge(
-///     Glyph::Table,
-///     Font::Table,
-///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
-/// )
-/// .when_matched(MatchedAction::Delete);
-///
-/// CommonTableExpression::new(Name::runtime("m"), merge);
-/// ```
-// [spec:pgorm:req:sql.ast+2]
+/// Every statement kind converts, because PostgreSQL takes each as a common
+/// table expression's body: SELECT, and INSERT, UPDATE, DELETE and MERGE,
+/// whose rows are those their RETURNING list yields. Only a SELECT nests as
+/// an expression subquery, and the typed constructors of one take a
+/// [`SelectStatement`](crate::SelectStatement).
+// [spec:pgorm:req:sql.ast+3]
 pub trait IntoSubQueryStatement {
     /// Wrap the statement in the [`SubQueryStatement`] variant for its kind
     fn into_sub_query_statement(self) -> SubQueryStatement;

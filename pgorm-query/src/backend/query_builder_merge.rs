@@ -8,7 +8,7 @@ impl QueryBuilder {
     /// `MERGE INTO [ONLY ]<target> USING <source> ON <condition>`, then the
     /// matched arms and the not-matched arms, each kind's conditional arms
     /// in the order they were added and its unconditional arm last.
-    // [spec:pgorm:req:sql.render.merge]
+    // [spec:pgorm:req:sql.render.merge+1]
     pub(crate) fn prepare_merge_statement(&self, merge: &MergeStatement, sql: &mut dyn SqlWriter) {
         if let Some(with) = &merge.with {
             self.prepare_plain_with_clause(with, sql);
@@ -26,19 +26,7 @@ impl QueryBuilder {
         write!(sql, " ON ").unwrap();
         self.prepare_condition_where(&merge.on, sql);
 
-        self.prepare_merge_arms(
-            "MATCHED",
-            &merge.matched,
-            sql,
-            |builder, action, sql| match action {
-                MatchedAction::Update(update) => {
-                    write!(sql, "UPDATE SET ").unwrap();
-                    builder.prepare_merge_assignments(&update.sets, sql);
-                }
-                MatchedAction::Delete => write!(sql, "DELETE").unwrap(),
-                MatchedAction::DoNothing => write!(sql, "DO NOTHING").unwrap(),
-            },
-        );
+        self.prepare_merge_arms("MATCHED", &merge.matched, sql, Self::prepare_matched_action);
         self.prepare_merge_arms(
             "NOT MATCHED",
             &merge.not_matched,
@@ -51,6 +39,31 @@ impl QueryBuilder {
                 NotMatchedAction::DoNothing => write!(sql, "DO NOTHING").unwrap(),
             },
         );
+        self.prepare_merge_arms(
+            "NOT MATCHED BY SOURCE",
+            &merge.not_matched_by_source,
+            sql,
+            Self::prepare_matched_action,
+        );
+
+        self.prepare_returning(
+            merge.returning.as_ref(),
+            merge.returns_action.then_some("merge_action()"),
+            sql,
+        );
+    }
+
+    /// `UPDATE SET ..`, `DELETE` or `DO NOTHING`: what an arm does to a target
+    /// row, matched or not matched by source.
+    fn prepare_matched_action(&self, action: &MatchedAction, sql: &mut dyn SqlWriter) {
+        match action {
+            MatchedAction::Update(update) => {
+                write!(sql, "UPDATE SET ").unwrap();
+                self.prepare_merge_assignments(&update.sets, sql);
+            }
+            MatchedAction::Delete => write!(sql, "DELETE").unwrap(),
+            MatchedAction::DoNothing => write!(sql, "DO NOTHING").unwrap(),
+        }
     }
 
     /// ` WHEN <kind>[ AND <condition>] THEN <action>` for each arm of one kind:

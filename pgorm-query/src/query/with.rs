@@ -12,14 +12,13 @@ use crate::{
 /// The name and the query are given to [CommonTableExpression::new]; the column list and the
 /// materialization hint are optional and are added afterwards.
 ///
-/// PostgreSQL admits a data-modifying statement — INSERT, UPDATE, DELETE — as a
-/// common table expression, provided it carries a RETURNING clause so it yields
-/// the rows the enclosing query reads.
-///
-/// pgorm-query does not enforce that: a write CTE with no RETURNING renders
-/// happily and is refused by the server. Supplying the RETURNING clause is the
-/// caller's part.
-// [spec:pgorm:def:sql.ast.with+4]
+/// PostgreSQL admits a data-modifying statement — INSERT, UPDATE, DELETE,
+/// MERGE — as a common table expression. Its rows are those its RETURNING
+/// clause yields. Without one the statement still runs, and reading the CTE
+/// is refused (`0A000`); the server, not this type, says so. A write CTE runs
+/// only at the top level of a statement: one in a nested query's WITH clause
+/// is refused (`0A000`).
+// [spec:pgorm:def:sql.ast.with+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonTableExpression {
     pub(crate) table_name: Name,
@@ -280,7 +279,7 @@ impl Cycle {
 ///     r#"WITH "cte" ("id") AS (SELECT "id" FROM "table") SELECT * FROM "cte""#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.with+4]
+// [spec:pgorm:def:sql.ast.with+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct WithClause {
     pub(crate) first: CommonTableExpression,
@@ -416,7 +415,7 @@ impl RecursiveWithClause {
 /// INSERT, UPDATE or DELETE accepts, and what the statement then carries. A
 /// [`MergeStatement`](crate::MergeStatement) takes the plain form alone,
 /// because PostgreSQL refuses `WITH RECURSIVE` before a `MERGE`.
-// [spec:pgorm:def:sql.ast.with+4]
+// [spec:pgorm:def:sql.ast.with+5]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnyWithClause {
     /// A non-recursive clause of one or more common table expressions.

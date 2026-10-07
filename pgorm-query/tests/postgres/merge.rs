@@ -1,7 +1,10 @@
 use super::*;
 use crate::oracle::{assert_eq, parsed_nodes};
 use CmdType::{CmdDelete, CmdInsert, CmdNothing, CmdUpdate};
-use MergeMatchKind::{MergeWhenMatched as Matched, MergeWhenNotMatchedByTarget as NotMatched};
+use MergeMatchKind::{
+    MergeWhenMatched as Matched, MergeWhenNotMatchedBySource as BySource,
+    MergeWhenNotMatchedByTarget as NotMatched,
+};
 use pg_query::protobuf::{BoolExprType, CmdType, MergeMatchKind, OverridingKind};
 
 fn on() -> SimpleExpr {
@@ -47,8 +50,8 @@ fn arms(sql: &str) -> Vec<(MergeMatchKind, CmdType, bool)> {
         .collect()
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    the target, the source and the condition, then arms
-// [spec:pgorm:req:sql.render.merge/test]    `MERGE INTO <target> USING <source> ON <condition>`
+// [spec:pgorm:req:sql.ast.merge+1/test]    the target, the source and the condition, then arms
+// [spec:pgorm:req:sql.render.merge+1/test]    `MERGE INTO <target> USING <source> ON <condition>`
 #[test]
 fn merge_renders_target_source_condition_and_arms() {
     let sql = merge()
@@ -76,8 +79,8 @@ fn merge_renders_target_source_condition_and_arms() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    conditional arms are tried in the order they were added
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.ast.merge+1/test]    conditional arms are tried in the order they were added
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn conditional_arms_keep_the_order_they_were_added() {
     let gone = || Expr::col((Font::Table, Font::Name)).is_null();
@@ -112,9 +115,9 @@ fn conditional_arms_keep_the_order_they_were_added() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    the unreachable-arm statement has no representation: an
+// [spec:pgorm:req:sql.ast.merge+1/test]    the unreachable-arm statement has no representation: an
 // unconditional arm renders after its kind's conditional arms whenever it was added
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn unconditional_arm_renders_after_conditional_arms() {
     let sql = merge()
@@ -148,7 +151,7 @@ fn unconditional_arm_renders_after_conditional_arms() {
     );
 }
 
-// [spec:pgorm:req:sql.render.merge/test]    an arm's condition takes no parentheses: `AND` is
+// [spec:pgorm:req:sql.render.merge+1/test]    an arm's condition takes no parentheses: `AND` is
 // the clause's keyword, and a top-level OR after it is read as the whole condition
 #[test]
 fn an_arms_condition_is_read_whole() {
@@ -178,7 +181,7 @@ fn an_arms_condition_is_read_whole() {
     assert_eq!(condition["args"].as_array().map(Vec::len), Some(2), "{sql}");
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    a kind holds one unconditional arm: the last call wins
+// [spec:pgorm:req:sql.ast.merge+1/test]    a kind holds one unconditional arm: the last call wins
 #[test]
 fn the_last_unconditional_arm_of_a_kind_wins() {
     let sql = merge()
@@ -189,7 +192,7 @@ fn the_last_unconditional_arm_of_a_kind_wins() {
     assert_eq!(arms(&sql), [(Matched, CmdNothing, false)]);
 }
 
-// [spec:pgorm:req:sql.render.merge/test]    the matched arms render before the not-matched arms
+// [spec:pgorm:req:sql.render.merge+1/test]    the matched arms render before the not-matched arms
 #[test]
 fn matched_arms_render_before_not_matched_arms() {
     let sql = Query::merge(Glyph::Table, Font::Table, on())
@@ -211,7 +214,7 @@ fn matched_arms_render_before_not_matched_arms() {
     );
 }
 
-// [spec:pgorm:req:sql.render.merge/test]    every action in its grammar position, the
+// [spec:pgorm:req:sql.render.merge+1/test]    every action in its grammar position, the
 // assignments in the order added
 #[test]
 fn every_action_renders_where_the_grammar_puts_it() {
@@ -274,9 +277,9 @@ fn every_action_renders_where_the_grammar_puts_it() {
     assert_eq!(set, ["image", "aspect", "tokens"]);
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    the insert's columns and its row come from the same
+// [spec:pgorm:req:sql.ast.merge+1/test]    the insert's columns and its row come from the same
 // pairs, so they always have the same length
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn an_inserts_columns_and_row_line_up() {
     let sql = merge()
@@ -304,8 +307,8 @@ fn an_inserts_columns_and_row_line_up() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    the target is a named table: schema, alias and ONLY
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.ast.merge+1/test]    the target is a named table: schema, alias and ONLY
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn target_takes_schema_alias_and_only() {
     let target = (Name::runtime("app"), Glyph::Table)
@@ -337,8 +340,8 @@ fn target_takes_schema_alias_and_only() {
     assert_eq!(statement(&only)["relation"]["inh"], false);
 }
 
-// [spec:pgorm:req:sql.ast.merge/test]    the source is any relation a FROM clause takes
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.ast.merge+1/test]    the source is any relation a FROM clause takes
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn the_source_is_any_from_item() {
     let s = || Name::runtime("s");
@@ -387,7 +390,7 @@ fn the_source_is_any_from_item() {
 }
 
 // [spec:pgorm:def:query.build.with+2/test]    a plain WITH clause prefixes the MERGE
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn a_with_clause_prefixes_the_merge() {
     let f = || Name::runtime("f");
@@ -426,7 +429,7 @@ fn a_with_clause_prefixes_the_merge() {
     assert_eq!(ctes, Some(2));
 }
 
-// [spec:pgorm:req:sql.render.merge/test]    every value is bound, numbered in text order
+// [spec:pgorm:req:sql.render.merge+1/test]    every value is bound, numbered in text order
 // [spec:pgorm:req:sql.ast.build+3/test]
 #[test]
 fn build_binds_every_value_in_text_order() {
@@ -465,5 +468,240 @@ fn build_binds_every_value_in_text_order() {
             "bold".into(),
             "fresh".into(),
         ]
+    );
+}
+
+// [spec:pgorm:req:sql.ast.merge+1/test]    a not-matched-by-source arm takes a target row's
+// actions, its conditional arms in call order and its unconditional arm after them
+// [spec:pgorm:req:sql.render.merge+1/test]    ` WHEN NOT MATCHED BY SOURCE`, after the other kinds
+#[test]
+fn by_source_arms_render_last_in_call_order() {
+    let sql = merge()
+        .when_not_matched_by_source(MatchedAction::Delete)
+        .when_not_matched_by_source_and(
+            Expr::col((Glyph::Table, Glyph::Aspect)).gt(2),
+            MergeUpdate::value(Glyph::Aspect, 0),
+        )
+        .when_not_matched_by_source_and(
+            Expr::col((Glyph::Table, Glyph::Image)).is_null(),
+            MatchedAction::DoNothing,
+        )
+        .when_matched(MatchedAction::Delete)
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            head(),
+            r#"WHEN MATCHED THEN DELETE"#,
+            r#"WHEN NOT MATCHED BY SOURCE AND "glyph"."aspect" > 2 THEN UPDATE SET "aspect" = 0"#,
+            r#"WHEN NOT MATCHED BY SOURCE AND "glyph"."image" IS NULL THEN DO NOTHING"#,
+            r#"WHEN NOT MATCHED BY SOURCE THEN DELETE"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        arms(&sql),
+        [
+            (Matched, CmdDelete, false),
+            (BySource, CmdUpdate, true),
+            (BySource, CmdNothing, true),
+            (BySource, CmdDelete, false),
+        ]
+    );
+}
+
+// [spec:pgorm:req:sql.ast.merge+1/test]    `PendingMerge` begins a statement with either
+// not-matched-by-source arm
+#[test]
+fn a_by_source_arm_can_begin_the_statement() {
+    let unconditional = merge()
+        .when_not_matched_by_source(MergeUpdate::value(Glyph::Aspect, 0))
+        .to_string();
+    assert_eq!(
+        unconditional,
+        format!(
+            r#"{} WHEN NOT MATCHED BY SOURCE THEN UPDATE SET "aspect" = 0"#,
+            head()
+        )
+    );
+    let conditional = merge()
+        .when_not_matched_by_source_and(
+            Expr::col((Glyph::Table, Glyph::Aspect)).gt(2),
+            MatchedAction::Delete,
+        )
+        .to_string();
+    assert_eq!(
+        conditional,
+        format!(
+            r#"{} WHEN NOT MATCHED BY SOURCE AND "glyph"."aspect" > 2 THEN DELETE"#,
+            head()
+        )
+    );
+    assert_eq!(arms(&conditional), [(BySource, CmdDelete, true)]);
+}
+
+/// The column references of `sql`'s MERGE RETURNING list, each a list of
+/// its fields, and `"merge_action()"` for the action.
+fn returned(sql: &str) -> Vec<Vec<String>> {
+    statement(sql)["returning_clause"]["exprs"]
+        .as_array()
+        .expect("a RETURNING list")
+        .iter()
+        .map(|target| {
+            let value = &target["ResTarget"]["val"];
+            if value.get("MergeSupportFunc").is_some() {
+                return vec!["merge_action()".to_owned()];
+            }
+            value["ColumnRef"]["fields"]
+                .as_array()
+                .expect("a column reference")
+                .iter()
+                .map(|field| {
+                    field["String"]["sval"]
+                        .as_str()
+                        .map_or_else(|| "*".to_owned(), str::to_owned)
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn fields(names: &[&str]) -> Vec<String> {
+    names.iter().map(|name| (*name).to_owned()).collect()
+}
+
+// [spec:pgorm:req:sql.ast.merge+1/test]    `returning` sets the list, read after the arms
+// [spec:pgorm:req:sql.render.merge+1/test]    RETURNING last
+// [spec:pgorm:req:sql.render.returning+3/test]    on a MERGE as on the other writes
+#[test]
+fn returning_follows_the_arms() {
+    let sql = merge()
+        .when_matched(MergeUpdate::value(Glyph::Image, font(Font::Name)))
+        .when_not_matched_by_source(MatchedAction::Delete)
+        .returning(Query::returning().columns([
+            (ReturningRow::Old, Glyph::Image),
+            (ReturningRow::New, Glyph::Image),
+        ]))
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            head(),
+            r#"WHEN MATCHED THEN UPDATE SET "image" = "font"."name""#,
+            r#"WHEN NOT MATCHED BY SOURCE THEN DELETE"#,
+            r#"RETURNING old."image", new."image""#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        returned(&sql),
+        [fields(&["old", "image"]), fields(&["new", "image"])]
+    );
+}
+
+// [spec:pgorm:req:sql.ast.merge+1/test]    `returning_action` leads the list with
+// `merge_action()`, and alone is the list
+// [spec:pgorm:req:sql.render.returning+3/test]    after the renames, before the caller's list
+#[test]
+fn the_action_leads_the_list() {
+    let o = alias("o");
+    let sql = merge()
+        .when_matched(MatchedAction::Delete)
+        .returning(Query::returning().column((o, Glyph::Id)).old_as(o))
+        .returning_action()
+        .to_string();
+    assert_eq!(
+        sql,
+        format!(
+            r#"{} WHEN MATCHED THEN DELETE RETURNING WITH (OLD AS "o") merge_action(), "o"."id""#,
+            head()
+        )
+    );
+    assert_eq!(
+        returned(&sql),
+        [fields(&["merge_action()"]), fields(&["o", "id"])]
+    );
+
+    let alone = merge()
+        .when_matched(MatchedAction::Delete)
+        .returning_action()
+        .to_string();
+    assert_eq!(
+        alone,
+        format!(
+            "{} WHEN MATCHED THEN DELETE RETURNING merge_action()",
+            head()
+        )
+    );
+    assert_eq!(returned(&alone), [fields(&["merge_action()"])]);
+}
+
+// [spec:pgorm:req:sql.ast.merge+1/test]    the name a function call would take is quoted, so
+// `Func::named` cannot reach `merge_action()`
+#[test]
+fn a_named_function_is_not_the_action() {
+    let sql = Query::select()
+        .expr(Func::named(Name::runtime("merge_action")))
+        .to_string();
+    assert_eq!(sql, r#"SELECT "merge_action"()"#);
+    assert!(parsed_nodes(&sql, "MergeSupportFunc").is_empty());
+    assert_eq!(parsed_nodes(&sql, "FuncCall").len(), 1);
+}
+
+// [spec:pgorm:req:sql.ast+3/test]    a MERGE nests as a CTE body
+// [spec:pgorm:def:sql.ast.with+5/test]
+#[test]
+fn a_merge_is_a_cte_body() {
+    let body = merge()
+        .when_matched(MatchedAction::Delete)
+        .returning_action()
+        .returning(Query::returning().column(Glyph::Id))
+        .to_owned();
+    let m = || Name::runtime("m");
+    let sql = Query::select()
+        .column(Asterisk)
+        .from(m())
+        .with(WithClause::new(CommonTableExpression::new(m(), body)))
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"WITH "m" AS (MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id""#,
+            r#"WHEN MATCHED THEN DELETE RETURNING merge_action(), "id")"#,
+            r#"SELECT * FROM "m""#,
+        ]
+        .join(" ")
+    );
+    let ctes = parsed_nodes(&sql, "CommonTableExpr");
+    assert_eq!(ctes.len(), 1);
+    assert!(ctes[0]["ctequery"].get("MergeStmt").is_some());
+}
+
+// [spec:pgorm:req:sql.render.merge+1/test]    values in a by-source arm and in RETURNING are
+// bound, numbered in text order
+#[test]
+fn by_source_and_returning_values_are_bound() {
+    let (sql, values) = merge()
+        .when_matched_and(font(Font::Language).eq("en"), MatchedAction::Delete)
+        .when_not_matched_by_source_and(
+            Expr::col((Glyph::Table, Glyph::Aspect)).gt(2),
+            MergeUpdate::value(Glyph::Image, "orphan"),
+        )
+        .returning(Query::returning().expr(Expr::col((ReturningRow::New, Glyph::Aspect)).add(1)))
+        .returning_action()
+        .build();
+    assert_eq!(
+        sql,
+        [
+            head(),
+            r#"WHEN MATCHED AND "font"."language" = $1 THEN DELETE"#,
+            r#"WHEN NOT MATCHED BY SOURCE AND "glyph"."aspect" > $2 THEN UPDATE SET "image" = $3"#,
+            r#"RETURNING merge_action(), new."aspect" + $4"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        values.0,
+        vec!["en".into(), 2i32.into(), "orphan".into(), 1i32.into()]
     );
 }

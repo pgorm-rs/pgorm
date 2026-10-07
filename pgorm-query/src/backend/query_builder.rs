@@ -30,6 +30,8 @@ mod grouping;
 mod merge;
 #[path = "query_builder_range.rs"]
 mod range;
+#[path = "query_builder_returning.rs"]
+mod returning;
 #[path = "query_builder_sequence.rs"]
 mod sequence;
 #[path = "query_builder_subscript.rs"]
@@ -188,7 +190,7 @@ impl QueryBuilder {
 
         self.prepare_on_conflict(&insert.on_conflict, sql);
 
-        self.prepare_returning(&insert.returning, sql);
+        self.prepare_returning(insert.returning.as_ref(), None, sql);
     }
 
     fn prepare_union_statement(
@@ -356,7 +358,7 @@ impl QueryBuilder {
 
         self.prepare_condition(&update.r#where, "WHERE", sql);
 
-        self.prepare_returning(&update.returning, sql);
+        self.prepare_returning(update.returning.as_ref(), None, sql);
     }
 
     /// Translate [`DeleteStatement`] into SQL statement.
@@ -391,7 +393,7 @@ impl QueryBuilder {
 
         self.prepare_condition(&delete.r#where, "WHERE", sql);
 
-        self.prepare_returning(&delete.returning, sql);
+        self.prepare_returning(delete.returning.as_ref(), None, sql);
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
@@ -668,7 +670,7 @@ impl QueryBuilder {
                 table.prepare(sql.as_writer());
                 write!(sql, ".*").unwrap();
             }
-            // [spec:pgorm:req:sql.render.returning+2] the relation's keyword, bare
+            // [spec:pgorm:req:sql.render.returning+3] the relation's keyword, bare
             ColumnRef::RowColumn(row, column) => {
                 write!(sql, "{}.", row.keyword()).unwrap();
                 column.prepare(sql.as_writer());
@@ -1254,52 +1256,6 @@ impl QueryBuilder {
         if let Some(condition) = filter {
             write!(sql, " WHERE ").unwrap();
             self.prepare_condition_where(condition, sql);
-        }
-    }
-
-    /// Hook to insert "RETURNING" statements.
-    // [spec:pgorm:req:sql.render.returning+2]
-    fn prepare_returning(&self, returning: &Option<ReturningClause>, sql: &mut dyn SqlWriter) {
-        if let Some(returning) = returning {
-            write!(sql, " RETURNING ").unwrap();
-            let renames = [("OLD", &returning.old), ("NEW", &returning.new)];
-            let mut renames = renames
-                .iter()
-                .filter_map(|(row, name)| name.as_ref().map(|name| (row, name)))
-                .peekable();
-            if renames.peek().is_some() {
-                write!(sql, "WITH (").unwrap();
-                renames.fold(true, |first, (row, name)| {
-                    if !first {
-                        write!(sql, ", ").unwrap();
-                    }
-                    write!(sql, "{row} AS ").unwrap();
-                    name.prepare(sql.as_writer());
-                    false
-                });
-                write!(sql, ") ").unwrap();
-            }
-            match &returning.items {
-                ReturningItems::All => write!(sql, "*").unwrap(),
-                ReturningItems::Columns(cols) => {
-                    cols.iter().fold(true, |first, column_ref| {
-                        if !first {
-                            write!(sql, ", ").unwrap()
-                        }
-                        self.prepare_column_ref(column_ref, sql);
-                        false
-                    });
-                }
-                ReturningItems::Exprs(exprs) => {
-                    exprs.iter().fold(true, |first, expr| {
-                        if !first {
-                            write!(sql, ", ").unwrap()
-                        }
-                        self.prepare_simple_expr(expr, sql);
-                        false
-                    });
-                }
-            }
         }
     }
 
@@ -2660,6 +2616,7 @@ impl SubQueryStatement {
             InsertStatement(stmt) => QueryBuilder.prepare_insert_statement(stmt, sql),
             UpdateStatement(stmt) => QueryBuilder.prepare_update_statement(stmt, sql),
             DeleteStatement(stmt) => QueryBuilder.prepare_delete_statement(stmt, sql),
+            MergeStatement(stmt) => QueryBuilder.prepare_merge_statement(stmt, sql),
         }
     }
 }

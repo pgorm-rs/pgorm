@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ast+2/test]
+// [spec:pgorm:req:sql.ast+3/test]
 // [spec:pgorm:def:sql.ast.select+3/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
@@ -1011,7 +1011,7 @@ fn select_57() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+4/test]
+// [spec:pgorm:def:sql.ast.with+5/test]
 // [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn select_58() {
@@ -1215,7 +1215,7 @@ fn insert_from_select() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+4/test]
+// [spec:pgorm:def:sql.ast.with+5/test]
 #[test]
 fn insert_6() -> error::Result<()> {
     let select = SelectStatement::new()
@@ -1600,10 +1600,10 @@ fn insert_on_conflict_both_filters() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.returning+1/test]
+// [spec:pgorm:def:sql.ast.returning+2/test]
 #[test]
 #[allow(clippy::approx_constant)]
-// [spec:pgorm:req:sql.render.returning+2/test]
+// [spec:pgorm:req:sql.render.returning+3/test]
 fn insert_returning_all_columns() {
     assert_eq!(
         Query::insert()
@@ -2580,7 +2580,7 @@ fn condition_holder_5() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+4/test]    a non-recursive clause takes its first CTE at
+// [spec:pgorm:def:sql.ast.with+5/test]    a non-recursive clause takes its first CTE at
 // construction and renders every one it was given
 // [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
@@ -2608,7 +2608,7 @@ fn with_clause_renders_each_of_its_ctes() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+4/test]    `from_select` names the CTE after the select's first
+// [spec:pgorm:def:sql.ast.with+5/test]    `from_select` names the CTE after the select's first
 // FROM table and takes its columns from the projection
 #[test]
 fn from_select_names_the_cte_after_its_table() {
@@ -2635,7 +2635,7 @@ fn from_select_names_the_cte_after_its_table() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.with+4/test]    a select with no FROM table has no name to derive, so
+// [spec:pgorm:def:sql.ast.with+5/test]    a select with no FROM table has no name to derive, so
 // `from_select` declines rather than yielding a nameless CTE
 #[test]
 fn from_select_declines_a_select_without_a_table() {

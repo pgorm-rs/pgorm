@@ -371,7 +371,7 @@ fn sweep_window_function_shapes() {
 // [spec:pgorm:req:sql.render.oracle+1/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert+2/test]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
-// [spec:pgorm:req:sql.render.returning+2/test]
+// [spec:pgorm:req:sql.render.returning+3/test]
 #[test]
 fn sweep_insert_shapes() {
     let insert = || {
@@ -461,7 +461,7 @@ fn sweep_update_and_delete_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    MERGE
-// [spec:pgorm:req:sql.render.merge/test]
+// [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn sweep_merge_shapes() {
     let on = || Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id));
@@ -512,6 +512,34 @@ fn sweep_merge_shapes() {
             base(),
         )))
         .to_string(),
+        merge()
+            .when_not_matched_by_source_and(name().is_null(), MatchedAction::DoNothing)
+            .when_not_matched_by_source(MergeUpdate::value(Glyph::Aspect, 0))
+            .returning_action()
+            .to_string(),
+        merge()
+            .when_matched(MatchedAction::Delete)
+            .returning(
+                Query::returning()
+                    .exprs([
+                        Expr::col((Name::runtime("o"), Asterisk)),
+                        Expr::col((ReturningRow::New, Asterisk)),
+                    ])
+                    .old_as(Name::runtime("o")),
+            )
+            .returning_action()
+            .to_string(),
+        Query::select()
+            .column(Asterisk)
+            .from(Name::runtime("m"))
+            .with(WithClause::new(CommonTableExpression::new(
+                Name::runtime("m"),
+                merge()
+                    .when_not_matched_by_source(MatchedAction::Delete)
+                    .returning(Query::returning().all())
+                    .to_owned(),
+            )))
+            .to_string(),
     ]);
 }
 

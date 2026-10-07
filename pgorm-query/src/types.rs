@@ -143,10 +143,10 @@ pub enum ColumnRef {
     TableAsterisk(Name),
     /// A column of a written row's old or new version, `old."col"`, which
     /// only a RETURNING list resolves.
-    // [spec:pgorm:def:sql.ast.returning+1]
+    // [spec:pgorm:def:sql.ast.returning+2]
     RowColumn(crate::ReturningRow, Name),
     /// Every column of a written row's old or new version, `old.*`.
-    // [spec:pgorm:def:sql.ast.returning+1]
+    // [spec:pgorm:def:sql.ast.returning+2]
     RowAsterisk(crate::ReturningRow),
 }
 

@@ -213,7 +213,7 @@ impl PendingTableAlter {
 /// let moved: TableAlterStatement = alter.take();
 /// ```
 // [spec:pgorm:req:sql.ddl.alter-table+10]
-// [spec:pgorm:req:sql.ast+2]
+// [spec:pgorm:req:sql.ast+3]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: TableName,

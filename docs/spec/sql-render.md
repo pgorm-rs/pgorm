@@ -602,13 +602,15 @@ an ideal Postgres renderer would emit.
 > unrepresentable per `sql.ast.on-conflict`, which is the only guard available
 > since `sql.render.oracle` cannot see it.
 
-> [spec:pgorm:req:sql.render.returning+2]
-> A returning clause on INSERT, UPDATE, or DELETE MUST render as the final
-> clause ` RETURNING `, then, when the clause renames either version of the
-> written row, `WITH (`, the renames comma-separated with `OLD AS "o"` before
-> `NEW AS "n"` whichever was named first, and `) `; then `*`, a
-> comma-separated list of column refs, or a comma-separated list of
-> expressions. A clause renaming neither writes no `WITH`. A version's column
+> [spec:pgorm:req:sql.render.returning+3]
+> A returning clause on INSERT, UPDATE, DELETE or MERGE MUST render as the
+> final clause ` RETURNING `, then, when the clause renames either version of
+> the written row, `WITH (`, the renames comma-separated with `OLD AS "o"`
+> before `NEW AS "n"` whichever was named first, and `) `; then, on a MERGE
+> that returns its action, `merge_action()`, followed by `, ` when a list
+> follows; then `*`, a comma-separated list of column refs, or a
+> comma-separated list of expressions. A MERGE that returns its action and
+> has no list renders ` RETURNING merge_action()`. A clause renaming neither writes no `WITH`. A version's column
 > (`ColumnRef::RowColumn`) renders the version's keyword bare, `.`, and the
 > quoted column (`old."col"`), and every column of a version
 > (`ColumnRef::RowAsterisk`) the keyword and `.*`. The keyword is written
@@ -646,22 +648,28 @@ an ideal Postgres renderer would emit.
 
 ## MERGE
 
-> [spec:pgorm:req:sql.render.merge]
+> [spec:pgorm:req:sql.render.merge+1]
 > A `MergeStatement` MUST open with its carried WITH clause when it has one,
 > written by the plain-clause renderer that `prepare_with_clause` also uses
 > (`sql.render.cte`). Then come `MERGE INTO `, `ONLY ` when set, and the
 > target as a named table (`"schema"."t" AS "a"`). ` USING ` follows with the
 > source written by `prepare_from_item`, so every FROM item renders as it does
 > in a SELECT (`sql.render.subquery`), and then ` ON ` and the join
-> condition. The arms come last: every matched arm, then every not-matched
-> arm, each kind's conditional arms in call order and its unconditional arm
-> after them (`sql.ast.merge`).
+> condition. The arms follow: every matched arm, then every not-matched arm,
+> then every not-matched-by-source arm, each kind's conditional arms in call
+> order and its unconditional arm after them (`sql.ast.merge`). The
+> RETURNING clause comes last (`sql.render.returning`).
 >
-> An arm renders ` WHEN MATCHED` or ` WHEN NOT MATCHED`, then ` AND ` and
-> its condition when it has one, then ` THEN ` and its action. The condition
+> An arm renders ` WHEN MATCHED`, ` WHEN NOT MATCHED` or ` WHEN NOT MATCHED
+> BY SOURCE`, then ` AND ` and its condition when it has one, then ` THEN `
+> and its action. The not-matched arm keeps the spelling without `BY TARGET`,
+> which PostgreSQL 15 and 16 also read, and the parse is the same
+> (`MERGE_WHEN_NOT_MATCHED_BY_TARGET`). The condition
 > takes no parentheses. Here `AND` is the clause's keyword rather than an
 > operator, and the condition runs to `THEN`, so a top-level `OR` is read
-> whole, as the parse tree shows. The actions render as `UPDATE SET "col" =
+> whole, as the parse tree shows. A not-matched-by-source arm takes a matched
+> arm's actions and renders them the same way. The actions render as
+> `UPDATE SET "col" =
 > <expr>, ..`, `DELETE`, `DO NOTHING`, `INSERT DEFAULT VALUES`, and
 > `INSERT ("col", ..)` followed by an optional ` OVERRIDING SYSTEM VALUE` or
 > ` OVERRIDING USER VALUE`, then ` VALUES (<expr>, ..)`. The insert's column

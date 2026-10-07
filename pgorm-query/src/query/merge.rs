@@ -1,6 +1,7 @@
 use crate::{
-    Condition, FromItem, IntoCondition, IntoName, Name, NamedTable, Overriding,
-    QueryStatementBuilder, SimpleExpr, Values, WithClause, backend::QueryBuilder, prepare::*,
+    Condition, FromItem, IntoCondition, IntoName, IntoSubQueryStatement, Name, NamedTable,
+    Overriding, QueryStatementBuilder, ReturningClause, SimpleExpr, SubQueryStatement, Values,
+    WithClause, backend::QueryBuilder, prepare::*,
 };
 use inherent::inherent;
 
@@ -8,7 +9,7 @@ use inherent::inherent;
 /// it reads, and the condition that pairs their rows.
 ///
 /// PostgreSQL refuses a `MERGE` with no `WHEN` clause (`42601`), so this is not
-/// yet a statement and has nothing to render or build. Each of its four methods
+/// yet a statement and has nothing to render or build. Each of its six methods
 /// adds the first arm and returns the [`MergeStatement`]:
 ///
 /// ```compile_fail,E0599
@@ -21,7 +22,7 @@ use inherent::inherent;
 /// )
 /// .build();
 /// ```
-// [spec:pgorm:req:sql.ast.merge]
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct PendingMerge {
     pub(crate) target: NamedTable,
@@ -63,21 +64,21 @@ pub struct PendingMerge {
 /// ```
 ///
 /// A target row the condition pairs with a source row is *matched*. A source
-/// row it pairs with no target row is *not matched*. Each kind of row takes
+/// row it pairs with no target row is *not matched*, and a target row it
+/// pairs with no source row is *not matched by source*. Each kind of row takes
 /// its own arms, and an arm may carry an `AND` condition of its own. Within a
 /// kind, a row takes the first conditional arm whose condition holds, in the
 /// order the arms were added. If none holds, it takes that kind's
 /// unconditional arm, and with no such arm the row is left alone. An
 /// unconditional arm always renders after its kind's conditional arms. That is
 /// the only place PostgreSQL accepts one: any arm after it is refused as
-/// unreachable (`42601`), so that statement cannot be built. The two kinds
-/// never compete for a row, so the matched arms rendering first changes
-/// nothing.
+/// unreachable (`42601`), so that statement cannot be built. The three kinds
+/// never compete for a row, so the order the kinds render in changes nothing.
 ///
-/// The actions follow the grammar: a matched row can be updated, deleted or
-/// left alone ([`MatchedAction`]), and a source row with no match can be
-/// inserted or skipped ([`NotMatchedAction`]). An insert for a matched row
-/// does not typecheck:
+/// The actions follow the grammar. A target row, matched or not matched by
+/// source, can be updated, deleted or left alone ([`MatchedAction`]), and a
+/// source row with no match can be inserted or skipped
+/// ([`NotMatchedAction`]). An insert for a target row does not typecheck:
 ///
 /// ```compile_fail,E0277
 /// use pgorm_query::{tests_cfg::*, *};
@@ -110,11 +111,11 @@ pub struct PendingMerge {
 /// assigned to no column, so it needs a cast, as it would in any `FROM`
 /// clause.
 ///
-/// The statement renders and builds like the four DML statements. It does not
-/// nest, though: PostgreSQL accepts `MERGE` neither as a common table
-/// expression nor as an expression subquery, so it does not implement
-/// [`IntoSubQueryStatement`](crate::IntoSubQueryStatement).
-// [spec:pgorm:req:sql.ast.merge]
+/// The statement renders and builds like the four DML statements, and it
+/// nests where they do: as a common table expression's body, through
+/// [`IntoSubQueryStatement`]. With [`returning`](Self::returning) the CTE
+/// yields the rows the merge wrote.
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct MergeStatement {
     pub(crate) with: Option<Box<WithClause>>,
@@ -124,11 +125,14 @@ pub struct MergeStatement {
     pub(crate) on: Condition,
     pub(crate) matched: MergeArms<MatchedAction>,
     pub(crate) not_matched: MergeArms<NotMatchedAction>,
+    pub(crate) not_matched_by_source: MergeArms<MatchedAction>,
+    pub(crate) returning: Option<ReturningClause>,
+    pub(crate) returns_action: bool,
 }
 
 /// The arms of one kind: the conditional arms in the order they were added,
 /// then at most one unconditional arm, which is where the grammar admits it.
-// [spec:pgorm:req:sql.ast.merge]
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MergeArms<A> {
     pub(crate) conditional: Vec<(Condition, A)>,
@@ -144,8 +148,9 @@ impl<A> Default for MergeArms<A> {
     }
 }
 
-/// What a `MERGE` does with a target row the join condition matched.
-// [spec:pgorm:req:sql.ast.merge]
+/// What a `MERGE` does with a target row: one the join condition matched, or,
+/// in a `NOT MATCHED BY SOURCE` arm, one it matched with no source row.
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum MatchedAction {
     /// `UPDATE SET ..`, built by [`MergeUpdate::value`].
@@ -158,7 +163,7 @@ pub enum MatchedAction {
 }
 
 /// What a `MERGE` does with a source row that matched no target row.
-// [spec:pgorm:req:sql.ast.merge]
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum NotMatchedAction {
     /// `INSERT (..) VALUES (..)`, built by [`MergeInsert::value`].
@@ -200,7 +205,7 @@ impl MergeAssignments {
 ///
 /// A column is a bare name: PostgreSQL resolves it against the target, and
 /// refuses one qualified by the table's name (`42703`).
-// [spec:pgorm:req:sql.ast.merge]
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct MergeUpdate {
     pub(crate) sets: MergeAssignments,
@@ -259,7 +264,7 @@ impl From<MergeUpdate> for MatchedAction {
 /// constructor takes the first pair. A row of defaults is
 /// [`NotMatchedAction::InsertDefaultValues`], which takes no `OVERRIDING`
 /// clause. PostgreSQL accepts that clause only before `VALUES`.
-// [spec:pgorm:req:sql.ast.merge]
+// [spec:pgorm:req:sql.ast.merge+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct MergeInsert {
     pub(crate) values: MergeAssignments,
@@ -355,6 +360,9 @@ impl PendingMerge {
             on: self.on,
             matched: MergeArms::default(),
             not_matched: MergeArms::default(),
+            not_matched_by_source: MergeArms::default(),
+            returning: None,
+            returns_action: false,
         }
     }
 
@@ -405,6 +413,32 @@ impl PendingMerge {
         let mut statement = self.into_statement();
         statement
             .not_matched
+            .conditional
+            .push((condition.into_condition(), action.into()));
+        statement
+    }
+
+    /// Begin the statement with the unconditional not-matched-by-source arm.
+    /// See [`MergeStatement::when_not_matched_by_source`].
+    pub fn when_not_matched_by_source<A>(self, action: A) -> MergeStatement
+    where
+        A: Into<MatchedAction>,
+    {
+        let mut statement = self.into_statement();
+        statement.not_matched_by_source.otherwise = Some(action.into());
+        statement
+    }
+
+    /// Begin the statement with a conditional not-matched-by-source arm. See
+    /// [`MergeStatement::when_not_matched_by_source_and`].
+    pub fn when_not_matched_by_source_and<C, A>(self, condition: C, action: A) -> MergeStatement
+    where
+        C: IntoCondition,
+        A: Into<MatchedAction>,
+    {
+        let mut statement = self.into_statement();
+        statement
+            .not_matched_by_source
             .conditional
             .push((condition.into_condition(), action.into()));
         statement
@@ -543,6 +577,158 @@ impl MergeStatement {
         self
     }
 
+    /// Set the arm a target row that no source row matched takes when no
+    /// conditional arm of its kind took it: `WHEN NOT MATCHED BY SOURCE THEN
+    /// <action>`. Such a row is a target row like a matched one, so it takes
+    /// the same actions, a [`MatchedAction`]: update it, delete it, or leave
+    /// it alone. An insert has nothing to insert from and does not typecheck:
+    ///
+    /// ```compile_fail,E0277
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// Query::merge(
+    ///     Glyph::Table,
+    ///     Font::Table,
+    ///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    /// )
+    /// .when_not_matched_by_source(NotMatchedAction::InsertDefaultValues);
+    /// ```
+    ///
+    /// The arm renders after every conditional arm of its kind, and the last
+    /// call wins, as with [`when_matched`](Self::when_matched). Its kind
+    /// renders after the other two.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::merge(
+    ///     Glyph::Table,
+    ///     Font::Table,
+    ///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    /// )
+    /// .when_not_matched_by_source(MatchedAction::Delete)
+    /// .when_matched(MergeUpdate::value(Glyph::Image, Expr::col((Font::Table, Font::Name))))
+    /// .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id""#,
+    ///         r#"WHEN MATCHED THEN UPDATE SET "image" = "font"."name""#,
+    ///         r#"WHEN NOT MATCHED BY SOURCE THEN DELETE"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// The row has no source row, so neither the arm's condition nor its
+    /// update can read the source: PostgreSQL refuses a reference to it
+    /// (`42P01`).
+    pub fn when_not_matched_by_source<A>(&mut self, action: A) -> &mut Self
+    where
+        A: Into<MatchedAction>,
+    {
+        self.not_matched_by_source.otherwise = Some(action.into());
+        self
+    }
+
+    /// Add a not-matched-by-source arm that applies only where `condition`
+    /// holds: `WHEN NOT MATCHED BY SOURCE AND <condition> THEN <action>`. The
+    /// condition reads the target row alone, as with
+    /// [`when_not_matched_by_source`](Self::when_not_matched_by_source), and
+    /// arms are tried in the order they were added, as with
+    /// [`when_matched_and`](Self::when_matched_and).
+    pub fn when_not_matched_by_source_and<C, A>(&mut self, condition: C, action: A) -> &mut Self
+    where
+        C: IntoCondition,
+        A: Into<MatchedAction>,
+    {
+        self.not_matched_by_source
+            .conditional
+            .push((condition.into_condition(), action.into()));
+        self
+    }
+
+    /// Return a row for each row the merge wrote: `RETURNING ..`, after the
+    /// arms. The last call wins.
+    ///
+    /// The list reads the source row and the target row, and the target row's
+    /// two versions through [`ReturningRow`](crate::ReturningRow). A column
+    /// named bare resolves against both relations, so one both have is
+    /// ambiguous (`42702`) until it is qualified, and `*` is the source's
+    /// columns followed by the target's. A target column reads the row as the
+    /// merge left it, and a deleted row as it was. A version the action did
+    /// not produce reads as NULL: an inserted row has no `old`, a deleted row
+    /// no `new`. A row an arm left alone with `DO NOTHING` returns nothing.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::merge(
+    ///     Glyph::Table,
+    ///     Font::Table,
+    ///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    /// )
+    /// .when_matched(MergeUpdate::value(Glyph::Image, Expr::col((Font::Table, Font::Name))))
+    /// .returning(Query::returning().columns([
+    ///     (ReturningRow::Old, Glyph::Image),
+    ///     (ReturningRow::New, Glyph::Image),
+    /// ]))
+    /// .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id""#,
+    ///         r#"WHEN MATCHED THEN UPDATE SET "image" = "font"."name""#,
+    ///         r#"RETURNING old."image", new."image""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    pub fn returning(&mut self, returning: ReturningClause) -> &mut Self {
+        self.returning = Some(returning);
+        self
+    }
+
+    /// Also return the action each row took, as the RETURNING list's first
+    /// column: `merge_action()`, the text `INSERT`, `UPDATE` or `DELETE`.
+    /// With no [`returning`](Self::returning) list, it is the list.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::merge(
+    ///     Glyph::Table,
+    ///     Font::Table,
+    ///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    /// )
+    /// .when_matched(MatchedAction::Delete)
+    /// .when_not_matched(MergeInsert::value(Glyph::Id, Expr::col((Font::Table, Font::Id))))
+    /// .returning_action()
+    /// .returning(Query::returning().column(Glyph::Id))
+    /// .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id""#,
+    ///         r#"WHEN MATCHED THEN DELETE"#,
+    ///         r#"WHEN NOT MATCHED THEN INSERT ("id") VALUES ("font"."id")"#,
+    ///         r#"RETURNING merge_action(), "id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    ///
+    /// This is the only way to write `merge_action()`. PostgreSQL resolves it
+    /// in a MERGE's RETURNING list and refuses it anywhere else (`42601`), so
+    /// it is not an expression that could be placed elsewhere.
+    pub fn returning_action(&mut self) -> &mut Self {
+        self.returns_action = true;
+        self
+    }
+
     /// Attach a WITH clause, rendered as the statement's prefix. The last
     /// call wins.
     ///
@@ -627,6 +813,50 @@ impl MergeStatement {
     pub fn only(&mut self) -> &mut Self {
         self.only = true;
         self
+    }
+}
+
+/// A MERGE nests as a common table expression's body, whose rows are those
+/// its RETURNING list yields:
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let merge = Query::merge(
+///     Glyph::Table,
+///     Font::Table,
+///     Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+/// )
+/// .when_matched(MatchedAction::Delete)
+/// .returning_action()
+/// .returning(Query::returning().column(Glyph::Id))
+/// .to_owned();
+///
+/// let query = Query::select()
+///     .column(Asterisk)
+///     .from(Name::runtime("m"))
+///     .with(WithClause::new(CommonTableExpression::new(Name::runtime("m"), merge)))
+///     .to_owned();
+///
+/// assert_eq!(
+///     query.to_string(),
+///     [
+///         r#"WITH "m" AS (MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id""#,
+///         r#"WHEN MATCHED THEN DELETE RETURNING merge_action(), "id")"#,
+///         r#"SELECT * FROM "m""#,
+///     ]
+///     .join(" ")
+/// );
+/// ```
+///
+/// PostgreSQL accepts a MERGE without RETURNING there too, as it does an
+/// UPDATE: the statement still runs, and only reading the CTE is refused
+/// (`0A000`). It does not accept a MERGE as an expression subquery (`42601`),
+/// which no typed constructor of one builds.
+// [spec:pgorm:req:sql.ast+3]
+impl IntoSubQueryStatement for MergeStatement {
+    fn into_sub_query_statement(self) -> SubQueryStatement {
+        SubQueryStatement::MergeStatement(Box::new(self))
     }
 }
 

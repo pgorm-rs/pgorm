@@ -48,7 +48,7 @@ pub(crate) use grouping::GroupingKind;
 pub use with::*;
 
 /// Shorthand for constructing any table query
-// [spec:pgorm:req:sql.ast+2]
+// [spec:pgorm:req:sql.ast+3]
 #[derive(Debug, Clone)]
 pub struct Query;
 
@@ -61,13 +61,14 @@ pub enum QueryStatement {
     Delete(DeleteStatement),
 }
 
-// [spec:pgorm:req:sql.ast+2]
+// [spec:pgorm:req:sql.ast+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubQueryStatement {
     SelectStatement(SelectStatement),
     InsertStatement(InsertStatement),
     UpdateStatement(UpdateStatement),
     DeleteStatement(DeleteStatement),
+    MergeStatement(Box<MergeStatement>),
 }
 
 impl Query {
@@ -98,7 +99,7 @@ impl Query {
     /// The target is a table name, optionally schema-qualified and aliased,
     /// and the source is any relation a `FROM` clause takes: a table, a
     /// subquery, a values list, a function call or a validated fragment.
-    // [spec:pgorm:req:sql.ast.merge]
+    // [spec:pgorm:req:sql.ast.merge+1]
     pub fn merge<T, S, C>(target: T, source: S, on: C) -> PendingMerge
     where
         T: IntoNamedTable,
