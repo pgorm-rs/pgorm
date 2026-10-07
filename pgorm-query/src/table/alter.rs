@@ -742,8 +742,12 @@ impl TableAlterStatement {
     /// Change a constraint that exists: `ALTER CONSTRAINT "name" <change>`.
     ///
     /// Which kind of constraint the name holds is the server's knowledge, and
-    /// each [`ConstraintChange`] applies to one kind: asked of another, it is
-    /// refused (`42809`).
+    /// each [`ConstraintChange`] applies to the kinds it names: asked of
+    /// another, it is refused (`42809`). The builder cannot see the kind, so
+    /// the one change whose kinds differ by release —
+    /// [`Enforced`](ConstraintChange::Enforced) and
+    /// [`NotEnforced`](ConstraintChange::NotEnforced) on a `CHECK`, refused by
+    /// PostgreSQL 18 and taken by 19 — builds under either target.
     ///
     /// # Examples
     ///

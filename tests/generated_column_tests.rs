@@ -573,15 +573,17 @@ async fn expression_actions_refused_by_sqlstate() -> Result<(), Error> {
     Ok(())
 }
 
-/// A `CHECK` constraint does not stop a virtual column taking a new
-/// expression on PostgreSQL 19, where 18 refused it (`0A000`). The table is
-/// not rewritten, as for any virtual column; the rows are checked against the
-/// constraint instead, and one that breaks it refuses the action (`23514`)
-/// and leaves the old expression in place.
+/// A `CHECK` constraint on the table, by release. PostgreSQL 18 refuses a
+/// virtual column a new expression under one (`0A000`) and the old expression
+/// stays. 19 takes it without rewriting the table, as for any virtual column,
+/// and checks the rows against the constraint instead: one that breaks it
+/// refuses the action (`23514`) and leaves the old expression in place.
 // [spec:pgorm:req:sql.ddl.alter-table+10/test]    SET EXPRESSION on a virtual
-// column under a CHECK constraint checks the rows rather than being refused
+// column under a CHECK constraint, refused on 18 and checking the rows on 19
+// [spec:pgorm:req:sql.target/test]    18's answer in the default build, 19's
+// under pg-19
 #[pgorm_macros::test]
-async fn set_expression_under_a_check_checks_the_rows() -> Result<(), Error> {
+async fn set_expression_under_a_check() -> Result<(), Error> {
     let ctx = TestContext::new("generated_set_expression_check").await;
     let db = ctx.db.get().await?;
     reading_table(&db).await?;
@@ -596,17 +598,31 @@ async fn set_expression_under_a_check_checks_the_rows() -> Result<(), Error> {
             )
             .to_string()
     };
-    let before = relfilenode(&db, "reading").await?;
-    db.batch_execute(&computed(10)).await?;
-    assert_eq!(relfilenode(&db, "reading").await?, before);
-    assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
 
-    let error = db
-        .batch_execute(&computed(-1))
-        .await
-        .expect_err("every row breaks the CHECK");
-    refused_with(&error, &SqlState::CHECK_VIOLATION);
-    assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
+    #[cfg(not(feature = "pg-19"))]
+    {
+        let error = db
+            .batch_execute(&computed(10))
+            .await
+            .expect_err("PostgreSQL 18 refuses it while the table has a CHECK");
+        refused_with(&error, &SqlState::FEATURE_NOT_SUPPORTED);
+        assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3)]);
+    }
+
+    #[cfg(feature = "pg-19")]
+    {
+        let before = relfilenode(&db, "reading").await?;
+        db.batch_execute(&computed(10)).await?;
+        assert_eq!(relfilenode(&db, "reading").await?, before);
+        assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
+
+        let error = db
+            .batch_execute(&computed(-1))
+            .await
+            .expect_err("every row breaks the CHECK");
+        refused_with(&error, &SqlState::CHECK_VIOLATION);
+        assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
+    }
 
     drop(db);
     ctx.delete().await;

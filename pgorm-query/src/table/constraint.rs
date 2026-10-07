@@ -129,8 +129,8 @@ pub enum Enforcement {
     Enforced,
     /// `NOT ENFORCED`: the constraint is recorded and never checked. It is
     /// never valid, a foreign key's `ON DELETE` and `ON UPDATE` actions never
-    /// fire, and `VALIDATE CONSTRAINT` refuses it (`55000`); a foreign key is
-    /// enforced again with
+    /// fire, and `VALIDATE CONSTRAINT` refuses it (`55000`); a foreign key, or
+    /// on PostgreSQL 19 a `CHECK`, is enforced again with
     /// [`ConstraintChange::Enforced`](crate::ConstraintChange::Enforced).
     NotEnforced,
 }
@@ -150,8 +150,10 @@ impl Enforcement {
 /// What `ALTER CONSTRAINT "name" ...` changes about a constraint that exists.
 ///
 /// The server alone knows which kind of constraint a name holds, and each
-/// change applies to one kind, so asking another kind for it is refused there
-/// (`42809`).
+/// change applies to the kinds its variant names, so asking another kind for
+/// it is refused there (`42809`). Where those kinds differ by release, the
+/// variant says so: the builder cannot tell a `CHECK`'s name from a foreign
+/// key's, so no target can rule the difference out by type.
 // [spec:pgorm:req:sql.ddl.alter-table+10]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {

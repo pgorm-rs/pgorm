@@ -419,11 +419,19 @@ async fn constructor_clauses_hold_live() -> Result<(), Error> {
     };
     let from_query: Json = both_paths(&db, series_array(3)).await?;
     assert_eq!(from_query, json!([3, 2, 1]));
-    let from_no_rows: Json = both_paths(&db, series_array(0)).await?;
+    // [spec:pgorm:req:sql.target/test]    a query of no rows: NULL on 18, the
+    // empty array on 19
+    let from_no_rows: Option<Json> = both_paths(&db, series_array(0)).await?;
+    #[cfg(not(feature = "pg-19"))]
+    assert_eq!(
+        from_no_rows, None,
+        "PostgreSQL 18 answers a query of no rows with NULL, as JSON_ARRAYAGG does"
+    );
+    #[cfg(feature = "pg-19")]
     assert_eq!(
         from_no_rows,
-        json!([]),
-        "PostgreSQL 19 answers a query of no rows with an empty array, where 18 gave NULL"
+        Some(json!([])),
+        "PostgreSQL 19 answers a query of no rows with an empty array"
     );
 
     let parsed: Json = both_paths(&db, Func::json(r#"{"a": [1]}"#)).await?;

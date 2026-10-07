@@ -216,14 +216,17 @@ async fn alter_constraint_enforces_a_foreign_key() -> Result<(), Error> {
 }
 
 /// On PostgreSQL 19 `ALTER CONSTRAINT` moves a `CHECK` between enforced and
-/// not, as it moves a foreign key; 18 refuses a `CHECK`'s (`42809`).
+/// not, as it moves a foreign key; 18 refuses a `CHECK`'s (`42809`), which
+/// `enforcement_refusals_by_sqlstate` holds in the default build.
 /// `ENFORCED` checks the rows already there, refusing the statement while one
 /// breaks the condition (`23514`), and the constraint is valid once they
 /// pass; `NOT ENFORCED` leaves it unchecked and not valid again.
 // [spec:pgorm:req:sql.ddl.alter-table+10/test]    ENFORCED and NOT ENFORCED apply
-// to a CHECK as to a foreign key
+// to a CHECK as to a foreign key, from PostgreSQL 19
 // [spec:pgorm:req:sql.ddl.enforcement/test]    ALTER CONSTRAINT moves a CHECK
-// between the two, ENFORCED checking the rows as it goes
+// between the two on 19, ENFORCED checking the rows as it goes
+// [spec:pgorm:req:sql.target/test]    19's answer, built and run under pg-19 alone
+#[cfg(feature = "pg-19")]
 #[pgorm_macros::test]
 async fn alter_constraint_enforces_a_check() -> Result<(), Error> {
     let ctx = TestContext::new("not_enforced_alter_check").await;
@@ -278,11 +281,14 @@ async fn alter_constraint_enforces_a_check() -> Result<(), Error> {
 }
 
 /// What the server refuses around enforcement, by SQLSTATE: altering a key's
-/// enforcement, validating a constraint that is not enforced, and deferring a
-/// `CHECK` whether or not it is enforced. A foreign key that is not enforced
-/// may still be deferrable.
+/// enforcement, or on PostgreSQL 18 a `CHECK`'s (19 takes it:
+/// `alter_constraint_enforces_a_check`), validating a constraint that is not
+/// enforced, and deferring a `CHECK` whether or not it is enforced. A foreign
+/// key that is not enforced may still be deferrable.
 // [spec:pgorm:req:sql.ddl.enforcement/test]    the refusals around NOT ENFORCED,
 // and a NOT ENFORCED foreign key taking deferrability
+// [spec:pgorm:req:sql.target/test]    18's refusal of a CHECK's enforcement,
+// held in the default build only
 #[pgorm_macros::test]
 async fn enforcement_refusals_by_sqlstate() -> Result<(), Error> {
     let ctx = TestContext::new("not_enforced_refusals").await;
@@ -328,6 +334,12 @@ async fn enforcement_refusals_by_sqlstate() -> Result<(), Error> {
         refused_with(&error, state);
     };
     for change in [ConstraintChange::Enforced, ConstraintChange::NotEnforced] {
+        #[cfg(not(feature = "pg-19"))]
+        refused(
+            alter().alter_constraint(n("positive"), change).to_string(),
+            &SqlState::WRONG_OBJECT_TYPE,
+        )
+        .await;
         refused(
             Table::alter(n("parent"))
                 .alter_constraint(n("parent_pkey"), change)
