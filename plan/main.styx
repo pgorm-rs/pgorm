@@ -9395,15 +9395,35 @@ children (
 
     {
         id range-consumers-beyond-builtins
-        title "Ranges reach the consumers scope-range-types refused: arrays of ranges, created range types and multiranges, Python"
+        title "Ranges reach the consumers scope-range-types refused: arrays of ranges, an overlap builder, Python"
         kind @feat
         deps (pg18-test-server)
+        children (
+            {
+                id range-arrays-and-overlap
+                title "An entity field holds an array of ranges or multiranges, codegen writes one for int4range[], and Expr tests two ranges for overlap"
+                kind @feat
+            }
+
+            {
+                id python-ranges
+                title "Python reads, writes and builds with the built-in ranges and multiranges: a Range class, tagged values, decoded columns, stubs"
+                kind @feat
+            }
+        )
         log (
             {
                 at 2026-10-05T00:17:24.301434Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed when scope-range-types landed (6006221d), which built range values for PostgreSQL's six built-in range types and refused, by name, every consumer listed here. These items could use ranges; until now they only handle them. (1) Arrays of ranges: `Vec<Range<T>>` / `Vec<Multirange<T>>` have no NotU8, ValueType or TryGetable impl, so an entity field of `int4range[]` does not compile. Codegen refuses `int4range[]` for that reason. `Value::array([..])` already binds and renders one. Live-checked: `($1::int4range[])[3]` reads back through the bind path and the inline literal path alike. (2) Range types a schema creates over a subtype that is not one of the six (the PG docs' floatrange is `Range<f64>`). RangeType and RangeElement are closed to the built-ins, and a created type's name is unknown to the Rust type, so supporting this needs a tag that names the created type. (3) Multiranges a schema creates. tokio-postgres's TYPEINFO query joins pg_range on rngtypid, so it reports such a type (typtype 'm') as Kind::Simple, and pgorm refuses it in both directions (live-tested: slot_multirange). This needs a driver-side type lookup or an explicit subtype supplied by the caller. (4) Codegen refuses `CREATE TYPE ... AS RANGE` by name, and a column of a created range type is unsupported. (5) Python refuses ranges by name: the capability manifest lists range and multirange as unsupported, decode raises DecodeError, and PyValue::from_rust raises UnsupportedCapabilityError. Support needs a Python range class, new snapshot tags, type stubs and the wheel acceptance suites. (6) Expr has contains() for @> and contained() for <@, but no builder for && (only BinOper::Overlap through Expr::binary). An element-containment predicate needs its operand pinned with cast_as, because PostgreSQL types `r @> $1`'s $1 as the range. Spec homes: sql.value.range, exec.decode.range, exec.cursor.binding-range, sql.ddl.type-range, python.values."
+            }
+
+            {
+                at 2026-10-07T10:38:10.158014Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Narrowed 2026-10-07 and split into two children, each a feat commit of its own: range-arrays-and-overlap (pieces 1 and 6 of the filing note: Vec<Range<T>> / Vec<Multirange<T>> entity fields, codegen for int4range[], and Expr::overlaps for &&) and python-ranges (piece 5). Pieces 2-4 hinge on one design question — how pgorm names a range type a schema created, in Value's range tag and in ColumnType — and are filed as created-range-types (values over other subtypes, codegen for CREATE TYPE ... AS RANGE and its columns) and created-multiranges (blocked by the driver's type lookup; routes recorded there). They are separate root nodes, not children, so this node completes with what it delivers."
             }
         )
     }
@@ -10082,6 +10102,35 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "SQLSTATEs checked on 18.6 when filing: a CHECK added NOT VALID over a breaking row is accepted (convalidated false) and refuses a new breaking row (23514); CHECK (...) NO INHERIT on a partitioned table is refused 42P16 (\"cannot add NO INHERIT constraint to partitioned table\"), where a NOT NULL's NO INHERIT there is 0A000."
+            }
+        )
+    }
+
+    {
+        id created-range-types
+        title "A range type a schema creates is named end to end: values over any subtype, its DDL read by codegen, its columns typed"
+        kind @feat
+        log (
+            {
+                at 2026-10-07T10:38:09.942226Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Split from range-consumers-beyond-builtins (2026-10-07) because it needs its own design: how pgorm names a range type a schema created. Pieces: (a) Range<T> over a subtype none of the six built-ins range over (CREATE TYPE floatrange AS RANGE (SUBTYPE = float8) would be Range<f64>); (b) codegen for CREATE TYPE ... AS RANGE, which sql_schema refuses by name (statement_kind), and columns of a created range type, which it cannot type today (codegen.ddl.types deliberately produces no ColumnType::Named). What a value of a created range needs, measured against the code: binding and decoding need only the subtype, because tokio-postgres reports a created range as Kind::Range(subtype) (live: `slot` over int4 binds and decodes through Range<i32> today). Three things need the created type's name, and Value::Range's tag (RangeType, the closed six) cannot hold it. The inline literal is the range type's constructor call (`floatrange(1.5, 2.5, '[)')`, `'empty'::floatrange`). A value in a position that types nothing renders `$1::<range type>` (sql.render.sql-json, sql.render.cast-param-type). An entity column's ColumnType must render the created name in DDL, while codegen must know the subtype to write Range<T>. Options weighed: (1) a RangeType variant holding a &'static descriptor. RangeType grows from 1 byte to 16, so ArrayType grows and Value doubles from 16 to 32 bytes. That is still inside range.rs's 4-word size assertion but against Value's one-pointer-payload doc. (2) a subtype-only tag, a new enum beside RangeType in which the six built-ins name their range. Value stays small and binding and decoding work. But the inline literal of a nameless range needs a textual `'[1.5,2.5)'` renderer with range_in's own quoting, which the constructor-call rendering exists to avoid, and its placeholders go untyped, so to_string() and SQL/JSON positions fall back to context typing. (3) a user-declared Rust type naming the created range (an ActiveEnum-like derive over a newtype), which still needs (1) or (2) underneath. Codegen also needs either a ColumnType that carries name and subtype (a new variant, touching every exhaustive consumer including JsonValueType's mirror) or a side channel out of parse_schema. A limitation that exists today, checked live on 18.6: a created range over a built-in subtype is tagged as the built-in, so to_string() writes `int4range(..)` where the column is `slot`. The server refuses it: INSERT is 42804 (\"column span is of type slot but expression is of type int4range\") and `slot = int4range` is 42883, because there is no cast between range types. Only the bound path is right."
+            }
+        )
+    }
+
+    {
+        id created-multiranges
+        title "A multirange a schema creates binds and decodes, though the driver reports it as a simple type"
+        kind @feat
+        deps (created-range-types)
+        log (
+            {
+                at 2026-10-07T10:38:10.018504Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Split from range-consumers-beyond-builtins (2026-10-07). A multirange a schema creates is refused both ways (cursor_bind_range::bind_multirange, MultirangeSql::accepts). The cause: tokio-postgres 0.7.18's TYPEINFO_QUERY (src/prepare.rs) joins pg_range only ON r.rngtypid = t.oid, so a created multirange (typtype 'm', whose pg_range row is keyed by rngmultitypid) arrives as Kind::Simple with no subtype. Routes found, none taken: (1) Driver: a lookup that also joins on rngmultitypid would report Kind::Multirange(subtype). That is a tokio-postgres change, either an upstream PR or a fork pgorm does not carry today. (2) SQL: bind through the multirange's own variadic constructor over an array of its ranges, which the driver types correctly. Checked live on 18.6 with a prepared parameter: floatmultirange(VARIADIC $1) with $1 typed floatrange[] builds {[1,2),[3,4)}, and builds {} from '{}'. Decode through ARRAY(SELECT unnest(col)), which is floatrange[]. Both are rewrites the entity layer would have to own, as save_as/select_as own an enum's cast. (3) A subtype supplied by the caller cannot be checked against the server's type, and could send bytes the server reads as another type. Depends on created-range-types for naming the multirange."
             }
         )
     }
