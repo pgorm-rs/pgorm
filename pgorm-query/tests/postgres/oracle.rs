@@ -1,9 +1,9 @@
 //! Render-conformance oracle: rendered SQL is fed to the real PostgreSQL grammar.
 //!
 //! `pg_query` statically links libpg_query, which is the PostgreSQL server's own
-//! parser. Version 6.x of the crate carries the PG17 grammar, a superset of the
-//! PG16 grammar the live test server speaks, so a string it accepts is a string
-//! PG16 accepts too for every construct pgorm-query renders.
+//! parser. The pinned fork carries the PostgreSQL 18 grammar (libpg_query
+//! 18.1.0), the same release the live test server runs, so a string it accepts
+//! is a string the server's parser accepts.
 //!
 //! The oracle is syntax-only: it has no catalog, so unknown tables, unknown
 //! columns and type-modifier misuse pass. The live-Postgres integration suite in
