@@ -38,7 +38,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_exists<C, P>(context: C, path: P) -> JsonExists
     where
         C: Into<JsonInput>,
@@ -59,7 +59,7 @@ impl Func {
     /// let query = Query::select()
     ///     .expr(
     ///         Func::json_value(Expr::col(Char::UserData), "$.size")
-    ///             .returning(ColumnType::Integer)
+    ///             .returning(JsonValueType::Integer)
     ///             .on_empty(JsonValueBehavior::Default(0.into()))
     ///             .on_error(JsonValueBehavior::Error),
     ///     )
@@ -75,7 +75,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_value<C, P>(context: C, path: P) -> JsonValue
     where
         C: Into<JsonInput>,
@@ -113,7 +113,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_query<C, P>(context: C, path: P) -> JsonQuery
     where
         C: Into<JsonInput>,
@@ -158,7 +158,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_object() -> JsonObject {
         JsonObject {
             entries: Vec::new(),
@@ -181,7 +181,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAY(1::int4, 'a'::text NULL ON NULL)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_array() -> JsonArray {
         JsonArray {
             elements: Vec::new(),
@@ -204,7 +204,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAY(SELECT "id" FROM "character")"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_array_query(query: SelectStatement) -> JsonArrayQuery {
         JsonArrayQuery {
             query: Box::new(query),
@@ -225,7 +225,7 @@ impl Func {
     ///     r#"SELECT JSON_OBJECTAGG("character" : "font_size") FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_objectagg<K, V>(key: K, value: V) -> JsonObjectAgg
     where
         K: Into<SimpleExpr>,
@@ -254,7 +254,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAYAGG("id" ORDER BY "font_size" DESC) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_arrayagg<V>(value: V) -> JsonArrayAgg
     where
         V: Into<JsonInput>,
@@ -280,7 +280,7 @@ impl Func {
     ///     r#"SELECT JSON('{"a":1}'::text WITH UNIQUE KEYS)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json<V>(input: V) -> JsonParse
     where
         V: Into<JsonInput>,
@@ -304,7 +304,7 @@ impl Func {
     /// assert_eq!(sql, r#"SELECT JSON_SCALAR($1::int4)"#);
     /// assert_eq!(values, Values(vec![5.into()]));
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_scalar<T>(expr: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -314,6 +314,10 @@ impl Func {
 
     /// `JSON_SERIALIZE(input)`: a JSON value as `text`.
     ///
+    /// The input is read through `JSON(..)`, which serializes a `jsonb` value
+    /// as its document where PostgreSQL 18.6's `JSON_SERIALIZE` alone does
+    /// not ([`JsonSerialize`]).
+    ///
     /// ```
     /// use pgorm_query::{tests_cfg::*, *};
     ///
@@ -322,10 +326,10 @@ impl Func {
     ///         .expr(Func::json_serialize(Expr::col(Char::UserData)).returning(ColumnType::Bytea))
     ///         .from(Char::Table)
     ///         .to_string(),
-    ///     r#"SELECT JSON_SERIALIZE("user_data" RETURNING bytea) FROM "character""#
+    ///     r#"SELECT JSON_SERIALIZE(JSON("user_data") RETURNING bytea) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+2]
     pub fn json_serialize<V>(input: V) -> JsonSerialize
     where
         V: Into<JsonInput>,

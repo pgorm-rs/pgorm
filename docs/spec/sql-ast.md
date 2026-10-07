@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+21]
+> [spec:pgorm:req:sql.surface+22]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -132,7 +132,8 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.expr.sql-json`): `SqlJson`, the expression node's payload;
 > `JsonExists`, `JsonValue` and `JsonQuery`, the three query functions, with
 > `JsonExistsBehavior`, `JsonValueBehavior` and `JsonQueryBehavior`, what each
-> answers on an empty or failed path; `JsonObject`, `JsonArray`,
+> answers on an empty or failed path, and `JsonValueType`, the types
+> `JSON_VALUE` returns its scalar as; `JsonObject`, `JsonArray`,
 > `JsonArrayQuery`, `JsonObjectAgg`, `JsonArrayAgg`, `JsonParse` and
 > `JsonSerialize`, the constructors; `JsonInput`, an operand with or without
 > `FORMAT JSON`; `JsonKind` and `JsonTest`, what `IS JSON` tests; and
@@ -613,7 +614,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
 > and the constructors — are the neighbouring vocabulary,
-> `[spec:pgorm:def:sql.ast.expr.sql-json+1]`, and replace none of these. The
+> `[spec:pgorm:def:sql.ast.expr.sql-json+2]`, and replace none of these. The
 > replacement was weighed operator by operator on PostgreSQL 18.6 and refused
 > on both counts it needed: a GIN `jsonb_ops` index serves `?`, `?|` and `?&`
 > and no index serves `JSON_EXISTS`; an expression index on `->>` or its cast
@@ -1437,7 +1438,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SQL/JSON
 
-> [spec:pgorm:def:sql.ast.expr.sql-json+1]
+> [spec:pgorm:def:sql.ast.expr.sql-json+2]
 > PostgreSQL's SQL/JSON — the query functions `JSON_EXISTS`, `JSON_VALUE` and
 > `JSON_QUERY`, the constructors `JSON_OBJECT`, `JSON_ARRAY` (over values or
 > over a one-column query), `JSON_OBJECTAGG`, `JSON_ARRAYAGG`, `JSON()`,
@@ -1522,11 +1523,28 @@ today, including panicking edges and deliberate failsafes.
 > `JSON_VALUE` has neither clause (`42601`).
 >
 > **`RETURNING`** takes a `ColumnType`, the type vocabulary a column is
-> declared in, on every form that has one: `JSON_VALUE` (default `text`),
-> `JSON_QUERY` (default `jsonb`), the four constructors and two aggregates
-> (default `json`) and `JSON_SERIALIZE` (default `text`; only a string type or
-> `bytea`, `42804` otherwise). `JSON()` and `JSON_SCALAR()` take none
-> (`42601`) and return `json`. The `FORMAT JSON [ENCODING UTF8]` a `RETURNING`
+> declared in, on every form that has one but `JSON_VALUE`: `JSON_QUERY`
+> (default `jsonb`), the four constructors and two aggregates (default
+> `json`) and `JSON_SERIALIZE` (default `text`; only a string type or `bytea`,
+> `42804` otherwise). `JSON()` and `JSON_SCALAR()` take none (`42601`) and
+> return `json`. `JSON_VALUE` (default `text`) takes a `JsonValueType`, which
+> is `ColumnType`'s variants without `Json` and `JsonBinary`, each converting
+> into its namesake; `TryFrom<ColumnType>` converts a type chosen at run time
+> and hands those two back. They are left out because PostgreSQL 18.6 returns
+> them wrongly (bug #19695): once one evaluation of `JSON_VALUE .. RETURNING
+> jsonb` or `RETURNING json` is `NULL` — a JSON `null`, a path that finds
+> nothing or fails, a `NULL` context item — every later evaluation of it in the
+> statement is `NULL`, because the executor converts those two types without
+> clearing the null flag the previous answer set. Checked live over a
+> multi-row query: `RETURNING jsonb` and `json` stick, while `integer`,
+> `text`, an array, a composite and a domain over `jsonb` (converted by a
+> step that clears the flag) do not, and nor does a `JSON_TABLE` column of
+> type `jsonb`, which is read as `JSON_QUERY` reads it. No rewrite answers the
+> same: `JSON_QUERY` returns a JSON `null` as itself and an object or array
+> rather than failing, so a caller wanting JSON out of a path reaches for it
+> knowing those two differences, and a `Named` type is the caller's own
+> spelling, not inspected. A test pins the defect, so the release that fixes
+> it is noticed and the two variants return. The `FORMAT JSON [ENCODING UTF8]` a `RETURNING`
 > may carry is not built: the output is UTF-8 JSON text either way, and a
 > `bytea` result is the same bytes with or without it (live-checked);
 > `JSON_VALUE` refuses it outright.
@@ -1550,11 +1568,30 @@ today, including panicking edges and deliberate failsafes.
 > rows each returns `NULL`. Both are window functions too: `expr_window` and
 > its siblings take any `WindowFunction` (`sql.ast.window-statement`).
 >
-> **What 18.6 does that the builder records but does not paper over:**
-> `JSON_SERIALIZE` over a `jsonb` operand returns the one-byte text `\x01`
-> rather than the document (a `json` or `text` operand serializes correctly),
-> so a caller casts `jsonb` to `json` first; and `JSON_VALUE` renders a JSON
-> boolean as `t`/`f`, where `->>` renders `true`/`false`.
+> **`JSON_SERIALIZE` reads its operand through `JSON(..)`**
+> (`sql.render.sql-json`). PostgreSQL 18.6's `JSON_SERIALIZE` over a `jsonb`
+> operand returns bytes of jsonb's binary header rather than the document —
+> `\x01` for a one-member object, `\x02` for two — whatever the `RETURNING`
+> type, and `FORMAT JSON` on a `jsonb` operand is accepted and changes
+> nothing. The parser builds the output conversion for a `json` input, so the
+> `jsonb` bytes are read as text (reported to pgsql-bugs on 2026-03-03; no fix
+> in 18.6). The builder cannot see an operand's type, and a cast to `json`
+> would fail on `bytea` (`42846`), which `JSON_SERIALIZE` takes, marked or not.
+> `JSON(..)` is the conversion that fits every operand: live on 18.6 it turns
+> `jsonb` into the `json` of its canonical text, and makes of `json`, a
+> string, an untyped literal and `bytea`, each with or without `FORMAT JSON`,
+> exactly the `json` value `JSON_SERIALIZE` itself makes of them — the same
+> text, the same `22P02` for a string that is not JSON, no unique-keys check.
+> The one difference is an operand of another type, refused `42846` ("cannot
+> cast type integer to json") rather than `42804`. A test pins the bare
+> defect, so the release that fixes it is noticed and the `JSON(..)` can go.
+>
+> `JSON_VALUE` renders a JSON boolean as `t`/`f`, where `->>` renders
+> `true`/`false`; the builder records that and does not paper over it.
+> PostgreSQL bug #19046 — `JSON_ARRAY` or `JSON_OBJECT` over a column of a
+> subquery on the nullable side of an outer join answering a value instead of
+> `NULL` (17.6, 18rc1) — is a shape the builder can write, and needs no guard:
+> it was fixed upstream in September 2025, and does not reproduce on 18.6.
 >
 > **The JSON operators stay, and replace nothing.** The operator decision of
 > 2026-10-06 was to replace an operator of `sql.ast.expr.json` only where the

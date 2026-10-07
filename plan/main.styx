@@ -10002,12 +10002,27 @@ children (
                 title "pgorm's SQL/JSON builders work around PostgreSQL 18's known JSON_SERIALIZE and JSON_VALUE bugs"
                 kind @fix
                 deps (pg17-sql-json)
+                sealed true
                 log (
                     {
                         at 2026-10-07T09:12:22.998951Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Two PostgreSQL bugs reach the SQL/JSON builders that f17b3e49 landed. (1) JSON_SERIALIZE over a jsonb value returns part of jsonb's internal binary header instead of the document. The lead reproduced it in plain psql on 18.6: JSON_SERIALIZE('{\"a\":1}'::jsonb) is text of length 1, while the same document as ::json serializes correctly. Reported to pgsql-bugs 2026-03-03 against 18.3 (\"JSON_SERIALIZE for JSONB returns parts of the internal JSONB representation\", https://www.postgresql.org/message-id/03583FE7-A5EE-407C-907D-67865F3F8BFC@gmail.com). Cause: makeJsonConstructorExpr builds the output coercion for a json input, so json_out runs on jsonb bytes. A parser patch has been proposed; committed is unconfirmed. f17b3e49 documented the bug and pinned it with a test that fails when the server is fixed. Better: make pgorm's json_serialize write correct SQL now — cast a jsonb input to json, or always cast, if that is semantically neutral for every input JsonInput allows (check text and bytea with FORMAT JSON live) — and keep the canary test that says when the cast can go. (2) BUG #19695: JSON_VALUE ... RETURNING jsonb returns NULL for every later evaluation once one evaluation returns NULL, reported against 18.6 (mirror: https://github.com/MisterRaindrop/postgresql-github-mirror/issues/440). Reproduce it live over a multi-row query. If it reproduces, guard pgorm's json_value: refuse RETURNING jsonb at the type level until fixed, or render an equivalent that avoids the bug (e.g. JSON_QUERY for a jsonb result) if that is semantically the same. Say which in sql.ast.expr.json, with a canary test. Also check whether BUG #19046 (json_array() with a column reference in a subquery combined with RIGHT JOIN, 17.x and 18rc1) still reproduces on 18.6."
+                    }
+
+                    {
+                        at 2026-10-07T09:14:26.801495Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T10:36:54.511877Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

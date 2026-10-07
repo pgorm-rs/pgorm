@@ -506,7 +506,7 @@ an ideal Postgres renderer would emit.
 > function is PostgreSQL's determination, and a renderer that second-guessed
 > it would reject valid calls on functions this enum does not enumerate.
 
-> [spec:pgorm:req:sql.render.sql-json]
+> [spec:pgorm:req:sql.render.sql-json+1]
 > A `SimpleExpr::SqlJson` MUST render as an atom: each function form in its
 > own call parentheses, and `IS JSON` inside parentheses of its own —
 > `("data" IS JSON OBJECT WITH UNIQUE KEYS)` — as `CASE` takes, so
@@ -537,9 +537,13 @@ an ideal Postgres renderer would emit.
 > `JSON_ARRAY(<select>[ RETURNING t])`, `JSON_OBJECTAGG(k : v[ ABSENT ON
 > NULL][ WITH UNIQUE KEYS][ RETURNING t])`, `JSON_ARRAYAGG(v[ ORDER BY …][
 > NULL ON NULL][ RETURNING t])`, `JSON(v[ WITH UNIQUE KEYS])`,
-> `JSON_SCALAR(v)` and `JSON_SERIALIZE(v[ RETURNING t])`; an aggregate's
+> `JSON_SCALAR(v)` and `JSON_SERIALIZE(JSON(v)[ RETURNING t])`; an aggregate's
 > ` FILTER (WHERE …)` follows its parentheses as a `FunctionCall`'s does
-> (`sql.render.func-mods`). A clause with nothing before it between the
+> (`sql.render.func-mods`). `JSON_SERIALIZE`'s operand MUST be read through
+> `JSON(..)`, with its ` FORMAT JSON` inside: PostgreSQL 18.6's
+> `JSON_SERIALIZE` writes a `jsonb` operand as bytes of its binary header, and
+> `JSON(..)` gives it the `json` value it makes of every other operand
+> (`sql.ast.expr.sql-json`). A clause with nothing before it between the
 > parentheses has no leading space, so `JSON_OBJECT(RETURNING jsonb)` and the
 > empty `JSON_OBJECT()` and `JSON_ARRAY()` render as PostgreSQL writes them.
 > An object member MUST render `key : value`, not `key VALUE value`: the

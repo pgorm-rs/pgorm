@@ -14,7 +14,7 @@ pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
     ColumnType, Expr, Func, JsonExistsBehavior, JsonKind, JsonQueryBehavior, JsonValueBehavior,
-    Name, Order, Query, SelectStatement, SimpleExpr, Values, WindowStatement,
+    JsonValueType, Name, Order, Query, SelectStatement, SimpleExpr, Values, WindowStatement,
 };
 use pgorm::{ConnectionTrait, entity::prelude::*};
 use pretty_assertions::assert_eq;
@@ -72,8 +72,8 @@ where
 /// A bound path selects what it names — including a key holding a quote,
 /// which an interpolated path would end — and a `PASSING` variable is the
 /// name as written, case and all.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the query functions over a live document
-// [spec:pgorm:req:sql.render.sql-json/test]    the path is bound, never part of the text
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    the query functions over a live document
+// [spec:pgorm:req:sql.render.sql-json+1/test]    the path is bound, never part of the text
 #[pgorm_macros::test]
 async fn bound_paths_and_variables_select_what_they_name() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_bound_paths").await;
@@ -87,7 +87,7 @@ async fn bound_paths_and_variables_select_what_they_name() -> Result<(), Error> 
 
     let size: i32 = read(
         &db,
-        Func::json_value(doc(), "$.size").returning(ColumnType::Integer),
+        Func::json_value(doc(), "$.size").returning(JsonValueType::Integer),
     )
     .await?;
     assert_eq!(size, 12);
@@ -129,7 +129,7 @@ async fn bound_paths_and_variables_select_what_they_name() -> Result<(), Error> 
 
 /// Each behaviour answers as specified, and each function's default is what
 /// an absent clause gives.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the behaviours of the three query functions
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    the behaviours of the three query functions
 #[pgorm_macros::test]
 async fn behaviours_answer_as_specified() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_behaviours").await;
@@ -160,7 +160,7 @@ async fn behaviours_answer_as_specified() -> Result<(), Error> {
 
     // JSON_VALUE: ON EMPTY answers a missing key, ON ERROR a value that does
     // not convert or is not a scalar.
-    let missing = || Func::json_value(doc(), "$.missing").returning(ColumnType::Integer);
+    let missing = || Func::json_value(doc(), "$.missing").returning(JsonValueType::Integer);
     assert_eq!(read::<Option<i32>>(&db, missing()).await?, None);
     assert_eq!(
         read::<i32>(
@@ -175,7 +175,7 @@ async fn behaviours_answer_as_specified() -> Result<(), Error> {
         .expect_err("ERROR ON EMPTY raises");
     refused_with(&error, &SqlState::from_code("22035"));
 
-    let word = || Func::json_value(doc(), "$.word").returning(ColumnType::Integer);
+    let word = || Func::json_value(doc(), "$.word").returning(JsonValueType::Integer);
     assert_eq!(read::<Option<i32>>(&db, word()).await?, None);
     assert_eq!(
         read::<i32>(
@@ -260,7 +260,7 @@ async fn behaviours_answer_as_specified() -> Result<(), Error> {
 
 /// A `DEFAULT` is a literal even under the bound render — the server refuses
 /// a parameter there — and a hostile one stays a string.
-// [spec:pgorm:req:sql.render.sql-json/test]    the DEFAULT literal is escaped, and the server
+// [spec:pgorm:req:sql.render.sql-json+1/test]    the DEFAULT literal is escaped, and the server
 // accepts it where it refuses a parameter (42804)
 #[pgorm_macros::test]
 async fn a_default_is_a_literal_the_server_accepts() -> Result<(), Error> {
@@ -294,7 +294,7 @@ async fn a_default_is_a_literal_the_server_accepts() -> Result<(), Error> {
 
 /// A value builds the same JSON bound as inlined: a number is a number, a
 /// string a string, and a JSON document nests.
-// [spec:pgorm:req:sql.render.sql-json/test]    a value carries its own type in every SQL/JSON
+// [spec:pgorm:req:sql.render.sql-json+1/test]    a value carries its own type in every SQL/JSON
 // position, so both render paths build the same JSON
 #[pgorm_macros::test]
 async fn values_build_the_same_json_bound_and_inlined() -> Result<(), Error> {
@@ -347,7 +347,7 @@ async fn values_build_the_same_json_bound_and_inlined() -> Result<(), Error> {
 
 /// The constructors' clauses do what their names say, and the server refuses
 /// what the builder cannot see.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    ON NULL, UNIQUE KEYS, RETURNING and the
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    ON NULL, UNIQUE KEYS, RETURNING and the
 // query form, live
 #[pgorm_macros::test]
 async fn constructor_clauses_hold_live() -> Result<(), Error> {
@@ -452,24 +452,149 @@ async fn constructor_clauses_hold_live() -> Result<(), Error> {
     Ok(())
 }
 
-/// PostgreSQL 18.6 serializes a `jsonb` operand as the one-byte text `\x01`
-/// — its binary format's version — rather than the document; a `json`
-/// operand serializes correctly. Held here so a release that fixes it is
-/// noticed and the rule's warning retired.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the 18.6 JSON_SERIALIZE defect over jsonb
+/// `JSON_SERIALIZE` over a `jsonb` value writes the document, in both render
+/// paths, as it does over `json`, text and `bytea`, `FORMAT JSON` or not.
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    JSON_SERIALIZE over every operand it takes
+// [spec:pgorm:req:sql.render.sql-json+1/test]    the operand read through JSON(..)
 #[pgorm_macros::test]
-async fn json_serialize_over_jsonb_returns_the_format_byte() -> Result<(), Error> {
+async fn json_serialize_writes_a_jsonb_document() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_serialize_jsonb").await;
     let db = ctx.db.get().await?;
 
-    let jsonb: String = both_paths(&db, Func::json_serialize(json!({"a": 1}))).await?;
-    assert_eq!(jsonb, "\u{1}");
+    let jsonb: String = both_paths(&db, Func::json_serialize(json!({"b": [1, 2], "a": 1}))).await?;
+    assert_eq!(jsonb, r#"{"a": 1, "b": [1, 2]}"#);
+    let jsonb_bytes: Vec<u8> = both_paths(
+        &db,
+        Func::json_serialize(json!({"a": 1})).returning(ColumnType::Bytea),
+    )
+    .await?;
+    assert_eq!(jsonb_bytes, br#"{"a": 1}"#);
+    let marked: String = both_paths(
+        &db,
+        Func::json_serialize(Expr::val(json!([1])).format_json()),
+    )
+    .await?;
+    assert_eq!(marked, "[1]");
+
     let json: String = both_paths(
         &db,
         Func::json_serialize(Expr::val(json!({"a": 1})).cast_as(Name::runtime("json"))),
     )
     .await?;
     assert_eq!(json, r#"{"a":1}"#);
+    let text: String = both_paths(&db, Func::json_serialize(r#"{"a" : 1}"#)).await?;
+    assert_eq!(text, r#"{"a" : 1}"#);
+    let text_marked: String = both_paths(
+        &db,
+        Func::json_serialize(Expr::val(r#"{"a" : 1}"#).format_json()),
+    )
+    .await?;
+    assert_eq!(text_marked, r#"{"a" : 1}"#);
+    let bytes = || Expr::val(br#"{"a" : 1}"#.to_vec());
+    let from_bytes: String = both_paths(&db, Func::json_serialize(bytes())).await?;
+    let from_marked_bytes: String =
+        both_paths(&db, Func::json_serialize(bytes().format_json())).await?;
+    assert_eq!(
+        (from_bytes.as_str(), from_marked_bytes.as_str()),
+        (r#"{"a" : 1}"#, r#"{"a" : 1}"#)
+    );
+
+    let error = both_paths::<String>(&db, Func::json_serialize("not json"))
+        .await
+        .expect_err("text that is not JSON");
+    refused_with(&error, &SqlState::INVALID_TEXT_REPRESENTATION);
+    let error = both_paths::<String>(&db, Func::json_serialize(5))
+        .await
+        .expect_err("an integer is not JSON text");
+    refused_with(&error, &SqlState::CANNOT_COERCE);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// PostgreSQL 18.6's own `JSON_SERIALIZE` over a `jsonb` operand returns bytes
+/// of the binary header — `\x01`, a one-member object's member count — rather
+/// than the document. This is why the builder reads the operand through
+/// `JSON(..)`; when a release fixes it this fails, and the `JSON(..)` can go.
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    the 18.6 JSON_SERIALIZE defect the builder
+// works around
+#[pgorm_macros::test]
+async fn bare_json_serialize_over_jsonb_is_broken() -> Result<(), Error> {
+    let ctx = TestContext::new("sql_json_serialize_canary").await;
+    let db = ctx.db.get().await?;
+
+    let (broken, two_members): (String, String) = (
+        r#"SELECT JSON_SERIALIZE('{"a": 1}'::jsonb), JSON_SERIALIZE('{"a": 1, "b": 2}'::jsonb)"#,
+        Values(vec![]),
+    )
+        .into_tuple()
+        .one(&db)
+        .await?;
+    assert_eq!((broken.as_str(), two_members.as_str()), ("\u{1}", "\u{2}"));
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// PostgreSQL 18.6's `JSON_VALUE .. RETURNING jsonb` (and `json`) returns
+/// `NULL` for every row after one whose answer was `NULL` (bug #19695), which
+/// is why [`JsonValueType`] has no JSON variant; when a release fixes it this
+/// fails, and the two variants can come back. `RETURNING integer`, which the
+/// type keeps, answers each row.
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    JSON_VALUE's RETURNING leaves out the
+// types 18.6 returns wrongly
+#[pgorm_macros::test]
+async fn json_value_returning_jsonb_sticks_at_null() -> Result<(), Error> {
+    let ctx = TestContext::new("sql_json_value_canary").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(
+        r#"CREATE TABLE t (n integer, doc jsonb);
+           INSERT INTO t VALUES (1, '{"k": 1}'), (2, '{"k": null}'), (3, '{"k": 3}'),
+                                (4, '{}'), (5, '{"k": 5}'), (6, NULL), (7, '{"k": 7}')"#,
+    )
+    .await?;
+
+    let rows = |sql: &str| {
+        let sql = sql.to_owned();
+        let db = &db;
+        async move {
+            (sql, Values(vec![]))
+                .into_tuple::<Option<String>>()
+                .all(db)
+                .await
+        }
+    };
+    let every = |text: [Option<&str>; 7]| text.map(|t| t.map(str::to_owned)).to_vec();
+    for ty in ["jsonb", "json"] {
+        assert_eq!(
+            rows(&format!(
+                "SELECT JSON_VALUE(doc, '$.k' RETURNING {ty})::text FROM t ORDER BY n"
+            ))
+            .await?,
+            every([Some("1"), None, None, None, None, None, None]),
+            "RETURNING {ty}"
+        );
+    }
+
+    assert_eq!(
+        JsonValueType::try_from(ColumnType::JsonBinary),
+        Err(ColumnType::JsonBinary)
+    );
+    assert_eq!(
+        JsonValueType::try_from(ColumnType::Json),
+        Err(ColumnType::Json)
+    );
+    let ints: Vec<Option<i32>> = Query::select()
+        .expr(Func::json_value(doc(), "$.k").returning(JsonValueType::Integer))
+        .from(Name::runtime("t"))
+        .order_by(Name::runtime("n"), Order::Asc)
+        .build()
+        .into_tuple()
+        .all(&db)
+        .await?;
+    assert_eq!(ints, [Some(1), None, Some(3), None, Some(5), None, Some(7)]);
 
     drop(db);
     ctx.delete().await;
@@ -478,7 +603,7 @@ async fn json_serialize_over_jsonb_returns_the_format_byte() -> Result<(), Error
 
 /// The aggregates order, filter and treat `NULL` as specified, answer `NULL`
 /// over no rows, and run as window functions.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    JSON_ARRAYAGG and JSON_OBJECTAGG, live
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    JSON_ARRAYAGG and JSON_OBJECTAGG, live
 // [spec:pgorm:def:sql.ast.window-statement+6/test]    a JSON aggregate under OVER
 #[pgorm_macros::test]
 async fn aggregates_order_filter_and_drop_nulls() -> Result<(), Error> {
@@ -558,7 +683,7 @@ async fn aggregates_order_filter_and_drop_nulls() -> Result<(), Error> {
 
 /// `IS JSON` tests each kind, and unique keys at any depth; `IS NOT JSON`
 /// negates it; a `NULL` operand is `NULL` either way.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    IS JSON over each kind, live
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    IS JSON over each kind, live
 #[pgorm_macros::test]
 async fn is_json_tests_each_kind() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_is_json").await;
@@ -615,7 +740,7 @@ async fn forced_plan(
 /// cast by an expression index on exactly that expression, which `JSON_VALUE`
 /// does not match. `JSON_VALUE` is served by an index on itself, with the
 /// path bound under a custom plan.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the index evidence behind keeping the
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    the index evidence behind keeping the
 // operators
 // [spec:pgorm:req:sql.ast.expr.json+1/test]    the operators an index serves and SQL/JSON
 // does not replace
@@ -669,7 +794,7 @@ async fn an_index_serves_operators_not_sql_json() -> Result<(), Error> {
     )
     .await?;
     assert!(!plan.contains("Index"), "{plan}");
-    let as_int = || Func::json_value(doc(), "$.k").returning(ColumnType::Integer);
+    let as_int = || Func::json_value(doc(), "$.k").returning(JsonValueType::Integer);
     let plan = forced_plan(&db, &filtered(Expr::expr(as_int()).eq(42))).await?;
     assert!(!plan.contains("Index"), "{plan}");
 
@@ -697,7 +822,7 @@ fn jsonb(document: Json) -> SimpleExpr {
 /// text and a boolean as `true`, where `JSON_VALUE` returns `NULL` for the one
 /// and `t` for the other; and a failed cast raises where `JSON_VALUE` follows
 /// `ON ERROR`.
-// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the semantic differences the rule records
+// [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    the semantic differences the rule records
 // [spec:pgorm:req:sql.ast.expr.json+1/test]
 #[pgorm_macros::test]
 async fn the_operators_and_sql_json_answer_differently() -> Result<(), Error> {
@@ -759,7 +884,7 @@ async fn the_operators_and_sql_json_answer_differently() -> Result<(), Error> {
         .expect_err("'x' is no integer");
     refused_with(&error, &SqlState::INVALID_TEXT_REPRESENTATION);
     let followed: Option<i32> = Query::select()
-        .expr(Func::json_value(document, "$.word").returning(ColumnType::Integer))
+        .expr(Func::json_value(document, "$.word").returning(JsonValueType::Integer))
         .build()
         .into_tuple()
         .one(&db)

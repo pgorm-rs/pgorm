@@ -898,6 +898,7 @@ assertions (
     {id pg18-uuid-functions, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:03:19.869642Z}
     {id pg17-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:39:18.440693Z}
     {id pg17-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-07T09:10:17.635886Z}
+    {id json-server-bug-guards, kind @complete, author "brendan@necessary.nu", at 2026-10-07T10:36:54.511877Z}
 )
 
 impl_evidence (
