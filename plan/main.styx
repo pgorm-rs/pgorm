@@ -9607,6 +9607,13 @@ children (
                         kind @note
                         text "Re-pinned sqlmap (security/sqlmap/pins.json) and the campaign (fixtures.py IMAGE) to postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c, the same index digest pgorm-python/tests/with_postgres.py pins and the one docker buildx imagetools reports for the tag on 2026-10-07 (image id sha256:1f1c66e06b20…, built 2026-10-06, PGDATA /var/lib/postgresql/18/docker, VOLUME /var/lib/postgresql). One 16-to-18 change broke both harnesses before any scan: both mounted their anonymous data volume at /var/lib/postgresql/data, and the 18 image's entrypoint refuses to start with anything mounted there (\"Error: in 18+, these Docker images are configured to store database data in a format which is compatible with pg_ctlcluster ... there appears to be PostgreSQL data in: /var/lib/postgresql/data (unused mount/volume)\"). Both now mount at /var/lib/postgresql (sqlmap container_args, campaign Fixture.start). Verified before committing: the sqlmap smoke profile passes 3/3 on 18.6 with that mount, and the campaign Fixture starts two worker pairs on 18.6 (UTF8, C collation, UTC, 2s/500ms deadlines, restricted role) and cleans up. test_campaign_report.py's pass-through image string moves to 18.6 too."
                     }
+
+                    {
+                        at 2026-10-07T15:21:06.10925Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sqlmap on PostgreSQL 18.6, 2026-10-07, at e2b92232 (clean tree, source 748d6644…). Full profile target/sqlmap-ci/full-1007, 14:20–14:53Z: PASS, 117/117 controls detected, 93 declared inapplicable, 0 protected findings, 0 falsified exemptions, direct regressions 17/17, 234 scans; control medians B 1.3 s, E 0.7 s, U 1.4 s, S/T 31.2 s (16.13: 1.6/0.7/1.8/31.9/31.8). Identifiers profile target/sqlmap-ci/ident-1007, 14:53–15:05Z: PASS, 28/28, 38 inapplicable, 0 findings, 56 scans, 681 s scanning (812 on 16.13), slowest scan 43.5 s. Both started below load 5 with no cleaner running; no sleep in either window (power log quiet from 12:48Z). The full run saw compiles that were not its own (9 rustc at 14:39Z, 1–4 from 14:47–14:51Z) and a load peak of 9.4 at 14:50:47Z; every timing control fired regardless. Nothing in the harness, manifest, profiles or fixture SQL needed a new expectation on 18 beyond the data mount. Recorded in security/sqlmap/acceptance/2026-10-07.md. Before the first scan, an orphaned pgorm-sqlmap-adapter from an earlier harness run (PID 79477, parent 1, 29 days old, listening on 127.0.0.1:60057) was stopped with SIGTERM."
+                    }
                 )
             }
 
