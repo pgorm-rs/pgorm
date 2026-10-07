@@ -401,25 +401,30 @@ async fn constructor_clauses_hold_live() -> Result<(), Error> {
         .expect_err("a NULL key");
     refused_with(&error, &SqlState::NULL_VALUE_NOT_ALLOWED);
 
-    let from_query: Json = both_paths(
-        &db,
+    let series_array = |upper: i32| {
         Func::json_array_query(
             Query::select()
                 .column(Name::runtime("x"))
                 .from_function(
                     Func::named(Name::runtime("generate_series")).args([
                         Expr::val(1).cast_as(Name::runtime("int4")),
-                        Expr::val(3).cast_as(Name::runtime("int4")),
+                        Expr::val(upper).cast_as(Name::runtime("int4")),
                     ]),
                     Name::runtime("x"),
                 )
                 .order_by(Name::runtime("x"), Order::Desc)
                 .take(),
         )
-        .returning(ColumnType::JsonBinary),
-    )
-    .await?;
+        .returning(ColumnType::JsonBinary)
+    };
+    let from_query: Json = both_paths(&db, series_array(3)).await?;
     assert_eq!(from_query, json!([3, 2, 1]));
+    let from_no_rows: Json = both_paths(&db, series_array(0)).await?;
+    assert_eq!(
+        from_no_rows,
+        json!([]),
+        "PostgreSQL 19 answers a query of no rows with an empty array, where 18 gave NULL"
+    );
 
     let parsed: Json = both_paths(&db, Func::json(r#"{"a": [1]}"#)).await?;
     assert_eq!(parsed, json!({"a": [1]}));

@@ -902,6 +902,7 @@ assertions (
     {id range-arrays-and-overlap, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:09:47.153279Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
     {id pg18-security-baselines, kind @complete, author "brendan@necessary.nu", at 2026-10-07T15:21:42.614443Z}
+    {id pg19-test-server, kind @doing, author "brendan@necessary.nu", at 2026-10-07T15:27:50.534451Z}
 )
 
 impl_evidence (

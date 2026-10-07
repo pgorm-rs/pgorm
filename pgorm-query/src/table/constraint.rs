@@ -163,14 +163,14 @@ pub enum ConstraintChange {
     /// partitioned table's constraint cannot be kept from its partitions
     /// (`0A000`).
     NoInherit,
-    /// `ENFORCED`: a foreign key is checked again, every row already there
-    /// included — one that breaks it refuses the statement (`23503`) — and
-    /// is valid once it passes. A `CHECK`'s enforcement cannot be altered
-    /// (`42809`).
+    /// `ENFORCED`: a foreign key, or from PostgreSQL 19 a `CHECK`, is
+    /// checked again, every row already there included — one that breaks it
+    /// refuses the statement (`23503`, `23514`) — and is valid once it
+    /// passes. PostgreSQL 18 cannot alter a `CHECK`'s enforcement (`42809`).
     // [spec:pgorm:req:sql.ddl.enforcement]
     Enforced,
-    /// `NOT ENFORCED`: a foreign key is no longer checked, and is no longer
-    /// valid.
+    /// `NOT ENFORCED`: a foreign key, or from PostgreSQL 19 a `CHECK`, is
+    /// left unchecked and not valid.
     // [spec:pgorm:req:sql.ddl.enforcement]
     NotEnforced,
 }

@@ -1571,7 +1571,9 @@ today, including panicking edges and deliberate failsafes.
 > `IS JSON` only the third. The query form of `JSON_ARRAY` takes neither
 > (`42601`) and always drops `NULL`s, so it is its own builder,
 > `JsonArrayQuery`, with only `returning`; its query must have one column
-> (`42601`), which the builder cannot see through `*`. An object's key may
+> (`42601`), which the builder cannot see through `*`. Over a query of no
+> rows it is the empty array from PostgreSQL 19, and `NULL` on 18, which
+> answered it as the aggregate below does. An object's key may
 > not be `NULL` (`22004`).
 >
 > **The aggregates** take `filter(cond)`, the `FILTER (WHERE ..)` of

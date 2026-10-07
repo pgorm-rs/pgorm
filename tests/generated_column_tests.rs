@@ -494,7 +494,7 @@ async fn drop_expression_keeps_stored_values() -> Result<(), Error> {
 /// generated (`55000`), unless the drop says `IF EXISTS`; a drop on a virtual
 /// column, `IF EXISTS` or not (`0A000`); a new expression a generated column
 /// could not have been created with (`42P17`); and a new expression for a
-/// virtual column once the table has a `CHECK` constraint (`0A000`), where a
+/// virtual column once the table belongs to a publication (`0A000`), where a
 /// stored column's still goes through.
 // [spec:pgorm:req:sql.ddl.alter-table+10/test]    the refusals of SET and DROP
 // EXPRESSION, by SQLSTATE, and IF EXISTS passing over a plain column
@@ -549,7 +549,7 @@ async fn expression_actions_refused_by_sqlstate() -> Result<(), Error> {
     .await;
     assert_eq!(derived_values(&db).await?, [(2, 2), (4, 3)]);
 
-    db.batch_execute("ALTER TABLE reading ADD CHECK (base > 0)")
+    db.batch_execute("CREATE PUBLICATION reading_feed FOR TABLE reading")
         .await?;
     db.batch_execute(
         &alter()
@@ -567,6 +567,46 @@ async fn expression_actions_refused_by_sqlstate() -> Result<(), Error> {
         &SqlState::FEATURE_NOT_SUPPORTED,
     )
     .await;
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A `CHECK` constraint does not stop a virtual column taking a new
+/// expression on PostgreSQL 19, where 18 refused it (`0A000`). The table is
+/// not rewritten, as for any virtual column; the rows are checked against the
+/// constraint instead, and one that breaks it refuses the action (`23514`)
+/// and leaves the old expression in place.
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]    SET EXPRESSION on a virtual
+// column under a CHECK constraint checks the rows rather than being refused
+#[pgorm_macros::test]
+async fn set_expression_under_a_check_checks_the_rows() -> Result<(), Error> {
+    let ctx = TestContext::new("generated_set_expression_check").await;
+    let db = ctx.db.get().await?;
+    reading_table(&db).await?;
+    db.batch_execute("ALTER TABLE reading ADD CHECK (computed > 0)")
+        .await?;
+
+    let computed = |factor: i32| {
+        Table::alter(Name::runtime("reading"))
+            .set_expression(
+                Name::runtime("computed"),
+                Expr::col(Name::runtime("base")).mul(factor),
+            )
+            .to_string()
+    };
+    let before = relfilenode(&db, "reading").await?;
+    db.batch_execute(&computed(10)).await?;
+    assert_eq!(relfilenode(&db, "reading").await?, before);
+    assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
+
+    let error = db
+        .batch_execute(&computed(-1))
+        .await
+        .expect_err("every row breaks the CHECK");
+    refused_with(&error, &SqlState::CHECK_VIOLATION);
+    assert_eq!(derived_values(&db).await?, [(2, 10), (4, 20)]);
 
     drop(db);
     ctx.delete().await;

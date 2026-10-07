@@ -83,8 +83,8 @@ to it at once. `add_check(table, condition, name=None, not_enforced=False)`
 adds a `CHECK` to a table that exists. `alter_constraint(table, name,
 "inherit" | "no_inherit")` changes whether a `NOT NULL` constraint passes to
 inheriting tables, and `alter_constraint(table, name, "enforced" |
-"not_enforced")` whether a foreign key is enforced; enforcing one checks the
-rows already there. Database
+"not_enforced")` whether a foreign key, or on PostgreSQL 19 a `CHECK`, is
+enforced; enforcing one checks the rows already there. Database
 validation and privileges still apply; these APIs do not introspect the
 database or compute migrations.
 

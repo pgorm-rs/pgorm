@@ -215,10 +215,72 @@ async fn alter_constraint_enforces_a_foreign_key() -> Result<(), Error> {
     Ok(())
 }
 
-/// What the server refuses around enforcement, by SQLSTATE: altering a
-/// `CHECK`'s or a key's enforcement, validating a constraint that is not
-/// enforced, and deferring a `CHECK` whether or not it is enforced. A foreign
-/// key that is not enforced may still be deferrable.
+/// On PostgreSQL 19 `ALTER CONSTRAINT` moves a `CHECK` between enforced and
+/// not, as it moves a foreign key; 18 refuses a `CHECK`'s (`42809`).
+/// `ENFORCED` checks the rows already there, refusing the statement while one
+/// breaks the condition (`23514`), and the constraint is valid once they
+/// pass; `NOT ENFORCED` leaves it unchecked and not valid again.
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]    ENFORCED and NOT ENFORCED apply
+// to a CHECK as to a foreign key
+// [spec:pgorm:req:sql.ddl.enforcement/test]    ALTER CONSTRAINT moves a CHECK
+// between the two, ENFORCED checking the rows as it goes
+#[pgorm_macros::test]
+async fn alter_constraint_enforces_a_check() -> Result<(), Error> {
+    let ctx = TestContext::new("not_enforced_alter_check").await;
+    let db = ctx.db.get().await?;
+    db.batch_execute(
+        &Table::create(n("reading"))
+            .col(ColumnDef::new(n("amount")).integer())
+            .check(
+                Check::new(Expr::col(n("amount")).gt(0))
+                    .name(n("positive"))
+                    .enforcement(Enforcement::NotEnforced),
+            )
+            .to_string(),
+    )
+    .await?;
+    db.batch_execute("INSERT INTO reading VALUES (-5)").await?;
+
+    let alter = |change| {
+        Table::alter(n("reading"))
+            .alter_constraint(n("positive"), change)
+            .to_string()
+    };
+    let broken = db
+        .batch_execute(&alter(ConstraintChange::Enforced))
+        .await
+        .expect_err("the row already there is checked");
+    refused_with(&broken, &SqlState::CHECK_VIOLATION);
+    assert_eq!(
+        constraints(&db, "reading").await?,
+        [row("positive", "c", false, false)]
+    );
+
+    db.batch_execute("UPDATE reading SET amount = 5").await?;
+    for (change, enforced) in [
+        (ConstraintChange::Enforced, true),
+        (ConstraintChange::NotEnforced, false),
+    ] {
+        db.batch_execute(&alter(change)).await?;
+        assert_eq!(
+            constraints(&db, "reading").await?,
+            [row("positive", "c", enforced, enforced)]
+        );
+        match db.batch_execute("INSERT INTO reading VALUES (-1)").await {
+            Err(error) if enforced => refused_with(&error, &SqlState::CHECK_VIOLATION),
+            inserted => assert_eq!(inserted.is_ok(), !enforced, "{inserted:?}"),
+        }
+    }
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// What the server refuses around enforcement, by SQLSTATE: altering a key's
+/// enforcement, validating a constraint that is not enforced, and deferring a
+/// `CHECK` whether or not it is enforced. A foreign key that is not enforced
+/// may still be deferrable.
 // [spec:pgorm:req:sql.ddl.enforcement/test]    the refusals around NOT ENFORCED,
 // and a NOT ENFORCED foreign key taking deferrability
 #[pgorm_macros::test]
@@ -266,11 +328,6 @@ async fn enforcement_refusals_by_sqlstate() -> Result<(), Error> {
         refused_with(&error, state);
     };
     for change in [ConstraintChange::Enforced, ConstraintChange::NotEnforced] {
-        refused(
-            alter().alter_constraint(n("positive"), change).to_string(),
-            &SqlState::WRONG_OBJECT_TYPE,
-        )
-        .await;
         refused(
             Table::alter(n("parent"))
                 .alter_constraint(n("parent_pkey"), change)
