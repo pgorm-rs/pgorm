@@ -10,7 +10,7 @@ import time
 
 from . import baseline, process
 
-IMAGE = "postgres:16.13-bookworm@sha256:472efd9a66f2b2f1a5aeb18b28de74332e6ef88c2b93a1a5d812fb6db67a5f60"
+IMAGE = "postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
 LABEL = "pgorm.generative=disposable"
 SETTINGS = """
 SELECT json_build_object(
@@ -208,8 +208,10 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
                 "--read-only",
                 "--security-opt",
                 "no-new-privileges",
+                # The 18 image keeps its data under /var/lib/postgresql/18/docker
+                # and refuses to start with anything mounted at .../data.
                 "--mount",
-                "type=volume,destination=/var/lib/postgresql/data",
+                "type=volume,destination=/var/lib/postgresql",
                 "--tmpfs",
                 "/var/run/postgresql",
                 "--tmpfs",

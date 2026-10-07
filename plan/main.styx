@@ -9593,6 +9593,20 @@ children (
                         kind @note
                         text "Pins: security/sqlmap/pins.json:10 (postgres:16.13-bookworm digest); security/generative/src/pgorm_campaign/fixtures.py:13 (the same image), asserted in security/generative/tests/test_campaign_report.py:25,92. Re-pin both to the latest postgres:18.x-bookworm by digest, then re-run and record a full sqlmap profile, the identifiers profile and the full generative campaign on 18, in the existing acceptance formats. Older acceptance records stay as history, since they describe the server they ran on. These are timing-sensitive full runs: one at a time, on a quiet and awake machine, with no cleaner loop running (memory: timing-sensitive-runs). Depends on pg-query-18 so the campaign's compile suite and the oracle parse with the 18 grammar."
                     }
+
+                    {
+                        at 2026-10-07T14:16:48.704427Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T14:16:57.945607Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-pinned sqlmap (security/sqlmap/pins.json) and the campaign (fixtures.py IMAGE) to postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c, the same index digest pgorm-python/tests/with_postgres.py pins and the one docker buildx imagetools reports for the tag on 2026-10-07 (image id sha256:1f1c66e06b20…, built 2026-10-06, PGDATA /var/lib/postgresql/18/docker, VOLUME /var/lib/postgresql). One 16-to-18 change broke both harnesses before any scan: both mounted their anonymous data volume at /var/lib/postgresql/data, and the 18 image's entrypoint refuses to start with anything mounted there (\"Error: in 18+, these Docker images are configured to store database data in a format which is compatible with pg_ctlcluster ... there appears to be PostgreSQL data in: /var/lib/postgresql/data (unused mount/volume)\"). Both now mount at /var/lib/postgresql (sqlmap container_args, campaign Fixture.start). Verified before committing: the sqlmap smoke profile passes 3/3 on 18.6 with that mount, and the campaign Fixture starts two worker pairs on 18.6 (UTF8, C collation, UTC, 2s/500ms deadlines, restricted role) and cleans up. test_campaign_report.py's pass-through image string moves to 18.6 too."
+                    }
                 )
             }
 

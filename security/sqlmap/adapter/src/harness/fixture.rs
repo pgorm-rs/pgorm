@@ -108,11 +108,15 @@ impl Fixture {
 }
 
 /// The disposable server's `docker run` arguments, its default statement timeout the profile's.
+///
+/// The data volume mounts at `/var/lib/postgresql`: the 18 image keeps its
+/// data under `/var/lib/postgresql/18/docker` and refuses to start with
+/// anything mounted at the `.../data` path older images used.
 // [spec:pgorm:req:security.sqlmap.profiles+3]
 pub fn container_args(name: &str, image: &str, settings: &Settings) -> Vec<String> {
     let mut args: Vec<String> = ["run", "--detach", "--name", name,
         "--label", "pgorm.sqlmap=disposable", "--network", "bridge", "--publish", "127.0.0.1::5432",
-        "--env", "POSTGRES_PASSWORD", "--mount", "type=volume,destination=/var/lib/postgresql/data", "--memory", "512m", "--cpus", "2", image]
+        "--env", "POSTGRES_PASSWORD", "--mount", "type=volume,destination=/var/lib/postgresql", "--memory", "512m", "--cpus", "2", image]
         .map(str::to_owned).into();
     args.extend(["-c".into(), format!("statement_timeout={}s", settings.postgres_statement_timeout_seconds), "-c".into(), "lock_timeout=2s".into()]);
     args
