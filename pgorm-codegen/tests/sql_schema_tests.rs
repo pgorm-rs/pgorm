@@ -878,15 +878,27 @@ fn range_types_map_through_the_vocabulary() {
     assert_not_contains(span, "column_type");
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    an array of ranges has no
-// field type to generate, so it is refused by name
+// [spec:pgorm:req:codegen.entity.types.unsupported+4/test]    an array of ranges or
+// multiranges is a `Vec` of them, the derive taking its column type from the
+// field's own `ValueType` as it does for a range
 // [spec:pgorm:sem:codegen.ddl.types+5/test]    and a range type takes no modifier
 #[test]
-fn an_array_or_modified_range_is_refused() {
-    assert_error(
-        "CREATE TABLE span (id integer PRIMARY KEY, a int4range[]);",
-        "table `span` column `a`: column type Array(Range(Int4)) is not supported by codegen",
+fn array_of_ranges_generates_a_vec() {
+    let generated = from_sql(
+        "CREATE TABLE span_list (\
+             id integer PRIMARY KEY, \
+             a int4range[] NOT NULL, b datemultirange[] NOT NULL, c tstzrange[]\
+         );",
     );
+    let span_list = generated.file("span_list.rs");
+    for field in [
+        "pub a: Vec<Range<i32> >,",
+        "pub b: Vec<Multirange<Date> >,",
+        "pub c: Option<Vec<Range<DateTimeWithTimeZone> > >,",
+    ] {
+        assert_contains(span_list, field);
+    }
+    assert_not_contains(span_list, "column_type");
     assert_error(
         "CREATE TABLE span (id integer PRIMARY KEY, a int4range(3));",
         "unsupported DDL: `int4range` with a type modifier on column `span`.`a` at statement 1",

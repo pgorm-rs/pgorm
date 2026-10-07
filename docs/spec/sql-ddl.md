@@ -1119,7 +1119,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > taking the multirange with it.
 >
 > A value of a created range type over one of the built-in subtypes reads
-> and writes as `Range<T>` (`[spec:pgorm:def:sql.value.range]`); its
+> and writes as `Range<T>` (`[spec:pgorm:def:sql.value.range+1]`); its
 > multirange does not, because tokio-postgres reports it as a simple type
 > (`[spec:pgorm:req:exec.cursor.binding-range]`). A column of either is
 > `ColumnType::named`.

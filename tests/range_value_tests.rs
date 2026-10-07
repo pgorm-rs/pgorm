@@ -48,6 +48,26 @@ mod spans {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+mod lists {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "range_lists")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub counts: Vec<Range<i32>>,
+        pub amounts: Vec<Range<Decimal>>,
+        pub day_sets: Vec<Multirange<Date>>,
+        pub instants: Option<Vec<Range<DateTimeWithTimeZone>>>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
     let ctx = TestContext::new("range_value_tests").await;
@@ -55,6 +75,7 @@ async fn main() -> Result<(), Error> {
 
     let schema = Schema::new();
     create_table_without_asserts(&db, &schema.create_table_from_entity(spans::Entity)).await?;
+    create_table_without_asserts(&db, &schema.create_table_from_entity(lists::Entity)).await?;
 
     every_range_type_round_trips_through_an_entity(&db).await?;
     a_discrete_range_comes_back_canonical(&db).await?;
@@ -64,6 +85,9 @@ async fn main() -> Result<(), Error> {
     the_bound_and_inline_renderings_agree(&db).await?;
     the_operators_read_ranges(&db).await?;
     a_created_range_type_binds_by_its_subtype(&db).await?;
+    arrays_of_ranges_round_trip_through_an_entity(&db).await?;
+    an_array_reads_only_its_own_range_type(&db).await?;
+    overlap_reads_ranges_multiranges_and_arrays(&db).await?;
     the_server_refuses_what_it_cannot_store(&db).await?;
 
     drop(db);
@@ -124,8 +148,8 @@ fn model(id: i32) -> spans::Model {
 /// Every built-in range type is written by an entity insert and read back by
 /// its select, a NULL range included; a numeric bound keeps its scale and a
 /// timestamp bound its microseconds.
-// [spec:pgorm:def:sql.value.range/test]
-// [spec:pgorm:def:exec.decode.range/test]
+// [spec:pgorm:def:sql.value.range+1/test]
+// [spec:pgorm:def:exec.decode.range+1/test]
 // [spec:pgorm:req:exec.cursor.binding-range/test]
 async fn every_range_type_round_trips_through_an_entity(
     db: &DatabaseConnection,
@@ -164,7 +188,7 @@ async fn every_range_type_round_trips_through_an_entity(
 /// The server stores a discrete range in its canonical `[)` form, so a range
 /// written with other brackets reads back as the same set spelled
 /// differently; a continuous range is stored as written.
-// [spec:pgorm:def:sql.value.range/test]
+// [spec:pgorm:def:sql.value.range+1/test]
 async fn a_discrete_range_comes_back_canonical(db: &DatabaseConnection) -> Result<(), Error> {
     let int4 = |range: Range<i32>| Value::from(range);
     assert_eq!(
@@ -221,8 +245,8 @@ async fn a_discrete_range_comes_back_canonical(db: &DatabaseConnection) -> Resul
 /// The empty range is one value: written as itself or as bounds that hold
 /// nothing, it reads back as `Empty`, and it is never the range of every
 /// value, which is two unbounded sides.
-// [spec:pgorm:def:sql.value.range/test]
-// [spec:pgorm:def:exec.decode.range/test]
+// [spec:pgorm:def:sql.value.range+1/test]
+// [spec:pgorm:def:exec.decode.range+1/test]
 // [spec:pgorm:req:exec.cursor.binding-range/test]
 async fn the_empty_range_is_not_every_value(db: &DatabaseConnection) -> Result<(), Error> {
     let empty = Value::from(Range::<i32>::Empty);
@@ -249,7 +273,7 @@ async fn the_empty_range_is_not_every_value(db: &DatabaseConnection) -> Result<(
 /// server keeps it inside the brackets and reports the side as finite, and
 /// the decode refuses it as it refuses that value outside a range, rather
 /// than reading it as unbounded.
-// [spec:pgorm:def:exec.decode.range/test]
+// [spec:pgorm:def:exec.decode.range+1/test]
 async fn an_infinite_bound_is_not_unbounded(db: &DatabaseConnection) -> Result<(), Error> {
     let unbounded: Range<Date> = read(
         db,
@@ -279,8 +303,8 @@ async fn an_infinite_bound_is_not_unbounded(db: &DatabaseConnection) -> Result<(
 
 /// A multirange is stored sorted, with overlapping and adjacent ranges merged
 /// and empty ones dropped; the empty multirange is a value of its own.
-// [spec:pgorm:def:sql.value.range/test]
-// [spec:pgorm:def:exec.decode.range/test]
+// [spec:pgorm:def:sql.value.range+1/test]
+// [spec:pgorm:def:exec.decode.range+1/test]
 // [spec:pgorm:req:exec.cursor.binding-range/test]
 async fn a_multirange_comes_back_merged(db: &DatabaseConnection) -> Result<(), Error> {
     let written: Multirange<i32> = [
@@ -394,18 +418,15 @@ async fn the_bound_and_inline_renderings_agree(db: &DatabaseConnection) -> Resul
     );
 
     // An array of ranges binds element by element and renders as an array of
-    // constructor calls; there is no `Vec<Range<T>>` to read it back into, so
-    // an element is read instead.
-    let ranges = Value::array([Range::from(1i32..3), Range::Empty, Range::from(..=9)]);
-    let bound: Range<i32> = read(db, "SELECT ($1::int4range[])[3]", ranges.clone()).await?;
-    let inline: Range<i32> = (format!("SELECT ({ranges})[3]"), Values(Vec::new()))
+    // constructor calls, and reads back whole as a `Vec<Range<T>>`.
+    let ranges = Value::from(vec![Range::from(1i32..3), Range::Empty, Range::from(..=9)]);
+    let bound: Vec<Range<i32>> = read(db, "SELECT $1::int4range[]", ranges.clone()).await?;
+    let inline: Vec<Range<i32>> = (format!("SELECT {ranges}"), Values(Vec::new()))
         .into_tuple()
         .one(db)
         .await?;
-    assert_eq!(bound, Range::from(..10));
+    assert_eq!(bound, [Range::from(1..3), Range::Empty, Range::from(..10)]);
     assert_eq!(inline, bound);
-    let empty: bool = read(db, "SELECT isempty(($1::int4range[])[2])", ranges).await?;
-    assert!(empty);
     Ok(())
 }
 
@@ -465,7 +486,7 @@ async fn the_operators_read_ranges(db: &DatabaseConnection) -> Result<(), Error>
 /// multirange reaches the driver as a simple type, so it is refused both
 /// ways rather than guessed at.
 // [spec:pgorm:req:exec.cursor.binding-range/test]
-// [spec:pgorm:def:exec.decode.range/test]
+// [spec:pgorm:def:exec.decode.range+1/test]
 // [spec:pgorm:req:sql.ddl.type-range/test]
 async fn a_created_range_type_binds_by_its_subtype(db: &DatabaseConnection) -> Result<(), Error> {
     db.batch_execute(
@@ -523,7 +544,7 @@ async fn a_created_range_type_binds_by_its_subtype(db: &DatabaseConnection) -> R
 
 /// What the server refuses, it refuses with its own code: bounds out of
 /// order, and a discrete bound its canonical form would overflow.
-// [spec:pgorm:def:sql.value.range/test]
+// [spec:pgorm:def:sql.value.range+1/test]
 async fn the_server_refuses_what_it_cannot_store(db: &DatabaseConnection) -> Result<(), Error> {
     let inverted = read::<Range<i32>>(
         db,
@@ -537,5 +558,227 @@ async fn the_server_refuses_what_it_cannot_store(db: &DatabaseConnection) -> Res
         .await
         .unwrap_err();
     refused_with(&overflow, &SqlState::NUMERIC_VALUE_OUT_OF_RANGE);
+    Ok(())
+}
+
+/// An array of ranges is an entity field: `Vec<Range<T>>` and
+/// `Vec<Multirange<T>>` are written element by element and read back in
+/// order, each element canonical as it would be alone, the empty range kept
+/// apart from every value and an empty array from a NULL one.
+// [spec:pgorm:def:sql.value.array+6/test]    `Vec<Range<T>>` and `Vec<Multirange<T>>` convert
+// [spec:pgorm:def:exec.decode.range+1/test]    and decode as arrays
+// [spec:pgorm:def:sql.value.range+1/test]
+async fn arrays_of_ranges_round_trip_through_an_entity(
+    db: &DatabaseConnection,
+) -> Result<(), Error> {
+    let first = lists::Model {
+        id: 1,
+        counts: vec![
+            Range::from(1..=5),
+            Range::Empty,
+            Range::from(..3),
+            Range::from(..),
+        ],
+        amounts: vec![],
+        day_sets: vec![
+            [
+                Range::from(date(2024, 1, 5)..date(2024, 1, 9)),
+                Range::from(date(2024, 1, 1)..date(2024, 1, 6)),
+            ]
+            .into_iter()
+            .collect(),
+            Multirange::default(),
+        ],
+        instants: None,
+    };
+    let returned = first.clone().into_active_model().insert(db).await?;
+    let canonical = lists::Model {
+        counts: vec![
+            Range::from(1..6),
+            Range::Empty,
+            Range::from(..3),
+            Range::from(..),
+        ],
+        day_sets: vec![
+            [Range::from(date(2024, 1, 1)..date(2024, 1, 9))]
+                .into_iter()
+                .collect(),
+            Multirange::default(),
+        ],
+        ..first
+    };
+    assert_eq!(returned, canonical);
+    assert_eq!(lists::Entity::find_by_id(1).one(db).await?, canonical);
+
+    let second = lists::Model {
+        id: 2,
+        counts: vec![Range::from(7..9)],
+        amounts: vec![Range::new(Excluded(dec(-150, 2)), Included(dec(5, 0)))],
+        day_sets: vec![],
+        instants: Some(vec![Range::from(instant(1_700_000_000, 1)..), Range::Empty]),
+    };
+    second.clone().into_active_model().insert(db).await?;
+    assert_eq!(lists::Entity::find_by_id(2).one(db).await?, second.clone());
+    let Some(Excluded(lower)) = second.amounts[0].lower().cloned() else {
+        panic!("an exclusive lower bound");
+    };
+    assert_eq!(lower.scale(), 2);
+
+    assert_eq!(
+        lists::Column::Counts.def(),
+        ColumnType::Array(std::sync::Arc::new(ColumnType::Range(
+            pgorm::pgorm_query::RangeType::Int4
+        )))
+        .def()
+    );
+    Ok(())
+}
+
+/// An array decodes only from an array of its own range type — a created
+/// range type over the same subtype included — and a NULL element fails the
+/// whole array, as it does in every other `Vec<T>`.
+// [spec:pgorm:def:exec.decode.range+1/test]
+// [spec:pgorm:sem:exec.verify.accepts/test]    an array of ranges answers through the newtype
+async fn an_array_reads_only_its_own_range_type(db: &DatabaseConnection) -> Result<(), Error> {
+    use tokio_postgres::types::Type as Wire;
+
+    assert!(<Vec<Range<i32>> as TryGetable>::accepts(
+        &Wire::INT4_RANGE_ARRAY
+    ));
+    assert!(!<Vec<Range<i32>> as TryGetable>::accepts(
+        &Wire::INT8_RANGE_ARRAY
+    ));
+    assert!(!<Vec<Range<i32>> as TryGetable>::accepts(&Wire::INT4_RANGE));
+    assert!(!<Vec<Range<i32>> as TryGetable>::accepts(
+        &Wire::INT4MULTI_RANGE_ARRAY
+    ));
+    assert!(<Vec<Multirange<i32>> as TryGetable>::accepts(
+        &Wire::INT4MULTI_RANGE_ARRAY
+    ));
+
+    let created: Vec<Range<i32>> = read(
+        db,
+        "SELECT ARRAY[$1::slot, '[3,4)'::slot]",
+        Range::from(1i32..2).into(),
+    )
+    .await?;
+    assert_eq!(created, [Range::from(1..2), Range::from(3..4)]);
+
+    let with_null = read::<Vec<Range<i32>>>(
+        db,
+        "SELECT ARRAY[$1::int4range, NULL]",
+        Range::from(1i32..2).into(),
+    )
+    .await;
+    assert!(
+        with_null.is_err(),
+        "a NULL element decoded as {with_null:?}"
+    );
+    let other = read::<Vec<Range<i64>>>(
+        db,
+        "SELECT ARRAY[$1::int4range]",
+        Range::from(1i32..2).into(),
+    )
+    .await;
+    assert!(other.is_err(), "an int4range[] decoded as {other:?}");
+    Ok(())
+}
+
+/// `overlaps` is `&&`: true when two ranges, a multirange and a range, two
+/// multiranges or two arrays share a value; the empty range overlaps
+/// nothing, every value included; and an element is no operand of it.
+// [spec:pgorm:req:sql.ast.expr.operators+4/test]    `overlaps` reads ranges, multiranges and
+// arrays live
+async fn overlap_reads_ranges_multiranges_and_arrays(db: &DatabaseConnection) -> Result<(), Error> {
+    let ids = |condition: SimpleExpr| {
+        spans::Entity::find()
+            .select([spans::Column::Id])
+            .filter(condition)
+            .order_by_asc(spans::Column::Id)
+            .into_tuple::<i32>()
+    };
+    let counts = || Expr::col(spans::Column::Counts);
+    assert_eq!(
+        ids(counts().overlaps(Range::from(5..9))).all(db).await?,
+        [1, 2]
+    );
+    assert_eq!(
+        ids(counts().overlaps(Range::from(6..9))).all(db).await?,
+        Vec::<i32>::new()
+    );
+    assert_eq!(
+        ids(counts().overlaps(Range::<i32>::Empty)).all(db).await?,
+        Vec::<i32>::new()
+    );
+    // Beside a multirange the server types a bare operand as that multirange,
+    // so a range is pinned to its own type to reach `multirange && range`.
+    let sets = || Expr::col(spans::Column::CountSets);
+    let unpinned = ids(sets().overlaps(Range::from(4..5)))
+        .all(db)
+        .await
+        .unwrap_err();
+    assert!(
+        unpinned
+            .to_string()
+            .contains("cannot bind a `Range` value to Postgres type `int4multirange`"),
+        "{unpinned}"
+    );
+    let pinned = |range: Range<i32>| Expr::val(range).cast_as(alias("int4range"));
+    assert_eq!(
+        ids(sets().overlaps(pinned(Range::from(4..5))))
+            .all(db)
+            .await?,
+        Vec::<i32>::new()
+    );
+    assert_eq!(
+        ids(sets().overlaps(pinned(Range::from(3..6))))
+            .all(db)
+            .await?,
+        [1, 2]
+    );
+    assert_eq!(
+        ids(sets().overlaps(
+            [Range::from(0..2), Range::from(7..8)]
+                .into_iter()
+                .collect::<Multirange<i32>>()
+        ))
+        .all(db)
+        .await?,
+        [1, 2]
+    );
+
+    // The left operand is pinned to its type, so the server infers the
+    // right one from it, as it would from a column.
+    let both = |left: Value, cast: &'static str, right: Value| {
+        let query = Query::select()
+            .expr(Expr::expr(Expr::val(left).cast_as_raw(cast)).overlaps(right))
+            .to_owned();
+        async move {
+            let inline: bool = (query.to_string(), Values(Vec::new()))
+                .into_tuple()
+                .one(db)
+                .await?;
+            let (sql, values) = query.build();
+            let bound: bool = (sql, values).into_tuple().one(db).await?;
+            assert_eq!(inline, bound, "{query}");
+            Ok::<bool, Error>(bound)
+        }
+    };
+    assert!(both(Value::array([1i32, 2]), "int4[]", Value::array([2i32, 3])).await?);
+    assert!(!both(Value::array([1i32]), "int4[]", Value::array([2i32])).await?);
+    assert!(
+        !both(
+            Range::<i32>::Empty.into(),
+            "int4range",
+            Range::<i32>::from(..).into()
+        )
+        .await?
+    );
+
+    let element = ids(counts().overlaps(Expr::val(3).cast_as(alias("int4"))))
+        .all(db)
+        .await
+        .unwrap_err();
+    refused_with(&element, &SqlState::UNDEFINED_FUNCTION);
     Ok(())
 }

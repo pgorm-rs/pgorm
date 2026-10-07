@@ -458,7 +458,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+3]
+> [spec:pgorm:req:codegen.entity.types.unsupported+4]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -468,9 +468,9 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > form; outside `transform` the message names the column alone. `Array`
 > element types are checked recursively, so an array of an unsupported
 > element type is itself unsupported. An array of ranges or multiranges is
-> unsupported though its element is not: `Vec<Range<T>>` has no value
-> conversion (`[spec:pgorm:def:sql.value.array+5]`), so no field type for it
-> would compile.
+> supported as its element is — `int4range[]` is `Vec<Range<i32>>`
+> (`[spec:pgorm:def:sql.value.array+6]`) — the compact writer stating no
+> `column_type` for it, as for a range.
 >
 > A type inside the table can still be beyond the writer, in which case the
 > same gate refuses it with its own message. `Enum { name, .. }` is refused

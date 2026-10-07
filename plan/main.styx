@@ -9403,6 +9403,22 @@ children (
                 id range-arrays-and-overlap
                 title "An entity field holds an array of ranges or multiranges, codegen writes one for int4range[], and Expr tests two ranges for overlap"
                 kind @feat
+                sealed true
+                log (
+                    {
+                        at 2026-10-07T10:38:38.69323Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T11:09:47.153279Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {

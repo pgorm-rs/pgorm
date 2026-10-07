@@ -75,5 +75,5 @@ pub use uuid::Uuid;
 // [spec:pgorm:def:exec.decode.types+3]
 pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};
 
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 pub use crate::pgorm_query::{Multirange, Range, RangeType};

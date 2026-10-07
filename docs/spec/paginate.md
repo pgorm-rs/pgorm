@@ -379,7 +379,7 @@ bound parameter is held to.
 > (`[spec:pgorm:def:exec.cursor.binding+6]`), and a bound of the wrong variant
 > refused by that bound's own rule. A `NULL` bound is written as no bound,
 > because that is what PostgreSQL's constructors read it as and what the
-> literal rendering writes (`[spec:pgorm:def:sql.value.range]`); sent as a
+> literal rendering writes (`[spec:pgorm:def:sql.value.range+1]`); sent as a
 > `NULL`, its length of -1 would be read by the range's receive function as
 > a length.
 >

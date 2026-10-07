@@ -341,7 +341,7 @@ fn hostile_named_type_survives_the_expanded_column_def() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    a named type the
+// [spec:pgorm:req:codegen.entity.types.unsupported+4/test]    a named type the
 // generated `ColumnType::named("..")` could not rebuild — schema-qualified, an
 // array, or a type expression — is refused by name rather than respelled as a
 // different type
@@ -375,7 +375,7 @@ fn column_conversion_rejects_an_unrespellable_named_type() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    a type outside the
+// [spec:pgorm:req:codegen.entity.types.unsupported+4/test]    a type outside the
 // mapping fails the whole run with a `TransformError` naming table, column and
 // type — no placeholder code, and no panic
 #[test]
@@ -395,7 +395,7 @@ fn transform_rejects_column_type_outside_mapping() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+3/test]    the check sits at
+// [spec:pgorm:req:codegen.entity.types.unsupported+4/test]    the check sits at
 // `Column` construction, so the writer never meets an unmapped type; `Array`
 // element types are checked through
 #[test]
@@ -535,6 +535,7 @@ fn compact_primary_key_facts_surface_as_field_attributes() {
 
 // [spec:pgorm:sem:codegen.entity.types+4/test]    a range column is the `Range` of its
 // subtype's Rust type, and the expanded writer names its `RangeType`
+// [spec:pgorm:req:codegen.entity.types.unsupported+4/test]    an array of ranges is supported
 #[test]
 fn range_columns_name_their_range_type() {
     use pgorm_query::RangeType;
@@ -554,6 +555,16 @@ fn range_columns_name_their_range_type() {
             ColumnType::Multirange(RangeType::TimestampTz),
             "Multirange < DateTimeWithTimeZone >",
             "ColumnType :: Multirange (RangeType :: TimestampTz) . def ()",
+        ),
+        (
+            ColumnType::Array(std::sync::Arc::new(ColumnType::Range(RangeType::Int4))),
+            "Vec < Range < i32 >>",
+            "ColumnType :: Array (Arc :: new (ColumnType :: Range (RangeType :: Int4))) . def ()",
+        ),
+        (
+            ColumnType::Array(std::sync::Arc::new(ColumnType::Multirange(RangeType::Date))),
+            "Vec < Multirange < Date >>",
+            "ColumnType :: Array (Arc :: new (ColumnType :: Multirange (RangeType :: Date))) . def ()",
         ),
     ] {
         let col_def = ColumnDef::new_with_type(Name::runtime("span"), col_type)

@@ -190,8 +190,8 @@ These rules capture what the code does today, including known gaps.
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
 
-> [spec:pgorm:def:exec.decode.range]
-> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range]`)
+> [spec:pgorm:def:exec.decode.range+1]
+> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+1]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
 > `Decimal` unconditionally, and `jiff::civil::Date`,
 > `jiff::civil::DateTime` and `jiff::Timestamp` under `with-jiff`, the gate
@@ -221,8 +221,16 @@ These rules capture what the code does today, including known gaps.
 > `VerifyStatement` reports a range column of another subtype or a
 > multirange read as a range.
 >
-> There is no array of ranges: `Vec<Range<T>>` implements neither
-> `TryGetable` nor `ValueType` (`[spec:pgorm:def:sql.value.array+5]`).
+> An array of ranges is `Vec<Range<T>>`, and of multiranges
+> `Vec<Multirange<T>>`, for the same subtypes under the same gates and,
+> as every `Vec<T>` decode is (`exec.decode.array`), under `postgres-array`.
+> Each reads `Vec<RangeSql<T>>` or `Vec<MultirangeSql<T>>` through the
+> driver's array decoding, so it accepts an array whose member the newtype
+> accepts — `int4range[]` and an array of a range type a schema created over
+> `int4`, but not `int8range[]`, `int4range` or `int4multirange[]` — and an
+> element the newtype refuses fails the whole array. A NULL element fails as
+> it does in every other `Vec<T>`. Their `ValueType` is the generic one
+> (`[spec:pgorm:def:sql.value.array+6]`).
 
 > [spec:pgorm:def:exec.decode.many]
 > `TryGetableMany` extracts tuples from a row: `try_get_many` takes a

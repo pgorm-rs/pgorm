@@ -515,7 +515,7 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
-> [spec:pgorm:req:sql.ast.expr.operators+3]
+> [spec:pgorm:req:sql.ast.expr.operators+4]
 > `Expr` and `SimpleExpr` MUST provide combinators that produce `Binary`/`Unary`
 > nodes: comparisons `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, plus
 > `equals`/`not_equals` for column-to-column comparison; arithmetic `add`,
@@ -537,7 +537,8 @@ today, including panicking edges and deliberate failsafes.
 > its bounds written in the wrong order matches nothing and reports no error.
 >
 > PostgreSQL-specific operators MUST be available: full-text `matches` (`@@`)
-> and containment `contains` (`@>`) / `contained` (`<@`), and temporal
+> and containment `contains` (`@>`) / `contained` (`<@`), overlap `overlaps`
+> (`&&`), and temporal
 > `at_time_zone`, whose right operand is an ordinary expression — a bound zone
 > name or a column of them — and whose direction follows the left operand's
 > type, as the server's operator does. Containment and
@@ -545,6 +546,18 @@ today, including panicking edges and deliberate failsafes.
 > one `@>`, one `<@` and one `||` across arrays, ranges, `tsquery` and `jsonb`
 > alike — so these three combinators MUST also serve as the JSON containment
 > and merge tests, and `sql.ast.expr.json` MUST NOT name duplicates of them.
+>
+> `overlaps` asks whether its operands share a value: two ranges, a
+> multirange and a range or another multirange, two arrays. It lives in a
+> child module of `expr`, as the JSON and membership families do, and
+> renders `BinOper::Overlap`, which `binary` still reaches. Checked live on
+> PostgreSQL 18.6: the empty range overlaps nothing, `(,)` included; beside a
+> range column the server types a bare operand as that range (`r && $1`
+> infers `int4range`) and beside a multirange as that multirange, so a range
+> compared with a multirange is pinned with `cast_as` to reach the
+> `multirange && range` operator, and a bound range left unpinned there is
+> refused before it is sent; an element is no operand of `&&` at all
+> (`42883`), unlike containment's element form.
 > The escape hatch `binary(op, rhs)` accepts any `BinOper`, whose variants
 > further include regex (`~`, `~*`), trigram similarity and distance operators,
 > pgvector distance operators, `Overlap`, and `Raw(&'static str)` for

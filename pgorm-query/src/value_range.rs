@@ -9,7 +9,9 @@ use jiff::{
 };
 use rust_decimal::Decimal;
 
-use crate::{ArrayType, ColumnType, Nullable, Value, ValueType, ValueTypeError};
+use crate::{
+    ArrayType, ColumnType, Nullable, Value, ValueType, ValueTypeError, value::with_array::NotU8,
+};
 
 /// Which of PostgreSQL's built-in range types a range is, named by the subtype
 /// it ranges over.
@@ -19,7 +21,7 @@ use crate::{ArrayType, ColumnType, Nullable, Value, ValueType, ValueTypeError};
 /// `CREATE TYPE ... AS RANGE` has a name only its schema knows, so it has no
 /// variant here; a value of one over one of these subtypes still binds and
 /// decodes, because the wire format of a range is its subtype's.
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RangeType {
     /// `int4range` / `int4multirange`, over `integer` (`i32`).
@@ -38,7 +40,7 @@ pub enum RangeType {
 
 impl RangeType {
     /// The catalogue name of the range type: `int4range`, `tstzrange`, ...
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     pub fn range_type_name(self) -> &'static str {
         match self {
             Self::Int4 => "int4range",
@@ -52,7 +54,7 @@ impl RangeType {
 
     /// The catalogue name of the multirange over the range type:
     /// `int4multirange`, `tstzmultirange`, ...
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     pub fn multirange_type_name(self) -> &'static str {
         match self {
             Self::Int4 => "int4multirange",
@@ -97,7 +99,7 @@ impl RangeType {
 /// );
 /// assert!(Range::<i32>::Empty.is_empty());
 /// ```
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Range<T> {
     /// The range containing no value.
@@ -206,7 +208,7 @@ impl<T> From<ops::RangeFull> for Range<T> {
 /// multirange sorted, with overlapping and adjacent ranges merged and empty
 /// ones dropped, so `{[5,8), [1,3), [2,4), empty}` reads back as
 /// `{[1,4),[5,8)}`; the list here is the one written, in the order written.
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Multirange<T>(Vec<Range<T>>);
 
@@ -263,7 +265,7 @@ mod sealed {
 /// Sealed, because the answer it gives is one of PostgreSQL's built-in range
 /// types and the set of those is closed: a type with no built-in range would
 /// have to name one it is not.
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 pub trait RangeElement: ValueType + Nullable + Into<Value> + sealed::Sealed {
     /// The built-in range type over this subtype.
     fn range_type() -> RangeType;
@@ -318,7 +320,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 impl<T> From<Range<T>> for Value
 where
     T: RangeElement,
@@ -337,7 +339,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 impl<T> ValueType for Range<T>
 where
     T: RangeElement,
@@ -362,7 +364,13 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.array+6]
+impl<T> NotU8 for Range<T> where T: RangeElement {}
+
+// [spec:pgorm:def:sql.value.array+6]
+impl<T> NotU8 for Multirange<T> where T: RangeElement {}
+
+// [spec:pgorm:def:sql.value.range+1]
 impl<T> From<Multirange<T>> for Value
 where
     T: RangeElement,
@@ -381,7 +389,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range]
+// [spec:pgorm:def:sql.value.range+1]
 impl<T> ValueType for Multirange<T>
 where
     T: RangeElement,
@@ -413,7 +421,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn std_ranges_spell_their_bounds() {
         use Bound::{Excluded, Included, Unbounded};
@@ -426,7 +434,7 @@ mod tests {
         assert_eq!(Range::<i32>::from(..), Range::new(Unbounded, Unbounded));
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn the_empty_range_is_not_every_value() {
         let empty = Range::<i32>::Empty;
@@ -439,7 +447,7 @@ mod tests {
         assert_ne!(Value::from(empty), Value::from(everything));
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn a_range_round_trips_through_value() {
         let range = Range::from(Decimal::new(150, 2)..Decimal::new(3, 0));
@@ -464,7 +472,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn a_range_of_another_subtype_is_a_mismatch() {
         let value = Value::from(Range::from(1i64..2));
@@ -476,7 +484,7 @@ mod tests {
         assert!(<Range<i32> as ValueType>::try_from(empty).is_err());
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn a_null_bound_is_no_bound() {
         let value = Value::Range(
@@ -492,7 +500,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn a_typed_null_keeps_its_range_type() {
         assert_eq!(
@@ -514,7 +522,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn a_multirange_round_trips_through_value() {
         let multirange: Multirange<i32> = [Range::from(5..8), Range::Empty, Range::from(1..3)]
@@ -533,7 +541,45 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range/test]
+    // [spec:pgorm:def:sql.value.array+6/test]    a `Vec` of ranges or multiranges is an array of
+    // them, tagged with the range type and refusing another's
+    #[test]
+    fn a_vec_of_ranges_is_an_array() {
+        let ranges = vec![Range::from(1i32..3), Range::Empty];
+        let value = Value::from(ranges.clone());
+        assert_eq!(
+            value,
+            Value::Array(
+                ArrayType::Range(RangeType::Int4),
+                Some(Box::new(vec![
+                    Range::from(1i32..3).into(),
+                    Range::<i32>::Empty.into()
+                ]))
+            )
+        );
+        assert_eq!(
+            <Vec<Range<i32>> as ValueType>::try_from(value.clone()).unwrap(),
+            ranges
+        );
+        assert!(<Vec<Range<i64>> as ValueType>::try_from(value.clone()).is_err());
+        assert!(<Vec<Multirange<i32>> as ValueType>::try_from(value).is_err());
+        assert_eq!(
+            Value::from(None::<Vec<Range<i32>>>),
+            Value::Array(ArrayType::Range(RangeType::Int4), None)
+        );
+        let multiranges = vec![Multirange::<Date>::default()];
+        assert_eq!(
+            <Vec<Multirange<Date>> as ValueType>::try_from(Value::from(multiranges.clone()))
+                .unwrap(),
+            multiranges
+        );
+        assert_eq!(
+            <Vec<Multirange<Date>>>::column_type(),
+            ColumnType::Array(std::sync::Arc::new(ColumnType::Multirange(RangeType::Date)))
+        );
+    }
+
+    // [spec:pgorm:def:sql.value.range+1/test]
     #[test]
     fn each_subtype_names_its_range_type() {
         assert_eq!(

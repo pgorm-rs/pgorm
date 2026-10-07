@@ -1080,7 +1080,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+3/test]
+// [spec:pgorm:req:sql.ast.expr.operators+4/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1988,7 +1988,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+3/test]
+// [spec:pgorm:req:sql.ast.expr.operators+4/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2139,7 +2139,7 @@ fn empty_json_key_list_is_typed_array() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+3/test]    `@>`, `<@` and `||` are one
+// [spec:pgorm:req:sql.ast.expr.operators+4/test]    `@>`, `<@` and `||` are one
 // operator each across every type that has them, so the JSON family names no
 // duplicate: these are already the JSON containment and merge tests
 #[test]

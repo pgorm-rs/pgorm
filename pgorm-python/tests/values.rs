@@ -112,7 +112,7 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:def:sql.value.range/test]    a range or multirange is refused where a Rust value
+// [spec:pgorm:def:sql.value.range+1/test]    a range or multirange is refused where a Rust value
 // would become a Python one, NULL or not
 #[test]
 fn rust_ranges_are_refused_by_name() -> PyResult<()> {

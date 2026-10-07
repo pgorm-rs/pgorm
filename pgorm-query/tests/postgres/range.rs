@@ -163,7 +163,7 @@ fn a_range_type_binds_nothing() {
     assert!(values.0.is_empty());
 }
 
-// [spec:pgorm:def:sql.value.range/test]    a column of a built-in range type is written by the
+// [spec:pgorm:def:sql.value.range+1/test]    a column of a built-in range type is written by the
 // catalogue name
 #[test]
 fn a_range_column_type_is_its_catalogue_name() {
@@ -299,4 +299,42 @@ fn range_values_agree_on_identity() {
         Value::Multirange(RangeType::Int4, None)
     );
     assert!(std::mem::size_of::<Value>() <= 4 * std::mem::size_of::<usize>());
+}
+
+// [spec:pgorm:req:sql.ast.expr.operators+4/test]    `overlaps` is `&&` between its operands, bound
+// or inlined, and the parser reads one operator expression
+#[test]
+fn overlaps_renders_the_overlap_operator() {
+    let query = Query::select()
+        .column(n("id"))
+        .from(n("t"))
+        .and_where(Expr::col(n("span")).overlaps(Range::from(1i32..5)))
+        .and_where(
+            Expr::col(n("tags")).overlaps(Value::array([String::from("a"), String::from("b")])),
+        )
+        .to_owned();
+    let (sql, values) = query.build();
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "t" WHERE ("span" && $1) AND ("tags" && $2)"#
+    );
+    assert_eq!(
+        values,
+        Values(vec![
+            Range::from(1i32..5).into(),
+            Value::array([String::from("a"), String::from("b")])
+        ])
+    );
+    let inline = query.to_string();
+    assert_eq!(
+        inline,
+        r#"SELECT "id" FROM "t" WHERE ("span" && int4range(1, 5, '[)')) AND ("tags" && ARRAY ['a','b'])"#
+    );
+    for sql in [&sql, &inline] {
+        let overlaps: Vec<_> = parsed_nodes(sql, "AExpr")
+            .into_iter()
+            .filter(|node| node["name"][0]["String"]["sval"] == "&&")
+            .collect();
+        assert_eq!(overlaps.len(), 2, "{sql}");
+    }
 }

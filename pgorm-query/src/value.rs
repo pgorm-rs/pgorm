@@ -25,7 +25,7 @@ pub use pgvector::Vector;
 use crate::{ColumnType, Multirange, QueryBuilder, Range, RangeType, StringLen};
 
 /// [`Value`] types variant for Postgres array
-// [spec:pgorm:def:sql.value.array+5]
+// [spec:pgorm:def:sql.value.array+6]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ArrayType {
     Bool,
@@ -62,11 +62,11 @@ pub enum ArrayType {
     Vector,
 
     /// A range over one of the built-in range types, `int4range[]`.
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     Range(RangeType),
 
     /// A multirange over one of the built-in range types, `int4multirange[]`.
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     Multirange(RangeType),
 }
 
@@ -124,11 +124,11 @@ pub enum Value {
     /// an empty range still name one. Its bounds are values of the variant
     /// the range type ranges over — `Int` for `int4range` — and a NULL bound
     /// is no bound, as it is to PostgreSQL's range constructors.
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     Range(RangeType, Option<Box<Range<Value>>>),
 
     /// A multirange, tagged as [`Value::Range`] is.
-    // [spec:pgorm:def:sql.value.range]
+    // [spec:pgorm:def:sql.value.range+1]
     Multirange(RangeType, Option<Box<Multirange<Value>>>),
 }
 
@@ -627,7 +627,7 @@ mod with_mac_address {
     type_to_box_value!(MacAddress, MacAddress, MacAddr);
 }
 
-// [spec:pgorm:def:sql.value.array+5]
+// [spec:pgorm:def:sql.value.array+6]
 pub mod with_array {
     use super::*;
     use std::sync::Arc;
@@ -903,7 +903,7 @@ impl Value {
     /// an empty iterator still names its element type: an untagged empty array
     /// has no inline spelling PostgreSQL can type, and no element to infer one
     /// from.
-    // [spec:pgorm:def:sql.value.array+5]
+    // [spec:pgorm:def:sql.value.array+6]
     pub fn array<V, I>(values: I) -> Self
     where
         V: Into<Value> + ValueType,
@@ -1644,7 +1644,7 @@ mod tests {
         assert_eq!(out.to_string(), num);
     }
 
-    // [spec:pgorm:def:sql.value.array+5/test]
+    // [spec:pgorm:def:sql.value.array+6/test]
     #[test]
     fn test_array_value() {
         let array = vec![1, 2, 3, 4, 5];
@@ -1653,7 +1653,7 @@ mod tests {
         assert_eq!(out, vec![1, 2, 3, 4, 5]);
     }
 
-    // [spec:pgorm:def:sql.value.array+5/test]
+    // [spec:pgorm:def:sql.value.array+6/test]
     #[test]
     fn test_option_array_value() {
         let v: Value = Value::Array(ArrayType::Int, None);
@@ -1661,7 +1661,7 @@ mod tests {
         assert_eq!(out, None);
     }
 
-    // [spec:pgorm:def:sql.value.array+5/test]
+    // [spec:pgorm:def:sql.value.array+6/test]
     #[test]
     fn vector_has_an_array_type_tag() {
         assert_eq!(<Vector as ValueType>::array_type(), ArrayType::Vector);

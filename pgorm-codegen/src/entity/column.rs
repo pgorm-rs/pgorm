@@ -23,7 +23,7 @@ impl Column {
     /// Reject anything the writer could not render: a type outside the mapping
     /// table, and a DB name whose case-converted forms are not Rust
     /// identifiers.
-    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+4]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("column `{}`", self.name);
@@ -51,7 +51,7 @@ impl Column {
 
     // [spec:pgorm:sem:codegen.entity.types+4]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
-    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+4]
     pub fn get_rs_type(&self) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType) -> String {
             #[allow(unreachable_patterns)]
@@ -130,7 +130,7 @@ impl Column {
         col_type.map(|ty| quote! { column_type = #ty })
     }
 
-    // [spec:pgorm:req:codegen.entity.types.unsupported+3]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+4]
     pub fn get_def(&self) -> TokenStream {
         fn write_col_def(col_type: &ColumnType) -> TokenStream {
             match col_type {
@@ -314,7 +314,7 @@ fn range_type_tokens(range: RangeType) -> TokenStream {
 /// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
 /// through `Array` element types, over the enum names they will emit, and over
 /// the named types they will respell.
-// [spec:pgorm:req:codegen.entity.types.unsupported+3]
+// [spec:pgorm:req:codegen.entity.types.unsupported+4]
 fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> {
     match col_type {
         ColumnType::Char(_)
@@ -360,18 +360,6 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
             Ok(())
         }
         ColumnType::Range(_) | ColumnType::Multirange(_) => Ok(()),
-        // A `Vec` of ranges has no value conversion, so an array of them has
-        // no field type the entity could compile with.
-        ColumnType::Array(inner_col_type)
-            if matches!(
-                inner_col_type.as_ref(),
-                ColumnType::Range(_) | ColumnType::Multirange(_)
-            ) =>
-        {
-            Err(Error::TransformError(format!(
-                "{context}: column type {col_type:?} is not supported by codegen"
-            )))
-        }
         ColumnType::Array(inner_col_type) => validate_col_type(context, inner_col_type),
         other => Err(Error::TransformError(format!(
             "{context}: column type {other:?} is not supported by codegen"

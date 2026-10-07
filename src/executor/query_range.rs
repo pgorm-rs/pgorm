@@ -19,11 +19,11 @@ use super::{QueryResult, TryGetError, TryGetable};
 type WireResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
 /// A [`Range`] read from the wire, over any subtype a `FromSql` reads.
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 #[derive(Debug)]
 struct RangeSql<T>(Range<T>);
 
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 impl<'a, T> FromSql<'a> for RangeSql<T>
 where
     T: FromSql<'a>,
@@ -42,11 +42,11 @@ where
 
 /// A [`Multirange`] read from the wire: a count of ranges, each
 /// length-prefixed in a range's own encoding.
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 #[derive(Debug)]
 struct MultirangeSql<T>(Multirange<T>);
 
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 impl<'a, T> FromSql<'a> for MultirangeSql<T>
 where
     T: FromSql<'a>,
@@ -84,7 +84,7 @@ fn read_i32(raw: &mut &[u8]) -> WireResult<i32> {
 
 /// The empty flag decodes to [`Range::Empty`] and nothing else: a range with
 /// no bounds is the range with no values, never the range of every value.
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 fn range_from_sql<'a, T>(subtype: &Type, raw: &'a [u8]) -> WireResult<Range<T>>
 where
     T: FromSql<'a>,
@@ -118,7 +118,7 @@ where
     })
 }
 
-// [spec:pgorm:def:exec.decode.range]
+// [spec:pgorm:def:exec.decode.range+1]
 macro_rules! try_getable_range {
     ( $type: ty ) => {
         impl TryGetable for Range<$type> {
@@ -152,6 +152,42 @@ macro_rules! try_getable_range {
                 <MultirangeSql<$type> as FromSql>::accepts(ty)
             }
         }
+
+        // [spec:pgorm:def:exec.decode.range+1]
+        #[cfg(feature = "postgres-array")]
+        impl TryGetable for Vec<Range<$type>> {
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: Vec<RangeSql<$type>> =
+                    res.row.try_get(idx).map_err(TryGetError::postgres)?;
+                Ok(result.into_iter().map(|range| range.0).collect())
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]    an array whose member the newtype reads
+            fn accepts(ty: &Type) -> bool {
+                <Vec<RangeSql<$type>> as FromSql>::accepts(ty)
+            }
+        }
+
+        // [spec:pgorm:def:exec.decode.range+1]
+        #[cfg(feature = "postgres-array")]
+        impl TryGetable for Vec<Multirange<$type>> {
+            fn try_get_by<I: RowIndex + std::fmt::Display>(
+                res: &QueryResult,
+                idx: I,
+            ) -> Result<Self, TryGetError> {
+                let result: Vec<MultirangeSql<$type>> =
+                    res.row.try_get(idx).map_err(TryGetError::postgres)?;
+                Ok(result.into_iter().map(|multirange| multirange.0).collect())
+            }
+
+            // [spec:pgorm:sem:exec.verify.accepts]    an array whose member the newtype reads
+            fn accepts(ty: &Type) -> bool {
+                <Vec<MultirangeSql<$type>> as FromSql>::accepts(ty)
+            }
+        }
     };
 }
 
@@ -180,7 +216,7 @@ mod tests {
         RangeSql::<i32>::from_sql(&Type::INT4_RANGE, raw).map(|range| range.0)
     }
 
-    // [spec:pgorm:def:exec.decode.range/test]
+    // [spec:pgorm:def:exec.decode.range+1/test]
     #[test]
     fn decodes_each_bound_with_its_inclusivity() {
         assert_eq!(
@@ -198,14 +234,14 @@ mod tests {
         assert_eq!(decode(&[0b0001_1000]).unwrap(), Range::from(..));
     }
 
-    // [spec:pgorm:def:exec.decode.range/test]
+    // [spec:pgorm:def:exec.decode.range+1/test]
     #[test]
     fn decodes_the_empty_flag_as_the_empty_range() {
         assert_eq!(decode(&[0b0000_0001]).unwrap(), Range::Empty);
         assert_ne!(decode(&[0b0000_0001]).unwrap(), Range::from(..));
     }
 
-    // [spec:pgorm:def:exec.decode.range/test]
+    // [spec:pgorm:def:exec.decode.range+1/test]
     #[test]
     fn refuses_a_malformed_range() {
         let null_bound = [&[0b0000_0010][..], &(-1i32).to_be_bytes()[..], &int4(6)].concat();
@@ -217,7 +253,7 @@ mod tests {
         assert!(decode(&[0b0000_0001, 0]).is_err());
     }
 
-    // [spec:pgorm:def:exec.decode.range/test]
+    // [spec:pgorm:def:exec.decode.range+1/test]
     #[test]
     fn decodes_a_multirange_range_by_range() {
         let first = [&[0b0000_0010][..], &int4(1), &int4(4)].concat();
