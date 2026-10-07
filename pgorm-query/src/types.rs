@@ -14,7 +14,7 @@ pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
     // [spec:pgorm:req:sql.render.ident-quoting+7]
-    // [spec:pgorm:req:security.ident-oracle+12] (the quoting every registered
+    // [spec:pgorm:req:security.ident-oracle+13] (the quoting every registered
     // name position renders through, held to the identifier render oracle)
     fn prepare(&self, s: &mut dyn fmt::Write) {
         write!(s, "\"{}\"", self.quoted()).unwrap();
@@ -213,7 +213,7 @@ pub trait IntoColumnRef {
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
 // [spec:pgorm:def:sql.types.type-name+8]
-// [spec:pgorm:req:sql.ast.cast-shape]
+// [spec:pgorm:req:sql.ast.cast-shape+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
     pub schema: Option<Name>,

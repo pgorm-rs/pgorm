@@ -112,7 +112,7 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:def:sql.value.range+2/test]    a range or multirange reaches Python as a
+// [spec:pgorm:def:sql.value.range+3/test]    a range or multirange reaches Python as a
 // `pgorm.Range` or `pgorm.Multirange`, tagged with its range type, and converts back unchanged
 // [spec:pgorm:req:python.values+1/test]
 #[test]

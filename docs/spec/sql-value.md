@@ -22,7 +22,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)`,
 > `MacAddress(Box<MacAddress>)`, and the two range carriers of
-> `[spec:pgorm:def:sql.value.range+2]`,
+> `[spec:pgorm:def:sql.value.range+3]`,
 > `Range(RangeType, Option<Box<Range<Value>>>)` and
 > `Multirange(RangeType, Option<Box<Multirange<Value>>>)`, which carry their
 > range type beside the payload as `Array` carries its element type.
@@ -188,7 +188,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Ranges
 
-> [spec:pgorm:def:sql.value.range+2]
+> [spec:pgorm:def:sql.value.range+3]
 > A range value is `Range<T>`, an enum of two shapes: `Empty`, and
 > `Bounds { lower, upper }` with each bound a `std::ops::Bound<T>` —
 > `Included`, `Excluded` or `Unbounded`. The empty range is a value of its
@@ -235,7 +235,9 @@ including panic semantics and quirks inherited from sea-query.
 > `i32`, `i64`, `Decimal`, `civil::Date`, `civil::DateTime` and
 > `jiff::Timestamp` — and answers the `RangeType`; it is sealed because the
 > answer is one of the six, and a type with no built-in range would have to
-> name one it is not.
+> name one it is not. Each is a `RangeSubtype`
+> (`[spec:pgorm:def:sql.value.created-range]`), the wider sealed set a range
+> type a schema created can range over.
 >
 > For `T: RangeElement`, `Range<T>` and `Multirange<T>` convert into
 > `Value::Range` / `Value::Multirange` tagged with `T::range_type()`, each
@@ -255,11 +257,13 @@ including panic semantics and quirks inherited from sea-query.
 > extraction all read it so and the two renderings of one value agree.
 >
 > A range type created by `CREATE TYPE ... AS RANGE`
-> (`[spec:pgorm:req:sql.ddl.type-range]`) has a name only its schema knows,
-> so `RangeType` has no variant for it and a column of one is
-> `ColumnType::Named`. A value of one over one of the six subtypes still
-> binds and decodes through `Range<T>`, because the wire format of a range is
-> its subtype's; a range over any other subtype has no Rust type here.
+> (`[spec:pgorm:req:sql.ddl.type-range+1]`) has a name only its schema knows,
+> so `RangeType` has no variant for it: a value of one is its text form cast
+> to the type by name, and a column of one is `ColumnType::CreatedRange`
+> (`[spec:pgorm:def:sql.value.created-range]`). A `Value::Range` of a
+> built-in still binds against a placeholder the server types as such a
+> range over its subtype, because the wire format of a range is its
+> subtype's, and a row of one decodes through `Range<T>`.
 >
 > The Python binding carries the six and their multiranges
 > (`[spec:pgorm:req:python.values+1]`). A range is `pgorm.Range(lower, upper,
@@ -278,12 +282,93 @@ including panic semantics and quirks inherited from sea-query.
 > is, and a range type a schema created over one of the six subtypes reads
 > as the built-in over it, as `Range<T>` does here. A range over another
 > subtype and a multirange a schema created are `DecodeError`s, the first
-> naming its subtype, until `created-range-types` and `created-multiranges`
-> give them a Rust type. A registered entity's range field converts both
+> naming its subtype: Python has no spelling for a created range type's name
+> beside its value, which the Rust side gives `DeriveCreatedRange`'s newtype,
+> and is filed as `python-created-ranges`. A registered entity's range field converts both
 > ways through `PyValue::from_rust`, its column hinting the kind, and the
 > schema builder's `DataType` names the twelve types. Python's `Expr` has no
 > containment or overlap operator: its stub is at the function-density cap,
 > and a range predicate is written in `RawSQL` with a bound range.
+
+## Range types a schema creates
+
+> [spec:pgorm:def:sql.value.created-range]
+> A range type a schema creates with `CREATE TYPE ... AS RANGE`
+> (`[spec:pgorm:req:sql.ddl.type-range+1]`) is named by that schema, so no
+> `RangeType` variant can carry it, and `Value` does not: it stays one pointer
+> of payload wide. A value of one travels as its *text form* cast to the type
+> by name. The Rust side names the type once, in a newtype over `Range<T>`
+> deriving `DeriveCreatedRange` (`[spec:pgorm:sem:macros.derive.created-range]`)
+> with `range_name` and an optional `schema_name`, as an enum type is named
+> once by its `ActiveEnum`. A bare `Range<T>` field naming the type in an
+> attribute is not the shape, because `ValueType::column_type()` of a
+> `Range<f64>` would have no correct answer without a name, and the entity
+> derives reach a field only through its `ValueType`. The newtype implements
+> `pgorm::CreatedRange`, whose `name()` is the type's `TypeName` and whose
+> `into_expr()` is the value cast to it.
+>
+> `RangeSubtype` is the sealed set of Rust types such a range ranges over:
+> `i16`, `i32`, `i64`, `f32`, `f64`, `Decimal`, `String`, `civil::Date`,
+> `civil::Time`, `civil::DateTime`, `jiff::Timestamp` and `Uuid` — the
+> scalars PostgreSQL can range over (each type has a default b-tree operator
+> class) whose text form the type's input function reads back as the same
+> value and whose binary form a `FromSql` of the Rust type decodes. The rest
+> are left out: `bool` has two values to range over, `interval` and `money`
+> have no `Value` of their own, and `inet` and `macaddr` decode through
+> pgorm's own newtypes rather than a `FromSql` the range reader can use.
+>
+> The text form is `Display` and `FromStr` on `Range<T>` and `Multirange<T>`
+> for `T: RangeSubtype`. `Display` writes `empty`, or a bracket, each bound
+> and a bracket, as PostgreSQL's range output does: an unbounded side, and a
+> `NULL` bound — no bound here as everywhere — is nothing, and a bound is its
+> subtype's text, written as it is unless it is empty or holds a quote, a
+> backslash, a bracket, a parenthesis, a comma or whitespace, when it is
+> double-quoted with each `"` and `\` doubled; the range parser would
+> otherwise read those as syntax or keep them around the value. A float is
+> Rust's shortest round-trip spelling (`inf`, `NaN` and `-0` included), a
+> temporal bound the literal rendering's text truncated to the microsecond,
+> an instant with its offset. `FromStr` reads what PostgreSQL's range input
+> reads — surrounding whitespace, a case-insensitive `empty`, an empty side as
+> no bound, a quoted bound with backslash escapes and doubled quotes — and
+> each bound with the subtype's own text parsing, anything else being a
+> `ValueTypeError`. For a continuous range whose bounds print alike the text
+> is the server's own; where a bound prints differently (`1e300` as `1e+300`,
+> `inf` as `Infinity`) the server's text reads back as the same value.
+>
+> `Expr::as_range(type_name)` is the cast. It writes a `Value::Range` or
+> `Value::Multirange` operand as its text — a `NULL` staying `NULL` — and
+> casts the operand to the `TypeName`, quoted and schema-qualifiable as every
+> type name is (`[spec:pgorm:def:sql.types.type-name+8]`); any other operand,
+> such as the text the newtype converts into, is cast as it is. There is no
+> cast between two range types (`CAST(int4range(1, 5) AS slot)` is `42846`),
+> so text is the one form every range type reads. A text operand is a bound
+> parameter pinned to `text`, `CAST($1::text AS floatrange)`, because a bare
+> `$1` there is typed as the range and its text would be read as the range's
+> binary form; inline it is an escaped string literal, and the two renderings
+> are one value. A bound holding the literal's syntax, a quote or a
+> placeholder is read back as the text it is.
+>
+> A column of the type is `ColumnType::CreatedRange { name, schema, subtype }`:
+> DDL writes the name, schema-qualified and quoted where needed, and the
+> subtype is the `ColumnType` of what the bounds are, which no name says and
+> codegen reads. `ColumnTrait::save_as` on such a column is `as_range` to its
+> type (`[spec:pgorm:sem:entity.traits.column.enum-cast+5]`), so an insert, an
+> update and every value predicate write the text cast to the type. That is
+> what turns the `to_string()` of a built-in `Range<i32>` written to a column
+> of a range type over `int4` from a constructor call PostgreSQL refuses —
+> `42804` in an insert, `42883` against the column — into a literal it reads.
+> A row decodes from the range's binary form: tokio-postgres reports a created
+> range as a range over its subtype, so `Range<T>` decodes for every
+> `RangeSubtype` and refuses one over another subtype
+> (`[spec:pgorm:def:exec.decode.range+2]`), and the newtype decodes through it.
+>
+> pgorm cannot author the C function a canonical function is
+> (`[spec:pgorm:req:sql.ddl.type-range+1]`), so a range type a schema creates
+> through it is continuous whatever its subtype: one over `int4` keeps `[1,5]`
+> and `(1,5]` as written where `int4range` moves them, and `[5,5)` is still
+> `empty`. The server refuses, with its own code on both renderings, inverted
+> bounds (`22000`), a bound the subtype does not read and malformed text
+> (`22P02`), and a bound outside the subtype (`22003`).
 
 ## Value tuples
 
@@ -653,7 +738,7 @@ including panic semantics and quirks inherited from sea-query.
 > Carrying the answer here rather than in a second node shape is what lets a
 > cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
-> [spec:pgorm:def:sql.types.column-type+8]
+> [spec:pgorm:def:sql.types.column-type+9]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -670,9 +755,11 @@ including panic semantics and quirks inherited from sea-query.
 > enum type carries its schema in the type itself, so every rendering that
 > names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`,
-> `LTree`, and `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
-> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+2]`); a
-> range type a schema creates is `Named`, as every other created type is.
+> `LTree`, `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
+> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+3]`),
+> and `CreatedRange { name, schema, subtype }`, a range type a schema created,
+> named in full as an enum type is and carrying the `ColumnType` of its
+> subtype (`[spec:pgorm:def:sql.value.created-range]`).
 > `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
 > (`[spec:pgorm:req:sql.ddl.column-def+4]`).
@@ -713,6 +800,7 @@ including panic semantics and quirks inherited from sea-query.
 > `ColumnType` equality compares parameters for the parameterised variants,
 > compares `Named` and `Enum` by rendered identifier strings (and variant
 > lists), compares `Array` element types recursively, compares `Range` and
-> `Multirange` by the range type they name, and otherwise compares enum
+> `Multirange` by the range type they name, compares `CreatedRange` by its
+> rendered name and schema and its subtype, and otherwise compares enum
 > discriminants. Convenience constructors: `ColumnType::named(str)`,
 > `ColumnType::string(Option<u32>)` and `ColumnType::var_binary(u32)`.

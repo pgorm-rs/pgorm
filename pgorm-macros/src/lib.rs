@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 
 use syn::{DeriveInput, Error, parse_macro_input};
 
-// [spec:pgorm:def:macros.derive+2]
+// [spec:pgorm:def:macros.derive+3]
 #[cfg(feature = "derive")]
 mod derives;
 
@@ -153,7 +153,7 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 /// `Cargo.toml` (`my_orm = { package = "pgorm", .. }`), alias it back with
 /// `use my_orm as pgorm;` there or at the crate root; otherwise every generated path is
 /// an `E0433`. There is no `#[pgorm(crate = ...)]` override.
-// [spec:pgorm:def:macros.derive+2]
+// [spec:pgorm:def:macros.derive+3]
 // [spec:pgorm:sem:macros.derive.entity-model+5]
 // [spec:pgorm:req:macros.derive.entity-model.reject+1]
 #[cfg(feature = "derive")]
@@ -697,7 +697,7 @@ pub fn derive_relation(input: TokenStream) -> TokenStream {
 /// (`use my_migration as pgorm_migration;`) in the module holding the migration or at
 /// the crate root, exactly as `pgorm` itself does. There is no `#[pgorm(crate = ...)]`
 /// override.
-// [spec:pgorm:def:macros.derive+2]
+// [spec:pgorm:def:macros.derive+3]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveMigrationName)]
 pub fn derive_migration_name(input: TokenStream) -> TokenStream {
@@ -879,6 +879,44 @@ pub fn enum_iter(input: TokenStream) -> TokenStream {
 pub fn derive_value_type(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);
     match derives::expand_derive_value_type(derive_input) {
+        Ok(token_stream) => token_stream.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+/// Derive the traits a newtype over [`Range<T>`] needs to stand for a range
+/// type a schema created with `CREATE TYPE ... AS RANGE`: `pgorm::CreatedRange`,
+/// `ValueType`, `Nullable`, `TryGetable`, and conversions into its `Value` —
+/// the range's text form — and from the `Range<T>` it holds.
+///
+/// `range_name` names the range type, and `schema_name` qualifies it; both are
+/// names, quoted where they need to be.
+///
+/// ```rust
+/// use pgorm::entity::prelude::*;
+///
+/// #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
+/// #[pgorm(range_name = "floatrange")]
+/// pub struct FloatRange(pub Range<f64>);
+/// ```
+///
+/// The field is a `Range<T>`, `T` the subtype:
+///
+/// ```compile_fail
+/// use pgorm::entity::prelude::*;
+///
+/// #[derive(DeriveCreatedRange)]
+/// #[pgorm(range_name = "floatrange")]
+/// pub struct FloatRange(pub f64);
+/// ```
+///
+/// [`Range<T>`]: https://docs.rs/pgorm-query/latest/pgorm_query/enum.Range.html
+// [spec:pgorm:sem:macros.derive.created-range]
+#[cfg(feature = "derive")]
+#[proc_macro_derive(DeriveCreatedRange, attributes(pgorm))]
+pub fn derive_created_range(input: TokenStream) -> TokenStream {
+    let derive_input = parse_macro_input!(input as DeriveInput);
+    match derives::expand_derive_created_range(derive_input) {
         Ok(token_stream) => token_stream.into(),
         Err(e) => e.to_compile_error().into(),
     }

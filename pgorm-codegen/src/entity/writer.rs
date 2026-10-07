@@ -1,4 +1,4 @@
-use crate::{ActiveEnum, Entity, Error, util::escape_rust_keyword};
+use crate::{ActiveEnum, CreatedRangeType, Entity, Error, util::escape_rust_keyword};
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -11,6 +11,7 @@ use tracing::info;
 pub struct EntityWriter {
     pub(crate) entities: Vec<Entity>,
     pub(crate) enums: BTreeMap<String, ActiveEnum>,
+    pub(crate) ranges: BTreeMap<String, CreatedRangeType>,
 }
 
 pub struct WriterOutput {
@@ -185,7 +186,7 @@ impl EntityWriterContext {
 }
 
 impl EntityWriter {
-    // [spec:pgorm:req:codegen.entity.files]
+    // [spec:pgorm:req:codegen.entity.files+1]
     pub fn generate(self, context: &EntityWriterContext) -> WriterOutput {
         let mut files = Vec::new();
         files.extend(self.write_entities(context));
@@ -198,6 +199,9 @@ impl EntityWriter {
                 &context.enum_extra_derives,
                 &context.enum_extra_attributes,
             ));
+        }
+        if !self.ranges.is_empty() {
+            files.push(self.write_pgorm_range_types());
         }
         WriterOutput { files }
     }
@@ -260,7 +264,7 @@ impl EntityWriter {
             .collect()
     }
 
-    // [spec:pgorm:req:codegen.entity.files]
+    // [spec:pgorm:req:codegen.entity.files+1]
     pub fn write_index_file(&self, lib: bool) -> OutputFile {
         let mut lines = Vec::new();
         Self::write_doc_comment(&mut lines);
@@ -278,6 +282,14 @@ impl EntityWriter {
                 &mut lines,
                 vec![quote! {
                     pub mod pgorm_active_enums;
+                }],
+            );
+        }
+        if !self.ranges.is_empty() {
+            Self::write(
+                &mut lines,
+                vec![quote! {
+                    pub mod pgorm_range_types;
                 }],
             );
         }
@@ -367,6 +379,7 @@ impl EntityWriter {
     ) -> Vec<TokenStream> {
         let mut imports = Self::gen_import(with_serde);
         imports.extend(Self::gen_import_active_enum(entity));
+        imports.extend(Self::gen_import_range_types(entity));
         let mut code_blocks = vec![
             imports,
             Self::gen_entity_struct(),
@@ -405,6 +418,7 @@ impl EntityWriter {
     ) -> Vec<TokenStream> {
         let mut imports = Self::gen_import(with_serde);
         imports.extend(Self::gen_import_active_enum(entity));
+        imports.extend(Self::gen_import_range_types(entity));
         let mut code_blocks = vec![
             imports,
             Self::gen_compact_model_struct(
@@ -424,7 +438,7 @@ impl EntityWriter {
         code_blocks
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports]
+    // [spec:pgorm:sem:codegen.entity.imports+1]
     pub fn gen_import(with_serde: &WithSerde) -> TokenStream {
         let prelude_import = quote!(
             use pgorm::entity::prelude::*;
@@ -484,7 +498,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports]    active-enum imports
+    // [spec:pgorm:sem:codegen.entity.imports+1]    active-enum imports
     pub fn gen_import_active_enum(entity: &Entity) -> TokenStream {
         entity
             .columns

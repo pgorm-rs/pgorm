@@ -486,7 +486,7 @@ impl QueryBuilder {
             // SQL; a `Value` operand keeps the source-typed placeholder pin of
             // `sql.render.cast-param-type`.
             // [spec:pgorm:req:sql.render.cast-param-type+4]
-            // [spec:pgorm:req:sql.ast.cast-shape]
+            // [spec:pgorm:req:sql.ast.cast-shape+1]
             SimpleExpr::AsEnum(type_name, expr) => {
                 write!(sql, "CAST(").unwrap();
                 match expr.as_ref() {
@@ -1534,7 +1534,8 @@ impl QueryBuilder {
                 },
                 // [spec:pgorm:req:sql.render.ident-quoting+7]
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
-                ColumnType::Enum { name, schema, .. } => {
+                ColumnType::Enum { name, schema, .. }
+                | ColumnType::CreatedRange { name, schema, .. } => {
                     let mut type_name = TypeName::new(Name::clone(name));
                     type_name.schema = schema.clone();
                     type_name.to_sql_string()

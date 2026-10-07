@@ -1,4 +1,4 @@
-use super::{Enums, types, unresolved, unsupported};
+use super::{Declared, types, unresolved, unsupported};
 use crate::{Error, TableIdent};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
@@ -22,7 +22,7 @@ pub(super) struct Attachments {
 
 /// The identity a `CREATE TABLE` declares — schema and all — which is the key
 /// every other statement, and the entity transformer, refers to a table by.
-// [spec:pgorm:sem:codegen.ddl.objects+6]
+// [spec:pgorm:sem:codegen.ddl.objects+7]
 pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
     stmt.relation
         .as_ref()
@@ -34,7 +34,7 @@ pub(super) fn ident(stmt: &CreateStmt) -> TableIdent {
 }
 
 /// The schema a DDL statement's name is qualified with, if any.
-// [spec:pgorm:sem:codegen.ddl.objects+6]
+// [spec:pgorm:sem:codegen.ddl.objects+7]
 pub(super) fn schema_of(relation: &RangeVar) -> Option<String> {
     Some(relation.schemaname.clone()).filter(|schema| !schema.is_empty())
 }
@@ -52,7 +52,7 @@ pub(super) fn name(stmt: &CreateStmt, at: usize) -> Result<String, Error> {
 pub(super) fn build(
     stmt: &CreateStmt,
     at: usize,
-    enums: &Enums,
+    declared: &Declared,
     attachments: Attachments,
 ) -> Result<TableCreateStatement, Error> {
     let table_name = name(stmt, at)?;
@@ -87,7 +87,7 @@ pub(super) fn build(
     for element in &stmt.table_elts {
         match &element.node {
             Some(NodeEnum::ColumnDef(def)) => {
-                let mut column = column(def, &target, &table_name, at, enums)?;
+                let mut column = column(def, &target, &table_name, at, declared)?;
                 if column.primary_key {
                     declare(TableKey::new(Name::runtime(column.name.as_str())))?;
                 }
@@ -171,7 +171,7 @@ pub(super) fn build(
 /// column, as a table constraint beside a column's, or twice on one column.
 /// PostgreSQL refuses every such table (42P16), and none is a composite key:
 /// that is one `PRIMARY KEY (a, b)`.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn second_primary_key(table_name: &str, at: usize) -> Error {
     unresolved(
         format!("table `{table_name}` declares more than one primary key"),
@@ -181,7 +181,7 @@ fn second_primary_key(table_name: &str, at: usize) -> Error {
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -341,7 +341,7 @@ fn column(
     target: &TableName,
     table_name: &str,
     at: usize,
-    enums: &Enums,
+    declared: &Declared,
 ) -> Result<Column, Error> {
     let column_name = def.colname.as_str();
     if column_name.is_empty() {
@@ -374,7 +374,7 @@ fn column(
     let Some(type_name) = def.type_name.as_ref() else {
         return Err(unresolved(format!("{context} has no type"), at));
     };
-    let kind = types::column_kind(type_name, enums, &context, at)?;
+    let kind = types::column_kind(type_name, declared, &context, at)?;
     let mut column = ColumnDef::new_with_type(Name::runtime(column_name), kind.col_type);
     if kind.auto_increment {
         column.auto_increment();
@@ -681,7 +681,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -741,7 +741,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn constraint_kind(constraint: &Constraint, kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

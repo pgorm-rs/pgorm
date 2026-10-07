@@ -1,4 +1,4 @@
-use super::{Enums, unresolved, unsupported};
+use super::{Declared, DeclaredType, unresolved, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
@@ -16,17 +16,17 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+5]
+// [spec:pgorm:sem:codegen.ddl.types+6]
 pub(super) fn column_kind(
     type_name: &TypeName,
-    enums: &Enums,
+    declared: &Declared,
     context: &str,
     at: usize,
 ) -> Result<ColumnKind, Error> {
     let names = idents(&type_name.names)
         .ok_or_else(|| unsupported(format!("a computed type name on {context}"), at))?;
     let modifiers = modifiers(type_name, context, at)?;
-    let kind = named_type(&names, &modifiers, enums, context, at)?;
+    let kind = named_type(&names, &modifiers, declared, context, at)?;
     match type_name.array_bounds.as_slice() {
         [] => Ok(kind),
         [bound] => {
@@ -79,11 +79,11 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+5]
+// [spec:pgorm:sem:codegen.ddl.types+6]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
-    enums: &Enums,
+    declared: &Declared,
     context: &str,
     at: usize,
 ) -> Result<ColumnKind, Error> {
@@ -93,35 +93,10 @@ fn named_type(
         [schema, name] => (false, Some(schema), name),
         _ => return Err(unsupported(format!("a type name on {context}"), at)),
     };
-    if !catalog {
-        let identity = (schema.cloned(), name.clone());
-        if let Some(variants) = enums.get(&identity) {
-            return Ok(plain(ColumnType::Enum {
-                schema: identity.0.map(|schema| Name::runtime(schema) as _),
-                name: Name::runtime(name.as_str()),
-                variants: variants
-                    .iter()
-                    .map(|variant| Name::runtime(variant.as_str()))
-                    .collect(),
-            }));
-        }
-        // A reference that names some declared enum's bare name under the
-        // wrong qualification MUST NOT resolve to another schema's type.
-        if enums.keys().any(|(_, declared)| declared == name) {
-            let spelled = spell_enum_identity(&(schema.cloned(), name.clone()));
-            return Err(unresolved(
-                format!(
-                    "type `{spelled}` on {context} is not declared; a same-named enum under a different qualification does not resolve it"
-                ),
-                at,
-            ));
-        }
-        if let Some(schema) = schema {
-            return Err(unsupported(
-                format!("type `{schema}.{name}` on {context}"),
-                at,
-            ));
-        }
+    if !catalog
+        && let Some(kind) = declared_type(schema.map(String::as_str), name, declared, context, at)?
+    {
+        return Ok(kind);
     }
     if let (Some(col_type), []) = (builtin_range(name), modifiers) {
         return Ok(plain(col_type));
@@ -182,9 +157,69 @@ fn named_type(
     Ok(plain(col_type))
 }
 
+/// A name the file declared as a type — an enum or a range type — resolved by
+/// its exact identity, `None` when it names none and is to be read as a
+/// built-in. A reference to a declared type's bare name under another
+/// qualification MUST NOT resolve to that schema's type, and a schema-qualified
+/// name the file did not declare is no built-in either.
+// [spec:pgorm:sem:codegen.ddl.types+6]
+fn declared_type(
+    schema: Option<&str>,
+    name: &str,
+    declared: &Declared,
+    context: &str,
+    at: usize,
+) -> Result<Option<ColumnKind>, Error> {
+    let identity = (schema.map(str::to_owned), name.to_owned());
+    match declared.get(&identity) {
+        Some(DeclaredType::Enum(variants)) => {
+            return Ok(Some(plain(ColumnType::Enum {
+                schema: identity.0.map(|schema| Name::runtime(schema) as _),
+                name: Name::runtime(name),
+                variants: variants
+                    .iter()
+                    .map(|variant| Name::runtime(variant.as_str()))
+                    .collect(),
+            })));
+        }
+        Some(DeclaredType::Range(subtype)) => {
+            return Ok(Some(plain(ColumnType::CreatedRange {
+                schema: identity.0.map(|schema| Name::runtime(schema) as _),
+                name: Name::runtime(name),
+                subtype: Arc::new(subtype.clone()),
+            })));
+        }
+        None => {}
+    }
+    let same_named = declared
+        .iter()
+        .find(|((_, declared), _)| declared.as_str() == name)
+        .map(|(_, kind)| kind);
+    if let Some(kind) = same_named {
+        let spelled = spell_identity(&identity);
+        let kind = match kind {
+            DeclaredType::Enum(_) => "enum",
+            DeclaredType::Range(_) => "range type",
+        };
+        return Err(unresolved(
+            format!(
+                "type `{spelled}` on {context} is not declared; a same-named {kind} under a different qualification does not resolve it"
+            ),
+            at,
+        ));
+    }
+    match schema {
+        Some(schema) => Err(unsupported(
+            format!("type `{schema}.{name}` on {context}"),
+            at,
+        )),
+        None => Ok(None),
+    }
+}
+
 /// A built-in range or multirange type by its catalogue name. None takes a
 /// type modifier, so a modified one falls through to the refusal below.
-// [spec:pgorm:sem:codegen.ddl.types+5]
+// [spec:pgorm:sem:codegen.ddl.types+6]
 fn builtin_range(name: &str) -> Option<ColumnType> {
     [
         RangeType::Int4,
@@ -232,8 +267,8 @@ pub(super) fn idents(nodes: &[pg_query::protobuf::Node]) -> Option<Vec<String>> 
         .collect()
 }
 
-/// The human spelling of an enum identity: `schema.name` or the bare name.
-pub(super) fn spell_enum_identity(identity: &super::EnumIdentity) -> String {
+/// The human spelling of a type's identity: `schema.name` or the bare name.
+pub(super) fn spell_identity(identity: &super::TypeIdentity) -> String {
     match identity {
         (Some(schema), name) => format!("{schema}.{name}"),
         (None, name) => name.clone(),

@@ -1061,7 +1061,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Range types
 
-> [spec:pgorm:req:sql.ddl.type-range]
+> [spec:pgorm:req:sql.ddl.type-range+1]
 > `TypeCreateStatement::as_range(definition)` defines a range type, beside the
 > enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the composite of
 > `[spec:pgorm:req:sql.ddl.type-composite+1]`, in the one slot what a type is
@@ -1118,10 +1118,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `RESTRICT` refusing while a column has the type (`2BP01`), `CASCADE`
 > taking the multirange with it.
 >
-> A value of a created range type over one of the built-in subtypes reads
-> and writes as `Range<T>` (`[spec:pgorm:def:sql.value.range+2]`); its
-> multirange does not, because tokio-postgres reports it as a simple type
-> (`[spec:pgorm:req:exec.cursor.binding-range]`). A column of either is
+> A value of a range type created this way is its text form cast to the
+> type by name, and a column of one is `ColumnType::CreatedRange`, named and
+> carrying its subtype (`[spec:pgorm:def:sql.value.created-range]`); a built-in
+> `Range<T>` value reaches such a column through that cast, there being no
+> cast between two range types. Its multirange does not, because
+> tokio-postgres reports it as a simple type
+> (`[spec:pgorm:req:exec.cursor.binding-range]`), and a column of one is
 > `ColumnType::named`.
 
 ## Sequences

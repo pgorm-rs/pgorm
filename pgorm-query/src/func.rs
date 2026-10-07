@@ -12,7 +12,7 @@ mod uuid;
 /// A cast is not one of them: `CAST` is [`SimpleExpr::AsEnum`], so matching a
 /// `FunctionCall` never has to account for a cast.
 // [spec:pgorm:def:sql.ast.func+8]
-// [spec:pgorm:req:sql.ast.cast-shape]
+// [spec:pgorm:req:sql.ast.cast-shape+1]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Function {
     Max,

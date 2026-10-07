@@ -24,18 +24,18 @@
 //! entity's own module, and a key filled by `Func::uuidv7()` is the default a
 //! new table most often wants.
 
-// [spec:pgorm:def:entity.prelude+6]
+// [spec:pgorm:def:entity.prelude+7]
 // [spec:pgorm:sem:query.build.alias+2]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
     ActiveValue::{NotSet, Set, Unchanged},
     AliasName, ColumnDef, ColumnTrait, ColumnType, ColumnTypeTrait, Condition, ConnectionTrait,
-    CursorTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw, DecodeSelect,
-    Delete, EntityName, EntityTrait, EnumIter, FromQueryResult, Insert, IntoActiveModel,
-    IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait, PaginatorTrait,
-    PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder, QueryResult,
-    QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select, SqlName,
-    StaticName, TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
+    CreatedRange, CursorTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, DecodeRaw,
+    DecodeSelect, Delete, EntityName, EntityTrait, EnumIter, FromQueryResult, Insert,
+    IntoActiveModel, IntoActiveValue, Iterable, JoinType, Linked, LoaderTrait, ModelTrait,
+    PaginatorTrait, PrimaryKeyArity, PrimaryKeyToColumn, PrimaryKeyTrait, QueryFilter, QueryOrder,
+    QueryResult, QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select,
+    SqlName, StaticName, TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
     error::*,
     pgorm_query::{Expr, ForeignKeyAction, Func, Name, StringLen},
     set,
@@ -45,9 +45,9 @@ pub use std::sync::Arc;
 #[cfg(feature = "macros")]
 pub use crate::{
     DeriveActiveEnum, DeriveActiveModel, DeriveActiveModelBehavior, DeriveColumn,
-    DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel, DeriveIntoActiveModel,
-    DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelation, DeriveSqlName,
-    DeriveValueType,
+    DeriveCreatedRange, DeriveCustomColumn, DeriveDisplay, DeriveEntity, DeriveEntityModel,
+    DeriveIntoActiveModel, DeriveModel, DerivePartialModel, DerivePrimaryKey, DeriveRelation,
+    DeriveSqlName, DeriveValueType,
 };
 
 pub use async_trait;
@@ -75,5 +75,5 @@ pub use uuid::Uuid;
 // [spec:pgorm:def:exec.decode.types+3]
 pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};
 
-// [spec:pgorm:def:exec.decode.range+1]
+// [spec:pgorm:def:exec.decode.range+2]
 pub use crate::pgorm_query::{Multirange, Range, RangeType};

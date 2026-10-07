@@ -14,7 +14,7 @@
 /// PostgreSQL takes a precision only where the trailing field is `SECOND`, so
 /// the precision sits on the second-bearing field spellings and on the
 /// unqualified form, and `interval HOUR(3)` has no spelling here.
-// [spec:pgorm:def:sql.types.column-type+8]
+// [spec:pgorm:def:sql.types.column-type+9]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum IntervalSpec {
     /// `interval`, or `interval(p)` — every field, with a fractional-seconds
@@ -27,7 +27,7 @@ pub enum IntervalSpec {
 /// Fractional-seconds precision of an interval type.
 ///
 /// PostgreSQL accepts 0 through 6; a wider precision has no spelling.
-// [spec:pgorm:def:sql.types.column-type+8]
+// [spec:pgorm:def:sql.types.column-type+9]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum IntervalPrecision {
     P0,
@@ -76,7 +76,7 @@ impl std::fmt::Display for IntervalPrecision {
 
 /// All interval field qualifiers; the second-bearing ones carry the precision
 /// PostgreSQL allows only there.
-// [spec:pgorm:def:sql.types.column-type+8]
+// [spec:pgorm:def:sql.types.column-type+9]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PgInterval {
     Year,

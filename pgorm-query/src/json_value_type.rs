@@ -84,6 +84,11 @@ pub enum JsonValueType {
     LTree,
     Range(RangeType),
     Multirange(RangeType),
+    CreatedRange {
+        name: Name,
+        schema: Option<Name>,
+        subtype: Arc<ColumnType>,
+    },
 }
 
 impl From<JsonValueType> for ColumnType {
@@ -127,6 +132,15 @@ impl From<JsonValueType> for ColumnType {
             JsonValueType::LTree => Self::LTree,
             JsonValueType::Range(range) => Self::Range(range),
             JsonValueType::Multirange(range) => Self::Multirange(range),
+            JsonValueType::CreatedRange {
+                name,
+                schema,
+                subtype,
+            } => Self::CreatedRange {
+                name,
+                schema,
+                subtype,
+            },
         }
     }
 }
@@ -176,6 +190,15 @@ impl TryFrom<ColumnType> for JsonValueType {
             ColumnType::LTree => Self::LTree,
             ColumnType::Range(range) => Self::Range(range),
             ColumnType::Multirange(range) => Self::Multirange(range),
+            ColumnType::CreatedRange {
+                name,
+                schema,
+                subtype,
+            } => Self::CreatedRange {
+                name,
+                schema,
+                subtype,
+            },
         })
     }
 }

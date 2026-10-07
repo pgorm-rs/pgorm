@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+22]
+> [spec:pgorm:req:sql.surface+23]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -110,7 +110,8 @@ today, including panicking edges and deliberate failsafes.
 > holds (`sql.ddl.type-composite`); `Range`, `Multirange`, `RangeType` and
 > `RangeElement`, a range value, a multirange value, which built-in range
 > type a range is, and the sealed set of types the built-ins range over
-> (`sql.value.range`); `RangeDefinition`, in `extension` beside the type
+> (`sql.value.range`); `RangeSubtype`, the sealed set of types a range type a
+> schema created ranges over (`sql.value.created-range`); `RangeDefinition`, in `extension` beside the type
 > statements, a range type's subtype and options (`sql.ddl.type-range`);
 > `MergeStatement`, `PendingMerge`, `MatchedAction`, `NotMatchedAction`,
 > `MergeUpdate` and `MergeInsert`: the MERGE statement, the typestate before
@@ -1316,10 +1317,11 @@ today, including panicking edges and deliberate failsafes.
 
 ## Casts
 
-> [spec:pgorm:req:sql.ast.cast-shape]
+> [spec:pgorm:req:sql.ast.cast-shape+1]
 > A cast has exactly ONE node shape: `SimpleExpr::AsEnum(TypeName, operand)`.
-> Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`, the
-> entity layer's enum casts, and the `cast_as_raw` escape hatch — builds
+> Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`,
+> `as_range` (`[spec:pgorm:def:sql.value.created-range]`), the entity layer's
+> enum and created-range casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
 > the `TypeName` (`[spec:pgorm:def:sql.types.type-name+8]`), never by choosing
@@ -1368,7 +1370,7 @@ today, including panicking edges and deliberate failsafes.
 > `DEFAULT` the way it takes any expression, `ColumnDef::default(Func::uuidv7())`
 > (`[spec:pgorm:req:sql.ddl.column-def+12]`), and an entity as
 > `#[pgorm(default_expr = "Func::uuidv7()")]`, `Func` being a prelude member for
-> that reason (`[spec:pgorm:def:entity.prelude+6]`). `uuidv7_shifted` is
+> that reason (`[spec:pgorm:def:entity.prelude+7]`). `uuidv7_shifted` is
 > `uuidv7`'s one-argument overload, which moves the embedded time by an
 > `interval` and binds it as any argument is bound; PostgreSQL has no other
 > `uuidv7` arity (`uuidv7(1)` is `42883`). The two readers are immutable, so

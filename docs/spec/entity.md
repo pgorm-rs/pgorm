@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+4]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+5]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -159,6 +159,14 @@ explicit limitations.
 > case under the `with-json` + `postgres-array` features, saving into a `Json` /
 > `JsonBinary` column flattens a `Value::Array` of JSON values into a single
 > `Value::Json` array value instead of applying an enum cast.
+>
+> A column of a range type a schema created (`ColumnType::CreatedRange`) takes
+> the same write path through `Expr::as_range`
+> (`[spec:pgorm:def:sql.value.created-range]`): the value — the text a
+> `DeriveCreatedRange` newtype converts into, or a built-in range value, which
+> is written as its text first — is cast to the type by its structured
+> `TypeName`, there being no cast to it from a built-in range type. On read
+> it is left untouched: the range's binary form decodes as it is.
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
 > `save_as`: the scalar comparators, `between` / `not_between`, `if_null`, and
@@ -631,7 +639,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+6]
+> [spec:pgorm:def:entity.prelude+7]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -652,9 +660,11 @@ explicit limitations.
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
 > `ForeignKeyAction`, `Func`, `Arc`), with the range vocabulary a field of a range
 > column is written in — `Range`, `Multirange` and `RangeType`
-> (`[spec:pgorm:def:sql.value.range+2]`) — so a generated entity's
+> (`[spec:pgorm:def:sql.value.range+3]`) — so a generated entity's
 > `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
-> the glob. A file that also imports `std::ops::Range` by name keeps its
+> the glob, and `CreatedRange` with its derive `DeriveCreatedRange`
+> (`[spec:pgorm:def:sql.value.created-range]`), so a generated
+> `pgorm_range_types.rs` resolves through it too. A file that also imports `std::ops::Range` by name keeps its
 > own: an explicit import shadows a glob.
 >
 > `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.

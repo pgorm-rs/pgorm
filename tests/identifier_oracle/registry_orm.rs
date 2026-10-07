@@ -22,7 +22,7 @@ use pgorm::{
 };
 
 use super::{
-    fixtures::{cast_named, dyn_named},
+    fixtures::{cast_named, dyn_named, range_named},
     oracle::{
         Policy::{Pipeline as PipelinePolicy, PipelineAlias, PipelineBare, Quoted, TypePart},
         Rendered, Site,
@@ -583,6 +583,34 @@ fn entity_sites() -> Vec<Site> {
                     Some(index) => Rendered::sql(index.to_string()),
                     None => Rendered::Refused("the fixture entity declares no index".to_owned()),
                 }
+            },
+        },
+        Site {
+            id: "pgorm/column.save-as.created-range",
+            api: "ColumnTrait::eq on a ColumnType::CreatedRange { name: Name, .. } column",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                range_named::with_type(None, n, || {
+                    built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
+                        &range_named::Column::Id,
+                        pgorm::pgorm_query::Range::from(1..5),
+                    )))
+                })
+            },
+        },
+        Site {
+            id: "pgorm/column.save-as.created-range-schema",
+            api: "ColumnTrait::eq on a ColumnType::CreatedRange { schema: Some(Name), .. } column",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                range_named::with_type(Some(n), "ty", || {
+                    built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
+                        &range_named::Column::Id,
+                        pgorm::pgorm_query::Range::from(1..5),
+                    )))
+                })
             },
         },
         Site {

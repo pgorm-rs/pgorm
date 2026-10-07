@@ -161,3 +161,75 @@ pub mod cast_named {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+/// An entity whose one column is of a range type a schema created, named at
+/// run time — the cast `ColumnTrait::save_as` writes a value through.
+pub mod range_named {
+    use std::{cell::RefCell, sync::Arc};
+
+    use pgorm::{entity::prelude::*, pgorm_query::Name};
+
+    thread_local! {
+        static TYPE: RefCell<(Option<String>, String)> =
+            RefCell::new((None, String::from("ty")));
+    }
+
+    /// Run `f` with the column's range type named `name` under `schema`.
+    pub fn with_type<T>(schema: Option<&str>, name: &str, f: impl FnOnce() -> T) -> T {
+        TYPE.with(|cell| cell.replace((schema.map(str::to_owned), name.to_owned())));
+        let out = f();
+        TYPE.with(|cell| cell.replace((None, String::from("ty"))));
+        out
+    }
+
+    #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+    pub struct Entity;
+
+    impl EntityName for Entity {
+        fn table_name(&self) -> &str {
+            "t"
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+    pub struct Model {
+        pub id: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+    pub enum Column {
+        Id,
+    }
+
+    impl ColumnTrait for Column {
+        type EntityName = Entity;
+
+        fn def(&self) -> ColumnDef {
+            let (schema, name) = TYPE.with(|cell| cell.borrow().clone());
+            ColumnType::CreatedRange {
+                name: Name::runtime(name),
+                schema: schema.map(Name::runtime),
+                subtype: Arc::new(ColumnType::Integer),
+            }
+            .def()
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+    pub enum PrimaryKey {
+        Id,
+    }
+
+    impl PrimaryKeyTrait for PrimaryKey {
+        type ValueType = i32;
+
+        fn auto_increment() -> bool {
+            true
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}

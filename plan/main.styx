@@ -10194,6 +10194,7 @@ children (
         id created-range-types
         title "A range type a schema creates is named end to end: values over any subtype, its DDL read by codegen, its columns typed"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-07T10:38:09.942226Z
@@ -10207,6 +10208,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-07, choosing between (a) growing pgorm's Value from 16 to 32 bytes so a value can carry its created range type's name, and (b) keeping Value at 16 bytes and rendering a created-range value as a textual range literal cast to the named type: \"(b)\". So Value does not grow. A value of a range type a schema creates (e.g. CREATE TYPE floatrange AS RANGE (SUBTYPE = float8)) binds or inlines as its text form ('[1.5,2.5)') cast to the caller-named type: a quoted, possibly schema-qualified Name, registered in the identifier oracle. The literal comes from a renderer that escapes bounds through the value pipeline and is round-tripped live against the server's canonical form. The to_string() bug that range-consumers-beyond-builtins found, writing int4range(..) for a column whose type is a created range over int4, is fixed on the same path. Codegen for CREATE TYPE ... AS RANGE belongs to this node."
+            }
+
+            {
+                at 2026-10-07T15:40:07.457987Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-07T17:58:19.215794Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

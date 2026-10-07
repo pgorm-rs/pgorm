@@ -264,7 +264,7 @@ pub(crate) fn source_column_alias(index: usize, column: &str) -> String {
 /// program text — is written as it stands.
 // [spec:pgorm:sem:query.graph.writer+4]
 // [spec:pgorm:sem:pipeline.select-sources+4]
-// [spec:pgorm:req:sql.ast.cast-shape]
+// [spec:pgorm:req:sql.ast.cast-shape+1]
 pub(crate) fn source_read_cast<C: ColumnTrait>(col: &C) -> Option<TypeName> {
     use pgorm_query::SimpleExpr;
     match col.select_as(Expr::col(Name::new(*col))) {

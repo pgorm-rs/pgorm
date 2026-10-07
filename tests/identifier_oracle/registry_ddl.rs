@@ -136,6 +136,38 @@ pub fn sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "ddl/create-table.column-type-created-range",
+            api: "ColumnType::CreatedRange { name: Name, .. }",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(ColumnDef::new_with_type(
+                    fixed("c"),
+                    ColumnType::CreatedRange {
+                        name: n_(n),
+                        schema: None,
+                        subtype: std::sync::Arc::new(ColumnType::Double),
+                    },
+                )))
+            },
+        },
+        Site {
+            id: "ddl/create-table.column-type-created-range-schema",
+            api: "ColumnType::CreatedRange { schema: Some(Name), .. }",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(ColumnDef::new_with_type(
+                    fixed("c"),
+                    ColumnType::CreatedRange {
+                        name: fixed("ty"),
+                        schema: Some(n_(n)),
+                        subtype: std::sync::Arc::new(ColumnType::Double),
+                    },
+                )))
+            },
+        },
+        Site {
             id: "ddl/create-table.column-collation",
             api: "ColumnDef::collate(Name)",
             kinds: &["ColumnDef.coll_clause.collname[0]"],

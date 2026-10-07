@@ -2291,7 +2291,7 @@ fn test_pgvector_select() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.cast-shape/test]    every cast spelling — the quoted name and the
+// [spec:pgorm:req:sql.ast.cast-shape+1/test]    every cast spelling — the quoted name and the
 // verbatim type expression alike — is one `AsEnum` node differing only in its `TypeName`
 #[test]
 fn every_cast_spelling_builds_one_node_shape() {

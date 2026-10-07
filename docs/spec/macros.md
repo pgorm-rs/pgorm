@@ -10,14 +10,15 @@ known limitations.
 
 ## The macro suite
 
-> [spec:pgorm:def:macros.derive+2]
+> [spec:pgorm:def:macros.derive+3]
 > The `pgorm-macros` crate exposes the ORM's derive macros, all gated behind the crate's
 > `derive` feature except `EnumIter`, which is gated behind `strum`: `DeriveEntity`,
 > `DeriveEntityModel`, `DerivePrimaryKey`, `DeriveColumn`, `DeriveCustomColumn`,
 > `DeriveModel`, `DeriveActiveModel`, `DeriveIntoActiveModel`, `DeriveActiveModelBehavior`,
 > `DeriveActiveEnum`, `FromQueryResult`, `DeriveRelation`,
 > `DeriveMigrationName`, `FromJsonQueryResult`, `DerivePartialModel`, `DeriveValueType`,
-> `DeriveDisplay`, `DeriveSqlName`, and `EnumIter`, plus the `#[pgorm_macros::test]`
+> `DeriveCreatedRange`, `DeriveDisplay`, `DeriveSqlName`, and `EnumIter`, plus the
+> `#[pgorm_macros::test]`
 > attribute macro. Every entity-side derive reads its configuration from the shared
 > `#[pgorm(...)]` helper attribute (`EnumIter` uses `#[strum(...)]`).
 >
@@ -494,6 +495,27 @@ known limitations.
 > spanned compile error rather than being silently ignored. The expansion implements
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to
 > the inner type with `type_name()` = the struct name; no `Nullable` impl is generated.
+
+> [spec:pgorm:sem:macros.derive.created-range]
+> `DeriveCreatedRange` names a range type a schema created
+> (`[spec:pgorm:def:sql.value.created-range]`) on a tuple struct holding one
+> field written `Range<T>` — the last path segment `Range`, however qualified,
+> with one type argument, `T` the subtype. Any other shape is a compile error
+> spanned at the struct, or at the field when it is not a `Range<T>`. The
+> attribute takes `range_name = "..."`, which is required and names the type,
+> and `schema_name = "..."`, which qualifies it; both become
+> `Name::runtime`, so they are names and quoted where they need to be, and any
+> other key is a spanned compile error. The expansion implements
+> `pgorm::CreatedRange` (`name()`, the `TypeName`), `From<Range<T>>` for the
+> newtype, `From<newtype> for Value` as `Value::String` of the range's text
+> form, `Nullable` as the `NULL` string, `TryGetable` and its `accepts`
+> delegating to `Range<T>`'s, and `ValueType`: `try_from` parses a
+> `Value::String` with `Range<T>`'s `FromStr` and refuses anything else,
+> `type_name()` is the struct name, `array_type()` is `String`, and
+> `column_type()` is `ColumnType::CreatedRange` carrying the name, the schema
+> and `<T as ValueType>::column_type()`. A field of the newtype therefore
+> needs no `column_type` attribute: `DeriveEntityModel` takes the created
+> range column type from it.
 
 ## Name derives and query helpers
 

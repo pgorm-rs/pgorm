@@ -639,8 +639,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+22]
-// [spec:pgorm:req:sql.surface+22/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+23]
+// [spec:pgorm:req:sql.surface+23/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -673,6 +673,7 @@ mod types;
 pub mod value;
 mod value_identity;
 mod value_range;
+mod value_range_text;
 
 #[doc(hidden)]
 #[cfg(feature = "tests-cfg")]
@@ -716,6 +717,7 @@ pub use value::{
     ValueTuple, ValueTupleError, ValueType, ValueTypeError, Values, Vector,
 };
 pub use value_range::{Multirange, Range, RangeElement, RangeType};
+pub use value_range_text::RangeSubtype;
 
 // Query statements: the five DML builders, the clauses they take, and the
 // traits that let a caller write against any of them.

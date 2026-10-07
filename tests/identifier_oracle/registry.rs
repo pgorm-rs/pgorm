@@ -31,8 +31,8 @@
 use pgorm::pgorm_query::{
     Asterisk, ColumnType, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable,
     JoinType, JsonTable, JsonTableColumn, LockType, MatchedAction, MergeInsert, MergeUpdate, Name,
-    OnConflict, Order, Query, RecursiveWithClause, ReturningRow, Search, SearchOrder, SqlTemplate,
-    TypeName, WindowStatement, WithClause,
+    OnConflict, Order, Query, Range, RecursiveWithClause, ReturningRow, Search, SearchOrder,
+    SqlTemplate, TypeName, WindowStatement, WithClause,
 };
 
 use super::oracle::{
@@ -431,6 +431,27 @@ fn query_sites() -> Vec<Site> {
             policy: TypePart,
             render: |n| {
                 sql(Query::select().expr(Expr::val(1).cast_as_type(TypeName::new(n_(n)).array())))
+            },
+        },
+        Site {
+            id: "query/expr.as-range.type",
+            api: "Expr::as_range(TypeName::new(Name))",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Query::select()
+                    .expr(Expr::val(Range::from(1..5)).as_range(TypeName::new(n_(n)))))
+            },
+        },
+        Site {
+            id: "query/expr.as-range.schema",
+            api: "Expr::as_range(TypeName::new(type).schema(Name))",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Query::select().expr(
+                    Expr::val(Range::from(1..5)).as_range(TypeName::new(fixed("ty")).schema(n_(n))),
+                ))
             },
         },
         // -- collations -----------------------------------------------------

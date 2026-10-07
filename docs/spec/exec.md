@@ -190,12 +190,18 @@ These rules capture what the code does today, including known gaps.
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
 
-> [spec:pgorm:def:exec.decode.range+1]
-> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+2]`)
+> [spec:pgorm:def:exec.decode.range+2]
+> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+3]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
 > `Decimal` unconditionally, and `jiff::civil::Date`,
 > `jiff::civil::DateTime` and `jiff::Timestamp` under `with-jiff`, the gate
-> their scalars have (`[spec:pgorm:def:exec.decode.types+3]`). pgorm-query
+> their scalars have (`[spec:pgorm:def:exec.decode.types+3]`). `Range<T>`
+> alone implements it for the subtypes only a range type a schema created
+> ranges over (`[spec:pgorm:def:sql.value.created-range]`): `i16`, `f32`,
+> `f64` and `String` unconditionally, `jiff::civil::Time` under `with-jiff`
+> and `Uuid` under `with-uuid`. Their multiranges are reported by
+> tokio-postgres as simple types, and an array of such a range has no
+> conversion to bind it, so neither decodes. pgorm-query
 > owns the two types but not the wire crates, so they have no `FromSql`, and
 > the orphan rule forbids writing one here; each decodes through a private
 > local newtype — `RangeSql` and `MultirangeSql` — as an address decodes

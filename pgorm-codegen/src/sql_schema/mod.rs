@@ -7,8 +7,8 @@
 //! files.
 //!
 //! The bridge understands the DDL the entity model has a place for — tables,
-//! columns, primary keys, unique constraints, foreign keys, enum types,
-//! indexes and comments. Anything else in the file is a named error rather
+//! columns, primary keys, unique constraints, foreign keys, enum and range
+//! types, indexes and comments. Anything else in the file is a named error rather
 //! than a silent omission: a schema that generates entities is a schema the
 //! bridge understood in full.
 //!
@@ -40,18 +40,26 @@ use crate::{
 };
 use pg_query::NodeEnum;
 use pg_query::protobuf::{CommentStmt, CreateStmt, IndexStmt};
-use pgorm_query::TableCreateStatement;
+use pgorm_query::{ColumnType, TableCreateStatement};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 
-/// Enum type name → its values, in declaration order.
-/// An enum type's full identity: `(schema, name)`, `None` for an unqualified
-/// declaration. A qualified and an unqualified declaration of one name are
-/// distinct types, exactly as they are to PostgreSQL.
-pub(crate) type EnumIdentity = (Option<String>, String);
+/// A declared type's full identity: `(schema, name)`, `None` for an
+/// unqualified declaration. A qualified and an unqualified declaration of one
+/// name are distinct types, exactly as they are to PostgreSQL.
+pub(crate) type TypeIdentity = (Option<String>, String);
 
-/// Declared enum types keyed by full identity.
-type Enums = BTreeMap<EnumIdentity, Vec<String>>;
+/// What a `CREATE TYPE` in the file makes a column of that type.
+pub(crate) enum DeclaredType {
+    /// An enum, by its values in declaration order.
+    Enum(Vec<String>),
+    /// A range, by the column type of the subtype it ranges over.
+    Range(ColumnType),
+}
+
+/// Declared types keyed by full identity. An enum and a range share one
+/// namespace, as every type in a schema does.
+type Declared = BTreeMap<TypeIdentity, DeclaredType>;
 
 /// Read DDL text as the schema statements the entity transformer consumes.
 ///
@@ -59,7 +67,7 @@ type Enums = BTreeMap<EnumIdentity, Vec<String>>;
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
 // [spec:pgorm:def:codegen.ddl+3]
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
         .map_err(|err| Error::TransformError(format!("schema SQL did not parse: {err}")))?;
@@ -79,13 +87,13 @@ pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<Writ
 }
 
 /// A construct the bridge does not carry into the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn unsupported(what: impl Display, at: usize) -> Error {
     Error::TransformError(format!("unsupported DDL: {what} at statement {at}"))
 }
 
 /// A construct the bridge understands but cannot resolve in this schema.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn unresolved(problem: impl Display, at: usize) -> Error {
     Error::TransformError(format!("statement {at}: {problem}"))
 }
@@ -94,7 +102,7 @@ fn unresolved(problem: impl Display, at: usize) -> Error {
 /// position in the file.
 #[derive(Default)]
 struct Collected<'a> {
-    enums: Enums,
+    declared: Declared,
     tables: Vec<(usize, &'a CreateStmt)>,
     indexes: Vec<(usize, &'a IndexStmt)>,
     comments: Vec<(usize, &'a CommentStmt)>,
@@ -102,7 +110,7 @@ struct Collected<'a> {
 
 /// Sort every statement in the file into the four the bridge reads, refusing
 /// anything else by name.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Error> {
     let mut collected = Collected::default();
     for (index, raw) in parsed.stmts.iter().enumerate() {
@@ -116,13 +124,21 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
             NodeEnum::CommentStmt(stmt) => collected.comments.push((at, stmt.as_ref())),
             NodeEnum::CreateEnumStmt(stmt) => {
                 let (identity, values) = objects::enum_type(stmt, at)?;
-                if collected.enums.insert(identity.clone(), values).is_some() {
-                    let spelled = types::spell_enum_identity(&identity);
-                    return Err(unresolved(
-                        format!("type `{spelled}` is declared twice"),
-                        at,
-                    ));
-                }
+                declare(
+                    &mut collected.declared,
+                    identity,
+                    DeclaredType::Enum(values),
+                    at,
+                )?;
+            }
+            NodeEnum::CreateRangeStmt(stmt) => {
+                let (identity, subtype) = objects::range_type(stmt, &collected.declared, at)?;
+                declare(
+                    &mut collected.declared,
+                    identity,
+                    DeclaredType::Range(subtype),
+                    at,
+                )?;
             }
             other => return Err(unsupported(statement_kind(other), at)),
         }
@@ -130,12 +146,31 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
     Ok(collected)
 }
 
-/// Resolve the collected statements against each other: enum types into the
-/// columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+6]
+/// Record a type the file declares, refusing a second declaration of one
+/// identity — whichever kinds the two are.
+// [spec:pgorm:sem:codegen.ddl.objects+7]
+fn declare(
+    declared: &mut Declared,
+    identity: TypeIdentity,
+    kind: DeclaredType,
+    at: usize,
+) -> Result<(), Error> {
+    let spelled = types::spell_identity(&identity);
+    match declared.insert(identity, kind) {
+        Some(_) => Err(unresolved(
+            format!("type `{spelled}` is declared twice"),
+            at,
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Resolve the collected statements against each other: declared types into
+/// the columns naming them, indexes and comments into the table they describe.
+// [spec:pgorm:sem:codegen.ddl.objects+7]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
-        enums,
+        declared: types,
         tables,
         indexes,
         comments,
@@ -205,14 +240,14 @@ fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
             .get_mut(position)
             .map(std::mem::take)
             .unwrap_or_default();
-        statements.push(table::build(stmt, at, &enums, attachment)?);
+        statements.push(table::build(stmt, at, &types, attachment)?);
     }
     Ok(statements)
 }
 
 /// The SQL a statement the bridge does not read was written as, named the way
 /// its author wrote it.
-// [spec:pgorm:req:codegen.ddl.unsupported+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+11]
 fn statement_kind(node: &NodeEnum) -> &'static str {
     match node {
         NodeEnum::AlterTableStmt(_) => "ALTER TABLE",
@@ -231,7 +266,6 @@ fn statement_kind(node: &NodeEnum) -> &'static str {
         NodeEnum::CreateForeignTableStmt(_) => "CREATE FOREIGN TABLE",
         NodeEnum::CreateTableAsStmt(_) => "CREATE TABLE AS",
         NodeEnum::CreateStatsStmt(_) => "CREATE STATISTICS",
-        NodeEnum::CreateRangeStmt(_) => "CREATE TYPE ... AS RANGE",
         NodeEnum::CompositeTypeStmt(_) => "CREATE TYPE ... AS",
         NodeEnum::ViewStmt(_) => "CREATE VIEW",
         NodeEnum::RuleStmt(_) => "CREATE RULE",

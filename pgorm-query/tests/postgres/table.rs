@@ -210,7 +210,7 @@ fn create_9() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+8/test]    a precision rides on the second-bearing
+// [spec:pgorm:def:sql.types.column-type+9/test]    a precision rides on the second-bearing
 // field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {

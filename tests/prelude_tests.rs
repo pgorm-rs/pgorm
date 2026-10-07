@@ -36,7 +36,7 @@ async fn _paged<C: ConnectionTrait>(db: &C) -> Result<u64, Error> {
         .await
 }
 
-// [spec:pgorm:def:entity.prelude+6/test]    a query built, an active model set, a
+// [spec:pgorm:def:entity.prelude+7/test]    a query built, an active model set, a
 // statement decoded and a column enumerated, with the prelude as the only import
 #[test]
 fn prelude_carries_what_a_query_needs() {
@@ -102,7 +102,7 @@ fn prelude_carries_what_a_query_needs() {
     );
 }
 
-// [spec:pgorm:def:entity.prelude+6/test]    `Func`, the vocabulary an entity's
+// [spec:pgorm:def:entity.prelude+7/test]    `Func`, the vocabulary an entity's
 // `default_expr` names a function default in, with the prelude as the only import
 #[test]
 fn prelude_carries_the_function_vocabulary() {

@@ -123,7 +123,7 @@ fn the_expanded_format_defaults_the_schema_too() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.collisions+1/test]    two schemas' same-named
+// [spec:pgorm:req:codegen.entity.collisions+2/test]    two schemas' same-named
 // tables are two tables that want one file, and the gate says so
 #[test]
 fn same_name_in_two_schemas_is_refused() {
@@ -136,7 +136,7 @@ fn same_name_in_two_schemas_is_refused() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.collisions+1/test]    a qualified table and an
+// [spec:pgorm:req:codegen.entity.collisions+2/test]    a qualified table and an
 // unqualified one of the same name collide the same way — whether they are one
 // table is `search_path`'s business, and either way there is one `item.rs`
 #[test]
@@ -149,7 +149,7 @@ fn qualified_and_unqualified_namesakes_are_refused() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.collisions+1/test]    one identity declared
+// [spec:pgorm:req:codegen.entity.collisions+2/test]    one identity declared
 // twice is a duplicate, not a collision
 #[test]
 fn a_table_declared_twice_is_refused() {
@@ -253,7 +253,7 @@ fn a_refusal_names_the_qualified_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+6/test]    an index attaches to the table
+// [spec:pgorm:sem:codegen.ddl.objects+7/test]    an index attaches to the table
 // its own name resolves to, not to whatever shares the bare name
 #[test]
 fn an_index_attaches_by_qualified_name() {
@@ -264,7 +264,7 @@ fn an_index_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+6/test]    and a qualified index that does
+// [spec:pgorm:sem:codegen.ddl.objects+7/test]    and a qualified index that does
 // name its table is folded into it, giving the column its `unique`
 #[test]
 fn a_qualified_index_reaches_its_own_table() {
@@ -280,7 +280,7 @@ fn a_qualified_index_reaches_its_own_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+6/test]    a comment resolves the same way
+// [spec:pgorm:sem:codegen.ddl.objects+7/test]    a comment resolves the same way
 #[test]
 fn a_comment_attaches_by_qualified_name() {
     assert_error(
@@ -290,7 +290,7 @@ fn a_comment_attaches_by_qualified_name() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+6/test]    an unqualified reference that
+// [spec:pgorm:sem:codegen.ddl.objects+7/test]    an unqualified reference that
 // two tables answer to is named as such, rather than attached to one of them
 #[test]
 fn an_ambiguous_unqualified_index_is_refused() {
@@ -342,7 +342,7 @@ fn qualified_enum_preserves_its_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+5/test]    a qualified reference resolves
+// [spec:pgorm:sem:codegen.ddl.types+6/test]    a qualified reference resolves
 // only its exact identity: a same-named enum under another qualification MUST
 // NOT satisfy it
 #[test]
@@ -355,7 +355,7 @@ fn qualified_enum_does_not_resolve_another_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+5/test]    nor does an unqualified
+// [spec:pgorm:sem:codegen.ddl.types+6/test]    nor does an unqualified
 // reference resolve a type declared only under a schema
 #[test]
 fn unqualified_reference_needs_an_unqualified_declaration() {

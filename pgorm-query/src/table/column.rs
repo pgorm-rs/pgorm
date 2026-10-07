@@ -56,7 +56,8 @@ pub trait IntoColumnDef {
 /// | LTree                 | ltree                    |
 /// | Range                 | int4range, ..., tstzrange |
 /// | Multirange            | int4multirange, ...      |
-// [spec:pgorm:def:sql.types.column-type+8]
+/// | CreatedRange          | RANGE_TYPE_NAME          |
+// [spec:pgorm:def:sql.types.column-type+9]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -100,13 +101,23 @@ pub enum ColumnType {
     LTree,
     /// One of the built-in range types, `int4range` through `tstzrange`. A
     /// range type created by `CREATE TYPE ... AS RANGE` is
-    /// [`Named`](Self::Named), as every other created type is.
-    // [spec:pgorm:def:sql.value.range+2]
+    /// [`CreatedRange`](Self::CreatedRange).
+    // [spec:pgorm:def:sql.value.range+3]
     Range(RangeType),
     /// The multirange over one of the built-in range types,
     /// `int4multirange` through `tstzmultirange`.
-    // [spec:pgorm:def:sql.value.range+2]
+    // [spec:pgorm:def:sql.value.range+3]
     Multirange(RangeType),
+    /// A range type a schema created with `CREATE TYPE ... AS RANGE`, named
+    /// in full as an enum type is, and the subtype it ranges over. The name
+    /// is what DDL writes and what a value is cast to; the subtype is what a
+    /// value's bounds are, which no name says.
+    // [spec:pgorm:def:sql.value.created-range]
+    CreatedRange {
+        name: Name,
+        schema: Option<Name>,
+        subtype: Arc<ColumnType>,
+    },
 }
 
 /// Length for var-char; default to 255
@@ -119,7 +130,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+8]
+// [spec:pgorm:def:sql.types.column-type+9]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -152,6 +163,23 @@ impl PartialEq for ColumnType {
             }
             (Self::Array(l0), Self::Array(r0)) => l0 == r0,
             (Self::Range(l0), Self::Range(r0)) => l0 == r0,
+            (
+                Self::CreatedRange {
+                    name: l_name,
+                    schema: l_schema,
+                    subtype: l_subtype,
+                },
+                Self::CreatedRange {
+                    name: r_name,
+                    schema: r_schema,
+                    subtype: r_subtype,
+                },
+            ) => {
+                l_name.to_string() == r_name.to_string()
+                    && l_schema.as_ref().map(|s| s.to_string())
+                        == r_schema.as_ref().map(|s| s.to_string())
+                    && l_subtype == r_subtype
+            }
             (Self::Multirange(l0), Self::Multirange(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
@@ -533,7 +561,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+8]
+    // [spec:pgorm:def:sql.types.column-type+9]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self

@@ -1,6 +1,6 @@
 use crate::{
-    ActiveEnum, Column, ConjunctRelation, Entity, EntityWriter, Error, PrimaryKey, Relation,
-    RelationType, TableIdent, util::escape_rust_keyword,
+    ActiveEnum, Column, ConjunctRelation, CreatedRangeType, Entity, EntityWriter, Error,
+    PrimaryKey, Relation, RelationType, TableIdent, util::escape_rust_keyword,
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::TableCreateStatement;
@@ -18,7 +18,7 @@ impl EntityTransformer {
     // [spec:pgorm:sem:codegen.entity.transform+10]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
-    // [spec:pgorm:req:codegen.entity.collisions+1]
+    // [spec:pgorm:req:codegen.entity.collisions+2]
     pub fn transform(table_create_stmts: Vec<TableCreateStatement>) -> Result<EntityWriter, Error> {
         let declared: Vec<TableIdent> = table_create_stmts
             .iter()
@@ -26,6 +26,7 @@ impl EntityTransformer {
             .collect();
         validate_distinct_names(&declared)?;
         let mut enums: BTreeMap<String, ActiveEnum> = BTreeMap::new();
+        let mut ranges: BTreeMap<String, CreatedRangeType> = BTreeMap::new();
         let mut inverse_relations: BTreeMap<TableIdent, Vec<Relation>> = BTreeMap::new();
         let mut entities: BTreeMap<TableIdent, Entity> = BTreeMap::new();
         for table_create in table_create_stmts.into_iter() {
@@ -85,6 +86,35 @@ impl EntityTransformer {
                             enum_name: name.clone(),
                             schema: schema.clone(),
                             values: variants.clone(),
+                        },
+                    );
+                }
+                if let pgorm_query::ColumnType::CreatedRange {
+                    name,
+                    schema,
+                    subtype,
+                } = col.get_inner_col_type()
+                {
+                    let key = match schema {
+                        Some(schema) => format!("{}.{}", schema.to_string(), name.to_string()),
+                        None => name.to_string(),
+                    };
+                    let colliding = ranges.iter().any(|(existing_key, existing)| {
+                        existing.name.to_string() == name.to_string() && *existing_key != key
+                    });
+                    if colliding {
+                        return Err(Error::TransformError(format!(
+                            "range type `{}` is used under two qualifications; the generated \
+                             Rust newtype can carry only one",
+                            name.to_string()
+                        )));
+                    }
+                    ranges.insert(
+                        key,
+                        CreatedRangeType {
+                            name: name.clone(),
+                            schema: schema.clone(),
+                            subtype: subtype.as_ref().clone(),
                         },
                     );
                 }
@@ -189,7 +219,7 @@ impl EntityTransformer {
             }
         }
         validate_references(&entities)?;
-        validate_identities(&entities, &enums)?;
+        validate_identities(&entities, &enums, &ranges)?;
         for (tbl_name, relations) in inverse_relations.into_iter() {
             if let Some(entity) = entities.get_mut(&tbl_name) {
                 for relation in relations.into_iter() {
@@ -285,7 +315,11 @@ impl EntityTransformer {
         for active_enum in enums.values() {
             active_enum.validate()?;
         }
-        Ok(EntityWriter { entities, enums })
+        Ok(EntityWriter {
+            entities,
+            enums,
+            ranges,
+        })
     }
 }
 
@@ -350,7 +384,7 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
 /// single file, and an unqualified reference to that name could mean either;
 /// the schemas are what tells them apart, and a generation run has one output
 /// directory to tell them apart in.
-// [spec:pgorm:req:codegen.entity.collisions+1]
+// [spec:pgorm:req:codegen.entity.collisions+2]
 fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
     let mut claimed: HashMap<&str, &TableIdent> = HashMap::new();
     for ident in declared.iter() {
@@ -410,10 +444,11 @@ fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Er
 /// and declare the module twice; two columns of a table, two enums or two
 /// values of one enum that derive one identifier would each emit a duplicate
 /// definition.
-// [spec:pgorm:req:codegen.entity.collisions+1]
+// [spec:pgorm:req:codegen.entity.collisions+2]
 fn validate_identities(
     entities: &BTreeMap<TableIdent, Entity>,
     enums: &BTreeMap<String, ActiveEnum>,
+    ranges: &BTreeMap<String, CreatedRangeType>,
 ) -> Result<(), Error> {
     let mut modules = Claims::default();
     let mut types = Claims::default();
@@ -456,12 +491,20 @@ fn validate_identities(
             variants.claim(&whose, "variant name", variant, &value)?;
         }
     }
+    for (key, range) in ranges.iter() {
+        enum_types.claim(
+            "enums and range types",
+            "type name",
+            range.name.to_string().to_upper_camel_case(),
+            key,
+        )?;
+    }
     Ok(())
 }
 
 /// The DB name that claimed each derived identifier, so a second claim on one
 /// can name both sides.
-// [spec:pgorm:req:codegen.entity.collisions+1]
+// [spec:pgorm:req:codegen.entity.collisions+2]
 #[derive(Default)]
 struct Claims(HashMap<String, String>);
 
