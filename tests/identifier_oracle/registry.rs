@@ -29,10 +29,10 @@
 //! the migration ledger, the cursor's qualifiers).
 
 use pgorm::pgorm_query::{
-    Asterisk, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable, JoinType,
-    LockType, MatchedAction, MergeInsert, MergeUpdate, Name, OnConflict, Order, Query,
-    RecursiveWithClause, ReturningRow, Search, SearchOrder, SqlTemplate, TypeName, WindowStatement,
-    WithClause,
+    Asterisk, ColumnType, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable,
+    JoinType, JsonTable, JsonTableColumn, LockType, MatchedAction, MergeInsert, MergeUpdate, Name,
+    OnConflict, Order, Query, RecursiveWithClause, ReturningRow, Search, SearchOrder, SqlTemplate,
+    TypeName, WindowStatement, WithClause,
 };
 
 use super::oracle::{
@@ -938,6 +938,96 @@ fn query_sites() -> Vec<Site> {
                     .expr(Func::json_query(Expr::col(fixed("c")), "$").passing(1, n_(n))))
             },
         },
+        Site {
+            id: "query/json-table.alias",
+            api: "JsonTable::alias(Name)",
+            kinds: &["JsonTable.alias.aliasname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(Asterisk)
+                    .from(json_table().alias(n_(n))))
+            },
+        },
+        Site {
+            id: "query/json-table.path-name",
+            api: "JsonTable::path_name(Name)",
+            kinds: &["JsonTable.pathspec.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(Asterisk)
+                    .from(json_table().path_name(n_(n)).alias(fixed("j"))))
+            },
+        },
+        Site {
+            id: "query/json-table.passing",
+            api: "JsonTable::passing(value, Name)",
+            kinds: &["JsonArgument.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(Asterisk)
+                    .from(json_table().passing(1, n_(n)).alias(fixed("j"))))
+            },
+        },
+        Site {
+            id: "query/json-table.column.ordinality",
+            api: "JsonTableColumn::ordinality(Name)",
+            kinds: &["JsonTableColumn.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(Asterisk)
+                    .from(json_table_of(JsonTableColumn::ordinality(n_(n)))))
+            },
+        },
+        Site {
+            id: "query/json-table.column.value",
+            api: "JsonTableColumn::value(Name, type)",
+            kinds: &["JsonTableColumn.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(json_table_of(
+                    JsonTableColumn::value(n_(n), ColumnType::Text).into(),
+                )))
+            },
+        },
+        Site {
+            id: "query/json-table.column.query",
+            api: "JsonTableColumn::query(Name, type)",
+            kinds: &["JsonTableColumn.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(json_table_of(
+                    JsonTableColumn::query(n_(n), ColumnType::JsonBinary).into(),
+                )))
+            },
+        },
+        Site {
+            id: "query/json-table.column.exists",
+            api: "JsonTableColumn::exists(Name, type)",
+            kinds: &["JsonTableColumn.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(json_table_of(
+                    JsonTableColumn::exists(n_(n), ColumnType::Boolean).into(),
+                )))
+            },
+        },
+        Site {
+            id: "query/json-table.nested.path-name",
+            api: "JsonNestedColumns::path_name(Name)",
+            kinds: &["JsonTableColumn.pathspec.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(json_table_of(
+                    JsonTableColumn::nested("$", JsonTableColumn::ordinality(fixed("o")))
+                        .path_name(n_(n))
+                        .into(),
+                )))
+            },
+        },
     ]
 }
 
@@ -963,4 +1053,19 @@ fn recursive_cte() -> CommonTableExpression {
     );
     cte.column(fixed("c"));
     cte
+}
+
+/// A `JSON_TABLE` over fixed names only, for the sites that name its alias,
+/// its root path or a variable.
+fn json_table() -> JsonTable {
+    Func::json_table(
+        Expr::col(fixed("c")),
+        "$",
+        JsonTableColumn::ordinality(fixed("o")),
+    )
+}
+
+/// A `JSON_TABLE` aliased `j` whose one column is `column`.
+fn json_table_of(column: JsonTableColumn) -> FromItem {
+    Func::json_table(Expr::col(fixed("c")), "$", column).alias(fixed("j"))
 }

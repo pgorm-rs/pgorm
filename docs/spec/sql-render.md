@@ -566,14 +566,38 @@ an ideal Postgres renderer would emit.
 > (`sql.render.placeholder-typing`). An expression other than a value is
 > written as it is, and carries its own type.
 
-> [spec:pgorm:req:sql.render.subquery+2]
+> [spec:pgorm:req:sql.render.json-table]
+> A `FromItem::JsonTable` MUST render `JSON_TABLE(` the context item, `, ` the
+> root path, ` AS "name"` when the root path is named, the `PASSING` list as
+> `sql.render.sql-json` writes it, ` COLUMNS (` the columns comma-separated
+> `)`, ` ERROR ON ERROR` or ` EMPTY ON ERROR` when set, then `) AS "alias"`.
+> A column renders `"name" FOR ORDINALITY`; `"name" <type>[ PATH <p>][
+> <behaviour> ON EMPTY][ <behaviour> ON ERROR]`; `"name" <type> FORMAT JSON[
+> PATH <p>][ <shaping>][ <behaviour> ON EMPTY][ <behaviour> ON ERROR]`;
+> `"name" <type> EXISTS[ PATH <p>][ <behaviour> ON ERROR]`; or `NESTED PATH <p>[
+> AS "name"] COLUMNS (..)`, recursively. The type renders as a column's does
+> (`sql.render.ddl.types`), and the behaviours and shaping as the query
+> functions' do.
+>
+> Every path — the root, a column's, a nested one — MUST render as a string
+> literal under both render paths, through `write_string_quoted`, the escaping
+> `sql.render.string-escape` defines for an inlined string: a quote or a
+> backslash escaped by a backslash inside `E'..'`, any other path a plain
+> `'..'`. It is the literal PostgreSQL requires there, and the same escaping
+> is what keeps a path's text from ending the literal: a path is data, so it
+> is never interpolated. A
+> context item, a `PASSING` value and a `DEFAULT` render as they do in the
+> query functions — typed and bound, typed and bound, and an escaped literal.
+
+> [spec:pgorm:req:sql.render.subquery+3]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
 > `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
 > A `SimpleExpr::Tuple` renders `(e1, e2, …)`; `SimpleExpr::Values` renders
 > `(v1, v2, …)` with each element parameterized. As a FROM item,
 > `FromItem::SubQuery` renders `(SELECT …) AS "alias"`, `FromItem::ValuesList`
-> renders `(VALUES (…), (…)) AS "alias"`, and `FromItem::FunctionCall` renders
-> `func(args) AS "alias"`; all such forms carry mandatory aliases, and
+> renders `(VALUES (…), (…)) AS "alias"`, `FromItem::FunctionCall` renders
+> `func(args) AS "alias"`, and `FromItem::JsonTable` renders per
+> `sql.render.json-table`; all such forms carry mandatory aliases, and
 > `FromItem::Table` renders its `TableName` followed by ` AS "alias"` when an
 > alias is bound. Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
@@ -887,7 +911,7 @@ an ideal Postgres renderer would emit.
 > `SqlTemplate::from_sql(sql, values)` is the second constructor, for text
 > that is real SQL rather than a template authored for this machinery — a
 > caller's own statement, which is where relation-position fragments come
-> from (`[spec:pgorm:def:sql.types.table-ref+4]`). It differs in the `$`
+> from (`[spec:pgorm:def:sql.types.table-ref+5]`). It differs in the `$`
 > grammar and in nothing else: only `$N` is a substitution, and every other
 > `$` is reproduced verbatim — `$$` included, because in real SQL `$$` opens
 > a dollar-quoted body rather than standing in for a literal `$`. This is

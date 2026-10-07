@@ -9957,12 +9957,27 @@ children (
                 title "JSON_TABLE is a FROM item: COLUMNS, PATH, NESTED PATH, FOR ORDINALITY, EXISTS columns and ON ERROR"
                 kind @feat
                 deps (pg17-sql-json)
+                sealed true
                 log (
                     {
                         at 2026-10-07T08:05:24.46974Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Split from pg17-sql-json (2026-10-07), which builds the rest of PostgreSQL's SQL/JSON (sql.ast.expr.sql-json) and records JSON_TABLE as sql.scope's one deferred SQL/JSON entry, deleted when this lands. Build JSON_TABLE(context, path [AS name] [PASSING v AS name, ...] COLUMNS (...) [ERROR | EMPTY [ARRAY] ON ERROR]) as a FromItem kind: regular columns (name type [FORMAT JSON] [PATH p] [wrapper/quotes] [ON EMPTY] [ON ERROR]), FOR ORDINALITY, EXISTS columns (name type EXISTS [PATH p] [ON ERROR]) and NESTED [PATH] p [AS name] COLUMNS (...). Checked on 18.6: the root path is refused as a parameter (0A000, \"only string constants are supported in JSON_TABLE path specification\") and column and NESTED paths are string constants in the grammar (a parameter is 42601), so every path renders as a literal through the value pipeline's escaping, never interpolated; E'', U&'' and dollar-quoted literals are all accepted there; PASSING values bind. COLUMNS () and NESTED ... COLUMNS () are 42601, so the lists are non-empty by construction; a column or path name given twice is 42712 (\"duplicate JSON_TABLE column or path name\"); the top-level ON ERROR takes only ERROR or EMPTY [ARRAY] (NULL is 42601) and defaults to EMPTY (no rows); a scalar column (no FORMAT JSON, wrapper or quotes, non-json type) takes only ERROR, NULL or DEFAULT (EMPTY ARRAY is 42601, \"Only ERROR, NULL, or DEFAULT expression is allowed in ON ERROR for scalar columns\"); FORMAT JSON on a non-string column type is 0A000; an EXISTS column takes ERROR, TRUE, FALSE or UNKNOWN ON ERROR only (NULL is 42601) and no ON EMPTY (42601), and its type may be boolean, integer or text; PLAN is not in 18's grammar (42601). A column without PATH reads $.\"name\", matched case-exactly when the name is quoted. JSON_TABLE is implicitly LATERAL (FROM t, JSON_TABLE(t.doc, ...) and LEFT JOIN ... ON TRUE both work), and its alias is optional (default json_table) where FromItem's value-producing forms carry a mandatory one. Column names, path names, PASSING names and the alias are caller identifiers to register with the identifier oracle. Reuse sql.ast.expr.sql-json's JsonInput, behaviour enums and shaping slot, and ColumnType for column types."
+                    }
+
+                    {
+                        at 2026-10-07T08:39:53.596624Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T09:10:17.635886Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

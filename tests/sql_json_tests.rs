@@ -72,7 +72,7 @@ where
 /// A bound path selects what it names — including a key holding a quote,
 /// which an interpolated path would end — and a `PASSING` variable is the
 /// name as written, case and all.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    the query functions over a live document
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the query functions over a live document
 // [spec:pgorm:req:sql.render.sql-json/test]    the path is bound, never part of the text
 #[pgorm_macros::test]
 async fn bound_paths_and_variables_select_what_they_name() -> Result<(), Error> {
@@ -129,7 +129,7 @@ async fn bound_paths_and_variables_select_what_they_name() -> Result<(), Error> 
 
 /// Each behaviour answers as specified, and each function's default is what
 /// an absent clause gives.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    the behaviours of the three query functions
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the behaviours of the three query functions
 #[pgorm_macros::test]
 async fn behaviours_answer_as_specified() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_behaviours").await;
@@ -347,7 +347,7 @@ async fn values_build_the_same_json_bound_and_inlined() -> Result<(), Error> {
 
 /// The constructors' clauses do what their names say, and the server refuses
 /// what the builder cannot see.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    ON NULL, UNIQUE KEYS, RETURNING and the
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    ON NULL, UNIQUE KEYS, RETURNING and the
 // query form, live
 #[pgorm_macros::test]
 async fn constructor_clauses_hold_live() -> Result<(), Error> {
@@ -456,7 +456,7 @@ async fn constructor_clauses_hold_live() -> Result<(), Error> {
 /// — its binary format's version — rather than the document; a `json`
 /// operand serializes correctly. Held here so a release that fixes it is
 /// noticed and the rule's warning retired.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    the 18.6 JSON_SERIALIZE defect over jsonb
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the 18.6 JSON_SERIALIZE defect over jsonb
 #[pgorm_macros::test]
 async fn json_serialize_over_jsonb_returns_the_format_byte() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_serialize_jsonb").await;
@@ -478,7 +478,7 @@ async fn json_serialize_over_jsonb_returns_the_format_byte() -> Result<(), Error
 
 /// The aggregates order, filter and treat `NULL` as specified, answer `NULL`
 /// over no rows, and run as window functions.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    JSON_ARRAYAGG and JSON_OBJECTAGG, live
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    JSON_ARRAYAGG and JSON_OBJECTAGG, live
 // [spec:pgorm:def:sql.ast.window-statement+6/test]    a JSON aggregate under OVER
 #[pgorm_macros::test]
 async fn aggregates_order_filter_and_drop_nulls() -> Result<(), Error> {
@@ -558,7 +558,7 @@ async fn aggregates_order_filter_and_drop_nulls() -> Result<(), Error> {
 
 /// `IS JSON` tests each kind, and unique keys at any depth; `IS NOT JSON`
 /// negates it; a `NULL` operand is `NULL` either way.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    IS JSON over each kind, live
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    IS JSON over each kind, live
 #[pgorm_macros::test]
 async fn is_json_tests_each_kind() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_is_json").await;
@@ -615,7 +615,7 @@ async fn forced_plan(
 /// cast by an expression index on exactly that expression, which `JSON_VALUE`
 /// does not match. `JSON_VALUE` is served by an index on itself, with the
 /// path bound under a custom plan.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    the index evidence behind keeping the
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the index evidence behind keeping the
 // operators
 // [spec:pgorm:req:sql.ast.expr.json+1/test]    the operators an index serves and SQL/JSON
 // does not replace
@@ -697,7 +697,7 @@ fn jsonb(document: Json) -> SimpleExpr {
 /// text and a boolean as `true`, where `JSON_VALUE` returns `NULL` for the one
 /// and `t` for the other; and a failed cast raises where `JSON_VALUE` follows
 /// `ON ERROR`.
-// [spec:pgorm:def:sql.ast.expr.sql-json/test]    the semantic differences the rule records
+// [spec:pgorm:def:sql.ast.expr.sql-json+1/test]    the semantic differences the rule records
 // [spec:pgorm:req:sql.ast.expr.json+1/test]
 #[pgorm_macros::test]
 async fn the_operators_and_sql_json_answer_differently() -> Result<(), Error> {

@@ -43,7 +43,7 @@ fn select_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+2/test]
+// [spec:pgorm:req:sql.ast.select.from+3/test]
 #[test]
 fn select_4() {
     assert_eq!(
@@ -1097,8 +1097,8 @@ fn select_61() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+2/test]
-// [spec:pgorm:req:sql.render.subquery+2/test]
+// [spec:pgorm:req:sql.ast.select.from+3/test]
+// [spec:pgorm:req:sql.render.subquery+3/test]
 #[test]
 fn select_62() {
     let select = SelectStatement::new()

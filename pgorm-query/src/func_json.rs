@@ -5,7 +5,8 @@
 use super::*;
 use crate::{
     JsonArray, JsonArrayAgg, JsonArrayQuery, JsonExists, JsonInput, JsonObject, JsonObjectAgg,
-    JsonParse, JsonQuery, JsonSerialize, JsonValue, SelectStatement, SqlJson, json::JsonPathTarget,
+    JsonParse, JsonQuery, JsonSerialize, JsonTable, JsonTableColumn, JsonValue, SelectStatement,
+    SqlJson, json::JsonPathTarget,
 };
 
 impl Func {
@@ -37,7 +38,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_exists<C, P>(context: C, path: P) -> JsonExists
     where
         C: Into<JsonInput>,
@@ -74,7 +75,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_value<C, P>(context: C, path: P) -> JsonValue
     where
         C: Into<JsonInput>,
@@ -112,7 +113,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_query<C, P>(context: C, path: P) -> JsonQuery
     where
         C: Into<JsonInput>,
@@ -157,7 +158,7 @@ impl Func {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_object() -> JsonObject {
         JsonObject {
             entries: Vec::new(),
@@ -180,7 +181,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAY(1::int4, 'a'::text NULL ON NULL)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_array() -> JsonArray {
         JsonArray {
             elements: Vec::new(),
@@ -203,7 +204,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAY(SELECT "id" FROM "character")"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_array_query(query: SelectStatement) -> JsonArrayQuery {
         JsonArrayQuery {
             query: Box::new(query),
@@ -224,7 +225,7 @@ impl Func {
     ///     r#"SELECT JSON_OBJECTAGG("character" : "font_size") FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_objectagg<K, V>(key: K, value: V) -> JsonObjectAgg
     where
         K: Into<SimpleExpr>,
@@ -253,7 +254,7 @@ impl Func {
     ///     r#"SELECT JSON_ARRAYAGG("id" ORDER BY "font_size" DESC) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_arrayagg<V>(value: V) -> JsonArrayAgg
     where
         V: Into<JsonInput>,
@@ -279,7 +280,7 @@ impl Func {
     ///     r#"SELECT JSON('{"a":1}'::text WITH UNIQUE KEYS)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json<V>(input: V) -> JsonParse
     where
         V: Into<JsonInput>,
@@ -303,7 +304,7 @@ impl Func {
     /// assert_eq!(sql, r#"SELECT JSON_SCALAR($1::int4)"#);
     /// assert_eq!(values, Values(vec![5.into()]));
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_scalar<T>(expr: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -324,7 +325,7 @@ impl Func {
     ///     r#"SELECT JSON_SERIALIZE("user_data" RETURNING bytea) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn json_serialize<V>(input: V) -> JsonSerialize
     where
         V: Into<JsonInput>,
@@ -332,6 +333,55 @@ impl Func {
         JsonSerialize {
             input: input.into(),
             returning: None,
+        }
+    }
+
+    /// `JSON_TABLE(context, path COLUMNS (column, ..))`: a FROM item with a
+    /// row per item `path` finds. It takes its first column, because a
+    /// `JSON_TABLE` without one is refused (`42601`).
+    ///
+    /// The path is a literal here, escaped as an inlined string is: the
+    /// server takes no parameter for it. A value the path needs is passed
+    /// with [`passing`](JsonTable::passing), which binds it.
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .column(Asterisk)
+    ///     .from(Char::Table)
+    ///     .from(
+    ///         Func::json_table(
+    ///             Expr::col(Char::UserData),
+    ///             "$.tags[*]",
+    ///             JsonTableColumn::ordinality(Name::runtime("n")),
+    ///         )
+    ///         .column(JsonTableColumn::value(Name::runtime("tag"), ColumnType::Text).path("$"))
+    ///         .alias(Name::runtime("t")),
+    ///     )
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.build().0,
+    ///     [
+    ///         r#"SELECT * FROM "character", JSON_TABLE("user_data", '$.tags[*]'"#,
+    ///         r#"COLUMNS ("n" FOR ORDINALITY, "tag" text PATH '$')) AS "t""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.json-table]
+    pub fn json_table<C, P, K>(context: C, path: P, column: K) -> JsonTable
+    where
+        C: Into<JsonInput>,
+        P: Into<String>,
+        K: Into<JsonTableColumn>,
+    {
+        JsonTable {
+            target: JsonPathTarget::new(context, path),
+            path_name: None,
+            columns: vec![column.into()],
+            on_error: None,
         }
     }
 }

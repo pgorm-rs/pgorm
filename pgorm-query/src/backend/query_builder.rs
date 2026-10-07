@@ -28,6 +28,8 @@ mod generated;
 mod grouping;
 #[path = "query_builder_json.rs"]
 mod json;
+#[path = "query_builder_json_table.rs"]
+mod json_table;
 #[path = "query_builder_merge.rs"]
 mod merge;
 #[path = "query_builder_range.rs"]
@@ -399,7 +401,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
-    // [spec:pgorm:req:sql.render.subquery+2] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.subquery+3] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr+3]
     fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
@@ -609,7 +611,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`FromItem`] into SQL statement.
-    // [spec:pgorm:req:sql.render.subquery+2] (value-bearing from items carry mandatory aliases)
+    // [spec:pgorm:req:sql.render.subquery+3] (value-bearing from items carry mandatory aliases)
     fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
         match from_item {
             FromItem::Table(table) => self.prepare_named_table(table, sql),
@@ -638,7 +640,7 @@ impl QueryBuilder {
             // otherwise swallow the closing parenthesis. Each resolved value
             // re-enters through `prepare_simple_expr`, so the fragment's own
             // `$N` are renumbered into this statement's parameter space.
-            // [spec:pgorm:req:sql.render.subquery+2]
+            // [spec:pgorm:req:sql.render.subquery+3]
             FromItem::Template(template, alias) => {
                 write!(sql, "(").unwrap();
                 for segment in template.segments() {
@@ -650,6 +652,7 @@ impl QueryBuilder {
                 write!(sql, "\n) AS ").unwrap();
                 alias.prepare(sql.as_writer());
             }
+            FromItem::JsonTable(table, alias) => self.prepare_json_table(table, alias, sql),
         }
     }
 
@@ -2322,7 +2325,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`NamedTable`] into SQL statement.
-    // [spec:pgorm:def:sql.types.table-ref+4]
+    // [spec:pgorm:def:sql.types.table-ref+5]
     fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {

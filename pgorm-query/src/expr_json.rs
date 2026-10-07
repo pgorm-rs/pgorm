@@ -296,7 +296,7 @@ impl Expr {
     ///     r#"SELECT JSON_OBJECT('doc'::text : "character" FORMAT JSON) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn format_json(self) -> JsonInput {
         JsonInput {
             expr: self.into(),
@@ -321,7 +321,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE ("character" IS JSON OBJECT WITH UNIQUE KEYS)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn is_json<T>(self, test: T) -> SimpleExpr
     where
         T: Into<JsonTest>,
@@ -349,7 +349,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE ("character" IS NOT JSON)"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.expr.sql-json]
+    // [spec:pgorm:def:sql.ast.expr.sql-json+1]
     pub fn is_not_json<T>(self, test: T) -> SimpleExpr
     where
         T: Into<JsonTest>,

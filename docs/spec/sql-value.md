@@ -431,7 +431,7 @@ including panic semantics and quirks inherited from sea-query.
 > Asterisk)` to `TableAsterisk`, `(ReturningRow, name)` to `RowColumn`, and
 > `(ReturningRow, Asterisk)` to `RowAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+4]
+> [spec:pgorm:def:sql.types.table-ref+5]
 > Table references are split by position, so that a reference which names no
 > table cannot reach a statement that needs one. There are three positions,
 > and each takes the widest type its position admits: DDL targets a name,
@@ -457,10 +457,11 @@ including panic semantics and quirks inherited from sea-query.
 > qualified by — the bound alias when there is one, otherwise the table name.
 >
 > `FromItem` is the query-position reference: `Table(NamedTable)` — the DML
-> reference reused, so aliasing is expressed in one place — plus the four
+> reference reused, so aliasing is expressed in one place — plus the five
 > value-producing forms `SubQuery(SelectStatement, alias)`,
-> `ValuesList(Vec<ValueTuple>, alias)`, `FunctionCall(FunctionCall, alias)`
-> and `Template(SqlTemplate, alias)`, each carrying a mandatory alias.
+> `ValuesList(Vec<ValueTuple>, alias)`, `FunctionCall(FunctionCall, alias)`,
+> `Template(SqlTemplate, alias)` and `JsonTable(Box<JsonTable>, alias)`
+> (`sql.ast.json-table`), each carrying a mandatory alias.
 > `IntoFromItem` accepts a `FromItem` unchanged and widens anything
 > `IntoNamedTable` accepts; `From<NamedTable> for FromItem` and
 > `From<TableName> for FromItem` are the same widening as value conversions.

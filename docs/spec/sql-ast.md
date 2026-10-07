@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+20]
+> [spec:pgorm:req:sql.surface+21]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -136,7 +136,10 @@ today, including panicking edges and deliberate failsafes.
 > `JsonArrayQuery`, `JsonObjectAgg`, `JsonArrayAgg`, `JsonParse` and
 > `JsonSerialize`, the constructors; `JsonInput`, an operand with or without
 > `FORMAT JSON`; `JsonKind` and `JsonTest`, what `IS JSON` tests; and
-> `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`). An
+> `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`); and
+> `JsonTable`, `JsonTableBehavior`, `JsonTableColumn`, `JsonValueColumn`,
+> `JsonQueryColumn`, `JsonExistsColumn` and `JsonNestedColumns`: `JSON_TABLE`,
+> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -177,7 +180,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+13]
+> [spec:pgorm:req:sql.scope+14]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -213,14 +216,6 @@ today, including panicking edges and deliberate failsafes.
 >   what the composite's DDL was built without: nothing in the ORM reads a
 >   composite value (`sql.ddl.type-composite`), so a type that changes shape
 >   has no reader to keep in step.
->
-> - **`JSON_TABLE`.** PostgreSQL's SQL/JSON table function, a FROM item that
->   turns a JSON document into rows (`COLUMNS`, `PATH`, `NESTED PATH`,
->   `FOR ORDINALITY`, `EXISTS` columns, `ON ERROR`). The rest of SQL/JSON is
->   built (`sql.ast.expr.sql-json`); this waits on a new `FromItem` kind with
->   its own non-empty column list and the column names and path names it
->   quotes, and on its paths, which the server takes only as literals. Filed as
->   its own node, `pg17-json-table`.
 >
 > **Out of scope** — not the builder's job:
 >
@@ -308,7 +303,7 @@ today, including panicking edges and deliberate failsafes.
 > `cond_having`); both feed the HAVING `ConditionHolder` with the semantics of
 > `sql.ast.condition.holder`.
 
-> [spec:pgorm:req:sql.ast.select.from+2]
+> [spec:pgorm:req:sql.ast.select.from+3]
 > FROM clauses MUST accumulate: calling `from` repeatedly produces multiple
 > comma-separated FROM items (the "old-school join" form), and `from_clear`
 > MUST remove all of them. The FROM item variants are: plain tables (with
@@ -316,8 +311,11 @@ today, including panicking edges and deliberate failsafes.
 > table), `from_subquery` (`FromItem::SubQuery` with mandatory alias),
 > `from_function` (`FromItem::FunctionCall` with alias), and `from_values`
 > (`FromItem::ValuesList` rendering `(VALUES (..), (..)) AS "alias"`).
+> `FromItem::JsonTable` (`sql.ast.json-table`) is made by `JsonTable::alias`
+> and handed to the generic `from`, or to a join: the alias is the one thing
+> a shorthand would take, and the builder already holds it.
 >
-> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+4]`) gets no
+> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+5]`) gets no
 > shorthand of its own. Its constructor returns `Result`, and a shorthand
 > would have to either return `Result` — breaking the `&mut Self` chain every
 > other builder method keeps — or swallow the failure; instead it is built
@@ -615,7 +613,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
 > and the constructors — are the neighbouring vocabulary,
-> `[spec:pgorm:def:sql.ast.expr.sql-json]`, and replace none of these. The
+> `[spec:pgorm:def:sql.ast.expr.sql-json+1]`, and replace none of these. The
 > replacement was weighed operator by operator on PostgreSQL 18.6 and refused
 > on both counts it needed: a GIN `jsonb_ops` index serves `?`, `?|` and `?&`
 > and no index serves `JSON_EXISTS`; an expression index on `->>` or its cast
@@ -759,7 +757,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+3]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -962,7 +960,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a FROM relation list, a WHERE
 > `ConditionHolder` (per `sql.ast.condition.holder`), an optional
@@ -996,7 +994,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+4]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+4]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a USING relation list, a WHERE `ConditionHolder` shared with the
 > condition rules, and an optional `ReturningClause`. Like the other three
@@ -1020,7 +1018,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:req:sql.ast.merge+1]
 > `MergeStatement` is the MERGE AST node. It holds a target `NamedTable`
-> (`[spec:pgorm:def:sql.types.table-ref+4]`: a name, bare or
+> (`[spec:pgorm:def:sql.types.table-ref+5]`: a name, bare or
 > schema-qualified, with an optional alias), an `only` flag, a source
 > `FromItem`, the join condition, an optional plain `WithClause`, its
 > `WHEN` arms, and an optional RETURNING list. `Query::merge(target, source,
@@ -1327,7 +1325,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+7]
+> [spec:pgorm:def:sql.ast.func+8]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -1429,8 +1427,8 @@ today, including panicking edges and deliberate failsafes.
 > Nor are SQL/JSON's functions, for the same reason: `Func::json_exists`,
 > `json_value`, `json_query`, `json_object`, `json_array`, `json_array_query`,
 > `json_objectagg`, `json_arrayagg`, `json`, `json_scalar` and
-> `json_serialize` return the builders of `sql.ast.expr.sql-json`
-> (`func_json.rs`).
+> `json_serialize` return the builders of `sql.ast.expr.sql-json`, and
+> `json_table` the FROM item of `sql.ast.json-table` (`func_json.rs`).
 >
 > `Func::named(name)` calls an arbitrary function by identifier
 > (`Function::Named`). A `FunctionCall` converts into
@@ -1439,7 +1437,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SQL/JSON
 
-> [spec:pgorm:def:sql.ast.expr.sql-json]
+> [spec:pgorm:def:sql.ast.expr.sql-json+1]
 > PostgreSQL's SQL/JSON — the query functions `JSON_EXISTS`, `JSON_VALUE` and
 > `JSON_QUERY`, the constructors `JSON_OBJECT`, `JSON_ARRAY` (over values or
 > over a one-column query), `JSON_OBJECTAGG`, `JSON_ARRAYAGG`, `JSON()`,
@@ -1450,7 +1448,7 @@ today, including panicking edges and deliberate failsafes.
 > `ON ERROR`, `ON NULL`, `WITH UNIQUE KEYS`, `FORMAT JSON`) are grammar between
 > the parentheses, which `Func::named`'s argument list cannot spell. Each form
 > is built by a `Func` constructor returning its own builder, as `Func::grouping`
-> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+7]`): `json_exists`,
+> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+8]`): `json_exists`,
 > `json_value` and `json_query` take a context item and a path; `json_object()`
 > and `json_array()` start empty; `json_array_query(select)`,
 > `json_objectagg(key, value)`, `json_arrayagg(value)`, `json(input)` and
@@ -1465,8 +1463,8 @@ today, including panicking edges and deliberate failsafes.
 > `Into<String>` and is bound, never written into the statement's text
 > (`sql.render.sql-json`); PostgreSQL accepts a parameter there. Where the
 > server's grammar demands a literal instead — `JSON_TABLE`'s paths
-> (`sql.scope`) — the path is a literal escaped by the value pipeline, not
-> interpolated.
+> (`sql.ast.json-table`) — the path is a literal escaped by the value
+> pipeline, not interpolated.
 >
 > **A JSON input** — a context item, a `PASSING` value, a constructor's value,
 > the operand of `JSON()` and `JSON_SERIALIZE()` — is a `JsonInput`: any
@@ -1601,3 +1599,71 @@ today, including panicking edges and deliberate failsafes.
 > is `jsonb`-only, `42883`), building JSON, or an index created on the
 > SQL/JSON expression itself. Containment, which both families can say, is
 > `@>` (`sql.ast.expr.operators`), served by either opclass.
+
+> [spec:pgorm:def:sql.ast.json-table]
+> `JSON_TABLE` is a FROM item, `FromItem::JsonTable(Box<JsonTable>, Name)`:
+> rows read out of a JSON document, one per item its path finds, one column
+> per column definition. `Func::json_table(context, path, column)` builds a
+> `JsonTable` and takes its first column, because PostgreSQL refuses an empty
+> list (`COLUMNS ()` is `42601`); `column(c)` appends more. `passing(value,
+> name)` gives the paths a variable, bound, as it does for the query functions
+> (`sql.ast.expr.sql-json`); `path_name(name)` names the root path (`AS name`);
+> `on_error(b)` takes a `JsonTableBehavior` — `Error` or `Empty` — the only two
+> PostgreSQL admits there (`NULL ON ERROR` is `42601`, "Only EMPTY [ ARRAY ] or
+> ERROR is allowed in the top-level ON ERROR clause"); without one, a failing
+> root path yields no rows, `EMPTY` spelled or not. `EMPTY ARRAY` is the same
+> behaviour and is not a second spelling. `alias(name)` makes the `FromItem`.
+> PostgreSQL would name an unaliased `JSON_TABLE` `json_table`, but the alias is
+> required here as on every FROM item that is not a table
+> (`sql.types.table-ref`), so its columns are qualified by a name the caller
+> chose. Like a function in FROM, it is implicitly `LATERAL`: its context item
+> may read the columns of the FROM items before it, whether it follows a comma
+> or a join (`LEFT JOIN JSON_TABLE(..) ON TRUE` keeps a row whose document
+> yields nothing).
+>
+> **Paths are literals here.** The root path is refused as a parameter
+> (`0A000`, "only string constants are supported in JSON_TABLE path
+> specification") and a column's or a nested path is a string constant in the
+> grammar, a parameter being a syntax error (`42601`). Each is therefore a
+> `String` the renderer writes through the value pipeline's literal escaping
+> (`sql.render.json-table`), never interpolated; the `PASSING` values are
+> still bound, so caller data that needs to reach a path goes through a
+> variable.
+>
+> **A column** is a `JsonTableColumn`, made by one of five constructors:
+>
+> - `ordinality(name)` — `name FOR ORDINALITY`, the row's number from 1.
+> - `value(name, type)` — `name type`, a `JsonValueColumn`: the scalar its
+>   path finds, read as `JSON_VALUE` reads it, with `on_empty` and `on_error`
+>   taking a `JsonValueBehavior`. The server refuses `EMPTY ARRAY` or `EMPTY
+>   OBJECT` on a scalar column (`42601`, "Only ERROR, NULL, or DEFAULT
+>   expression is allowed in ON ERROR for scalar columns"), which the type
+>   leaves out. A `json`, `jsonb`, array or composite type is read as
+>   `JSON_QUERY` reads it, under the same three behaviours.
+> - `query(name, type)` — `name type FORMAT JSON`, a `JsonQueryColumn`: the
+>   JSON its path finds, read as `JSON_QUERY` reads it, with the shaping slot
+>   (`with_wrapper`, `with_conditional_wrapper`, `omit_quotes`) and
+>   `JsonQueryBehavior`s. `FORMAT JSON` is always written, which is what makes
+>   the column `JSON_QUERY`'s whatever its type; the type must be a string
+>   type, `json`, `jsonb` or `bytea` (`0A000`, "cannot use JSON format with
+>   non-string output types", otherwise).
+> - `exists(name, type)` — `name type EXISTS`, a `JsonExistsColumn`: whether
+>   its path finds anything, as a `boolean`, an integer or text; `on_error`
+>   takes a `JsonExistsBehavior` and there is no `ON EMPTY` (`42601`), as for
+>   `JSON_EXISTS`.
+> - `nested(path, column)` — `NESTED PATH path COLUMNS (..)`, a
+>   `JsonNestedColumns` taking its first column for the same reason the table
+>   does (`42601` for an empty one), with `column(c)` and `path_name(name)`.
+>   A nested path's rows join their parent's as an outer join would: a parent
+>   whose nested path finds nothing keeps one row, its nested columns `NULL`.
+>
+> Each of the first four takes `path(p)`; without one a column reads
+> `$."name"` — its own name, matched exactly as written, since the name is
+> quoted. Column names and path names share one namespace across the whole
+> table, nested levels included, and a name given twice is refused (`42712`,
+> "duplicate JSON_TABLE column or path name"); the builder does not track
+> names, so that check is the server's. Column names, path names, the
+> `PASSING` names and the alias are caller-supplied identifiers, quoted like
+> every other and registered with the identifier oracle
+> (`security.ident-oracle`). PostgreSQL 18's grammar has no `PLAN` clause
+> (`42601`), so there is none to build.

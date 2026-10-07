@@ -16,7 +16,7 @@ use crate::{
 
 /// `JSON_OBJECT(..)`: an object of key/value members. Built by
 /// [`Func::json_object`](crate::Func::json_object).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonObject {
     pub(crate) entries: Vec<(SimpleExpr, JsonInput)>,
@@ -65,7 +65,7 @@ impl From<JsonObject> for SimpleExpr {
 
 /// `JSON_ARRAY(..)`: an array of the given values. Built by
 /// [`Func::json_array`](crate::Func::json_array).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonArray {
     pub(crate) elements: Vec<JsonInput>,
@@ -109,7 +109,7 @@ impl From<JsonArray> for SimpleExpr {
 /// The query form takes no `ON NULL` (`42601`), so it has none to set: a
 /// `NULL` row is always left out. A query of more than one column is refused
 /// (`42601`).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonArrayQuery {
     pub(crate) query: Box<SelectStatement>,
@@ -135,7 +135,7 @@ impl From<JsonArrayQuery> for SimpleExpr {
 ///
 /// An object's members have no order to give it, and the grammar takes no
 /// `ORDER BY` here (`42601`).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonObjectAgg {
     pub(crate) key: SimpleExpr,
@@ -188,7 +188,7 @@ impl From<JsonObjectAgg> for SimpleExpr {
 /// rows. Built by [`Func::json_arrayagg`](crate::Func::json_arrayagg).
 ///
 /// The grammar takes no `DISTINCT` here (`42601`).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonArrayAgg {
     pub(crate) value: JsonInput,
@@ -245,7 +245,7 @@ impl From<JsonArrayAgg> for SimpleExpr {
 /// `JSON(..)`: text — or, under `FORMAT JSON`, UTF-8 bytes — parsed as a
 /// `json` value, failing on text that is not JSON (`22P02`). Built by
 /// [`Func::json`](crate::Func::json).
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonParse {
     pub(crate) input: JsonInput,
@@ -273,7 +273,7 @@ impl From<JsonParse> for SimpleExpr {
 /// PostgreSQL 18.6 serializes a `json` or `text` operand faithfully but a
 /// `jsonb` one wrongly — the result is the one-byte text `\x01` — so a `jsonb`
 /// value is cast to `json` first.
-// [spec:pgorm:def:sql.ast.expr.sql-json]
+// [spec:pgorm:def:sql.ast.expr.sql-json+1]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonSerialize {
     pub(crate) input: JsonInput,

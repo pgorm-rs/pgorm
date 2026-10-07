@@ -12,6 +12,7 @@ mod frame;
 mod func;
 mod grouping;
 mod index;
+mod json_table;
 mod merge;
 mod oracle;
 mod oracle_pins;

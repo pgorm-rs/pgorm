@@ -679,7 +679,7 @@ explicit limitations.
 > member on the same grounds: a field's `default_expr` is Rust written in the
 > entity's own module (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`),
 > and `default_expr = "Func::uuidv7()"` — a key PostgreSQL fills time-ordered
-> (`[spec:pgorm:def:sql.ast.func+7]`) — resolves through the glob. `LinkedAlias` is
+> (`[spec:pgorm:def:sql.ast.func+8]`) — resolves through the glob. `LinkedAlias` is
 > NOT a member — it is reached as the return of a `Linked` method, so a caller
 > never has to name the type.
 >

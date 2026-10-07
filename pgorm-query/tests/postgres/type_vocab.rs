@@ -64,7 +64,7 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoTableName` maps iden / 2-tuple
+// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
@@ -77,7 +77,7 @@ fn into_table_name_maps_the_two_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoNamedTable` maps the same spellings to an
+// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoNamedTable` maps the same spellings to an
 // unaliased named table, and a `TableName` or `NamedTable` passes through
 #[test]
 fn into_named_table_maps_the_named_forms() {
@@ -111,7 +111,7 @@ fn into_named_table_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    `IntoFromItem` widens every named spelling, and
+// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoFromItem` widens every named spelling, and
 // a `TableName` or `NamedTable` converts infallibly
 #[test]
 fn into_from_item_maps_the_named_forms() {
@@ -139,7 +139,7 @@ fn into_from_item_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    `alias` binds an alias and replaces an existing
+// [spec:pgorm:def:sql.types.table-ref+5/test]    `alias` binds an alias and replaces an existing
 // one, on the named form and on the value-producing forms alike
 #[test]
 fn from_item_alias_adds_or_replaces() {
@@ -182,7 +182,7 @@ fn from_item_alias_adds_or_replaces() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    a column of a from item is qualified by its
+// [spec:pgorm:def:sql.types.table-ref+5/test]    a column of a from item is qualified by its
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
@@ -217,7 +217,7 @@ fn from_item_qualifier_prefers_the_alias() {
     assert_eq!(template.table_name(), None);
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    the named form renders as dotted, quoted parts
+// [spec:pgorm:def:sql.types.table-ref+5/test]    the named form renders as dotted, quoted parts
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
@@ -246,7 +246,7 @@ fn named_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    the write statements take the same named table,
+// [spec:pgorm:def:sql.types.table-ref+5/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+3/test]
 // [spec:pgorm:req:sql.ast.update+5/test]
@@ -284,7 +284,7 @@ fn aliased_dml_targets_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+5/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
 fn value_producing_from_item_forms_render() {
@@ -334,10 +334,10 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4/test]    a fragment in relation position keeps its
+// [spec:pgorm:def:sql.types.table-ref+5/test]    a fragment in relation position keeps its
 // non-marker text verbatim and renumbers its markers into the enclosing statement's parameter
 // space, so it composes with a statement that binds values of its own
-// [spec:pgorm:req:sql.render.subquery+2/test]
+// [spec:pgorm:req:sql.render.subquery+3/test]
 #[test]
 fn template_from_item_renumbers_into_the_enclosing_statement() {
     let fragment = SqlTemplate::from_sql(

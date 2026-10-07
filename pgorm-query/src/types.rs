@@ -200,7 +200,7 @@ pub trait IntoColumnRef {
 ///
 /// Table::truncate(Glyph::Table.into_named_table().alias(Name::runtime("g")));
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 /// A type name in cast or column-type position: optionally
@@ -394,7 +394,7 @@ pub enum TableName {
 }
 
 /// Conversion into the [`TableName`] a DDL statement targets.
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 pub trait IntoTableName {
     /// Consume `self` and produce a [`TableName`]
     fn into_table_name(self) -> TableName;
@@ -456,7 +456,7 @@ pub trait IntoTableName {
 /// );
 /// Query::delete().from_table(func);
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedTable {
     /// The table this reference names
@@ -466,7 +466,7 @@ pub struct NamedTable {
 }
 
 /// Conversion into the [`NamedTable`] a DML statement targets.
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 pub trait IntoNamedTable {
     /// Consume `self` and produce a [`NamedTable`]
     fn into_named_table(self) -> NamedTable;
@@ -477,7 +477,7 @@ pub trait IntoNamedTable {
 /// A named table carries its alias beside it rather than in the variant, so
 /// aliasing is orthogonal to how the name is qualified; the value-producing
 /// forms carry the alias Postgres requires of them.
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FromItem {
@@ -489,6 +489,10 @@ pub enum FromItem {
     ValuesList(Vec<ValueTuple>, Name),
     /// Function call with alias
     FunctionCall(FunctionCall, Name),
+    /// `JSON_TABLE` with alias, built by
+    /// [`JsonTable::alias`](crate::JsonTable::alias).
+    // [spec:pgorm:def:sql.ast.json-table]
+    JsonTable(Box<crate::JsonTable>, Name),
     /// A validated SQL fragment with alias: text this crate did not build,
     /// standing where a relation stands.
     ///
@@ -525,7 +529,7 @@ pub enum FromItem {
 }
 
 /// Conversion into a [`FromItem`].
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 pub trait IntoFromItem {
     /// Consume `self` and produce a [`FromItem`]
     fn into_from_item(self) -> FromItem;
@@ -855,7 +859,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 impl TableName {
     /// The table identifier, without its schema
     pub fn table(&self) -> &Name {
@@ -891,7 +895,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 impl NamedTable {
     /// Bind an alias to the name, replacing any alias already bound
     pub fn alias<A>(self, alias: A) -> Self
@@ -944,7 +948,7 @@ impl From<TableName> for FromItem {
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+4]
+// [spec:pgorm:def:sql.types.table-ref+5]
 impl FromItem {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
@@ -957,6 +961,7 @@ impl FromItem {
             Self::ValuesList(values, _) => Self::ValuesList(values, alias.into_name()),
             Self::FunctionCall(func, _) => Self::FunctionCall(func, alias.into_name()),
             Self::Template(template, _) => Self::Template(template, alias.into_name()),
+            Self::JsonTable(table, _) => Self::JsonTable(table, alias.into_name()),
         }
     }
 
@@ -967,7 +972,8 @@ impl FromItem {
             Self::SubQuery(_, _)
             | Self::ValuesList(_, _)
             | Self::FunctionCall(_, _)
-            | Self::Template(_, _) => None,
+            | Self::Template(_, _)
+            | Self::JsonTable(_, _) => None,
         }
     }
 
@@ -979,7 +985,8 @@ impl FromItem {
             Self::SubQuery(_, alias)
             | Self::ValuesList(_, alias)
             | Self::FunctionCall(_, alias)
-            | Self::Template(_, alias) => alias,
+            | Self::Template(_, alias)
+            | Self::JsonTable(_, alias) => alias,
         }
     }
 }

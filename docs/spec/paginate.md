@@ -499,14 +499,14 @@ bound parameter is held to.
 > (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
 > and placed in relation position as
 > `FromItem::Template(fragment, "sub_statement")`
-> (`[spec:pgorm:def:sql.types.table-ref+4]`). What the paginator holds is
+> (`[spec:pgorm:def:sql.types.table-ref+5]`). What the paginator holds is
 > then ONE shape — an ordinary `SelectStatement` — for a built source and
 > a raw one alike: the page clauses of `exec.paginator.fetch` and the
 > count wrapper of `exec.paginator.count` are the builder's, and the
 > paginator MUST NOT format SQL text of its own. The rendering, including
 > the newline before the closing parenthesis that keeps a trailing `--`
 > comment from swallowing it, belongs to
-> `[spec:pgorm:req:sql.render.subquery+2]`. Wrapping rather than splicing
+> `[spec:pgorm:req:sql.render.subquery+3]`. Wrapping rather than splicing
 > means `LIMIT` and `OFFSET` land outside the caller's own clauses instead
 > of colliding with them, so a raw statement that already carries
 > `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will not reorder
