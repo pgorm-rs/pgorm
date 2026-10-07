@@ -1295,7 +1295,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+5]
+> [spec:pgorm:def:sql.ast.func+6]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. The `Function` enum covers the
@@ -1308,7 +1308,30 @@ today, including panicking edges and deliberate failsafes.
 > PostgreSQL full-text family `to_tsquery`, `to_tsvector`,
 > `phraseto_tsquery`, `plainto_tsquery`, `websearch_to_tsquery` (each with an
 > optional `regconfig` OID prepended as first argument), `ts_rank`,
-> `ts_rank_cd`; and array/subquery comparators `any`, `some`, `all`.
+> `ts_rank_cd`; array/subquery comparators `any`, `some`, `all`; and
+> PostgreSQL 18's UUID family, below.
+>
+> The UUID family is `uuidv4()`, `uuidv7()`, `uuidv7_shifted(shift)`,
+> `uuid_extract_timestamp(u)` and `uuid_extract_version(u)` (`func_uuid.rs`),
+> rendering `UUIDV4`, `UUIDV7`, `UUID_EXTRACT_TIMESTAMP` and
+> `UUID_EXTRACT_VERSION`. `uuidv4` is PostgreSQL 18's name for what
+> `gen_random_uuid` returns, and both stay: `gen_random_uuid` is the spelling
+> every release since 13 resolves. `uuidv7` mints a time-ordered UUID whose
+> leading 48 bits are the Unix time in milliseconds; the live suite holds that
+> values a session mints sort strictly in the order it minted them, even
+> within one millisecond, so a `uuidv7()` column default fills a key that
+> indexes like a sequence. A column takes one as its
+> `DEFAULT` the way it takes any expression, `ColumnDef::default(Func::uuidv7())`
+> (`[spec:pgorm:req:sql.ddl.column-def+12]`), and an entity as
+> `#[pgorm(default_expr = "Func::uuidv7()")]`, `Func` being a prelude member for
+> that reason (`[spec:pgorm:def:entity.prelude+6]`). `uuidv7_shifted` is
+> `uuidv7`'s one-argument overload, which moves the embedded time by an
+> `interval` and binds it as any argument is bound; PostgreSQL has no other
+> `uuidv7` arity (`uuidv7(1)` is `42883`). The two readers are immutable, so
+> they can stand in an expression index or a generated column, and each answers
+> `NULL` rather than failing where it has nothing to read: the timestamp, at
+> millisecond precision, only for a version 7 or version 1 UUID, and the
+> version only for a UUID of the RFC 9562 variant.
 >
 > Beyond its arguments a call carries the two clauses PostgreSQL admits after
 > them, each optional and each empty by default:

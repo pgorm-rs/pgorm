@@ -134,6 +134,19 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await connection.execute(s.drop_table(renamed))
             await connection.execute(s.drop_table(renamed, if_exists=True))
 
+    # [spec:pgorm:req:python.expressions/test]
+    async def test_uuidv7_default_keys_rows_in_write_order(self):
+        table = p.Table("minted", schema=self.namespace)
+        ddl = s.create_table(table).column(s.ColumnDef("id", "uuid").default(p.call("uuidv7"))).primary_key("id")
+        ddl = ddl.column(s.ColumnDef("written", "integer").not_null())
+        self.assertIn('"id" uuid DEFAULT UUIDV7()', ddl.inspect().sql)
+        await self.pool.execute(ddl)
+        for written in range(16):
+            await self.pool.execute(p.insert(table).columns("written").values(written))
+        version = p.call("uuid_extract_version", p.col("id")).as_("version")
+        rows = await self.pool.fetch_all(p.select(p.col("written"), version).from_(table).order_by(p.col("id").asc()))
+        self.assertEqual([dict(row) for row in rows], [{"written": n, "version": 7} for n in range(16)])
+
     # [spec:pgorm:req:python.schema/test]
     async def test_not_null_constraints_by_name(self):
         table = p.Table('kept "x"', schema=self.namespace)

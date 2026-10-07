@@ -194,7 +194,7 @@ is what `EntityTrait::find()` produces.
 > `order_by*` and `filter`, the qualifier of a `(table, column)` pair, the
 > table alias of `join_as` / `join_as_rev` / `from_alias`, a lateral join's
 > alias, a window name, and a CTE's name and columns. `alias` and `AliasName`
-> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+5]`).
+> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+6]`).
 >
 > Reaching the `Key` positions — `column_as`'s alias, `cursor_by`, a
 > cursor's secondary ordering — takes no extra impl at the ORM layer, because

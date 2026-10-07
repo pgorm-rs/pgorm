@@ -19,8 +19,12 @@
 //! the query introduces is written at the point the query is written, and
 //! writing it as a token instead of a string is only cheaper than
 //! `Name::runtime` if the token is already in scope.
+//!
+//! `Func` is here because an entity's `default_expr` is Rust written in the
+//! entity's own module, and a key filled by `Func::uuidv7()` is the default a
+//! new table most often wants.
 
-// [spec:pgorm:def:entity.prelude+5]
+// [spec:pgorm:def:entity.prelude+6]
 // [spec:pgorm:sem:query.build.alias+2]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
@@ -33,7 +37,7 @@ pub use crate::{
     QuerySelect, QueryTrait, Related, RelatedLink, RelationDef, RelationTrait, Select, SqlName,
     StaticName, TransactionTrait, TryInsert, TryIntoModel, Update, Value, alias,
     error::*,
-    pgorm_query::{Expr, ForeignKeyAction, Name, StringLen},
+    pgorm_query::{Expr, ForeignKeyAction, Func, Name, StringLen},
     set,
 };
 pub use std::sync::Arc;

@@ -4,7 +4,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:def:sql.ast.func+5/test]      FILTER takes any IntoCondition
+// [spec:pgorm:def:sql.ast.func+6/test]      FILTER takes any IntoCondition
 // [spec:pgorm:req:sql.render.func-mods/test]
 #[test]
 fn aggregate_filter_renders_after_the_arguments() {
@@ -54,7 +54,7 @@ fn aggregate_filter_numbers_its_parameters_in_sequence() {
 }
 
 // Each `filter` call replaces the last rather than accumulating.
-// [spec:pgorm:def:sql.ast.func+5/test]
+// [spec:pgorm:def:sql.ast.func+6/test]
 #[test]
 fn a_second_filter_replaces_the_first() {
     assert_eq!(
@@ -70,7 +70,7 @@ fn a_second_filter_replaces_the_first() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.func+5/test]      WITHIN GROUP, and the two
+// [spec:pgorm:def:sql.ast.func+6/test]      WITHIN GROUP, and the two
 // ordered-set constructors
 // [spec:pgorm:req:sql.render.func-mods/test]
 #[test]
@@ -97,7 +97,7 @@ fn within_group_renders_the_ordered_set_ordering() {
 
 // The ordering accumulates, for the hypothetical-set aggregates that rank
 // against several columns at once.
-// [spec:pgorm:def:sql.ast.func+5/test]
+// [spec:pgorm:def:sql.ast.func+6/test]
 #[test]
 fn within_group_accumulates_its_ordering() {
     assert_eq!(
@@ -188,7 +188,7 @@ fn an_unmodified_call_renders_unchanged() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.func+5/test]
+// [spec:pgorm:def:sql.ast.func+6/test]
 #[test]
 fn sub_query_with_fn() {
     #[derive(SqlName)]
@@ -210,5 +210,51 @@ fn sub_query_with_fn() {
     assert_eq!(
         select.to_string(),
         r#"SELECT jsonb_agg((SELECT * FROM "character"))"#
+    );
+}
+
+// PostgreSQL 18's UUID family: the two generators, v7's shifted form with its
+// interval bound like any value, and the two readers over a column.
+// [spec:pgorm:def:sql.ast.func+6/test]
+#[test]
+fn the_uuid_family_renders_its_calls() {
+    assert_eq!(
+        Query::select()
+            .expr(Func::uuidv4())
+            .expr(Func::uuidv7())
+            .to_string(),
+        r#"SELECT UUIDV4(), UUIDV7()"#
+    );
+    assert_eq!(
+        Query::select()
+            .expr(Func::uuidv7_shifted(
+                Expr::val("-1 day").cast_as(Name::runtime("interval"))
+            ))
+            .build(),
+        (
+            r#"SELECT UUIDV7(CAST($1::text AS interval))"#.to_owned(),
+            Values(vec!["-1 day".into()])
+        )
+    );
+    assert_eq!(
+        Query::select()
+            .expr(Func::uuid_extract_timestamp(Expr::col(Glyph::Id)))
+            .expr(Func::uuid_extract_version(Expr::col(Glyph::Id)))
+            .from(Glyph::Table)
+            .to_string(),
+        r#"SELECT UUID_EXTRACT_TIMESTAMP("id"), UUID_EXTRACT_VERSION("id") FROM "glyph""#
+    );
+}
+
+// A v7 call is a column default like any expression.
+// [spec:pgorm:def:sql.ast.func+6/test]
+#[test]
+fn a_uuidv7_call_is_a_column_default() {
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).uuid().default(Func::uuidv7()))
+            .primary_key(Glyph::Id)
+            .to_string(),
+        r#"CREATE TABLE "glyph" ( "id" uuid DEFAULT UUIDV7(), PRIMARY KEY ("id") )"#
     );
 }

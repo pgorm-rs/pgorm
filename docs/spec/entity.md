@@ -631,7 +631,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+5]
+> [spec:pgorm:def:entity.prelude+6]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -650,7 +650,7 @@ explicit limitations.
 > `ConnectionTrait`, `TransactionTrait`; `Iterable`, `Condition`, `JoinType`,
 > `Value`, the `error` module's contents, and the handful of `pgorm_query`
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
-> `ForeignKeyAction`, `Arc`), with the range vocabulary a field of a range
+> `ForeignKeyAction`, `Func`, `Arc`), with the range vocabulary a field of a range
 > column is written in — `Range`, `Multirange` and `RangeType`
 > (`[spec:pgorm:def:sql.value.range]`) — so a generated entity's
 > `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
@@ -675,7 +675,11 @@ explicit limitations.
 > The alias vocabulary `alias` and `AliasName` are members
 > (`[spec:pgorm:sem:query.build.alias+2]`) on the same grounds as `Expr`: a name
 > the query introduces is written where the query is written, and a token is
-> only cheaper than `Name::runtime` when it is already in scope. `LinkedAlias` is
+> only cheaper than `Name::runtime` when it is already in scope. `Func` is a
+> member on the same grounds: a field's `default_expr` is Rust written in the
+> entity's own module (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`),
+> and `default_expr = "Func::uuidv7()"` — a key PostgreSQL fills time-ordered
+> (`[spec:pgorm:def:sql.ast.func+6]`) — resolves through the glob. `LinkedAlias` is
 > NOT a member — it is reached as the return of a `Linked` method, so a caller
 > never has to name the type.
 >

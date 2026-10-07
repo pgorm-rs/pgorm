@@ -107,9 +107,14 @@ are handled by Rust's `LikeExpr`; a plain string is rejected at this boundary.
 
 `call(name, *arguments)` invokes the named Rust `Func` constructor for:
 `lower`, `upper`, `abs`, `char_length`, `count`, `count_distinct`, `sum`, `avg`,
-`min`, `max`, `round`, `coalesce`, `random` and `gen_random_uuid`.
-`round` accepts one or two arguments, `coalesce` one or more, `random` and
-`gen_random_uuid` none, and the others one. Unsupported names or argument
+`min`, `max`, `round`, `coalesce`, `random`, `gen_random_uuid`, and PostgreSQL
+18's `uuidv4`, `uuidv7`, `uuid_extract_timestamp` and `uuid_extract_version`.
+`round` accepts one or two arguments, `coalesce` one or more, `random`,
+`gen_random_uuid` and `uuidv4` none, `uuidv7` none or one (the `interval` its
+embedded time is shifted by, Rust's `Func::uuidv7_shifted`), and the others
+one. A call is an expression wherever one is taken, so
+`ColumnDef("id", "uuid").default(call("uuidv7"))` gives a table a time-ordered
+key. Unsupported names or argument
 counts raise `UnsupportedCapabilityError`. The capability manifest records
 these signatures in `expression_functions`. This name selects a supported
 function constructor; it is not raw SQL.

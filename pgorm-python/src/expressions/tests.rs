@@ -191,7 +191,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
             ("min", Func::min(x.clone())),
             ("max", Func::max(x.clone())),
             ("round", Func::round(x.clone())),
-            ("coalesce", Func::coalesce([x.into()])),
+            ("coalesce", Func::coalesce([x.clone().into()])),
         ];
         for (name, expected) in cases {
             parity(
@@ -207,6 +207,26 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
             &globals,
             "p.call('gen_random_uuid')",
             Func::gen_random_uuid().into(),
+        )?;
+        parity(py, &globals, "p.call('uuidv4')", Func::uuidv4().into())?;
+        parity(py, &globals, "p.call('uuidv7')", Func::uuidv7().into())?;
+        parity(
+            py,
+            &globals,
+            "p.call('uuidv7', p.col('x'))",
+            Func::uuidv7_shifted(x.clone()).into(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.call('uuid_extract_timestamp', p.col('x'))",
+            Func::uuid_extract_timestamp(x.clone()).into(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.call('uuid_extract_version', p.col('x'))",
+            Func::uuid_extract_version(x.clone()).into(),
         )
     })
 }

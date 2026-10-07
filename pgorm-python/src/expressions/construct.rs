@@ -186,6 +186,11 @@ pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExp
         ("coalesce", [_, ..]) => Func::coalesce(args),
         ("random", []) => Func::random(),
         ("gen_random_uuid", []) => Func::gen_random_uuid(),
+        ("uuidv4", []) => Func::uuidv4(),
+        ("uuidv7", []) => Func::uuidv7(),
+        ("uuidv7", [shift]) => Func::uuidv7_shifted(shift.clone()),
+        ("uuid_extract_timestamp", [value]) => Func::uuid_extract_timestamp(value.clone()),
+        ("uuid_extract_version", [value]) => Func::uuid_extract_version(value.clone()),
         _ => {
             return Err(crate::UnsupportedCapabilityError::new_err(
                 "unsupported function or argument count",

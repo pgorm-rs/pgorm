@@ -9682,12 +9682,27 @@ children (
                 title "uuidv7() and uuidv4() are typed functions, usable as a column default"
                 kind @feat
                 deps (pg18-test-server)
+                sealed true
                 log (
                     {
                         at 2026-10-06T12:50:55.323928Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "PostgreSQL 18 adds uuidv7() (time-ordered) and uuidv4() (an alias of gen_random_uuid()), plus uuid_extract_timestamp and uuid_extract_version, which work on v7. They are reachable today through Func::named(\"uuidv7\") (parses under pg_query 6.2.0 and runs on 18.6, verified), so the typed form is about discoverability and use as a column default: a Func::uuidv7() / uuidv4() and the way an entity or ColumnDef sets one as a default (default_expr), with live tests that a v7 default orders by creation time."
+                    }
+
+                    {
+                        at 2026-10-07T06:25:25.641821Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T08:03:19.869642Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
