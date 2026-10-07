@@ -9756,6 +9756,13 @@ children (
                         kind @decision
                         text "Operator 2026-10-06, after asking what SQL/JSON is: \"all of it, and replace any older stuff with it if that's sensible to do.\" Build the whole of PostgreSQL's SQL/JSON:\n- JSON_QUERY, JSON_VALUE and JSON_EXISTS, with PASSING, RETURNING, wrapper and quotes behaviour, and ON EMPTY / ON ERROR\n- JSON_TABLE as a FROM item: COLUMNS, PATH, NESTED PATH, FOR ORDINALITY, EXISTS columns, ON ERROR\n- the 17 constructors JSON(), JSON_SCALAR() and JSON_SERIALIZE()\n- the 16 forms if missing: JSON_OBJECT, JSON_ARRAY, JSON_OBJECTAGG, JSON_ARRAYAGG and IS JSON\n\nThe existing operators live in pgorm-query/src/expr_json.rs:\n- get_json_field / cast_json_field (-> / ->>, then a cast)\n- get_json_path / cast_json_path (#> / #>>)\n- has_json_key / has_any_json_keys / has_all_json_keys (? / ?| / ?&)\n\nReplace one only where the SQL/JSON form gives the same semantics and the same index use, verified live with EXPLAIN on PostgreSQL 18. Two checks matter:\n- whether a GIN jsonb_ops / jsonb_path_ops index that serves ?, ?|, ?& and @> also serves JSON_EXISTS\n- whether an expression index on (data->>'k') or ((data->>'k')::int) is still used for JSON_VALUE(... RETURNING ...)\n\nCompare semantics too: ? also matches string array elements; a failed cast throws while JSON_VALUE follows ON ERROR; and behaviour differs on a missing path and on a path that hits an object or array.\n\nThe lead's expectation, unverified, is that indexes make wholesale replacement wrong, so both families stay and the rule says which to use when. The evidence decides, and the rule records it. Any old API removed is deleted outright, with no shims, and every caller (pipeline, pgorm-python, the campaign emitters) is updated."
                     }
+
+                    {
+                        at 2026-10-07T08:05:31.635466Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "2026-10-07: JSON_TABLE split into its own node, pg17-json-table, as the operator's note allowed: it is a FROM item rather than an expression, with its own column grammar and literal-only paths, and the rest of SQL/JSON is one coherent commit without it. This node keeps the query functions, the constructors, IS JSON and the operator-replacement verdict; sql.scope records JSON_TABLE as deferred until pg17-json-table lands. Python's binding is filed as python-sql-json."
+                    }
                 )
             }
 
@@ -9926,6 +9933,36 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed by merge-beyond-pg16 (c5acfcaa), from that node's original note: \"Once RETURNING lands, a bulk 'sync this set' terminal that reports per-row actions is the one ORM use worth weighing.\" It has landed: MERGE takes a RETURNING list, returning_action() writes merge_action() ('INSERT' / 'UPDATE' / 'DELETE' per row), and WHEN NOT MATCHED BY SOURCE reaches the target rows a source set did not mention. No ORM path emits MERGE (sql.ast.merge+1): the upsert an entity layer writes is ON CONFLICT.\n\nThe candidate is an entity terminal that makes a table (or the rows a filter selects) match a set of models in one statement: insert the new, update the changed, and optionally delete the target rows the set did not mention (a BY SOURCE arm, which then needs the filter in its condition so it does not delete outside the selected rows), returning each row's model and its action. Questions to settle: whether it is worth it beside ON CONFLICT plus a delete; the source relation (a VALUES list needs every value cast, since a source value is assigned to no column, sql.render.placeholder-typing, and the live suite already holds 42883 / 42725 for an uncast one), and the size limit that implies; how the per-row action decodes beside the model (merge_action() is text, and RETURNING * is the source's columns followed by the target's, so the list must name the target's columns qualified, a bare name both relations have being 42702); concurrency (MERGE takes no ON CONFLICT arbiter, so PostgreSQL documents a concurrent insert of the same key as a unique violation, 23505, where ON CONFLICT would arbitrate it); the name in the exec vocabulary (exec.crud.exec-vocabulary); and Python's registered entities."
+                    }
+                )
+            }
+
+            {
+                id pg17-json-table
+                title "JSON_TABLE is a FROM item: COLUMNS, PATH, NESTED PATH, FOR ORDINALITY, EXISTS columns and ON ERROR"
+                kind @feat
+                deps (pg17-sql-json)
+                log (
+                    {
+                        at 2026-10-07T08:05:24.46974Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Split from pg17-sql-json (2026-10-07), which builds the rest of PostgreSQL's SQL/JSON (sql.ast.expr.sql-json) and records JSON_TABLE as sql.scope's one deferred SQL/JSON entry, deleted when this lands. Build JSON_TABLE(context, path [AS name] [PASSING v AS name, ...] COLUMNS (...) [ERROR | EMPTY [ARRAY] ON ERROR]) as a FromItem kind: regular columns (name type [FORMAT JSON] [PATH p] [wrapper/quotes] [ON EMPTY] [ON ERROR]), FOR ORDINALITY, EXISTS columns (name type EXISTS [PATH p] [ON ERROR]) and NESTED [PATH] p [AS name] COLUMNS (...). Checked on 18.6: the root path is refused as a parameter (0A000, \"only string constants are supported in JSON_TABLE path specification\") and column and NESTED paths are string constants in the grammar (a parameter is 42601), so every path renders as a literal through the value pipeline's escaping, never interpolated; E'', U&'' and dollar-quoted literals are all accepted there; PASSING values bind. COLUMNS () and NESTED ... COLUMNS () are 42601, so the lists are non-empty by construction; a column or path name given twice is 42712 (\"duplicate JSON_TABLE column or path name\"); the top-level ON ERROR takes only ERROR or EMPTY [ARRAY] (NULL is 42601) and defaults to EMPTY (no rows); a scalar column (no FORMAT JSON, wrapper or quotes, non-json type) takes only ERROR, NULL or DEFAULT (EMPTY ARRAY is 42601, \"Only ERROR, NULL, or DEFAULT expression is allowed in ON ERROR for scalar columns\"); FORMAT JSON on a non-string column type is 0A000; an EXISTS column takes ERROR, TRUE, FALSE or UNKNOWN ON ERROR only (NULL is 42601) and no ON EMPTY (42601), and its type may be boolean, integer or text; PLAN is not in 18's grammar (42601). A column without PATH reads $.\"name\", matched case-exactly when the name is quoted. JSON_TABLE is implicitly LATERAL (FROM t, JSON_TABLE(t.doc, ...) and LEFT JOIN ... ON TRUE both work), and its alias is optional (default json_table) where FromItem's value-producing forms carry a mandatory one. Column names, path names, PASSING names and the alias are caller identifiers to register with the identifier oracle. Reuse sql.ast.expr.sql-json's JsonInput, behaviour enums and shaping slot, and ColumnType for column types."
+                    }
+                )
+            }
+
+            {
+                id python-sql-json
+                title "Python builds SQL/JSON: the query functions, the constructors and IS JSON"
+                kind @feat
+                deps (pg17-sql-json)
+                log (
+                    {
+                        at 2026-10-07T08:05:24.532137Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed with pg17-sql-json (2026-10-07). pgorm-python's call() reaches the named Func constructors of a fixed table (python.expressions); SQL/JSON's builders have no binding, so Python reaches them only through raw SQL: Func::json_exists / json_value / json_query with PASSING, RETURNING, the wrapper-or-quotes slot and the three behaviour enums (JsonExistsBehavior, JsonValueBehavior, JsonQueryBehavior); the constructors json_object, json_array, json_array_query, json_objectagg and json_arrayagg (ORDER BY, FILTER, and the window form expr_window now accepts), json, json_scalar and json_serialize; Expr::format_json; and Expr::is_json / is_not_json with JsonKind and JsonTest. A binding needs native objects for each builder and behaviour, capability-manifest entries, stubs, and parity cases against the Rust builders, rendering as Rust does: paths bound as text cast to jsonpath, a value typed in both render paths, a DEFAULT as an escaped literal. JSON_TABLE's half follows pg17-json-table."
                     }
                 )
             }
