@@ -62,22 +62,20 @@ silently accept a mismatched report.
 
 ## Recorded result and limits
 
-The complete checker passed locally on 2026-10-06 with CPython 3.14.4 and the GIL,
+The complete checker passed locally on 2026-10-08 with CPython 3.14.4 and the GIL,
 macOS 26.5.1 arm64, and PostgreSQL 18.6 (the Docker wrapper's
-`postgres:18.6-bookworm`). The run included 24 native binding tests,
-eight application Rust tests, 28 direct-builder query programs, registered
-application checks and 111 standalone Python tests on each of two installations
-(direct wheel and source-derived wheel). Both installations passed strict
-package/example typing, installed signature checks and 13 expected invalid
+`postgres:18.6-bookworm`), under macOS's default temporary directory, which is
+reached through the `/var` → `/private/var` symlink. The run included 25 native
+binding tests, eight application Rust tests, 28 direct-builder query programs,
+registered application checks and 124 standalone Python tests on each of two
+installations (direct wheel and source-derived wheel). Both installations passed
+strict package/example typing, installed signature checks and 13 expected invalid
 typing cases. The generated application also passed its package typing and
 four expected invalid cases. The default Rust workspace build and nspec
-validation passed. It replaces the 2026-09-10 record, the same checker against
-PostgreSQL 16.
-
-The run set `TMPDIR` to its resolved path. Under macOS's default temporary
-directory, reached through the `/var` → `/private/var` symlink, the typing
-checker's installed-package check compares the native module's unresolved
-directory with the resolved package root and fails before any typing runs.
+validation passed. Homebrew's `emcc`, a Python program that libc's build script
+runs on every host, was shadowed by a stub exiting 1 so the no-Python build
+probe judged pgorm's build alone (the `python-acceptance-emcc-probe` node). It
+replaces the 2026-10-06 record, which needed `TMPDIR` set to its resolved path.
 
 These results establish the tested combination recorded in
 [support.json](support.json). The configured macOS 15 and Linux CI jobs still

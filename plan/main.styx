@@ -10180,6 +10180,7 @@ children (
         id python-typing-check-symlinked-tmp
         title "The typing checker's installed-package check passes when the temporary directory sits behind a symlink"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-06T14:15:01.552943Z
@@ -10193,6 +10194,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T15:48:34.504635Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
