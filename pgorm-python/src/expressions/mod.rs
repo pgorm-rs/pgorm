@@ -22,7 +22,7 @@ use construct::sequence;
 pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
-// [spec:pgorm:req:python.expressions]
+// [spec:pgorm:req:python.expressions+1]
 // [spec:pgorm:req:python.ownership]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
 #[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]

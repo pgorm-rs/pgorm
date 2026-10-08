@@ -101,10 +101,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions]
+> [spec:pgorm:req:python.expressions+1]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
 > LIKE patterns, function calls and qualified casts through Rust builders.
+> SQL/JSON's query functions, constructors, `FORMAT JSON` and `IS JSON` MUST
+> lower into the corresponding `pgorm_query` builders, each clause applied
+> through the builder's own method. Their behaviours MUST be typed per
+> function, so a choice PostgreSQL refuses for that function cannot be passed,
+> and a choice the Rust builder cannot express MUST raise an error rather than
+> be dropped.
 > Condition grouping and empty-condition semantics MUST match the named Rust
 > API. Python truth testing of a query expression MUST raise an error instead
 > of evaluating it as a local boolean or silently dropping part of a predicate.

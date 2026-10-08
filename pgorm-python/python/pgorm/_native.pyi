@@ -137,6 +137,16 @@ from ._expressions import (
     literal as literal, call as call, tuple_expr as tuple_expr,
 )
 from ._statements import Table as Table, Select as Select, Join as Join
+from ._json import (
+    JsonInput as JsonInput, JsonKind as JsonKind, JsonExistsBehavior as JsonExistsBehavior,
+    JsonValueBehavior as JsonValueBehavior, JsonQueryBehavior as JsonQueryBehavior,
+    JsonDefault as JsonDefault, json_exists as json_exists, json_value as json_value,
+    json_query as json_query, json_object as json_object, json_array as json_array,
+    json_array_query as json_array_query, json_objectagg as json_objectagg,
+    json_arrayagg as json_arrayagg, json_parse as json_parse, json_scalar as json_scalar,
+    json_serialize as json_serialize, format_json as format_json,
+    is_json as is_json, is_not_json as is_not_json,
+)
 from ._results import Record as Record, Field as Field
 from ._entities import Entity as Entity, EntityColumn as EntityColumn, EntityQuery as EntityQuery, entity as entity
 from ._graphs import Graph as Graph, GraphQuery as GraphQuery, GraphCursor as GraphCursor, graph as graph

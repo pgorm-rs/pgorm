@@ -12,7 +12,7 @@ use crate::{
     expressions::{AliasedExpr, Compiled, PyCondition, require_expr},
 };
 
-pub(super) fn condition(value: &Bound<'_, PyAny>) -> PyResult<Condition> {
+pub(crate) fn condition(value: &Bound<'_, PyAny>) -> PyResult<Condition> {
     if let Ok(condition) = value.extract::<PyRef<'_, PyCondition>>() {
         Ok(condition.inner.clone())
     } else {

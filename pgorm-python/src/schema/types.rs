@@ -27,7 +27,7 @@ fn integer(value: Option<&Bound<'_, PyAny>>, label: &str) -> PyResult<Option<u32
 }
 
 impl PyDataType {
-    pub(super) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+    pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(kind) = value.extract::<PyRef<'_, Self>>() {
             return Ok(kind.clone());
         }

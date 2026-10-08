@@ -10126,12 +10126,27 @@ children (
                 title "Python builds SQL/JSON: the query functions, the constructors and IS JSON"
                 kind @feat
                 deps (pg17-sql-json)
+                sealed true
                 log (
                     {
                         at 2026-10-07T08:05:24.532137Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed with pg17-sql-json (2026-10-07). pgorm-python's call() reaches the named Func constructors of a fixed table (python.expressions); SQL/JSON's builders have no binding, so Python reaches them only through raw SQL: Func::json_exists / json_value / json_query with PASSING, RETURNING, the wrapper-or-quotes slot and the three behaviour enums (JsonExistsBehavior, JsonValueBehavior, JsonQueryBehavior); the constructors json_object, json_array, json_array_query, json_objectagg and json_arrayagg (ORDER BY, FILTER, and the window form expr_window now accepts), json, json_scalar and json_serialize; Expr::format_json; and Expr::is_json / is_not_json with JsonKind and JsonTest. A binding needs native objects for each builder and behaviour, capability-manifest entries, stubs, and parity cases against the Rust builders, rendering as Rust does: paths bound as text cast to jsonpath, a value typed in both render paths, a DEFAULT as an escaped literal. JSON_TABLE's half follows pg17-json-table."
+                    }
+
+                    {
+                        at 2026-10-08T15:55:17.404209Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T16:02:37.335682Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

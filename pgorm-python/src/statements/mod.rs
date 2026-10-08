@@ -12,6 +12,7 @@ mod tests;
 mod write;
 
 pub(crate) use capabilities::operations as capabilities;
+pub(crate) use common::condition;
 pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
 pub use insert::PyInsert;
 use pyo3::prelude::*;

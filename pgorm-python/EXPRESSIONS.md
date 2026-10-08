@@ -124,6 +124,83 @@ to its Rust API. Arithmetic names such as `expr.add` refer to Python operators
 (`Expr.__add__`). Projection/ordering objects retain their state until a
 statement consumes a clone. They cannot accidentally become predicates.
 
+## SQL/JSON
+
+PostgreSQL's SQL/JSON functions, constructors and `IS JSON` are functions
+returning an `Expr`. Each clause is a keyword argument applied through the
+Rust builder's own method, so the SQL is `pgorm_query`'s:
+
+```python
+from pgorm import (JsonDefault, JsonQueryBehavior, JsonValueBehavior, col,
+                   format_json, json_exists, json_object, json_query, json_value)
+
+doc = col("doc")
+size = json_value(doc, "$.size", returning="integer",
+                  on_empty=JsonDefault(0), on_error=JsonValueBehavior.Error)
+assert size.inspect().sql == (
+    'SELECT JSON_VALUE("doc", CAST($1::text AS jsonpath) RETURNING integer '
+    "DEFAULT 0 ON EMPTY ERROR ON ERROR)"
+)
+tagged = json_exists(doc, "$.tags[*] ? (@ == $Tag)", passing={"Tag": "blue"})
+tags = json_query(doc, "$.tags[*]", shaping="with_wrapper",
+                  on_empty=JsonQueryBehavior.EmptyArray)
+row = json_object({"id": col("id"), "body": format_json(col("body"))},
+                  absent_on_null=True, returning="jsonb")
+```
+
+| Python | Rust builder |
+| --- | --- |
+| `json_exists(context, path, *, passing, on_error)` | `Func::json_exists` |
+| `json_value(context, path, *, passing, returning, on_empty, on_error)` | `Func::json_value` |
+| `json_query(context, path, *, passing, returning, shaping, on_empty, on_error)` | `Func::json_query` |
+| `json_object(entries, *, absent_on_null, unique_keys, returning)` | `Func::json_object` and `entry` |
+| `json_array(*elements, null_on_null, returning)` | `Func::json_array` and `element` |
+| `json_array_query(select, *, returning)` | `Func::json_array_query` |
+| `json_objectagg(key, value, *, absent_on_null, unique_keys, returning, filter)` | `Func::json_objectagg` |
+| `json_arrayagg(value, *, order_by, null_on_null, returning, filter)` | `Func::json_arrayagg` |
+| `json_parse(input, *, unique_keys)` | `Func::json` (`JSON(..)`) |
+| `json_scalar(operand)` | `Func::json_scalar` |
+| `json_serialize(input, *, returning)` | `Func::json_serialize` |
+| `format_json(operand)` | `Expr::format_json`, a `JsonInput` |
+| `is_json(operand, kind=JsonKind.Value, *, unique_keys)` / `is_not_json` | `Expr::is_json` / `is_not_json` |
+
+The path is a `str` that Rust binds as `text` cast to `jsonpath`, so it never
+becomes statement text. `PASSING` takes a `dict` from variable name to value.
+Each name is an identifier, quoted, so `$Tag` in the path names `"Tag"` exactly.
+Values in positions that give them no type (`PASSING`, constructor members,
+aggregate operands, `json_scalar`, `IS JSON`, the context) carry their type in
+both render paths: `json_scalar(5)` is the JSON number 5, not the string `"5"`.
+`format_json` marks an operand as JSON text. It returns a `JsonInput`, accepted
+only in the positions SQL/JSON reads JSON, never as an expression.
+
+Each function takes its own behaviour class, so a choice PostgreSQL refuses
+cannot be written. `JsonExistsBehavior` is `True_`, `False_` (with the
+underscore Python's keywords need), `Unknown` or `Error`. `JsonValueBehavior`
+is `Null` or `Error`, and `JsonQueryBehavior` adds `EmptyArray` and
+`EmptyObject`. `JsonDefault(value)` is `DEFAULT value` for either. PostgreSQL
+refuses a parameter there (`42804`), so Rust writes the value as an escaped
+literal in both render paths. A value carrying an enum cast is refused, because
+the literal cannot keep the cast.
+
+`json_query`'s `shaping` is one slot: `"with_wrapper"`,
+`"with_conditional_wrapper"` or `"omit_quotes"`, because PostgreSQL refuses
+`OMIT QUOTES` beside a wrapper. `returning` takes a `DataType` or a built-in
+type name. `json_value` refuses `json` and `jsonb` with `ConstructionError`,
+since PostgreSQL 18.6 returns `NULL` for every later row once one of those
+evaluations is `NULL` (bug #19695); `json_query` reads JSON out of a
+document instead. `json_object` takes a `dict` of string keys, bound as
+values, or a list of `(key, value)` pairs whose keys may be expressions, so a
+repeated key can still be tested against `unique_keys`. `json_arrayagg`'s
+`order_by` is a list of `Expr.asc()` / `desc()`. The Rust builder places no
+`NULLS FIRST` or `NULLS LAST` there, so an ordering that asks for one is
+refused rather than dropped. `filter` takes an expression or a `Condition`.
+
+`JSON(..)` is `json_parse` so that importing it cannot shadow Python's `json`
+module. `json_serialize` reads its input through `JSON(..)`, so a `jsonb`
+value serializes as its document on PostgreSQL 18.6. The aggregates' window
+form is not reachable from Python: `Select` has no window clause. `JSON_TABLE`,
+a `FROM` item, is not bound yet either, because `Select.from_` takes a `Table`.
+
 Run installed expression tests and Rust parity tests from the repository root:
 
 ```sh

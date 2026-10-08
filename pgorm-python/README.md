@@ -85,7 +85,8 @@ print([value.snapshot() for value in compiled.params])
 ```
 
 See [expression construction and Rust API mappings](EXPRESSIONS.md) for
-conditions, functions, literal/bound paths, casts and ownership semantics.
+conditions, functions, SQL/JSON, literal/bound paths, casts and ownership
+semantics.
 
 ## Statements
 

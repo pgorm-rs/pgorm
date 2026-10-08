@@ -163,7 +163,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         .map_err(|_| ConstructionError::new_err("expected a query expression"))
 }
 
-// [spec:pgorm:req:python.expressions]
+// [spec:pgorm:req:python.expressions+1]
 #[pyfunction]
 #[pyo3(signature = (name, *arguments))]
 pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExpr> {
