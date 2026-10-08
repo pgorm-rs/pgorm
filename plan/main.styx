@@ -10425,4 +10425,32 @@ children (
             }
         )
     }
+
+    {
+        id python-json-table
+        title "Python reads rows out of a JSON document with JSON_TABLE, a FROM item"
+        kind @feat
+        log (
+            {
+                at 2026-10-08T16:03:28.361105Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed by python-sql-json (f2e880a6), whose node note left JSON_TABLE's half to follow pg17-json-table (983505d0). Rust builds it as Func::json_table(context, path, first_column) -> JsonTable, made a FromItem by alias(name), with JsonTableColumn's five kinds (ordinality, value, query, exists, nested with its own first column), passing, path_name and on_error (JsonTableBehavior: ERROR or EMPTY only); paths are escaped literals because the server refuses a parameter there (0A000 root, 42601 column). Python cannot place it: Select.from_ and Select.join take only a Table (pgorm-python/src/statements/select.rs), so there is no FROM item beyond a named table, no comma-joined second FROM item, and no LEFT JOIN .. ON TRUE over a lateral one. Needs: a Python spelling for a FROM item that is not a table (JSON_TABLE first; a subquery or VALUES list would share the same door), accepted by from_ and the join methods; native objects for the table, its column kinds and their behaviours, reusing python-sql-json's JsonValueBehavior / JsonQueryBehavior / JsonExistsBehavior / JsonDefault where the Rust column kinds take those enums; stubs (a sibling .pyi), capability-manifest entries, parity cases against the Rust builders, live tests on 18.6 (each column kind, NESTED PATH as an outer join, 2203A under ERROR ON ERROR, a hostile path literal, 42712 for a repeated column name), and python.statements gaining the FROM item. The alias and every column, path and PASSING name reach the Rust builder as a Name, so the identifier oracle already covers them."
+            }
+        )
+    }
+
+    {
+        id python-select-windows
+        title "Python's runtime Select calls a function over a window, a JSON aggregate's OVER form included"
+        kind @feat
+        log (
+            {
+                at 2026-10-08T16:03:37.222867Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed by python-sql-json (f2e880a6). pg17-sql-json's note lists the window form of JSON_OBJECTAGG / JSON_ARRAYAGG, which SelectStatement::expr_window / expr_window_as / expr_window_name(_as) and the WINDOW clause accept for any WindowFunction. Python's runtime Select (pgorm-python/src/statements/select.rs) has no window method at all, so neither a JSON aggregate nor count / sum / row_number reaches OVER (..) there; only the pipeline API's windows (pgorm::pipeline) and RawSQL do. Decide the Python spelling (an over(partition_by=, order_by=, frame=) on an aggregate expression, or a select item carrying a window spec), keeping OVER attached only to a function call as Rust's narrowed expr_window does (bug.window-position), and give it stubs, capability-manifest entries, parity cases against the Rust builders, live tests on 18.6, and python.statements' text."
+            }
+        )
+    }
 )
