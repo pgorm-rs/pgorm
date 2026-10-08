@@ -1,10 +1,12 @@
 use pgorm_query::{Expr, SimpleExpr, TypeName, Value};
 
 /// A Rust type standing for a range type a schema created with `CREATE TYPE
-/// ... AS RANGE`: a newtype over [`Range<T>`](crate::Range), named the way an
-/// [`ActiveEnum`](crate::ActiveEnum) names its enum type, because the range
-/// type's name is what PostgreSQL needs to read a value of it and no
-/// [`Value`] can carry one.
+/// ... AS RANGE`, or for the multirange PostgreSQL creates beside it: a
+/// newtype over [`Range<T>`](crate::Range) or
+/// [`Multirange<T>`](crate::Multirange), named the way an
+/// [`ActiveEnum`](crate::ActiveEnum) names its enum type, because the type's
+/// name is what PostgreSQL needs to read a value of it and no [`Value`] can
+/// carry one.
 ///
 /// A value converts into its text form, `[1.5,2.5)`, as
 /// [`Value::String`]: each bound is written in its subtype's text and
@@ -13,8 +15,11 @@ use pgorm_query::{Expr, SimpleExpr, TypeName, Value};
 /// [`save_as`](crate::ColumnTrait::save_as) casts that text to the type by
 /// name, bound as a `text` parameter or escaped inline; there is no cast
 /// between two range types, so a built-in range value written to the column
-/// is turned into its text first. A row decodes from the range's binary form,
-/// over whatever subtype the server reports.
+/// is turned into its text first. A row of a range decodes from the range's
+/// binary form, over whatever subtype the server reports; a row of a
+/// multirange, which the driver reports as a simple type, is read as its
+/// text, the column's [`select_as`](crate::ColumnTrait::select_as) casting it
+/// so.
 ///
 /// Derived with [`DeriveCreatedRange`](pgorm_macros::DeriveCreatedRange):
 ///
@@ -33,7 +38,7 @@ use pgorm_query::{Expr, SimpleExpr, TypeName, Value};
 ///     ),
 /// );
 /// ```
-// [spec:pgorm:def:sql.value.created-range]
+// [spec:pgorm:def:sql.value.created-range+1]
 pub trait CreatedRange: Into<Value> {
     /// The range type's name, schema-qualified when it was declared with one.
     fn name() -> TypeName;

@@ -496,24 +496,28 @@ known limitations.
 > `From<T> for Value` (through `self.0`), `TryGetable`, and `ValueType` delegating to
 > the inner type with `type_name()` = the struct name; no `Nullable` impl is generated.
 
-> [spec:pgorm:sem:macros.derive.created-range]
-> `DeriveCreatedRange` names a range type a schema created
-> (`[spec:pgorm:def:sql.value.created-range]`) on a tuple struct holding one
-> field written `Range<T>` — the last path segment `Range`, however qualified,
-> with one type argument, `T` the subtype. Any other shape is a compile error
-> spanned at the struct, or at the field when it is not a `Range<T>`. The
-> attribute takes `range_name = "..."`, which is required and names the type,
-> and `schema_name = "..."`, which qualifies it; both become
-> `Name::runtime`, so they are names and quoted where they need to be, and any
+> [spec:pgorm:sem:macros.derive.created-range+1]
+> `DeriveCreatedRange` names a range type a schema created, or the
+> multirange created beside one (`[spec:pgorm:def:sql.value.created-range+1]`),
+> on a tuple struct holding one field: written `Range<T>` under `range_name =
+> "..."`, `Multirange<T>` under `multirange_name = "..."` — the last path
+> segment, however qualified, with one type argument, `T` the subtype. Exactly
+> one of the two keys is required; both, neither, a field the key does not
+> name, or any other shape is a compile error spanned at the struct, the key
+> or the field. `schema_name = "..."` qualifies the type. Each becomes
+> `Name::runtime`, so it is a name and quoted where it needs to be, and any
 > other key is a spanned compile error. The expansion implements
 > `pgorm::CreatedRange` (`name()`, the `TypeName`), `From<Range<T>>` for the
-> newtype, `From<newtype> for Value` as `Value::String` of the range's text
-> form, `Nullable` as the `NULL` string, `TryGetable` and its `accepts`
-> delegating to `Range<T>`'s, and `ValueType`: `try_from` parses a
-> `Value::String` with `Range<T>`'s `FromStr` and refuses anything else,
+> newtype, `From<newtype> for Value` as `Value::String` of the text form,
+> `Nullable` as the `NULL` string, `TryGetable` — delegating to `Range<T>`'s
+> for a range, and for a multirange reading the column's text (which its
+> `select_as` casts it to) and parsing it with `Multirange<T>`'s `FromStr`, a
+> failure being `TryGetError::Db` naming the newtype — with `accepts`
+> answering as what it reads does, and `ValueType`: `try_from` parses a
+> `Value::String` with the held type's `FromStr` and refuses anything else,
 > `type_name()` is the struct name, `array_type()` is `String`, and
-> `column_type()` is `ColumnType::CreatedRange` carrying the name, the schema
-> and `<T as ValueType>::column_type()`. A field of the newtype therefore
+> `column_type()` is `ColumnType::CreatedRange` or `CreatedMultirange`
+> carrying the name, the schema and `<T as ValueType>::column_type()`. A field of the newtype therefore
 > needs no `column_type` attribute: `DeriveEntityModel` takes the created
 > range column type from it.
 

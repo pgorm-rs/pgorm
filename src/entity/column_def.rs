@@ -61,7 +61,7 @@ pub(crate) fn escape_like_text(text: &str) -> String {
 /// The enum type a column stores, as the structured [`TypeName`] every cast
 /// renders — schema qualification carried, the array flag set for a column
 /// holding an array of the enum.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+5]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+6]
 pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     match col_type {
         ColumnType::Enum { name, schema, .. } => {
@@ -76,11 +76,13 @@ pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeN
     }
 }
 
-/// The range type a schema created that a column stores, as the [`TypeName`]
-/// a value written to it is cast to.
-// [spec:pgorm:def:sql.value.created-range]
+/// The range or multirange type a schema created that a column stores, as
+/// the [`TypeName`] a value written to it is cast to.
+// [spec:pgorm:def:sql.value.created-range+1]
 pub(crate) fn created_range_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
-    let ColumnType::CreatedRange { name, schema, .. } = col_type else {
+    let (ColumnType::CreatedRange { name, schema, .. }
+    | ColumnType::CreatedMultirange { name, schema, .. }) = col_type
+    else {
         return None;
     };
     let type_name = pgorm_query::TypeName::new(Name::clone(name));
@@ -259,11 +261,11 @@ where
 mod tests {
     use crate::{ColumnTrait, EntityTrait};
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5/test]    every
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6/test]    every
     // value-position operand passes through `save_as` — between, if_null and
     // the array membership forms included — for the derive-generated override
     // and the enum default alike
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5/test]    a
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6/test]    a
     // schema-qualified enum type reaches every rendering qualified: the value
     // cast, the array cast, the CREATE TABLE column type and CREATE TYPE
     #[test]

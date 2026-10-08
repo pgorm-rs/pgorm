@@ -591,7 +591,7 @@ fn entity_sites() -> Vec<Site> {
             kinds: &["TypeCast.type_name.names[0]"],
             policy: TypePart,
             render: |n| {
-                range_named::with_type(None, n, || {
+                range_named::with_type(false, None, n, || {
                     built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
                         &range_named::Column::Id,
                         pgorm::pgorm_query::Range::from(1..5),
@@ -605,10 +605,42 @@ fn entity_sites() -> Vec<Site> {
             kinds: &["TypeCast.type_name.names[0]"],
             policy: TypePart,
             render: |n| {
-                range_named::with_type(Some(n), "ty", || {
+                range_named::with_type(false, Some(n), "ty", || {
                     built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
                         &range_named::Column::Id,
                         pgorm::pgorm_query::Range::from(1..5),
+                    )))
+                })
+            },
+        },
+        Site {
+            id: "pgorm/column.save-as.created-multirange",
+            api: "ColumnTrait::eq on a ColumnType::CreatedMultirange { name: Name, .. } column",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                range_named::with_type(true, None, n, || {
+                    built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
+                        &range_named::Column::Id,
+                        pgorm::pgorm_query::Multirange::from(vec![
+                            pgorm::pgorm_query::Range::from(1..5),
+                        ]),
+                    )))
+                })
+            },
+        },
+        Site {
+            id: "pgorm/column.save-as.created-multirange-schema",
+            api: "ColumnTrait::eq on a ColumnType::CreatedMultirange { schema: Some(Name), .. } column",
+            kinds: &["TypeCast.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                range_named::with_type(true, Some(n), "ty", || {
+                    built(&range_named::Entity::find().filter(pgorm::ColumnTrait::eq(
+                        &range_named::Column::Id,
+                        pgorm::pgorm_query::Multirange::from(vec![
+                            pgorm::pgorm_query::Range::from(1..5),
+                        ]),
                     )))
                 })
             },

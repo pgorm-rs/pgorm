@@ -294,7 +294,7 @@ mod test {
     }
 }
 
-// [spec:pgorm:def:sql.types.column-type+9]
+// [spec:pgorm:def:sql.types.column-type+10]
 impl fmt::Display for PgInterval {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (fields, precision) = match self {
@@ -515,7 +515,7 @@ pub enum TypeAs {
     // [spec:pgorm:req:sql.render.ddl.enum-type+5]
     Enum(Vec<String>),
     /// `AS RANGE (..)`, carrying the subtype and the options beside it.
-    // [spec:pgorm:req:sql.ddl.type-range+1]
+    // [spec:pgorm:req:sql.ddl.type-range+2]
     Range(RangeDefinition),
 }
 

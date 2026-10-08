@@ -361,7 +361,7 @@ bound parameter is held to.
 > error or wrong bytes.
 
 
-> [spec:pgorm:req:exec.cursor.binding-range]
+> [spec:pgorm:req:exec.cursor.binding-range+1]
 > A `Value::Range` binds against a placeholder whose type is a range — the
 > built-in six, or a range type a schema created, which tokio-postgres
 > reports as a range over its subtype all the same — and a
@@ -385,10 +385,13 @@ bound parameter is held to.
 >
 > A multirange is written as a count and then each range length-prefixed in
 > a range's own encoding, against the subtype the multirange's kind names. A
-> multirange a schema created cannot be bound: tokio-postgres learns a
-> type's kind from `pg_range` joined on the *range* type, so the multirange
-> arrives as a simple type with no subtype to write the bounds in, and
-> guessing one would send bytes the server could read as another type.
+> multirange a schema created cannot be bound in binary: tokio-postgres
+> learns a type's kind from `pg_range` joined on the *range* type, so the
+> multirange arrives as a simple type with no subtype to write the bounds in,
+> and guessing one would send bytes the server could read as another type. It
+> is written as its text cast to its name instead
+> (`[spec:pgorm:def:sql.value.created-range+1]`), and a `Value::Multirange`
+> against such a placeholder is still refused here.
 >
 > PostgreSQL types a placeholder beside a range column by the column: in
 > `r @> $1`, `$1 <@ r` and `r && $1` it infers the range type, so an element

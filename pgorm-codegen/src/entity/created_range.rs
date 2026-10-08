@@ -5,19 +5,23 @@ use quote::{format_ident, quote};
 
 use crate::{Entity, EntityWriter, OutputFile};
 
-/// A range type a schema created, as the newtype the generated entities name
-/// it by: one per type, as an enum type is one `ActiveEnum`.
+/// A range type a schema created, or the multirange created beside it, as
+/// the newtype the generated entities name it by: one per type, as an enum
+/// type is one `ActiveEnum`.
 #[derive(Clone, Debug)]
 pub struct CreatedRangeType {
     pub(crate) name: Name,
     pub(crate) schema: Option<Name>,
     pub(crate) subtype: ColumnType,
+    /// Whether this is the multirange, held as a `Multirange<T>`, rather than
+    /// the range, held as a `Range<T>`.
+    pub(crate) multirange: bool,
 }
 
 /// The Rust type a range type created over `subtype` ranges over, as the
 /// prelude names it — `None` for a subtype pgorm's `RangeSubtype` does not
 /// cover, which no newtype can hold.
-// [spec:pgorm:sem:codegen.entity.types+5]
+// [spec:pgorm:sem:codegen.entity.types+6]
 pub(crate) fn created_range_subtype(subtype: &ColumnType) -> Option<&'static str> {
     Some(match subtype {
         ColumnType::SmallInteger => "i16",
@@ -45,7 +49,7 @@ impl CreatedRangeType {
 
     /// The newtype, deriving `DeriveCreatedRange` under the type's name and
     /// schema. `Eq` is derived unless the subtype is a float, as for a Model.
-    // [spec:pgorm:sem:codegen.entity.types+5]
+    // [spec:pgorm:sem:codegen.entity.types+6]
     pub fn impl_created_range(&self) -> TokenStream {
         let ident = Self::rs_type(&self.name);
         let Some(subtype) = created_range_subtype(&self.subtype) else {
@@ -58,7 +62,7 @@ impl CreatedRangeType {
         let subtype: TokenStream = subtype
             .parse()
             .expect("mapped Rust type names are token text");
-        let range_name = self.name.to_string();
+        let type_name = self.name.to_string();
         let schema_attr = self.schema.as_ref().map(|schema| {
             let schema = schema.to_string();
             quote! { , schema_name = #schema }
@@ -67,10 +71,14 @@ impl CreatedRangeType {
             ColumnType::Float | ColumnType::Double => quote! {},
             _ => quote! { , Eq },
         };
+        let (key, held) = match self.multirange {
+            false => (quote! { range_name }, quote! { Range }),
+            true => (quote! { multirange_name }, quote! { Multirange }),
+        };
         quote! {
             #[derive(Clone, Debug, PartialEq #eq, DeriveCreatedRange)]
-            #[pgorm(range_name = #range_name #schema_attr)]
-            pub struct #ident(pub Range<#subtype>);
+            #[pgorm(#key = #type_name #schema_attr)]
+            pub struct #ident(pub #held<#subtype>);
         }
     }
 }
@@ -97,12 +105,13 @@ impl EntityWriter {
     }
 
     /// The `use` of each range type's newtype an entity's columns name.
-    // [spec:pgorm:sem:codegen.entity.imports+1]
+    // [spec:pgorm:sem:codegen.entity.imports+2]
     pub fn gen_import_range_types(entity: &Entity) -> TokenStream {
         let mut imported: Vec<String> = Vec::new();
         let mut imports = TokenStream::new();
         for column in entity.columns.iter() {
-            if let ColumnType::CreatedRange { name, .. } = column.get_inner_col_type()
+            if let ColumnType::CreatedRange { name, .. }
+            | ColumnType::CreatedMultirange { name, .. } = column.get_inner_col_type()
                 && !imported.contains(&name.to_string())
             {
                 imported.push(name.to_string());

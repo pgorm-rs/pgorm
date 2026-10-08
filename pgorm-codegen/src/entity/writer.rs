@@ -438,7 +438,7 @@ impl EntityWriter {
         code_blocks
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports+1]
+    // [spec:pgorm:sem:codegen.entity.imports+2]
     pub fn gen_import(with_serde: &WithSerde) -> TokenStream {
         let prelude_import = quote!(
             use pgorm::entity::prelude::*;
@@ -498,7 +498,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports+1]    active-enum imports
+    // [spec:pgorm:sem:codegen.entity.imports+2]    active-enum imports
     pub fn gen_import_active_enum(entity: &Entity) -> TokenStream {
         entity
             .columns

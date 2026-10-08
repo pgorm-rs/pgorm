@@ -248,7 +248,7 @@ fn alter_type_rename_emits_identifier() {
 // second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle+1/test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
-// [spec:pgorm:def:sql.types.column-type+9/test]
+// [spec:pgorm:def:sql.types.column-type+10/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
     let hour = Table::create(Glyph::Table)

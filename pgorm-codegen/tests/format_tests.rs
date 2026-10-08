@@ -456,7 +456,7 @@ fn expanded_model_block_layout() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.imports+1/test]    the import block is the prelude
+// [spec:pgorm:sem:codegen.entity.imports+2/test]    the import block is the prelude
 // import plus the serde import selected by `WithSerde`
 #[test]
 fn import_block_matches_the_with_serde_variant() {
@@ -487,7 +487,7 @@ fn import_block_matches_the_with_serde_variant() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.imports+1/test]    entity files import each active
+// [spec:pgorm:sem:codegen.entity.imports+2/test]    entity files import each active
 // enum once, in first-use column order, looking through `Array`
 #[test]
 fn entity_imports_each_enum_once_in_first_use() {
@@ -527,7 +527,7 @@ fn entity_imports_each_enum_once_in_first_use() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.imports+1/test]    `pgorm_active_enums.rs` heads
+// [spec:pgorm:sem:codegen.entity.imports+2/test]    `pgorm_active_enums.rs` heads
 // with the same import block, without any enum imports, directly below the
 // generated-file header
 #[test]
@@ -554,7 +554,7 @@ fn active_enums_file_imports_serde_not_enum_modules() {
     assert_not_contains(enums, "use super::pgorm_active_enums::TaskState;");
 }
 
-// [spec:pgorm:sem:codegen.entity.imports+1/test]    in entity files the imports sit
+// [spec:pgorm:sem:codegen.entity.imports+2/test]    in entity files the imports sit
 // directly below the generated-file header
 #[test]
 fn imports_sit_directly_below_the_generated_header() {

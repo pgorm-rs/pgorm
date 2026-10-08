@@ -19,7 +19,7 @@ type WireResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 /// Bind a range against a range type — a built-in one or a range type a
 /// schema created, which tokio-postgres reports as a range over its subtype
 /// all the same. Any other inferred type is refused.
-// [spec:pgorm:req:exec.cursor.binding-range]
+// [spec:pgorm:req:exec.cursor.binding-range+1]
 pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) -> BindResult {
     match wire_type(ty).kind() {
         Kind::Range(subtype) => {
@@ -37,7 +37,7 @@ pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) ->
 /// kind from `pg_range` joined on the *range* type, so a multirange a schema
 /// created comes back as a simple type with no subtype to write the bounds
 /// in, and guessing one would send bytes the server reads as something else.
-// [spec:pgorm:req:exec.cursor.binding-range]
+// [spec:pgorm:req:exec.cursor.binding-range+1]
 pub(super) fn bind_multirange(
     multirange: &Multirange<Value>,
     ty: &Type,
@@ -59,7 +59,7 @@ pub(super) fn bind_multirange(
 
 /// A range's binary form: a flag byte, then each present bound
 /// length-prefixed. The empty range is the flag byte alone.
-// [spec:pgorm:req:exec.cursor.binding-range]
+// [spec:pgorm:req:exec.cursor.binding-range+1]
 fn write_range(range: &Range<Value>, subtype: &Type, out: &mut BytesMut) -> WireResult<()> {
     match range {
         Range::Empty => {
@@ -80,7 +80,7 @@ fn write_range(range: &Range<Value>, subtype: &Type, out: &mut BytesMut) -> Wire
 /// argument and as the literal rendering writes one. Sent as a NULL, it would
 /// reach the server as a bound of length -1, which the range's receive
 /// function reads as a length rather than as a NULL.
-// [spec:pgorm:req:exec.cursor.binding-range]
+// [spec:pgorm:req:exec.cursor.binding-range+1]
 fn write_bound(
     bound: &Bound<Value>,
     subtype: &Type,
@@ -127,7 +127,7 @@ mod tests {
         )
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn binds_each_bound_with_its_inclusivity() {
         assert_eq!(
@@ -148,7 +148,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn binds_the_empty_range_as_its_own_flag() {
         assert_eq!(
@@ -164,7 +164,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn binds_a_null_bound_as_no_bound() {
         assert_eq!(
@@ -179,7 +179,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn writes_bounds_through_the_scalar_adapter() {
         // An `int8` value narrowed to the range's `int4` subtype, as a scalar is.
@@ -210,7 +210,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn binds_a_created_range_type_by_subtype() {
         let created = Type::new(
@@ -225,7 +225,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn binds_a_multirange_as_counted_ranges() {
         let multirange: Multirange<i32> = [Range::from(1..3), Range::Empty].into_iter().collect();
@@ -247,7 +247,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
     #[test]
     fn refuses_a_range_against_other_types() {
         assert_eq!(

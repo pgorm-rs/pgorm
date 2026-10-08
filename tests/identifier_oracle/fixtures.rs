@@ -162,23 +162,30 @@ pub mod cast_named {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-/// An entity whose one column is of a range type a schema created, named at
-/// run time — the cast `ColumnTrait::save_as` writes a value through.
+/// An entity whose one column is of a range type a schema created, or of the
+/// multirange beside one, named at run time — the cast `ColumnTrait::save_as`
+/// writes a value through.
 pub mod range_named {
     use std::{cell::RefCell, sync::Arc};
 
     use pgorm::{entity::prelude::*, pgorm_query::Name};
 
     thread_local! {
-        static TYPE: RefCell<(Option<String>, String)> =
-            RefCell::new((None, String::from("ty")));
+        static TYPE: RefCell<(bool, Option<String>, String)> =
+            RefCell::new((false, None, String::from("ty")));
     }
 
-    /// Run `f` with the column's range type named `name` under `schema`.
-    pub fn with_type<T>(schema: Option<&str>, name: &str, f: impl FnOnce() -> T) -> T {
-        TYPE.with(|cell| cell.replace((schema.map(str::to_owned), name.to_owned())));
+    /// Run `f` with the column's range type — its multirange when
+    /// `multirange` — named `name` under `schema`.
+    pub fn with_type<T>(
+        multirange: bool,
+        schema: Option<&str>,
+        name: &str,
+        f: impl FnOnce() -> T,
+    ) -> T {
+        TYPE.with(|cell| cell.replace((multirange, schema.map(str::to_owned), name.to_owned())));
         let out = f();
-        TYPE.with(|cell| cell.replace((None, String::from("ty"))));
+        TYPE.with(|cell| cell.replace((false, None, String::from("ty"))));
         out
     }
 
@@ -205,11 +212,23 @@ pub mod range_named {
         type EntityName = Entity;
 
         fn def(&self) -> ColumnDef {
-            let (schema, name) = TYPE.with(|cell| cell.borrow().clone());
-            ColumnType::CreatedRange {
-                name: Name::runtime(name),
-                schema: schema.map(Name::runtime),
-                subtype: Arc::new(ColumnType::Integer),
+            let (multirange, schema, name) = TYPE.with(|cell| cell.borrow().clone());
+            let (name, schema, subtype) = (
+                Name::runtime(name),
+                schema.map(Name::runtime),
+                Arc::new(ColumnType::Integer),
+            );
+            match multirange {
+                false => ColumnType::CreatedRange {
+                    name,
+                    schema,
+                    subtype,
+                },
+                true => ColumnType::CreatedMultirange {
+                    name,
+                    schema,
+                    subtype,
+                },
             }
             .def()
         }

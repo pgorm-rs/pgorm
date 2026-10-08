@@ -448,9 +448,18 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     }
 
     /// Cast enum column as text; do nothing if `self` is not an enum.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5]
+    ///
+    /// A column of a multirange a schema created is cast to `text` too: the
+    /// driver reports such a multirange as a simple type with no subtype to
+    /// read its binary form by, so it is read as its text, which the
+    /// newtype's `FromStr` parses.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6]
+    // [spec:pgorm:def:sql.value.created-range+1]
     // [spec:pgorm:req:sql.ast.cast-shape+1]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
+        if let ColumnType::CreatedMultirange { .. } = self.def().get_column_type() {
+            return expr.cast_as_type(pgorm_query::TypeName::new(Text));
+        }
         cast_enum_as(expr, self, |col, _, col_type| {
             let text = pgorm_query::TypeName::new(Text);
             col.cast_as_type(match col_type {
@@ -473,7 +482,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column that overrides `save_as` with a cast of its own — what
     /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
         self.save_enum_array_as(val)
     }
@@ -483,7 +492,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
     /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
     /// columns without a `save_as` attribute.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6]
     // [spec:pgorm:req:sql.ast.cast-shape+1]
     fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
@@ -499,8 +508,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column of a range type a schema created takes its value through
     /// [`Expr::as_range`]: a range is written as its text form and cast to the
     /// type by name, there being no cast to it from a built-in range type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+5]
-    // [spec:pgorm:def:sql.value.created-range]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+6]
+    // [spec:pgorm:def:sql.value.created-range+1]
     // [spec:pgorm:req:sql.ast.cast-shape+1]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         match created_range_type_name(self.def().get_column_type()) {

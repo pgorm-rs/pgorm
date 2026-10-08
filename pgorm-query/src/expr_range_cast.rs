@@ -39,7 +39,7 @@ impl Expr {
     ///     r#"INSERT INTO "character" ("character") VALUES (CAST($1::text AS booking.slot))"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.value.created-range]
+    // [spec:pgorm:def:sql.value.created-range+1]
     // [spec:pgorm:req:sql.ast.cast-shape+1]
     pub fn as_range(self, type_name: TypeName) -> SimpleExpr {
         let operand = match SimpleExpr::from(self) {

@@ -57,7 +57,8 @@ pub trait IntoColumnDef {
 /// | Range                 | int4range, ..., tstzrange |
 /// | Multirange            | int4multirange, ...      |
 /// | CreatedRange          | RANGE_TYPE_NAME          |
-// [spec:pgorm:def:sql.types.column-type+9]
+/// | CreatedMultirange     | MULTIRANGE_TYPE_NAME     |
+// [spec:pgorm:def:sql.types.column-type+10]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -112,8 +113,17 @@ pub enum ColumnType {
     /// in full as an enum type is, and the subtype it ranges over. The name
     /// is what DDL writes and what a value is cast to; the subtype is what a
     /// value's bounds are, which no name says.
-    // [spec:pgorm:def:sql.value.created-range]
+    // [spec:pgorm:def:sql.value.created-range+1]
     CreatedRange {
+        name: Name,
+        schema: Option<Name>,
+        subtype: Arc<ColumnType>,
+    },
+    /// The multirange PostgreSQL creates beside a range type a schema
+    /// created, named in full — its own name, which is not the range's — and
+    /// the subtype its ranges range over.
+    // [spec:pgorm:def:sql.value.created-range+1]
+    CreatedMultirange {
         name: Name,
         schema: Option<Name>,
         subtype: Arc<ColumnType>,
@@ -130,7 +140,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+9]
+// [spec:pgorm:def:sql.types.column-type+10]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -170,6 +180,18 @@ impl PartialEq for ColumnType {
                     subtype: l_subtype,
                 },
                 Self::CreatedRange {
+                    name: r_name,
+                    schema: r_schema,
+                    subtype: r_subtype,
+                },
+            )
+            | (
+                Self::CreatedMultirange {
+                    name: l_name,
+                    schema: l_schema,
+                    subtype: l_subtype,
+                },
+                Self::CreatedMultirange {
                     name: r_name,
                     schema: r_schema,
                     subtype: r_subtype,
@@ -561,7 +583,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+9]
+    // [spec:pgorm:def:sql.types.column-type+10]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self

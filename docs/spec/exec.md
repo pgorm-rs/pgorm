@@ -190,7 +190,7 @@ These rules capture what the code does today, including known gaps.
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
 
-> [spec:pgorm:def:exec.decode.range+2]
+> [spec:pgorm:def:exec.decode.range+3]
 > `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+3]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
 > `Decimal` unconditionally, and `jiff::civil::Date`,
@@ -223,7 +223,8 @@ These rules capture what the code does today, including known gaps.
 > and reads its count of length-prefixed ranges, refusing a count, a length
 > or a trailing byte the message does not hold. A multirange a schema
 > created is reported by tokio-postgres as a simple type, which neither
-> accepts. `TryGetable::accepts` answers through the newtype, so
+> accepts: it is read as its text instead, by the newtype that names it
+> (`[spec:pgorm:def:sql.value.created-range+1]`). `TryGetable::accepts` answers through the newtype, so
 > `VerifyStatement` reports a range column of another subtype or a
 > multirange read as a range.
 >

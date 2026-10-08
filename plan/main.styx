@@ -10231,6 +10231,7 @@ children (
         title "A multirange a schema creates binds and decodes, though the driver reports it as a simple type"
         kind @feat
         deps (created-range-types)
+        sealed true
         log (
             {
                 at 2026-10-07T10:38:10.018504Z
@@ -10244,6 +10245,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-07 chose route (b) for created range types (see created-range-types' decision note): Value stays at 16 bytes, and a created-range value travels as a text literal cast to its named type. A created multirange follows the same principle. Bind through the variadic constructor that range-consumers-beyond-builtins verified live (floatmultirange(VARIADIC $1) with $1 typed floatrange[]), or as a text literal cast to the named multirange type, whichever proves simpler and safe. Decode through the route it recorded (ARRAY(SELECT unnest(col))), since tokio-postgres reports a created multirange as a simple type. The multirange type's name is caller-named and registered in the identifier oracle."
+            }
+
+            {
+                at 2026-10-07T18:23:33.00887Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T12:42:49.769136Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

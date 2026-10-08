@@ -55,6 +55,8 @@ pub(crate) enum DeclaredType {
     Enum(Vec<String>),
     /// A range, by the column type of the subtype it ranges over.
     Range(ColumnType),
+    /// The multirange created beside a range, by the same subtype.
+    Multirange(ColumnType),
 }
 
 /// Declared types keyed by full identity. An enum and a range share one
@@ -132,13 +134,15 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
                 )?;
             }
             NodeEnum::CreateRangeStmt(stmt) => {
-                let (identity, subtype) = objects::range_type(stmt, &collected.declared, at)?;
+                let parsed = objects::range_type(stmt, &collected.declared, at)?;
+                let subtype = DeclaredType::Multirange(parsed.subtype.clone());
                 declare(
                     &mut collected.declared,
-                    identity,
-                    DeclaredType::Range(subtype),
+                    parsed.range,
+                    DeclaredType::Range(parsed.subtype),
                     at,
                 )?;
+                declare(&mut collected.declared, parsed.multirange, subtype, at)?;
             }
             other => return Err(unsupported(statement_kind(other), at)),
         }
@@ -148,7 +152,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Record a type the file declares, refusing a second declaration of one
 /// identity — whichever kinds the two are.
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 fn declare(
     declared: &mut Declared,
     identity: TypeIdentity,
@@ -167,7 +171,7 @@ fn declare(
 
 /// Resolve the collected statements against each other: declared types into
 /// the columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         declared: types,

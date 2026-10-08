@@ -40,6 +40,14 @@ fn error(sql: &str) -> String {
     }
 }
 
+fn multi(name: &str, schema: Option<&str>, subtype: ColumnType) -> ColumnType {
+    ColumnType::CreatedMultirange {
+        name: Name::runtime(name),
+        schema: schema.map(Name::runtime),
+        subtype: Arc::new(subtype),
+    }
+}
+
 fn created(name: &str, schema: Option<&str>, subtype: ColumnType) -> ColumnType {
     ColumnType::CreatedRange {
         name: Name::runtime(name),
@@ -48,10 +56,10 @@ fn created(name: &str, schema: Option<&str>, subtype: ColumnType) -> ColumnType 
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+7/test]    a range type the file creates
+// [spec:pgorm:sem:codegen.ddl.objects+8/test]    a range type the file creates
 // types the columns naming it, by its full identity and with its subtype read
 // as a column's type is
-// [spec:pgorm:sem:codegen.ddl.types+6/test]
+// [spec:pgorm:sem:codegen.ddl.types+7/test]
 #[test]
 fn a_created_range_types_its_columns() {
     let statements = parse_schema(SCHEMA).expect("the schema parses");
@@ -64,19 +72,109 @@ fn a_created_range_types_its_columns() {
         columns,
         [
             Some(ColumnType::Integer),
+            Some(multi("floatmultirange", None, ColumnType::Double)),
             Some(created("floatrange", None, ColumnType::Double)),
             Some(created("slot", Some("booking"), ColumnType::Integer)),
+            Some(multi(
+                "slot_multirange",
+                Some("booking"),
+                ColumnType::Integer
+            )),
             Some(created("textrange", None, ColumnType::Text)),
         ]
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+5/test]    one newtype per range type,
+// [spec:pgorm:sem:codegen.ddl.objects+8/test]    a range type declares its
+// multirange too: under the name PostgreSQL derives, in the range's schema, or
+// under MULTIRANGE_TYPE_NAME as written
+#[test]
+fn a_created_range_declares_its_multirange() {
+    let column_of = |sql: &str| {
+        parse_schema(sql).expect("the schema parses")[0].get_columns()[1]
+            .get_column_type()
+            .cloned()
+    };
+    for (declared, column, name, schema) in [
+        (
+            "CREATE TYPE x_range_y_range AS RANGE (SUBTYPE = int4);",
+            "x_multirange_y_range",
+            "x_multirange_y_range",
+            None,
+        ),
+        (
+            "CREATE TYPE \"FloatRange\" AS RANGE (SUBTYPE = int4);",
+            "\"FloatRange_multirange\"",
+            "FloatRange_multirange",
+            None,
+        ),
+        (
+            "CREATE TYPE mr.plain AS RANGE (SUBTYPE = int4);",
+            "mr.plain_multirange",
+            "plain_multirange",
+            Some("mr"),
+        ),
+        (
+            "CREATE TYPE mr.q AS RANGE (SUBTYPE = int4, MULTIRANGE_TYPE_NAME = public.qm);",
+            "public.qm",
+            "qm",
+            Some("public"),
+        ),
+        (
+            "CREATE TYPE mr.q AS RANGE (SUBTYPE = int4, MULTIRANGE_TYPE_NAME = qm);",
+            "qm",
+            "qm",
+            None,
+        ),
+    ] {
+        assert_eq!(
+            column_of(&format!(
+                "{declared} CREATE TABLE t (id int PRIMARY KEY, m {column});"
+            )),
+            Some(multi(name, schema, ColumnType::Integer)),
+            "{declared}"
+        );
+    }
+    let long = "r".repeat(53);
+    assert_eq!(
+        column_of(&format!(
+            "CREATE TYPE {long} AS RANGE (SUBTYPE = int4); \
+             CREATE TABLE t (id int PRIMARY KEY, m {}_multirange);",
+            "r".repeat(52)
+        )),
+        Some(multi(
+            &format!("{}_multirange", "r".repeat(52)),
+            None,
+            ColumnType::Integer
+        )),
+    );
+    let clipped = format!("{}range", "a".repeat(55));
+    assert_eq!(
+        column_of(&format!(
+            "CREATE TYPE {clipped} AS RANGE (SUBTYPE = int4); \
+             CREATE TABLE t (id int PRIMARY KEY, m {}multiran);",
+            "a".repeat(55)
+        )),
+        Some(multi(
+            &format!("{}multiran", "a".repeat(55)),
+            None,
+            ColumnType::Integer
+        )),
+    );
+    assert_eq!(
+        error(
+            "CREATE TYPE floatrange AS RANGE (SUBTYPE = float8); CREATE TYPE floatmultirange AS ENUM ('a');"
+        ),
+        "statement 2: type `floatmultirange` is declared twice"
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.types+6/test]    one newtype per range type,
 // named in UpperCamelCase and deriving `DeriveCreatedRange` under its name and
 // schema, `Eq` but for a float subtype; the entity's fields name the newtypes
 // [spec:pgorm:req:codegen.entity.files+1/test]    `pgorm_range_types.rs` is
 // written and declared beside the entities
-// [spec:pgorm:sem:codegen.entity.imports+1/test]    each entity imports the
+// [spec:pgorm:sem:codegen.entity.imports+2/test]    each entity imports the
 // newtypes its columns name
 #[test]
 fn a_created_range_generates_a_compiling_newtype() {
@@ -113,16 +211,22 @@ fn a_created_range_generates_a_compiling_newtype() {
             .null()
     );
     assert_eq!(
+        measurement::Column::Slots.def(),
+        multi("slot_multirange", Some("booking"), ColumnType::Integer)
+            .def()
+            .null()
+    );
+    assert_eq!(
         <pgorm_range_types::Floatrange as pgorm::CreatedRange>::name().to_sql_string(),
         "floatrange"
     );
     assert_eq!(
         measurement::Entity::find().build().0,
-        r#"SELECT "measurement"."id", "measurement"."span", "measurement"."slot", "measurement"."label" FROM "measurement""#
+        r#"SELECT "measurement"."id", CAST("measurement"."spans" AS text), "measurement"."span", "measurement"."slot", CAST("measurement"."slots" AS text), "measurement"."label" FROM "measurement""#
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+5/test]    the expanded writer spells
+// [spec:pgorm:sem:codegen.entity.types+6/test]    the expanded writer spells
 // a created range column's type as the derive does
 #[test]
 fn the_expanded_writer_names_the_created_range() {
@@ -139,7 +243,17 @@ fn the_expanded_writer_names_the_created_range() {
     );
     assert_contains(
         generated.file("measurement.rs"),
-        "pub span: Floatrange, pub slot: Option<Slot>, pub label: Textrange,",
+        "pub spans: Floatmultirange, pub span: Floatrange, pub slot: Option<Slot>, \
+         pub slots: Option<SlotMultirange>, pub label: Textrange,",
+    );
+    assert_contains(
+        generated.file("measurement.rs"),
+        r#"Self::Spans => ColumnType::CreatedMultirange {
+            name: Name::runtime("floatmultirange"),
+            schema: None,
+            subtype: Arc::new(ColumnType::Double),
+        }
+        .def(),"#,
     );
 }
 
@@ -147,7 +261,7 @@ fn the_expanded_writer_names_the_created_range() {
 // carry out of a range type is named: a subtype no newtype can hold, an array
 // of a created range, an option PostgreSQL does not have, a range with no
 // subtype, a serial subtype, and a type declared twice
-// [spec:pgorm:req:codegen.entity.types.unsupported+5/test]
+// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]
 #[test]
 fn what_a_created_range_cannot_carry_is_named() {
     assert_eq!(
@@ -196,7 +310,7 @@ fn what_a_created_range_cannot_carry_is_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+7/test]    the options that do not change
+// [spec:pgorm:sem:codegen.ddl.objects+8/test]    the options that do not change
 // a row's value are read and set aside, and a range over an enum the file
 // declared reads its subtype as that enum, which no newtype holds
 #[test]

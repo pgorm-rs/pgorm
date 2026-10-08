@@ -1535,7 +1535,8 @@ impl QueryBuilder {
                 // [spec:pgorm:req:sql.render.ident-quoting+7]
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. }
-                | ColumnType::CreatedRange { name, schema, .. } => {
+                | ColumnType::CreatedRange { name, schema, .. }
+                | ColumnType::CreatedMultirange { name, schema, .. } => {
                     let mut type_name = TypeName::new(Name::clone(name));
                     type_name.schema = schema.clone();
                     type_name.to_sql_string()

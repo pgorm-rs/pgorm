@@ -93,6 +93,11 @@ impl EntityTransformer {
                     name,
                     schema,
                     subtype,
+                }
+                | pgorm_query::ColumnType::CreatedMultirange {
+                    name,
+                    schema,
+                    subtype,
                 } = col.get_inner_col_type()
                 {
                     let key = match schema {
@@ -115,6 +120,10 @@ impl EntityTransformer {
                             name: name.clone(),
                             schema: schema.clone(),
                             subtype: subtype.as_ref().clone(),
+                            multirange: matches!(
+                                col.get_inner_col_type(),
+                                pgorm_query::ColumnType::CreatedMultirange { .. }
+                            ),
                         },
                     );
                 }

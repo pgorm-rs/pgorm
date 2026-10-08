@@ -884,13 +884,14 @@ pub fn derive_value_type(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Derive the traits a newtype over [`Range<T>`] needs to stand for a range
-/// type a schema created with `CREATE TYPE ... AS RANGE`: `pgorm::CreatedRange`,
-/// `ValueType`, `Nullable`, `TryGetable`, and conversions into its `Value` —
-/// the range's text form — and from the `Range<T>` it holds.
+/// Derive the traits a newtype needs to stand for a type `CREATE TYPE ... AS
+/// RANGE` makes: over a [`Range<T>`] for the range type, or over a
+/// `Multirange<T>` for the multirange PostgreSQL creates beside it. It
+/// implements `pgorm::CreatedRange`, `ValueType`, `Nullable`, `TryGetable`,
+/// and conversions into its `Value` — the text form — and from what it holds.
 ///
-/// `range_name` names the range type, and `schema_name` qualifies it; both are
-/// names, quoted where they need to be.
+/// `range_name` or `multirange_name` names the type, and `schema_name`
+/// qualifies it; each is a name, quoted where it needs to be.
 ///
 /// ```rust
 /// use pgorm::entity::prelude::*;
@@ -898,20 +899,24 @@ pub fn derive_value_type(input: TokenStream) -> TokenStream {
 /// #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
 /// #[pgorm(range_name = "floatrange")]
 /// pub struct FloatRange(pub Range<f64>);
+///
+/// #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
+/// #[pgorm(multirange_name = "floatmultirange")]
+/// pub struct FloatMultirange(pub Multirange<f64>);
 /// ```
 ///
-/// The field is a `Range<T>`, `T` the subtype:
+/// The field is what the name says it is:
 ///
 /// ```compile_fail
 /// use pgorm::entity::prelude::*;
 ///
 /// #[derive(DeriveCreatedRange)]
-/// #[pgorm(range_name = "floatrange")]
-/// pub struct FloatRange(pub f64);
+/// #[pgorm(multirange_name = "floatmultirange")]
+/// pub struct FloatMultirange(pub Range<f64>);
 /// ```
 ///
 /// [`Range<T>`]: https://docs.rs/pgorm-query/latest/pgorm_query/enum.Range.html
-// [spec:pgorm:sem:macros.derive.created-range]
+// [spec:pgorm:sem:macros.derive.created-range+1]
 #[cfg(feature = "derive")]
 #[proc_macro_derive(DeriveCreatedRange, attributes(pgorm))]
 pub fn derive_created_range(input: TokenStream) -> TokenStream {

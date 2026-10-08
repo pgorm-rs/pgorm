@@ -7,7 +7,7 @@ use pg_query::protobuf::{
 use pgorm_query::{ColumnType, Name, TableKey, Unique};
 
 /// The full identity — schema and name — a `CREATE TYPE` declares.
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 fn type_identity(type_name: &[pg_query::protobuf::Node], at: usize) -> Result<TypeIdentity, Error> {
     let names = types::idents(type_name)
         .ok_or_else(|| unsupported("a computed type name in CREATE TYPE", at))?;
@@ -24,7 +24,7 @@ fn type_identity(type_name: &[pg_query::protobuf::Node], at: usize) -> Result<Ty
 
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -35,24 +35,37 @@ pub(super) fn enum_type(
     Ok((identity, values))
 }
 
-/// A `CREATE TYPE ... AS RANGE` as its full identity and the column type of
-/// its subtype, read as a column's type is and so against the types declared
-/// before it, as PostgreSQL requires the subtype to exist.
+/// What a `CREATE TYPE ... AS RANGE` declares: the range type, the multirange
+/// PostgreSQL creates beside it, and the column type of the subtype both range
+/// over.
+pub(super) struct ParsedRange {
+    pub(super) range: TypeIdentity,
+    pub(super) multirange: TypeIdentity,
+    pub(super) subtype: ColumnType,
+}
+
+/// A `CREATE TYPE ... AS RANGE` as the full identities of its range and its
+/// multirange and the column type of its subtype, read as a column's type is
+/// and so against the types declared before it, as PostgreSQL requires the
+/// subtype to exist.
 ///
-/// The subtype is all a column of the range carries into
-/// `ColumnType::CreatedRange`: the operator class, collation, canonical and
-/// difference functions say how the server orders, normalises and measures
-/// the range, none of which changes the value a row holds. The multirange's
-/// name is the multirange's own type, not this one's.
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+/// The subtype is all a column of either carries into
+/// `ColumnType::CreatedRange` / `CreatedMultirange`: the operator class,
+/// collation, canonical and difference functions say how the server orders,
+/// normalises and measures the range, none of which changes the value a row
+/// holds. The multirange is `MULTIRANGE_TYPE_NAME` as written — unqualified,
+/// it is created where an unqualified name is, not beside the range — or
+/// otherwise the name PostgreSQL derives, in the range's schema.
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 pub(super) fn range_type(
     stmt: &CreateRangeStmt,
     declared: &Declared,
     at: usize,
-) -> Result<(TypeIdentity, ColumnType), Error> {
-    let identity = type_identity(&stmt.type_name, at)?;
-    let spelled = types::spell_identity(&identity);
+) -> Result<ParsedRange, Error> {
+    let range = type_identity(&stmt.type_name, at)?;
+    let spelled = types::spell_identity(&range);
     let mut subtype = None;
+    let mut multirange = None;
     for node in &stmt.params {
         let Some(NodeEnum::DefElem(option)) = &node.node else {
             return Err(unsupported(
@@ -60,9 +73,9 @@ pub(super) fn range_type(
                 at,
             ));
         };
+        let arg = option.arg.as_ref().and_then(|arg| arg.node.as_ref());
         match option.defname.as_str() {
             "subtype" => {
-                let arg = option.arg.as_ref().and_then(|arg| arg.node.as_ref());
                 let Some(NodeEnum::TypeName(type_name)) = arg else {
                     return Err(unsupported(
                         format!("a SUBTYPE that is not a type name on range type `{spelled}`"),
@@ -76,11 +89,18 @@ pub(super) fn range_type(
                 }
                 subtype = Some(kind.col_type);
             }
-            "subtype_opclass"
-            | "collation"
-            | "canonical"
-            | "subtype_diff"
-            | "multirange_type_name" => {}
+            "multirange_type_name" => {
+                let Some(NodeEnum::TypeName(type_name)) = arg else {
+                    return Err(unsupported(
+                        format!(
+                            "a MULTIRANGE_TYPE_NAME that is not a type name on range type `{spelled}`"
+                        ),
+                        at,
+                    ));
+                };
+                multirange = Some(type_identity(&type_name.names, at)?);
+            }
+            "subtype_opclass" | "collation" | "canonical" | "subtype_diff" => {}
             other => {
                 return Err(unsupported(
                     format!("option `{other}` on range type `{spelled}`"),
@@ -91,7 +111,38 @@ pub(super) fn range_type(
     }
     let subtype =
         subtype.ok_or_else(|| unresolved(format!("range type `{spelled}` has no SUBTYPE"), at))?;
-    Ok((identity, subtype))
+    let multirange =
+        multirange.unwrap_or_else(|| (range.0.clone(), derived_multirange_name(&range.1)));
+    Ok(ParsedRange {
+        range,
+        multirange,
+        subtype,
+    })
+}
+
+/// The multirange name PostgreSQL derives from a range type's: the first
+/// `range` in it (case-sensitive) becomes `multirange`, or, when there is
+/// none, `_multirange` follows the name cut to 52 bytes; the result is cut to
+/// the 63 bytes of an identifier. Each cut falls on a character boundary.
+// [spec:pgorm:sem:codegen.ddl.objects+8]
+fn derived_multirange_name(range: &str) -> String {
+    let derived = match range.find("range") {
+        Some(at) => {
+            let (head, tail) = range.split_at(at);
+            format!("{head}multi{tail}")
+        }
+        None => format!("{}_multirange", clip(range, 52)),
+    };
+    clip(&derived, 63).to_owned()
+}
+
+/// The longest prefix of `text` within `bytes` bytes that ends on a character
+/// boundary.
+fn clip(text: &str, bytes: usize) -> &str {
+    (0..=bytes.min(text.len()))
+        .rev()
+        .find_map(|end| text.get(..end))
+        .unwrap_or_default()
 }
 
 /// A `CREATE INDEX`, and the table it belongs to.
@@ -103,7 +154,7 @@ pub(super) struct ParsedIndex {
     pub(super) constraint: Option<TableKey<Unique>>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 // [spec:pgorm:req:codegen.ddl.unsupported+11]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
@@ -221,7 +272,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+7]
+// [spec:pgorm:sem:codegen.ddl.objects+8]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

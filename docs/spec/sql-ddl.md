@@ -1061,7 +1061,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Range types
 
-> [spec:pgorm:req:sql.ddl.type-range+1]
+> [spec:pgorm:req:sql.ddl.type-range+2]
 > `TypeCreateStatement::as_range(definition)` defines a range type, beside the
 > enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the composite of
 > `[spec:pgorm:req:sql.ddl.type-composite+1]`, in the one slot what a type is
@@ -1122,10 +1122,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > type by name, and a column of one is `ColumnType::CreatedRange`, named and
 > carrying its subtype (`[spec:pgorm:def:sql.value.created-range]`); a built-in
 > `Range<T>` value reaches such a column through that cast, there being no
-> cast between two range types. Its multirange does not, because
-> tokio-postgres reports it as a simple type
-> (`[spec:pgorm:req:exec.cursor.binding-range]`), and a column of one is
-> `ColumnType::named`.
+> cast between two range types. Its multirange travels as its text too, and
+> is read as its text, because tokio-postgres reports it as a simple type
+> (`[spec:pgorm:req:exec.cursor.binding-range+1]`); a column of one is
+> `ColumnType::CreatedMultirange`.
 
 ## Sequences
 

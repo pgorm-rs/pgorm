@@ -89,6 +89,11 @@ pub enum JsonValueType {
         schema: Option<Name>,
         subtype: Arc<ColumnType>,
     },
+    CreatedMultirange {
+        name: Name,
+        schema: Option<Name>,
+        subtype: Arc<ColumnType>,
+    },
 }
 
 impl From<JsonValueType> for ColumnType {
@@ -137,6 +142,15 @@ impl From<JsonValueType> for ColumnType {
                 schema,
                 subtype,
             } => Self::CreatedRange {
+                name,
+                schema,
+                subtype,
+            },
+            JsonValueType::CreatedMultirange {
+                name,
+                schema,
+                subtype,
+            } => Self::CreatedMultirange {
                 name,
                 schema,
                 subtype,
@@ -195,6 +209,15 @@ impl TryFrom<ColumnType> for JsonValueType {
                 schema,
                 subtype,
             } => Self::CreatedRange {
+                name,
+                schema,
+                subtype,
+            },
+            ColumnType::CreatedMultirange {
+                name,
+                schema,
+                subtype,
+            } => Self::CreatedMultirange {
                 name,
                 schema,
                 subtype,

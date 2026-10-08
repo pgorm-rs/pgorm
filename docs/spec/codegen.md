@@ -386,7 +386,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `#[pgorm(...)]` field metadata of the compact format has no expanded
 > counterpart because `Column` / `PrimaryKey` are spelled out explicitly.
 
-> [spec:pgorm:sem:codegen.entity.imports+1]
+> [spec:pgorm:sem:codegen.entity.imports+2]
 > `gen_import` builds the per-file import block: always
 > `use pgorm::entity::prelude::*;`, followed by the serde import selected
 > by `WithSerde` — `use serde::Serialize;` for `Serialize`,
@@ -396,8 +396,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `use super::pgorm_active_enums::<EnumName>;` per distinct enum among the
 > entity's column types (looked through `Array` via `get_inner_col_type`),
 > deduplicated in first-use column order, and `gen_import_range_types` with
-> one `use super::pgorm_range_types::<RangeName>;` per distinct range type a
-> schema created, the same way. The same `gen_import` block —
+> one `use super::pgorm_range_types::<RangeName>;` per distinct range or
+> multirange type a schema created, the same way. The same `gen_import` block —
 > without enum imports — heads `pgorm_active_enums.rs`
 > (`codegen.entity.enums`), and the prelude import alone heads
 > `pgorm_range_types.rs`; in every file the imports sit directly below
@@ -405,7 +405,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+5]
+> [spec:pgorm:sem:codegen.entity.types+6]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -422,7 +422,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > | `Enum { name, .. }` | UpperCamelCase of `name` |
 > | `Array(inner)` | `Vec<T(inner)>` (recursive) |
 > | `Range(t)` / `Multirange(t)` | `Range<E>` / `Multirange<E>`, `E` being `i32`, `i64`, `Decimal`, `Date`, `DateTime` or `DateTimeWithTimeZone` for `Int4` through `TimestampTz` |
-> | `CreatedRange { name, .. }` | UpperCamelCase of `name`, the newtype over `Range<E>` that `pgorm_range_types.rs` declares |
+> | `CreatedRange { name, .. }` / `CreatedMultirange { name, .. }` | UpperCamelCase of `name`, the newtype over `Range<E>` / `Multirange<E>` that `pgorm_range_types.rs` declares |
 > | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime+1` |
 >
 > No row produces an unsigned Rust integer: Postgres has no unsigned integer
@@ -437,21 +437,24 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > generates one `ActiveEnum`: `pub struct <RangeName>(pub Range<E>);`
 > deriving `Clone`, `Debug`, `PartialEq`, `Eq` unless `E` is a float, and
 > `DeriveCreatedRange` under `#[pgorm(range_name = "<name>")]`, with
-> `schema_name` when the type is qualified
+> `schema_name` when the type is qualified; a column of its multirange
+> generates `pub struct <MultirangeName>(pub Multirange<E>);` under
+> `multirange_name` the same way
 > (`[spec:pgorm:def:sql.value.created-range]`). `E` is the subtype's Rust
 > type as this table maps it — `i16`, `i32`, `i64`, `f32`, `f64`, `Decimal`,
 > `String` (for `Char`, `String` and `Text`), `Date`, `Time`, `DateTime`,
 > `DateTimeWithTimeZone` or `Uuid`. The compact writer states no
 > `column_type` for such a field, the derive taking it from the newtype's
-> `ValueType`; the expanded writer spells `ColumnType::CreatedRange { name,
-> schema, subtype }` out, as the derive builds it. The live round trip of a
+> `ValueType`; the expanded writer spells `ColumnType::CreatedRange` or
+> `CreatedMultirange { name, schema, subtype }` out, as the derive builds
+> it. The live round trip of a
 > generated entity is held at the workspace root (`tests/created_range_tests.rs`),
 > over the same files `pgorm-codegen/tests/sql/created_range/` compares the
 > writer's output with.
 >
 > The `Eq` derive is added to the Model derive list only when no column's
 > type is `Float` or `Double`, checked recursively through `Array` element
-> types and a created range's subtype; a single float column suppresses `Eq`
+> types and a created range's or multirange's subtype; a single float column suppresses `Eq`
 > for the whole Model.
 
 > [spec:pgorm:sem:codegen.entity.types.datetime+2]
@@ -482,7 +485,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+5]
+> [spec:pgorm:req:codegen.entity.types.unsupported+6]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -494,8 +497,9 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > element type is itself unsupported. An array of ranges or multiranges is
 > supported as its element is — `int4range[]` is `Vec<Range<i32>>`
 > (`[spec:pgorm:def:sql.value.array+6]`) — the compact writer stating no
-> `column_type` for it, as for a range. A range type a schema created is
-> supported over the subtypes `codegen.entity.types` maps for it, and refused
+> `column_type` for it, as for a range. A range type a schema created, and
+> the multirange beside it, is supported over the subtypes
+> `codegen.entity.types` maps for it, and refused
 > over any other with ``TransformError("... range type `<name>` over <subtype>
 > is not supported by codegen; a created range's subtype is one pgorm's
 > `RangeSubtype` covers")``, `<subtype>` in `Debug` form; an array of one is
@@ -899,7 +903,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so there is no constraint a non-unique index could
 > be carried as. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+6]
+> [spec:pgorm:sem:codegen.ddl.types+7]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
@@ -923,8 +927,9 @@ compiling the C parser falls on people generating entities and on nobody else.
 > file declared as a range type (`codegen.ddl.objects`) resolves to
 > `ColumnType::CreatedRange` carrying its identity and its subtype's column
 > type, exactly as an enum resolves — by full identity, with no fallback to a
-> same-named range type under another qualification. Its multirange is not
-> read, so a column of one is unsupported. `serial`, `bigserial` and `smallserial` (and
+> same-named range type under another qualification — and a name declared
+> as the multirange created beside one resolves to
+> `ColumnType::CreatedMultirange` the same way. `serial`, `bigserial` and `smallserial` (and
 > `serial4`/`serial8`/`serial2`) are `Integer`/`BigInteger`/`SmallInteger` plus
 > the auto-increment fact the renderer spells as the serial family. A name the
 > file declared as an enum type resolves to `ColumnType::Enum` carrying that
@@ -1031,7 +1036,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
 
-> [spec:pgorm:sem:codegen.ddl.objects+7]
+> [spec:pgorm:sem:codegen.ddl.objects+8]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -1046,10 +1051,19 @@ compiling the C parser falls on people generating entities and on nobody else.
 > be a range's subtype. Its other options, `SUBTYPE_OPCLASS`, `COLLATION`,
 > `CANONICAL`, `SUBTYPE_DIFF` and `MULTIRANGE_TYPE_NAME`, are read and set
 > aside: they say how the server orders, normalises and measures the range,
-> none of which changes the value a row holds, and the multirange is a type
-> of its own. A range type is where `transform` discovers the newtypes it
-> writes (`codegen.entity.types`). An enum and a range type share one
-> namespace, so `is declared twice` holds across the two kinds.
+> none of which changes the value a row holds. It also declares the
+> multirange PostgreSQL creates beside the range, by the same subtype:
+> `MULTIRANGE_TYPE_NAME` as written — unqualified, the server creates it
+> where an unqualified name is created, not beside the range, so its
+> identity is unqualified too — or, without it, the name PostgreSQL derives
+> in the range's schema: the first `range` in the range's name, compared
+> case-sensitively, becomes `multirange`, or, when there is none,
+> `_multirange` follows the name cut to 52 bytes, and the result is cut to
+> 63 (`floatrange` → `floatmultirange`, `slot` → `slot_multirange`,
+> `"FloatRange"` → `"FloatRange_multirange"`; live on 18.6). A range or
+> multirange type is where `transform` discovers the newtypes it writes
+> (`codegen.entity.types`). Enums, ranges and multiranges share one
+> namespace, so `is declared twice` holds across the three kinds.
 >
 > A unique `CREATE INDEX` is folded into its table as the unique key that
 > enforces the same uniqueness — a `TableKey<Unique>`
