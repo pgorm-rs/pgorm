@@ -802,7 +802,11 @@ assertions (
     {id prqlc-pin-incomplete, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:22.817775Z}
     {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
     {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
+    {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
+    {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
+    {id python-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:02:37.335682Z}
+    {id python-typing-check-symlinked-tmp, kind @complete, author "brendan@necessary.nu", at 2026-10-08T15:48:34.504635Z}
     {id python.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:14.867381Z}
     {id query-aggregate-modifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-20T19:04:53.640837Z}
     {id query-bound-quoting-contract, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:03:02.924238Z}
@@ -871,6 +875,7 @@ assertions (
     {id sqlmap.controls.verify, kind @complete, author "brendan@necessary.nu", at 2026-09-14T19:51:44.825902Z}
     {id sqlmap.spec, kind @complete, author "brendan@necessary.nu", at 2026-09-08T10:06:16.052903Z}
     {id supply-chain-unscanned, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:29.034891Z}
+    {id table-key-distinct-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-08T17:00:43.03556Z}
     {id tokenizer-backslash-standard, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:26:31.551166Z}
     {id transaction-stale-plan-recovery, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:12:04.84501Z}
     {id type-part-keyword-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:48:03.368721Z}
@@ -905,7 +910,6 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id table-key-distinct-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-08T17:00:43.03556Z}
 )
 
 impl_evidence (

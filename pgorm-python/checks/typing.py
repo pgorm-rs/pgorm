@@ -11,13 +11,20 @@ import tempfile
 
 
 def run(command, environment, *, capture=False):
-    return subprocess.run(
+    result = subprocess.run(
         [str(part) for part in command],
         env=environment,
         text=True,
         capture_output=capture,
-        check=True,
     )
+    if result.returncode:
+        # A captured child's traceback would otherwise be lost to the caller's log.
+        if capture:
+            print(result.stderr, end="", file=sys.stderr)
+        raise subprocess.CalledProcessError(
+            result.returncode, result.args, result.stdout, result.stderr
+        )
+    return result
 
 
 def reject_invalid(command, source, environment):
@@ -50,7 +57,7 @@ import hashlib, importlib.metadata, json, pathlib, platform, pgorm
 from pgorm import _native
 root = pathlib.Path(pgorm.__file__).resolve().parent
 assert (root / 'py.typed').is_file()
-assert pathlib.Path(_native.__file__).parent == root
+assert pathlib.Path(_native.__file__).resolve().parent == root
 assert root == pathlib.Path(importlib.metadata.distribution('pgorm').locate_file('pgorm')).resolve()
 print(json.dumps({'version': pgorm.__version__, 'python': platform.python_version(),
     'native': str(_native.__file__), 'stubs': {

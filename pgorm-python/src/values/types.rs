@@ -1,6 +1,7 @@
 use pgorm::pgorm_query::{ArrayType, Name, TypeName, Value};
 use pyo3::prelude::*;
 
+use super::created::CreatedKind;
 use crate::errors::ConstructionError;
 
 // [spec:pgorm:req:python.value-tags]
@@ -18,7 +19,10 @@ pub struct PyTypeName {
 impl PyTypeName {
     #[new]
     #[pyo3(signature = (name, *, schema=None))]
-    fn new(name: &Bound<'_, PyAny>, schema: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+    pub(crate) fn new(
+        name: &Bound<'_, PyAny>,
+        schema: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
         let name = name
             .extract::<String>()
             .map_err(super::construction_error)?;
@@ -114,6 +118,7 @@ scalar_kinds! {
 pub enum Tag {
     Scalar(ArrayType),
     Enum(PyTypeName),
+    Created(CreatedKind),
     Array(Box<Tag>),
 }
 
@@ -121,6 +126,8 @@ impl Tag {
     pub fn parse(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(name) = value.extract::<PyRef<'_, PyTypeName>>() {
             Ok(Self::Enum(name.clone()))
+        } else if let Some(kind) = super::created::extract(value) {
+            Ok(Self::Created(kind))
         } else {
             Ok(Self::Scalar(parse_scalar(value.extract::<&str>()?)?))
         }
@@ -130,6 +137,7 @@ impl Tag {
         match self {
             Self::Scalar(kind) => scalar_name(kind),
             Self::Enum(_) => "enum",
+            Self::Created(kind) => kind.kind_name(),
             Self::Array(_) => "array",
         }
     }
@@ -137,7 +145,7 @@ impl Tag {
     pub fn array_type(&self) -> PyResult<ArrayType> {
         match self {
             Self::Scalar(kind) => Ok(kind.clone()),
-            Self::Enum(_) => Ok(ArrayType::String),
+            Self::Enum(_) | Self::Created(_) => Ok(ArrayType::String),
             Self::Array(_) => Err(ConstructionError::new_err(
                 "nested arrays are not supported",
             )),
@@ -147,6 +155,7 @@ impl Tag {
     pub fn to_python(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         match self {
             Self::Enum(name) => Ok(Py::new(py, name.clone())?.into_any()),
+            Self::Created(kind) => kind.to_python(py),
             _ => Ok(self.name().into_pyobject(py)?.into_any().unbind()),
         }
     }

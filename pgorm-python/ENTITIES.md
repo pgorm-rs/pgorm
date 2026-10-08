@@ -123,7 +123,13 @@ names. Plain Python inputs use the declared SQL column type as a conversion
 hint. Explicit `Value` tags preserve the caller's chosen Rust value variant;
 the real Rust model/ActiveModel setter performs the final conversion checks.
 An unusual custom field type may therefore require an explicit tagged value.
-Qualified enum input must match the declared column enum identity.
+Qualified enum input must match the declared column enum identity. A field of a
+`DeriveCreatedRange` newtype, a range type a schema created, hints its
+`CreatedRange` or `CreatedMultirange` kind: a plain `pgorm.Range` or
+`pgorm.Multirange` converts with the subtype's limits, a tagged value must name
+the same type, and the field reads back as the range, tagged with the kind. The
+Rust newtype writes it as its text cast to the type and reads a multirange
+through its text, so both read through `find`.
 
 `dict(model)` returns Python values, and `model.tagged("id")` retains the Rust
 value tag. `model.with_value(column, value)` clones and calls `ModelTrait::set`;

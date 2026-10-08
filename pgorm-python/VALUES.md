@@ -49,6 +49,7 @@ supplying a different kind with that value raises `ConstructionError`.
 | `array` | `Array` | `Value.array(element_kind, list_or_tuple_or_none)` |
 | `enum` | `String` plus `TypeName` | `Value(label_or_none, type_name)` |
 | `int4range` … `tstzmultirange` | `Range`, `Multirange` | `pgorm.Range`, `pgorm.Multirange`; see [Ranges](#ranges) |
+| `CreatedRange(..)`, `CreatedMultirange(..)` | `String` (the text form) | `pgorm.Range`, `pgorm.Multirange`; see [Range types a schema created](#range-types-a-schema-created) |
 
 Every scalar supports `Value.null(kind)` or `Value(None, kind)`. These are
 typed SQL NULL values. `Value.json(None)` creates JSON null; it has
@@ -134,12 +135,56 @@ The kind is always explicit: a range's element type is not inferred. Each bound
 converts exactly as a scalar of its element kind does, with the same limits.
 Equality is structural, as in Rust; the server canonicalises a discrete range,
 so `Range(1, 5, "[]")` written to an `int4range` reads back as `Range(1, 6)`,
-and stores a multirange sorted and merged. Result columns of these types, and
-of a range type a schema created over one of these subtypes, decode to the same
-values; a range over another subtype, and a multirange a schema created, raise
-`DecodeError`. A snapshot's `data` for a range is `{"empty": true}` or
-`{"lower": ..., "upper": ..., "bounds": "[)"}`, each bound in its element
+and stores a multirange sorted and merged. Result columns of these types
+decode to the same values. A snapshot's `data` for a range is `{"empty": true}`
+or `{"lower": ..., "upper": ..., "bounds": "[)"}`, each bound in its element
 kind's own encoding and `null` for no bound; a multirange's is a list of them.
+
+### Range types a schema created
+
+A range type made with `CREATE TYPE ... AS RANGE` has a name only its schema
+knows. Its kind names it, with the value kind of its subtype:
+`CreatedRange(name, subtype, schema=None)`, and `CreatedMultirange(name,
+subtype, schema=None)` for the multirange PostgreSQL creates beside it, named
+by its own name (`floatmultirange`, or `slot_multirange` beside `slot`).
+
+```python
+from pgorm import CreatedMultirange, CreatedRange, Multirange, Range, Value, bind
+
+floatrange = CreatedRange("floatrange", "f64", schema="measure")
+span = Value(Range(1.5, 2.5), floatrange)
+assert span.snapshot()["data"] == "[1.5,2.5)"
+assert bind(span).inspect().sql == "SELECT CAST($1::text AS measure.floatrange)"
+spans = Value(Multirange([Range(1.0, 3.0)]), CreatedMultirange("floatmultirange", "f64"))
+```
+
+The subtype is one of the twelve a created range can range over, Rust's
+`RangeSubtype`: `i16`, `i32`, `i64`, `f32`, `f64`, `decimal`, `text`, `date`,
+`time`, `datetime`, `datetime_utc` and `uuid`. Each bound converts as a scalar
+of that kind does, with its limits. The value holds the range's text form, the
+`Value::String` a Rust `DeriveCreatedRange` newtype converts into, written by
+Rust's `Display` with each bound quoted where the range parser needs it.
+`bind` writes it as `CAST($1::text AS name)` and `literal` as an escaped string
+cast to the name, Rust's `Expr::as_range`, because there is no cast between two
+range types. The name is a quoted, possibly schema-qualified type name. A `str`
+in the type's text form is accepted as well and read with the subtype's own
+parsing, the way PostgreSQL's range input reads it, so whitespace inside the
+brackets is part of a bound. `value` reads the text back as a `Range` or
+`Multirange`, `created_type` returns the kind, `type_name` the name, and the
+snapshot's `type` is `{"kind": "created_range", "name": ..., "schema": ...,
+"subtype": ...}` with the text as its `data`.
+
+A result column of a created range type decodes, from its binary form through
+the subtype's own codec, to that kind, named as the column's type is, with the
+schema the server reports. This holds for one over `int4` too: it reads as
+`CreatedRange("slot", "i32", schema=...)`, not as `int4range`, so the value
+writes back to its column (an `int4range` literal there is `42804`). A created
+range is continuous whatever its subtype, so `[1,5]` reads back as written. The
+driver reports a created multirange as a simple type with no subtype, so a
+column of one raises `DecodeError`; select it cast to `text` and pass the text
+to `Value(text, CreatedMultirange(...))`. Arrays of a created range are refused
+both ways. The pipeline and SQL/JSON's `JsonDefault` refuse a created range's
+value, as they refuse a qualified enum's, having no place for its cast.
 
 ## Inspection and equality
 

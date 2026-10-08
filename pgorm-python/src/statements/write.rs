@@ -54,10 +54,16 @@ impl PyUpdate {
         next
     }
 
-    #[pyo3(signature = (*items))]
-    fn returning(&self, items: &Bound<'_, PyTuple>) -> PyResult<Self> {
+    #[pyo3(signature = (*items, old_as=None, new_as=None))]
+    fn returning(
+        &self,
+        items: &Bound<'_, PyTuple>,
+        old_as: Option<&Bound<'_, PyAny>>,
+        new_as: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.returning(common::returning(items)?);
+        next.inner
+            .returning(common::returning(items, old_as, new_as)?);
         Ok(next)
     }
 
@@ -116,10 +122,16 @@ impl PyDelete {
         next
     }
 
-    #[pyo3(signature = (*items))]
-    fn returning(&self, items: &Bound<'_, PyTuple>) -> PyResult<Self> {
+    #[pyo3(signature = (*items, old_as=None, new_as=None))]
+    fn returning(
+        &self,
+        items: &Bound<'_, PyTuple>,
+        old_as: Option<&Bound<'_, PyAny>>,
+        new_as: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.returning(common::returning(items)?);
+        next.inner
+            .returning(common::returning(items, old_as, new_as)?);
         Ok(next)
     }
 

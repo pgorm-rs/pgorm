@@ -88,7 +88,7 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertEqual(dict(row), {"overlaps": True, "contains": False, "element": True})
 
-    async def test_created_range_types_read_by_their_subtype(self):
+    async def test_created_ranges_read_as_their_kind(self):
         schema = "python_range_" + uuid4().hex
         async with self.pool.connection() as connection:
             await connection.execute(p.RawSQL(f'CREATE SCHEMA "{schema}"'))
@@ -97,17 +97,20 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
                     await connection.execute(p.RawSQL(
                         f'CREATE TYPE "{schema}".{name} AS RANGE (SUBTYPE = {subtype})'
                     ))
-                row = await connection.fetch_one(p.RawSQL(f"""SELECT '[1,3)'::"{schema}".slot AS n"""))
-                self.assertEqual(row["n"], p.Range(1, 3))
-                self.assertEqual(row.tagged("n").kind, "int4range")
-                for sql in (f"""'[1.5,2)'::"{schema}".floatrange""",
-                            f"""NULL::"{schema}".floatrange""",
-                            f"""'{{[1,3)}}'::"{schema}".slot_multirange"""):
-                    with self.subTest(sql=sql), self.assertRaises(p.DecodeError):
-                        await connection.fetch_one(p.RawSQL(f"SELECT {sql} AS n"))
+                row = await connection.fetch_one(p.RawSQL(
+                    f"""SELECT '[1,3)'::"{schema}".slot AS n, '[1.5,2)'::"{schema}".floatrange AS f"""
+                ))
+                self.assertEqual((row["n"], row["f"]), (p.Range(1, 3), p.Range(1.5, 2.0)))
+                self.assertEqual(row.tagged("n").created_type, p.CreatedRange("slot", "i32", schema=schema))
+                self.assertEqual(row.tagged("f").created_type,
+                                 p.CreatedRange("floatrange", "f64", schema=schema))
+                # The driver reports a created multirange as a simple type.
+                with self.assertRaises(p.DecodeError):
+                    await connection.fetch_one(p.RawSQL(
+                        f"""SELECT '{{[1,3)}}'::"{schema}".slot_multirange AS n"""
+                    ))
             finally:
                 await connection.execute(p.RawSQL(f'DROP SCHEMA "{schema}" CASCADE'))
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -115,6 +115,48 @@ pub(crate) fn operations() -> Map<String, Value> {
             "conflict.update.where_",
             "pgorm_query::ConflictUpdate::cond_where",
         ),
+        (
+            "returning.row_versions",
+            "pgorm_query::ReturningRow, ColumnRef::{RowColumn, RowAsterisk}",
+        ),
+        (
+            "returning.rename",
+            "pgorm_query::ReturningClause::{old_as, new_as}",
+        ),
+        ("select.with_", "pgorm_query::SelectStatement::with"),
+        (
+            "with",
+            "pgorm_query::WithClause::{new, cte}, CommonTableExpression::new",
+        ),
+        ("merge", "pgorm_query::Query::merge, PendingMerge"),
+        (
+            "merge.when_matched",
+            "pgorm_query::MergeStatement::{when_matched, when_matched_and}",
+        ),
+        (
+            "merge.when_not_matched",
+            "pgorm_query::MergeStatement::{when_not_matched, when_not_matched_and}",
+        ),
+        (
+            "merge.when_not_matched_by_source",
+            "pgorm_query::MergeStatement::{when_not_matched_by_source, when_not_matched_by_source_and}",
+        ),
+        (
+            "merge.update",
+            "pgorm_query::MergeUpdate::{value, and_value}, MatchedAction",
+        ),
+        (
+            "merge.insert",
+            "pgorm_query::MergeInsert::{value, and_value, overriding}, NotMatchedAction",
+        ),
+        ("merge.returning", "pgorm_query::MergeStatement::returning"),
+        (
+            "merge.returning_action",
+            "pgorm_query::MergeStatement::returning_action",
+        ),
+        ("merge.with_", "pgorm_query::MergeStatement::with"),
+        ("merge.only", "pgorm_query::MergeStatement::only"),
+        ("merge.inspect", "pgorm_query::MergeStatement::build"),
         ("raw_sql", "pgorm::SqlText with pgorm_query::Values"),
         ("raw_sql.inline_sql", "pgorm_query::inject_parameters"),
     ]

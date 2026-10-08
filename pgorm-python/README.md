@@ -85,7 +85,8 @@ print([value.snapshot() for value in compiled.params])
 ```
 
 See [expression construction and Rust API mappings](EXPRESSIONS.md) for
-conditions, functions, literal/bound paths, casts and ownership semantics.
+conditions, functions, SQL/JSON, literal/bound paths, casts and ownership
+semantics.
 
 ## Statements
 
@@ -101,7 +102,7 @@ See [execution, result types and stream ownership](RESULTS.md) for examples,
 PostgreSQL decoding limits and cancellation behavior.
 
 The [direct builder integration suite](DIRECT_BUILDERS.md) installs a wheel in
-a fresh Python environment, runs 28 application query programs against
+a fresh Python environment, runs 32 application query programs against
 PostgreSQL, and compares their SQL and tagged parameters with independent Rust
 builders. It provides the focused proof of direct Python access without HTTP.
 

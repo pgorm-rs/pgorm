@@ -79,9 +79,9 @@ impl PyPipelineBinder {
     fn bind(&self, value: &Bound<'_, PyAny>) -> PyResult<PyPipelineExpr> {
         self.scope.check()?;
         let value = PyValue::coerce(value)?;
-        if value.enum_cast().is_some() {
+        if value.has_named_type() {
             return Err(UnsupportedCapabilityError::new_err(
-                "pipeline Binder has no qualified enum cast API; bind a plain string when database type inference is intended",
+                "pipeline Binder has no cast API for a qualified enum or a created range; bind a plain string when database type inference is intended",
             ));
         }
         let index = self.scope.bind(value.rust_value().clone())?;

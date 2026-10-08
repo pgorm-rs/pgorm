@@ -358,3 +358,25 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             enums.insert(
                 {"moods": p.Value.array(p.TypeName("Mood", schema="wrong"), labels)}
             )
+
+    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:python.values+2/test]
+    async def test_created_range_columns_keep_their_type(self):
+        await self.pool.execute(
+            p.RawSQL("CREATE TYPE python_models.floatrange AS RANGE (SUBTYPE = float8)")
+        )
+        await self.pool.execute(
+            p.RawSQL("CREATE TABLE python_models.spans (span python_models.floatrange)")
+        )
+        floatrange = p.CreatedRange("floatrange", "f64", schema="python_models")
+        spans = p.Model("spans", {"span": p.Column(floatrange)}, schema="python_models")
+        row = await spans.insert({"span": p.Range(1.5, None)}).returning().one(self.pool)
+        self.assertEqual(row.tagged("span"), p.Value(p.Range(1.5, None), floatrange))
+        found = await spans.find().filter(spans.col("span") == p.Range(1.5, None)).one(self.pool)
+        self.assertEqual(found["span"], p.Range(1.5, None))
+        with self.assertRaises(p.ConstructionError):
+            p.Column(p.CreatedRange("floatrange", "f64"))
+        with self.assertRaises(p.ConstructionError):
+            p.Column(floatrange, array=True)
+        with self.assertRaises(p.UnsupportedCapabilityError):
+            p.Column(p.CreatedMultirange("floatmultirange", "f64", schema="python_models"))

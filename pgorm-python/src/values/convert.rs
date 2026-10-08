@@ -72,7 +72,7 @@ fn strict<'a, 'py, T: pyo3::type_object::PyTypeInfo>(
     }
 }
 
-// [spec:pgorm:req:python.values+1]
+// [spec:pgorm:req:python.values+2]
 pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Value> {
     let value = match kind {
         ArrayType::Bool => Value::Bool(Some(strict::<PyBool>(data)?.extract()?)),
@@ -117,9 +117,13 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
                 .collect::<PyResult<Vec<_>>>()?;
             Value::Vector(Some(Box::new(Vector::from(values))))
         }
-        ArrayType::Range(range) => {
-            Value::Range(*range, Some(Box::new(ranges::read(data, *range)?)))
-        }
+        ArrayType::Range(range) => Value::Range(
+            *range,
+            Some(Box::new(ranges::read_bounds(
+                data,
+                &ranges::element(*range),
+            )?)),
+        ),
         ArrayType::Multirange(range) => ranges::multirange_from_python(data, *range)?,
         _ => temporal::from_python(data, kind)?,
     };

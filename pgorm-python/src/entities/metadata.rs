@@ -6,19 +6,23 @@ use serde_json::{Value as Json, json};
 use crate::{
     errors::{ConstructionError, DecodeError},
     identifiers::validate_name,
-    values::{PyTypeName, PyValue},
+    values::{CreatedKind, PyTypeName, PyValue},
 };
 
 #[derive(Clone, Debug)]
 pub(crate) enum InputKind {
     Scalar(&'static str),
     Enum(PyTypeName),
+    Created(CreatedKind),
     Array(Box<Self>),
     Explicit,
 }
 
 impl InputKind {
     fn from_column(ty: &ColumnType) -> Self {
+        if let Some(kind) = CreatedKind::from_column(ty) {
+            return Self::Created(kind);
+        }
         let scalar = match ty {
             ColumnType::Char(Some(1)) => "char",
             ColumnType::Char(_) | ColumnType::String(_) | ColumnType::Text => "text",
@@ -57,6 +61,7 @@ impl InputKind {
         match self {
             Self::Scalar(name) => Ok(PyString::new(py, name).into_any()),
             Self::Enum(name) => Ok(Py::new(py, name.clone())?.into_bound(py).into_any()),
+            Self::Created(kind) => Ok(kind.to_python(py)?.into_bound(py)),
             _ => Err(ConstructionError::new_err(
                 "this column requires an explicit tagged Value",
             )),
@@ -65,6 +70,13 @@ impl InputKind {
 
     pub(crate) fn coerce(&self, value: &Bound<'_, PyAny>) -> PyResult<PyValue> {
         if let Ok(value) = value.extract::<PyRef<'_, PyValue>>() {
+            if let Some(kind) = value.created()
+                && !matches!(self, Self::Created(expected) if expected == kind)
+            {
+                return Err(ConstructionError::new_err(
+                    "created range Value belongs to a different declared column type",
+                ));
+            }
             if let Some(cast) = value.enum_cast() {
                 let (expected, array) = match self {
                     Self::Enum(name) => (Some(name), false),
@@ -103,6 +115,14 @@ impl InputKind {
             Self::Enum(name) if matches!(value, Value::String(_)) => {
                 Ok(PyValue::from_enum(value, name.clone(), false))
             }
+            Self::Created(kind) => match value {
+                Value::String(text) => {
+                    Ok(PyValue::from_created(text.map(|text| *text), kind.clone()))
+                }
+                _ => Err(DecodeError::new_err(
+                    "compiled created range returned an incompatible Rust Value",
+                )),
+            },
             Self::Array(member) => match member.as_ref() {
                 Self::Enum(name)
                     if matches!(
@@ -128,6 +148,10 @@ impl InputKind {
         match self {
             Self::Scalar(name) => json!({"kind": name}),
             Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
+            Self::Created(kind) => json!({
+                "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
+                "subtype": crate::values::scalar_name(&kind.subtype),
+            }),
             Self::Array(member) => json!({"kind": "array", "element": member.describe()}),
             Self::Explicit => json!({"kind": "explicit_value_required"}),
         }
@@ -295,6 +319,57 @@ mod tests {
                 array.rust_value(),
                 Value::Array(ArrayType::Range(RangeType::Int4), Some(_))
             ));
+            Ok(())
+        })
+    }
+
+    // [spec:pgorm:req:python.entities/test]    a created range column hints its created kind,
+    // so a registered entity's field takes a `pgorm.Range` and reads back tagged with the type
+    #[test]
+    fn created_range_columns_hint_their_created_kind() -> PyResult<()> {
+        use pgorm::pgorm_query::Name;
+
+        let column = ColumnType::CreatedRange {
+            name: Name::runtime("floatrange"),
+            schema: Some(Name::runtime("measure")),
+            subtype: Arc::new(ColumnType::Double),
+        };
+        let input = InputKind::from_column(&column);
+        assert_eq!(
+            input.describe(),
+            json!({"kind": "created_range", "name": "floatrange", "schema": "measure", "subtype": "f64"})
+        );
+        let multirange = ColumnType::CreatedMultirange {
+            name: Name::runtime("slot_multirange"),
+            schema: None,
+            subtype: Arc::new(ColumnType::Integer),
+        };
+        assert_eq!(
+            InputKind::from_column(&multirange).describe()["kind"],
+            "created_multirange"
+        );
+
+        Python::initialize();
+        Python::attach(|py| {
+            let range = Py::new(
+                py,
+                PyRange::bounds(
+                    Some(1.5f64.into_pyobject(py)?.into_any().unbind()),
+                    true,
+                    None,
+                    false,
+                ),
+            )?;
+            let value = input.coerce(range.bind(py).as_any())?;
+            assert_eq!(
+                value.rust_value(),
+                &Value::String(Some(Box::new("[1.5,)".into())))
+            );
+            let tagged = input.tagged(value.rust_value().clone())?;
+            assert_eq!(&tagged, &value);
+            let other = InputKind::from_column(&multirange)
+                .coerce(pyo3::types::PyString::new(py, "{[1,2)}").as_any())?;
+            assert!(input.coerce(Py::new(py, other)?.bind(py).as_any()).is_err());
             Ok(())
         })
     }

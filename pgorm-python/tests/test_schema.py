@@ -145,7 +145,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await connection.execute(s.drop_table(renamed))
             await connection.execute(s.drop_table(renamed, if_exists=True))
 
-    # [spec:pgorm:req:python.expressions/test]
+    # [spec:pgorm:req:python.expressions+1/test]
     async def test_uuidv7_default_keys_rows_in_write_order(self):
         table = p.Table("minted", schema=self.namespace)
         ddl = s.create_table(table).column(s.ColumnDef("id", "uuid").default(p.call("uuidv7"))).primary_key("id")

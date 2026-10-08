@@ -27,7 +27,7 @@ fn integer(value: Option<&Bound<'_, PyAny>>, label: &str) -> PyResult<Option<u32
 }
 
 impl PyDataType {
-    pub(super) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+    pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(kind) = value.extract::<PyRef<'_, Self>>() {
             return Ok(kind.clone());
         }
@@ -51,6 +51,16 @@ impl PyDataType {
         let scale = integer(scale, "scale")?;
         if length == Some(0) {
             return Err(ConstructionError::new_err("type length must be positive"));
+        }
+        if let Some(created) = crate::values::created_kind(kind) {
+            if length.is_some() || precision.is_some() || scale.is_some() {
+                return Err(ConstructionError::new_err(
+                    "created range types do not accept size modifiers",
+                ));
+            }
+            return Ok(Self {
+                inner: created.column_type(),
+            });
         }
         if let Ok(name) = kind.extract::<PyRef<'_, PyTypeName>>() {
             if length.is_some() || precision.is_some() || scale.is_some() {

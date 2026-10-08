@@ -16,7 +16,7 @@ def bits(value):
     return struct.pack(">d", value).hex()
 
 
-# [spec:pgorm:req:python.values+1/test]
+# [spec:pgorm:req:python.values+2/test]
 # [spec:pgorm:req:python.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
@@ -35,7 +35,8 @@ class ValueTests(unittest.TestCase):
         }
         ranges = {f"{name}{kind}" for name in ("int4", "int8", "num", "date", "ts", "tstz")
                   for kind in ("range", "multirange")}
-        self.assertEqual(set(cases) | ranges | {"array", "enum"}, set(capabilities()["value_types"]))
+        self.assertEqual(set(cases) | ranges | {"array", "enum", "created_range", "created_multirange"},
+                         set(capabilities()["value_types"]))
         for kind, original in cases.items():
             with self.subTest(kind=kind):
                 value = Value(original, kind)

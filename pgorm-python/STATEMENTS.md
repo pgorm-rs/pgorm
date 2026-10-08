@@ -90,6 +90,93 @@ existing predicate.
 it requests `RETURNING *`. It replaces the previous RETURNING clause through
 the Rust builder.
 
+### Row versions in RETURNING
+
+PostgreSQL 18's RETURNING reads a written row as it was before the write and as
+the statement left it. `ReturningRow.Old` and `ReturningRow.New` name the two
+versions: `.col(name)` reads one column (Rust's `(ReturningRow, column)`) and
+`.star()` every column. An UPDATE's `old` is the row before the update. A
+DELETE's `new` and an inserted row's `old` read NULL in every column. A row
+that `ON CONFLICT DO UPDATE` updated has the existing row as its `old`, so
+`ReturningRow.Old.col("id").is_null()` says which rows an upsert inserted:
+
+```python
+from pgorm import ConflictTarget, ReturningRow, col, insert
+
+upsert = (
+    insert(account).columns("id", "name").values(1, "Alice")
+    .on_conflict(ConflictTarget("id").update("name"))
+    .returning(col("id"), ReturningRow.Old.col("id").is_null().as_("inserted"))
+)
+```
+
+`returning(..., old_as=name, new_as=name)` renames a version, writing
+`RETURNING WITH (OLD AS "name", NEW AS "name")`, and the list then reads it
+as an ordinary table: `col("visits", table=name)`. Use it when the target, its
+alias or another relation of the statement is called `old` or `new`, which
+would otherwise take the keyword silently. A renamed version no longer answers
+to the keyword (`42P01`), a name that clashes with one of the statement's
+relations is refused (`42712`), and so is one name for both versions. The
+names are identifiers, quoted.
+
+## MERGE
+
+```python
+from pgorm import MatchedAction, MergeInsert, MergeUpdate, ReturningRow, Table, merge
+
+target, source = Table("account").as_("t"), Table("staged").as_("s")
+sync = (
+    merge(target, source, target.col("id") == source.col("id"))
+    .when_matched(MergeUpdate("name", source.col("name")))
+    .when_matched(MatchedAction.Delete, condition=source.col("name").is_null())
+    .when_not_matched(MergeInsert("id", source.col("id")).and_value("name", source.col("name")))
+    .when_not_matched_by_source(MatchedAction.Delete)
+    .returning_action()
+    .returning(target.col("id"), ReturningRow.Old.col("name").as_("was"))
+)
+```
+
+`merge(target, source, on)` returns a `PendingMerge`, Rust's `PendingMerge`:
+PostgreSQL refuses a MERGE with no WHEN clause (`42601`), so it has no
+`inspect()` and execution refuses it with `ConstructionError`. Its first arm
+returns the `Merge` statement. There are three kinds of row, each with its own
+method: `when_matched` takes a target row the condition paired with a source
+row, `when_not_matched` a source row it paired with none, and
+`when_not_matched_by_source` a target row no source row matched. Each takes an
+action and an optional `condition=`, which adds `AND condition` to the arm.
+
+Actions are typed by the row they take, as in Rust. A target row is updated
+(`MergeUpdate`), deleted (`MatchedAction.Delete`) or left alone
+(`MatchedAction.DoNothing`). A source row is inserted (`MergeInsert`, or
+`NotMatchedAction.InsertDefaultValues`) or skipped (`NotMatchedAction.DoNothing`).
+Anything else raises `TypeError`, so an insert for a target row cannot be
+built. `MergeUpdate(column, value)` and `MergeInsert(column, value)` take
+their first pair at construction, so neither is ever empty, and
+`.and_value(column, value)` adds another. A column is a bare name.
+`MergeInsert.overriding(Overriding.SystemValue)` or `Overriding.UserValue`
+writes `OVERRIDING ..` for identity columns.
+
+Within a kind, a row takes the first conditional arm whose condition holds, in
+call order, and otherwise the kind's one unconditional arm. The unconditional
+arm always renders after the conditional ones, the only place PostgreSQL
+accepts it, and a later unconditional arm of the same kind replaces it. A row
+that `DoNothing` left alone is not returned.
+
+`returning(*items, old_as=, new_as=)` is the statement's RETURNING list, as for
+the other writes. `returning_action()` adds `merge_action()` as its first
+column: `INSERT`, `UPDATE` or `DELETE` for each row. It has no expression form,
+because PostgreSQL resolves it only in a MERGE's RETURNING list. A column both
+the target and the source have must be qualified (`42702`), and `*` is the
+source's columns followed by the target's. `only()` writes `ONLY` before the
+target, leaving inheriting tables alone.
+
+The source is a `Table`. A query as the source is a common table expression:
+`With(name, select)` names it, `merge.with_(With(..))` attaches it, and the
+merge reads `Table(name)`. `With(name, query).cte(name, query)` adds more. A
+MERGE is itself a common table expression's body: `Select(...).with_(With("m",
+merge))` reads the rows its RETURNING list yields. A value in a CTE's own
+`SELECT` list is assigned to no column, so a bound one needs a cast.
+
 ## Conflict actions
 
 `Conflict.ignore()` selects Rust's untargeted `ON CONFLICT DO NOTHING`.
@@ -118,7 +205,8 @@ before execution preparation. SQL and parameters are not combined implicitly.
 
 The extension's Rust `statements::compile` entry point uses exactly these same
 validated builders for execution preparation. It accepts native statements,
-`Compiled` objects and explicit `RawSQL`, and rejects ordinary strings. These
+`Compiled` objects and explicit `RawSQL`, and rejects ordinary strings and a
+`PendingMerge`. These
 are dynamic statement operations; compiled entities and ActiveModels have
 separate APIs and hooks.
 

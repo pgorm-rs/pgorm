@@ -43,15 +43,12 @@ pub(crate) fn literal(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
 
 fn value_expr(value: &Bound<'_, PyAny>, literal: bool) -> PyResult<PyExpr> {
     let value = PyValue::coerce(value)?;
-    let mut inner = if literal {
+    let inner = if literal {
         SimpleExpr::Constant(value.rust_value().clone())
     } else {
         Expr::value(value.rust_value().clone())
     };
-    if let Some(cast) = value.enum_cast() {
-        inner = inner.cast_as_type(cast);
-    }
-    Ok(PyExpr::from_rust(inner))
+    Ok(PyExpr::from_rust(value.typed(inner)))
 }
 
 pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
@@ -163,7 +160,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         .map_err(|_| ConstructionError::new_err("expected a query expression"))
 }
 
-// [spec:pgorm:req:python.expressions]
+// [spec:pgorm:req:python.expressions+1]
 #[pyfunction]
 #[pyo3(signature = (name, *arguments))]
 pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExpr> {

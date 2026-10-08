@@ -148,7 +148,7 @@ fn model(id: i32) -> spans::Model {
 /// Every built-in range type is written by an entity insert and read back by
 /// its select, a NULL range included; a numeric bound keeps its scale and a
 /// timestamp bound its microseconds.
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
 // [spec:pgorm:req:exec.cursor.binding-range+1/test]
 async fn every_range_type_round_trips_through_an_entity(
@@ -188,7 +188,7 @@ async fn every_range_type_round_trips_through_an_entity(
 /// The server stores a discrete range in its canonical `[)` form, so a range
 /// written with other brackets reads back as the same set spelled
 /// differently; a continuous range is stored as written.
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 async fn a_discrete_range_comes_back_canonical(db: &DatabaseConnection) -> Result<(), Error> {
     let int4 = |range: Range<i32>| Value::from(range);
     assert_eq!(
@@ -245,7 +245,7 @@ async fn a_discrete_range_comes_back_canonical(db: &DatabaseConnection) -> Resul
 /// The empty range is one value: written as itself or as bounds that hold
 /// nothing, it reads back as `Empty`, and it is never the range of every
 /// value, which is two unbounded sides.
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
 // [spec:pgorm:req:exec.cursor.binding-range+1/test]
 async fn the_empty_range_is_not_every_value(db: &DatabaseConnection) -> Result<(), Error> {
@@ -303,7 +303,7 @@ async fn an_infinite_bound_is_not_unbounded(db: &DatabaseConnection) -> Result<(
 
 /// A multirange is stored sorted, with overlapping and adjacent ranges merged
 /// and empty ones dropped; the empty multirange is a value of its own.
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
 // [spec:pgorm:req:exec.cursor.binding-range+1/test]
 async fn a_multirange_comes_back_merged(db: &DatabaseConnection) -> Result<(), Error> {
@@ -544,7 +544,7 @@ async fn a_created_range_type_binds_by_its_subtype(db: &DatabaseConnection) -> R
 
 /// What the server refuses, it refuses with its own code: bounds out of
 /// order, and a discrete bound its canonical form would overflow.
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 async fn the_server_refuses_what_it_cannot_store(db: &DatabaseConnection) -> Result<(), Error> {
     let inverted = read::<Range<i32>>(
         db,
@@ -567,7 +567,7 @@ async fn the_server_refuses_what_it_cannot_store(db: &DatabaseConnection) -> Res
 /// apart from every value and an empty array from a NULL one.
 // [spec:pgorm:def:sql.value.array+6/test]    `Vec<Range<T>>` and `Vec<Multirange<T>>` convert
 // [spec:pgorm:def:exec.decode.range+3/test]    and decode as arrays
-// [spec:pgorm:def:sql.value.range+3/test]
+// [spec:pgorm:def:sql.value.range+4/test]
 async fn arrays_of_ranges_round_trip_through_an_entity(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {

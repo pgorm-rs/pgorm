@@ -35,7 +35,7 @@ fn parity(
 }
 
 // [spec:pgorm:req:python.delegation+1/test]
-// [spec:pgorm:req:python.expressions/test]
+// [spec:pgorm:req:python.expressions+1/test]
 #[test]
 fn expression_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -129,7 +129,7 @@ fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions/test]
+// [spec:pgorm:req:python.expressions+1/test]
 #[test]
 fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     Python::initialize();
@@ -172,7 +172,7 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions/test]
+// [spec:pgorm:req:python.expressions+1/test]
 #[test]
 fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     Python::initialize();
@@ -231,7 +231,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions/test]
+// [spec:pgorm:req:python.expressions+1/test]
 // [spec:pgorm:req:python.ownership/test]
 #[test]
 fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {

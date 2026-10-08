@@ -301,6 +301,12 @@ quality {
         // writing SimpleExpr::Raw(..) — makes the AST variant the
         // ergonomic spelling and drops the one entry point where the
         // verbatim-SQL decision is documented
-        allow-names (new account_only over raw)
+        //
+        // json_scalar is pgorm-python's binding of JSON_SCALAR, the one
+        // SQL/JSON function with no clause to apply, so its body is the
+        // Rust constructor over the coerced operand. Python can only reach
+        // a Rust function through such an entry point; removing it removes
+        // JSON_SCALAR from Python
+        allow-names (new account_only over raw json_scalar)
     }
 }

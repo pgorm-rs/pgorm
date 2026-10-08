@@ -15,7 +15,7 @@ def inspection(expression):
     return compiled.sql, [value.snapshot() for value in compiled.params]
 
 
-# [spec:pgorm:req:python.expressions/test]
+# [spec:pgorm:req:python.expressions+1/test]
 # [spec:pgorm:req:python.input-boundaries/test]
 # [spec:pgorm:req:python.ownership/test]
 # [spec:pgorm:req:python.delegation+1/test]

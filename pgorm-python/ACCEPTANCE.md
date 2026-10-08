@@ -43,7 +43,7 @@ point. Package installation occurs in fresh Python environments.
 
 | API or contract | Evidence run by acceptance |
 | --- | --- |
-| No HTTP; direct SELECT/CRUD | `checks/direct_builders.py` installs a wheel and executes 28 query programs against PostgreSQL. `tests/direct_builders.rs` independently constructs the Rust SQL and tagged parameters. Python's query phase rejects process launches; deliberately altered SQL and parameters must fail comparison. |
+| No HTTP; direct SELECT/CRUD | `checks/direct_builders.py` installs a wheel and executes 32 query programs against PostgreSQL. `tests/direct_builders.rs` independently constructs the Rust SQL and tagged parameters. Python's query phase rejects process launches; deliberately altered SQL and parameters must fail comparison. |
 | Values and expressions | Rust tests compare the Python wrappers with Rust value variants and expression constructors. Installed `test_values.py` and `test_expressions.py` cover exact conversion, typed NULL, enum identity, precision rejection and owned builder state. |
 | Statements and raw SQL | Native statement tests compare SQL and parameter order for SELECT, INSERT, UPDATE, DELETE, conflicts and raw templates. Installed statement and direct-builder tests exercise their public Python construction and execution. |
 | Runtime models and schema | Installed model tests cover mapped fields, defaults, CRUD, composite keys and decoding constraints. Rust `tests/schema.rs` compares explicit DDL; application `schema_parity.rs` compares generated statements with real entity traits. Both schema paths execute against PostgreSQL. |
@@ -62,22 +62,22 @@ silently accept a mismatched report.
 
 ## Recorded result and limits
 
-The complete checker passed locally on 2026-10-06 with CPython 3.14.4 and the GIL,
+The complete checker passed locally on 2026-10-08 with CPython 3.14.4 and the GIL,
 macOS 26.5.1 arm64, and PostgreSQL 18.6 (the Docker wrapper's
-`postgres:18.6-bookworm`). The run included 24 native binding tests,
-eight application Rust tests, 28 direct-builder query programs, registered
-application checks and 111 standalone Python tests on each of two installations
-(direct wheel and source-derived wheel). Both installations passed strict
-package/example typing, installed signature checks and 13 expected invalid
+`postgres:18.6-bookworm`), under macOS's default temporary directory, which is
+reached through the `/var` → `/private/var` symlink, with SQL/JSON, MERGE,
+RETURNING's row versions and created range types in the binding. The run
+included 34 native binding tests, eight application Rust tests, 32
+direct-builder query programs, registered application checks and 156
+standalone Python tests on each of two installations (direct wheel and
+source-derived wheel). Both installations passed
+strict package/example typing, installed signature checks and 13 expected invalid
 typing cases. The generated application also passed its package typing and
 four expected invalid cases. The default Rust workspace build and nspec
-validation passed. It replaces the 2026-09-10 record, the same checker against
-PostgreSQL 16.
-
-The run set `TMPDIR` to its resolved path. Under macOS's default temporary
-directory, reached through the `/var` → `/private/var` symlink, the typing
-checker's installed-package check compares the native module's unresolved
-directory with the resolved package root and fails before any typing runs.
+validation passed. Homebrew's `emcc`, a Python program that libc's build script
+runs on every host, was shadowed by a stub exiting 1 so the no-Python build
+probe judged pgorm's build alone (the `python-acceptance-emcc-probe` node). It
+replaces the 2026-10-06 record, which needed `TMPDIR` set to its resolved path.
 
 These results establish the tested combination recorded in
 [support.json](support.json). The configured macOS 15 and Linux CI jobs still

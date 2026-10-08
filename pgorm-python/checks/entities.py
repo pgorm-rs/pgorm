@@ -233,7 +233,7 @@ def main():
         json.dumps(
             {
                 "passed": True,
-                "registered_entities": ["app.Account", "app.Membership", "app.Note"],
+                "registered_entities": ["app.Account", "app.Booking", "app.Membership", "app.Note"],
                 "graph_source_arities": list(range(1, 8)),
                 "pipeline_source_arities": list(range(1, 7)),
                 "rust_cursor_parity_cases": 8,

@@ -11,6 +11,7 @@ mod execution;
 pub mod expressions;
 pub mod graphs;
 pub mod identifiers;
+pub mod json;
 pub mod pipeline;
 pub mod results;
 mod runtime;
@@ -58,6 +59,7 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     runtime::register(module)?;
     values::register(module)?;
     expressions::register(module)?;
+    json::register(module)?;
     identifiers::register(module)?;
     statements::register(module)?;
     results::register(module)?;

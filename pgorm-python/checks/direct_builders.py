@@ -93,7 +93,7 @@ def main():
         for field in ("sql", "params"):
             assert_parity_fails(oracle, report, environment, field)
     summary = {
-        "schema_version": 1, "passed": True, "query_programs": 28,
+        "schema_version": 1, "passed": True, "query_programs": 32,
         "clean_install": True, "python_process_audit": "no launches during query phase",
         "rust_parity": True, "sql_mismatch_rejected": True, "parameter_mismatch_rejected": True,
         "wheel": wheel.name, "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),

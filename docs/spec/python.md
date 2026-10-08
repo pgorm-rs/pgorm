@@ -73,13 +73,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > explicitly before execution. Runtime-generated compositions within those
 > capabilities MUST NOT invoke rustc, Cargo, Maturin or a code-generation build.
 
-> [spec:pgorm:req:python.values+1]
+> [spec:pgorm:req:python.values+2]
 > Conversions MUST preserve supported Rust value variants and nullability in
 > both directions. The conversion table MUST cover booleans, signed and
 > unsigned integer bounds, floating-point values including signed zero and
 > non-finite values, strings, bytes, Decimal, UUID, JSON, date/time values,
-> arrays, qualified enums, and the built-in ranges and multiranges where the
-> corresponding Rust feature exists.
+> arrays, qualified enums, the built-in ranges and multiranges where the
+> corresponding Rust feature exists, and the range and multirange types a
+> schema created. A created range's kind MUST carry the type's name, quoted
+> and schema-qualifiable, and its subtype, which converts each bound.
 > Python bool MUST NOT silently select the integer path. Integer overflow,
 > unsupported types and ambiguous conversions MUST raise explicit exceptions;
 > values MUST NOT silently stringify, wrap, truncate or become NULL.
@@ -101,10 +103,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions]
+> [spec:pgorm:req:python.expressions+1]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
 > LIKE patterns, function calls and qualified casts through Rust builders.
+> SQL/JSON's query functions, constructors, `FORMAT JSON` and `IS JSON` MUST
+> lower into the corresponding `pgorm_query` builders, each clause applied
+> through the builder's own method. Their behaviours MUST be typed per
+> function, so a choice PostgreSQL refuses for that function cannot be passed,
+> and a choice the Rust builder cannot express MUST raise an error rather than
+> be dropped.
 > Condition grouping and empty-condition semantics MUST match the named Rust
 > API. Python truth testing of a query expression MUST raise an error instead
 > of evaluating it as a local boolean or silently dropping part of a predicate.
@@ -120,10 +128,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements]
+> [spec:pgorm:req:python.statements+1]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
+> A RETURNING list MUST be able to read a written row's old and new versions
+> and rename them. MERGE MUST follow the Rust typestate: a pending MERGE with no
+> WHEN arm MUST NOT be inspectable or executable, each arm's action MUST be
+> typed by the kind of row the arm takes, with an explicit error for any
+> other, and `merge_action()` MUST be reachable only as the RETURNING list's
+> action column. A MERGE MUST be able to read a common table expression and to
+> be the body of one.
 > Schema/table/column names MUST be runtime inputs; shipped fixture names MUST
 > NOT be required. Execution and SQL inspection MUST use the same Rust builder
 > state, with SQL text and tagged bind values distinguishable in inspection.

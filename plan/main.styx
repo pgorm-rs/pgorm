@@ -828,7 +828,6 @@ children (
                         id table-key-distinct-columns
                         title "A table key cannot name the same column twice"
                         kind @fix
-                        sealed true
                         log (
                             {
                                 at 2026-10-05T22:00:12.634924Z
@@ -10095,6 +10094,20 @@ children (
                         kind @note
                         text "Split from merge-beyond-pg16 (c5acfcaa), whose decision note says why the binding was not built there. pgorm-python exposes no MERGE (python.statements asks for SELECT, INSERT, UPDATE and DELETE), and its INSERT / UPDATE / DELETE returning(*items) cannot read a written row's old and new versions or rename them, which pgorm-query now writes (ReturningRow, ReturningClause::old_as / new_as, sql.ast.returning+2; 947a062a). A raw statement reaches both today.\n\nMERGE needs native objects for the pending statement (no arm yet, so nothing to inspect or execute, as in Rust) and the statement; the three arm kinds, each with an optional condition (when_matched, when_not_matched, when_not_matched_by_source and their conditional forms, the unconditional arm of a kind rendering after its conditional arms, last call wins); the two action types (an update, a delete or nothing for a target row; an insert, a default-values insert or nothing for an unmatched source row, so an insert for a target row is refused by type or by an explicit TypeError); MergeUpdate / MergeInsert as non-empty (column, expression) pairs with overriding; with(), only(); and returning(*items) plus a returning_action flag, never a free merge_action() expression (it resolves only in a MERGE's RETURNING list, sql.ast.merge+1). The row versions need a Python spelling for (ReturningRow, column) and (ReturningRow, star), and the renames as keyword arguments of returning(). Each needs type stubs (a sibling .pyi if _writes.pyi or _statements.pyi would pass the size cap), capability-manifest entries (pgorm-python/src/statements/capabilities.rs), parity cases in checks/direct_builders.py, and live tests; the identifier oracle already covers the names, since Python reaches them only through the Rust APIs. python.statements gains MERGE and the versions in the same change."
                     }
+
+                    {
+                        at 2026-10-08T16:03:50.562078Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T16:16:36.872555Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -10155,6 +10168,20 @@ children (
                         kind @note
                         text "Filed with pg17-sql-json (2026-10-07). pgorm-python's call() reaches the named Func constructors of a fixed table (python.expressions); SQL/JSON's builders have no binding, so Python reaches them only through raw SQL: Func::json_exists / json_value / json_query with PASSING, RETURNING, the wrapper-or-quotes slot and the three behaviour enums (JsonExistsBehavior, JsonValueBehavior, JsonQueryBehavior); the constructors json_object, json_array, json_array_query, json_objectagg and json_arrayagg (ORDER BY, FILTER, and the window form expr_window now accepts), json, json_scalar and json_serialize; Expr::format_json; and Expr::is_json / is_not_json with JsonKind and JsonTest. A binding needs native objects for each builder and behaviour, capability-manifest entries, stubs, and parity cases against the Rust builders, rendering as Rust does: paths bound as text cast to jsonpath, a value typed in both render paths, a DEFAULT as an escaped literal. JSON_TABLE's half follows pg17-json-table."
                     }
+
+                    {
+                        at 2026-10-08T15:55:17.404209Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T16:02:37.335682Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -10208,6 +10235,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by pg18-test-server (84d97a35) while re-recording pgorm-python's acceptance on PostgreSQL 18, and unrelated to the server version. pgorm-python/checks/typing.py installed_metadata() resolves the package root (`root = Path(pgorm.__file__).resolve().parent`) and then asserts `Path(_native.__file__).parent == root` without resolving the native module's path. distribution.py installs each wheel into a venv under tempfile's directory. On macOS that is $TMPDIR=/var/folders/..., reached through the /var -> /private/var symlink, so the two paths differ by the prefix and the assertion fails before any typing runs. Reproduced in a fresh venv from the same wheel: the native module's parent is /var/folders/.../site-packages/pgorm while root is /private/var/folders/.../site-packages/pgorm. The failure surfaced as the distribution phase of checks/acceptance.py failing on 2026-10-06. The stderr is not captured into distribution.log, so the log shows only CalledProcessError. CI's macOS job passes because its runner's temporary directory is not behind a symlink, and the 2026-10-06 acceptance record ran with TMPDIR set to its resolved path (pgorm-python/ACCEPTANCE.md says so). Fix: resolve the native module's path before comparing (`Path(_native.__file__).resolve().parent == root`). Consider also surfacing the child's stderr when the metadata program fails. Acceptance: checks/acceptance.py passes through tests/with_postgres.py under macOS's default TMPDIR, and ACCEPTANCE.md's TMPDIR paragraph is removed."
+            }
+
+            {
+                at 2026-10-08T15:46:04.896168Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T15:48:34.504635Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -10329,6 +10370,20 @@ children (
                 kind @note
                 text "Filed by created-range-types (79b25c75), which gave Rust a created range type: a newtype over Range<T> deriving DeriveCreatedRange (range_name, schema_name), whose Value is Value::String of the range's text form and whose column is ColumnType::CreatedRange { name, schema, subtype }; a value is written as CAST(<text> AS <name>) through Expr::as_range, and a row decodes from the binary form for any RangeSubtype (i16, i32, i64, f32, f64, Decimal, String, Date, Time, DateTime, Timestamp, Uuid). Python has none of it. Today: (1) a Python Range's kind is a built-in type name (int4range ... tstzrange), and that kind tags a Value, its typed NULL, an array's elements and a snapshot; a created range needs a kind that names the created type (schema-qualifiable, quoted) and its subtype, since the subtype is what converts each bound and the name is what the cast needs. (2) Decoding a created range over a non-built-in subtype raises DecodeError naming the subtype (pgorm-python/src/results/ranges.rs; test_range_results.py asserts it for floatrange); one over a built-in subtype reads as the built-in kind. (3) A registered entity field of a DeriveCreatedRange newtype comes out of PyValue::from_rust as a str (its Value is text), and its column hints InputKind::Explicit (metadata.rs falls through on ColumnType::CreatedRange), so writing one from Python needs an explicit tagged Value. (4) The Rust FromStr/Display text form (range_out quoting) is the natural wire between the two: a Python created range could be bound as its text and cast by name exactly as Expr::as_range does. Acceptance: a kind for a created range type, conversion both ways with the subtype's limits, snapshot tags, stubs (a sibling .pyi if _ranges.pyi would cross its cap), decode of a created range column through a registered entity and RawSQL, and the wheel suites against the 18.6 server. Spec homes: sql.value.range (its Python paragraph names this node), sql.value.created-range, python.values. created-multiranges will add the multirange half; fold it in here or file its own."
             }
+
+            {
+                at 2026-10-08T16:19:19.277762Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T16:45:27.273279Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -10400,6 +10455,48 @@ children (
                         text "Home under the pg-19 feature (sql.target, 2026-10-07). The typed home this note weighs — constructors for lag, lead, first_value, last_value and nth_value that carry a null treatment — is new items behind #[cfg(feature = \"pg-19\")], marked doc(cfg(feature = \"pg-19\")), and so additive by construction. The alternative is ruled out by more than the server's refusals now: a null-treatment field or variant added under cfg to FunctionCall or WindowFunction appears whenever any crate in the graph turns pg-19 on, and breaks a dependent's exhaustive match or struct literal. Python's expression and pipeline surfaces follow behind pgorm-python's own pg-19, their capability entries carrying \"features\": [\"pg-19\"]. Live tests are #[cfg(feature = \"pg-19\")] against pgorm-test-19; the rust-pg-19 check platform keeps them compiling. Still behind pg-query-19."
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id python-acceptance-emcc-probe
+        title "The acceptance runner's no-Python build probe passes on a host whose emcc is a Python program"
+        kind @fix
+        log (
+            {
+                at 2026-10-08T15:47:43.547951Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found while running python-typing-check-symlinked-tmp's acceptance (2026-10-08). pgorm-python/checks/acceptance.py rust_without_python() builds the default workspace with python, python3, python3.14, pip, pip3 and maturin replaced by stubs that record their invocation, and fails if any ran. On a fresh target directory it fails on a macOS host with Homebrew's emscripten installed, for a reason that has nothing to do with pgorm: libc 0.2.189's build script runs `emcc -dumpversion` on every host (build.rs emcc_version_code(), not gated on the emscripten target), and /opt/homebrew/bin/emcc is a shell wrapper that runs `python3 -E .../emcc.py`, which hits the python3 stub. Reproduced with the stubs logging their parent: the invoker is target/debug/build/libc-*/build-script-build, cwd libc-0.2.189. The probe's intent is that pgorm's own build needs no Python tooling; a third-party build script probing for an unrelated compiler is outside it. Options: shadow emcc in the probe directory with a stub that exits non-zero without recording (libc then takes its non-emscripten default, as on a host without emscripten), or record the invoking process and ignore invocations whose parent is emcc. A warm target directory hides the failure because the build script does not rerun, so the probe should be tested against a fresh target. The 2026-10-08 acceptance record ran with an emcc that exits 1 first on PATH."
+            }
+        )
+    }
+
+    {
+        id python-json-table
+        title "Python reads rows out of a JSON document with JSON_TABLE, a FROM item"
+        kind @feat
+        log (
+            {
+                at 2026-10-08T16:03:28.361105Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed by python-sql-json (f2e880a6), whose node note left JSON_TABLE's half to follow pg17-json-table (983505d0). Rust builds it as Func::json_table(context, path, first_column) -> JsonTable, made a FromItem by alias(name), with JsonTableColumn's five kinds (ordinality, value, query, exists, nested with its own first column), passing, path_name and on_error (JsonTableBehavior: ERROR or EMPTY only); paths are escaped literals because the server refuses a parameter there (0A000 root, 42601 column). Python cannot place it: Select.from_ and Select.join take only a Table (pgorm-python/src/statements/select.rs), so there is no FROM item beyond a named table, no comma-joined second FROM item, and no LEFT JOIN .. ON TRUE over a lateral one. Needs: a Python spelling for a FROM item that is not a table (JSON_TABLE first; a subquery or VALUES list would share the same door), accepted by from_ and the join methods; native objects for the table, its column kinds and their behaviours, reusing python-sql-json's JsonValueBehavior / JsonQueryBehavior / JsonExistsBehavior / JsonDefault where the Rust column kinds take those enums; stubs (a sibling .pyi), capability-manifest entries, parity cases against the Rust builders, live tests on 18.6 (each column kind, NESTED PATH as an outer join, 2203A under ERROR ON ERROR, a hostile path literal, 42712 for a repeated column name), and python.statements gaining the FROM item. The alias and every column, path and PASSING name reach the Rust builder as a Name, so the identifier oracle already covers them."
+            }
+        )
+    }
+
+    {
+        id python-select-windows
+        title "Python's runtime Select calls a function over a window, a JSON aggregate's OVER form included"
+        kind @feat
+        log (
+            {
+                at 2026-10-08T16:03:37.222867Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed by python-sql-json (f2e880a6). pg17-sql-json's note lists the window form of JSON_OBJECTAGG / JSON_ARRAYAGG, which SelectStatement::expr_window / expr_window_as / expr_window_name(_as) and the WINDOW clause accept for any WindowFunction. Python's runtime Select (pgorm-python/src/statements/select.rs) has no window method at all, so neither a JSON aggregate nor count / sum / row_number reaches OVER (..) there; only the pipeline API's windows (pgorm::pipeline) and RawSQL do. Decide the Python spelling (an over(partition_by=, order_by=, frame=) on an aggregate expression, or a select item carrying a window spec), keeping OVER attached only to a function call as Rust's narrowed expr_window does (bug.window-position), and give it stubs, capability-manifest entries, parity cases against the Rust builders, live tests on 18.6, and python.statements' text."
             }
         )
     }
