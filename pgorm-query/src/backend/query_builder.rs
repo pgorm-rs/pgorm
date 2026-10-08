@@ -1741,7 +1741,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+14]
+    // [spec:pgorm:req:sql.ddl.create-table+15]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1764,7 +1764,7 @@ impl QueryBuilder {
             first = false;
         });
 
-        // [spec:pgorm:req:sql.ddl.create-table+14]
+        // [spec:pgorm:req:sql.ddl.create-table+15]
         if let Some(key) = &create.primary_key {
             if !first {
                 write!(sql, ", ").unwrap();
@@ -1967,7 +1967,7 @@ impl QueryBuilder {
     /// deferrability to write, and its columns are plain names: it has no
     /// entry that could carry an ordering, an operator class or an expression.
     /// A temporal key's `WITHOUT OVERLAPS` column closes the list.
-    // [spec:pgorm:req:sql.ddl.create-table+14]
+    // [spec:pgorm:req:sql.ddl.create-table+15]
     pub(super) fn prepare_table_key<K>(
         &self,
         keyword: &str,
@@ -1992,7 +1992,7 @@ impl QueryBuilder {
             name.prepare(sql.as_writer());
             false
         });
-        // [spec:pgorm:req:sql.ddl.create-table+14]
+        // [spec:pgorm:req:sql.ddl.create-table+15]
         if let Some(period) = &key.without_overlaps {
             write!(sql, ", ").unwrap();
             period.prepare(sql.as_writer());

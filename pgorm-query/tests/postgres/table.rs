@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
-// [spec:pgorm:req:sql.ddl.create-table+14/test]
+// [spec:pgorm:req:sql.ddl.create-table+15/test]
 // [spec:pgorm:req:sql.ddl.column-def+12/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
@@ -576,7 +576,7 @@ fn create_16() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+14/test]    a primary key is a table constraint, the one
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    a primary key is a table constraint, the one
 // spelling it has here, whether built or converted from a tuple
 #[test]
 fn a_primary_key_is_a_table_constraint() {

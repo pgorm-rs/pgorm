@@ -1,6 +1,7 @@
 use crate::{
     ActiveEnum, Column, ConjunctRelation, CreatedRangeType, Entity, EntityWriter, Error,
-    PrimaryKey, Relation, RelationType, TableIdent, util::escape_rust_keyword,
+    PrimaryKey, Relation, RelationType, TableIdent,
+    util::{escape_rust_keyword, repeated_column},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::TableCreateStatement;
@@ -8,14 +9,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+10]
+// [spec:pgorm:sem:codegen.entity.transform+11]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+10]
+    // [spec:pgorm:sem:codegen.entity.transform+11]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+2]
@@ -33,6 +34,7 @@ impl EntityTransformer {
             let ident = TableIdent::of(table_create.get_table_name());
             let table_name = ident.to_string();
             refuse_temporal_constraints(&table_create, &table_name)?;
+            refuse_repeated_key_columns(&table_create, &table_name)?;
             let unique_column_sets: Vec<BTreeSet<String>> = table_create
                 .get_unique_keys()
                 .iter()
@@ -340,7 +342,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+10]
+// [spec:pgorm:sem:codegen.entity.transform+11]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -363,7 +365,7 @@ pub(crate) fn resolve_reference<'a>(
 /// its other columns would claim they are unique when they are not, and a
 /// `PERIOD` foreign key read as its other pairs would join rows in no period
 /// of each other's — so either is refused, never read without its period.
-// [spec:pgorm:sem:codegen.entity.transform+10]
+// [spec:pgorm:sem:codegen.entity.transform+11]
 fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let temporal_key = table
         .get_primary_key()
@@ -385,6 +387,28 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
         return Err(Error::TransformError(format!(
             "table `{name}`: an entity cannot hold a PERIOD foreign key"
         )));
+    }
+    Ok(())
+}
+
+/// A primary or unique key naming a column twice, which PostgreSQL refuses
+/// (`42701`) and a caller-built statement can still hold. Read as written it
+/// would generate a `PrimaryKey` enum with one variant twice, which does not
+/// compile, and a unique key over `(a, a)` would mark `a` unique on its own;
+/// so it is refused by name, never read as the key without its repeat.
+// [spec:pgorm:sem:codegen.entity.transform+11]
+fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
+    let keys = table
+        .get_primary_key()
+        .map(|key| key.get_columns())
+        .into_iter()
+        .chain(table.get_unique_keys().iter().map(|key| key.get_columns()));
+    for columns in keys {
+        if let Some(column) = repeated_column(columns.iter().map(|column| column.to_string())) {
+            return Err(Error::TransformError(format!(
+                "table `{name}`: a key names column `{column}` twice"
+            )));
+        }
     }
     Ok(())
 }
@@ -417,7 +441,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+10]
+// [spec:pgorm:sem:codegen.entity.transform+11]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {

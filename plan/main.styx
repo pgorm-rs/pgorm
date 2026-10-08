@@ -828,6 +828,7 @@ children (
                         id table-key-distinct-columns
                         title "A table key cannot name the same column twice"
                         kind @fix
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T22:00:12.634924Z
@@ -841,6 +842,27 @@ children (
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Checked live on PostgreSQL 16.15 while landing on-conflict-columns, 2026-10-06. The server ACCEPTS a repeated column in an ON CONFLICT inference target. Inference matches an index by its column set, so repeats collapse: against PRIMARY KEY (a, b), ON CONFLICT (a, b, a) DO UPDATE and ON CONFLICT (b, a, b) DO NOTHING both arbitrate the key. Against UNIQUE (a), ON CONFLICT (a, a) and (a, a, a) arbitrate it too. ON CONFLICT (a, a) against PRIMARY KEY (a, b) is refused, but with 42P10 (no matching constraint) because {a} is not {a, b}, not because of the repeat. So the distinct-columns rule must NOT be shared with the conflict target: refusing a repeat there would be stricter than the server. on-conflict-columns gave the target a sibling trait, IntoKeyColumns, which TableKey's IntoTableKey is now built on, rather than TableKey itself. If this node enforces distinctness at tuple-conversion time, it belongs in the IntoTableKey/TableKey layer, not in IntoKeyColumns, or OnConflict::columns inherits it. The table-key side is confirmed too: PRIMARY KEY (a, a) gives 42701 \"column \\\"a\\\" appears twice in primary key constraint\", and UNIQUE (a, b, a) gives 42701 \"... appears twice in unique constraint\" (both inline in CREATE TABLE; ALTER ADD not yet checked)."
+                            }
+
+                            {
+                                at 2026-10-08T15:41:48.077043Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-08T15:46:05.145097Z
+                                author "brendan@necessary.nu"
+                                kind @decision
+                                text "Decided 2026-10-08, per [dec:pgorm:invalid-states-unrepresentable] and [dec:pgorm:no-panic]: the builder writes a repeated key column as given and the server refuses it; it is neither ruled out by type nor refused by the key, nor deduplicated. Unrepresentable is impossible: two columns of one type (two variants of one Column enum, two runtime Names) are two values no type tells apart. Refused by the key would make col, cols, every tuple conversion and every embedder (primary_key, unique, add_primary_key, add_unique) return a Result, an error path on every key a program declares for the one mistake the statement's execution reports by name (42701); pgorm executes DDL as its text, so execution is the fallible boundary a DDL statement has, as no-panic's consequence says. Deduplicating would declare a key other than the one written, unseen. Codegen reads keys at a fallible boundary of its own and refuses a repeat by name: the DDL bridge's PRIMARY KEY / UNIQUE (\"statement <n>: table `t` names column `c` twice in one key\"), a unique index folding into a constraint (\"column `c` named twice on unique index `i`\", since the server creates the index but not the constraint), and the transform gate for a caller-built statement (\"table `t`: a key names column `c` twice\"). Before this a repeat generated a PrimaryKey enum with one variant twice (did not compile), and UNIQUE (a, a) marked a unique on its own through the column set. Live, identical on 18.6 and 19beta4: PRIMARY KEY (a, a), UNIQUE (a, b, a), ALTER ADD PRIMARY KEY / UNIQUE each 42701; (p, p WITHOUT OVERLAPS) 42701 even without btree_gist; INCLUDE (a, b, b) on key (a) accepted (indkey 1 1 2 2), so the included columns may repeat; CREATE UNIQUE INDEX ON t (a, a) accepted; a foreign key's referencing list may repeat (FOREIGN KEY (a, a) REFERENCES p (x, y) accepted) while the referenced list may not (42830). Python mirrors Rust and is unchanged."
+                            }
+
+                            {
+                                at 2026-10-08T17:00:43.03556Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }

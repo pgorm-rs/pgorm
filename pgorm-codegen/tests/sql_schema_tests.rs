@@ -301,7 +301,7 @@ fn a_column_collation_rides_on_the_statement() {
     assert_eq!(collations(&rendered), expected);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a statement the bridge does
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a statement the bridge does
 // not read is named, never skipped
 #[test]
 fn unsupported_statements_are_named() {
@@ -331,7 +331,7 @@ fn unsupported_statements_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a CREATE TABLE clause with
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a CREATE TABLE clause with
 // no entity meaning is named rather than dropped
 #[test]
 fn unsupported_table_clauses_are_named() {
@@ -365,7 +365,7 @@ fn unsupported_table_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    the same holds for column
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    the same holds for column
 // clauses the entity model has no room for
 #[test]
 fn unsupported_column_clauses_are_named() {
@@ -395,7 +395,7 @@ fn unsupported_column_clauses_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    what PostgreSQL 18's grammar
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    what PostgreSQL 18's grammar
 // added and the entity model cannot hold yet is named, not read as the older
 // shape each one resembles
 #[test]
@@ -437,7 +437,7 @@ fn postgres_18_constraints_are_named() {
 
 // [spec:pgorm:sem:codegen.ddl.tables+8/test]    an explicit ENFORCED on a column's
 // REFERENCES rides on the statement, and the entity is the plain key's
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    an ENFORCED anywhere else is
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    an ENFORCED anywhere else is
 // named, as PostgreSQL refuses it there
 #[test]
 fn an_explicit_enforced_rides_on_the_statement() {
@@ -543,7 +543,7 @@ fn a_not_null_constraint_rides_on_the_statement() {
     assert_eq!(from_sql(declared).files, from_sql(plain).files);
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    two NOT NULL clauses on one
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    two NOT NULL clauses on one
 // column that PostgreSQL would refuse to make one constraint of are refused
 #[test]
 fn conflicting_not_null_constraints_are_refused() {
@@ -609,7 +609,7 @@ fn types_codegen_cannot_render_reach_the_gate() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    an index clause the builder
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    an index clause the builder
 // cannot express is named
 #[test]
 fn unsupported_index_clauses_are_named() {
@@ -680,7 +680,7 @@ fn a_unique_index_folds_into_its_constraint() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a COMMENT the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a COMMENT the bridge cannot
 // attach is named
 #[test]
 fn unsupported_comment_targets_are_named() {
@@ -690,7 +690,7 @@ fn unsupported_comment_targets_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a statement that names an
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a statement that names an
 // object the file does not declare is named too
 #[test]
 fn unresolved_references_are_named() {
@@ -712,7 +712,7 @@ fn unresolved_references_are_named() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a table declaring a second
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a table declaring a second
 // primary key is named in every spelling PostgreSQL refuses (42P16), rather
 // than read as the composite key one `PRIMARY KEY (a, b)` declares
 #[test]
@@ -730,7 +730,37 @@ fn a_second_primary_key_is_named() {
     assert!(parse_schema("CREATE TABLE t (a int, b int, PRIMARY KEY (a, b));").is_ok());
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+11/test]    a foreign key onto a table
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a key naming one column
+// twice, which PostgreSQL refuses (42701), is named rather than read with or
+// without its repeat; a unique index doing so is named as a DESC column on one is
+#[test]
+fn a_key_naming_a_column_twice_is_named() {
+    for (table, column) in [
+        ("CREATE TABLE t (a int, b int, PRIMARY KEY (a, a));", "a"),
+        ("CREATE TABLE t (a int, b int, UNIQUE (a, b, b));", "b"),
+        (
+            r#"CREATE TABLE t ("A" int, b int, CONSTRAINT k UNIQUE (b, "A", b, "A"));"#,
+            "b",
+        ),
+    ] {
+        assert_error(
+            &format!("CREATE TABLE u (id int); {table}"),
+            &format!("statement 2: table `t` names column `{column}` twice in one key"),
+        );
+    }
+    assert_error(
+        "CREATE TABLE t (a int, b int); CREATE UNIQUE INDEX i ON t (a, b, a);",
+        "unsupported DDL: column `a` named twice on unique index `i` at statement 2",
+    );
+    // Case is the server's: "A" and a are two columns, so neither key repeats.
+    assert!(parse_schema(r#"CREATE TABLE t ("A" int, a int, PRIMARY KEY ("A", a));"#).is_ok());
+    assert!(
+        parse_schema(r#"CREATE TABLE t ("A" int, a int); CREATE UNIQUE INDEX i ON t ("A", a);"#)
+            .is_ok()
+    );
+}
+
+// [spec:pgorm:req:codegen.ddl.unsupported+12/test]    a foreign key onto a table
 // or a column the file never declares is named too — by the transform gate the
 // whole pipeline runs, which is where every table is in hand at once
 #[test]

@@ -544,7 +544,7 @@ fn sweep_merge_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+14/test]
+// [spec:pgorm:req:sql.ddl.create-table+15/test]
 // [spec:pgorm:req:sql.ddl.alter-table+10/test]
 #[test]
 fn sweep_table_ddl_shapes() {

@@ -27,6 +27,23 @@ fn is_ident(raw: &str) -> bool {
     one_ident && tokens.next().is_none()
 }
 
+/// The first column a key names a second time, compared as the text the
+/// server reads. PostgreSQL refuses such a key (`42701`), and the entity a
+/// transform would read from it is not the key written: one `PrimaryKey`
+/// variant twice over, or a unique key whose set of columns is narrower than
+/// its list.
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
+// [spec:pgorm:sem:codegen.entity.transform+11]
+pub(crate) fn repeated_column<I>(columns: I) -> Option<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut seen = std::collections::BTreeSet::new();
+    columns
+        .into_iter()
+        .find(|column| !seen.insert(column.clone()))
+}
+
 // [spec:pgorm:sem:codegen.entity.keywords+1]
 pub(crate) fn escape_rust_keyword<T>(string: T) -> String
 where

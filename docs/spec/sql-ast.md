@@ -899,7 +899,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `OnConflict::columns` MUST name a whole key's columns in one call. It takes
 > an `IntoKeyColumns`, the conversion a table key is built from
-> (`[spec:pgorm:req:sql.ddl.create-table+14]`): one column or a tuple of one
+> (`[spec:pgorm:req:sql.ddl.create-table+15]`): one column or a tuple of one
 > to twelve, in order, so `OnConflict::columns((a, b))` is the target
 > `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
 > declares the key it arbitrates on. The conversion hands back the first
@@ -945,7 +945,7 @@ today, including panicking edges and deliberate failsafes.
 > (`42809`); it is also the one arbiter that only a name reaches, because
 > inference looks for a unique index and finds none (`42P10`). PostgreSQL
 > 18's temporal key, a primary or unique key ending `WITHOUT OVERLAPS`
-> (`[spec:pgorm:req:sql.ddl.create-table+14]`), is enforced as one and
+> (`[spec:pgorm:req:sql.ddl.create-table+15]`), is enforced as one and
 > arbitrates as one, which the live suite holds: `OnConflict::columns` over
 > its columns, period included, finds nothing to infer (`42P10`), and its
 > name takes `DO NOTHING`, an overlapping row being the conflict, and refuses

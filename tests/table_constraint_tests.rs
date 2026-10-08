@@ -2,7 +2,7 @@
 
 //! Primary and unique keys against a live PostgreSQL server.
 //!
-//! `TableKey` exists so that every key the builder can declare is one
+//! `TableKey` exists so that every key shape the builder can declare is one
 //! PostgreSQL accepts; the shapes it refuses — a non-unique kind, an ordered,
 //! collated, classed or computed key entry, a predicate, an access method,
 //! `NULLS NOT DISTINCT` on a primary key, a second primary key — have no
@@ -10,11 +10,15 @@
 //! What only a server can settle is the other half: that each shape the
 //! builder *can* make is created as the key it names, and behaves as one. Each
 //! case below reads the constraint back out of `pg_constraint` and
-//! `pg_index`, and sets the row its key refuses beside the row it admits.
+//! `pg_index`, and sets the row its key refuses beside the row it admits. The
+//! one key the builder writes and the server refuses is one naming a column
+//! twice, which no type can tell from two columns.
 
 pub mod common;
 pub use common::{TestContext, setup::*};
-use pgorm::pgorm_query::{ColumnDef, Deferrability, Name, Table, TableKey};
+use pgorm::pgorm_query::{
+    ColumnDef, ColumnType, Deferrability, Name, RangeType, Table, TableKey, Unique,
+};
 use pgorm::{ConnectionTrait, entity::prelude::*};
 use tokio_postgres::error::SqlState;
 
@@ -27,6 +31,7 @@ async fn main() -> Result<(), Error> {
     each_key_refuses_what_it_should(&db).await?;
     the_grammar_has_no_other_shape(&db).await?;
     a_later_primary_key_replaces_the_first(&db).await?;
+    a_key_naming_a_column_twice_is_refused(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -79,7 +84,7 @@ fn ledger() -> String {
 /// Each constraint as the catalogue holds it: its type, its key columns and
 /// included columns by name, whether nulls are distinct, and whether it is
 /// deferrable and initially deferred.
-// [spec:pgorm:req:sql.ddl.create-table+14/test]    against a live server: every constraint
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: every constraint
 // shape the builder makes is created, and is the constraint it names
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]
 async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(), Error> {
@@ -144,7 +149,7 @@ async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(
 /// says it should: a composite key only a repeat of the whole key, an
 /// included column never, a plain unique key any number of nulls, and a
 /// `NULLS NOT DISTINCT` one a second null.
-// [spec:pgorm:req:sql.ddl.create-table+14/test]    against a live server: each key refuses
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: each key refuses
 // what it should and nothing else
 async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), Error> {
     let insert = |a: i32, b: i32, c: Option<i32>, d: &str, e: Option<i32>| {
@@ -189,7 +194,7 @@ async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), 
 /// access method, and `NULLS NOT DISTINCT` on a primary key. Each is written
 /// raw here, because the builder cannot write it at all; the control beside
 /// them is the same table with a key the grammar takes.
-// [spec:pgorm:req:sql.ddl.create-table+14/test]    against a live server: the table-constraint
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: the table-constraint
 // shapes the builder cannot express are the ones PostgreSQL refuses
 async fn the_grammar_has_no_other_shape(db: &DatabaseConnection) -> Result<(), Error> {
     for constraint in [
@@ -235,7 +240,7 @@ async fn primary_key_of(db: &DatabaseConnection, table: &str) -> Result<(String,
 /// SQL has for one (`42P16`). The builder holds the key in one slot, so a
 /// table it builds with two `primary_key` calls has the second's key and
 /// only that, under the second's name.
-// [spec:pgorm:req:sql.ddl.create-table+14/test]    against a live server: the second key a table
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: the second key a table
 // is given replaces the first, where SQL that declares two is refused
 async fn a_later_primary_key_replaces_the_first(db: &DatabaseConnection) -> Result<(), Error> {
     for raw in [
@@ -267,6 +272,89 @@ async fn a_later_primary_key_replaces_the_first(db: &DatabaseConnection) -> Resu
         .await
         .expect_err("a repeated (b, a)");
     refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
+
+    Ok(())
+}
+
+/// A key names each of its columns once: PostgreSQL refuses one naming a
+/// column twice (`42701`), as a primary or a unique key, in `CREATE TABLE` and
+/// after `ALTER TABLE`'s `ADD`, its `WITHOUT OVERLAPS` column included. The
+/// builder writes such a key as given, the repeat kept, so the refusal is the
+/// server's and the key declared is never a narrower one than written. The
+/// included columns are no part of the key and may repeat it, which is the
+/// control.
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a key naming a column
+// twice is written as given and refused by the server, whatever spells it
+async fn a_key_naming_a_column_twice_is_refused(db: &DatabaseConnection) -> Result<(), Error> {
+    let twice = || {
+        Table::create(n("twice"))
+            .col(ColumnDef::new(n("a")).integer().not_null())
+            .col(ColumnDef::new(n("b")).integer().not_null())
+            .col(ColumnDef::new_with_type(
+                n("p"),
+                ColumnType::Range(RangeType::Int4),
+            ))
+            .to_owned()
+    };
+    let refused_twice = |create: String, repeat: &'static str| async move {
+        assert!(create.contains(repeat), "{create}");
+        let refused = db.batch_execute(&create).await.expect_err(&create);
+        refused_with(&refused, &SqlState::DUPLICATE_COLUMN);
+    };
+
+    refused_twice(
+        twice().primary_key((n("a"), n("a"))).to_string(),
+        r#"PRIMARY KEY ("a", "a")"#,
+    )
+    .await;
+    refused_twice(
+        twice()
+            .unique(TableKey::new(n("a")).col(n("b")).col(n("a")))
+            .to_string(),
+        r#"UNIQUE ("a", "b", "a")"#,
+    )
+    .await;
+    refused_twice(
+        twice()
+            .unique(TableKey::<Unique>::new(n("p")).without_overlaps(n("p")))
+            .to_string(),
+        r#"UNIQUE ("p", "p" WITHOUT OVERLAPS)"#,
+    )
+    .await;
+
+    db.batch_execute(&twice().to_string()).await?;
+    refused_twice(
+        Table::alter(n("twice"))
+            .add_primary_key(TableKey::new(n("b")).cols([n("a"), n("b")]))
+            .to_string(),
+        r#"ADD PRIMARY KEY ("b", "a", "b")"#,
+    )
+    .await;
+    refused_twice(
+        Table::alter(n("twice"))
+            .add_unique((n("b"), n("b")))
+            .to_string(),
+        r#"ADD UNIQUE ("b", "b")"#,
+    )
+    .await;
+
+    let included = Table::alter(n("twice"))
+        .add_unique(
+            TableKey::new(n("a"))
+                .name(n("twice_a"))
+                .include([n("a"), n("b"), n("b")]),
+        )
+        .to_string();
+    db.batch_execute(&included).await?;
+    let row = db
+        .query_one(
+            "SELECT i.indnkeyatts::int, i.indkey::text FROM pg_constraint c \
+             JOIN pg_index i ON i.indexrelid = c.conindid WHERE c.conname = 'twice_a'",
+            &[],
+        )
+        .await?;
+    let (keyed, columns): (i32, String) = (row.get(0), row.get(1));
+    assert_eq!((keyed, columns.as_str()), (1, "1 1 2 2"), "{included}");
 
     Ok(())
 }

@@ -1,5 +1,5 @@
 use super::{Declared, TypeIdentity, table, types, unresolved, unsupported};
-use crate::{Error, TableIdent};
+use crate::{Error, TableIdent, util::repeated_column};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, CreateEnumStmt, CreateRangeStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
@@ -155,7 +155,7 @@ pub(super) struct ParsedIndex {
 }
 
 // [spec:pgorm:sem:codegen.ddl.objects+8]
-// [spec:pgorm:req:codegen.ddl.unsupported+11]
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -233,6 +233,11 @@ pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     }
     if columns.iter().any(|(_, descending)| *descending) {
         return Err(on_unique("a DESC column"));
+    }
+    // The server takes a unique index over a column named twice, but not
+    // the table constraint it folds into (42701).
+    if let Some(column) = repeated_column(columns.iter().map(|(column, _)| column.to_string())) {
+        return Err(on_unique(&format!("column `{column}` named twice")));
     }
     let mut columns = columns.into_iter().map(|(column, _)| column);
     let Some(first) = columns.next() else {

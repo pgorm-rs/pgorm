@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+10]
+> [spec:pgorm:sem:codegen.entity.transform+11]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -127,7 +127,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > row it references, for the reasons `codegen.ddl.unsupported` gives; so each
 > is refused, ``TransformError("table `<table>`: an entity cannot hold a
 > WITHOUT OVERLAPS key")`` and ``TransformError("table `<table>`: an entity
-> cannot hold a PERIOD foreign key")``.
+> cannot hold a PERIOD foreign key")``. So is a primary or unique key naming
+> one column twice, which the builder writes as given and PostgreSQL refuses
+> (`42701`, `sql.ddl.create-table`): read, it would generate a `PrimaryKey`
+> enum with one variant twice, which does not compile, or make the one column
+> of a unique key over `(a, a)` unique on its own, so it is
+> ``TransformError("table `<table>`: a key names column `<column>` twice")``,
+> the columns compared as the text the server reads.
 >
 > Once every table has been read, the gate also checks that the schema is
 > closed under its own foreign keys: each relation's referenced table is a
@@ -789,7 +795,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+11]
+> [spec:pgorm:req:codegen.ddl.unsupported+12]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
@@ -881,7 +887,18 @@ compiling the C parser falls on people generating entities and on nobody else.
 > key")``. None of these is the composite key one `PRIMARY KEY (a, b)` declares,
 > and reading two of them as one — which the transform did, generating either a
 > composite key or a `PrimaryKey` enum with a variant twice over that did not
-> compile — would be the quiet reinterpretation this rule forbids. So are two
+> compile — would be the quiet reinterpretation this rule forbids. So is a
+> primary or unique key naming one column twice, which PostgreSQL refuses too
+> (`42701`, *column "a" appears twice in primary key constraint*):
+> ``TransformError("statement <n>: table `<t>` names column `<c>` twice in one
+> key")``. Read as written it would generate that same enum, and a unique key
+> over `(a, a)` would make `a` a unique column on its own; read without the
+> repeat it would be a key other than the one written. A unique index naming
+> a column twice the server does create, but the table constraint it folds
+> into cannot (`codegen.ddl.objects`), so it is named as a `DESC` column on one
+> is: ``TransformError("unsupported DDL: column `<c>` named twice on unique
+> <index> at statement <n>")``. Columns are compared as the text the server
+> reads. So are two
 > `NOT NULL` clauses on one column that PostgreSQL refuses to make one
 > constraint of (`42601`), between which a bridge keeping either would choose
 > in silence: two names, ``TransformError("statement <n>: column `<t>`.`<c>`

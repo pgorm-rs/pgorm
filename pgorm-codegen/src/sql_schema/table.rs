@@ -1,5 +1,5 @@
 use super::{Declared, types, unresolved, unsupported};
-use crate::{Error, TableIdent};
+use crate::{Error, TableIdent, util::repeated_column};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CollateClause, ColumnDef as PgColumnDef, ConstrType, Constraint, CreateStmt, RangeVar,
@@ -171,7 +171,7 @@ pub(super) fn build(
 /// column, as a table constraint beside a column's, or twice on one column.
 /// PostgreSQL refuses every such table (42P16), and none is a composite key:
 /// that is one `PRIMARY KEY (a, b)`.
-// [spec:pgorm:req:codegen.ddl.unsupported+11]
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
 fn second_primary_key(table_name: &str, at: usize) -> Error {
     unresolved(
         format!("table `{table_name}` declares more than one primary key"),
@@ -181,7 +181,7 @@ fn second_primary_key(table_name: &str, at: usize) -> Error {
 
 /// Refuse every `CREATE TABLE` feature the entity model has no place for, and
 /// hand back the table name the rest of the build hangs off.
-// [spec:pgorm:req:codegen.ddl.unsupported+11]
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
 fn reject_table_features(
     stmt: &CreateStmt,
     table_name: &str,
@@ -517,6 +517,14 @@ fn table_constraint(
         kind @ (ConstrType::ConstrPrimary | ConstrType::ConstrUnique) => {
             let columns = types::idents(&constraint.keys)
                 .ok_or_else(|| on("a constraint over computed keys"))?;
+            // PostgreSQL refuses the key (42701), and read as it stands it
+            // is not the key written: see `repeated_column`.
+            if let Some(column) = repeated_column(columns.iter().cloned()) {
+                return Err(unresolved(
+                    format!("{context} names column `{column}` twice in one key"),
+                    at,
+                ));
+            }
             let mut columns = columns.into_iter();
             let Some(first) = columns.next() else {
                 return Err(on("a key constraint over no columns"));
@@ -681,7 +689,7 @@ fn named(created: &mut ForeignKeyCreateStatement, constraint: &Constraint) {
 }
 
 /// Constraint attributes that survive into no part of the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+11]
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
 fn reject_constraint_features(
     constraint: &Constraint,
     context: &str,
@@ -741,7 +749,7 @@ fn constraint_type(constraint: &Constraint, context: &str, at: usize) -> Result<
 }
 
 /// How a constraint the bridge does not carry was written.
-// [spec:pgorm:req:codegen.ddl.unsupported+11]
+// [spec:pgorm:req:codegen.ddl.unsupported+12]
 fn constraint_kind(constraint: &Constraint, kind: ConstrType) -> &'static str {
     match kind {
         ConstrType::ConstrDefault => "a DEFAULT clause",

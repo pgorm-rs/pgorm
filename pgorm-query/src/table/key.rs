@@ -71,6 +71,17 @@ use std::marker::PhantomData;
 /// TableKey::<Unique>::new();
 /// ```
 ///
+/// A key names each of its columns once, its `WITHOUT OVERLAPS` column
+/// among them, and PostgreSQL refuses one naming a column twice (`42701`,
+/// *column "a" appears twice in primary key constraint*), in `CREATE TABLE`
+/// and in `ALTER TABLE ... ADD` alike. The key writes its columns as given
+/// and the refusal is the server's: two columns of one type are two values,
+/// which no type tells apart, and refusing a repeat here would make every
+/// key's construction fallible for the one mistake the statement's execution
+/// reports by name. Nor is a repeat dropped, which would declare a key other
+/// than the one written. The `INCLUDE` columns are no part of the key and
+/// may repeat it.
+///
 /// Nor does a key render on its own — no `Display` and no build path —
 /// because PostgreSQL spells one only inside the table it constrains:
 ///
@@ -79,7 +90,7 @@ use std::marker::PhantomData;
 ///
 /// TableKey::<Unique>::new(Glyph::Id).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ddl.create-table+15]
 #[derive(Debug, Clone)]
 pub struct TableKey<K> {
     pub(crate) name: Option<Name>,
@@ -94,13 +105,13 @@ pub struct TableKey<K> {
 }
 
 /// The kind of the table's one primary key: [`TableKey<Primary>`].
-// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ddl.create-table+15]
 #[derive(Debug, Clone, Copy)]
 pub struct Primary;
 
 /// The kind of a unique key, of which a table has any number:
 /// [`TableKey<Unique>`].
-// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ddl.create-table+15]
 #[derive(Debug, Clone, Copy)]
 pub struct Unique;
 
@@ -122,7 +133,8 @@ impl<K> TableKey<K> {
         }
     }
 
-    /// Add a further key column.
+    /// Add a further key column. A column the key already names is added
+    /// again, not dropped, and the server refuses the key (`42701`).
     #[must_use]
     pub fn col<C>(mut self, column: C) -> Self
     where
@@ -181,7 +193,7 @@ impl<K> TableKey<K> {
     }
 
     /// End the key with `column WITHOUT OVERLAPS`, PostgreSQL 18's temporal
-    /// key (`[spec:pgorm:req:sql.ddl.create-table+14]`), replacing any such
+    /// key (`[spec:pgorm:req:sql.ddl.create-table+15]`), replacing any such
     /// column already set.
     ///
     /// The key's other columns are compared for equality and this one, a range
@@ -234,7 +246,7 @@ impl<K> TableKey<K> {
     /// [`OnConflict::constraint`](crate::OnConflict::constraint) it arbitrates
     /// `DO NOTHING` and refuses `DO UPDATE` (`42809`), as an exclusion
     /// constraint does.
-    // [spec:pgorm:req:sql.ddl.create-table+14]
+    // [spec:pgorm:req:sql.ddl.create-table+15]
     #[must_use]
     pub fn without_overlaps<C>(mut self, column: C) -> Self
     where
@@ -257,7 +269,7 @@ impl<K> TableKey<K> {
     }
 
     /// The column the key ends `WITHOUT OVERLAPS`, if it is a temporal key.
-    // [spec:pgorm:req:sql.ddl.create-table+14]
+    // [spec:pgorm:req:sql.ddl.create-table+15]
     pub fn get_without_overlaps(&self) -> Option<&Name> {
         self.without_overlaps.as_ref()
     }
@@ -310,7 +322,7 @@ impl TableKey<Unique> {
 ///
 /// Table::create(Name::runtime("t")).primary_key(());
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ddl.create-table+15]
 // [spec:pgorm:req:sql.ast.on-conflict+4]
 pub trait IntoKeyColumns {
     /// The first column, and the rest in order.
@@ -329,7 +341,7 @@ where
 /// A value that converts into a [`TableKey`] of kind `K`: any
 /// [`IntoKeyColumns`] — one column or a tuple of one to twelve — or a key
 /// already built, which is how a key carrying a name or options is passed.
-// [spec:pgorm:req:sql.ddl.create-table+14]
+// [spec:pgorm:req:sql.ddl.create-table+15]
 pub trait IntoTableKey<K> {
     /// The key.
     fn into_table_key(self) -> TableKey<K>;
