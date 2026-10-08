@@ -1058,7 +1058,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > the labels pass through the value pipeline, i.e. single-quoted string
 > literals in `to_string` builds and bind parameters in parameterised builds.
 > `TypeAs` has three variants, `Enum`, `Composite`
-> (`[spec:pgorm:req:sql.ddl.type-composite+1]`) and `Range`
+> (`[spec:pgorm:req:sql.ddl.type-composite+2]`) and `Range`
 > (`[spec:pgorm:req:sql.ddl.type-range]`), and what a type is, is that
 > one slot: `as_enum()` and `values()` on a composite or a range replace it
 > with a label list, as `as_composite()` and `attribute()` and `as_range()`
@@ -1066,7 +1066,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > type, which names C input and output functions, belongs with
 > `CREATE FUNCTION` outside the builder.
 
-> [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+> [spec:pgorm:req:sql.ddl.type-alter-drop+7]
 > `TypeAlterStatement` MUST render `ALTER TYPE <name>` followed by exactly one
 > option: `ADD VALUE 'v'`, `ADD VALUE 'v' BEFORE 'w'` / `AFTER 'w'`
 > (`before()`/`after()` only upgrade an existing `Add` option and are no-ops
@@ -1085,7 +1085,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > and that one option: PostgreSQL rejects both `ALTER TYPE ` and `ALTER TYPE
 > "t"` with no option, so neither the nameless nor the option-less form MUST be
 > constructible (`[dec:pgorm:invalid-states-unrepresentable]`), the same
-> `PendingTableAlter` shape `Table::alter` uses.
+> `PendingTableAlter` shape `Table::alter` uses. Its attribute methods consume
+> it into the composite's own statements instead, `CompositeAlterStatement`
+> and `AttributeRenameStatement` (`[spec:pgorm:req:sql.ddl.type-composite+2]`):
+> a composite's changes chain and take a behavior, which no enumeration
+> option does, so they are not `TypeAlterOpt` variants that a label method
+> could be applied to.
 >
 > `TypeDropStatement` MUST render `DROP TYPE [IF EXISTS ]<name1>, <name2>
 > [ CASCADE|RESTRICT]` with names as quoted (possibly schema-qualified)
@@ -1096,12 +1101,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > None of this is particular to an enumeration. `DROP TYPE` and `RENAME TO`
 > name a type of any kind and serve a composite unchanged
-> (`[spec:pgorm:req:sql.ddl.type-composite+1]`); the label options are an
+> (`[spec:pgorm:req:sql.ddl.type-composite+2]`); the label options are an
 > enumeration's, and the server refuses them on any other type (`42809`).
 
 ## Composite types
 
-> [spec:pgorm:req:sql.ddl.type-composite+1]
+> [spec:pgorm:req:sql.ddl.type-composite+2]
 > `TypeCreateStatement` defines a composite type — a row type — beside the
 > enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the range of
 > `[spec:pgorm:req:sql.ddl.type-range]`. `as_composite()`
@@ -1140,10 +1145,45 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > them — `RESTRICT` refusing while a column still has the type (`2BP01`),
 > `CASCADE` dropping that column with it. The label alterations are an
 > enumeration's, and the server refuses them on a composite (`42809`, *is not
-> an enum*). The composite's own alterations — `ADD`, `DROP` and `ALTER
-> ATTRIBUTE`, and `RENAME ATTRIBUTE` — are not built:
-> `[spec:pgorm:req:sql.scope+11]` defers them, for the reason the next
-> paragraph gives.
+> an enum*).
+>
+> A composite's attributes are altered by `ALTER TYPE`, and a
+> `PendingTypeAlter` (`[spec:pgorm:req:sql.ddl.type-alter-drop+7]`) starts
+> either of two statements. `add_attribute(name, type)`,
+> `add_attribute_collated(name, type, collation)`, `drop_attribute(name)`,
+> `drop_attribute_if_exists(name)`, `alter_attribute(name, type)` and
+> `alter_attribute_collated(name, type, collation)` each consume it into a
+> `CompositeAlterStatement` holding that first `AttributeChange` — `Add` or
+> `Retype`, each a `CompositeAttribute` written as the create writes one, or
+> `Drop`, a name and an `IF EXISTS` flag — and the same six methods on the
+> statement append further changes, which it renders comma-separated in call
+> order, `ADD ATTRIBUTE "a" <type>[ COLLATE c]`, `DROP ATTRIBUTE [IF EXISTS
+> ]"a"` and `ALTER ATTRIBUTE "a" TYPE <type>[ COLLATE c]`; `changes()` reads
+> them back, never empty, so the change-less alteration has no constructor. A
+> change's behavior is a slot of the statement: `cascade()` and `restrict()`
+> set a `DropBehavior` (`[spec:pgorm:req:sql.ddl.alter-table+12]`), the last
+> winning, read back by `get_behavior()`, and it is written after every
+> change, since the grammar gives each change one; an unsaid behavior is
+> `RESTRICT`. `rename_attribute(from, to)` consumes the pending alter into an
+> `AttributeRenameStatement` rendering `RENAME ATTRIBUTE "a" TO "b"[
+> <behavior>]`, with the same two behavior methods: PostgreSQL takes `RENAME`
+> as an `ALTER TYPE`'s sole action (`42601` beside another), so the rename is
+> a statement with no method to chain a change onto, which a `compile_fail`
+> doctest holds (`[dec:pgorm:invalid-states-unrepresentable]`). An alteration
+> names its type as the other type statements do, and every attribute and
+> collation name is a quoted identifier registered with the identifier oracle.
+>
+> The live suite holds what the changes make and what the server refuses
+> around them. Chained changes apply in order, and the catalogue holds the
+> attributes they leave, each with its type and collation. A composite that
+> is a typed table's type (`CREATE TABLE ... OF`) is altered only `CASCADE`,
+> which carries each change into the table's columns: without it every
+> change is refused (`2BP01`), said `RESTRICT` or not. A column of the type in
+> another table refuses a retype even `CASCADE` (`0A000`). An attribute added
+> twice is refused (`42701`), and one dropped that the type lacks too
+> (`42703`), which `drop_attribute_if_exists` passes over with a notice. `NOT
+> NULL`, `DEFAULT` or a `USING` conversion after a change is a syntax error
+> (`42601`), and no change has a place for one.
 >
 > Nothing in pgorm reads a composite value. A column can be declared with the
 > type (`ColumnType::named`), but no `Value` variant carries a composite, no
@@ -1154,15 +1194,17 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > projection, `(<column>).<attribute>` through `Expr::raw` or an
 > `SqlTemplate`, or to cast it to `text` and parse that. The type this builds
 > is therefore one raw SQL and server-side code can use and the ORM cannot yet
-> name — what the deferral recorded before the DDL was built. A decode is what
-> a consumer would add, and the attribute alterations wait on it.
+> name. A decode is what a consumer would add. The attribute alterations,
+> which `sql.scope` deferred until a reader would keep in step with them, are
+> built as DDL nonetheless: a migration changes a type's shape whether or not
+> the ORM reads it, and the raw reads above follow the new shape.
 
 ## Range types
 
 > [spec:pgorm:req:sql.ddl.type-range+2]
 > `TypeCreateStatement::as_range(definition)` defines a range type, beside the
 > enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the composite of
-> `[spec:pgorm:req:sql.ddl.type-composite+1]`, in the one slot what a type is
+> `[spec:pgorm:req:sql.ddl.type-composite+2]`, in the one slot what a type is
 > occupies (`TypeAs::Range`), so it replaces a label or attribute list and is
 > replaced by one. The definition is an `extension::RangeDefinition`,
 > constructed over its subtype, `RangeDefinition::new(subtype)`, because

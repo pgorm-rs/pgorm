@@ -1077,6 +1077,103 @@ pub fn sites() -> Vec<Site> {
             policy: Literal,
             render: |n| sql(&Type::alter(fixed("ty")).rename_value("a", n)),
         },
+        Site {
+            id: "ddl/alter-type.composite-name",
+            api: "Type::alter(Name).add_attribute(..)",
+            kinds: &["AlterTableStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(n_(n)).add_attribute(fixed("a"), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/alter-type.add-attribute",
+            api: "PendingTypeAlter::add_attribute(Name, type)",
+            kinds: &["ColumnDef.colname"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(fixed("ty")).add_attribute(n_(n), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/alter-type.add-attribute-type",
+            api: "PendingTypeAlter::add_attribute(name, ColumnType::named(String))",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(&Type::alter(fixed("ty")).add_attribute(fixed("a"), ColumnType::named(n)))
+            },
+        },
+        Site {
+            id: "ddl/alter-type.add-attribute-collation",
+            api: "PendingTypeAlter::add_attribute_collated(name, type, Name)",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Type::alter(fixed("ty")).add_attribute_collated(
+                    fixed("a"),
+                    ColumnType::Text,
+                    n_(n),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/alter-type.drop-attribute",
+            api: "PendingTypeAlter::drop_attribute(Name)",
+            kinds: &["AlterTableCmd.name"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(fixed("ty")).drop_attribute(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-type.drop-attribute-if-exists",
+            api: "CompositeAlterStatement::drop_attribute_if_exists(Name)",
+            kinds: &["AlterTableCmd.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Type::alter(fixed("ty"))
+                    .drop_attribute(fixed("a"))
+                    .drop_attribute_if_exists(n_(n)))
+            },
+        },
+        Site {
+            id: "ddl/alter-type.alter-attribute",
+            api: "PendingTypeAlter::alter_attribute(Name, type)",
+            kinds: &["AlterTableCmd.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Type::alter(fixed("ty")).alter_attribute(n_(n), ColumnType::BigInteger))
+            },
+        },
+        Site {
+            id: "ddl/alter-type.alter-attribute-collation",
+            api: "PendingTypeAlter::alter_attribute_collated(name, type, Name)",
+            kinds: &["ColumnDef.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Type::alter(fixed("ty")).alter_attribute_collated(
+                    fixed("a"),
+                    ColumnType::Text,
+                    n_(n),
+                ))
+            },
+        },
+        Site {
+            id: "ddl/alter-type.rename-attribute-type",
+            api: "Type::alter(Name).rename_attribute(..)",
+            kinds: &["RenameStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(n_(n)).rename_attribute(fixed("a"), fixed("b"))),
+        },
+        Site {
+            id: "ddl/alter-type.rename-attribute-from",
+            api: "PendingTypeAlter::rename_attribute(Name, to)",
+            kinds: &["RenameStmt.subname"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(fixed("ty")).rename_attribute(n_(n), fixed("b"))),
+        },
+        Site {
+            id: "ddl/alter-type.rename-attribute-to",
+            api: "PendingTypeAlter::rename_attribute(from, Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Type::alter(fixed("ty")).rename_attribute(fixed("a"), n_(n))),
+        },
         // -- SEQUENCE ------------------------------------------------------
         Site {
             id: "ddl/create-sequence.name",

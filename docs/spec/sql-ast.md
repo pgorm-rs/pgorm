@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+25]
+> [spec:pgorm:req:sql.surface+26]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -107,7 +107,10 @@ today, including panicking edges and deliberate failsafes.
 > `SequenceType`, the options a sequence and an identity column share and the
 > type a sequence counts in (`sql.ddl.sequence`); `CompositeAttribute`, in
 > `extension` beside the type statements, the attribute a composite type
-> holds (`sql.ddl.type-composite`); `Range`, `Multirange`, `RangeType` and
+> holds, and `CompositeAlterStatement`, `AttributeChange` and
+> `AttributeRenameStatement`, there too, the changes `ALTER TYPE` makes to a
+> composite's attributes and the rename that stands alone
+> (`sql.ddl.type-composite`); `Range`, `Multirange`, `RangeType` and
 > `RangeElement`, a range value, a multirange value, which built-in range
 > type a range is, and the sealed set of types the built-ins range over
 > (`sql.value.range`); `RangeSubtype`, the sealed set of types a range type a
@@ -191,7 +194,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+14]
+> [spec:pgorm:req:sql.scope+15]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -215,18 +218,8 @@ today, including panicking edges and deliberate failsafes.
 > new renderer and a new `SubQueryStatement` arm; a clause on an existing
 > statement costs a field.
 >
-> **Deferred** — worth building, not built:
->
-> - **Composite attribute alteration.** `ALTER TYPE ... ADD ATTRIBUTE`,
->   `DROP ATTRIBUTE [IF EXISTS]`, `ALTER ATTRIBUTE ... TYPE` and `RENAME
->   ATTRIBUTE ... TO`, each taking `CASCADE` / `RESTRICT` to carry the change
->   into typed tables: four `TypeAlterOpt` variants, two of them carrying the
->   `CompositeAttribute` the create already renders, and a behaviour slot —
->   plus a list, since `ADD`, `DROP` and `ALTER` chain comma-separated in one
->   statement where `TypeAlterStatement` holds exactly one option. It waits on
->   what the composite's DDL was built without: nothing in the ORM reads a
->   composite value (`sql.ddl.type-composite`), so a type that changes shape
->   has no reader to keep in step.
+> **Deferred** — worth building, not built: none at present. Composite
+> attribute alteration, the last entry, is built (`sql.ddl.type-composite`).
 >
 > **Out of scope** — not the builder's job:
 >

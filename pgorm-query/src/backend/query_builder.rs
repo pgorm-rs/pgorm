@@ -2412,7 +2412,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+7]
     pub(crate) fn prepare_type_drop_statement(
         &self,
         drop: &TypeDropStatement,
@@ -2438,7 +2438,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+    // [spec:pgorm:req:sql.ddl.type-alter-drop+7]
     pub(crate) fn prepare_type_alter_statement(
         &self,
         alter: &TypeAlterStatement,

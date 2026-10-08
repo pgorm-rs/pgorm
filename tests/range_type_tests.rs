@@ -192,7 +192,7 @@ async fn the_server_judges_the_options(db: &DatabaseConnection) -> Result<(), Er
 /// the type holds a plain drop back, `CASCADE` takes the column's dependency
 /// with it, and the multirange goes with its range.
 // [spec:pgorm:req:sql.ddl.type-range+2/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7/test]
 async fn drop_and_rename_reach_a_range(db: &DatabaseConnection) -> Result<(), Error> {
     db.batch_execute(
         &Type::create(n("slot"))

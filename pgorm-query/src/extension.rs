@@ -6,10 +6,13 @@ use crate::{
 
 #[path = "extension_composite.rs"]
 mod composite;
+#[path = "extension_composite_alter.rs"]
+mod composite_alter;
 #[path = "extension_range.rs"]
 mod range;
 
 pub use composite::CompositeAttribute;
+pub use composite_alter::{AttributeChange, AttributeRenameStatement, CompositeAlterStatement};
 pub use range::RangeDefinition;
 
 /// Creates a new "CREATE or DROP EXTENSION" statement for PostgreSQL
@@ -505,7 +508,7 @@ pub struct TypeCreateStatement {
 pub enum TypeAs {
     /// `AS (..)`, a composite carrying its attributes, the marker and the
     /// attributes one fact as an enumeration's marker and labels are.
-    // [spec:pgorm:req:sql.ddl.type-composite+1]
+    // [spec:pgorm:req:sql.ddl.type-composite+2]
     Composite(Vec<CompositeAttribute>),
     /// `AS ENUM (..)`, carrying its labels: the marker and the values are one
     /// fact, so no value list survives without the `AS ENUM` that renders it.
@@ -530,7 +533,7 @@ pub enum TypeAs {
 ///
 /// Type::drop().if_exists();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7]
 #[derive(Debug, Clone)]
 pub struct TypeDropStatement {
     pub(crate) first: TypeRef,
@@ -550,10 +553,10 @@ pub struct TypeDropStatement {
 ///
 /// Type::alter(Font::Table).to_string();
 /// ```
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7]
 #[derive(Debug, Clone)]
 pub struct PendingTypeAlter {
-    name: TypeRef,
+    pub(crate) name: TypeRef,
 }
 
 /// Alter a type
@@ -562,7 +565,7 @@ pub struct PendingTypeAlter {
 /// option: it is reachable only by choosing an option on a
 /// [`PendingTypeAlter`], so the `ALTER TYPE "font"` PostgreSQL rejects has no
 /// constructor.
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7]
 #[derive(Debug, Clone)]
 pub struct TypeAlterStatement {
     pub(crate) name: TypeRef,

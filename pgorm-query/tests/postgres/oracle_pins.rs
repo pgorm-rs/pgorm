@@ -231,7 +231,7 @@ fn table_rename_target_is_bare_name() {
 // name, not an enum label, so it leaves the value pipeline and renders as the
 // quoted identifier the grammar wants.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7/test]
 #[test]
 fn alter_type_rename_emits_identifier() {
     let sql = Type::alter(Font::Table)
@@ -543,7 +543,7 @@ fn foreign_keys_name_two_tables_and_a_pair() {
 // from. The `compile_fail` doctests on each statement type prove it.
 // [spec:pgorm:req:sql.render.oracle+1/test]
 // [spec:pgorm:req:sql.ddl.type-enum+7/test]
-// [spec:pgorm:req:sql.ddl.type-alter-drop+6/test]
+// [spec:pgorm:req:sql.ddl.type-alter-drop+7/test]
 // [spec:pgorm:req:sql.ddl.extension+5/test]
 #[test]
 fn type_and_extension_names_are_taken() {

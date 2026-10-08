@@ -9545,12 +9545,27 @@ children (
         id composite-attribute-alteration
         title "A composite type's attributes can be added, dropped, retyped and renamed"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-05T22:00:12.722833Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed 2026-10-06 from the sql.scope Deferred entry \"Composite attribute alteration\" that scope-composite-types recorded (55c23657, docs/spec/sql-ast.md). ALTER TYPE ... ADD ATTRIBUTE, DROP ATTRIBUTE [IF EXISTS], ALTER ATTRIBUTE ... TYPE and RENAME ATTRIBUTE ... TO each take CASCADE / RESTRICT to carry the change into typed tables. That is four TypeAlterOpt variants, two of them carrying the CompositeAttribute the create already renders, plus a behaviour slot, plus a list, since ADD, DROP and ALTER chain comma-separated in one statement where TypeAlterStatement holds exactly one option today. The entry records why it waited: nothing in pgorm reads a composite value (sql.ddl.type-composite), so a type that changes shape has no reader to keep in step. Building it graduates the entry from sql.scope (bump, repin). Attribute names are caller-named identifiers and must be registered in the identifier render oracle."
+            }
+
+            {
+                at 2026-10-08T19:58:17.119568Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T20:08:16.695854Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

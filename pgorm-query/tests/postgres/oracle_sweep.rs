@@ -791,6 +791,16 @@ fn sweep_schema_object_ddl_shapes() {
         Type::alter(Name::runtime("tea"))
             .rename_value("oolong", "wulong")
             .to_string(),
+        Type::alter(Name::runtime("address"))
+            .add_attribute_collated(Name::runtime("zip"), ColumnType::Text, Name::runtime("C"))
+            .drop_attribute_if_exists(Name::runtime("no"))
+            .alter_attribute(Name::runtime("street"), ColumnType::string(Some(200)))
+            .cascade()
+            .to_string(),
+        Type::alter(Name::runtime("address"))
+            .rename_attribute(Name::runtime("no"), Name::runtime("number"))
+            .restrict()
+            .to_string(),
         Type::drop(Name::runtime("tea"))
             .if_exists()
             .cascade()
