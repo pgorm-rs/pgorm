@@ -21,7 +21,7 @@ RANGES = {
 }
 
 
-# [spec:pgorm:req:python.values+1/test]
+# [spec:pgorm:req:python.values+2/test]
 # [spec:pgorm:req:python.value-tags/test]
 class RangeTests(unittest.TestCase):
     def test_range_shapes_and_equality(self):

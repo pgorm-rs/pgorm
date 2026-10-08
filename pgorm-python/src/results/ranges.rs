@@ -6,7 +6,7 @@ use std::ops::Bound;
 
 use jiff::{
     Timestamp,
-    civil::{Date, DateTime},
+    civil::{Date, DateTime, Time},
 };
 use pgorm::pgorm_query::{ArrayType, Multirange, Range, RangeType, Value};
 use postgres_protocol::types::{self as wire, RangeBound};
@@ -16,8 +16,16 @@ use tokio_postgres::{
     types::{FromSql, Kind, Type},
 };
 
-use super::{codecs::ExactDecimal, decode::typed};
-use crate::errors::DecodeError;
+use uuid::Uuid;
+
+use super::{
+    codecs::ExactDecimal,
+    decode::{read, typed},
+};
+use crate::{
+    errors::DecodeError,
+    values::{CreatedKind, PyTypeName, PyValue},
+};
 
 type CodecError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -108,15 +116,45 @@ fn range_type(subtype: &Type) -> Option<RangeType> {
     })
 }
 
+/// Whether `ty` is one of the six built-in range types or their multiranges,
+/// rather than a type a schema created.
+fn built_in(ty: &Type) -> bool {
+    matches!(
+        *ty,
+        Type::INT4_RANGE
+            | Type::INT8_RANGE
+            | Type::NUM_RANGE
+            | Type::DATE_RANGE
+            | Type::TS_RANGE
+            | Type::TSTZ_RANGE
+            | Type::INT4MULTI_RANGE
+            | Type::INT8MULTI_RANGE
+            | Type::NUMMULTI_RANGE
+            | Type::DATEMULTI_RANGE
+            | Type::TSMULTI_RANGE
+            | Type::TSTZMULTI_RANGE
+    )
+}
+
 /// A range or multirange column, or an array of either, as a tagged value;
-/// `None` for a column of any other type.
+/// `None` for a column of any other type. A range type a schema created reads
+/// as its own kind, named as the column's type is, whatever its subtype.
 // [spec:pgorm:req:python.results]
-pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult<Option<Value>> {
+pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult<Option<PyValue>> {
     let (subtype, multi) = match ty.kind() {
         Kind::Range(subtype) => (subtype, false),
         Kind::Multirange(subtype) => (subtype, true),
         _ => return Ok(None),
     };
+    if !built_in(ty) {
+        if array {
+            return Err(DecodeError::new_err(format!(
+                "column {index} is an array of the created range type `{ty}`, which Python \
+                 does not hold"
+            )));
+        }
+        return created(row, index, ty, subtype, multi).map(Some);
+    }
     let Some(range) = range_type(subtype) else {
         return Err(DecodeError::new_err(format!(
             "column {index} ranges over `{subtype}`, which none of the built-in range types does"
@@ -139,7 +177,7 @@ pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult
             }
         };
     }
-    match range {
+    let value = match range {
         RangeType::Int4 => decode!(i32, |v| Value::Int(Some(v))),
         RangeType::Int8 => decode!(i64, |v| Value::BigInt(Some(v))),
         RangeType::Numeric => decode!(ExactDecimal, |v: ExactDecimal| Value::Decimal(Some(
@@ -150,6 +188,56 @@ pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult
         RangeType::TimestampTz => decode!(Timestamp, |v| Value::DateTimeWithTimeZone(Some(
             Box::new(v)
         ))),
+    }?;
+    PyValue::from_rust(value).map(Some)
+}
+
+/// A column of a range type a schema created: read in binary as a range of
+/// its subtype's Rust type, through the subtype's own codec, and held as the
+/// text form that type's values travel as, tagged with the type's name.
+// [spec:pgorm:req:python.results]
+fn created(row: &Row, index: usize, ty: &Type, subtype: &Type, multi: bool) -> PyResult<PyValue> {
+    macro_rules! text {
+        ($rust:ty, $kind:ident, $bound:expr) => {
+            (
+                ArrayType::$kind,
+                if multi {
+                    read::<MultirangeCodec<$rust>>(row, index)?.map(|v| v.0.map($bound).to_string())
+                } else {
+                    read::<RangeCodec<$rust>>(row, index)?.map(|v| v.0.map($bound).to_string())
+                },
+            )
+        };
     }
-    .map(Some)
+    let (kind, text) = match *subtype {
+        Type::INT2 => text!(i16, SmallInt, |v| v),
+        Type::INT4 => text!(i32, Int, |v| v),
+        Type::INT8 => text!(i64, BigInt, |v| v),
+        Type::FLOAT4 => text!(f32, Float, |v| v),
+        Type::FLOAT8 => text!(f64, Double, |v| v),
+        Type::NUMERIC => text!(ExactDecimal, Decimal, |v: ExactDecimal| v.0),
+        Type::TEXT | Type::VARCHAR | Type::BPCHAR => text!(String, String, |v| v),
+        Type::DATE => text!(Date, Date, |v| v),
+        Type::TIME => text!(Time, Time, |v| v),
+        Type::TIMESTAMP => text!(DateTime, DateTime, |v| v),
+        Type::TIMESTAMPTZ => text!(Timestamp, DateTimeWithTimeZone, |v| v),
+        Type::UUID => text!(Uuid, Uuid, |v| v),
+        _ => {
+            return Err(DecodeError::new_err(format!(
+                "column {index} ranges over `{subtype}`, which a created range read from \
+                 Python cannot"
+            )));
+        }
+    };
+    Ok(PyValue::from_created(
+        text,
+        CreatedKind {
+            name: PyTypeName {
+                name: ty.name().to_owned(),
+                schema: Some(ty.schema().to_owned()),
+            },
+            subtype: kind,
+            multirange: multi,
+        },
+    ))
 }

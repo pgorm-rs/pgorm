@@ -17,7 +17,7 @@ use crate::{
     values::{PyTypeName, PyValue},
 };
 
-fn read<T: for<'a> FromSql<'a>>(row: &Row, index: usize) -> PyResult<Option<T>> {
+pub(super) fn read<T: for<'a> FromSql<'a>>(row: &Row, index: usize) -> PyResult<Option<T>> {
     row.try_get(index).map_err(|_| DecodeError::new_err(format!(
         "column {index} cannot be decoded without loss; its PostgreSQL type or value is unsupported"
     )))
@@ -59,8 +59,8 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
             })
         };
     }
-    if let Some(inner) = super::ranges::value(row, index, ty, array)? {
-        return PyValue::from_rust(inner);
+    if let Some(value) = super::ranges::value(row, index, ty, array)? {
+        return Ok(value);
     }
     if matches!(ty.kind(), Kind::Enum(_)) {
         let inner = typed::<EnumLabel>(row, index, array, ArrayType::String, |v| {

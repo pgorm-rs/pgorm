@@ -908,6 +908,7 @@ assertions (
     {id python-typing-check-symlinked-tmp, kind @complete, author "brendan@necessary.nu", at 2026-10-08T15:48:34.504635Z}
     {id python-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:02:37.335682Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
+    {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
 )
 
 impl_evidence (

@@ -49,7 +49,7 @@ MODEL_KINDS = frozenset(
 # [spec:pgorm:req:python.models]
 @dataclass(frozen=True, slots=True)
 class Column:
-    kind: str | p.TypeName
+    kind: str | p.TypeName | p.CreatedRange
     name: str | None = None
     nullable: bool = False
     primary_key: bool = False
@@ -69,18 +69,31 @@ class Column:
                 raise p.ConstructionError(
                     "enum columns require a schema-qualified TypeName"
                 )
+        elif isinstance(self.kind, p.CreatedRange):
+            # A decoded row names its range type with the schema it lives in.
+            if self.kind.schema is None:
+                raise p.ConstructionError(
+                    "created range columns require a schema-qualified CreatedRange"
+                )
         elif type(self.kind) is not str or self.kind not in MODEL_KINDS:
             raise p.UnsupportedCapabilityError(
                 "column kind is not supported by the native Record decoder"
             )
-        null = p.Value.array(self.kind, None) if self.array else p.Value.null(self.kind)
+        kind = self.kind
+        if not self.array:
+            null = p.Value.null(kind)
+        elif isinstance(kind, p.CreatedRange):
+            raise p.ConstructionError("arrays of a created range type are not supported")
+        else:
+            null = p.Value.array(kind, None)
         object.__setattr__(self, "_null", null)
 
     def validate(self, value: p.Value, *, decoding: bool = False) -> p.Value:
         error = p.DecodeError if decoding else p.ConstructionError
-        if (value.kind, value.type_name, value.element_type) != (
+        if (value.kind, value.type_name, value.created_type, value.element_type) != (
             self._null.kind,
             self._null.type_name,
+            self._null.created_type,
             self._null.element_type,
         ):
             raise error("value type differs from the declared model column")
@@ -89,12 +102,13 @@ class Column:
         return value
 
     def value(self, data: Any) -> p.Value:
+        kind = self.kind
         if isinstance(data, p.Value):
             result = data
-        elif self.array:
-            result = p.Value.array(self.kind, data)
+        elif self.array and not isinstance(kind, p.CreatedRange):
+            result = p.Value.array(kind, data)
         else:
-            result = p.Value(data, self.kind)
+            result = p.Value(data, kind)
         return self.validate(result)
 
     def describe(self) -> dict[str, Any]:

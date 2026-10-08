@@ -292,7 +292,7 @@ fn unrepresentable_choices_are_refused() -> PyResult<()> {
             ("p.json_object([('a', 1, 2)])", "(key, value) tuples"),
             (
                 "p.JsonDefault(p.Value('calm', p.TypeName('Mood')))",
-                "enum type's cast",
+                "created range's cast",
             ),
         ] {
             refused(py, &globals, source, message);

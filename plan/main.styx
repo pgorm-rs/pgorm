@@ -10345,12 +10345,27 @@ children (
         id python-created-ranges
         title "Python reads and writes a range type a schema created, its name carried beside the value"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-07T18:23:07.300252Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by created-range-types (79b25c75), which gave Rust a created range type: a newtype over Range<T> deriving DeriveCreatedRange (range_name, schema_name), whose Value is Value::String of the range's text form and whose column is ColumnType::CreatedRange { name, schema, subtype }; a value is written as CAST(<text> AS <name>) through Expr::as_range, and a row decodes from the binary form for any RangeSubtype (i16, i32, i64, f32, f64, Decimal, String, Date, Time, DateTime, Timestamp, Uuid). Python has none of it. Today: (1) a Python Range's kind is a built-in type name (int4range ... tstzrange), and that kind tags a Value, its typed NULL, an array's elements and a snapshot; a created range needs a kind that names the created type (schema-qualifiable, quoted) and its subtype, since the subtype is what converts each bound and the name is what the cast needs. (2) Decoding a created range over a non-built-in subtype raises DecodeError naming the subtype (pgorm-python/src/results/ranges.rs; test_range_results.py asserts it for floatrange); one over a built-in subtype reads as the built-in kind. (3) A registered entity field of a DeriveCreatedRange newtype comes out of PyValue::from_rust as a str (its Value is text), and its column hints InputKind::Explicit (metadata.rs falls through on ColumnType::CreatedRange), so writing one from Python needs an explicit tagged Value. (4) The Rust FromStr/Display text form (range_out quoting) is the natural wire between the two: a Python created range could be bound as its text and cast by name exactly as Expr::as_range does. Acceptance: a kind for a created range type, conversion both ways with the subtype's limits, snapshot tags, stubs (a sibling .pyi if _ranges.pyi would cross its cap), decode of a created range column through a registered entity and RawSQL, and the wheel suites against the 18.6 server. Spec homes: sql.value.range (its Python paragraph names this node), sql.value.created-range, python.values. created-multiranges will add the multirange half; fold it in here or file its own."
+            }
+
+            {
+                at 2026-10-08T16:19:19.277762Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T16:45:27.273279Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

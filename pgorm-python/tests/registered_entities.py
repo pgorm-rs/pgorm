@@ -17,6 +17,8 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL('CREATE TYPE python_entities."Mood" AS ENUM (\'calm\', \'busy\')'))
         await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.accounts (id integer PRIMARY KEY, "display name" text NOT NULL, note text, version integer NOT NULL, mood python_entities."Mood" NOT NULL)'))
         await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.notes (id integer PRIMARY KEY, account_id integer NOT NULL, body text NOT NULL)'))
+        await self.pool.execute(p.RawSQL('CREATE TYPE python_entities.floatrange AS RANGE (SUBTYPE = float8)'))
+        await self.pool.execute(p.RawSQL('CREATE TABLE python_entities.bookings (id integer PRIMARY KEY, span python_entities.floatrange NOT NULL, spans python_entities.floatmultirange)'))
         self.account = p.entity("app.Account")
         self.note = p.entity("app.Note")
 
@@ -31,7 +33,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:python.entities/test]
     async def test_registration_declares_real_types_and_mapping(self):
         registrations = p.capabilities()["registrations"]["entities"]
-        self.assertEqual([r["name"] for r in registrations], ["app.Account", "app.Membership", "app.Note"])
+        self.assertEqual([r["name"] for r in registrations], ["app.Account", "app.Booking", "app.Membership", "app.Note"])
         info = self.account.describe()
         self.assertTrue(info["rust_entity"].endswith("account::Entity"))
         self.assertTrue(info["rust_model"].endswith("account::Model"))
@@ -72,6 +74,36 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await updated.into_active().delete(connection), 1)
             self.assertIsNone(await self.account.find().one_opt(connection))
         self.assertEqual(model.tagged("mood").type_name, p.TypeName("Mood", schema="python_entities"))
+
+    # [spec:pgorm:req:python.entities/test]
+    # [spec:pgorm:req:python.values+2/test]
+    async def test_created_ranges_round_trip_through_an_entity(self):
+        booking = p.entity("app.Booking")
+        span = p.CreatedRange("floatrange", "f64", schema="python_entities")
+        spans = p.CreatedMultirange("floatmultirange", "f64", schema="python_entities")
+        self.assertEqual(booking.col("span").describe()["input_hint"],
+                         {"kind": "created_range", "name": "floatrange", "schema": "python_entities", "subtype": "f64"})
+        self.assertEqual(booking.col("spans").describe()["input_hint"]["kind"], "created_multirange")
+        async with self.pool.connection() as connection:
+            active = (booking.active().set("id", 1).set("span", p.Range(1.5, 2.5))
+                      .set("spans", p.Multirange([p.Range(5.0, 8.0), p.Range(1.0, 3.0)])))
+            self.assertEqual(active.get("span").value.created_type, span)
+            await active.insert(connection)
+            found = await booking.find().filter(booking.col("span") == p.Range(1.5, 2.5)).one(connection)
+            self.assertEqual(found["span"], p.Range(1.5, 2.5))
+            # The server stores a multirange sorted and merged.
+            self.assertEqual(found["spans"], p.Multirange([p.Range(1.0, 3.0), p.Range(5.0, 8.0)]))
+            self.assertEqual(found.tagged("span").created_type, span)
+            self.assertEqual(found.tagged("spans").created_type, spans)
+            row = await connection.fetch_one(p.RawSQL("SELECT span FROM python_entities.bookings"))
+            self.assertEqual(row["span"], p.Range(1.5, 2.5))
+            self.assertEqual(row.tagged("span"), found.tagged("span"))
+            moved = await found.into_active().set("span", p.Range(None, 0.5, "(]")).set("spans", None).update(connection)
+            self.assertEqual((moved["span"], moved["spans"]), (p.Range(None, 0.5, "(]"), None))
+            with self.assertRaises(p.ConstructionError):
+                booking.active().set("span", p.Value(p.Range(1.0, 2.0), p.CreatedRange("floatrange", "f64")))
+            with self.assertRaises(p.ConstructionError):
+                booking.active().set("span", p.Range(1, 2))
 
     # [spec:pgorm:req:python.entities/test]
     async def test_typed_select_reuses_real_entity_projection(self):

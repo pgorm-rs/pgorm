@@ -43,15 +43,12 @@ pub(crate) fn literal(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
 
 fn value_expr(value: &Bound<'_, PyAny>, literal: bool) -> PyResult<PyExpr> {
     let value = PyValue::coerce(value)?;
-    let mut inner = if literal {
+    let inner = if literal {
         SimpleExpr::Constant(value.rust_value().clone())
     } else {
         Expr::value(value.rust_value().clone())
     };
-    if let Some(cast) = value.enum_cast() {
-        inner = inner.cast_as_type(cast);
-    }
-    Ok(PyExpr::from_rust(inner))
+    Ok(PyExpr::from_rust(value.typed(inner)))
 }
 
 pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {

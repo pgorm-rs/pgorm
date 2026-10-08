@@ -67,9 +67,9 @@ impl PyPipelineExpr {
             Recipe::Null
         } else {
             let value = PyValue::coerce(value)?;
-            if value.enum_cast().is_some() {
+            if value.has_named_type() {
                 return Err(UnsupportedCapabilityError::new_err(
-                    "pipeline literals do not support qualified enum tags",
+                    "pipeline literals do not support qualified enum or created range tags",
                 ));
             }
             match value.rust_value() {

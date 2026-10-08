@@ -20,6 +20,10 @@ fn tag(value: &Tag) -> Json {
     match value {
         Tag::Scalar(_) => json!({"kind": value.name()}),
         Tag::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
+        Tag::Created(kind) => json!({
+            "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
+            "subtype": super::types::scalar_name(&kind.subtype),
+        }),
         Tag::Array(element) => json!({"kind": "array", "element": tag(element)}),
     }
 }

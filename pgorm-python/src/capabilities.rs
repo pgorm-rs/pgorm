@@ -82,6 +82,7 @@ fn manifest() -> Value {
             "value.null": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
             "value.snapshot": {"rust_api": "pgorm_python::values::PyValue", "features": []},
             "value.range": {"rust_api": "pgorm::pgorm_query::{Range, Multirange, Value::Range, Value::Multirange}", "features": []},
+            "value.created_range": {"rust_api": "pgorm::pgorm_query::{Range, Multirange} Display/FromStr over RangeSubtype, Value::String, Expr::as_range, ColumnType::{CreatedRange, CreatedMultirange}", "features": []},
             "type_name": {"rust_api": "pgorm::pgorm_query::TypeName", "features": []},
             "model.declare": {"rust_api": "pgorm::pgorm_query::{NamedTable, Value}", "features": [], "python_convenience": true},
             "model.column": {"rust_api": "pgorm::pgorm_query::{Expr, SimpleExpr, Value}", "features": [], "python_convenience": true},
@@ -91,13 +92,14 @@ fn manifest() -> Value {
             "model.delete": {"rust_api": "pgorm::pgorm_query::DeleteStatement", "features": [], "python_convenience": true},
             "model.records": {"rust_api": "pgorm::ConnectionTrait::{query_all, query_one} / pgorm_python::results", "features": ["runtime-tokio"], "python_convenience": true}
         },
-        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(crate::values::range_kind_names()).chain(["enum", "array"]).collect::<Vec<_>>(),
+        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(crate::values::range_kind_names()).chain(["enum", "created_range", "created_multirange", "array"]).collect::<Vec<_>>(),
         "value_policy": {
             "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
             "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",
             "temporal_precision": "microseconds; finer precision and subsecond offsets rejected",
             "aware_datetime": "explicit UTC tag requiring a zero offset",
             "enum_storage": "Rust String value with qualified TypeName metadata",
+            "created_range_storage": "Rust String of the text form with the qualified type name and subtype; written as CAST(text AS name)",
             "snapshot": "version 1, tagged JSON with integer strings and IEEE float bits"
         },
         "expression_functions": {
@@ -116,7 +118,7 @@ fn manifest() -> Value {
             "numeric": "exact 96-bit Decimal coefficient and scale 0–28; other values rejected",
             "json": "serde_json i64/u64/f64; numeric value loss and nesting beyond 64 rejected",
             "arrays": "one dimension, lower bound 1, nullable elements; other shapes rejected",
-            "ranges": "the six built-in range types and their multiranges, a range type a schema created over one of their subtypes reading as the built-in; other subtypes and created multiranges rejected",
+            "ranges": "the six built-in range types and their multiranges; a range type a schema created over any RangeSubtype as its own created_range kind, named by the column's type, held as its text form; created multiranges, which the driver reports as simple types, and arrays of a created range rejected",
             "unsupported": ["domain", "composite", "interval", "timetz", "bit", "money"],
             "stream": "one pull at a time over bounded driver buffers; owns connection until EOF or close"
         },

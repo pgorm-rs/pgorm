@@ -93,7 +93,10 @@ database or compute migrations.
 varchar, bit, varbit and vector; varbit requires it. `numeric` accepts
 `precision=1..1000` with optional `scale=0..1000`. The six built-in range types
 and their multiranges are named as PostgreSQL names them, `int4range` through
-`tstzmultirange`, the column type a `without_overlaps` key ends with.
+`tstzmultirange`, the column type a `without_overlaps` key ends with. A
+`CreatedRange` or `CreatedMultirange` names a range type a schema created, Rust's
+`ColumnType::CreatedRange` / `CreatedMultirange`, written quoted and
+schema-qualified as it was given.
 A `p.TypeName` references an
 existing named type with full schema identity. `.array()` retains that element
 type. A type usable in DDL is not necessarily decodable as a dynamic `Record`;

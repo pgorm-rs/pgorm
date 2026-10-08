@@ -62,11 +62,11 @@ pub enum ArrayType {
     Vector,
 
     /// A range over one of the built-in range types, `int4range[]`.
-    // [spec:pgorm:def:sql.value.range+3]
+    // [spec:pgorm:def:sql.value.range+4]
     Range(RangeType),
 
     /// A multirange over one of the built-in range types, `int4multirange[]`.
-    // [spec:pgorm:def:sql.value.range+3]
+    // [spec:pgorm:def:sql.value.range+4]
     Multirange(RangeType),
 }
 
@@ -124,11 +124,11 @@ pub enum Value {
     /// an empty range still name one. Its bounds are values of the variant
     /// the range type ranges over — `Int` for `int4range` — and a NULL bound
     /// is no bound, as it is to PostgreSQL's range constructors.
-    // [spec:pgorm:def:sql.value.range+3]
+    // [spec:pgorm:def:sql.value.range+4]
     Range(RangeType, Option<Box<Range<Value>>>),
 
     /// A multirange, tagged as [`Value::Range`] is.
-    // [spec:pgorm:def:sql.value.range+3]
+    // [spec:pgorm:def:sql.value.range+4]
     Multirange(RangeType, Option<Box<Multirange<Value>>>),
 }
 

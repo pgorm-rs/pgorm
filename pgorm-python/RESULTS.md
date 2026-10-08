@@ -79,6 +79,7 @@ pgorm's `TryGetable`. Conversions then use the public `Value` conversion path.
 | enum | enum / label, qualified `TypeName` retained |
 | supported scalar array | array / list, including nullable elements |
 | int4range … tstzrange; int4multirange … tstzmultirange | the range type's name / `pgorm.Range`, `pgorm.Multirange` |
+| a range type a schema created | created_range, its `CreatedRange` named as the column's type / `pgorm.Range` |
 | pgvector `vector`, when installed in PostgreSQL | vector / list of f32 values |
 
 PostgreSQL stores a timestamptz instant without its input timezone; decoded
@@ -90,9 +91,11 @@ when decoded, integers beyond i64/u64, and nesting beyond 64 levels are
 rejected. JSON object ordering/whitespace are not retained.
 
 Arrays must have at most one dimension and lower bound 1; an empty array and
-an SQL NULL array remain distinct. A range type a schema created over one of
-the six built-in subtypes decodes as the built-in over that subtype; a range
-over another subtype, and a multirange a schema created, raise `DecodeError`.
+an SQL NULL array remain distinct. A range type a schema created decodes as
+its own kind, whatever its subtype, from its binary form through the subtype's
+codec ([VALUES.md](VALUES.md#range-types-a-schema-created)). The driver
+reports a multirange a schema created as a simple type, so a column of one,
+like an array of a created range, raises `DecodeError`; read it cast to `text`.
 A range's numeric bound is held to the exactness a numeric column is.
 Multi-dimensional/non-default-bound arrays,
 domains, composites, intervals and unlisted types raise `DecodeError`,

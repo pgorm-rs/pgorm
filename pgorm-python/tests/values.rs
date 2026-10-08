@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{ArrayType, Value};
 use pgorm_python::values::{PyTypeName, PyValue};
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.values+1/test]
+// [spec:pgorm:req:python.values+2/test]
 #[test]
 fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     Python::initialize();
@@ -73,7 +73,7 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+1/test]
+// [spec:pgorm:req:python.values+2/test]
 // [spec:pgorm:req:python.value-tags/test]
 #[test]
 fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
@@ -112,9 +112,9 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:def:sql.value.range+3/test]    a range or multirange reaches Python as a
+// [spec:pgorm:def:sql.value.range+4/test]    a range or multirange reaches Python as a
 // `pgorm.Range` or `pgorm.Multirange`, tagged with its range type, and converts back unchanged
-// [spec:pgorm:req:python.values+1/test]
+// [spec:pgorm:req:python.values+2/test]
 #[test]
 fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     use pgorm::pgorm_query::{Multirange, Range, RangeType};
@@ -156,6 +156,77 @@ fn rust_ranges_round_trip_through_python() -> PyResult<()> {
         assert!(range.is_exact_instance_of::<PyRange>());
         assert!(range.getattr("lower_inf")?.extract::<bool>()?);
         assert_eq!(range.getattr("bounds")?.extract::<String>()?, "()");
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.values+2/test]    a created range's Python value is the Value its Rust
+// newtype converts into, written as the newtype writes itself, and reads back as the range
+#[test]
+fn created_ranges_match_their_rust_newtypes() -> PyResult<()> {
+    use pgorm::{
+        CreatedRange,
+        entity::prelude::*,
+        pgorm_query::{Multirange, Query, Range},
+    };
+    use pgorm_python::expressions::PyExpr;
+
+    #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
+    #[pgorm(range_name = "Float Range", schema_name = "measure")]
+    struct FloatRange(Range<f64>);
+
+    #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
+    #[pgorm(multirange_name = "slot_multirange")]
+    struct Slots(Multirange<i32>);
+
+    Python::initialize();
+    Python::attach(|py| {
+        let pgorm = PyModule::new(py, "pgorm")?;
+        pgorm_python::install(&pgorm, Default::default())?;
+        let globals = pyo3::types::PyDict::new(py);
+        globals.set_item("p", &pgorm)?;
+        let cases: [(&str, Value, pgorm::pgorm_query::SimpleExpr); 2] = [
+            (
+                "p.Value(p.Range(1.5, None), p.CreatedRange('Float Range', 'f64', schema='measure'))",
+                FloatRange(Range::from(1.5..)).into(),
+                FloatRange(Range::from(1.5..)).into_expr(),
+            ),
+            (
+                "p.Value(p.Multirange([p.Range(5, 8), p.Range(1, 3, '[]')]), p.CreatedMultirange('slot_multirange', 'i32'))",
+                Slots(Multirange::from(vec![
+                    Range::from(5..8),
+                    Range::from(1..=3),
+                ]))
+                .into(),
+                Slots(Multirange::from(vec![
+                    Range::from(5..8),
+                    Range::from(1..=3),
+                ]))
+                .into_expr(),
+            ),
+        ];
+        for (source, expected, written) in cases {
+            let value = py.eval(&CString::new(source)?, Some(&globals), None)?;
+            assert_eq!(
+                value.extract::<PyRef<'_, PyValue>>()?.rust_value(),
+                &expected
+            );
+            let bound = pgorm.getattr("bind")?.call1((&value,))?;
+            assert_eq!(bound.extract::<PyRef<'_, PyExpr>>()?.inner, written);
+            let compiled = bound.call_method0("inspect")?;
+            assert_eq!(
+                compiled.getattr("sql")?.extract::<String>()?,
+                Query::select().expr(written).build().0
+            );
+            let kind = value.getattr("created_type")?;
+            let back = py
+                .get_type::<PyValue>()
+                .call1((value.getattr("value")?, kind))?;
+            assert_eq!(
+                back.extract::<PyRef<'_, PyValue>>()?.rust_value(),
+                &expected
+            );
+        }
         Ok(())
     })
 }

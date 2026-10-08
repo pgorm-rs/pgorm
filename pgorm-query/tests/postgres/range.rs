@@ -163,7 +163,7 @@ fn a_range_type_binds_nothing() {
     assert!(values.0.is_empty());
 }
 
-// [spec:pgorm:def:sql.value.range+3/test]    a column of a built-in range type is written by the
+// [spec:pgorm:def:sql.value.range+4/test]    a column of a built-in range type is written by the
 // catalogue name
 #[test]
 fn a_range_column_type_is_its_catalogue_name() {

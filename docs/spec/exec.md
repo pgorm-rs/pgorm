@@ -191,7 +191,7 @@ These rules capture what the code does today, including known gaps.
 > macro.
 
 > [spec:pgorm:def:exec.decode.range+3]
-> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+3]`)
+> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+4]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
 > `Decimal` unconditionally, and `jiff::civil::Date`,
 > `jiff::civil::DateTime` and `jiff::Timestamp` under `with-jiff`, the gate

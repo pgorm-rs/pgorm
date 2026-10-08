@@ -22,7 +22,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)`,
 > `MacAddress(Box<MacAddress>)`, and the two range carriers of
-> `[spec:pgorm:def:sql.value.range+3]`,
+> `[spec:pgorm:def:sql.value.range+4]`,
 > `Range(RangeType, Option<Box<Range<Value>>>)` and
 > `Multirange(RangeType, Option<Box<Multirange<Value>>>)`, which carry their
 > range type beside the payload as `Array` carries its element type.
@@ -188,7 +188,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Ranges
 
-> [spec:pgorm:def:sql.value.range+3]
+> [spec:pgorm:def:sql.value.range+4]
 > A range value is `Range<T>`, an enum of two shapes: `Empty`, and
 > `Bounds { lower, upper }` with each bound a `std::ops::Bound<T>` —
 > `Included`, `Excluded` or `Unbounded`. The empty range is a value of its
@@ -266,7 +266,7 @@ including panic semantics and quirks inherited from sea-query.
 > subtype's, and a row of one decodes through `Range<T>`.
 >
 > The Python binding carries the six and their multiranges
-> (`[spec:pgorm:req:python.values+1]`). A range is `pgorm.Range(lower, upper,
+> (`[spec:pgorm:req:python.values+2]`). A range is `pgorm.Range(lower, upper,
 > bounds="[)")` or `pgorm.Range.empty()`, and a multirange
 > `pgorm.Multirange(ranges)`: immutable native classes holding Python bound
 > values, `None` on a side being no bound, so that side's bracket is always
@@ -279,14 +279,23 @@ including panic semantics and quirks inherited from sea-query.
 > its brackets. A range or multirange column, or an array of either,
 > decodes to them through `postgres_protocol`'s range reader and the
 > subtype's own codec, a numeric bound held to the exactness a numeric column
-> is, and a range type a schema created over one of the six subtypes reads
-> as the built-in over it, as `Range<T>` does here. A range over another
-> subtype and a multirange a schema created are `DecodeError`s, the first
-> naming its subtype: Python has no spelling for a created range type's name
-> beside its value, which the Rust side gives `DeriveCreatedRange`'s newtype,
-> and is filed as `python-created-ranges`. A registered entity's range field converts both
-> ways through `PyValue::from_rust`, its column hinting the kind, and the
-> schema builder's `DataType` names the twelve types. Python's `Expr` has no
+> is. A range type a schema created has kinds of its own instead,
+> `pgorm.CreatedRange(name, subtype, schema=..)` and
+> `pgorm.CreatedMultirange(..)`, naming the type and the value kind of its
+> subtype, one of `RangeSubtype`'s twelve
+> (`[spec:pgorm:def:sql.value.created-range]`). A value of one is the
+> `Value::String` of its text form, the `Value` a `DeriveCreatedRange`
+> newtype converts into, each bound converted with the subtype kind's limits;
+> it is written through `Expr::as_range`, and its snapshot carries the name,
+> the schema and the subtype beside the text. A column of a created range
+> decodes as that kind, named as the column's type is, whatever its subtype
+> — one over `int4` included, so the value writes back to its column — while
+> a created multirange, which the driver reports as a simple type, and an
+> array of a created range are `DecodeError`s, the multirange read instead
+> through its text. A registered entity's range field converts both ways
+> through `PyValue::from_rust`, its column hinting the kind, a created range's
+> hinting its created kind, and the schema builder's `DataType` names the
+> twelve types and the created ones. Python's `Expr` has no
 > containment or overlap operator: its stub is at the function-density cap,
 > and a range predicate is written in `RawSQL` with a bound range.
 
@@ -790,7 +799,7 @@ including panic semantics and quirks inherited from sea-query.
 > names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`,
 > `LTree`, `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
-> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+3]`),
+> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+4]`),
 > `CreatedRange { name, schema, subtype }`, a range type a schema created,
 > named in full as an enum type is and carrying the `ColumnType` of its
 > subtype, and `CreatedMultirange { name, schema, subtype }`, the multirange

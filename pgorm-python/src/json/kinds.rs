@@ -146,9 +146,9 @@ impl PyJsonDefault {
     #[new]
     fn new(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let value = PyValue::coerce(value)?;
-        if value.enum_cast().is_some() {
+        if value.has_named_type() {
             return Err(ConstructionError::new_err(
-                "a JSON DEFAULT is written as a plain literal; it cannot carry an enum type's cast",
+                "a JSON DEFAULT is written as a plain literal; it cannot carry an enum's or a created range's cast",
             ));
         }
         Ok(Self {

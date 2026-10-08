@@ -663,7 +663,7 @@ explicit limitations.
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
 > `ForeignKeyAction`, `Func`, `Arc`), with the range vocabulary a field of a range
 > column is written in — `Range`, `Multirange` and `RangeType`
-> (`[spec:pgorm:def:sql.value.range+3]`) — so a generated entity's
+> (`[spec:pgorm:def:sql.value.range+4]`) — so a generated entity's
 > `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
 > the glob, and `CreatedRange` with its derive `DeriveCreatedRange`
 > (`[spec:pgorm:def:sql.value.created-range]`), so a generated
