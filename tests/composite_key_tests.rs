@@ -233,6 +233,30 @@ mod book_author {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// Where a tenant keeps a thing: keyed by the tenant and two codes the tenant
+/// chose, a three-column key with two text parts, which a lookup names with
+/// borrowed parts in more than one position.
+mod placement {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "placement")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub tenant_id: i32,
+        #[pgorm(primary_key)]
+        pub room: String,
+        #[pgorm(primary_key)]
+        pub slot: String,
+        pub item: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 async fn create_from_entity<C, E>(db: &C, entity: E) -> Result<(), Error>
 where
     C: ConnectionTrait,
@@ -503,6 +527,80 @@ async fn key_lookups_take_borrowed_parts() -> Result<(), Error> {
             author_id: 2,
         }
     );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:def:entity.traits.primary-key+6/test]    a key of three columns
+// takes its text parts borrowed, as &str, &String or Cow, in any position, each
+// converted into the key's part in its position
+// [spec:pgorm:req:entity.traits.crud+4/test]    find_by_id and delete_by_id
+// filter on all three columns, so keys differing in one part name other rows
+#[pgorm_macros::test]
+async fn three_part_lookups_take_borrowed_parts() -> Result<(), Error> {
+    let ctx = TestContext::new("composite_key_three_part_borrowed").await;
+    let db = ctx.db.get().await?;
+    create_from_entity(&db, placement::Entity).await?;
+    let placed = Insert::many(
+        [
+            (1, "hall", "top", "lamp"),
+            (1, "hall", "low", "boots"),
+            (1, "attic", "top", "trunk"),
+            (2, "hall", "top", "coat"),
+        ]
+        .map(|(tenant_id, room, slot, item)| placement::ActiveModel {
+            tenant_id: set(tenant_id),
+            room: set(room),
+            slot: set(slot),
+            item: set(item),
+        }),
+    )
+    .exec_returning_models(&db)
+    .await?;
+
+    assert_eq!(
+        placement::Entity::find_by_id((1, "hall", "top"))
+            .one(&db)
+            .await?,
+        placed[0]
+    );
+    let room = String::from("hall");
+    assert_eq!(
+        placement::Entity::find_by_id((1, &room, Cow::Borrowed("low")))
+            .one(&db)
+            .await?
+            .item,
+        "boots"
+    );
+    assert_eq!(
+        placement::Entity::find_by_id((2, Cow::<str>::Owned(room.clone()), "top"))
+            .one(&db)
+            .await?
+            .item,
+        "coat"
+    );
+    assert_eq!(
+        placement::Entity::find_by_id((2, "attic", "top"))
+            .one_opt(&db)
+            .await?,
+        None
+    );
+
+    assert_eq!(
+        placement::Entity::delete_by_id((1, Cow::Borrowed("attic"), &String::from("top")))
+            .exec(&db)
+            .await?,
+        1
+    );
+    assert_eq!(
+        placement::Entity::delete_by_id((1, "attic", "top"))
+            .exec(&db)
+            .await?,
+        0
+    );
+    assert_eq!(placement::Entity::find().all(&db).await?.len(), 3);
 
     drop(db);
     ctx.delete().await;

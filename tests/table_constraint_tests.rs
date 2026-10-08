@@ -17,7 +17,8 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    ColumnDef, ColumnType, Deferrability, Name, RangeType, Table, TableKey, Unique,
+    ColumnDef, ColumnType, Deferrability, Name, RangeType, Table, TableCreateStatement, TableKey,
+    Unique,
 };
 use pgorm::{ConnectionTrait, entity::prelude::*};
 use tokio_postgres::error::SqlState;
@@ -32,6 +33,7 @@ async fn main() -> Result<(), Error> {
     the_grammar_has_no_other_shape(&db).await?;
     a_later_primary_key_replaces_the_first(&db).await?;
     a_key_naming_a_column_twice_is_refused(&db).await?;
+    wide_keys_keep_their_column_order(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -355,6 +357,136 @@ async fn a_key_naming_a_column_twice_is_refused(db: &DatabaseConnection) -> Resu
         .await?;
     let (keyed, columns): (i32, String) = (row.get(0), row.get(1));
     assert_eq!((keyed, columns.as_str()), (1, "1 1 2 2"), "{included}");
+
+    Ok(())
+}
+
+/// `c01` to `c<count>`, in order.
+fn wide_columns(count: usize) -> Vec<Name> {
+    (1..=count).map(column_numbered).collect()
+}
+
+/// `c<i>`, two digits wide.
+fn column_numbered(i: usize) -> Name {
+    n(&format!("c{i:02}"))
+}
+
+/// `CREATE TABLE <name> (c01 integer NOT NULL, …, c33 integer NOT NULL)`:
+/// one more column than PostgreSQL lets a key or index have.
+fn wide(name: &str) -> TableCreateStatement {
+    let mut create = Table::create(n(name));
+    for column in wide_columns(33) {
+        create.col(ColumnDef::new(column).integer().not_null());
+    }
+    create
+}
+
+/// Each key of `table` as the catalogue holds it: its kind and its columns in
+/// key order, by name, sorted by the columns.
+async fn keys_of(db: &DatabaseConnection, table: &str) -> Result<Vec<(String, String)>, Error> {
+    let rows = db
+        .query_all(
+            &format!(
+                "SELECT c.contype::text, string_agg(a.attname, ',' ORDER BY k.ord) AS columns \
+                 FROM pg_constraint c, unnest(c.conkey) WITH ORDINALITY k(attnum, ord) \
+                 JOIN pg_attribute a ON a.attnum = k.attnum \
+                 WHERE c.conrelid = '{table}'::regclass AND c.contype IN ('p', 'u') \
+                 AND a.attrelid = c.conrelid GROUP BY c.oid, c.contype ORDER BY columns"
+            ),
+            &[],
+        )
+        .await?;
+    Ok(rows.iter().map(|row| (row.get(0), row.get(1))).collect())
+}
+
+/// `(kind, "c03,c01,c02")` for the columns numbered `order`.
+fn key(kind: &str, order: &[usize]) -> (String, String) {
+    let columns: Vec<String> = order.iter().map(|i| format!("c{i:02}")).collect();
+    (kind.to_owned(), columns.join(","))
+}
+
+/// A key written by hand as a tuple keeps the tuple's order, which need not
+/// be the table's: a 3-tuple and a 12-tuple, the widest an entity's key value
+/// can be, each as a primary and as a unique key, in `CREATE TABLE` and after
+/// `ALTER TABLE`'s `ADD`, read back from the catalogue column by column. A
+/// key past twelve columns is a computed list, `TableKey::cols`, taken up to
+/// PostgreSQL's limit of 32 columns to an index; the 33rd is refused
+/// (`54011`).
+// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a 3- and a
+// 12-tuple key, and a computed one past twelve, each created in its own column order
+// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+async fn wide_keys_keep_their_column_order(db: &DatabaseConnection) -> Result<(), Error> {
+    let c = column_numbered;
+    let create = wide("wide_created")
+        .primary_key((c(3), c(1), c(2)))
+        .unique((
+            c(12),
+            c(11),
+            c(10),
+            c(9),
+            c(8),
+            c(7),
+            c(6),
+            c(5),
+            c(4),
+            c(3),
+            c(2),
+            c(1),
+        ))
+        .to_string();
+    assert!(
+        create.contains(r#"PRIMARY KEY ("c03", "c01", "c02")"#),
+        "{create}"
+    );
+    db.batch_execute(&create).await?;
+    assert_eq!(
+        keys_of(db, "wide_created").await?,
+        [
+            key("p", &[3, 1, 2]),
+            key("u", &[12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]),
+        ],
+        "{create}"
+    );
+
+    db.batch_execute(&wide("wide_altered").to_string()).await?;
+    let alter = Table::alter(n("wide_altered"))
+        .add_primary_key((
+            c(1),
+            c(12),
+            c(2),
+            c(11),
+            c(3),
+            c(10),
+            c(4),
+            c(9),
+            c(5),
+            c(8),
+            c(6),
+            c(7),
+        ))
+        .add_unique((c(2), c(3), c(1)))
+        .add_unique(TableKey::new(c(32)).cols((1..32).map(c)))
+        .to_string();
+    db.batch_execute(&alter).await?;
+    let thirty_two: Vec<usize> = std::iter::once(32).chain(1..32).collect();
+    assert_eq!(
+        keys_of(db, "wide_altered").await?,
+        [
+            key("p", &[1, 12, 2, 11, 3, 10, 4, 9, 5, 8, 6, 7]),
+            key("u", &[2, 3, 1]),
+            key("u", &thirty_two),
+        ],
+        "{alter}"
+    );
+
+    let past_the_limit = Table::alter(n("wide_altered"))
+        .add_unique(TableKey::new(c(33)).cols(wide_columns(32)))
+        .to_string();
+    let refused = db
+        .batch_execute(&past_the_limit)
+        .await
+        .expect_err(&past_the_limit);
+    refused_with(&refused, &SqlState::TOO_MANY_COLUMNS);
 
     Ok(())
 }

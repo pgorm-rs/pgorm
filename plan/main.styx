@@ -814,12 +814,27 @@ children (
                         id composite-key-arity-tests
                         title "Keys past two columns are tested where they are written by hand: 3- and 12-column table-key tuples, and borrowed parts in a 3-column lookup"
                         kind @test
+                        sealed true
                         log (
                             {
                                 at 2026-10-05T22:00:12.548054Z
                                 author "brendan@necessary.nu"
                                 kind @note
                                 text "Filed 2026-10-06 at the operator's request (\"you did do variadic tuples right? primary keys can be more than two cols\"). The code is variadic: IntoTableKey (pgorm-query/src/table/key.rs:249-277) and IntoPrimaryKey (src/entity/primary_key.rs:112) are macro-generated for tuples of 1 to 12, and TableKey::cols takes any length. Declaration is tested at every arity 1-12 (test_composite_primary_key). Three columns are proven live through the entity schema path: book_author in tests/composite_key_tests.rs, keyed (tenant_id, book_id, author_id), created by create_table_from_entity and read with find_by_id((1, 1, 2)). Four columns are covered by render only (quad in entity_trait_tests). Two gaps remain. The hand-written tuple form on the table builder, .primary_key((a, b, c)) / .unique((..)) / add_primary_key / add_unique, is only tested with 1- and 2-tuples (pgorm-query/tests/postgres/table_constraint.rs, codegen transform_tests). Borrowed key parts, find_by_id((1, \"a\")), are only tested on 2-column keys. Acceptance: a 3-tuple and a 12-tuple table key, each rendered and accepted by the live server with its PRIMARY KEY / UNIQUE read back from the catalogue in order; a key past 12 columns via TableKey::cols proven live; and a borrowed &str (and Cow) part in a lookup on a key of 3 or more columns, live."
+                            }
+
+                            {
+                                at 2026-10-08T18:24:26.944834Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Todo → Doing (nplan start)"
+                            }
+
+                            {
+                                at 2026-10-08T18:31:39.94185Z
+                                author "brendan@necessary.nu"
+                                kind @status
+                                text "Doing → Done (nplan complete)"
                             }
                         )
                     }
