@@ -9897,6 +9897,41 @@ children (
                         kind @note
                         text "PostgreSQL 19's GA is planned for 2026-10-29 (RC1 2026-10-15). Do not start before GA. Then move the test server and every pin to 19, survey 19's final release notes against pgorm's typed surface as was done for 17/18 (beta 4 reverted SQL/PGQ, FOR PORTION OF, partition MERGE/SPLIT, the pg_get_*_ddl functions and online checksum changes, so check what actually shipped), check whether libpg_query and pg_query.rs have a 19 grammar, and file what it finds as nodes."
                     }
+
+                    {
+                        at 2026-10-07T15:27:46.549863Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-07: \"what's stopping us from doing some preliminary tests on the rc branch? pg_query? If nothing, we can have a pg-19 branch to test this one.\" Nothing stops it: libpg_query has no 19 grammar yet (no branch or tag past 18.1.0), but that only matters for 19-only syntax, which pgorm does not emit, so the 18 grammar covers everything pgorm writes. Decision: preliminary testing runs now against the newest 19 build (19beta4, postgres:19beta4-bookworm, container pgorm-test-19 on port 54319, separate from the 18.6 pgorm-test server) on branch pg-19, then again on RC1 (2026-10-15). pg-19 merges to main only after 19's GA (2026-10-29) and a re-run on RC1; this node completes on main after GA, not on the branch."
+                    }
+
+                    {
+                        at 2026-10-07T15:27:50.534451Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-07T15:48:36.958428Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Preliminary run on PostgreSQL 19beta4, 2026-10-07, branch pg-19 from 5893893d. Server: container pgorm-test-19, postgres:19beta4-bookworm (sha256:4c618d9a30e0), \"PostgreSQL 19beta4 (Debian 19~beta4-1.pgdg12+1) on aarch64-unknown-linux-gnu\", port 54319. Its data sits under /var/lib/postgresql/19/docker, as 18 keeps it, so the volume mounts at /var/lib/postgresql. Before adapting anything: nextest 1764/1766 (main is 1766/1766 on 18.6); pgorm-query doctests with every feature 431 + 64 (2 ignored) and pgorm's 167 (2 ignored) all pass; pgorm-python 122/124 (124/124 on a disposable 18.6 through tests/with_postgres.py at the same commit); the application check (checks/entities.py) passes; nplan check 31/31. Every failure is one of three 19 behaviour changes, each confirmed against a disposable 18.6 container. (1) ALTER CONSTRAINT .. ENFORCED / NOT ENFORCED applies to a CHECK, which 18 refuses (42809). ENFORCED checks the rows (23514) and leaves the constraint valid; NOT ENFORCED leaves it not valid. Keys, NOT NULL and EXCLUDE stay 42809. (2) SET EXPRESSION on a virtual column is no longer refused under a CHECK constraint (18: 0A000). There is no rewrite; the rows are checked against the table's CHECKs (23514). A publication still refuses it (0A000). (3) JSON_ARRAY(query) over no rows is [] (18: NULL); no test asserted it. These are tests and spec text that pinned 18's behaviour, not pgorm bugs. They were adapted on pg-19: the tests, sql.ddl.alter-table, sql.ddl.enforcement, sql.ast.expr.sql-json, the rustdoc and pgorm-python/SCHEMA.md. No rule version was bumped, as no builder changed. After: nextest 1768/1768 and pgorm-python 124/124 on 19beta4. Exactly the three new assertions fail on 18.6 (checked), so pg-19 merges only with the move of the server. Also checked on 19beta4: standard_conforming_strings is forced on. SET .. off is 0A000, while ALTER ROLE .. SET .. on, as the sqlmap and campaign fixtures do, is accepted, and escape_string_warning is gone. Both JSON server-bug canaries (JSON_SERIALIZE over jsonb, and #19695) still see their bugs. 19 adds five unreserved keywords (ignore, lsn, repack, respect, wait); ignore and respect are not bare column labels, but pgorm writes AS before every label, and the restricted set is unchanged. The changed defaults (jit off, max_locks_per_transaction 128, default_toast_compression lz4, log_lock_waits on) and the refusal of CR/LF in database and role names touch nothing pgorm asserts. The ambiguous-operator error moved \"Could not choose a best candidate operator\" from HINT to DETAIL; nothing asserts it. Not run: sqlmap and the generative campaign, which wait for RC1 or GA on a quiet machine. Typed surface: ON CONFLICT DO SELECT and window IGNORE/RESPECT NULLS are filed under postgres-19, both behind pg-query-19 (libpg_query has no 19 grammar yet). The rest reaches pgorm through Func::named and casts: oid8, uuid/bytea casts, random(min, max) over dates and timestamps, base64url and base32hex, error_on_null, range_minus_multi and multirange_minus_multi, tid_block and tid_offset, the jsonpath string methods, and IS JSON over domains. Some additions are outside pgorm's scope: REPACK, WAIT, GRANT .. GRANTED BY, CHECKPOINT options, publication EXCEPT and ALL SEQUENCES, and COPY TO JSON / ON_ERROR SET_NULL. Re-run on RC1 (2026-10-15) and again at GA."
+                    }
+
+                    {
+                        at 2026-10-07T18:08:10.8234Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-07, after 8e3fdece changed three test expectations to PostgreSQL 19's answers unconditionally: \"so those changes should be gated behind a pg-19 feature. This is how we can maintain backwards compat in a typesafe way. pg-18 will be our default (i.e. doesn't need to be stated).\" Decision: a cargo feature pg-19. Without it pgorm targets PostgreSQL 18, the floor (there is no pg-18 feature, and no 16/17 support to preserve). With it pgorm targets 19: the builder offers 19-only surface and the documented and tested behaviour is 19's. Features stay additive: pg-19 may add API and change the documented server behaviour, never remove 18 API that 19 still accepts. The three adaptations of 8e3fdece are redone under the gate (18's answer by default, 19's under cfg(feature = \"pg-19\")), and each difference is gated in the type wherever the builder knows enough to tell, documented per version where it cannot. The sql!/prql! grammar and the render oracle stay on the 18 grammar until pg-query-19 lands."
+                    }
+
+                    {
+                        at 2026-10-07T18:41:21.195717Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "pg-19 feature landed on branch pg-19 (2026-10-07), per the operator's decision above; the model is rule sql.target (docs/spec/sql-ast.md). Crates: pgorm-query declares pg-19 = [], pgorm forwards it (pg-19 = [\"pgorm-query/pg-19\"]), pgorm-python forwards it (pg-19 = [\"pgorm/pg-19\"]) and its manifest's features list pg-19 when pgorm targets 19; pgorm_query::POSTGRES_TARGET (18 | 19) is the target a dependent can read. pgorm-macros, pgorm-codegen, pgorm-sql-macro and pgorm-migration do not carry it: nothing of theirs differs yet (sql-macro and codegen take it with pg-query-19). Type gating: none of the three differences can be, each turning on server knowledge no builder value records (the kind of constraint a name holds; the table's CHECKs; the row count of JSON_ARRAY's query), so each is documented per release in the rule and the rustdoc, and its live test holds 18's answer by default and 19's under cfg(feature = \"pg-19\"); a CHECK-only alter method was weighed and not built, since it would assert a kind the type cannot check and render the SQL alter_constraint already renders. No decode type or doc promised either JSON_ARRAY answer. Checks: platform rust-pg-19 (workspace check and clippy, every target, with pg-19; pgorm's lib with no defaults and macros only, each with pg-19) and python-native's check-pg-19. CI: nothing on 19 until GA. There is no Rust live-test job at all to extend (nextest is a local gate), PGDG apt carries postgresql-19 19~beta4 only in noble-pgdg's 19 component (a floating beta with no pin), and Homebrew has no 19; at GA this node moves the server and CI's PostgreSQL pins, and the pg-19 suite runs locally against pgorm-test-19 until then. Results: nextest without the feature on 18.6 1769/1769 (main's 1766 + set_expression_under_a_check + the two target_release_tests), with pg-19 on 19beta4 1770/1770 (+ alter_constraint_enforces_a_check); pgorm-python default on a disposable 18.6 124/124 and pg-19 on 19beta4 124/124. Each way round, against the wrong server exactly the version-dependent tests fail: 3 Rust tests either way, and test_schema's two Python tests either way. pgorm-query doctests 431 + 65 by default (POSTGRES_TARGET's example is compile_fail E0080 there) and 432 + 64 with every feature (the same example compiles and runs)."
+                    }
                 )
             }
 
@@ -10194,7 +10229,6 @@ children (
         id created-range-types
         title "A range type a schema creates is named end to end: values over any subtype, its DDL read by codegen, its columns typed"
         kind @feat
-        sealed true
         log (
             {
                 at 2026-10-07T10:38:09.942226Z
@@ -10231,7 +10265,6 @@ children (
         title "A multirange a schema creates binds and decodes, though the driver reports it as a simple type"
         kind @feat
         deps (created-range-types)
-        sealed true
         log (
             {
                 at 2026-10-07T10:38:10.018504Z
@@ -10273,6 +10306,78 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by created-range-types (79b25c75), which gave Rust a created range type: a newtype over Range<T> deriving DeriveCreatedRange (range_name, schema_name), whose Value is Value::String of the range's text form and whose column is ColumnType::CreatedRange { name, schema, subtype }; a value is written as CAST(<text> AS <name>) through Expr::as_range, and a row decodes from the binary form for any RangeSubtype (i16, i32, i64, f32, f64, Decimal, String, Date, Time, DateTime, Timestamp, Uuid). Python has none of it. Today: (1) a Python Range's kind is a built-in type name (int4range ... tstzrange), and that kind tags a Value, its typed NULL, an array's elements and a snapshot; a created range needs a kind that names the created type (schema-qualifiable, quoted) and its subtype, since the subtype is what converts each bound and the name is what the cast needs. (2) Decoding a created range over a non-built-in subtype raises DecodeError naming the subtype (pgorm-python/src/results/ranges.rs; test_range_results.py asserts it for floatrange); one over a built-in subtype reads as the built-in kind. (3) A registered entity field of a DeriveCreatedRange newtype comes out of PyValue::from_rust as a str (its Value is text), and its column hints InputKind::Explicit (metadata.rs falls through on ColumnType::CreatedRange), so writing one from Python needs an explicit tagged Value. (4) The Rust FromStr/Display text form (range_out quoting) is the natural wire between the two: a Python created range could be bound as its text and cast by name exactly as Expr::as_range does. Acceptance: a kind for a created range type, conversion both ways with the subtype's limits, snapshot tags, stubs (a sibling .pyi if _ranges.pyi would cross its cap), decode of a created range column through a registered entity and RawSQL, and the wheel suites against the 18.6 server. Spec homes: sql.value.range (its Python paragraph names this node), sql.value.created-range, python.values. created-multiranges will add the multirange half; fold it in here or file its own."
+            }
+        )
+    }
+
+    {
+        id postgres-19
+        title "pgorm builds what PostgreSQL 19 adds to its typed surface"
+        kind @feat
+        children (
+            {
+                id pg-query-19
+                title "pgorm parses with PostgreSQL 19's grammar once libpg_query releases one"
+                kind @build
+                log (
+                    {
+                        at 2026-10-07T15:47:52.370747Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by pg19-test-server's preliminary run on 19beta4 (branch pg-19, 2026-10-07). libpg_query has no 19 grammar yet: its newest tag is 18.1.0 and its branches stop at 18-latest, and pg_query.rs has nothing past its pg-18 branch (both checked with git ls-remote on 2026-10-07). pgorm emits no 19-only syntax, so the 18 grammar covers everything it writes today, and the whole suite passes on 19beta4 with it. Checked with pg_query::parse at pgorm's pinned fork rev 09ebc3a4, the 18 grammar refuses: INSERT ... ON CONFLICT (c) DO SELECT [FOR UPDATE] [WHERE ..] RETURNING; lag(x) IGNORE NULLS / first_value(x) RESPECT NULLS OVER (..); REPACK; WAIT FOR LSN; CREATE PUBLICATION .. FOR ALL TABLES EXCEPT TABLE. It parses SELECT 1 ignore, which 19 refuses (42601): 19 adds five unreserved keywords (ignore, lsn, repack, respect, wait; pg_get_keywords diffed between 18.6 and 19beta4), and ignore and respect are not bare column labels. pgorm writes AS before every column label, so no render is affected, but until the oracle parses with 19's grammar it would pass such a render. The restricted set (COL_NAME, TYPE_FUNC_NAME, RESERVED) is unchanged in 19, so sql.value's quoting and its keyword pin hold. Until this lands, sql! and prql! refuse 19-only syntax at compile time, metric fingerprints and the pipeline's census cannot read it, and codegen's parse_schema cannot read DDL that uses it. Every node that renders 19-only syntax depends on this one, so the identifier oracle parses what it renders. Route as pg-query-18 took it: move the necessary-nu/pg_query.rs fork to libpg_query's 19 tag once one is released (or take upstream's own 19 release), pinned by exact rev; the operator chooses between the fork and waiting. Acceptance: every pg_query user above parses 19's grammar, a 19-only statement passes sql!, sql.render.oracle's rationale names 19, and the oracle and every pg_query-based test pass."
+                    }
+
+                    {
+                        at 2026-10-07T18:33:28.974072Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.target (2026-10-07) holds every parser on PostgreSQL 18's grammar under either target until this lands — the render oracle, sql! and prql!, codegen's DDL reader, the paginator, metric fingerprints — and leaves to this node how they follow the pg-19 feature, on one condition: an 18 build's sql! must not accept what 18 cannot parse. A feature cannot swap one pg_query for another: features are additive, so an 18 grammar behind default plus a 19 one behind pg-19 would link both libpg_query copies, whose C symbols collide. The workable shapes are one grammar (19's) for every build, with an 18 build's sql! and oracle refusing the 19-only parse nodes (ON CONFLICT DO SELECT's action, a function call's null treatment, the new statements) by walking the tree; or a 19 libpg_query built with prefixed symbols. Whichever is chosen, pgorm-sql-macro and pgorm-codegen gain pg-19 then (no surface of theirs differs yet), and tests/target_release_tests.rs's CARRIERS list grows to match."
+                    }
+                )
+            }
+
+            {
+                id pg19-on-conflict-do-select
+                title "An insert returns the row a conflict found: PostgreSQL 19's ON CONFLICT DO SELECT"
+                kind @feat
+                deps (pg-query-19 pg19-test-server)
+                log (
+                    {
+                        at 2026-10-07T15:47:52.436363Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by pg19-test-server's preliminary run on 19beta4 (2026-10-07); release notes E.1.3.2. Checked live on 19beta4: INSERT ... ON CONFLICT <arbiter> DO SELECT [FOR UPDATE | FOR NO KEY UPDATE | FOR SHARE | FOR KEY SHARE] [WHERE <cond>] RETURNING .. returns the existing row for each proposed row that conflicts, beside the rows it inserts (a two-row insert with one conflict returns both, INSERT 0 2). Refusals: no RETURNING is 42601 (\"ON CONFLICT DO SELECT requires a RETURNING clause\"); no arbiter is 42601 (\"requires inference specification or constraint name\"), so it is a third ConflictAction under OnConflict::Targeted and never under AnyDoNothing; NOWAIT or SKIP LOCKED after the lock strength is a syntax error. ON CONSTRAINT works as the arbiter. WHERE filters which conflicting rows come back (a false filter returns none) and may read the target and excluded; RETURNING may not read excluded (42P01), and its old and new both read the existing row. It works as a CTE body. Builder: a ConflictAction arm carrying an optional lock strength and filter (sql.ast.on-conflict, sql.render), with the insert's RETURNING required by the type when the action is DO SELECT, so the refused insert does not construct ([dec:pgorm:invalid-states-unrepresentable]). ORM: a get-or-insert terminal on Insert (one model per input, inserted or found) is the natural consumer; for one row it replaces the ON CONFLICT DO NOTHING plus SELECT round trip. Python: python.statements' conflict handling gains the action, with capability-manifest entries, stubs and parity cases in checks/direct_builders.py. Depends on pg-query-19 (the oracle must parse what is rendered) and pg19-test-server (the live tests need a 19 server)."
+                    }
+
+                    {
+                        at 2026-10-07T18:33:28.67657Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Home under the pg-19 feature (sql.target, 2026-10-07). DO SELECT is syntax only 19 parses, so it is built behind #[cfg(feature = \"pg-19\")] in pgorm-query, marked doc(cfg(feature = \"pg-19\")), and pgorm-python's conflict handling gains it behind pgorm-python's own pg-19, its capability entry carrying \"features\": [\"pg-19\"] and absent without it. It cannot be a plain ConflictAction::DoSelect variant under cfg: ConflictAction is an exhaustive public enum, and a variant that appears whenever any crate in the graph turns pg-19 on breaks every exhaustive match a dependent wrote, which is the additivity sql.target forbids. Two homes stay additive: a typed path of its own reached from the targeted arbiter's typestate (OnConflict::Targeted), which is also where the type can require the insert's RETURNING; or ConflictAction made #[non_exhaustive] first, in the default build, as a separate breaking change. The first fits the RETURNING requirement. Its live tests are #[cfg(feature = \"pg-19\")] and run with cargo nextest run --workspace --features pg-19 against pgorm-test-19 (port 54319); the rust-pg-19 check platform keeps them compiling. Still behind pg-query-19: the oracle parses with 18's grammar and refuses the render."
+                    }
+                )
+            }
+
+            {
+                id pg19-window-null-treatment
+                title "A window function skips nulls: PostgreSQL 19's IGNORE NULLS and RESPECT NULLS"
+                kind @feat
+                deps (pg-query-19 pg19-test-server)
+                log (
+                    {
+                        at 2026-10-07T15:47:52.501906Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by pg19-test-server's preliminary run on 19beta4 (2026-10-07); release notes E.1.3.2. Checked live on 19beta4: lag, lead, first_value, last_value and nth_value take IGNORE NULLS or RESPECT NULLS between the call and OVER (lag(x) IGNORE NULLS OVER (ORDER BY ..)); RESPECT NULLS is the default. An aggregate refuses the clause (42809, \"aggregate functions do not accept RESPECT/IGNORE NULLS\"), as does any other window function (0A000, \"function row_number does not allow RESPECT/IGNORE NULLS\"), and the five still need OVER (42809). pgorm reaches these functions only through Func::named and expr_window (sql.ast.window-statement), and FunctionCall has no place for the clause. Weigh a typed home: constructors for the five functions that carry a null treatment, rather than a modifier on every FunctionCall that the server refuses for almost all of them. Python's pipeline and expression surfaces would follow the same shape. Depends on pg-query-19 (the oracle must parse what is rendered) and pg19-test-server (the live tests need a 19 server)."
+                    }
+
+                    {
+                        at 2026-10-07T18:33:28.843989Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Home under the pg-19 feature (sql.target, 2026-10-07). The typed home this note weighs — constructors for lag, lead, first_value, last_value and nth_value that carry a null treatment — is new items behind #[cfg(feature = \"pg-19\")], marked doc(cfg(feature = \"pg-19\")), and so additive by construction. The alternative is ruled out by more than the server's refusals now: a null-treatment field or variant added under cfg to FunctionCall or WindowFunction appears whenever any crate in the graph turns pg-19 on, and breaks a dependent's exhaustive match or struct literal. Python's expression and pipeline surfaces follow behind pgorm-python's own pg-19, their capability entries carrying \"features\": [\"pg-19\"]. Live tests are #[cfg(feature = \"pg-19\")] against pgorm-test-19; the rust-pg-19 check platform keeps them compiling. Still behind pg-query-19."
+                    }
+                )
             }
         )
     }

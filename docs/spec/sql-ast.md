@@ -141,7 +141,8 @@ today, including panicking edges and deliberate failsafes.
 > `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`); and
 > `JsonTable`, `JsonTableBehavior`, `JsonTableColumn`, `JsonValueColumn`,
 > `JsonQueryColumn`, `JsonExistsColumn` and `JsonNestedColumns`: `JSON_TABLE`,
-> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`). An
+> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`); and
+> `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
 > item leaves the list with the state it described: `StandaloneIndexKind`
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
@@ -255,6 +256,58 @@ today, including panicking edges and deliberate failsafes.
 >   transaction. `CREATE EXTENSION` itself is the exception that proves the
 >   rule and is built (`sql.ddl.extension`), because an extension is what makes
 >   a *column type* available and so is reachable from an entity.
+
+## Target release
+
+> [spec:pgorm:req:sql.target]
+> A build of pgorm targets one PostgreSQL major release. 18 is the floor and
+> the default: a build that names no release targets 18, there is no `pg-18`
+> feature to say so, and nothing older is kept working. The `pg-19` cargo
+> feature targets 19. pgorm-query declares it, since the typed surface lives
+> there; pgorm forwards it (`pg-19 = ["pgorm-query/pg-19"]`), and so does
+> pgorm-python (`pg-19 = ["pgorm/pg-19"]`), whose capability manifest then
+> lists `pg-19` among its `features` (`python.capabilities`). No other crate
+> carries it, because no other crate's surface or behaviour differs between
+> the two releases yet. `pgorm_query::POSTGRES_TARGET` is the release a build
+> targets, 18 or 19: a dependent cannot read another crate's features through
+> `cfg`, so this is how it learns the target, at compile time if it likes.
+>
+> The feature is additive, as Cargo requires. Unification turns it on for
+> every crate in a build once any one asks, so it MAY add typed surface only
+> 19 accepts and MAY change which release's answers the live suite holds, and
+> it MUST NOT remove or reshape anything the default build has that 19 still
+> accepts. 19-only surface therefore arrives as new items — a type, a method,
+> a constructor, each marked `doc(cfg(feature = "pg-19"))` — and never as a
+> new variant of an exhaustive public enum, a new public field or a changed
+> signature, any of which breaks a dependent that compiles today. A builder
+> value renders the same SQL under either target: what the server does with
+> that SQL is the server's, and a release difference in it is documented
+> rather than rendered around.
+>
+> The type gates what the builder can know. Syntax only 19 parses is
+> reachable only under `pg-19`, so code built for 18 cannot construct a
+> statement 18 cannot parse. A difference that turns on what the server holds
+> — which kind of constraint a name is, which constraints a table has, how
+> many rows a subquery returns — is beyond what any builder value records, so
+> it is documented per release instead: the rule and the rustdoc give 18's
+> answer and 19's, naming each, and the live test holds 18's answer by
+> default and 19's under `cfg(feature = "pg-19")` (pgorm-python's tests branch
+> on the manifest's `features`). Each build's suite runs against the server it
+> targets: `DATABASE_URL` names an 18 server for the default build and a 19
+> one for `pg-19`. Three such differences exist today, and no 19-only syntax
+> is built yet: `ALTER CONSTRAINT .. ENFORCED` / `NOT ENFORCED` on a `CHECK`
+> (`sql.ddl.enforcement`), `SET EXPRESSION` on a virtual column under a
+> `CHECK` (`sql.ddl.alter-table`), and `JSON_ARRAY` over a query of no rows
+> (`sql.ast.expr.sql-json`).
+>
+> Every parse pgorm makes stays on PostgreSQL 18's grammar under either target
+> until libpg_query releases a 19 one: the render oracle
+> (`sql.render.oracle`), `sql!` and `prql!`, codegen's DDL reader, the
+> paginator and metric fingerprints. Building 19-only syntax waits for that
+> grammar, since every render has to parse, and until it lands `sql!` refuses
+> 19-only syntax under `pg-19` too. That work decides how the parsers follow
+> the target, and whether pgorm-sql-macro and pgorm-codegen gain the feature
+> for it, keeping an 18 build's `sql!` from accepting what 18 cannot parse.
 
 ## SELECT statements
 
@@ -1573,7 +1626,9 @@ today, including panicking edges and deliberate failsafes.
 > `IS JSON` only the third. The query form of `JSON_ARRAY` takes neither
 > (`42601`) and always drops `NULL`s, so it is its own builder,
 > `JsonArrayQuery`, with only `returning`; its query must have one column
-> (`42601`), which the builder cannot see through `*`. An object's key may
+> (`42601`), which the builder cannot see through `*`. Over a query of no
+> rows it is the empty array from PostgreSQL 19, and `NULL` on 18, which
+> answered it as the aggregate below does. An object's key may
 > not be `NULL` (`22004`).
 >
 > **The aggregates** take `filter(cond)`, the `FILTER (WHERE ..)` of

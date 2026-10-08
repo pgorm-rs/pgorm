@@ -31,6 +31,11 @@
 //!
 //! Macro: `derive` `attr`
 //!
+//! Target release: `pg-19`. A build targets PostgreSQL 18 unless it says
+//! otherwise, and there is no feature for 18; `pg-19` targets 19
+//! ([`POSTGRES_TARGET`]). It only adds: what 19 alone accepts is built behind
+//! it, and every 18 render stays as it is.
+//!
 //! Type support is unconditional: `jiff`, `serde_json`, `rust_decimal`, `uuid`,
 //! `ipnetwork`, `mac_address`, `pgvector`, Postgres arrays and intervals.
 //!
@@ -667,6 +672,7 @@ mod query;
 mod schema;
 mod sequence;
 mod table;
+mod target;
 mod template;
 mod token;
 mod types;
@@ -762,6 +768,9 @@ pub use table::{
     TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement, TableKey,
     TableRenameStatement, TableTruncateStatement, Unique,
 };
+
+// The PostgreSQL release the build targets.
+pub use target::POSTGRES_TARGET;
 
 // Rendering: the sink a statement is written into, and the two entry points
 // that are not a statement's own `build`.

@@ -537,8 +537,10 @@ impl TableAlterStatement {
     /// computes on read. The expression is held to what a generated column's
     /// is (immutable, reading no other generated column: `42P17`), and a
     /// column that is not generated, an identity included, is refused
-    /// (`55000`). So is a virtual column whose table has a `CHECK` constraint
-    /// or belongs to a publication (`0A000`).
+    /// (`55000`). So is a virtual column whose table belongs to a publication
+    /// (`0A000`), or on PostgreSQL 18 has a `CHECK` constraint; from 19 the
+    /// rows are checked against the table's `CHECK` constraints instead
+    /// (`23514`).
     ///
     /// This is the one way to change a generated column's expression:
     /// [`modify_column`](Self::modify_column) writes no
@@ -740,8 +742,12 @@ impl TableAlterStatement {
     /// Change a constraint that exists: `ALTER CONSTRAINT "name" <change>`.
     ///
     /// Which kind of constraint the name holds is the server's knowledge, and
-    /// each [`ConstraintChange`] applies to one kind: asked of another, it is
-    /// refused (`42809`).
+    /// each [`ConstraintChange`] applies to the kinds it names: asked of
+    /// another, it is refused (`42809`). The builder cannot see the kind, so
+    /// the one change whose kinds differ by release —
+    /// [`Enforced`](ConstraintChange::Enforced) and
+    /// [`NotEnforced`](ConstraintChange::NotEnforced) on a `CHECK`, refused by
+    /// PostgreSQL 18 and taken by 19 — builds under either target.
     ///
     /// # Examples
     ///

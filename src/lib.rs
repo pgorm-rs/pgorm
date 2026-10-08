@@ -4,6 +4,16 @@
 //! [`pgorm_query`] builder and executed with their values bound as parameters
 //! rather than interpolated.
 //!
+//! # PostgreSQL release
+//!
+//! A build targets PostgreSQL 18 unless it asks for 19 with the `pg-19`
+//! feature; there is no feature for 18 and no support for anything older. The
+//! feature only adds: what 19 alone accepts is built behind it, and nothing an
+//! 18 build has changes, so a crate elsewhere in the dependency graph turning
+//! it on cannot break this one's statements. Where the two releases' servers
+//! answer one statement differently, the documentation gives both answers.
+//! [`pgorm_query::POSTGRES_TARGET`] says which release a build targets.
+//!
 //! # Renaming the dependency
 //!
 //! Every derive expands to call-site-relative `pgorm::...` paths, so the name

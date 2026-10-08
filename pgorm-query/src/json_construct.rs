@@ -108,7 +108,10 @@ impl From<JsonArray> for SimpleExpr {
 ///
 /// The query form takes no `ON NULL` (`42601`), so it has none to set: a
 /// `NULL` row is always left out. A query of more than one column is refused
-/// (`42601`).
+/// (`42601`). Over a query of no rows it is `NULL` on PostgreSQL 18, as
+/// [`JSON_ARRAYAGG`](crate::Func::json_arrayagg) is, and the empty array from
+/// 19, so code that reads it under both releases decodes it into an
+/// `Option`.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct JsonArrayQuery {

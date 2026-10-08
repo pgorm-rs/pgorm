@@ -129,8 +129,8 @@ pub enum Enforcement {
     Enforced,
     /// `NOT ENFORCED`: the constraint is recorded and never checked. It is
     /// never valid, a foreign key's `ON DELETE` and `ON UPDATE` actions never
-    /// fire, and `VALIDATE CONSTRAINT` refuses it (`55000`); a foreign key is
-    /// enforced again with
+    /// fire, and `VALIDATE CONSTRAINT` refuses it (`55000`); a foreign key, or
+    /// on PostgreSQL 19 a `CHECK`, is enforced again with
     /// [`ConstraintChange::Enforced`](crate::ConstraintChange::Enforced).
     NotEnforced,
 }
@@ -150,8 +150,10 @@ impl Enforcement {
 /// What `ALTER CONSTRAINT "name" ...` changes about a constraint that exists.
 ///
 /// The server alone knows which kind of constraint a name holds, and each
-/// change applies to one kind, so asking another kind for it is refused there
-/// (`42809`).
+/// change applies to the kinds its variant names, so asking another kind for
+/// it is refused there (`42809`). Where those kinds differ by release, the
+/// variant says so: the builder cannot tell a `CHECK`'s name from a foreign
+/// key's, so no target can rule the difference out by type.
 // [spec:pgorm:req:sql.ddl.alter-table+10]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {
@@ -163,14 +165,14 @@ pub enum ConstraintChange {
     /// partitioned table's constraint cannot be kept from its partitions
     /// (`0A000`).
     NoInherit,
-    /// `ENFORCED`: a foreign key is checked again, every row already there
-    /// included — one that breaks it refuses the statement (`23503`) — and
-    /// is valid once it passes. A `CHECK`'s enforcement cannot be altered
-    /// (`42809`).
+    /// `ENFORCED`: a foreign key, or from PostgreSQL 19 a `CHECK`, is
+    /// checked again, every row already there included — one that breaks it
+    /// refuses the statement (`23503`, `23514`) — and is valid once it
+    /// passes. PostgreSQL 18 cannot alter a `CHECK`'s enforcement (`42809`).
     // [spec:pgorm:req:sql.ddl.enforcement]
     Enforced,
-    /// `NOT ENFORCED`: a foreign key is no longer checked, and is no longer
-    /// valid.
+    /// `NOT ENFORCED`: a foreign key, or from PostgreSQL 19 a `CHECK`, is
+    /// left unchecked and not valid.
     // [spec:pgorm:req:sql.ddl.enforcement]
     NotEnforced,
 }

@@ -540,8 +540,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > NULL` alone: a `CHECK`, key or foreign key named there is refused (`42809`),
 > as is `NO INHERIT` on a partitioned table's (`0A000`). `Enforced`
 > (`ENFORCED`) and `NotEnforced` (`NOT ENFORCED`), also 18's, apply to a
-> foreign key alone (`[spec:pgorm:req:sql.ddl.enforcement]`): a `CHECK`'s or a
-> key's enforcement is refused there (`42809`). Each change is a
+> foreign key and, from PostgreSQL 19, a `CHECK`
+> (`[spec:pgorm:req:sql.ddl.enforcement]`): a key's enforcement is refused
+> there (`42809`), as 18 refuses a `CHECK`'s. Each change is a
 > closed choice rather than a flag, so an `ALTER CONSTRAINT` that changes
 > nothing has no value to be built from
 > (`[dec:pgorm:invalid-states-unrepresentable]`). Renaming a constraint,
@@ -569,8 +570,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > that `DROP EXPRESSION IF EXISTS` passes over it with a notice; `DROP
 > EXPRESSION` on a virtual column is refused, `IF EXISTS` or not (`0A000`),
 > having no stored values to keep; `SET EXPRESSION` on a virtual column is
-> refused while its table has any `CHECK` constraint or belongs to a
-> publication (`0A000`), where a stored column's goes through; and a new
+> refused while its table belongs to a publication (`0A000`), where a stored
+> column's goes through; a `CHECK` constraint on the table refuses it too on
+> PostgreSQL 18 (`0A000`), while from 19 the rows are checked against the
+> table's `CHECK` constraints instead, a row that breaks one refusing the
+> action (`23514`); and a new
 > expression is held to what a generated column's is at creation —
 > immutable, reading no other generated column (`42P17`), holding no
 > subquery (`0A000`), of the column's type (`42804`). Both actions combine
@@ -929,8 +933,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `VALIDATE CONSTRAINT` refuses it (`55000`). `ALTER CONSTRAINT "name"
 > ENFORCED` / `NOT ENFORCED` (`ConstraintChange`, `[spec:pgorm:req:sql.ddl.alter-table+10]`)
 > moves a foreign key between the two, `ENFORCED` checking every row as it
-> goes (`23503`) and `NOT ENFORCED` leaving it not valid; a `CHECK`'s cannot
-> be altered (`42809`), so one is dropped and added again.
+> goes (`23503`) and `NOT ENFORCED` leaving it not valid. From PostgreSQL 19
+> it moves a `CHECK` the same way, `ENFORCED` refusing a row that breaks the
+> condition (`23514`); 18 cannot alter a `CHECK`'s (`42809`), so there one is
+> dropped and added again.
 
 ## Enum types
 

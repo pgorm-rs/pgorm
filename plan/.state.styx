@@ -634,11 +634,18 @@ assertions (
     {id codegen-relation-cardinality, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:26.312596Z}
     {id codegen-relation-integrity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:19.739973Z}
     {id codegen-schema-qualifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:21:48.870962Z}
+    {id composite-key-edge-coverage, kind @complete, author "brendan@necessary.nu", at 2026-10-05T21:16:37.554772Z}
+    {id composite-key-generated-column, kind @complete, author "brendan@necessary.nu", at 2026-10-05T10:57:22.968642Z}
+    {id composite-key-refusals, kind @complete, author "brendan@necessary.nu", at 2026-10-05T19:06:49.235085Z}
+    {id composite-key-writes, kind @complete, author "brendan@necessary.nu", at 2026-10-05T13:28:02.338181Z}
     {id connect-manager-options, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:14.642639Z}
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
     {id coverage-remaining-gaps, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:04:46.850667Z}
+    {id created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T12:42:49.769136Z}
+    {id created-range-types, kind @complete, author "brendan@necessary.nu", at 2026-10-07T17:58:19.215794Z}
+    {id cursor-bind-jiff-gate, kind @complete, author "brendan@necessary.nu", at 2026-10-01T22:11:03.011048Z}
     {id cursor-joined-boundary, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:06:49.650565Z}
     {id cursor-reuse, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:06:45.834515Z}
     {id cursor-source-key-tiebreaks, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:47:06.955598Z}
@@ -656,6 +663,7 @@ assertions (
     {id distinct-sort-range-rows, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:40.28601Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
+    {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
     {id empty-insert-batch, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:50:38.839369Z}
     {id enum-schema-codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-07T15:32:00.624163Z}
     {id enum-schema-surface, kind @complete, author "brendan@necessary.nu", at 2026-09-07T15:12:53.594408Z}
@@ -682,6 +690,7 @@ assertions (
     {id graph-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T17:40:27.266491Z}
     {id graph-long-column-aliases, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:53:25.354727Z}
     {id graph-unicode-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T21:59:36.946216Z}
+    {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
     {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
@@ -700,6 +709,7 @@ assertions (
     {id insert-returning-manual-pk, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:02.163452Z}
     {id jiff-temporal, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:54:19.382561Z}
     {id joined-row-decode-errors, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:26:15.432338Z}
+    {id json-server-bug-guards, kind @complete, author "brendan@necessary.nu", at 2026-10-07T10:36:54.511877Z}
     {id like-sugar-escaping, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:25:55.102226Z}
     {id linked-fold, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:32:33.531154Z}
     {id literal-temporal-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:48:16.275282Z}
@@ -712,6 +722,7 @@ assertions (
     {id macro-partial-model-attrs, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:01.627583Z}
     {id macro-sea-attr-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:13.386141Z}
     {id macro-unknown-attrs, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:45:57.119701Z}
+    {id merge-beyond-pg16, kind @complete, author "brendan@necessary.nu", at 2026-10-07T06:22:45.178693Z}
     {id metrics-rollback-honest, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:05:51.114928Z}
     {id migration-checksums, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:20.974605Z}
     {id migration-ledger-module-name, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:18:13.949101Z}
@@ -733,22 +744,38 @@ assertions (
     {id nopanic.value-accessors, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:11:30.878873Z}
     {id nopanic.value-tuple, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:46:15.258382Z}
     {id nullable-projection-absence, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:08:20.541646Z}
+    {id on-conflict-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:15:11.139777Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
     {id outer-ordering-qualifier, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:17.205808Z}
     {id paginator-advances, kind @complete, author "brendan@necessary.nu", at 2026-09-21T16:41:21.340145Z}
     {id pair-deletion, kind @complete, author "brendan@necessary.nu", at 2026-09-06T16:13:59.32051Z}
     {id parameter-wire-types, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:31:53.446847Z}
+    {id pg-query-18, kind @complete, author "brendan@necessary.nu", at 2026-10-06T16:50:30.93194Z}
+    {id pg17-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-07T09:10:17.635886Z}
+    {id pg17-set-expression, kind @complete, author "brendan@necessary.nu", at 2026-10-06T21:04:49.227031Z}
+    {id pg17-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:39:18.440693Z}
+    {id pg18-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-07T01:09:00.747535Z}
+    {id pg18-not-null-constraints, kind @complete, author "brendan@necessary.nu", at 2026-10-06T23:46:07.969248Z}
+    {id pg18-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-07T04:52:44.725158Z}
+    {id pg18-security-baselines, kind @complete, author "brendan@necessary.nu", at 2026-10-07T15:21:42.614443Z}
+    {id pg18-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-07T02:55:53.087666Z}
+    {id pg18-test-server, kind @complete, author "brendan@necessary.nu", at 2026-10-06T14:14:25.161626Z}
+    {id pg18-uuid-functions, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:03:19.869642Z}
+    {id pg18-virtual-generated, kind @complete, author "brendan@necessary.nu", at 2026-10-06T19:26:22.580736Z}
+    {id pg19-test-server, kind @doing, author "brendan@necessary.nu", at 2026-10-07T15:27:50.534451Z}
     {id pgparse.codegen-ddl, kind @complete, author "brendan@necessary.nu", at 2026-09-02T21:15:51.896227Z}
     {id pgparse.fingerprint, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:06:32.153992Z}
     {id pgparse.oracle, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:06:45.622062Z}
     {id pgparse.sql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:54:19.194709Z}
     {id pipeline-append-distinct, kind @complete, author "brendan@necessary.nu", at 2026-09-23T21:59:17.384305Z}
+    {id pipeline-bare-dollar-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T21:45:40.062525Z}
     {id pipeline-hidden-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:05.303529Z}
     {id pipeline-hostile-identifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-09T14:03:56.770605Z}
     {id pipeline-identifier-quoting-own, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:06.162426Z}
     {id pipeline-join-distinct-order, kind @complete, author "brendan@necessary.nu", at 2026-09-23T21:59:17.451895Z}
     {id pipeline-native-panic, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:28:05.205873Z}
+    {id pipeline-read-cast-verbatim, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:19:07.367803Z}
     {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
     {id pipeline-renamed-column-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:38.820334Z}
     {id pipeline-unused-parameters, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:16:03.581143Z}
@@ -769,10 +796,13 @@ assertions (
     {id pool-config-secret-debug, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:32.292134Z}
     {id pool-savepoint-quoted, kind @complete, author "brendan@necessary.nu", at 2026-09-21T17:04:49.769326Z}
     {id prqlc-distinct-on-dropped-key, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.601834Z}
+    {id prqlc-git-dependency, kind @complete, author "brendan@necessary.nu", at 2026-09-24T19:21:11.801942Z}
     {id prqlc-group-by-wildcard, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.493273Z}
     {id prqlc-literal-ordinal, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.551826Z}
     {id prqlc-pin-incomplete, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:22.817775Z}
     {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
+    {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
+    {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
     {id python.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:14.867381Z}
     {id query-aggregate-modifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-20T19:04:53.640837Z}
     {id query-bound-quoting-contract, kind @complete, author "brendan@necessary.nu", at 2026-09-20T12:03:02.924238Z}
@@ -793,6 +823,7 @@ assertions (
     {id query-update-from, kind @complete, author "brendan@necessary.nu", at 2026-09-20T18:32:14.763023Z}
     {id query-verbs-keep-promises, kind @complete, author "brendan@necessary.nu", at 2026-09-20T13:13:26.404952Z}
     {id quoted-result-name-doubled, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:39.582401Z}
+    {id range-arrays-and-overlap, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:09:47.153279Z}
     {id raw-identifier-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-08T13:14:34.249448Z}
     {id raw-pagination-placeholder-lexing, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:29:03.688424Z}
     {id relation-def-rev, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:13:12.176232Z}
@@ -806,11 +837,23 @@ assertions (
     {id save-as-predicate-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:39:08.287478Z}
     {id schema-enum-arrays, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:27.938472Z}
     {id schema-enum-dedup, kind @complete, author "brendan@necessary.nu", at 2026-09-05T15:38:30.128281Z}
+    {id scope-array-subscripts, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:36:17.387681Z}
+    {id scope-collate, kind @complete, author "brendan@necessary.nu", at 2026-09-25T07:07:17.973407Z}
+    {id scope-composite-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T20:35:59.619861Z}
+    {id scope-constraint-deferrability, kind @complete, author "brendan@necessary.nu", at 2026-09-25T05:05:47.264161Z}
+    {id scope-frame-exclude, kind @complete, author "brendan@necessary.nu", at 2026-09-25T04:12:26.746987Z}
+    {id scope-grouping-sets, kind @complete, author "brendan@necessary.nu", at 2026-09-25T02:33:47.327387Z}
+    {id scope-merge, kind @complete, author "brendan@necessary.nu", at 2026-10-05T01:58:35.862938Z}
+    {id scope-on-constraint, kind @complete, author "brendan@necessary.nu", at 2026-09-30T17:02:07.648474Z}
+    {id scope-range-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T23:55:37.285787Z}
+    {id scope-sequences, kind @complete, author "brendan@necessary.nu", at 2026-10-01T23:10:34.664342Z}
+    {id scope-simple-case, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:02:12.227018Z}
     {id sea-config-residue, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:40:06.389769Z}
     {id sea-orm-active-enums-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:15.78141Z}
     {id sea-rc-name, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:49:46.138719Z}
     {id seaography-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:08.718488Z}
     {id seaquery-doc-branding, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:57:15.3319Z}
+    {id searched-case-needs-arm, kind @complete, author "brendan@necessary.nu", at 2026-09-25T03:10:12.098266Z}
     {id select-sources-read-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:35:42.050401Z}
     {id select-sources-wide-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:58:57.496733Z}
     {id selecttwo, kind @complete, author "brendan@necessary.nu", at 2026-09-06T14:08:58.856007Z}
@@ -819,6 +862,9 @@ assertions (
     {id spec, kind @complete, author "brendan@necessary.nu", at 2026-09-06T14:24:08.822493Z}
     {id sql-value-json, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:29.060218Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
+    {id sqlmap-identifier-profile, kind @complete, author "brendan@necessary.nu", at 2026-10-05T03:49:29.250867Z}
+    {id sqlmap-profile-args-honoured, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:21:20.93194Z}
+    {id sqlmap-smoke-unrunnable, kind @complete, author "brendan@necessary.nu", at 2026-09-24T16:21:33.966967Z}
     {id sqlmap.controls.contexts, kind @complete, author "brendan@necessary.nu", at 2026-09-14T15:54:28.159137Z}
     {id sqlmap.controls.inapplicable, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:59:29.464321Z}
     {id sqlmap.controls.literal, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:58:53.144613Z}
@@ -827,6 +873,7 @@ assertions (
     {id supply-chain-unscanned, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:29.034891Z}
     {id tokenizer-backslash-standard, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:26:31.551166Z}
     {id transaction-stale-plan-recovery, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:12:04.84501Z}
+    {id type-part-keyword-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:48:03.368721Z}
     {id unrep.build-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T15:54:19.389968Z}
     {id unrep.condition-chain, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:20:22.136562Z}
     {id unrep.cte-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T18:04:04.408634Z}
@@ -858,52 +905,6 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id sqlmap-profile-args-honoured, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:21:20.93194Z}
-    {id sqlmap-smoke-unrunnable, kind @complete, author "brendan@necessary.nu", at 2026-09-24T16:21:33.966967Z}
-    {id prqlc-git-dependency, kind @complete, author "brendan@necessary.nu", at 2026-09-24T19:21:11.801942Z}
-    {id pipeline-bare-dollar-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T21:45:40.062525Z}
-    {id pipeline-read-cast-verbatim, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:19:07.367803Z}
-    {id type-part-keyword-names, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:48:03.368721Z}
-    {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
-    {id scope-simple-case, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:02:12.227018Z}
-    {id scope-array-subscripts, kind @complete, author "brendan@necessary.nu", at 2026-09-25T01:36:17.387681Z}
-    {id scope-grouping-sets, kind @complete, author "brendan@necessary.nu", at 2026-09-25T02:33:47.327387Z}
-    {id searched-case-needs-arm, kind @complete, author "brendan@necessary.nu", at 2026-09-25T03:10:12.098266Z}
-    {id scope-frame-exclude, kind @complete, author "brendan@necessary.nu", at 2026-09-25T04:12:26.746987Z}
-    {id scope-constraint-deferrability, kind @complete, author "brendan@necessary.nu", at 2026-09-25T05:05:47.264161Z}
-    {id scope-collate, kind @complete, author "brendan@necessary.nu", at 2026-09-25T07:07:17.973407Z}
-    {id scope-on-constraint, kind @complete, author "brendan@necessary.nu", at 2026-09-30T17:02:07.648474Z}
-    {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
-    {id cursor-bind-jiff-gate, kind @complete, author "brendan@necessary.nu", at 2026-10-01T22:11:03.011048Z}
-    {id scope-sequences, kind @complete, author "brendan@necessary.nu", at 2026-10-01T23:10:34.664342Z}
-    {id scope-composite-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T20:35:59.619861Z}
-    {id scope-range-types, kind @complete, author "brendan@necessary.nu", at 2026-10-04T23:55:37.285787Z}
-    {id scope-merge, kind @complete, author "brendan@necessary.nu", at 2026-10-05T01:58:35.862938Z}
-    {id sqlmap-identifier-profile, kind @complete, author "brendan@necessary.nu", at 2026-10-05T03:49:29.250867Z}
-    {id composite-key-generated-column, kind @complete, author "brendan@necessary.nu", at 2026-10-05T10:57:22.968642Z}
-    {id composite-key-writes, kind @complete, author "brendan@necessary.nu", at 2026-10-05T13:28:02.338181Z}
-    {id composite-key-refusals, kind @complete, author "brendan@necessary.nu", at 2026-10-05T19:06:49.235085Z}
-    {id composite-key-edge-coverage, kind @complete, author "brendan@necessary.nu", at 2026-10-05T21:16:37.554772Z}
-    {id on-conflict-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:15:11.139777Z}
-    {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
-    {id pg18-test-server, kind @complete, author "brendan@necessary.nu", at 2026-10-06T14:14:25.161626Z}
-    {id pg-query-18, kind @complete, author "brendan@necessary.nu", at 2026-10-06T16:50:30.93194Z}
-    {id pg18-virtual-generated, kind @complete, author "brendan@necessary.nu", at 2026-10-06T19:26:22.580736Z}
-    {id pg17-set-expression, kind @complete, author "brendan@necessary.nu", at 2026-10-06T21:04:49.227031Z}
-    {id pg18-not-null-constraints, kind @complete, author "brendan@necessary.nu", at 2026-10-06T23:46:07.969248Z}
-    {id pg18-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-07T01:09:00.747535Z}
-    {id pg18-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-07T02:55:53.087666Z}
-    {id pg18-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-07T04:52:44.725158Z}
-    {id merge-beyond-pg16, kind @complete, author "brendan@necessary.nu", at 2026-10-07T06:22:45.178693Z}
-    {id pg18-uuid-functions, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:03:19.869642Z}
-    {id pg17-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-07T08:39:18.440693Z}
-    {id pg17-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-07T09:10:17.635886Z}
-    {id json-server-bug-guards, kind @complete, author "brendan@necessary.nu", at 2026-10-07T10:36:54.511877Z}
-    {id range-arrays-and-overlap, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:09:47.153279Z}
-    {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
-    {id pg18-security-baselines, kind @complete, author "brendan@necessary.nu", at 2026-10-07T15:21:42.614443Z}
-    {id created-range-types, kind @complete, author "brendan@necessary.nu", at 2026-10-07T17:58:19.215794Z}
-    {id created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T12:42:49.769136Z}
 )
 
 impl_evidence (
@@ -1162,6 +1163,13 @@ impl_evidence (
         query.graph.grouped
     ), covered_claims (
         {impl_name main, rule query.graph.grouped}
+    )}
+    {id identifier-render-oracle, covered_rules (
+        security.ident-oracle
+        security.ident-oracle.nul
+    ), covered_claims (
+        {impl_name main, rule security.ident-oracle}
+        {impl_name main, rule security.ident-oracle.nul}
     )}
     {id infra.conn, covered_rules (
         conn.pool
@@ -1880,13 +1888,6 @@ impl_evidence (
         {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
-    )}
-    {id identifier-render-oracle, covered_rules (
-        security.ident-oracle
-        security.ident-oracle.nul
-    ), covered_claims (
-        {impl_name main, rule security.ident-oracle}
-        {impl_name main, rule security.ident-oracle.nul}
     )}
 )
 

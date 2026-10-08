@@ -52,6 +52,16 @@ hashes, type-check evidence and the extension's dynamic library dependencies
 (`otool -L` on macOS or `ldd` on Linux). `summary.json` remains failed until both
 installations pass. These commands do not upload to a package registry.
 
+## PostgreSQL release
+
+A wheel targets PostgreSQL 18 unless its native module is built with the
+`pg-19` feature (`maturin build --features pg-19`), which builds pgorm for 19.
+`pgorm.capabilities()["features"]` then lists `pg-19`. Where the two releases
+answer a statement differently, the tests hold the answer of the release the
+module targets, so a 19 build is tested against a PostgreSQL 19 server through
+`PGORM_TEST_DSN`; the database wrappers here provision 18. CI builds and tests
+18 only until PostgreSQL 19's general release.
+
 ## CI and supported combinations
 
 The [Python workflow](../.github/workflows/python.yml) runs the checker for
