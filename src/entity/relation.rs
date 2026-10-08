@@ -1,8 +1,8 @@
 use crate::{ColumnPairs, EntityTrait, Iterable, QuerySelect, Select, unpack_table_name};
 use core::marker::PhantomData;
 use pgorm_query::{
-    Condition, ConditionType, ForeignKeyCreateStatement, FromItem, IntoName, JoinType, Name,
-    TableForeignKey, alias,
+    Condition, ConditionType, Deferrability, Enforcement, ForeignKeyCreateStatement, FromItem,
+    IntoName, JoinType, Name, TableForeignKey, alias,
 };
 use std::fmt::Debug;
 
@@ -47,7 +47,7 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+8]
+// [spec:pgorm:def:entity.relation.def+9]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
@@ -69,6 +69,13 @@ pub struct RelationDef {
     pub on_condition: Option<Box<dyn Fn(Name, Name) -> Condition + Send + Sync>>,
     /// The name of foreign key constraint
     pub fk_name: Option<String>,
+    /// Whether the server holds rows to the foreign key, if the relation
+    /// says: a `NOT ENFORCED` key is recorded and never checked.
+    // [spec:pgorm:def:entity.relation.def+9]
+    pub enforcement: Option<Enforcement>,
+    /// When the foreign key's check runs, if the relation says.
+    // [spec:pgorm:def:entity.relation.def+9]
+    pub deferrability: Option<Deferrability>,
     /// Condition type of join on expression
     pub condition_type: ConditionType,
 }
@@ -84,7 +91,10 @@ impl std::fmt::Debug for RelationDef {
             .field("on_delete", &self.on_delete)
             .field("on_update", &self.on_update);
         debug_on_condition(&mut d, &self.on_condition);
-        d.field("fk_name", &self.fk_name).finish()
+        d.field("fk_name", &self.fk_name)
+            .field("enforcement", &self.enforcement)
+            .field("deferrability", &self.deferrability)
+            .finish()
     }
 }
 
@@ -134,6 +144,8 @@ where
     on_update: Option<ForeignKeyAction>,
     on_condition: Option<Box<dyn Fn(Name, Name) -> Condition + Send + Sync>>,
     fk_name: Option<String>,
+    enforcement: Option<Enforcement>,
+    deferrability: Option<Deferrability>,
     condition_type: ConditionType,
 }
 
@@ -154,7 +166,10 @@ where
             .field("on_delete", &self.on_delete)
             .field("on_update", &self.on_update);
         debug_on_condition(&mut d, &self.on_condition);
-        d.field("fk_name", &self.fk_name).finish()
+        d.field("fk_name", &self.fk_name)
+            .field("enforcement", &self.enforcement)
+            .field("deferrability", &self.deferrability)
+            .finish()
     }
 }
 
@@ -166,7 +181,7 @@ impl RelationDef {
     /// written for `(source, target)` never silently starts receiving
     /// `(target, source)`. A closure attached *after* reversing is authored
     /// against the reversed roles, as its author sees them.
-    // [spec:pgorm:def:entity.relation.def+8]
+    // [spec:pgorm:def:entity.relation.def+9]
     pub fn rev(mut self) -> Self {
         let on_condition = self.on_condition.take().map(|f| {
             Box::new(move |left: Name, right: Name| f(right, left))
@@ -182,6 +197,8 @@ impl RelationDef {
             on_update: self.on_update,
             on_condition,
             fk_name: None,
+            enforcement: self.enforcement,
+            deferrability: self.deferrability,
             condition_type: self.condition_type,
         }
     }
@@ -332,6 +349,8 @@ where
             on_update: None,
             on_condition: None,
             fk_name: None,
+            enforcement: None,
+            deferrability: None,
             condition_type: ConditionType::All,
         }
     }
@@ -353,6 +372,8 @@ where
             on_update: self.on_update,
             on_condition: self.on_condition,
             fk_name: self.fk_name,
+            enforcement: self.enforcement,
+            deferrability: self.deferrability,
             condition_type: self.condition_type,
         }
     }
@@ -375,6 +396,8 @@ where
             on_update: None,
             on_condition: None,
             fk_name: None,
+            enforcement: None,
+            deferrability: None,
             condition_type: ConditionType::All,
         }
     }
@@ -432,6 +455,23 @@ where
         self.condition_type = condition_type;
         self
     }
+
+    /// Say whether the server holds rows to the relation's foreign key:
+    /// [`Enforcement::NotEnforced`] records the key without checking it, so
+    /// the table may hold rows it references nothing for.
+    // [spec:pgorm:def:entity.relation.def+9]
+    pub fn enforcement(mut self, enforcement: Enforcement) -> Self {
+        self.enforcement = Some(enforcement);
+        self
+    }
+
+    /// Say when the relation's foreign key is checked
+    /// ([`Deferrability::DeferrableInitiallyDeferred`] checks it at commit).
+    // [spec:pgorm:def:entity.relation.def+9]
+    pub fn deferrability(mut self, deferrability: Deferrability) -> Self {
+        self.deferrability = Some(deferrability);
+        self
+    }
 }
 
 // [spec:pgorm:req:entity.relation.builder+1]
@@ -451,6 +491,8 @@ where
             on_update: b.on_update,
             on_condition: b.on_condition,
             fk_name: b.fk_name,
+            enforcement: b.enforcement,
+            deferrability: b.deferrability,
             condition_type: b.condition_type,
         }
     }
@@ -476,6 +518,12 @@ macro_rules! foreign_key_from_relation {
         if let Some(action) = $relation.on_update {
             foreign_key.on_update(action);
         }
+        if let Some(deferrability) = $relation.deferrability {
+            foreign_key.deferrability(deferrability);
+        }
+        if let Some(enforcement) = $relation.enforcement {
+            foreign_key.enforcement(enforcement);
+        }
         let name = if let Some(name) = $relation.fk_name {
             name
         } else {
@@ -495,7 +543,7 @@ macro_rules! foreign_key_from_relation {
     }};
 }
 
-// [spec:pgorm:req:entity.relation.fk+3]
+// [spec:pgorm:req:entity.relation.fk+4]
 impl From<RelationDef> for ForeignKeyCreateStatement {
     fn from(relation: RelationDef) -> Self {
         foreign_key_from_relation!(relation, Self)
@@ -517,6 +565,8 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     on_update: None,
 ///     on_condition: None,
 ///     fk_name: Some("foo-bar".to_string()),
+///     enforcement: None,
+///     deferrability: None,
 ///     condition_type: ConditionType::All,
 /// };
 ///
@@ -527,7 +577,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```
-// [spec:pgorm:req:entity.relation.fk+3]
+// [spec:pgorm:req:entity.relation.fk+4]
 impl From<RelationDef> for TableForeignKey {
     fn from(relation: RelationDef) -> Self {
         foreign_key_from_relation!(relation, Self)

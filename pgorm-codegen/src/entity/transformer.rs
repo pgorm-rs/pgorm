@@ -9,14 +9,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+2]
@@ -342,7 +342,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -365,7 +365,7 @@ pub(crate) fn resolve_reference<'a>(
 /// its other columns would claim they are unique when they are not, and a
 /// `PERIOD` foreign key read as its other pairs would join rows in no period
 /// of each other's — so either is refused, never read without its period.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let temporal_key = table
         .get_primary_key()
@@ -396,7 +396,7 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
 /// would generate a `PrimaryKey` enum with one variant twice, which does not
 /// compile, and a unique key over `(a, a)` would mark `a` unique on its own;
 /// so it is refused by name, never read as the key without its repeat.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let keys = table
         .get_primary_key()
@@ -441,7 +441,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {

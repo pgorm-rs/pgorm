@@ -1,5 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ForeignKeyAction, TableForeignKey};
+use pgorm_query::{Deferrability, Enforcement, ForeignKeyAction, TableForeignKey};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
@@ -27,6 +27,12 @@ pub struct Relation {
     pub(crate) rel_type: RelationType,
     pub(crate) on_update: Option<ForeignKeyAction>,
     pub(crate) on_delete: Option<ForeignKeyAction>,
+    /// `NotEnforced` when the key is; an explicit `ENFORCED` states the
+    /// default and reads as nothing said.
+    pub(crate) enforcement: Option<Enforcement>,
+    /// When the key is checked, if it is deferrable; an explicit `NOT
+    /// DEFERRABLE` states the default and reads as nothing said.
+    pub(crate) deferrability: Option<Deferrability>,
     pub(crate) self_referencing: bool,
     pub(crate) num_suffix: usize,
     pub(crate) impl_related: bool,
@@ -34,7 +40,7 @@ pub struct Relation {
 
 impl Relation {
     /// Which table this relation references.
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     pub fn ref_ident(&self) -> TableIdent {
         TableIdent {
             table: self.ref_table.clone(),
@@ -43,7 +49,7 @@ impl Relation {
     }
 
     // [spec:pgorm:sem:codegen.entity.keywords+1]
-    // [spec:pgorm:sem:codegen.entity.relations+1]
+    // [spec:pgorm:sem:codegen.entity.relations+2]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("relation to `{}`", self.ref_ident());
         safe_ident(
@@ -65,7 +71,7 @@ impl Relation {
         Ok(())
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations+1]
+    // [spec:pgorm:sem:codegen.entity.relations+2]
     pub fn get_enum_name(&self) -> Ident {
         let name = if self.self_referencing {
             format_ident!("SelfRef")
@@ -125,12 +131,13 @@ impl Relation {
                     let ref_column = map_ref_column(ref_column);
                     def = quote! { #def.and_columns(Column::#src_column, #ref_column) };
                 }
+                def.extend(self.get_key_calls());
                 quote! { #def.into() }
             }
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations+1]
+    // [spec:pgorm:sem:codegen.entity.relations+2]
     pub fn get_attrs(&self) -> TokenStream {
         let rel_type = self.get_rel_type();
         let module_name = if let Some(module_name) = self.get_module_name() {
@@ -176,6 +183,7 @@ impl Relation {
                 } else {
                     quote! {}
                 };
+                let key_check = self.get_key_attrs();
                 quote! {
                     #[pgorm(
                         #rel_type = #ref_entity,
@@ -183,9 +191,68 @@ impl Relation {
                         to = #to,
                         #on_update
                         #on_delete
+                        #key_check
                     )]
                 }
             }
+        }
+    }
+
+    /// The owning relation's foreign-key behavior as builder calls, for the
+    /// expanded format's `def()`: its actions, then its deferrability and
+    /// enforcement where the key declared them.
+    // [spec:pgorm:sem:codegen.entity.relations+2]
+    fn get_key_calls(&self) -> TokenStream {
+        let mut calls = TokenStream::new();
+        if let Some(action) = &self.on_update {
+            let action = format_ident!("{}", Self::get_foreign_key_action(action));
+            calls.extend(quote! { .on_update(ForeignKeyAction::#action) });
+        }
+        if let Some(action) = &self.on_delete {
+            let action = format_ident!("{}", Self::get_foreign_key_action(action));
+            calls.extend(quote! { .on_delete(ForeignKeyAction::#action) });
+        }
+        if let Some(deferrability) = self.deferrability {
+            let variant = format_ident!("{}", Self::get_deferrability(deferrability));
+            calls.extend(quote! {
+                .deferrability(pgorm::pgorm_query::Deferrability::#variant)
+            });
+        }
+        if let Some(enforcement) = self.enforcement {
+            let variant = format_ident!("{}", Self::get_enforcement(enforcement));
+            calls.extend(quote! { .enforcement(pgorm::pgorm_query::Enforcement::#variant) });
+        }
+        calls
+    }
+
+    /// The compact format's `deferrability = ".."` and `enforcement = ".."`
+    /// attribute keys, where the key declared them.
+    // [spec:pgorm:sem:codegen.entity.relations+2]
+    fn get_key_attrs(&self) -> TokenStream {
+        let mut attrs = TokenStream::new();
+        if let Some(deferrability) = self.deferrability {
+            let variant = Self::get_deferrability(deferrability);
+            attrs.extend(quote! { deferrability = #variant, });
+        }
+        if let Some(enforcement) = self.enforcement {
+            let variant = Self::get_enforcement(enforcement);
+            attrs.extend(quote! { enforcement = #variant, });
+        }
+        attrs
+    }
+
+    fn get_deferrability(deferrability: Deferrability) -> &'static str {
+        match deferrability {
+            Deferrability::NotDeferrable => "NotDeferrable",
+            Deferrability::DeferrableInitiallyImmediate => "DeferrableInitiallyImmediate",
+            Deferrability::DeferrableInitiallyDeferred => "DeferrableInitiallyDeferred",
+        }
+    }
+
+    fn get_enforcement(enforcement: Enforcement) -> &'static str {
+        match enforcement {
+            Enforcement::Enforced => "Enforced",
+            Enforcement::NotEnforced => "NotEnforced",
         }
     }
 
@@ -253,7 +320,7 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 impl From<&TableForeignKey> for Relation {
     fn from(tbl_fk: &TableForeignKey) -> Self {
         let ref_table = TableIdent::of(tbl_fk.get_ref_table());
@@ -265,6 +332,12 @@ impl From<&TableForeignKey> for Relation {
             rel_type: RelationType::BelongsTo,
             on_delete: tbl_fk.get_on_delete(),
             on_update: tbl_fk.get_on_update(),
+            enforcement: tbl_fk
+                .get_enforcement()
+                .filter(|enforcement| *enforcement == Enforcement::NotEnforced),
+            deferrability: tbl_fk
+                .get_deferrability()
+                .filter(|deferrability| *deferrability != Deferrability::NotDeferrable),
             self_referencing: false,
             num_suffix: 0,
             impl_related: true,
@@ -288,6 +361,8 @@ mod tests {
                 rel_type: RelationType::HasOne,
                 on_delete: None,
                 on_update: None,
+                enforcement: None,
+                deferrability: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,
@@ -300,6 +375,8 @@ mod tests {
                 rel_type: RelationType::BelongsTo,
                 on_delete: Some(ForeignKeyAction::Cascade),
                 on_update: Some(ForeignKeyAction::Cascade),
+                enforcement: None,
+                deferrability: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,
@@ -312,6 +389,8 @@ mod tests {
                 rel_type: RelationType::HasMany,
                 on_delete: Some(ForeignKeyAction::Cascade),
                 on_update: None,
+                enforcement: None,
+                deferrability: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,
@@ -344,6 +423,8 @@ mod tests {
             "Entity::has_one(super::fruit::Entity).into()",
             "Entity::belongs_to(super::filling::Entity) \
                 .columns(Column::FillingId, super::filling::Column::Id) \
+                .on_update(ForeignKeyAction::Cascade) \
+                .on_delete(ForeignKeyAction::Cascade) \
                 .into()",
             "Entity::has_many(super::filling::Entity).into()",
         ];

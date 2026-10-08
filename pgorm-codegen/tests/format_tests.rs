@@ -362,6 +362,8 @@ fn expanded_relation_trait_def_matches_variants_or_panics() {
                 match self {
                     Self::Cake => Entity::belongs_to(super::cake::Entity)
                         .columns(Column::CakeId, super::cake::Column::Id)
+                        .on_update(ForeignKeyAction::Cascade)
+                        .on_delete(ForeignKeyAction::Cascade)
                         .into(),
                 }
             }

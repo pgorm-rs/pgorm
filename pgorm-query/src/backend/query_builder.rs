@@ -2152,7 +2152,7 @@ impl QueryBuilder {
 
     // FOREIGN KEY
 
-    // [spec:pgorm:req:sql.ddl.foreign-key+9]
+    // [spec:pgorm:req:sql.ddl.foreign-key+10]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2183,7 +2183,7 @@ impl QueryBuilder {
             col.prepare(sql.as_writer());
             false
         });
-        // [spec:pgorm:req:sql.ddl.foreign-key+9]
+        // [spec:pgorm:req:sql.ddl.foreign-key+10]
         if let Some((period, _)) = &create.foreign_key.period {
             write!(sql, ", PERIOD ").unwrap();
             period.prepare(sql.as_writer());

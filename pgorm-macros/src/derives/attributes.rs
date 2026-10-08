@@ -149,6 +149,8 @@ pub mod field_attr {
             pub to: Option<syn::Lit>,
             pub fk_name: Option<syn::Lit>,
             pub condition_type: Option<syn::Lit>,
+            pub enforcement: Option<syn::Lit>,
+            pub deferrability: Option<syn::Lit>,
         }
     }
 }

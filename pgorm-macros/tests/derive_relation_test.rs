@@ -159,6 +159,14 @@ mod book {
             on_delete = "Cascade"
         )]
         Shelf,
+        #[pgorm(
+            belongs_to = "super::shelf::Entity",
+            from = "(Column::TenantId, Column::ShelfId)",
+            to = "(super::shelf::Column::TenantId, super::shelf::Column::Id)",
+            enforcement = "NotEnforced",
+            deferrability = "DeferrableInitiallyDeferred"
+        )]
+        LooseShelf,
     }
 
     impl Related<super::shelf::Entity> for Entity {
@@ -174,7 +182,7 @@ fn cols(id: &Key) -> Vec<String> {
     id.iter().map(|i| SqlName::to_string(&**i)).collect()
 }
 
-// [spec:pgorm:syn:macros.derive.relation+1/test]    belongs_to + the mandatory from/to
+// [spec:pgorm:syn:macros.derive.relation+2/test]    belongs_to + the mandatory from/to
 #[test]
 fn belongs_to_builds_a_non_owning_relation_def() {
     let def = fruit::Relation::Cake.def();
@@ -195,7 +203,7 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     assert_eq!(def.condition_type, ConditionType::All);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+1/test]    the optional builder keys
+// [spec:pgorm:syn:macros.derive.relation+2/test]    the optional builder keys
 #[test]
 fn optional_keys_chain_onto_the_relation_builder() {
     let def = fruit::Relation::DecoratedCake.def();
@@ -216,7 +224,34 @@ fn optional_keys_chain_onto_the_relation_builder() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.relation+1/test]    has_many / has_one, where from and to are optional
+// [spec:pgorm:syn:macros.derive.relation+2/test]    `enforcement` and `deferrability` name a
+// variant of their enum and chain onto the builder, reaching the foreign key schema generation
+// builds from the relation
+#[test]
+fn key_check_attributes_reach_the_foreign_key() {
+    use pgorm::pgorm_query::{Deferrability, Enforcement, ForeignKeyCreateStatement};
+
+    let def = book::Relation::LooseShelf.def();
+    assert_eq!(def.enforcement, Some(Enforcement::NotEnforced));
+    assert_eq!(
+        def.deferrability,
+        Some(Deferrability::DeferrableInitiallyDeferred)
+    );
+    assert_eq!(
+        ForeignKeyCreateStatement::from(def).to_string(),
+        [
+            r#"ALTER TABLE "book" ADD CONSTRAINT "fk-book-tenant_id-shelf_id""#,
+            r#"FOREIGN KEY ("tenant_id", "shelf_id") REFERENCES "shelf" ("tenant_id", "id")"#,
+            r#"DEFERRABLE INITIALLY DEFERRED NOT ENFORCED"#,
+        ]
+        .join(" ")
+    );
+    let plain = book::Relation::Shelf.def();
+    assert_eq!(plain.enforcement, None);
+    assert_eq!(plain.deferrability, None);
+}
+
+// [spec:pgorm:syn:macros.derive.relation+2/test]    has_many / has_one, where from and to are optional
 #[test]
 fn has_many_and_has_one_reverse_the_target() {
     let many = cake::Relation::Fruits.def();
@@ -236,7 +271,7 @@ fn has_many_and_has_one_reverse_the_target() {
     assert_eq!(cols(&one.columns.to_key()), vec!["cake_id".to_owned()]);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+1/test]    container-level entity override
+// [spec:pgorm:syn:macros.derive.relation+2/test]    container-level entity override
 #[test]
 fn the_entity_identifier_is_overridable() {
     let def = entity_override::AltRelation::Fruit.def();
@@ -247,7 +282,7 @@ fn the_entity_identifier_is_overridable() {
     assert_eq!(def.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+1/test]    tuple `from` / `to` pair
+// [spec:pgorm:syn:macros.derive.relation+2/test]    tuple `from` / `to` pair
 // column by column: the def carries every pair in order, and the join it
 // renders, both ways round, constrains every pair rather than the first
 #[test]

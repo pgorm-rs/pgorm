@@ -88,7 +88,7 @@ fn basket_with_two_fruit_keys() -> TableCreateStatement {
         .to_owned()
 }
 
-// [spec:pgorm:sem:codegen.entity.relations+1/test]    variants are the
+// [spec:pgorm:sem:codegen.entity.relations+2/test]    variants are the
 // UpperCamelCase of the referenced table, `SelfRef` when self-referencing, with
 // a nonzero `num_suffix` appended
 #[test]
@@ -127,7 +127,7 @@ fn relation_variants_are_named_after_the_referenced_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.relations+1/test]    a compact FK-owning relation
+// [spec:pgorm:sem:codegen.entity.relations+2/test]    a compact FK-owning relation
 // renders belongs_to / from / to, with parenthesized tuples for multi-column
 // keys and `Entity` (no module path) when self-referencing
 #[test]
@@ -204,7 +204,7 @@ fn compact_belongs_to_attributes_carry_from_and_to() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.relations+1/test]    `on_update` / `on_delete`
+// [spec:pgorm:sem:codegen.entity.relations+2/test]    `on_update` / `on_delete`
 // appear only when the FK declared an action, and cover all five actions
 #[test]
 fn foreign_key_actions_render_only_when_declared() {
@@ -268,7 +268,7 @@ fn foreign_key_actions_render_only_when_declared() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.relations+1/test]    inverse relations render as
+// [spec:pgorm:sem:codegen.entity.relations+2/test]    inverse relations render as
 // `has_one` / `has_many` with no `from` / `to`
 #[test]
 fn inverse_relations_render_without_from_and_to() {
@@ -305,7 +305,7 @@ fn inverse_relations_render_without_from_and_to() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.relations+1/test]    in the expanded format the
+// [spec:pgorm:sem:codegen.entity.relations+2/test]    in the expanded format the
 // same facts render as `RelationTrait::def` builder chains
 #[test]
 fn expanded_relation_defs_render_as_builder_chains() {
@@ -319,6 +319,8 @@ fn expanded_relation_defs_render_as_builder_chains() {
         generated.file("fruit.rs"),
         "Self::Cake => Entity::belongs_to(super::cake::Entity)
             .columns(Column::CakeId, super::cake::Column::Id)
+            .on_update(ForeignKeyAction::Cascade)
+            .on_delete(ForeignKeyAction::Cascade)
             .into(),",
     );
 

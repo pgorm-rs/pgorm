@@ -435,7 +435,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 

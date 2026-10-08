@@ -14,7 +14,7 @@
 // [spec:pgorm:sem:macros.derive.partial-model+3/test]    an unknown field key, and the both-keys conflict the accumulating parser makes reachable
 // [spec:pgorm:sem:macros.derive.value-type+3/test]    non-tuple input and an unread `#[pgorm(...)]` key
 // [spec:pgorm:syn:macros.derive.active-enum+2/test]    `rs_type` / `db_type` are mandatory
-// [spec:pgorm:syn:macros.derive.relation+1/test]    `belongs_to` without `from` is rejected, and `from` / `to` of unequal arity are rejected while the arity is still known
+// [spec:pgorm:syn:macros.derive.relation+2/test]    `belongs_to` without `from` is rejected, `from` / `to` of unequal arity are rejected while the arity is still known, and an `enforcement` or `deferrability` naming no variant is rejected at its value
 // [spec:pgorm:req:entity.relation.builder+1/test]    a builder given no columns has no conversion into a `RelationDef`
 // [spec:pgorm:sem:macros.derive.entity-model.primary-key+5/test]    an identity beside a second identity form, `auto_increment`, a default or a nullable field, `auto_increment = true` on a composite key, a thirteenth key column, and `primary_key` given twice on one field
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+7/test]    a generated column given both kinds, beside an identity, a default or `auto_increment`, and a virtual one keyed, unique or indexed

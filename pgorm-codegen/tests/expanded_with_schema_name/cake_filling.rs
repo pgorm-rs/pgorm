@@ -60,9 +60,13 @@ impl RelationTrait for Relation {
         match self {
             Self::Cake => Entity::belongs_to(super::cake::Entity)
                 .columns(Column::CakeId, super::cake::Column::Id)
+                .on_update(ForeignKeyAction::Cascade)
+                .on_delete(ForeignKeyAction::Cascade)
                 .into(),
             Self::Filling => Entity::belongs_to(super::filling::Entity)
                 .columns(Column::FillingId, super::filling::Column::Id)
+                .on_update(ForeignKeyAction::Cascade)
+                .on_delete(ForeignKeyAction::Cascade)
                 .into(),
         }
     }

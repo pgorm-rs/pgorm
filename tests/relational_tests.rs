@@ -1420,7 +1420,7 @@ fn relation_trait_and_ownership_direction() {
     );
 }
 
-// [spec:pgorm:def:entity.relation.def+8/test]    the `RelationDef` record and its
+// [spec:pgorm:def:entity.relation.def+9/test]    the `RelationDef` record and its
 // combinators: `rev()` swaps from/to, negates `is_owner`, clears `fk_name` and
 // keeps everything else; `from_alias` re-points the source table; `on_condition`
 // replaces any existing custom condition; `condition_type` picks AND vs OR.
@@ -1680,7 +1680,7 @@ fn relation_builder_accumulates_a_definition() {
     assert_eq!(full.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:def:entity.relation.def+8/test]    a set of join columns is a
+// [spec:pgorm:def:entity.relation.def+9/test]    a set of join columns is a
 // list of pairs, so both sides always name the same number of columns however
 // the definition is built, reversed or extended
 #[test]
@@ -1719,7 +1719,7 @@ fn column_pairs_keep_the_two_sides_equal() {
     balanced(&composite.rev().columns);
 }
 
-// [spec:pgorm:req:entity.relation.fk+3/test]    `From<RelationDef>` for both
+// [spec:pgorm:req:entity.relation.fk+4/test]    `From<RelationDef>` for both
 // `ForeignKeyCreateStatement` and `TableForeignKey` maps every column pair,
 // applies the `on_delete` / `on_update` actions, takes the constraint name from
 // `fk_name` when set and otherwise derives `fk-{from_table}-{from_cols}`, and
@@ -1821,6 +1821,8 @@ fn relation_def_converts_to_foreign_key_forms() {
         on_update: None,
         on_condition: None,
         fk_name: None,
+        enforcement: None,
+        deferrability: None,
         condition_type: ConditionType::All,
     };
     let stmt: ForeignKeyCreateStatement = qualified.into();

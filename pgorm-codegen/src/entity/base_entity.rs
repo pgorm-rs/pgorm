@@ -15,7 +15,7 @@ use crate::{
 ///
 /// Ordered by bare name first, so the entity map — and every output that walks
 /// it — stays alphabetical by table name however the schemas sort.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableIdent {
     pub table: String,
@@ -24,7 +24,7 @@ pub struct TableIdent {
 
 impl TableIdent {
     /// The identity a DDL statement's table name spells.
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     pub fn of(name: &TableName) -> Self {
         Self {
             table: name.table().to_string(),
@@ -34,7 +34,7 @@ impl TableIdent {
 }
 
 /// As the schema wrote it: `schema.table`, or `table` when unqualified.
-// [spec:pgorm:sem:codegen.entity.transform+11]
+// [spec:pgorm:sem:codegen.entity.transform+12]
 impl fmt::Display for TableIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.schema {
@@ -57,7 +57,7 @@ pub struct Entity {
 
 impl Entity {
     /// Which table this entity is generated from.
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     pub fn ident(&self) -> TableIdent {
         TableIdent {
             table: self.table_name.clone(),
@@ -68,14 +68,14 @@ impl Entity {
     /// The schema the generated entity names: the source table's own qualifier
     /// when it had one, else the configured default. A fact the schema states
     /// is never overridden by an option.
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     pub fn effective_schema<'a>(&'a self, default: &'a Option<String>) -> Option<&'a str> {
         self.schema_name.as_deref().or(default.as_deref())
     }
 
     /// Everything the writer derives from this entity's DB names, checked while
     /// the caller can still be handed the failure.
-    // [spec:pgorm:sem:codegen.entity.transform+11]
+    // [spec:pgorm:sem:codegen.entity.transform+12]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let qualified = self.ident().to_string();
@@ -337,6 +337,8 @@ mod tests {
                     rel_type: RelationType::HasOne,
                     on_delete: Some(ForeignKeyAction::Cascade),
                     on_update: Some(ForeignKeyAction::Cascade),
+                    enforcement: None,
+                    deferrability: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
@@ -349,6 +351,8 @@ mod tests {
                     rel_type: RelationType::HasOne,
                     on_delete: Some(ForeignKeyAction::Cascade),
                     on_update: Some(ForeignKeyAction::Cascade),
+                    enforcement: None,
+                    deferrability: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,

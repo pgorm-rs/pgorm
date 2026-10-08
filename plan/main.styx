@@ -10065,6 +10065,7 @@ children (
                 title "An entity relation can say its foreign key is NOT ENFORCED, so codegen can read one"
                 kind @feat
                 deps (pg18-not-enforced)
+                sealed true
                 log (
                     {
                         at 2026-10-07T01:09:33.583206Z
@@ -10078,6 +10079,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while landing pg18-temporal-keys (d33e0801): the DDL bridge refuses a NOT ENFORCED foreign key, but EntityTransformer::transform, which takes caller-built TableCreateStatements, reads one as a plain relation without a word (TableForeignKey::get_enforcement is never consulted). pg18-temporal-keys made the gate refuse a WITHOUT OVERLAPS key and a PERIOD foreign key in a caller-built statement (refuse_temporal_constraints, codegen.entity.transform+10), for the same reason the bridge refuses them; a NOT ENFORCED foreign key belongs beside them until this node lets the entity hold it."
+                    }
+
+                    {
+                        at 2026-10-08T20:13:12.469763Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T20:35:57.343304Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -426,7 +426,7 @@ fn create_table_with_no_columns_is_valid() {
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
 // [spec:pgorm:req:sql.ddl.alter-table+12/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+9/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+10/test]
 #[test]
 fn ddl_targets_are_taken_by_construction() {
     let rendered = [
@@ -485,7 +485,7 @@ fn index_name_and_drop_table_stay_optional() {
 // `compile_fail` doctests on `ForeignKeyCreateStatement` prove the constructor
 // refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+9/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+10/test]
 // [spec:pgorm:req:sql.ddl.create-table+16/test]
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {

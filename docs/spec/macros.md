@@ -396,7 +396,7 @@ known limitations.
 
 ## Relations
 
-> [spec:pgorm:syn:macros.derive.relation+1]
+> [spec:pgorm:syn:macros.derive.relation+2]
 > `DeriveRelation` applies to enums only. Each variant requires exactly one of
 > `belongs_to = "path::to::Entity"`, `has_one = "..."`, or `has_many = "..."` (checked
 > in that order; none present is the error "Missing one of 'has_one', 'has_many' or
@@ -412,8 +412,14 @@ known limitations.
 > known, with "'from' names N column(s) and 'to' names M; a relation joins its
 > columns in pairs". Further optional keys chain builder calls: `on_update`/`on_delete` (a
 > `ForeignKeyAction` variant name), `on_condition` (an expression wrapped in an
-> `IntoCondition` closure), `fk_name` (string), and `condition_type` (case-insensitive
-> `"all"` or `"any"`; anything else is "Condition type must be one of `all` or `any`").
+> `IntoCondition` closure), `fk_name` (string), `condition_type` (case-insensitive
+> `"all"` or `"any"`; anything else is "Condition type must be one of `all` or `any`"),
+> and `enforcement` / `deferrability`, each naming a variant of
+> `pgorm_query::Enforcement` (`"Enforced"`, `"NotEnforced"`) or
+> `pgorm_query::Deferrability` (`"NotDeferrable"`, `"DeferrableInitiallyImmediate"`,
+> `"DeferrableInitiallyDeferred"`); any other name is refused at the value, "'enforcement'
+> must be one of Enforced, NotEnforced" and its `deferrability` counterpart, where a
+> mistyped `on_delete` surfaces only as an unknown variant downstream.
 > Non-string literal values are rejected with "attribute must be a string". The
 > expansion is an `impl RelationTrait` whose `def()` matches each variant to
 > `Entity::belongs_to/has_one/has_many(target)` plus the paired column calls, the

@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+11]
+> [spec:pgorm:sem:codegen.entity.transform+12]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -165,7 +165,10 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > invariants, not caller-reachable failures.
 >
 > Foreign keys become `BelongsTo` relations on the owning table, keeping the
-> FK's columns, referenced columns, `on_update`, and `on_delete` actions. A
+> FK's columns, referenced columns, `on_update`, and `on_delete` actions, and
+> its `NOT ENFORCED` and deferrability: an explicit `ENFORCED` or `NOT
+> DEFERRABLE` states the default and is kept as nothing said, so the entity
+> is the plain key's. A
 > relation whose referenced table equals its own table is flagged
 > `self_referencing`. When several FKs of one table reference the same
 > target table, each such relation receives a distinct 1-based `num_suffix`
@@ -602,7 +605,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Relations
 
-> [spec:pgorm:sem:codegen.entity.relations+1]
+> [spec:pgorm:sem:codegen.entity.relations+2]
 > `Relation` enum variants are named by the UpperCamelCase of the referenced
 > table, with two adjustments: a self-referencing relation is named
 > `SelfRef`, and a nonzero `num_suffix` is appended (`Fruit1`, `Fruit2`,
@@ -613,13 +616,21 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > self-referencing), multi-column FKs render `from`/`to` as parenthesized
 > tuples `"(Column::A, Column::B)"`, and `on_update`/`on_delete` appear only
 > when the FK declared an action (`Restrict`, `Cascade`, `SetNull`,
-> `NoAction`, `SetDefault`). Inverse relations emit
+> `NoAction`, `SetDefault`), followed by `deferrability = "<Deferrability>"`
+> and `enforcement = "NotEnforced"` where the key declared them. Inverse
+> relations emit
 > `#[pgorm(has_one = "...")]` or `#[pgorm(has_many = "...")]` with no
 > `from`/`to`. In the expanded format the same information renders as
 > `RelationTrait::def()` match arms:
 > `Entity::has_many(super::fruit::Entity).into()` and
 > `Entity::belongs_to(...).columns(<src>, <ref>).into()`, with each further
-> column of a composite FK appended as `.and_columns(<src>, <ref>)`. A relation
+> column of a composite FK appended as `.and_columns(<src>, <ref>)`, then the
+> key's `.on_update(ForeignKeyAction::<Action>)`,
+> `.on_delete(ForeignKeyAction::<Action>)`,
+> `.deferrability(pgorm::pgorm_query::Deferrability::<..>)` and
+> `.enforcement(pgorm::pgorm_query::Enforcement::NotEnforced)` where it
+> declared them — the same information as the compact attribute, which the
+> expanded format once lost the actions of. A relation
 > whose constrained and referenced column lists differ in length is rejected by
 > `Relation::validate`, so no generated relation can name a column on one side
 > without its counterpart on the other.
@@ -795,7 +806,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+12]
+> [spec:pgorm:req:codegen.ddl.unsupported+13]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
@@ -822,7 +833,8 @@ compiling the C parser falls on people generating entities and on nobody else.
 > tables; column
 > `DEFAULT`, `CHECK`, `GENERATED`,
 > `STORAGE` and `COMPRESSION` clauses, and an identity's sequence options; table-level `CHECK`
-> and `EXCLUDE` constraints, deferrable constraints, `NO INHERIT` on any
+> and `EXCLUDE` constraints, deferrable keys (a foreign key's deferrability
+> is read, `codegen.ddl.tables`), `NO INHERIT` on any
 > constraint but a `NOT NULL`, `INCLUDE`
 > columns, constraint index and storage options, and `MATCH` clauses;
 > `REFERENCES` without a referenced column list, which no catalog is present to
@@ -852,11 +864,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > reinterpretation this rule forbids, and each is named instead until the
 > entity model can hold it: a
 > primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
-> which is not the plain key over the same columns; a foreign key matching on
-> a `PERIOD` (`a PERIOD foreign key`); and a `NOT ENFORCED` foreign key or
-> column attribute (`a NOT ENFORCED constraint`). Each of the three the
-> bridged statement could carry (`sql.ddl.create-table`, `sql.ddl.foreign-key`,
-> `sql.ddl.enforcement`) and the entity cannot. An entity's primary key, its
+> which is not the plain key over the same columns; and a foreign key matching
+> on a `PERIOD` (`a PERIOD foreign key`). Each the bridged statement could carry
+> (`sql.ddl.create-table`, `sql.ddl.foreign-key`) and the entity cannot. A
+> `NOT ENFORCED` foreign key the entity does hold, since its relation says so
+> (`entity.relation.def`), and the bridge reads it (`codegen.ddl.tables`); a
+> `NOT ENFORCED` anywhere else stays named (`a NOT ENFORCED constraint`), where
+> PostgreSQL refuses it too. An entity's primary key, its
 > unique columns and its relations match by equality alone, so a temporal key
 > read as its other columns would claim them unique — `find_by_id` expecting
 > one row of a room that has one per period — and read with its period as one
@@ -864,10 +878,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > key read as its other pairs would join a booking to the room's every
 > period, and read with its period as a pair would match a booking only to a
 > period equal to its own; and schema generation from either entity would
-> create the plain key. A foreign key that is not enforced admits rows that
-> break it, and the relation an entity reads it as has no way to say so, so
-> schema generation from that entity would create the key enforced, and a
-> load would meet the orphans the relation promises are absent. An explicit `ENFORCED` is
+> create the plain key. An explicit `ENFORCED` is
 > refused (`an ENFORCED clause`) everywhere PostgreSQL refuses it — after a
 > column's `NOT NULL`, key or `DEFAULT` — and read on a column's
 > `REFERENCES`, where it states the default (`codegen.ddl.tables`). 18's `NOT
@@ -906,7 +917,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `NO INHERIT`, ``TransformError("statement <n>: column `<t>`.`<c>` declares
 > NOT NULL both with and without NO INHERIT")``; and so is a table-level `NOT
 > NULL` naming a column its table does not have, as a column comment naming
-> one is. A foreign
+> one is. So is a column's `REFERENCES` followed by one attribute clause twice
+> — `DEFERRABLE` or `NOT DEFERRABLE`, `INITIALLY`, `ENFORCED` or `NOT ENFORCED`
+> — which PostgreSQL refuses (`42601`), ``TransformError("statement <n>:
+> column `<t>`.`<c>` gives its foreign key <clause> twice")``, and one followed
+> by `INITIALLY DEFERRED` after `NOT DEFERRABLE` (`42601`),
+> ``TransformError("statement <n>: INITIALLY DEFERRED on a NOT DEFERRABLE key
+> on column `<t>`.`<c>`")``. A foreign
 > key naming a table the file never creates, or a column that table does not
 > have, is refused too, but by the transform gate `entities_from_sql` runs
 > (`codegen.entity.transform`) rather than here: the bridge resolves one
@@ -972,7 +989,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+8]
+> [spec:pgorm:sem:codegen.ddl.tables+9]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -1052,6 +1069,18 @@ compiling the C parser falls on people generating entities and on nobody else.
 > nothing, the two are indistinguishable in the parse tree, and it is
 > Postgres' default — so the generated relation carries an `on_update` or
 > `on_delete` exactly where the schema chose something other than the default.
+>
+> A foreign key's deferrability and `NOT ENFORCED` are its relation's
+> (`entity.relation.def`), and the bridge reads both, on a column's
+> `REFERENCES` or a table-level `FOREIGN KEY`. A table-level key carries them on
+> its own node, `INITIALLY DEFERRED` having made it `DEFERRABLE` already; a
+> column's arrive as attribute clauses after the `REFERENCES`, which qualify
+> it in any order, `INITIALLY DEFERRED` implying `DEFERRABLE` as the server
+> reads it: `DEFERRABLE` is `DeferrableInitiallyImmediate`, `INITIALLY
+> DEFERRED` `DeferrableInitiallyDeferred`, `NOT DEFERRABLE` `NotDeferrable`
+> and `NOT ENFORCED` `Enforcement::NotEnforced`, each riding on the
+> statement as said. Attribute clauses after anything else — a key, a `NOT
+> NULL` — stay named (`codegen.ddl.unsupported`).
 
 > [spec:pgorm:sem:codegen.ddl.objects+8]
 > Statements are resolved against each other rather than in file order: a

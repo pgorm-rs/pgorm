@@ -78,7 +78,7 @@ async fn main() -> Result<(), Error> {
     result
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+11/test]    preserving the source
+// [spec:pgorm:sem:codegen.entity.transform+12/test]    preserving the source
 // table's schema qualifier is what keeps generated CRUD off a same-named table
 // on the `search_path`
 // [spec:pgorm:def:codegen.entity.compact+1/test]

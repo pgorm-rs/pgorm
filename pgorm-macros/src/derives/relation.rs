@@ -182,6 +182,7 @@ impl DeriveRelation {
                     result = quote! { #result.condition_type(#condition_type) };
                 }
 
+                result.extend(Self::key_check(&attr)?);
                 result = quote! { #result.into() };
 
                 Result::<_, syn::Error>::Ok(result)
@@ -199,6 +200,48 @@ impl DeriveRelation {
                 }
             }
         ))
+    }
+
+    /// The `enforcement` and `deferrability` a relation's foreign key is
+    /// declared with, as builder calls: each value names a variant of its enum
+    /// (`"NotEnforced"`, `"DeferrableInitiallyDeferred"`), and any other name
+    /// is refused here, where its span is still known.
+    // [spec:pgorm:syn:macros.derive.relation+2]
+    fn key_check(attr: &field_attr::Pgorm) -> syn::Result<TokenStream> {
+        let mut calls = TokenStream::new();
+        if let Some(lit) = &attr.enforcement {
+            let variant = Self::variant_of(lit, "enforcement", &["Enforced", "NotEnforced"])?;
+            calls.extend(quote! { .enforcement(pgorm::pgorm_query::Enforcement::#variant) });
+        }
+        if let Some(lit) = &attr.deferrability {
+            let variant = Self::variant_of(
+                lit,
+                "deferrability",
+                &[
+                    "NotDeferrable",
+                    "DeferrableInitiallyImmediate",
+                    "DeferrableInitiallyDeferred",
+                ],
+            )?;
+            calls.extend(quote! { .deferrability(pgorm::pgorm_query::Deferrability::#variant) });
+        }
+        Ok(calls)
+    }
+
+    /// The variant `lit` names, one of `variants`.
+    fn variant_of(lit: &syn::Lit, key: &str, variants: &[&str]) -> syn::Result<syn::Ident> {
+        let syn::Lit::Str(lit_str) = lit else {
+            return Err(syn::Error::new_spanned(lit, "attribute must be a string"));
+        };
+        let value = lit_str.value();
+        if variants.contains(&value.as_str()) {
+            Ok(format_ident!("{}", value, span = lit_str.span()))
+        } else {
+            Err(syn::Error::new_spanned(
+                lit,
+                format!("'{key}' must be one of {}", variants.join(", ")),
+            ))
+        }
     }
 
     /// Pair the `from` and `to` attributes column by column.
@@ -260,7 +303,7 @@ impl DeriveRelation {
 }
 
 /// Method to derive a Relation
-// [spec:pgorm:syn:macros.derive.relation+1]
+// [spec:pgorm:syn:macros.derive.relation+2]
 pub fn expand_derive_relation(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

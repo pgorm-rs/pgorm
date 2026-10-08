@@ -842,13 +842,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Foreign keys
 
-> [spec:pgorm:req:sql.ddl.foreign-key+9]
+> [spec:pgorm:req:sql.ddl.foreign-key+10]
 > `TableForeignKey` holds the owning and referenced table names, a non-empty
 > list of `(column, referenced column)` pairs, an optional constraint name, and
 > optional `on_delete`/`on_update` `ForeignKeyAction`s (`Restrict`→`RESTRICT`,
 > `Cascade`→`CASCADE`, `SetNull`→`SET NULL`, `NoAction`→`NO ACTION`,
 > `SetDefault`→`SET DEFAULT`), an optional `Deferrability` saying when the
-> check runs, and an optional `Enforcement` saying whether it runs at all
+> check runs (read back by `get_deferrability()`), and an optional
+> `Enforcement` saying whether it runs at all
 > (`enforcement(e)`, read back by `get_enforcement()`;
 > `[spec:pgorm:req:sql.ddl.enforcement]`). `TableForeignKey::new(table, column, ref_table,
 > ref_column)` — reached from a statement as `ForeignKey::create(..)` — takes
@@ -948,7 +949,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The one enum qualifies every constraint the builder spells that PostgreSQL
 > lets defer. A foreign key carries it as a field
-> (`[spec:pgorm:req:sql.ddl.foreign-key+9]`). A primary or unique key carries
+> (`[spec:pgorm:req:sql.ddl.foreign-key+10]`). A primary or unique key carries
 > it on its `TableKey`, whose `deferrability(d)` sets it
 > (`[spec:pgorm:req:sql.ddl.create-table+16]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
@@ -1002,7 +1003,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is the server's default, so a builder emitting it would assert a choice the
 > caller did not make, and `Enforced` renders only because a caller said it.
 >
-> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+9]`)
+> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+10]`)
 > and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+16]`),
 > and nothing else can, because nothing else takes it: PostgreSQL refuses
 > `[NOT] ENFORCED` on a primary key, a unique key, a `NOT NULL` and an

@@ -484,14 +484,16 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+8]
+> [spec:pgorm:def:entity.relation.def+9]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
 > `is_owner`, optional `on_delete` /
 > `on_update` foreign-key actions (`pgorm_query::ForeignKeyAction`), an optional
 > boxed `on_condition` closure receiving the left and right join names, an optional
-> `fk_name`, and a `condition_type` (`All` = AND, `Any` = OR). `rev()` swaps the
+> `fk_name`, an optional `enforcement` (`pgorm_query::Enforcement`) and
+> `deferrability` (`pgorm_query::Deferrability`) its foreign key is declared
+> with, and a `condition_type` (`All` = AND, `Any` = OR). `rev()` swaps the
 > from/to tables and columns, negates `is_owner`, clears `fk_name`, and keeps the
 > remaining attributes; an attached `on_condition` keeps its authored roles, its
 > arguments re-swapped along with the tables, so reversing a def MUST NOT change
@@ -553,6 +555,22 @@ explicit limitations.
 > (`Column::Name.like(..)`) qualifies with the entity's canonical table —
 > and the `tests_cfg` `TropicalFruit` relation is the standing in-tree
 > example.
+>
+> A relation's foreign key may be PostgreSQL 18's `NOT ENFORCED` — recorded,
+> never checked, with no referential triggers — or deferrable, and the
+> relation says so: `RelationBuilder::enforcement(e)` and `deferrability(d)`
+> set the two fields, which `rev()` keeps and the conversion into a foreign
+> key carries (`[spec:pgorm:req:entity.relation.fk+4]`), so the schema
+> generated from an entity creates the key the entity describes rather than
+> one enforced and checked at once. A `NOT ENFORCED` key admits a row whose
+> columns reference nothing, and the relation's readers take such a row as
+> having no related row, the answer they give a key that matches nothing:
+> `load_one` yields `None` for it, `load_many` and `find_related` leave it
+> out of every bucket, a graph's optional slot pairs it with `None`, and a
+> required slot, joined `INNER`, leaves it out. The live suite holds each,
+> beside the plain key that refuses the orphan (`23503`), and holds a
+> deferred key letting a transaction write a row before the row it
+> references, refusing at `COMMIT` one that never came (`23503`).
 
 > [spec:pgorm:req:entity.relation.builder+1]
 > `RelationBuilder<E, R, C>` (`src/entity/relation.rs`) accumulates a
@@ -591,7 +609,7 @@ explicit limitations.
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+8]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def+9]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
@@ -623,12 +641,13 @@ explicit limitations.
 > entity related to itself is well-formed where an unaliased join of the
 > `Related` path would name one table twice.
 
-> [spec:pgorm:req:entity.relation.fk+3]
+> [spec:pgorm:req:entity.relation.fk+4]
 > A `RelationDef` converts into DDL foreign-key forms via
 > `From<RelationDef> for ForeignKeyCreateStatement` and `for TableForeignKey`
 > (`src/entity/relation.rs`). The conversion maps every pair in `columns` to a
 > constrained column and its referenced column,
-> applies `on_delete` and `on_update` actions when present, and names the
+> applies `on_delete` and `on_update` actions, the `deferrability` and the
+> `enforcement` when present, and names the
 > constraint from `fk_name` when set; otherwise the name MUST be derived as
 > `fk-{from_table}-{from_cols joined with '-'}`. Both conversions unpack the table
 > references to bare tables (the schema of a `FromItem`'s `TableName`, and any bound
