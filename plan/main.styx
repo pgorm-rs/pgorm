@@ -10225,14 +10225,36 @@ children (
             {
                 id orm-merge-sync
                 title "Weigh an entity terminal that syncs a set of rows with MERGE and reports each row's action"
-                kind @feat
+                kind @docs
                 deps (merge-beyond-pg16)
+                sealed true
                 log (
                     {
                         at 2026-10-07T06:23:42.070125Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed by merge-beyond-pg16 (c5acfcaa), from that node's original note: \"Once RETURNING lands, a bulk 'sync this set' terminal that reports per-row actions is the one ORM use worth weighing.\" It has landed: MERGE takes a RETURNING list, returning_action() writes merge_action() ('INSERT' / 'UPDATE' / 'DELETE' per row), and WHEN NOT MATCHED BY SOURCE reaches the target rows a source set did not mention. No ORM path emits MERGE (sql.ast.merge+1): the upsert an entity layer writes is ON CONFLICT.\n\nThe candidate is an entity terminal that makes a table (or the rows a filter selects) match a set of models in one statement: insert the new, update the changed, and optionally delete the target rows the set did not mention (a BY SOURCE arm, which then needs the filter in its condition so it does not delete outside the selected rows), returning each row's model and its action. Questions to settle: whether it is worth it beside ON CONFLICT plus a delete; the source relation (a VALUES list needs every value cast, since a source value is assigned to no column, sql.render.placeholder-typing, and the live suite already holds 42883 / 42725 for an uncast one), and the size limit that implies; how the per-row action decodes beside the model (merge_action() is text, and RETURNING * is the source's columns followed by the target's, so the list must name the target's columns qualified, a bare name both relations have being 42702); concurrency (MERGE takes no ON CONFLICT arbiter, so PostgreSQL documents a concurrent insert of the same key as a unique violation, 23505, where ON CONFLICT would arbitrate it); the name in the exec vocabulary (exec.crud.exec-vocabulary); and Python's registered entities."
+                    }
+
+                    {
+                        at 2026-10-08T22:27:40.937317Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T22:28:00.212755Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Decided 2026-10-09: no. pgorm builds no entity terminal that syncs a set of rows with MERGE; the typed MERGE builder (Query::merge, returning_action, WHEN NOT MATCHED BY SOURCE; sql.ast.merge) stays the route for a caller who wants one statement. Reasons, in weight order. (1) Concurrency: MERGE takes no ON CONFLICT arbiter. Live on 18.6, a MERGE (WHEN MATCHED update / WHEN NOT MATCHED insert) racing another transaction's uncommitted insert of the same key waits on it and then fails 23505 once it commits, where INSERT .. ON CONFLICT DO UPDATE in the same race waits, updates the committed row, and now reports it (exec_returning_upserts answers Updated, orm-returning-old-new; the live suite holds that race). A 'sync' that fails under ordinary concurrent writers forces retry policy onto the ORM, which cannot choose one for the caller. (2) Coverage: the insert-the-new / update-the-changed half is exactly the upsert, which already reports each row's action with its before and after; the delete-the-unmentioned half is Delete::many(E).filter(scope AND key NOT IN set) in the same transaction. Together they are one atomic change with arbitration on the half that races. (3) The BY SOURCE arm deletes every target row the source did not mention unless the caller's scope rides in its condition, so a terminal would have to take the scope as a required argument to be safe, and a mistake there deletes outside it in silence; the two-statement form puts the scope where it is read. (4) A VALUES source binds every value with no column to infer a type from (text, 42883 / 42725, held by merge_tests), so the terminal would cast every value by its column type, row by row, against the 65535-parameter limit the upsert already lives within, for no answer the upsert does not give. (5) Decoding merge_action() beside a model needs the target's columns qualified (a bare name both relations have is 42702) and prefixed: doable, and no reason by itself. Nothing in Python's registered entities follows from a no. Revisit if a caller needs MERGE's WHEN MATCHED AND <condition> arms per row, which neither the upsert nor a delete expresses."
+                    }
+
+                    {
+                        at 2026-10-08T22:28:04.904937Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
