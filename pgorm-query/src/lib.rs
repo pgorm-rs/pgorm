@@ -551,14 +551,16 @@
 //! );
 //! ```
 //!
-//! ### Foreign Key Drop
+//! ### Constraint Drop
+//!
+//! A foreign key is dropped by name, as a constraint of any kind is.
 //!
 //! ```rust
 //! # use pgorm_query::{*, tests_cfg::*};
-//! let foreign_key = ForeignKey::drop(Character::Table, Name::runtime("FK_character_id"));
+//! let drop = Table::alter(Character::Table).drop_constraint(Name::runtime("FK_character_id"));
 //!
 //! assert_eq!(
-//!     foreign_key.to_string(),
+//!     drop.to_string(),
 //!     r#"ALTER TABLE "character" DROP CONSTRAINT "FK_character_id""#
 //! );
 //! ```
@@ -644,8 +646,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+23]
-// [spec:pgorm:req:sql.surface+23/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+24]
+// [spec:pgorm:req:sql.surface+24/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -749,8 +751,7 @@ pub use types::{NullOrdering, Order, OrderExpr};
 // Schema statements: the DDL builders and the column vocabulary they share.
 pub use comment::{Comment, CommentStatement, CommentTarget};
 pub use foreign_key::{
-    Deferrability, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement,
-    ForeignKeyDropStatement, TableForeignKey,
+    Deferrability, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, TableForeignKey,
 };
 pub use index::{
     Index, IndexColumn, IndexColumnTarget, IndexCreateStatement, IndexDropStatement, IndexKind,
@@ -762,11 +763,12 @@ pub use sequence::{
 };
 pub use table::{
     AddColumnOption, Check, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType,
-    ConstraintChange, Enforcement, GeneratedKind, IdentityGeneration, IntervalPrecision,
-    IntervalSpec, IntoCheck, IntoColumnDef, IntoKeyColumns, IntoTableKey, NotNullConstraint,
-    PendingTableAlter, PgInterval, Primary, StringLen, Table, TableAlterOption,
-    TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement, TableKey,
-    TableRenameStatement, TableTruncateStatement, Unique,
+    ConstraintChange, ConstraintDrop, ConstraintRenameStatement, DropBehavior, Enforcement,
+    GeneratedKind, IdentityGeneration, IntervalPrecision, IntervalSpec, IntoCheck, IntoColumnDef,
+    IntoConstraintDrop, IntoKeyColumns, IntoTableKey, NotNullConstraint, PendingTableAlter,
+    PgInterval, Primary, StringLen, Table, TableAlterOption, TableAlterStatement,
+    TableCreateStatement, TableDropOpt, TableDropStatement, TableKey, TableRenameStatement,
+    TableTruncateStatement, Unique,
 };
 
 // The PostgreSQL release the build targets.

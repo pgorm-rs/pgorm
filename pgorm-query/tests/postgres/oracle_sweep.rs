@@ -545,7 +545,7 @@ fn sweep_merge_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    table DDL
 // [spec:pgorm:req:sql.ddl.create-table+15/test]
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -700,8 +700,22 @@ fn sweep_table_ddl_shapes() {
             .drop_column(Glyph::Aspect)
             .to_string(),
         Table::alter(Char::Table)
-            .drop_foreign_key(Name::runtime("fk"))
+            .drop_constraint(Name::runtime("fk"))
+            .drop_constraint(
+                ConstraintDrop::new(Name::runtime("pk"))
+                    .if_exists()
+                    .cascade(),
+            )
+            .drop_constraint(ConstraintDrop::new(Name::runtime("ck")).restrict())
             .to_string(),
+        Table::rename_constraint(Char::Table, Name::runtime("fk"), Name::runtime("fk2"))
+            .to_string(),
+        Table::rename_constraint(
+            (Name::runtime("public"), Char::Table),
+            Name::runtime("fk"),
+            Name::runtime("fk2"),
+        )
+        .to_string(),
         Table::rename(Glyph::Table, Name::runtime("glyph_old")).to_string(),
         Table::truncate(Glyph::Table).to_string(),
         Table::drop(Glyph::Table).if_exists().cascade().to_string(),
@@ -741,7 +755,6 @@ fn sweep_schema_object_ddl_shapes() {
             .on_delete(ForeignKeyAction::SetNull)
             .on_update(ForeignKeyAction::NoAction)
             .to_string(),
-        ForeignKey::drop(Char::Table, Name::runtime("fk")).to_string(),
         Type::create(Name::runtime("tea"))
             .values(["breakfast", "earl grey"])
             .to_string(),

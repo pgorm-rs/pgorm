@@ -348,7 +348,7 @@ fn truncate_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
 #[test]
 fn alter_1() {
     assert_eq!(
@@ -364,7 +364,7 @@ fn alter_1() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
 #[test]
 fn alter_2() {
     assert_eq!(
@@ -420,7 +420,7 @@ fn alter_5() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a rename is a statement of its own, so it
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a rename is a statement of its own, so it
 // cannot join the comma-separated options
 #[test]
 fn alter_7() {
@@ -447,7 +447,7 @@ fn alter_8() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a key is added as an action of its own,
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a key is added as an action of its own,
 // after the column it keys
 #[test]
 fn alter_9() {
@@ -601,7 +601,7 @@ fn a_primary_key_is_a_table_constraint() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a foreign key embeds by value, so the source
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a foreign key embeds by value, so the source
 // survives only where the call site cloned it
 #[test]
 fn alter_embeds_its_foreign_key_by_value() {
@@ -666,7 +666,7 @@ fn generated_column_writes_its_kind() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a generated column's expression is
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a generated column's expression is
 // set with its `AS` and dropped with or without `IF EXISTS`, each its own action
 // beside the statement's others
 #[test]
@@ -745,7 +745,7 @@ fn column_not_null_is_one_constraint() {
     assert_eq!(not_nulls, [(Some("second".to_owned()), true)]);
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a NOT NULL is added at table
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a NOT NULL is added at table
 // level, validated and altered by name
 #[test]
 fn not_null_actions_render_on_their_own() {
@@ -790,7 +790,62 @@ fn not_null_actions_render_on_their_own() {
     assert!(!constraint.is_no_inherit());
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a modified column's plain NOT
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a constraint of any kind is dropped by
+// name, with IF EXISTS and a behavior when the drop says so, the last behavior winning, and
+// renamed by a statement of its own
+#[test]
+fn constraints_drop_and_rename_by_name() {
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .drop_constraint(Name::runtime("glyph_aspect_not_null"))
+            .drop_constraint(ConstraintDrop::new(Name::runtime("glyph_pkey")).if_exists())
+            .drop_constraint(
+                ConstraintDrop::new(Name::runtime("glyph_image_key"))
+                    .restrict()
+                    .cascade()
+            )
+            .drop_constraint(
+                ConstraintDrop::new(Name::runtime("glyph_check"))
+                    .cascade()
+                    .restrict()
+            )
+            .to_string(),
+        [
+            r#"ALTER TABLE "glyph" DROP CONSTRAINT "glyph_aspect_not_null","#,
+            r#"DROP CONSTRAINT IF EXISTS "glyph_pkey","#,
+            r#"DROP CONSTRAINT "glyph_image_key" CASCADE,"#,
+            r#"DROP CONSTRAINT "glyph_check" RESTRICT"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        Table::alter((Name::runtime("schema"), Char::Table))
+            .drop_constraint(Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6"))
+            .to_string(),
+        r#"ALTER TABLE "schema"."character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
+    );
+    let drop = ConstraintDrop::new(Name::runtime("k"))
+        .if_exists()
+        .cascade();
+    assert_eq!(drop.get_name().to_string(), "k");
+    assert!(drop.is_if_exists());
+    assert_eq!(drop.get_behavior(), Some(DropBehavior::Cascade));
+    let plain = ConstraintDrop::new(Name::runtime("k"));
+    assert!(!plain.is_if_exists());
+    assert_eq!(plain.get_behavior(), None);
+
+    assert_eq!(
+        Table::rename_constraint(
+            (Name::runtime("schema"), Glyph::Table),
+            Name::runtime("glyph_pkey"),
+            Name::runtime("glyph_key"),
+        )
+        .to_string(),
+        r#"ALTER TABLE "schema"."glyph" RENAME CONSTRAINT "glyph_pkey" TO "glyph_key""#
+    );
+}
+
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a modified column's plain NOT
 // NULL is SET, and its named or NO INHERIT one is added, which SET cannot say
 #[test]
 fn modified_named_not_null_is_added() {
@@ -857,7 +912,7 @@ fn enforcement_renders_after_the_constraint() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]    a CHECK is added as an action of
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]    a CHECK is added as an action of
 // its own, a modified column's CHECK is added rather than written bare, and
 // ALTER CONSTRAINT changes a foreign key's enforcement
 #[test]

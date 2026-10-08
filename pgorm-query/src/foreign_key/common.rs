@@ -15,7 +15,7 @@ use crate::{Enforcement, types::*};
 /// catch. Further pairs are appended with [`TableForeignKey::col`], and a
 /// temporal key's `PERIOD` pair, which closes both lists, is set with
 /// [`TableForeignKey::period`].
-// [spec:pgorm:req:sql.ddl.foreign-key+8]
+// [spec:pgorm:req:sql.ddl.foreign-key+9]
 #[derive(Debug, Clone)]
 pub struct TableForeignKey {
     pub(crate) name: Option<Name>,
@@ -136,7 +136,7 @@ impl TableForeignKey {
     /// PostgreSQL 18's temporal foreign key — replacing any such pair already
     /// set; [`ForeignKeyCreateStatement::period`](crate::ForeignKeyCreateStatement::period)
     /// says what it means.
-    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    // [spec:pgorm:req:sql.ddl.foreign-key+9]
     pub fn period<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
     where
         C: IntoName,
@@ -186,7 +186,7 @@ impl TableForeignKey {
 
     /// The `(column, referenced column)` pair matched as periods, if this is a
     /// temporal foreign key.
-    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    // [spec:pgorm:req:sql.ddl.foreign-key+9]
     pub fn get_period(&self) -> Option<&(Name, Name)> {
         self.period.as_ref()
     }

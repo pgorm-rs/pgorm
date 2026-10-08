@@ -1,6 +1,7 @@
-//! Constraints `ALTER TABLE` adds, validates and alters by name: a table-level
-//! `NOT NULL`, whether a constraint is enforced, and the changes
-//! `ALTER CONSTRAINT` makes to one that exists.
+//! Constraints `ALTER TABLE` adds, validates, alters and drops by name: a
+//! table-level `NOT NULL`, whether a constraint is enforced, the changes
+//! `ALTER CONSTRAINT` makes to one that exists, and the `DROP CONSTRAINT`
+//! that removes one of any kind.
 
 use crate::types::{IntoName, Name};
 
@@ -31,7 +32,7 @@ use crate::types::{IntoName, Name};
 ///     r#"ALTER TABLE "glyph" ADD CONSTRAINT "glyph_aspect_present" NOT NULL "aspect" NOT VALID"#,
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 #[derive(Debug, Clone)]
 pub struct NotNullConstraint {
     pub(crate) column: Name,
@@ -154,7 +155,7 @@ impl Enforcement {
 /// it is refused there (`42809`). Where those kinds differ by release, the
 /// variant says so: the builder cannot tell a `CHECK`'s name from a foreign
 /// key's, so no target can rule the difference out by type.
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {
     /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
@@ -179,7 +180,7 @@ pub enum ConstraintChange {
 
 impl ConstraintChange {
     /// The words this change is written with, after the constraint's name.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::Inherit => "INHERIT",
@@ -187,5 +188,150 @@ impl ConstraintChange {
             Self::Enforced => "ENFORCED",
             Self::NotEnforced => "NOT ENFORCED",
         }
+    }
+}
+
+/// What a drop does to the objects that depend on what it drops: `RESTRICT`,
+/// refusing the drop while any does (`2BP01`), which is PostgreSQL's default,
+/// or `CASCADE`, dropping them with it.
+// [spec:pgorm:req:sql.ddl.alter-table+11]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropBehavior {
+    /// `RESTRICT`: refuse the drop while anything depends on it.
+    Restrict,
+    /// `CASCADE`: drop whatever depends on it too.
+    Cascade,
+}
+
+impl DropBehavior {
+    /// The keyword, as the statement writes it.
+    pub(crate) fn keyword(self) -> &'static str {
+        match self {
+            Self::Restrict => "RESTRICT",
+            Self::Cascade => "CASCADE",
+        }
+    }
+}
+
+/// A constraint dropped by name: `DROP CONSTRAINT [IF EXISTS ]"name"[
+/// RESTRICT | CASCADE]`, what
+/// [`TableAlterStatement::drop_constraint`](crate::TableAlterStatement::drop_constraint)
+/// takes.
+///
+/// A constraint of any kind is dropped the same way — a key, a foreign key, a
+/// `CHECK`, PostgreSQL 18's `NOT NULL` — so the drop names the constraint and
+/// not its kind; which kind the name holds is the server's knowledge. A name
+/// on its own converts into the plain drop ([`IntoConstraintDrop`]).
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// assert_eq!(
+///     Table::alter(Glyph::Table)
+///         .drop_constraint(Name::runtime("glyph_aspect_check"))
+///         .drop_constraint(
+///             ConstraintDrop::new(Name::runtime("glyph_pkey"))
+///                 .if_exists()
+///                 .cascade(),
+///         )
+///         .to_string(),
+///     [
+///         r#"ALTER TABLE "glyph" DROP CONSTRAINT "glyph_aspect_check","#,
+///         r#"DROP CONSTRAINT IF EXISTS "glyph_pkey" CASCADE"#,
+///     ]
+///     .join(" ")
+/// );
+/// ```
+///
+/// The drop is the server's to refuse where it cannot be made: a name the
+/// table has no constraint under (`42704`, which `if_exists` turns into a
+/// notice), a key another table's foreign key depends on unless the drop
+/// cascades to it (`2BP01`), a constraint a table inherited from its parent
+/// (`42P16`), and the `NOT NULL` of a primary-key column (`42P16`).
+// [spec:pgorm:req:sql.ddl.alter-table+11]
+#[derive(Debug, Clone)]
+pub struct ConstraintDrop {
+    pub(crate) name: Name,
+    pub(crate) if_exists: bool,
+    pub(crate) behavior: Option<DropBehavior>,
+}
+
+impl ConstraintDrop {
+    /// Drop the constraint called `name`, refusing a name the table does not
+    /// have and anything that depends on it.
+    pub fn new<N>(name: N) -> Self
+    where
+        N: IntoName,
+    {
+        Self {
+            name: name.into_name(),
+            if_exists: false,
+            behavior: None,
+        }
+    }
+
+    /// Pass over a name the table has no constraint under, with a notice:
+    /// `DROP CONSTRAINT IF EXISTS "name"`.
+    #[must_use]
+    pub fn if_exists(mut self) -> Self {
+        self.if_exists = true;
+        self
+    }
+
+    /// Drop whatever depends on the constraint too: ` CASCADE`. The last of
+    /// `cascade()` and `restrict()` wins.
+    #[must_use]
+    pub fn cascade(mut self) -> Self {
+        self.behavior = Some(DropBehavior::Cascade);
+        self
+    }
+
+    /// Refuse the drop while anything depends on the constraint, saying so:
+    /// ` RESTRICT`, which is also what an unsaid behavior does. The last of
+    /// `cascade()` and `restrict()` wins.
+    #[must_use]
+    pub fn restrict(mut self) -> Self {
+        self.behavior = Some(DropBehavior::Restrict);
+        self
+    }
+
+    /// The name of the constraint dropped.
+    pub fn get_name(&self) -> &Name {
+        &self.name
+    }
+
+    /// Whether a missing name is passed over.
+    pub fn is_if_exists(&self) -> bool {
+        self.if_exists
+    }
+
+    /// What the drop does to dependent objects, if the caller said.
+    pub fn get_behavior(&self) -> Option<DropBehavior> {
+        self.behavior
+    }
+}
+
+/// A name, which is the plain drop of the constraint it names, or a
+/// [`ConstraintDrop`] already built: what
+/// [`TableAlterStatement::drop_constraint`](crate::TableAlterStatement::drop_constraint)
+/// takes.
+// [spec:pgorm:req:sql.ddl.alter-table+11]
+pub trait IntoConstraintDrop {
+    /// The drop.
+    fn into_constraint_drop(self) -> ConstraintDrop;
+}
+
+impl IntoConstraintDrop for ConstraintDrop {
+    fn into_constraint_drop(self) -> ConstraintDrop {
+        self
+    }
+}
+
+impl<N> IntoConstraintDrop for N
+where
+    N: IntoName,
+{
+    fn into_constraint_drop(self) -> ConstraintDrop {
+        ConstraintDrop::new(self)
     }
 }

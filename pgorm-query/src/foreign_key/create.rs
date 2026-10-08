@@ -100,7 +100,7 @@ use crate::{
 ///     r#"ALTER TABLE "character" ADD CONSTRAINT "FK_character_id" FOREIGN KEY ("id") REFERENCES "character" ("id") ON DELETE CASCADE ON UPDATE CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.foreign-key+8]
+// [spec:pgorm:req:sql.ddl.foreign-key+9]
 #[derive(Debug, Clone)]
 pub struct ForeignKeyCreateStatement {
     pub(crate) foreign_key: TableForeignKey,
@@ -143,7 +143,7 @@ impl ForeignKeyCreateStatement {
 
     /// Match `column` to `ref_column` as periods, closing both column lists
     /// with `PERIOD`: PostgreSQL 18's temporal foreign key
-    /// (`[spec:pgorm:req:sql.ddl.foreign-key+8]`). A later call replaces the
+    /// (`[spec:pgorm:req:sql.ddl.foreign-key+9]`). A later call replaces the
     /// pair.
     ///
     /// The other pairs still match by equality, and the referencing row's
@@ -190,7 +190,7 @@ impl ForeignKeyCreateStatement {
     /// only, and refuses any other [`ForeignKeyAction`] on it, `ON DELETE` or
     /// `ON UPDATE` (`0A000`); deferrability and
     /// [`enforcement`](Self::enforcement) it takes as a plain key does.
-    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    // [spec:pgorm:req:sql.ddl.foreign-key+9]
     pub fn period<C, S>(&mut self, column: C, ref_column: S) -> &mut Self
     where
         C: IntoName,

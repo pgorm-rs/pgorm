@@ -192,7 +192,7 @@ fn cross_join_renders_without_on_clause() {
 // the sole action of an ALTER TABLE, so a column rename is a statement of its
 // own and cannot be listed beside an ADD COLUMN.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
 #[test]
 fn column_rename_is_its_own_statement() {
     let added = Table::alter(Font::Table)
@@ -380,7 +380,7 @@ fn oracle_records_parse_valid_defects() {
 // with the state it guarded — the strings below have no builder left to produce
 // them.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
 // [spec:pgorm:req:sql.ddl.index-create+11/test]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]
 #[test]
@@ -425,8 +425,8 @@ fn create_table_with_no_columns_is_valid() {
 // [spec:pgorm:req:sql.ddl.index-create+11/test]
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
-// [spec:pgorm:req:sql.ddl.alter-table+10/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]
+// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+9/test]
 #[test]
 fn ddl_targets_are_taken_by_construction() {
     let rendered = [
@@ -441,7 +441,8 @@ fn ddl_targets_are_taken_by_construction() {
             .name(Name::runtime("idx"))
             .to_string(),
         Index::drop(Name::runtime("idx")).to_string(),
-        ForeignKey::drop(Char::Table, Name::runtime("fk")).to_string(),
+        Table::rename_constraint(Char::Table, Name::runtime("fk"), Name::runtime("fk2"))
+            .to_string(),
     ];
 
     for sql in &rendered {
@@ -484,7 +485,7 @@ fn index_name_and_drop_table_stay_optional() {
 // `compile_fail` doctests on `ForeignKeyCreateStatement` prove the constructor
 // refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+9/test]
 // [spec:pgorm:req:sql.ddl.create-table+15/test]
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {

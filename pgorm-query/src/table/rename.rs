@@ -90,7 +90,7 @@ impl std::fmt::Display for TableRenameStatement {
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 #[derive(Debug, Clone)]
 pub struct ColumnRenameStatement {
     pub(crate) table: TableName,
@@ -122,6 +122,82 @@ impl std::fmt::Display for ColumnRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
         QueryBuilder.prepare_column_rename_statement(self, &mut sql);
+        f.write_str(&sql)
+    }
+}
+
+/// Rename a constraint of an existing table
+///
+/// PostgreSQL admits `RENAME` only as the sole action of an `ALTER TABLE`, as
+/// it does a column's rename, so a constraint rename is a statement of its own:
+/// `ALTER TABLE <table> RENAME CONSTRAINT "from" TO "to"`. A constraint of any
+/// kind is renamed this way, PostgreSQL 18's `NOT NULL` among them, and a
+/// primary or unique key's index takes the new name with it.
+///
+/// All three names are taken by the constructor, so a partly-named rename does
+/// not construct.
+///
+/// ```compile_fail,E0061
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::rename_constraint(Font::Table, Name::runtime("font_pkey")).to_string();
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let rename = Table::rename_constraint(
+///     Font::Table,
+///     Name::runtime("font_pkey"),
+///     Name::runtime("font_key"),
+/// );
+///
+/// assert_eq!(
+///     rename.to_string(),
+///     r#"ALTER TABLE "font" RENAME CONSTRAINT "font_pkey" TO "font_key""#
+/// );
+/// ```
+///
+/// What the rename can do is the server's knowledge: a name the table has no
+/// constraint under is refused (`42704`), as is a new name another of its
+/// constraints holds (`42710`); a constraint the table inherited is renamed
+/// only through the parent, whose rename reaches every child's copy (`42P16`
+/// on the child).
+// [spec:pgorm:req:sql.ddl.alter-table+11]
+#[derive(Debug, Clone)]
+pub struct ConstraintRenameStatement {
+    pub(crate) table: TableName,
+    pub(crate) from_name: Name,
+    pub(crate) to_name: Name,
+}
+
+impl ConstraintRenameStatement {
+    /// Construct rename constraint statement from the table and the two
+    /// constraint names
+    pub fn new<T, F, R>(table: T, from_name: F, to_name: R) -> Self
+    where
+        T: IntoTableName,
+        F: IntoName,
+        R: IntoName,
+    {
+        Self {
+            table: table.into_table_name(),
+            from_name: from_name.into_name(),
+            to_name: to_name.into_name(),
+        }
+    }
+}
+
+/// Renders the statement with every value inlined as an escaped SQL literal.
+/// This is its only rendering: it exposes no placeholder-emitting build, so
+/// nothing here is left to bind.
+// [spec:pgorm:req:sql.ddl+8]
+impl std::fmt::Display for ConstraintRenameStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sql = String::with_capacity(256);
+        QueryBuilder.prepare_constraint_rename_statement(self, &mut sql);
         f.write_str(&sql)
     }
 }

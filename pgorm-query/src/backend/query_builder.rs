@@ -1552,7 +1552,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1624,7 +1624,7 @@ impl QueryBuilder {
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
                             }
-                            // [spec:pgorm:req:sql.ddl.alter-table+10]
+                            // [spec:pgorm:req:sql.ddl.alter-table+11]
                             ColumnSpec::NotNull { name, no_inherit } => {
                                 let mut constraint =
                                     NotNullConstraint::new(column_def.name.clone());
@@ -1640,7 +1640,7 @@ impl QueryBuilder {
                             }
                             // A modified column's CHECK is a constraint the
                             // table gains, which ALTER TABLE spells as an ADD.
-                            // [spec:pgorm:req:sql.ddl.alter-table+10]
+                            // [spec:pgorm:req:sql.ddl.alter-table+11]
                             ColumnSpec::Check(check) => {
                                 write!(sql, "ADD ").unwrap();
                                 self.prepare_check_constraint(check, sql);
@@ -1666,9 +1666,8 @@ impl QueryBuilder {
                     write!(sql, "DROP COLUMN ").unwrap();
                     column_name.prepare(sql.as_writer());
                 }
-                TableAlterOption::DropForeignKey(name) => {
-                    write!(sql, "DROP CONSTRAINT ").unwrap();
-                    name.prepare(sql.as_writer());
+                TableAlterOption::DropConstraint(drop) => {
+                    self.prepare_drop_constraint(drop, sql);
                 }
                 TableAlterOption::AddForeignKey(foreign_key) => {
                     let create = ForeignKeyCreateStatement {
@@ -1680,7 +1679,7 @@ impl QueryBuilder {
                         Mode::TableAlter,
                     );
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+10]
+                // [spec:pgorm:req:sql.ddl.alter-table+11]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1726,7 +1725,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -2145,20 +2144,7 @@ impl QueryBuilder {
 
     // FOREIGN KEY
 
-    /// Translate [`ForeignKeyDropStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.foreign-key+8]
-    pub(crate) fn prepare_foreign_key_drop_statement(
-        &self,
-        drop: &ForeignKeyDropStatement,
-        sql: &mut dyn SqlWriter,
-    ) {
-        write!(sql, "ALTER TABLE ").unwrap();
-        self.prepare_table_name(&drop.table, sql);
-        write!(sql, " DROP CONSTRAINT ").unwrap();
-        drop.name.prepare(sql.as_writer());
-    }
-
-    // [spec:pgorm:req:sql.ddl.foreign-key+8]
+    // [spec:pgorm:req:sql.ddl.foreign-key+9]
     fn prepare_foreign_key_create_statement_internal(
         &self,
         create: &ForeignKeyCreateStatement,
@@ -2189,7 +2175,7 @@ impl QueryBuilder {
             col.prepare(sql.as_writer());
             false
         });
-        // [spec:pgorm:req:sql.ddl.foreign-key+8]
+        // [spec:pgorm:req:sql.ddl.foreign-key+9]
         if let Some((period, _)) = &create.foreign_key.period {
             write!(sql, ", PERIOD ").unwrap();
             period.prepare(sql.as_writer());

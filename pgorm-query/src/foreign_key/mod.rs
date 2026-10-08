@@ -3,15 +3,15 @@
 //! # Usage
 //!
 //! - Table Foreign Key Create, see [`ForeignKeyCreateStatement`]
-//! - Table Foreign Key Drop, see [`ForeignKeyDropStatement`]
+//!
+//! A foreign key is dropped as a constraint of any kind is, by name:
+//! [`TableAlterStatement::drop_constraint`](crate::TableAlterStatement::drop_constraint).
 
 mod common;
 mod create;
-mod drop;
 
 pub use common::*;
 pub use create::*;
-pub use drop::*;
 
 use crate::types::{IntoName, IntoTableName};
 
@@ -25,7 +25,6 @@ pub struct ForeignKey;
 #[derive(Debug, Clone)]
 pub enum ForeignKeyStatement {
     Create(ForeignKeyCreateStatement),
-    Drop(ForeignKeyDropStatement),
 }
 
 impl ForeignKey {
@@ -44,14 +43,5 @@ impl ForeignKey {
         S: IntoName,
     {
         ForeignKeyCreateStatement::new(table, column, ref_table, ref_column)
-    }
-
-    /// Construct foreign key [`ForeignKeyDropStatement`] over its table and constraint
-    pub fn drop<T, N>(table: T, name: N) -> ForeignKeyDropStatement
-    where
-        T: IntoTableName,
-        N: IntoName,
-    {
-        ForeignKeyDropStatement::new(table, name)
     }
 }

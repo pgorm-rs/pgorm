@@ -1,6 +1,7 @@
 use crate::{
-    Check, ColumnDef, ConstraintChange, IntoCheck, IntoColumnDef, IntoTableKey, NotNullConstraint,
-    Primary, SimpleExpr, TableForeignKey, TableKey, Unique, backend::QueryBuilder, types::*,
+    Check, ColumnDef, ConstraintChange, ConstraintDrop, IntoCheck, IntoColumnDef,
+    IntoConstraintDrop, IntoTableKey, NotNullConstraint, Primary, SimpleExpr, TableForeignKey,
+    TableKey, Unique, backend::QueryBuilder, types::*,
 };
 
 /// A table awaiting its first alter action.
@@ -17,7 +18,7 @@ use crate::{
 /// ```
 ///
 /// [`Table::alter`]: crate::Table::alter
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 #[derive(Debug, Clone)]
 pub struct PendingTableAlter {
     table: TableName,
@@ -70,16 +71,20 @@ impl PendingTableAlter {
         self.with(TableAlterOption::AddForeignKey(foreign_key.into()))
     }
 
-    /// Drop a foreign key from existing table
-    pub fn drop_foreign_key<T>(self, name: T) -> TableAlterStatement
+    /// Drop a constraint of any kind by name: `DROP CONSTRAINT "name"`, or
+    /// with the `IF EXISTS` and behavior a [`ConstraintDrop`] carries.
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    pub fn drop_constraint<D>(self, drop: D) -> TableAlterStatement
     where
-        T: IntoName,
+        D: IntoConstraintDrop,
     {
-        self.with(TableAlterOption::DropForeignKey(name.into_name()))
+        self.with(TableAlterOption::DropConstraint(
+            drop.into_constraint_drop(),
+        ))
     }
 
     /// Give the table its primary key: `ADD PRIMARY KEY (…)`.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_primary_key<K>(self, key: K) -> TableAlterStatement
     where
         K: IntoTableKey<Primary>,
@@ -88,7 +93,7 @@ impl PendingTableAlter {
     }
 
     /// Add a unique key to the table: `ADD UNIQUE (…)`.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_unique<K>(self, key: K) -> TableAlterStatement
     where
         K: IntoTableKey<Unique>,
@@ -99,7 +104,7 @@ impl PendingTableAlter {
     /// Recompute a generated column from a new expression:
     /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`. See
     /// [`TableAlterStatement::set_expression`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn set_expression<C, E>(self, column: C, expr: E) -> TableAlterStatement
     where
         C: IntoName,
@@ -114,7 +119,7 @@ impl PendingTableAlter {
     /// Make a stored generated column a plain one that keeps its values:
     /// `ALTER COLUMN "c" DROP EXPRESSION`. See
     /// [`TableAlterStatement::drop_expression`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn drop_expression<C>(self, column: C) -> TableAlterStatement
     where
         C: IntoName,
@@ -125,7 +130,7 @@ impl PendingTableAlter {
     /// `ALTER COLUMN "c" DROP EXPRESSION IF EXISTS`, which leaves a column
     /// that is not generated as it is. See
     /// [`TableAlterStatement::drop_expression_if_exists`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn drop_expression_if_exists<C>(self, column: C) -> TableAlterStatement
     where
         C: IntoName,
@@ -136,14 +141,14 @@ impl PendingTableAlter {
     /// Add a `NOT NULL` constraint over a column:
     /// `ADD [CONSTRAINT "name" ]NOT NULL "c"…`. See
     /// [`TableAlterStatement::add_not_null`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_not_null(self, constraint: NotNullConstraint) -> TableAlterStatement {
         self.with(TableAlterOption::AddNotNull(constraint))
     }
 
     /// Add a `CHECK` constraint: `ADD [CONSTRAINT "name" ]CHECK (<expr>)…`.
     /// See [`TableAlterStatement::add_check`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_check<C>(self, check: C) -> TableAlterStatement
     where
         C: IntoCheck,
@@ -154,7 +159,7 @@ impl PendingTableAlter {
     /// Check the rows a `NOT VALID` constraint skipped:
     /// `VALIDATE CONSTRAINT "name"`. See
     /// [`TableAlterStatement::validate_constraint`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn validate_constraint<N>(self, name: N) -> TableAlterStatement
     where
         N: IntoName,
@@ -164,7 +169,7 @@ impl PendingTableAlter {
 
     /// Change a constraint that exists: `ALTER CONSTRAINT "name" <change>`.
     /// See [`TableAlterStatement::alter_constraint`].
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn alter_constraint<N>(self, name: N, change: ConstraintChange) -> TableAlterStatement
     where
         N: IntoName,
@@ -212,7 +217,7 @@ impl PendingTableAlter {
 /// let mut alter = Table::alter(Font::Table).drop_column(Font::Name).to_owned();
 /// let moved: TableAlterStatement = alter.take();
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 // [spec:pgorm:req:sql.ast+3]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
@@ -235,14 +240,17 @@ pub struct AddColumnOption {
 /// listed beside anything else.
 // Boxing a variant would change the public shape of a DDL statement enum callers match on.
 #[allow(clippy::large_enum_variant)]
-// [spec:pgorm:req:sql.ddl.alter-table+10]
+// [spec:pgorm:req:sql.ddl.alter-table+11]
 #[derive(Debug, Clone)]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
     ModifyColumn(ColumnDef),
     DropColumn(Name),
     AddForeignKey(TableForeignKey),
-    DropForeignKey(Name),
+    /// `DROP CONSTRAINT [IF EXISTS ]"name"[ RESTRICT | CASCADE]`: a constraint
+    /// of any kind, by name.
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    DropConstraint(ConstraintDrop),
     /// `ADD [CONSTRAINT "name"] PRIMARY KEY (…)`. The table may already have
     /// one, which only the server knows: it refuses a second (`42P16`).
     AddPrimaryKey(TableKey<Primary>),
@@ -251,14 +259,14 @@ pub enum TableAlterOption {
     /// `ALTER COLUMN "c" SET EXPRESSION AS (<expr>)`: a generated column's new
     /// expression. Whether the column is generated is the server's knowledge;
     /// it refuses one that is not (`55000`).
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     SetExpression {
         column: Name,
         expr: SimpleExpr,
     },
     /// `ALTER COLUMN "c" DROP EXPRESSION[ IF EXISTS]`: a stored generated
     /// column made plain, keeping its values.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     DropExpression {
         column: Name,
         if_exists: bool,
@@ -266,18 +274,18 @@ pub enum TableAlterOption {
     /// `ADD [CONSTRAINT "name" ]NOT NULL "c"[ NO INHERIT][ NOT VALID]`: a
     /// not-null constraint added at table level, the one spelling that can be
     /// `NOT VALID`.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     AddNotNull(NotNullConstraint),
     /// `ADD [CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]`.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     AddCheck(Check),
     /// `VALIDATE CONSTRAINT "name"`: the rows a `NOT VALID` foreign key,
     /// `CHECK` or `NOT NULL` skipped, checked now. Any other kind is refused
     /// (`42809`).
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     ValidateConstraint(Name),
     /// `ALTER CONSTRAINT "name" <change>`.
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     AlterConstraint {
         name: Name,
         change: ConstraintChange,
@@ -453,7 +461,9 @@ impl TableAlterStatement {
         self.add_alter_option(TableAlterOption::AddForeignKey(foreign_key.into()))
     }
 
-    /// Drop a foreign key from existing table
+    /// Drop a constraint of any kind by name: `DROP CONSTRAINT [IF EXISTS
+    /// ]"name"[ RESTRICT | CASCADE]`. A name is the plain drop, and a
+    /// [`ConstraintDrop`] carries `IF EXISTS` and the behavior.
     ///
     /// # Examples
     ///
@@ -461,8 +471,8 @@ impl TableAlterStatement {
     /// use pgorm_query::{tests_cfg::*, *};
     ///
     /// let table = Table::alter(Character::Table)
-    ///     .drop_foreign_key(Name::runtime("FK_character_glyph"))
-    ///     .drop_foreign_key(Name::runtime("FK_character_font"))
+    ///     .drop_constraint(Name::runtime("FK_character_glyph"))
+    ///     .drop_constraint(Name::runtime("character_font_id_not_null"))
     ///     .to_owned();
     ///
     /// assert_eq!(
@@ -470,16 +480,19 @@ impl TableAlterStatement {
     ///     [
     ///         r#"ALTER TABLE "character""#,
     ///         r#"DROP CONSTRAINT "FK_character_glyph","#,
-    ///         r#"DROP CONSTRAINT "FK_character_font""#,
+    ///         r#"DROP CONSTRAINT "character_font_id_not_null""#,
     ///     ]
     ///     .join(" ")
     /// );
     /// ```
-    pub fn drop_foreign_key<T>(&mut self, name: T) -> &mut Self
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    pub fn drop_constraint<D>(&mut self, drop: D) -> &mut Self
     where
-        T: IntoName,
+        D: IntoConstraintDrop,
     {
-        self.add_alter_option(TableAlterOption::DropForeignKey(name.into_name()))
+        self.add_alter_option(TableAlterOption::DropConstraint(
+            drop.into_constraint_drop(),
+        ))
     }
 
     /// Give the table its primary key: `ADD PRIMARY KEY (…)`, the key the
@@ -510,7 +523,7 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_primary_key<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Primary>,
@@ -520,7 +533,7 @@ impl TableAlterStatement {
 
     /// Add a unique key to the table: `ADD UNIQUE (…)`, the key a table
     /// declares with [`TableCreateStatement::unique`](crate::TableCreateStatement::unique).
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_unique<K>(&mut self, key: K) -> &mut Self
     where
         K: IntoTableKey<Unique>,
@@ -567,7 +580,7 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn set_expression<C, E>(&mut self, column: C, expr: E) -> &mut Self
     where
         C: IntoName,
@@ -588,7 +601,7 @@ impl TableAlterStatement {
     /// values to keep (`0A000`), and for a column that is not generated
     /// (`55000`) — unless the action says
     /// [`IF EXISTS`](Self::drop_expression_if_exists).
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn drop_expression<C>(&mut self, column: C) -> &mut Self
     where
         C: IntoName,
@@ -613,7 +626,7 @@ impl TableAlterStatement {
     ///     r#"ALTER TABLE "glyph" ALTER COLUMN "aspect" DROP EXPRESSION IF EXISTS"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn drop_expression_if_exists<C>(&mut self, column: C) -> &mut Self
     where
         C: IntoName,
@@ -664,7 +677,7 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_not_null(&mut self, constraint: NotNullConstraint) -> &mut Self {
         self.add_alter_option(TableAlterOption::AddNotNull(constraint))
     }
@@ -702,7 +715,7 @@ impl TableAlterStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn add_check<C>(&mut self, check: C) -> &mut Self
     where
         C: IntoCheck,
@@ -731,7 +744,7 @@ impl TableAlterStatement {
     ///     r#"ALTER TABLE "glyph" VALIDATE CONSTRAINT "glyph_aspect_present""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn validate_constraint<N>(&mut self, name: N) -> &mut Self
     where
         N: IntoName,
@@ -761,7 +774,7 @@ impl TableAlterStatement {
     ///     r#"ALTER TABLE "glyph" ALTER CONSTRAINT "glyph_aspect_present" NO INHERIT"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ddl.alter-table+10]
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
     pub fn alter_constraint<N>(&mut self, name: N, change: ConstraintChange) -> &mut Self
     where
         N: IntoName,

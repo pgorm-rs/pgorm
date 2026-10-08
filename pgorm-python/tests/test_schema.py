@@ -190,6 +190,31 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             ])
 
     # [spec:pgorm:req:python.schema/test]
+    async def test_constraints_drop_and_rename_by_name(self):
+        table = p.Table('checked "x"', schema=self.namespace)
+        quoted = f'{self.quoted}."checked ""x"""'
+        ddl = s.create_table(table).column(s.ColumnDef("n", "integer").check(p.col("n") > 0, name='positive "x"'))
+        await self.pool.execute(ddl)
+        catalog = p.RawSQL(
+            "SELECT conname::text AS name FROM pg_constraint "
+            "WHERE conrelid = $1::text::regclass AND contype = 'c' ORDER BY conname",
+            [quoted],
+        )
+        async with self.pool.connection() as connection:
+            await connection.execute(s.rename_constraint(table, 'positive "x"', "above zero"))
+            self.assertEqual([dict(row) for row in await connection.fetch_all(catalog)], [{"name": "above zero"}])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
+            self.assertEqual(refused.exception.sqlstate, "23514")
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(s.drop_constraint(table, 'positive "x"'))
+            self.assertEqual(refused.exception.sqlstate, "42704")
+            await connection.execute(s.drop_constraint(table, 'positive "x"', if_exists=True))
+            await connection.execute(s.drop_constraint(table, "above zero", cascade=True))
+            self.assertEqual(await connection.fetch_all(catalog), [])
+            await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
+
+    # [spec:pgorm:req:python.schema/test]
     async def test_temporal_keys(self):
         table = p.Table('booked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."booked ""x"""'

@@ -45,6 +45,9 @@ def programs(p):
         "validate_constraint": p.validate_constraint(table, 'present "x"'),
         "alter_constraint_inherit": p.alter_constraint(table, 'present "x"', "inherit"),
         "alter_constraint_no_inherit": p.alter_constraint(table, 'present "x"', "no_inherit"),
+        "drop_constraint": p.drop_constraint(table, 'present "x"'),
+        "drop_constraint_if_exists": p.drop_constraint(table, 'present "x"', if_exists=True, cascade=True),
+        "rename_constraint": p.rename_constraint(table, 'present "x"', 'kept "x"'),
         "check_named": p.CreateTable(table)
             .column(p.ColumnDef("n", "integer").check(p.col("n") > 0, name='positive "x"', not_enforced=True))
             .check(p.col("n") < 100, name='small "x"').check(p.col("n") != 7, not_enforced=True),

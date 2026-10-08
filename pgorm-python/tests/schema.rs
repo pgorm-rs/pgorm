@@ -1,8 +1,8 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    Check, ColumnDef, ColumnType, ConstraintChange, Enforcement, Expr, GeneratedKind, Index,
-    IndexOrder, IndexType, IntoName, Name, NotNullConstraint, StringLen, Table, TableKey,
-    TableName, TypeName, Values, extension::Type,
+    Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Enforcement, Expr,
+    GeneratedKind, Index, IndexOrder, IndexType, IntoName, Name, NotNullConstraint, StringLen,
+    Table, TableKey, TableName, TypeName, Values, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -258,6 +258,27 @@ fn programs() -> BTreeMap<&'static str, String> {
             "alter_constraint_no_inherit",
             Table::alter(table.clone())
                 .alter_constraint(a("present \"x\""), ConstraintChange::NoInherit)
+                .to_string(),
+        ),
+        (
+            "drop_constraint",
+            Table::alter(table.clone())
+                .drop_constraint(a("present \"x\""))
+                .to_string(),
+        ),
+        (
+            "drop_constraint_if_exists",
+            Table::alter(table.clone())
+                .drop_constraint(
+                    ConstraintDrop::new(a("present \"x\""))
+                        .if_exists()
+                        .cascade(),
+                )
+                .to_string(),
+        ),
+        (
+            "rename_constraint",
+            Table::rename_constraint(table.clone(), a("present \"x\""), a("kept \"x\""))
                 .to_string(),
         ),
         (

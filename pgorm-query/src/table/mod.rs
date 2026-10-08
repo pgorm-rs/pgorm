@@ -7,6 +7,7 @@
 //! - Table Drop, see [`TableDropStatement`]
 //! - Table Rename, see [`TableRenameStatement`]
 //! - Column Rename, see [`ColumnRenameStatement`]
+//! - Constraint Rename, see [`ConstraintRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
 use crate::types::{IntoName, IntoTableName};
@@ -30,7 +31,10 @@ pub use alter::*;
 pub use check::{Check, IntoCheck};
 pub use column::*;
 pub use column_generated::GeneratedKind;
-pub use constraint::{ConstraintChange, Enforcement, NotNullConstraint};
+pub use constraint::{
+    ConstraintChange, ConstraintDrop, DropBehavior, Enforcement, IntoConstraintDrop,
+    NotNullConstraint,
+};
 pub use create::*;
 pub use drop::*;
 pub use interval::*;
@@ -53,6 +57,7 @@ pub enum TableStatement {
     Drop(TableDropStatement),
     Rename(TableRenameStatement),
     RenameColumn(ColumnRenameStatement),
+    RenameConstraint(ConstraintRenameStatement),
     Truncate(TableTruncateStatement),
 }
 
@@ -104,6 +109,22 @@ impl Table {
         ColumnRenameStatement::new(table, from_name, to_name)
     }
 
+    /// Construct constraint [`ConstraintRenameStatement`] over a table and two
+    /// constraint names
+    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    pub fn rename_constraint<T, F, R>(
+        table: T,
+        from_name: F,
+        to_name: R,
+    ) -> ConstraintRenameStatement
+    where
+        T: IntoTableName,
+        F: IntoName,
+        R: IntoName,
+    {
+        ConstraintRenameStatement::new(table, from_name, to_name)
+    }
+
     /// Construct table [`TableTruncateStatement`] over the table it empties
     pub fn truncate<T>(table: T) -> TableTruncateStatement
     where
@@ -125,6 +146,7 @@ impl std::fmt::Display for TableStatement {
             Self::Drop(stat) => stat.fmt(f),
             Self::Rename(stat) => stat.fmt(f),
             Self::RenameColumn(stat) => stat.fmt(f),
+            Self::RenameConstraint(stat) => stat.fmt(f),
             Self::Truncate(stat) => stat.fmt(f),
         }
     }

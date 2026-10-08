@@ -759,7 +759,32 @@ async fn live_ddl_object_names_and_labels() {
         .await;
         assert_eq!(described, 2, "comment text did not round-trip as {name:?}");
 
-        run(&db, &ForeignKey::drop(Name::runtime("t"), n()).to_string()).await;
+        run(
+            &db,
+            &Table::rename_constraint(Name::runtime("t"), n(), Name::runtime("renamed"))
+                .to_string(),
+        )
+        .await;
+        run(
+            &db,
+            &Table::rename_constraint(Name::runtime("t"), Name::runtime("renamed"), n())
+                .to_string(),
+        )
+        .await;
+        let renamed = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_constraint WHERE contype = 'f' AND conname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(renamed, 1, "no foreign key renamed back to {name:?}");
+        run(
+            &db,
+            &Table::alter(Name::runtime("t"))
+                .drop_constraint(n())
+                .to_string(),
+        )
+        .await;
         run(&db, &Index::drop(n()).to_string()).await;
         run(&db, &Type::drop(n()).to_string()).await;
     }

@@ -2,9 +2,9 @@
 //! how to add one.
 
 use pgorm::pgorm_query::{
-    Check, ColumnDef, ColumnType, Comment, ConstraintChange, Enforcement, Expr, ForeignKey, Index,
-    IndexColumn, IndexType, NotNullConstraint, Sequence, SequenceOption, Table, TableForeignKey,
-    TableKey, TypeName,
+    Check, ColumnDef, ColumnType, Comment, ConstraintChange, ConstraintDrop, Enforcement, Expr,
+    ForeignKey, Index, IndexColumn, IndexType, NotNullConstraint, Sequence, SequenceOption, Table,
+    TableForeignKey, TableKey, TypeName,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -494,11 +494,21 @@ pub fn sites() -> Vec<Site> {
             render: |n| sql(&Table::alter(fixed("t")).drop_column(n_(n))),
         },
         Site {
-            id: "ddl/alter-table.drop-foreign-key",
-            api: "TableAlterStatement::drop_foreign_key(Name)",
+            id: "ddl/alter-table.drop-constraint",
+            api: "TableAlterStatement::drop_constraint(Name)",
             kinds: &["AlterTableCmd.name"],
             policy: Quoted,
-            render: |n| sql(&Table::alter(fixed("t")).drop_foreign_key(n_(n))),
+            render: |n| sql(&Table::alter(fixed("t")).drop_constraint(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-table.drop-constraint-if-exists",
+            api: "TableAlterStatement::drop_constraint(ConstraintDrop::new(Name).if_exists())",
+            kinds: &["AlterTableCmd.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Table::alter(fixed("t"))
+                    .drop_constraint(ConstraintDrop::new(n_(n)).if_exists().cascade()))
+            },
         },
         Site {
             id: "ddl/alter-table.modify-column-not-null-named",
@@ -616,6 +626,27 @@ pub fn sites() -> Vec<Site> {
             kinds: &["RenameStmt.newname"],
             policy: Quoted,
             render: |n| sql(&Table::rename_column(fixed("t"), fixed("c"), n_(n))),
+        },
+        Site {
+            id: "ddl/rename-constraint.table",
+            api: "Table::rename_constraint(Name, from, to)",
+            kinds: &["RenameStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| sql(&Table::rename_constraint(n_(n), fixed("k"), fixed("l"))),
+        },
+        Site {
+            id: "ddl/rename-constraint.from",
+            api: "Table::rename_constraint(table, Name, to)",
+            kinds: &["RenameStmt.subname"],
+            policy: Quoted,
+            render: |n| sql(&Table::rename_constraint(fixed("t"), n_(n), fixed("l"))),
+        },
+        Site {
+            id: "ddl/rename-constraint.to",
+            api: "Table::rename_constraint(table, from, Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Table::rename_constraint(fixed("t"), fixed("k"), n_(n))),
         },
         Site {
             id: "ddl/drop-table.table",
@@ -782,20 +813,6 @@ pub fn sites() -> Vec<Site> {
                     n_(n),
                 ))
             },
-        },
-        Site {
-            id: "ddl/foreign-key-drop.name",
-            api: "ForeignKey::drop(table, Name)",
-            kinds: &["AlterTableCmd.name"],
-            policy: Quoted,
-            render: |n| sql(&ForeignKey::drop(fixed("t"), n_(n))),
-        },
-        Site {
-            id: "ddl/foreign-key-drop.table",
-            api: "ForeignKey::drop(Name, name)",
-            kinds: &["AlterTableStmt.relation.relname"],
-            policy: Quoted,
-            render: |n| sql(&ForeignKey::drop(n_(n), fixed("k"))),
         },
         // -- TYPE ----------------------------------------------------------
         Site {

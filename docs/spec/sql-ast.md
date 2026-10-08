@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+23]
+> [spec:pgorm:req:sql.surface+24]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -125,6 +125,10 @@ today, including panicking edges and deliberate failsafes.
 > generated column is, stored or virtual (`sql.ddl.column-def`);
 > `NotNullConstraint` and `ConstraintChange`, a `NOT NULL` constraint added at
 > table level and what `ALTER CONSTRAINT` changes about one that exists
+> (`sql.ddl.alter-table`); `ConstraintDrop`, `IntoConstraintDrop`,
+> `DropBehavior` and `ConstraintRenameStatement`, a constraint of any kind
+> dropped by name, the conversion a name takes into the plain drop, whether a
+> drop restricts or cascades, and the statement that renames one
 > (`sql.ddl.alter-table`); `Check` and `IntoCheck`, a `CHECK` constraint and
 > the conversion an expression takes into one (`sql.ddl.create-table`),
 > `Enforcement`, whether a foreign key or `CHECK` is enforced
@@ -147,7 +151,9 @@ today, including panicking edges and deliberate failsafes.
 > went when the primary-key index kind it screened the standalone renderer
 > from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
 > column could also declare did, `TableKey` replacing it
-> (`sql.ddl.create-table`).
+> (`sql.ddl.create-table`), and `ForeignKeyDropStatement` when the drop named
+> for one constraint kind did, `ConstraintDrop` replacing it
+> (`sql.ddl.alter-table`).
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose

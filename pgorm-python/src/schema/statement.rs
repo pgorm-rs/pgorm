@@ -1,7 +1,7 @@
 use crate::expressions::Compiled;
 use pgorm::pgorm_query::{
-    ColumnRenameStatement, CommentStatement, IndexDropStatement, TableAlterStatement,
-    TableDropStatement, TableRenameStatement, TableTruncateStatement, Values,
+    ColumnRenameStatement, CommentStatement, ConstraintRenameStatement, IndexDropStatement,
+    TableAlterStatement, TableDropStatement, TableRenameStatement, TableTruncateStatement, Values,
     extension::{TypeAlterStatement, TypeCreateStatement, TypeDropStatement},
 };
 use pyo3::prelude::*;
@@ -13,6 +13,7 @@ pub(crate) enum Statement {
     DropTable(TableDropStatement),
     RenameTable(TableRenameStatement),
     RenameColumn(ColumnRenameStatement),
+    RenameConstraint(ConstraintRenameStatement),
     Truncate(TableTruncateStatement),
     DropIndex(IndexDropStatement),
     CreateEnum(TypeCreateStatement),
@@ -36,6 +37,7 @@ impl PyDDL {
             Statement::DropTable(s) => s.to_string(),
             Statement::RenameTable(s) => s.to_string(),
             Statement::RenameColumn(s) => s.to_string(),
+            Statement::RenameConstraint(s) => s.to_string(),
             Statement::Truncate(s) => s.to_string(),
             Statement::DropIndex(s) => s.to_string(),
             Statement::CreateEnum(s) => s.to_string(),

@@ -53,7 +53,7 @@ fn every_ddl_entry_point_is_reachable() {
             .starts_with("ALTER TABLE")
     );
     assert!(
-        ForeignKey::drop(Char::Table, Name::runtime("fk"))
+        Table::rename_constraint(Char::Table, Name::runtime("fk"), Name::runtime("fk2"))
             .to_string()
             .starts_with("ALTER TABLE")
     );
@@ -133,8 +133,8 @@ fn ddl_statements_render_through_display() {
         r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#,
     );
     assert_renders(
-        &ForeignKey::drop(Char::Table, Name::runtime("fk")),
-        r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#,
+        &Table::rename_constraint(Char::Table, Name::runtime("fk"), Name::runtime("fk2")),
+        r#"ALTER TABLE "character" RENAME CONSTRAINT "fk" TO "fk2""#,
     );
     assert_renders(
         &Comment::on_table(Glyph::Table, "glyphs"),
@@ -175,10 +175,11 @@ fn table_statement_wrapper_dispatches() {
     let schema_statements = [
         SchemaStatement::TableStatement(TableStatement::Drop(Table::drop(Glyph::Table))),
         SchemaStatement::IndexStatement(IndexStatement::Drop(Index::drop(Name::runtime("idx")))),
-        SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Drop(ForeignKey::drop(
-            Char::Table,
-            Name::runtime("fk"),
-        ))),
+        SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Create(
+            ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
+                .name(Name::runtime("fk"))
+                .to_owned(),
+        )),
     ];
 
     let rendered: Vec<String> = schema_statements
@@ -190,9 +191,6 @@ fn table_statement_wrapper_dispatches() {
             SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Create(inner)) => {
                 inner.to_string()
             }
-            SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Drop(inner)) => {
-                inner.to_string()
-            }
         })
         .collect();
 
@@ -201,7 +199,7 @@ fn table_statement_wrapper_dispatches() {
         vec![
             r#"DROP TABLE "glyph""#.to_owned(),
             r#"DROP INDEX "idx""#.to_owned(),
-            r#"ALTER TABLE "character" DROP CONSTRAINT "fk""#.to_owned(),
+            r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#.to_owned(),
         ]
     );
 }
@@ -257,12 +255,17 @@ fn ddl_index_and_constraint_names_escape_quotes() {
         r#"ALTER TABLE "character" ADD CONSTRAINT "f""k" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#
     );
     assert_eq!(
-        ForeignKey::drop(Char::Table, Name::runtime(r#"f"k"#)).to_string(),
-        r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
+        Table::rename_constraint(
+            Char::Table,
+            Name::runtime(r#"f"k"#),
+            Name::runtime(r#"k"f"#)
+        )
+        .to_string(),
+        r#"ALTER TABLE "character" RENAME CONSTRAINT "f""k" TO "k""f""#
     );
     assert_eq!(
         Table::alter(Char::Table)
-            .drop_foreign_key(Name::runtime(r#"f"k"#))
+            .drop_constraint(Name::runtime(r#"f"k"#))
             .to_string(),
         r#"ALTER TABLE "character" DROP CONSTRAINT "f""k""#
     );

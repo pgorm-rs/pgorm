@@ -69,8 +69,8 @@ index name.
 
 Table changes use `add_column`, `modify_column`, `drop_column`, `rename_column`,
 `set_expression`, `drop_expression`, `add_not_null`, `add_check`,
-`validate_constraint`, `alter_constraint`, `rename_table`, `truncate` and
-`drop_table`. Each returns a ready native DDL statement. A `modify_column`
+`validate_constraint`, `alter_constraint`, `drop_constraint`,
+`rename_constraint`, `rename_table`, `truncate` and `drop_table`. Each returns a ready native DDL statement. A `modify_column`
 definition selects Rust's corresponding type, nullability and default changes;
 a generated column's expression is changed by `set_expression(table, column,
 expr)`, which the rows already written take, and removed by
@@ -84,7 +84,11 @@ adds a `CHECK` to a table that exists. `alter_constraint(table, name,
 "inherit" | "no_inherit")` changes whether a `NOT NULL` constraint passes to
 inheriting tables, and `alter_constraint(table, name, "enforced" |
 "not_enforced")` whether a foreign key, or on PostgreSQL 19 a `CHECK`, is
-enforced; enforcing one checks the rows already there. Database
+enforced; enforcing one checks the rows already there.
+`drop_constraint(table, name, if_exists=False, cascade=False)` drops a
+constraint of any kind by name — a key, a foreign key, a `CHECK` or a `NOT
+NULL` — and `rename_constraint(table, name, new_name)` renames one, a key's
+index with it. Database
 validation and privileges still apply; these APIs do not introspect the
 database or compute migrations.
 

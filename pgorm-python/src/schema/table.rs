@@ -7,8 +7,8 @@ use crate::{
     statements::PyTable,
 };
 use pgorm::pgorm_query::{
-    ConstraintChange, NotNullConstraint, Table, TableCreateStatement, TableKey, TableName, Unique,
-    Values,
+    ConstraintChange, ConstraintDrop, NotNullConstraint, Table, TableCreateStatement, TableKey,
+    TableName, Unique, Values,
 };
 use pyo3::{prelude::*, types::PyTuple};
 
@@ -133,6 +133,24 @@ pub(super) fn rename_column(
 ) -> PyResult<PyDDL> {
     Ok(PyDDL {
         inner: Statement::RenameColumn(Table::rename_column(
+            table_name(table)?,
+            PyIdentifier::new(name)?.name(),
+            PyIdentifier::new(new_name)?.name(),
+        )),
+    })
+}
+
+/// `ALTER TABLE ... RENAME CONSTRAINT ... TO ...`: a constraint of any kind,
+/// renamed by a statement of its own, as a column is.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+pub(super) fn rename_constraint(
+    table: &PyTable,
+    name: &Bound<'_, PyAny>,
+    new_name: &Bound<'_, PyAny>,
+) -> PyResult<PyDDL> {
+    Ok(PyDDL {
+        inner: Statement::RenameConstraint(Table::rename_constraint(
             table_name(table)?,
             PyIdentifier::new(name)?.name(),
             PyIdentifier::new(new_name)?.name(),
@@ -352,6 +370,29 @@ pub(super) fn validate_constraint(table: &PyTable, name: &Bound<'_, PyAny>) -> P
         inner: Statement::AlterTable(
             Table::alter(table_name(table)?).validate_constraint(PyIdentifier::new(name)?.name()),
         ),
+    })
+}
+
+/// `ALTER TABLE ... DROP CONSTRAINT [IF EXISTS] ... [CASCADE]`: a constraint
+/// of any kind, dropped by name.
+// [spec:pgorm:req:python.schema]
+#[pyfunction]
+#[pyo3(signature=(table, name, *, if_exists=false, cascade=false))]
+pub(super) fn drop_constraint(
+    table: &PyTable,
+    name: &Bound<'_, PyAny>,
+    if_exists: bool,
+    cascade: bool,
+) -> PyResult<PyDDL> {
+    let mut drop = ConstraintDrop::new(PyIdentifier::new(name)?.name());
+    if if_exists {
+        drop = drop.if_exists();
+    }
+    if cascade {
+        drop = drop.cascade();
+    }
+    Ok(PyDDL {
+        inner: Statement::AlterTable(Table::alter(table_name(table)?).drop_constraint(drop)),
     })
 }
 

@@ -19,6 +19,8 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         ("schema.add_check", "pgorm_query::PendingTableAlter::add_check"),
         ("schema.validate_constraint", "pgorm_query::PendingTableAlter::validate_constraint"),
         ("schema.alter_constraint", "pgorm_query::PendingTableAlter::alter_constraint"),
+        ("schema.drop_constraint", "pgorm_query::PendingTableAlter::drop_constraint"),
+        ("schema.rename_constraint", "pgorm_query::ConstraintRenameStatement"),
         ("schema.create_index", "pgorm_query::IndexCreateStatement"),
         ("schema.drop_index", "pgorm_query::IndexDropStatement"),
         ("schema.create_enum", "pgorm_query::extension::TypeCreateStatement"),

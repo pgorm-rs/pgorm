@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::assert_eq;
 
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]
+// [spec:pgorm:req:sql.ddl.foreign-key+9/test]
 #[test]
 fn create_1() {
     assert_eq!(
@@ -41,7 +41,7 @@ fn create_2() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]    all three check-timing states render, after the
+// [spec:pgorm:req:sql.ddl.foreign-key+9/test]    all three check-timing states render, after the
 // referential actions, and the default renders only when it is asked for
 #[test]
 fn deferrability_renders_after_the_referential_actions() {
@@ -88,28 +88,7 @@ fn deferrability_renders_after_the_referential_actions() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]
-#[test]
-fn drop_1() {
-    assert_eq!(
-        ForeignKey::drop(Char::Table, Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6")).to_string(),
-        r#"ALTER TABLE "character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
-    );
-}
-
-#[test]
-fn drop_2() {
-    assert_eq!(
-        ForeignKey::drop(
-            (Name::runtime("schema"), Char::Table),
-            Name::runtime("FK_2e303c3a712662f1fc2a4d0aad6")
-        )
-        .to_string(),
-        r#"ALTER TABLE "schema"."character" DROP CONSTRAINT "FK_2e303c3a712662f1fc2a4d0aad6""#
-    );
-}
-
-// [spec:pgorm:req:sql.ddl.foreign-key+8/test]    a PERIOD pair closes both column lists, after
+// [spec:pgorm:req:sql.ddl.foreign-key+9/test]    a PERIOD pair closes both column lists, after
 // every other pair whatever order the calls come in, in the standalone statement, inside CREATE
 // TABLE and after ALTER TABLE's ADD alike
 #[test]
