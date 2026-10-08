@@ -47,17 +47,24 @@ def rust_without_python(root, output, environment):
         )
     with tempfile.TemporaryDirectory(prefix="pgorm-no-python-") as temporary:
         directory = Path(temporary)
-        marker = directory / "invoked"
+        log = directory / "invoked"
         for name in ("python", "python3", "python3.14", "pip", "pip3", "maturin"):
             path = directory / name
             path.write_text(
-                '#!/bin/sh\nprintf "%s\\n" "$0" >> "$PGORM_PYTHON_TOOL_LOG"\nexit 97\n'
+                "#!/bin/sh\n"
+                'printf "%s\\t%s\\t%s\\t%s\\n" "${0##*/}" "${CARGO_PKG_NAME-}" '
+                '"${CARGO_MANIFEST_DIR-}" "$*" >> "$PGORM_PYTHON_TOOL_LOG"\n'
+                "exit 97\n"
             )
             path.chmod(0o755)
         blocked = {
-            **environment,
+            **{
+                key: value
+                for key, value in environment.items()
+                if key != "CARGO_MANIFEST_DIR" and not key.startswith("CARGO_PKG_")
+            },
             "PATH": str(directory) + os.pathsep + environment["PATH"],
-            "PGORM_PYTHON_TOOL_LOG": str(marker),
+            "PGORM_PYTHON_TOOL_LOG": str(log),
             "PYO3_PYTHON": str(directory / "python"),
             "PYTHON_SYS_EXECUTABLE": str(directory / "python"),
         }
@@ -73,13 +80,51 @@ def rust_without_python(root, output, environment):
             blocked,
             output / "rust-without-python.log",
         )
-        if marker.exists():
-            raise RuntimeError("default Rust build invoked Python tooling")
+        workspace, dependencies = python_invocations(log, graph)
+        if workspace:
+            raise RuntimeError(
+                "default Rust build invoked Python tooling: " + json.dumps(workspace)
+            )
     return {
         "build_passed": True,
         "python_dependencies": False,
-        "python_tools_invoked": False,
+        "python_tools_invoked_by_workspace": False,
+        "dependency_python_probes": dependencies,
     }
+
+
+def python_invocations(log, graph):
+    """Split the stubs' records into pgorm's own invocations and dependencies' probes.
+
+    Cargo gives every build script and compiler run the CARGO_MANIFEST_DIR of
+    the package it builds, and a tool either one launches inherits it, so each
+    record names the package whose build step reached Python. A dependency's
+    record is a probe the build survived: the stub failed as Python would on a
+    host without it, and the build still passed, so that dependency builds the
+    same way there. libc's build script is one: it runs `emcc -dumpversion` on
+    every host, and Homebrew's emcc is a Python program. Every other record, a
+    workspace package's or one no package can be named for, is pgorm's build
+    reaching for Python.
+    """
+    members = set(graph["workspace_members"])
+    dependencies = {
+        Path(package["manifest_path"]).resolve().parent
+        for package in graph["packages"]
+        if package["id"] not in members
+    }
+    workspace, probes = [], []
+    for line in log.read_text().splitlines() if log.exists() else []:
+        fields = line.split("\t", 3)
+        if len(fields) != 4:
+            workspace.append({"record": line})
+            continue
+        tool, package, directory, arguments = fields
+        record = {"tool": tool, "package": package or None, "arguments": arguments}
+        if directory and Path(directory).resolve() in dependencies:
+            probes.append(record)
+        else:
+            workspace.append(record)
+    return workspace, probes
 
 
 def phase(root, name, output, environment):

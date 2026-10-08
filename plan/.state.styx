@@ -919,6 +919,7 @@ assertions (
     {id codegen-column-expressions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T21:50:20.383652Z}
     {id orm-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:17:50.237394Z}
     {id orm-merge-sync, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:28:04.904937Z}
+    {id python-acceptance-emcc-probe, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:42:02.931055Z}
 )
 
 impl_evidence (

@@ -52,7 +52,7 @@ point. Package installation occurs in fresh Python environments.
 | Connection and transaction execution | `registered_execution.py` records runtime builders, compiled queries, bound raw SQL, entity reads/writes, graph reads/cursors, plain pipelines and typed source terminals through both connection and transaction objects. `execution_oracle` independently repeats the operations in Rust and compares outcomes, including hooks, DDL, commit, rollback, a nested savepoint, read-only mode and connection streaming. A deliberately changed outcome must be rejected. |
 | Results, runtime and lifecycle | Installed tests exercise pool and connection execution, result cardinality, type decoding, TLS verification and rejection, errors, checkout timeout, cancellation, event-loop ownership, transaction reservation and bounded streaming cleanup. Native lifecycle tests verify Rust pool close/discard behavior underlying the Python lifecycle policy. |
 | Code generation and typing | `checks/codegen.py` builds and installs generated application bindings, checks deterministic output, executes registered entities/graphs and checks their concrete stubs. Distribution checks compare installed runtime signatures with stubs, type-check the package and runnable example, and require the expected invalid programs to fail. |
-| Distribution and optional Rust integration | `checks/distribution.py` builds an isolated wheel and source archive, builds another wheel directly from that archive, and tests both fresh installations including TLS and typing. It verifies package payloads, native links and notices. The acceptance runner checks that the default Rust dependency graph excludes PyO3, then builds the workspace with Python tooling replaced by failing probes. |
+| Distribution and optional Rust integration | `checks/distribution.py` builds an isolated wheel and source archive, builds another wheel directly from that archive, and tests both fresh installations including TLS and typing. It verifies package payloads, native links and notices. The acceptance runner checks that the default Rust dependency graph excludes PyO3, then builds the workspace with Python tooling replaced by failing probes, which record the package whose build step ran them. A workspace package's record fails the check; a dependency's is a probe the build survived without Python, such as libc's build script running `emcc -dumpversion` where emcc is Homebrew's Python program, and is listed in the summary. |
 | Specification tracking | `nplan spec validate` checks references under Rust binding code, Python sources and tests. The acceptance rule has implementation and verification annotations in executable code. |
 
 The execution comparison uses PostgreSQL's actual results, separately produced
@@ -75,9 +75,10 @@ strict package/example typing, installed signature checks and 13 expected invali
 typing cases. The generated application also passed its package typing and
 four expected invalid cases. The default Rust workspace build and nspec
 validation passed. Homebrew's `emcc`, a Python program that libc's build script
-runs on every host, was shadowed by a stub exiting 1 so the no-Python build
-probe judged pgorm's build alone (the `python-acceptance-emcc-probe` node). It
-replaces the 2026-10-06 record, which needed `TMPDIR` set to its resolved path.
+runs on every host, was shadowed by a stub exiting 1 for that run; the probe now
+tells a dependency's probe from pgorm's own build, so a host with that `emcc`
+passes it as it is. The record replaces the 2026-10-06 one, which needed
+`TMPDIR` set to its resolved path.
 
 These results establish the tested combination recorded in
 [support.json](support.json). The configured macOS 15 and Linux CI jobs still
