@@ -10187,6 +10187,13 @@ children (
                 kind @note
                 text "Found by pg18-test-server (84d97a35) while re-recording pgorm-python's acceptance on PostgreSQL 18, and unrelated to the server version. pgorm-python/checks/typing.py installed_metadata() resolves the package root (`root = Path(pgorm.__file__).resolve().parent`) and then asserts `Path(_native.__file__).parent == root` without resolving the native module's path. distribution.py installs each wheel into a venv under tempfile's directory. On macOS that is $TMPDIR=/var/folders/..., reached through the /var -> /private/var symlink, so the two paths differ by the prefix and the assertion fails before any typing runs. Reproduced in a fresh venv from the same wheel: the native module's parent is /var/folders/.../site-packages/pgorm while root is /private/var/folders/.../site-packages/pgorm. The failure surfaced as the distribution phase of checks/acceptance.py failing on 2026-10-06. The stderr is not captured into distribution.log, so the log shows only CalledProcessError. CI's macOS job passes because its runner's temporary directory is not behind a symlink, and the 2026-10-06 acceptance record ran with TMPDIR set to its resolved path (pgorm-python/ACCEPTANCE.md says so). Fix: resolve the native module's path before comparing (`Path(_native.__file__).resolve().parent == root`). Consider also surfacing the child's stderr when the metadata program fails. Acceptance: checks/acceptance.py passes through tests/with_postgres.py under macOS's default TMPDIR, and ACCEPTANCE.md's TMPDIR paragraph is removed."
             }
+
+            {
+                at 2026-10-08T15:46:04.896168Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -10378,6 +10385,20 @@ children (
                         text "Home under the pg-19 feature (sql.target, 2026-10-07). The typed home this note weighs — constructors for lag, lead, first_value, last_value and nth_value that carry a null treatment — is new items behind #[cfg(feature = \"pg-19\")], marked doc(cfg(feature = \"pg-19\")), and so additive by construction. The alternative is ruled out by more than the server's refusals now: a null-treatment field or variant added under cfg to FunctionCall or WindowFunction appears whenever any crate in the graph turns pg-19 on, and breaks a dependent's exhaustive match or struct literal. Python's expression and pipeline surfaces follow behind pgorm-python's own pg-19, their capability entries carrying \"features\": [\"pg-19\"]. Live tests are #[cfg(feature = \"pg-19\")] against pgorm-test-19; the rust-pg-19 check platform keeps them compiling. Still behind pg-query-19."
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id python-acceptance-emcc-probe
+        title "The acceptance runner's no-Python build probe passes on a host whose emcc is a Python program"
+        kind @fix
+        log (
+            {
+                at 2026-10-08T15:47:43.547951Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found while running python-typing-check-symlinked-tmp's acceptance (2026-10-08). pgorm-python/checks/acceptance.py rust_without_python() builds the default workspace with python, python3, python3.14, pip, pip3 and maturin replaced by stubs that record their invocation, and fails if any ran. On a fresh target directory it fails on a macOS host with Homebrew's emscripten installed, for a reason that has nothing to do with pgorm: libc 0.2.189's build script runs `emcc -dumpversion` on every host (build.rs emcc_version_code(), not gated on the emscripten target), and /opt/homebrew/bin/emcc is a shell wrapper that runs `python3 -E .../emcc.py`, which hits the python3 stub. Reproduced with the stubs logging their parent: the invoker is target/debug/build/libc-*/build-script-build, cwd libc-0.2.189. The probe's intent is that pgorm's own build needs no Python tooling; a third-party build script probing for an unrelated compiler is outside it. Options: shadow emcc in the probe directory with a stub that exits non-zero without recording (libc then takes its non-emscripten default, as on a host without emscripten), or record the invoking process and ignore invocations whose parent is emcc. A warm target directory hides the failure because the build script does not rerun, so the probe should be tested against a fresh target. The 2026-10-08 acceptance record ran with an emcc that exits 1 first on PATH."
             }
         )
     }
