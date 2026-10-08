@@ -10301,6 +10301,7 @@ children (
         id constraint-not-valid
         title "A foreign key or CHECK can be added NOT VALID, and a CHECK can be NO INHERIT"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-07T01:10:17.283536Z
@@ -10314,6 +10315,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "SQLSTATEs checked on 18.6 when filing: a CHECK added NOT VALID over a breaking row is accepted (convalidated false) and refuses a new breaking row (23514); CHECK (...) NO INHERIT on a partitioned table is refused 42P16 (\"cannot add NO INHERIT constraint to partitioned table\"), where a NOT NULL's NO INHERIT there is 0A000."
+            }
+
+            {
+                at 2026-10-08T19:26:22.541478Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T19:57:45.855691Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

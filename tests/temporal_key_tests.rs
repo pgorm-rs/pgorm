@@ -120,7 +120,7 @@ async fn definition(
 /// (`23514`). The plain key over the same columns, the control, admits the
 /// overlap. The GiST index behind the key needs `btree_gist` for the integer
 /// column (`42704` without it).
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a WITHOUT OVERLAPS
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: a WITHOUT OVERLAPS
 // key refuses overlapping periods for one key and admits adjacent ones
 #[pgorm_macros::test]
 async fn a_temporal_key_refuses_overlapping_periods() -> Result<(), Error> {
@@ -180,7 +180,7 @@ async fn a_temporal_key_refuses_overlapping_periods() -> Result<(), Error> {
 /// `NULLS NOT DISTINCT`, under which two rows with no room and one period
 /// conflict where the plain temporal key admits them; and it may be deferred,
 /// holding an overlap between statements until `COMMIT` refuses it.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a temporal unique key
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: a temporal unique key
 // takes NULLS NOT DISTINCT and deferrability, and both mean what they mean on a plain key
 #[pgorm_macros::test]
 async fn a_temporal_unique_key_takes_its_options() -> Result<(), Error> {

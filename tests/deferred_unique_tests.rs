@@ -94,7 +94,7 @@ async fn collide<C: ConnectionTrait>(db: &C, table: &str) -> Result<u64, Error> 
 /// clause, refuses the first half of the swap on the spot.
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: an initially
 // deferred unique key is checked at COMMIT
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 // [spec:pgorm:req:sql.scope+14/test]
 async fn a_deferred_unique_key_admits_a_transient_duplicate(
     db: &mut DatabaseConnection,
@@ -140,7 +140,7 @@ async fn a_deferred_unique_key_admits_a_transient_duplicate(
 /// named, so `SET CONSTRAINTS` has a name to reach it by.
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: SET CONSTRAINTS moves
 // a deferrable key's check
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 async fn set_constraints_immediate_fires_the_check_early(
     db: &mut DatabaseConnection,
 ) -> Result<(), Error> {
@@ -230,7 +230,7 @@ async fn a_deferred_primary_key_is_checked_at_commit(
 /// `ADD UNIQUE (…)`.
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]    against a live server: INITIALLY IMMEDIATE is
 // checked at the end of the statement, NOT DEFERRABLE per row
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 async fn an_initially_immediate_key_checks_at_statement_end(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {

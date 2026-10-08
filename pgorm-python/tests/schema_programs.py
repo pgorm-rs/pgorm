@@ -53,6 +53,10 @@ def programs(p):
             .check(p.col("n") < 100, name='small "x"').check(p.col("n") != 7, not_enforced=True),
         "add_check": p.add_check(table, p.col("n") > 0, name='positive "x"', not_enforced=True),
         "add_check_plain": p.add_check(table, p.col("n") > 0),
+        "add_check_not_valid": p.add_check(table, p.col("n") > 0, name='positive "x"', no_inherit=True, not_valid=True),
+        "check_no_inherit": p.CreateTable(table)
+            .column(p.ColumnDef("n", "integer").check(p.col("n") > 0, no_inherit=True))
+            .check(p.col("n") < 100, name='small "x"', no_inherit=True, not_enforced=True),
         "alter_constraint_enforced": p.alter_constraint(table, 'fk "x"', "enforced"),
         "alter_constraint_not_enforced": p.alter_constraint(table, 'fk "x"', "not_enforced"),
         "enum": p.create_enum(kind, ["", "O'Brien \\ 雪", "busy"]),

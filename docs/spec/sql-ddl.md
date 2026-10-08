@@ -64,7 +64,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables
 
-> [spec:pgorm:req:sql.ddl.create-table+15]
+> [spec:pgorm:req:sql.ddl.create-table+16]
 > `TableCreateStatement` composes a table name, ordered `ColumnDef`s (`col()`,
 > which stamps the table ref onto each column), the table's keys — one primary
 > key (`primary_key()`) and any number of unique keys (`unique()`), each a
@@ -120,7 +120,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > written inside the one it constrains — and has no rendering of its own, no
 > `Display` and no build path, because PostgreSQL spells it only inside a
 > table statement; `ALTER TABLE` adds the same type
-> (`[spec:pgorm:req:sql.ddl.alter-table+11]`). Its readers are `get_name()`,
+> (`[spec:pgorm:req:sql.ddl.alter-table+12]`). Its readers are `get_name()`,
 > `get_columns()`, `get_include()`, `get_deferrability()` and
 > `get_without_overlaps()`. Its columns,
 > not the key, are what an `ON CONFLICT` target naming the key takes:
@@ -201,16 +201,27 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > both `<table>_<column>_key`.
 >
 > A `CHECK` constraint is a `Check`: the expression its constructor takes
-> (`Check::new(expr)`), with by-value `name(n)` and `enforcement(e)`
-> (`[spec:pgorm:req:sql.ddl.enforcement]`) and the readers `get_expr()`,
-> `get_name()` and `get_enforcement()`. It renders `[CONSTRAINT "name"
-> ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]` wherever it stands — here, on a
+> (`Check::new(expr)`), with by-value `name(n)`, `enforcement(e)`
+> (`[spec:pgorm:req:sql.ddl.enforcement]`) and `no_inherit()`, and the readers
+> `get_expr()`, `get_name()`, `get_enforcement()` and `is_no_inherit()`. It
+> renders `[CONSTRAINT "name" ]CHECK (<expr>)[ NO INHERIT][ ENFORCED | NOT
+> ENFORCED]` wherever it stands — here, on a
 > column (`[spec:pgorm:req:sql.ddl.column-def+12]`) and after `ALTER TABLE`'s
-> `ADD` (`[spec:pgorm:req:sql.ddl.alter-table+11]`) — and has no
+> `ADD` (`[spec:pgorm:req:sql.ddl.alter-table+12]`) — and has no
 > deferrability, which PostgreSQL never gives a `CHECK`
 > (`[spec:pgorm:req:sql.ddl.deferrability+4]`). Each position takes any
 > `IntoCheck`: an expression, which is the unnamed, enforced constraint, or a
 > `Check` already built, as a key position takes a column or a `TableKey`.
+> `NO INHERIT` keeps the constraint from a table created `INHERITS` this
+> one, and the live suite holds it: a parent's `NO INHERIT` `CHECK`, on a
+> column, at table level or added after, is not copied to the child, which
+> admits the row the parent refuses, where a plain one is copied. It is
+> written before the enforcement, because a column's `CHECK` takes it there
+> alone (`NOT ENFORCED NO INHERIT` on a column is `42601`). A partitioned
+> table's constraints always reach its partitions, so the server refuses it
+> there (`42P16`), in `CREATE TABLE` and after `ADD` alike. A `CHECK` is
+> never `NOT VALID` here: that is an `ALTER TABLE`'s
+> (`[spec:pgorm:req:sql.ddl.alter-table+12]`).
 >
 > After the closing parenthesis only the `extra` string follows (e.g.
 > `USING columnar`). There are no table options: the MySQL-era `TableOpt`
@@ -253,12 +264,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A column carries no key. A primary or unique key is the table's, a tuple of
 > one or more columns declared on the table
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`), so `ColumnSpec` has no
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`), so `ColumnSpec` has no
 > `UniqueKey` or `PrimaryKey` arm and `ColumnDef` no `unique_key()`,
 > `primary_key()` or their deferrability variants: a key on a column was the
 > spelling that let one table hold two primary keys, and adding a key to a
 > table that exists is `ALTER TABLE`'s `add_primary_key` / `add_unique`
-> (`[spec:pgorm:req:sql.ddl.alter-table+11]`), not a column's.
+> (`[spec:pgorm:req:sql.ddl.alter-table+12]`), not a column's.
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
@@ -266,7 +277,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`, `DEFAULT <expr>`,
 > `[CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]` — `check(c)`
 > takes the `IntoCheck` a table's `check()` does
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`) —
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`) —
 > `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
@@ -294,7 +305,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > VALID` has no column-level spelling — the grammar refuses it in `CREATE
 > TABLE` and `ADD COLUMN` alike (`42601`) — and so no setter: a not-null
 > constraint is added `NOT VALID` by `ALTER TABLE`'s `add_not_null`
-> (`[spec:pgorm:req:sql.ddl.alter-table+11]`). A `NOT NULL` is never deferrable
+> (`[spec:pgorm:req:sql.ddl.alter-table+12]`). A `NOT NULL` is never deferrable
 > (`42601` on a column, `0A000` at table level) nor `[NOT] ENFORCED` (likewise).
 > The constraint is dropped by a modified column's `Null` spec, `ALTER COLUMN
 > "c" DROP NOT NULL`, whatever its name, and by `DROP CONSTRAINT "name"`;
@@ -308,7 +319,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > nothing there: the live suite's server creates a table-level `NOT NULL c NOT
 > VALID` valid (`convalidated`), a new table having no rows to leave
 > unchecked. So the concept has one form in `CREATE TABLE`, as a key does
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`).
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`).
 >
 > A generated column is one of PostgreSQL's two kinds, `GeneratedKind::Stored`
 > (computed when the row is written, kept on disk) or `GeneratedKind::Virtual`
@@ -445,7 +456,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Multirange(t)`→ its multirange (`int4multirange` through
 > `tstzmultirange`).
 
-> [spec:pgorm:req:sql.ddl.alter-table+11]
+> [spec:pgorm:req:sql.ddl.alter-table+12]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey`, `DropConstraint`, `AddPrimaryKey`, `AddUnique`,
@@ -465,17 +476,44 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > keep (`[spec:pgorm:req:sql.ast+2]`) — a second copy is `.to_owned()`.
 >
 > `add_foreign_key` — on both `PendingTableAlter` and `TableAlterStatement` —
-> takes `Into<TableForeignKey>` by value, as `add_column` takes
-> `IntoColumnDef`: an embedder consumes what it embeds, and a borrow that
-> silently cloned would be the third reuse-outcome
-> `[spec:pgorm:req:sql.ddl.create-table+15]` rules out.
+> takes any `IntoAddedConstraint<TableForeignKey>` by value, as `add_column`
+> takes `IntoColumnDef`: an embedder consumes what it embeds, and a borrow
+> that silently cloned would be the third reuse-outcome
+> `[spec:pgorm:req:sql.ddl.create-table+16]` rules out.
+>
+> A foreign key or a `CHECK` may be added `NOT VALID`, leaving the rows
+> already there unchecked while every row written from then on is held to it.
+> `TableForeignKey::not_valid()` and `Check::not_valid()` wrap the constraint
+> in a `NotValid<C>` (read back by `get_constraint()`), and the only positions
+> that take one are the two `ADD` actions, `add_foreign_key` and `add_check`,
+> through `IntoAddedConstraint<C>`: anything that converts into the
+> constraint, which is added checked, or the `NotValid` wrapper, which is
+> added `NOT VALID`. The clause renders last, after the deferrability and the
+> enforcement it may carry, which is where PostgreSQL takes it. Nothing that
+> creates a table or a column takes a `NotValid` — `foreign_key()`, `check()`
+> and `ColumnDef::check` — so it does not compile there
+> (`[dec:pgorm:invalid-states-unrepresentable]`, `compile_fail` doctests on
+> `NotValid`): a `CREATE TABLE` creates every constraint valid, its table
+> having no rows to leave unchecked, so a table-level `NOT VALID` there is
+> taken and ignored (`convalidated` true), and a column's `CHECK`,
+> `REFERENCES` or an added column's `CHECK` has no place for it (`42601`). A
+> `NOT NULL` is added `NOT VALID` by its own type
+> (`NotNullConstraint::not_valid`), for the same reason. The live suite holds
+> what it means: over rows that break it, the plain action is refused
+> (`23503`, `23514`) and the `NOT VALID` one taken, `convalidated` false; a new
+> breaking row is refused at once; `validate_constraint` refuses the old rows
+> the same way, and once they are mended makes the constraint valid. A `NOT
+> ENFORCED` constraint is never valid whatever it says, takes `NOT VALID`
+> beside it, and `VALIDATE CONSTRAINT` refuses it (`55000`). PostgreSQL
+> refuses `NOT VALID` on any other constraint (`0A000` on a unique key), which
+> no type here carries.
 >
 > `add_primary_key` and `add_unique`, on both types, take the key a table
 > declares when it is created — any `IntoTableKey` of their kind, a column, a
 > tuple or a built `TableKey` — by value, and render `ADD [CONSTRAINT "name"
 > ]PRIMARY KEY (cols)…` / `ADD [CONSTRAINT "name" ]UNIQUE [NULLS NOT DISTINCT
 > ](cols)…` with the key's `INCLUDE` and deferrability, the table-level
-> spelling of `[spec:pgorm:req:sql.ddl.create-table+15]` after `ADD`. They are
+> spelling of `[spec:pgorm:req:sql.ddl.create-table+16]` after `ADD`. They are
 > how a key is added to a table that exists, now that a column carries none
 > (`[spec:pgorm:req:sql.ddl.column-def+12]`): the `ADD COLUMN … UNIQUE` and
 > `ADD UNIQUE ("c")` a column's key spec used to render are this, one key at a
@@ -558,12 +596,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > where `NO INHERIT` is refused (`0A000`); `add_primary_key` over a column
 > whose constraint is still `NOT VALID` is refused as well (`55000`).
 >
-> `add_check(c)`, on both types, takes any `IntoCheck`
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`) and renders `ADD
-> [CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]`: the rows
-> already there are checked and one that breaks the condition refuses the
-> action (`23514`), unless the constraint is `NOT ENFORCED`, which holds no
-> row (`[spec:pgorm:req:sql.ddl.enforcement]`).
+> `add_check(c)`, on both types, takes any `IntoAddedConstraint<Check>` — an
+> `IntoCheck` (`[spec:pgorm:req:sql.ddl.create-table+16]`) or a `NotValid<Check>`
+> — and renders `ADD [CONSTRAINT "name" ]CHECK (<expr>)[ NO INHERIT][ ENFORCED
+> | NOT ENFORCED][ NOT VALID]`: the rows already there are checked and one
+> that breaks the condition refuses the action (`23514`), unless the
+> constraint is `NOT ENFORCED`, which holds no row
+> (`[spec:pgorm:req:sql.ddl.enforcement]`), or `NOT VALID`, which leaves them
+> for `validate_constraint`.
 >
 > `validate_constraint(name)` renders `VALIDATE CONSTRAINT "name"`: the rows a
 > `NOT VALID` foreign key, `CHECK` or `NOT NULL` constraint skipped, checked
@@ -729,7 +769,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `is_unique_key()` and `kind()` read it back. There is no primary-key kind,
 > because PostgreSQL spells `PRIMARY KEY` only as a table constraint and never
 > as `CREATE INDEX`; the primary key is the table's `TableKey`
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`), and so the standalone
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`), and so the standalone
 > renderer has no primary key to be handed. `IntoIndexColumn` accepts an
 > iden, an `(iden, IndexOrder)` pair, or an `IndexColumn` built outright, and
 > nothing else: the MySQL prefix-length forms
@@ -772,7 +812,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > An `IndexCreateStatement` renders only as `CREATE INDEX`: it does not
 > convert into the `TableKey` a table declares
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`), which is a type of its own
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`), which is a type of its own
 > because nearly everything this statement carries — the `Plain` kind, an
 > expression or ordered entry, an operator class, the predicate, the access
 > method — is a syntax error in a table constraint. The split runs both
@@ -837,7 +877,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is refused (`23503`), and so is deleting a parent row a child's period
 > needs; the plain foreign key over the same pairs, the control, is refused
 > outright (`42830`), `PERIOD` being the only way to reference a key ending
-> `WITHOUT OVERLAPS` (`[spec:pgorm:req:sql.ddl.create-table+15]`). PostgreSQL
+> `WITHOUT OVERLAPS` (`[spec:pgorm:req:sql.ddl.create-table+16]`). PostgreSQL
 > takes `PERIOD` on the last column of each list alone and refuses a list it
 > is the only column of (both `42601`), and refuses it on one side without
 > the other (`42830`). So the pair is a slot of its own, written last on both
@@ -878,13 +918,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`:
 > an embedded key constrains the table it sits inside and MUST NOT name
 > another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+11]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+12]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`). A foreign key is dropped by
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`). A foreign key is dropped by
 > name as a constraint of any kind is, by `drop_constraint`
-> (`[spec:pgorm:req:sql.ddl.alter-table+11]`): `ForeignKey::drop` and the
+> (`[spec:pgorm:req:sql.ddl.alter-table+12]`): `ForeignKey::drop` and the
 > `ForeignKeyDropStatement` it built rendered that same `ALTER TABLE <table>
 > DROP CONSTRAINT "name"` under a name for one kind, and are gone with the
 > `Drop` arm of `ForeignKeyStatement`; they MUST NOT return. Foreign-key table
@@ -910,9 +950,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > lets defer. A foreign key carries it as a field
 > (`[spec:pgorm:req:sql.ddl.foreign-key+9]`). A primary or unique key carries
 > it on its `TableKey`, whose `deferrability(d)` sets it
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`): it follows the key's column
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
-> alike (`[spec:pgorm:req:sql.ddl.alter-table+11]`). A column carries no key
+> alike (`[spec:pgorm:req:sql.ddl.alter-table+12]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
 > `unique_key_deferrability(d)` and `primary_key_deferrability(d)` — are gone
 > with the column keys (`[spec:pgorm:req:sql.ddl.column-def+12]`), and the
@@ -963,7 +1003,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > caller did not make, and `Enforced` renders only because a caller said it.
 >
 > A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+9]`)
-> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+15]`),
+> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+16]`),
 > and nothing else can, because nothing else takes it: PostgreSQL refuses
 > `[NOT] ENFORCED` on a primary key, a unique key, a `NOT NULL` and an
 > `EXCLUDE` at table level (`0A000`, "... constraints cannot be marked NOT
@@ -983,7 +1023,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `DEFERRABLE` (the server records both, the deferral meaning nothing while
 > nothing is checked); a `CHECK` stays undeferrable either way (`0A000`).
 > `VALIDATE CONSTRAINT` refuses it (`55000`). `ALTER CONSTRAINT "name"
-> ENFORCED` / `NOT ENFORCED` (`ConstraintChange`, `[spec:pgorm:req:sql.ddl.alter-table+11]`)
+> ENFORCED` / `NOT ENFORCED` (`ConstraintChange`, `[spec:pgorm:req:sql.ddl.alter-table+12]`)
 > moves a foreign key between the two, `ENFORCED` checking every row as it
 > goes (`23503`) and `NOT ENFORCED` leaving it not valid. From PostgreSQL 19
 > it moves a `CHECK` the same way, `ENFORCED` refusing a row that breaks the

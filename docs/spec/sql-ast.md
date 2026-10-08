@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+24]
+> [spec:pgorm:req:sql.surface+25]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -129,6 +129,8 @@ today, including panicking edges and deliberate failsafes.
 > `DropBehavior` and `ConstraintRenameStatement`, a constraint of any kind
 > dropped by name, the conversion a name takes into the plain drop, whether a
 > drop restricts or cascades, and the statement that renames one
+> (`sql.ddl.alter-table`); `NotValid` and `IntoAddedConstraint`, a foreign
+> key or `CHECK` added `NOT VALID` and what the two `ADD` actions take for one
 > (`sql.ddl.alter-table`); `Check` and `IntoCheck`, a `CHECK` constraint and
 > the conversion an expression takes into one (`sql.ddl.create-table`),
 > `Enforcement`, whether a foreign key or `CHECK` is enforced
@@ -905,7 +907,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `OnConflict::columns` MUST name a whole key's columns in one call. It takes
 > an `IntoKeyColumns`, the conversion a table key is built from
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`): one column or a tuple of one
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`): one column or a tuple of one
 > to twelve, in order, so `OnConflict::columns((a, b))` is the target
 > `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
 > declares the key it arbitrates on. The conversion hands back the first
@@ -951,7 +953,7 @@ today, including panicking edges and deliberate failsafes.
 > (`42809`); it is also the one arbiter that only a name reaches, because
 > inference looks for a unique index and finds none (`42P10`). PostgreSQL
 > 18's temporal key, a primary or unique key ending `WITHOUT OVERLAPS`
-> (`[spec:pgorm:req:sql.ddl.create-table+15]`), is enforced as one and
+> (`[spec:pgorm:req:sql.ddl.create-table+16]`), is enforced as one and
 > arbitrates as one, which the live suite holds: `OnConflict::columns` over
 > its columns, period included, finds nothing to infer (`42P10`), and its
 > name takes `DO NOTHING`, an overlapping row being the conflict, and refuses

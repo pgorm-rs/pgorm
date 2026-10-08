@@ -59,15 +59,16 @@ impl PyColumnDef {
         Ok(Self { inner })
     }
     // [spec:pgorm:req:python.schema]
-    #[pyo3(signature=(condition, *, name=None, not_enforced=false))]
+    #[pyo3(signature=(condition, *, name=None, not_enforced=false, no_inherit=false))]
     fn check(
         &self,
         condition: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
         not_enforced: bool,
+        no_inherit: bool,
     ) -> PyResult<Self> {
         let mut inner = self.inner.clone();
-        inner.check(check(condition, name, not_enforced)?);
+        inner.check(check(condition, name, not_enforced, no_inherit)?);
         Ok(Self { inner })
     }
     fn generated(&self, expression: &Bound<'_, PyAny>, kind: &str) -> PyResult<Self> {
@@ -86,17 +87,22 @@ impl PyColumnDef {
     }
 }
 
-/// A `CHECK` over `condition`, named and `NOT ENFORCED` as asked: what
-/// `ColumnDef.check`, `CreateTable.check` and `add_check` each build.
+/// A `CHECK` over `condition`, named, `NOT ENFORCED` and `NO INHERIT` as
+/// asked: what `ColumnDef.check`, `CreateTable.check` and `add_check` each
+/// build.
 // [spec:pgorm:req:python.schema]
 pub(super) fn check(
     condition: &Bound<'_, PyAny>,
     name: Option<&Bound<'_, PyAny>>,
     not_enforced: bool,
+    no_inherit: bool,
 ) -> PyResult<Check> {
     let mut check = Check::new(expressions::require_expr(condition)?.inner);
     if let Some(name) = name {
         check = check.name(PyIdentifier::new(name)?.name());
+    }
+    if no_inherit {
+        check = check.no_inherit();
     }
     if not_enforced {
         check = check.enforcement(Enforcement::NotEnforced);

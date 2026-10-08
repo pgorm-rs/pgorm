@@ -1552,7 +1552,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1624,7 +1624,7 @@ impl QueryBuilder {
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
                             }
-                            // [spec:pgorm:req:sql.ddl.alter-table+11]
+                            // [spec:pgorm:req:sql.ddl.alter-table+12]
                             ColumnSpec::NotNull { name, no_inherit } => {
                                 let mut constraint =
                                     NotNullConstraint::new(column_def.name.clone());
@@ -1640,7 +1640,7 @@ impl QueryBuilder {
                             }
                             // A modified column's CHECK is a constraint the
                             // table gains, which ALTER TABLE spells as an ADD.
-                            // [spec:pgorm:req:sql.ddl.alter-table+11]
+                            // [spec:pgorm:req:sql.ddl.alter-table+12]
                             ColumnSpec::Check(check) => {
                                 write!(sql, "ADD ").unwrap();
                                 self.prepare_check_constraint(check, sql);
@@ -1669,7 +1669,10 @@ impl QueryBuilder {
                 TableAlterOption::DropConstraint(drop) => {
                     self.prepare_drop_constraint(drop, sql);
                 }
-                TableAlterOption::AddForeignKey(foreign_key) => {
+                TableAlterOption::AddForeignKey {
+                    foreign_key,
+                    not_valid,
+                } => {
                     let create = ForeignKeyCreateStatement {
                         foreign_key: foreign_key.to_owned(),
                     };
@@ -1678,8 +1681,9 @@ impl QueryBuilder {
                         sql,
                         Mode::TableAlter,
                     );
+                    self.prepare_not_valid(*not_valid, sql);
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+11]
+                // [spec:pgorm:req:sql.ddl.alter-table+12]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1697,9 +1701,10 @@ impl QueryBuilder {
                 TableAlterOption::AddNotNull(constraint) => {
                     self.prepare_add_not_null(constraint, sql);
                 }
-                TableAlterOption::AddCheck(check) => {
+                TableAlterOption::AddCheck { check, not_valid } => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_check_constraint(check, sql);
+                    self.prepare_not_valid(*not_valid, sql);
                 }
                 TableAlterOption::ValidateConstraint(name) => {
                     self.prepare_validate_constraint(name, sql);
@@ -1725,7 +1730,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,
@@ -1740,7 +1745,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`TableCreateStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.create-table+15]
+    // [spec:pgorm:req:sql.ddl.create-table+16]
     pub(crate) fn prepare_table_create_statement(
         &self,
         create: &TableCreateStatement,
@@ -1763,7 +1768,7 @@ impl QueryBuilder {
             first = false;
         });
 
-        // [spec:pgorm:req:sql.ddl.create-table+15]
+        // [spec:pgorm:req:sql.ddl.create-table+16]
         if let Some(key) = &create.primary_key {
             if !first {
                 write!(sql, ", ").unwrap();
@@ -1941,6 +1946,9 @@ impl QueryBuilder {
         write!(sql, "CHECK (").unwrap();
         self.prepare_simple_expr(&check.expr, sql);
         write!(sql, ")").unwrap();
+        if check.no_inherit {
+            write!(sql, " NO INHERIT").unwrap();
+        }
         if let Some(enforcement) = check.enforcement {
             write!(sql, "{}", enforcement.clause()).unwrap();
         }
@@ -1966,7 +1974,7 @@ impl QueryBuilder {
     /// deferrability to write, and its columns are plain names: it has no
     /// entry that could carry an ordering, an operator class or an expression.
     /// A temporal key's `WITHOUT OVERLAPS` column closes the list.
-    // [spec:pgorm:req:sql.ddl.create-table+15]
+    // [spec:pgorm:req:sql.ddl.create-table+16]
     pub(super) fn prepare_table_key<K>(
         &self,
         keyword: &str,
@@ -1991,7 +1999,7 @@ impl QueryBuilder {
             name.prepare(sql.as_writer());
             false
         });
-        // [spec:pgorm:req:sql.ddl.create-table+15]
+        // [spec:pgorm:req:sql.ddl.create-table+16]
         if let Some(period) = &key.without_overlaps {
             write!(sql, ", ").unwrap();
             period.prepare(sql.as_writer());

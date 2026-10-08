@@ -32,8 +32,8 @@ pub use check::{Check, IntoCheck};
 pub use column::*;
 pub use column_generated::GeneratedKind;
 pub use constraint::{
-    ConstraintChange, ConstraintDrop, DropBehavior, Enforcement, IntoConstraintDrop,
-    NotNullConstraint,
+    ConstraintChange, ConstraintDrop, DropBehavior, Enforcement, IntoAddedConstraint,
+    IntoConstraintDrop, NotNullConstraint, NotValid,
 };
 pub use create::*;
 pub use drop::*;
@@ -111,7 +111,7 @@ impl Table {
 
     /// Construct constraint [`ConstraintRenameStatement`] over a table and two
     /// constraint names
-    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
     pub fn rename_constraint<T, F, R>(
         table: T,
         from_name: F,

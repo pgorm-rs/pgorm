@@ -312,6 +312,32 @@ fn programs() -> BTreeMap<&'static str, String> {
                 .to_string(),
         ),
         (
+            "add_check_not_valid",
+            Table::alter(table.clone())
+                .add_check(
+                    Check::new(Expr::col(a("n")).gt(0i64))
+                        .name(a("positive \"x\""))
+                        .no_inherit()
+                        .not_valid(),
+                )
+                .to_string(),
+        ),
+        (
+            "check_no_inherit",
+            Table::create(table.clone())
+                .col(
+                    ColumnDef::new_with_type(a("n"), ColumnType::Integer)
+                        .check(Check::new(Expr::col(a("n")).gt(0i64)).no_inherit()),
+                )
+                .check(
+                    Check::new(Expr::col(a("n")).lt(100i64))
+                        .name(a("small \"x\""))
+                        .no_inherit()
+                        .enforcement(Enforcement::NotEnforced),
+                )
+                .to_string(),
+        ),
+        (
             "alter_constraint_enforced",
             Table::alter(table.clone())
                 .alter_constraint(a("fk \"x\""), ConstraintChange::Enforced)

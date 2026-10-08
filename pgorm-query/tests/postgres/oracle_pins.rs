@@ -63,7 +63,7 @@ fn over_attaches_only_to_function_calls() {
 // to come from: nothing but the caller's own `extra` string can follow the
 // closing parenthesis. Deletion-proof, so there is no rejection left to pin.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 #[test]
 fn create_table_renders_no_trailing_options() {
     let sql = Table::create(Glyph::Table)
@@ -192,7 +192,7 @@ fn cross_join_renders_without_on_clause() {
 // the sole action of an ALTER TABLE, so a column rename is a statement of its
 // own and cannot be listed beside an ADD COLUMN.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 #[test]
 fn column_rename_is_its_own_statement() {
     let added = Table::alter(Font::Table)
@@ -380,7 +380,7 @@ fn oracle_records_parse_valid_defects() {
 // with the state it guarded — the strings below have no builder left to produce
 // them.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 // [spec:pgorm:req:sql.ddl.index-create+11/test]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]
 #[test]
@@ -406,7 +406,7 @@ fn empty_ddl_collections_do_not_construct() {
 // with no attributes is a real table — so a column-less create statement stays
 // buildable and is documented by `sql.ddl.create-table` instead.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 #[test]
 fn create_table_with_no_columns_is_valid() {
     let sql = Table::create(Glyph::Table).to_string();
@@ -421,11 +421,11 @@ fn create_table_with_no_columns_is_valid() {
 // PostgreSQL rejects at the token after it has nowhere to come from. The
 // `compile_fail` doctests on each statement type prove the constructors refuse.
 // [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 // [spec:pgorm:req:sql.ddl.index-create+11/test]
 // [spec:pgorm:req:sql.ddl.index-drop+3/test]
 // [spec:pgorm:req:sql.ddl.drop-rename-truncate+4/test]
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 // [spec:pgorm:req:sql.ddl.foreign-key+9/test]
 #[test]
 fn ddl_targets_are_taken_by_construction() {
@@ -486,7 +486,7 @@ fn index_name_and_drop_table_stay_optional() {
 // refuses the half-named key.
 // [spec:pgorm:req:sql.render.oracle+1/test]
 // [spec:pgorm:req:sql.ddl.foreign-key+9/test]
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
 #[test]
 fn foreign_keys_name_two_tables_and_a_pair() {
     let standalone = ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)

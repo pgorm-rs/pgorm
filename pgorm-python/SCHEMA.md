@@ -79,8 +79,12 @@ plain with its values. `add_not_null(table, column, name=None,
 no_inherit=False, not_valid=False)` adds a `NOT NULL` constraint over a column
 that exists; with `not_valid=True` the rows already there are left unchecked
 until `validate_constraint(table, name)` checks them, while new rows are held
-to it at once. `add_check(table, condition, name=None, not_enforced=False)`
-adds a `CHECK` to a table that exists. `alter_constraint(table, name,
+to it at once. `add_check(table, condition, name=None, not_enforced=False, no_inherit=False,
+not_valid=False)` adds a `CHECK` to a table that exists; with `not_valid=True`
+the rows already there are left for `validate_constraint` while new rows are
+held to it at once. `no_inherit=True`, which `ColumnDef.check` and
+`CreateTable.check` take too, keeps a `CHECK` from tables that inherit this
+one; a partitioned table refuses it. `alter_constraint(table, name,
 "inherit" | "no_inherit")` changes whether a `NOT NULL` constraint passes to
 inheriting tables, and `alter_constraint(table, name, "enforced" |
 "not_enforced")` whether a foreign key, or on PostgreSQL 19 a `CHECK`, is

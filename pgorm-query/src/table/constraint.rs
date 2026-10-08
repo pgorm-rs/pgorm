@@ -3,7 +3,10 @@
 //! `ALTER CONSTRAINT` makes to one that exists, and the `DROP CONSTRAINT`
 //! that removes one of any kind.
 
+use crate::TableForeignKey;
 use crate::types::{IntoName, Name};
+
+use super::{Check, IntoCheck};
 
 /// A `NOT NULL` constraint added to a table that exists:
 /// `ADD [CONSTRAINT "name" ]NOT NULL "column"[ NO INHERIT][ NOT VALID]`.
@@ -32,7 +35,7 @@ use crate::types::{IntoName, Name};
 ///     r#"ALTER TABLE "glyph" ADD CONSTRAINT "glyph_aspect_present" NOT NULL "aspect" NOT VALID"#,
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+11]
+// [spec:pgorm:req:sql.ddl.alter-table+12]
 #[derive(Debug, Clone)]
 pub struct NotNullConstraint {
     pub(crate) column: Name,
@@ -155,7 +158,7 @@ impl Enforcement {
 /// it is refused there (`42809`). Where those kinds differ by release, the
 /// variant says so: the builder cannot tell a `CHECK`'s name from a foreign
 /// key's, so no target can rule the difference out by type.
-// [spec:pgorm:req:sql.ddl.alter-table+11]
+// [spec:pgorm:req:sql.ddl.alter-table+12]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {
     /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
@@ -180,7 +183,7 @@ pub enum ConstraintChange {
 
 impl ConstraintChange {
     /// The words this change is written with, after the constraint's name.
-    // [spec:pgorm:req:sql.ddl.alter-table+11]
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::Inherit => "INHERIT",
@@ -194,7 +197,7 @@ impl ConstraintChange {
 /// What a drop does to the objects that depend on what it drops: `RESTRICT`,
 /// refusing the drop while any does (`2BP01`), which is PostgreSQL's default,
 /// or `CASCADE`, dropping them with it.
-// [spec:pgorm:req:sql.ddl.alter-table+11]
+// [spec:pgorm:req:sql.ddl.alter-table+12]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DropBehavior {
     /// `RESTRICT`: refuse the drop while anything depends on it.
@@ -248,7 +251,7 @@ impl DropBehavior {
 /// notice), a key another table's foreign key depends on unless the drop
 /// cascades to it (`2BP01`), a constraint a table inherited from its parent
 /// (`42P16`), and the `NOT NULL` of a primary-key column (`42P16`).
-// [spec:pgorm:req:sql.ddl.alter-table+11]
+// [spec:pgorm:req:sql.ddl.alter-table+12]
 #[derive(Debug, Clone)]
 pub struct ConstraintDrop {
     pub(crate) name: Name,
@@ -315,7 +318,7 @@ impl ConstraintDrop {
 /// [`ConstraintDrop`] already built: what
 /// [`TableAlterStatement::drop_constraint`](crate::TableAlterStatement::drop_constraint)
 /// takes.
-// [spec:pgorm:req:sql.ddl.alter-table+11]
+// [spec:pgorm:req:sql.ddl.alter-table+12]
 pub trait IntoConstraintDrop {
     /// The drop.
     fn into_constraint_drop(self) -> ConstraintDrop;
@@ -333,5 +336,122 @@ where
 {
     fn into_constraint_drop(self) -> ConstraintDrop {
         ConstraintDrop::new(self)
+    }
+}
+
+/// A foreign key or `CHECK` added `NOT VALID`: the rows already in the table
+/// are left unchecked, and every row written from then on is held to it, until
+/// [`validate_constraint`](crate::TableAlterStatement::validate_constraint)
+/// checks the rest.
+///
+/// [`TableForeignKey::not_valid`] and [`Check::not_valid`] make one, and only
+/// the `ALTER TABLE ... ADD` actions take it —
+/// [`add_foreign_key`](crate::TableAlterStatement::add_foreign_key) and
+/// [`add_check`](crate::TableAlterStatement::add_check) — because only there
+/// does the clause say anything: a `CREATE TABLE` creates every constraint
+/// valid, there being no rows to leave unchecked, so a table-level `NOT VALID`
+/// there is taken and ignored, and a column's `CHECK` or `REFERENCES` has no
+/// place for it at all (`42601`). So the `CREATE TABLE` positions and a
+/// column's `CHECK` take no `NotValid`:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// Table::create(Glyph::Table).check(Check::new(Expr::col(Glyph::Aspect).gt(0)).not_valid());
+/// ```
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// ColumnDef::new(Glyph::Aspect).check(Check::new(Expr::col(Glyph::Aspect).gt(0)).not_valid());
+/// ```
+///
+/// ```
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// let mut font = TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id);
+/// font.name(Name::runtime("character_font"));
+///
+/// assert_eq!(
+///     Table::alter(Char::Table)
+///         .add_foreign_key(font.not_valid())
+///         .add_check(Check::new(Expr::col(Char::SizeW).gt(0)).not_valid())
+///         .to_string(),
+///     [
+///         r#"ALTER TABLE "character" ADD CONSTRAINT "character_font""#,
+///         r#"FOREIGN KEY ("font_id") REFERENCES "font" ("id") NOT VALID,"#,
+///         r#"ADD CHECK ("size_w" > 0) NOT VALID"#,
+///     ]
+///     .join(" ")
+/// );
+/// ```
+///
+/// A `NOT ENFORCED` constraint is never valid, whatever it says, and
+/// `VALIDATE CONSTRAINT` refuses it (`55000`).
+// [spec:pgorm:req:sql.ddl.alter-table+12]
+#[derive(Debug, Clone)]
+pub struct NotValid<C> {
+    pub(crate) constraint: C,
+}
+
+impl<C> NotValid<C> {
+    /// The constraint added `NOT VALID`.
+    pub fn get_constraint(&self) -> &C {
+        &self.constraint
+    }
+}
+
+impl TableForeignKey {
+    /// Add this key `NOT VALID`, leaving the rows already there unchecked:
+    /// what [`add_foreign_key`](crate::TableAlterStatement::add_foreign_key)
+    /// takes, and nothing that creates a table does ([`NotValid`]).
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    pub fn not_valid(self) -> NotValid<Self> {
+        NotValid { constraint: self }
+    }
+}
+
+impl Check {
+    /// Add this `CHECK` `NOT VALID`, leaving the rows already there
+    /// unchecked: what [`add_check`](crate::TableAlterStatement::add_check)
+    /// takes, and nothing that creates a table or a column does
+    /// ([`NotValid`]).
+    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    pub fn not_valid(self) -> NotValid<Self> {
+        NotValid { constraint: self }
+    }
+}
+
+/// What an `ALTER TABLE ... ADD` action takes for a constraint of kind `C`:
+/// anything that converts into the constraint, which is checked against the
+/// rows already there, or the constraint wrapped in [`NotValid`], which is
+/// not.
+// [spec:pgorm:req:sql.ddl.alter-table+12]
+pub trait IntoAddedConstraint<C> {
+    /// The constraint, and whether it is added `NOT VALID`.
+    fn into_added_constraint(self) -> (C, bool);
+}
+
+impl<C> IntoAddedConstraint<C> for NotValid<C> {
+    fn into_added_constraint(self) -> (C, bool) {
+        (self.constraint, true)
+    }
+}
+
+impl<F> IntoAddedConstraint<TableForeignKey> for F
+where
+    F: Into<TableForeignKey>,
+{
+    fn into_added_constraint(self) -> (TableForeignKey, bool) {
+        (self.into(), false)
+    }
+}
+
+impl<C> IntoAddedConstraint<Check> for C
+where
+    C: IntoCheck,
+{
+    fn into_added_constraint(self) -> (Check, bool) {
+        (self.into_check(), false)
     }
 }

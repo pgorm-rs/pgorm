@@ -215,6 +215,34 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
 
     # [spec:pgorm:req:python.schema/test]
+    async def test_check_not_valid_and_no_inherit(self):
+        table = p.Table('validated "x"', schema=self.namespace)
+        quoted = f'{self.quoted}."validated ""x"""'
+        await self.pool.execute(s.create_table(table).column(s.ColumnDef("n", "integer")))
+        await self.pool.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
+        catalog = p.RawSQL(
+            "SELECT conname::text AS name, convalidated AS valid, connoinherit AS no_inherit "
+            "FROM pg_constraint WHERE conrelid = $1::text::regclass AND contype = 'c' ORDER BY conname",
+            [quoted],
+        )
+        async with self.pool.connection() as connection:
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(s.add_check(table, p.col("n") > 0, name="positive"))
+            self.assertEqual(refused.exception.sqlstate, "23514")
+            await connection.execute(s.add_check(table, p.col("n") > 0, name="positive", no_inherit=True, not_valid=True))
+            self.assertEqual([dict(row) for row in await connection.fetch_all(catalog)], [
+                {"name": "positive", "valid": False, "no_inherit": True},
+            ])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-2)"))
+            self.assertEqual(refused.exception.sqlstate, "23514")
+            await connection.execute(p.RawSQL(f"UPDATE {quoted} SET n = 1"))
+            await connection.execute(s.validate_constraint(table, "positive"))
+            self.assertEqual([dict(row) for row in await connection.fetch_all(catalog)], [
+                {"name": "positive", "valid": True, "no_inherit": True},
+            ])
+
+    # [spec:pgorm:req:python.schema/test]
     async def test_temporal_keys(self):
         table = p.Table('booked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."booked ""x"""'

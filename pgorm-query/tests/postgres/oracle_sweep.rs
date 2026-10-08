@@ -544,8 +544,8 @@ fn sweep_merge_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+1/test]    table DDL
-// [spec:pgorm:req:sql.ddl.create-table+15/test]
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.create-table+16/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -698,6 +698,29 @@ fn sweep_table_ddl_shapes() {
         Table::rename_column(Glyph::Table, Glyph::Aspect, Name::runtime("ratio")).to_string(),
         Table::alter(Glyph::Table)
             .drop_column(Glyph::Aspect)
+            .to_string(),
+        Table::alter(Char::Table)
+            .add_foreign_key(
+                TableForeignKey::new(Char::Table, Char::FontId, Font::Table, Font::Id)
+                    .name(Name::runtime("fk"))
+                    .enforcement(Enforcement::NotEnforced)
+                    .to_owned()
+                    .not_valid(),
+            )
+            .add_check(
+                Check::new(Expr::col(Char::SizeW).gt(0))
+                    .no_inherit()
+                    .enforcement(Enforcement::NotEnforced)
+                    .not_valid(),
+            )
+            .to_string(),
+        Table::create(Char::Table)
+            .col(
+                ColumnDef::new(Char::SizeW)
+                    .integer()
+                    .check(Check::new(Expr::col(Char::SizeW).gt(0)).no_inherit()),
+            )
+            .check(Check::new(Expr::col(Char::SizeW).lt(9)).no_inherit())
             .to_string(),
         Table::alter(Char::Table)
             .drop_constraint(Name::runtime("fk"))

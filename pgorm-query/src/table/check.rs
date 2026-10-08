@@ -46,6 +46,7 @@ pub struct Check {
     pub(crate) expr: SimpleExpr,
     pub(crate) name: Option<Name>,
     pub(crate) enforcement: Option<Enforcement>,
+    pub(crate) no_inherit: bool,
 }
 
 impl Check {
@@ -58,6 +59,7 @@ impl Check {
             expr: expr.into(),
             name: None,
             enforcement: None,
+            no_inherit: false,
         }
     }
 
@@ -81,6 +83,18 @@ impl Check {
         self
     }
 
+    /// Keep the constraint from tables that inherit this one: `CHECK (...) NO
+    /// INHERIT`, written before the enforcement, where a column's `CHECK`
+    /// takes it alone (`42601` after `NOT ENFORCED`). A partitioned table's
+    /// constraints always reach its partitions, so the server refuses it
+    /// there (`42P16`).
+    // [spec:pgorm:req:sql.ddl.create-table+16]
+    #[must_use]
+    pub fn no_inherit(mut self) -> Self {
+        self.no_inherit = true;
+        self
+    }
+
     /// The condition every row is held to.
     pub fn get_expr(&self) -> &SimpleExpr {
         &self.expr
@@ -94,6 +108,12 @@ impl Check {
     /// Whether the server enforces the constraint, if the caller said.
     pub fn get_enforcement(&self) -> Option<Enforcement> {
         self.enforcement
+    }
+
+    /// Whether the constraint is kept from inheriting tables.
+    // [spec:pgorm:req:sql.ddl.create-table+16]
+    pub fn is_no_inherit(&self) -> bool {
+        self.no_inherit
     }
 }
 

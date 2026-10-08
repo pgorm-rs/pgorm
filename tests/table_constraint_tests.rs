@@ -86,7 +86,7 @@ fn ledger() -> String {
 /// Each constraint as the catalogue holds it: its type, its key columns and
 /// included columns by name, whether nulls are distinct, and whether it is
 /// deferrable and initially deferred.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: every constraint
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: every constraint
 // shape the builder makes is created, and is the constraint it names
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]
 async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(), Error> {
@@ -151,7 +151,7 @@ async fn every_shape_is_created_as_it_names(db: &DatabaseConnection) -> Result<(
 /// says it should: a composite key only a repeat of the whole key, an
 /// included column never, a plain unique key any number of nulls, and a
 /// `NULLS NOT DISTINCT` one a second null.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: each key refuses
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: each key refuses
 // what it should and nothing else
 async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), Error> {
     let insert = |a: i32, b: i32, c: Option<i32>, d: &str, e: Option<i32>| {
@@ -196,7 +196,7 @@ async fn each_key_refuses_what_it_should(db: &DatabaseConnection) -> Result<(), 
 /// access method, and `NULLS NOT DISTINCT` on a primary key. Each is written
 /// raw here, because the builder cannot write it at all; the control beside
 /// them is the same table with a key the grammar takes.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: the table-constraint
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: the table-constraint
 // shapes the builder cannot express are the ones PostgreSQL refuses
 async fn the_grammar_has_no_other_shape(db: &DatabaseConnection) -> Result<(), Error> {
     for constraint in [
@@ -242,7 +242,7 @@ async fn primary_key_of(db: &DatabaseConnection, table: &str) -> Result<(String,
 /// SQL has for one (`42P16`). The builder holds the key in one slot, so a
 /// table it builds with two `primary_key` calls has the second's key and
 /// only that, under the second's name.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: the second key a table
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: the second key a table
 // is given replaces the first, where SQL that declares two is refused
 async fn a_later_primary_key_replaces_the_first(db: &DatabaseConnection) -> Result<(), Error> {
     for raw in [
@@ -285,7 +285,7 @@ async fn a_later_primary_key_replaces_the_first(db: &DatabaseConnection) -> Resu
 /// server's and the key declared is never a narrower one than written. The
 /// included columns are no part of the key and may repeat it, which is the
 /// control.
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a key naming a column
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: a key naming a column
 // twice is written as given and refused by the server, whatever spells it
 async fn a_key_naming_a_column_twice_is_refused(db: &DatabaseConnection) -> Result<(), Error> {
     let twice = || {
@@ -412,9 +412,9 @@ fn key(kind: &str, order: &[usize]) -> (String, String) {
 /// key past twelve columns is a computed list, `TableKey::cols`, taken up to
 /// PostgreSQL's limit of 32 columns to an index; the 33rd is refused
 /// (`54011`).
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    against a live server: a 3- and a
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    against a live server: a 3- and a
 // 12-tuple key, and a computed one past twelve, each created in its own column order
-// [spec:pgorm:req:sql.ddl.alter-table+11/test]
+// [spec:pgorm:req:sql.ddl.alter-table+12/test]
 async fn wide_keys_keep_their_column_order(db: &DatabaseConnection) -> Result<(), Error> {
     let c = column_numbered;
     let create = wide("wide_created")

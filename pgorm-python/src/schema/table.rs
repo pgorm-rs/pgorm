@@ -80,15 +80,16 @@ impl PyCreateTable {
         Ok(Self { inner })
     }
 
-    #[pyo3(signature=(condition, *, name=None, not_enforced=false))]
+    #[pyo3(signature=(condition, *, name=None, not_enforced=false, no_inherit=false))]
     fn check(
         &self,
         condition: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
         not_enforced: bool,
+        no_inherit: bool,
     ) -> PyResult<Self> {
         let mut inner = self.inner.clone();
-        inner.check(column::check(condition, name, not_enforced)?);
+        inner.check(column::check(condition, name, not_enforced, no_inherit)?);
         Ok(Self { inner })
     }
 
@@ -341,23 +342,30 @@ pub(super) fn add_not_null(
     })
 }
 
-/// `ALTER TABLE ... ADD [CONSTRAINT ...] CHECK (...) [NOT ENFORCED]`: the
-/// constraint `CreateTable.check` declares, added to a table that exists.
+/// `ALTER TABLE ... ADD [CONSTRAINT ...] CHECK (...) [NO INHERIT] [NOT
+/// ENFORCED] [NOT VALID]`: the constraint `CreateTable.check` declares, added
+/// to a table that exists, and with `not_valid` leaving the rows already
+/// there unchecked.
 // [spec:pgorm:req:python.schema]
 #[pyfunction]
-#[pyo3(signature=(table, condition, *, name=None, not_enforced=false))]
+#[pyo3(signature=(table, condition, *, name=None, not_enforced=false, no_inherit=false, not_valid=false))]
 pub(super) fn add_check(
     table: &PyTable,
     condition: &Bound<'_, PyAny>,
     name: Option<&Bound<'_, PyAny>>,
     not_enforced: bool,
+    no_inherit: bool,
+    not_valid: bool,
 ) -> PyResult<PyDDL> {
+    let check = column::check(condition, name, not_enforced, no_inherit)?;
+    let pending = Table::alter(table_name(table)?);
+    let added = if not_valid {
+        pending.add_check(check.not_valid())
+    } else {
+        pending.add_check(check)
+    };
     Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_check(column::check(
-            condition,
-            name,
-            not_enforced,
-        )?)),
+        inner: Statement::AlterTable(added),
     })
 }
 

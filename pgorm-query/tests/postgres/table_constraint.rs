@@ -54,7 +54,7 @@ fn contype(node: &serde_json::Value) -> ConstrType {
     ConstrType::try_from(code as i32).expect("a known constraint type")
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    a column or a tuple of them converts into a
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    a column or a tuple of them converts into a
 // key of either kind, which renders as the table constraint it names, its columns plain names
 #[test]
 fn every_key_renders_as_its_table_constraint() {
@@ -146,7 +146,7 @@ fn every_key_renders_as_its_table_constraint() {
     assert_eq!(converted.get_columns().len(), 12);
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    a name, INCLUDE and deferrability ride on
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    a name, INCLUDE and deferrability ride on
 // any key, in the grammar's order
 // [spec:pgorm:req:sql.ddl.deferrability+4/test]
 #[test]
@@ -190,7 +190,7 @@ fn a_key_takes_a_name_include_and_deferrability() {
     assert_eq!(constraint_node(&sql)["conname"], "", "{sql}");
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    the primary key is one slot a later call
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    the primary key is one slot a later call
 // replaces, so a table renders one PRIMARY KEY however often it is declared; the unique keys
 // append, and every key follows the columns, the primary key first
 #[test]
@@ -252,7 +252,7 @@ fn one_primary_key_and_any_unique_keys() {
     assert!(Table::create(Glyph::Table).get_primary_key().is_none());
 }
 
-// [spec:pgorm:req:sql.ddl.create-table+15/test]    a key ending WITHOUT OVERLAPS writes that
+// [spec:pgorm:req:sql.ddl.create-table+16/test]    a key ending WITHOUT OVERLAPS writes that
 // column last, after every other key column whatever order the calls come in, and beside a
 // name, NULLS NOT DISTINCT, INCLUDE and deferrability in the grammar's order
 #[test]
