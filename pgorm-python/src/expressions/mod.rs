@@ -157,6 +157,13 @@ impl PyExpr {
             alias: PyIdentifier::new(alias)?,
         })
     }
+    /// This call over a window: a `Window`, or the name of the one a
+    /// statement declares with `Select.window`. Only a function call or a
+    /// JSON aggregate takes one, as PostgreSQL's grammar has it.
+    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<crate::statements::PyWindowedExpr> {
+        let call = crate::statements::WindowCall::of(&self.inner)?;
+        call.over(window)
+    }
     #[pyo3(signature = (*, nulls=None))]
     fn asc(&self, nulls: Option<Nulls>) -> OrderBy {
         OrderBy {

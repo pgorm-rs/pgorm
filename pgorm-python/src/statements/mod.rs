@@ -12,6 +12,7 @@ mod select;
 mod table;
 #[cfg(test)]
 mod tests;
+mod window;
 mod with;
 mod write;
 
@@ -28,6 +29,11 @@ use pyo3::prelude::*;
 pub use raw::RawSQL;
 pub use select::{Join, PySelect};
 pub use table::PyTable;
+pub(crate) use window::WindowCall;
+pub use window::{
+    PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing, PyFramePreceding, PyFrameType,
+    PyWindow, PyWindowFunction, PyWindowedExpr,
+};
 pub use with::{PyReturningRow, PyWith};
 pub use write::{PyDelete, PyUpdate};
 
@@ -69,6 +75,16 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyTable>()?;
     module.add_class::<PyFromItem>()?;
+    module.add_class::<PyFrameType>()?;
+    module.add_class::<PyFrameExclusion>()?;
+    module.add_class::<PyFrame>()?;
+    module.add_class::<PyFramePreceding>()?;
+    module.add_class::<PyFrameCurrentRow>()?;
+    module.add_class::<PyFrameFollowing>()?;
+    module.add_class::<PyWindow>()?;
+    module.add_class::<PyWindowedExpr>()?;
+    module.add_class::<PyWindowFunction>()?;
+    module.add_function(wrap_pyfunction!(window::window_function, module)?)?;
     module.add_class::<PySelect>()?;
     module.add_class::<Join>()?;
     module.add_class::<PyInsert>()?;

@@ -1,11 +1,8 @@
 use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement};
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{common, from_item::from_item};
-use crate::{
-    errors::ConstructionError,
-    expressions::{Compiled, OrderBy},
-};
+use super::{common, from_item::from_item, window::PyWindow};
+use crate::{errors::ConstructionError, expressions::Compiled, identifiers::PyIdentifier};
 
 /// Join kinds which require an ON condition; CROSS JOIN has its own method.
 #[pyclass(name = "Join", module = "pgorm", eq, from_py_object)]
@@ -28,7 +25,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+2]
+// [spec:pgorm:req:python.statements+3]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -108,21 +105,7 @@ impl PySelect {
     #[pyo3(signature = (*orderings))]
     fn order_by(&self, orderings: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let mut next = self.clone();
-        for ordering in orderings.iter() {
-            let ordering = ordering
-                .extract::<PyRef<'_, OrderBy>>()
-                .map_err(|_| ConstructionError::new_err("order_by requires OrderBy expressions"))?;
-            match &ordering.nulls {
-                Some(nulls) => next.inner.order_by_expr_with_nulls(
-                    ordering.expr.inner.clone(),
-                    ordering.direction.rust_order(),
-                    nulls.rust_nulls(),
-                ),
-                None => next
-                    .inner
-                    .order_by_expr(ordering.expr.inner.clone(), ordering.direction.rust_order()),
-            };
-        }
+        common::order(&mut next.inner, orderings)?;
         Ok(next)
     }
 
@@ -150,6 +133,15 @@ impl PySelect {
         let mut next = self.clone();
         next.inner.distinct();
         next
+    }
+
+    /// Declare the statement's named window, `WINDOW name AS (..)`, which an
+    /// item's `over(name)` reads. Rust's builder holds one; the last call wins.
+    fn window(&self, name: &Bound<'_, PyAny>, window: PyRef<'_, PyWindow>) -> PyResult<Self> {
+        let mut next = self.clone();
+        next.inner
+            .window(PyIdentifier::new(name)?.name(), window.inner.clone());
+        Ok(next)
     }
 
     /// Prefix a WITH clause; the last call wins. A MERGE body there is read

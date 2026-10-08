@@ -10714,12 +10714,27 @@ children (
         id python-select-windows
         title "Python's runtime Select calls a function over a window, a JSON aggregate's OVER form included"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-08T16:03:37.222867Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by python-sql-json (f2e880a6). pg17-sql-json's note lists the window form of JSON_OBJECTAGG / JSON_ARRAYAGG, which SelectStatement::expr_window / expr_window_as / expr_window_name(_as) and the WINDOW clause accept for any WindowFunction. Python's runtime Select (pgorm-python/src/statements/select.rs) has no window method at all, so neither a JSON aggregate nor count / sum / row_number reaches OVER (..) there; only the pipeline API's windows (pgorm::pipeline) and RawSQL do. Decide the Python spelling (an over(partition_by=, order_by=, frame=) on an aggregate expression, or a select item carrying a window spec), keeping OVER attached only to a function call as Rust's narrowed expr_window does (bug.window-position), and give it stubs, capability-manifest entries, parity cases against the Rust builders, live tests on 18.6, and python.statements' text."
+            }
+
+            {
+                at 2026-10-08T23:34:57.816714Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T23:54:27.016683Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

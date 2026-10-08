@@ -28,7 +28,7 @@ pub enum PyJsonTableBehavior {
     Empty,
 }
 
-// [spec:pgorm:req:python.statements+2]
+// [spec:pgorm:req:python.statements+3]
 /// One column of a `JSON_TABLE`, built by one of five static constructors,
 /// each taking only the clauses PostgreSQL admits for that kind of column.
 #[pyclass(name = "JsonTableColumn", module = "pgorm", frozen, from_py_object)]
@@ -190,7 +190,7 @@ impl PyJsonTableColumn {
     }
 }
 
-// [spec:pgorm:req:python.statements+2]
+// [spec:pgorm:req:python.statements+3]
 /// `JSON_TABLE(context, path COLUMNS (..)) AS alias`, a FROM item. The first
 /// column and the alias are required, because PostgreSQL refuses an empty
 /// column list and pgorm names every FROM item that is not a table.

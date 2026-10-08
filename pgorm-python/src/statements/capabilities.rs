@@ -50,6 +50,19 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::SelectStatement::offset, reset_offset",
         ),
         ("select.distinct", "pgorm_query::SelectStatement::distinct"),
+        ("select.window", "pgorm_query::SelectStatement::window"),
+        (
+            "window",
+            "pgorm_query::WindowStatement::new, OverStatement::add_partition_by, OrderedStatement::{order_by_expr, order_by_expr_with_nulls}, WindowStatement::frame",
+        ),
+        (
+            "window.frame",
+            "pgorm_query::FrameType::{unbounded_preceding, preceding, current_row, following}, FrameStart::{and_preceding, and_current_row, and_following, and_unbounded_following, exclude}, FrameClause::exclude, FrameExclusion",
+        ),
+        (
+            "window_function",
+            "pgorm_query::Func::named, FunctionCall::args",
+        ),
         ("select.inspect", "pgorm_query::SelectStatement::build"),
         (
             "insert",

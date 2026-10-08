@@ -62,6 +62,10 @@ pub(crate) fn operations() -> Map<String, Value> {
             "expr.inspect",
             "pgorm_query::SelectStatement::expr, SelectStatement::build",
         ),
+        (
+            "expr.over",
+            "pgorm_query::WindowFunction (FunctionCall, JsonArrayAgg, JsonObjectAgg), SelectStatement::{expr_window, expr_window_as, expr_window_name, expr_window_name_as}",
+        ),
         ("condition.all", "pgorm_query::Condition::all"),
         ("condition.any", "pgorm_query::Condition::any"),
         ("condition.add", "pgorm_query::Condition::add"),

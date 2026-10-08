@@ -143,6 +143,12 @@ from ._expressions import (
     literal as literal, call as call, tuple_expr as tuple_expr,
 )
 from ._statements import Table as Table, FromItem as FromItem, Select as Select, Join as Join
+from ._windows import (
+    FrameType as FrameType, FrameExclusion as FrameExclusion, Frame as Frame,
+    FramePrecedingStart as FramePrecedingStart, FrameCurrentRowStart as FrameCurrentRowStart,
+    FrameFollowingStart as FrameFollowingStart, Window as Window, WindowedExpr as WindowedExpr,
+    WindowFunction as WindowFunction, window_function as window_function,
+)
 from ._json import (
     JsonInput as JsonInput, JsonKind as JsonKind, JsonExistsBehavior as JsonExistsBehavior,
     JsonValueBehavior as JsonValueBehavior, JsonQueryBehavior as JsonQueryBehavior,

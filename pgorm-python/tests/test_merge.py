@@ -11,7 +11,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+2/test]
+# [spec:pgorm:req:python.statements+3/test]
 class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -168,7 +168,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(pending, "inspect"))
 
 
-# [spec:pgorm:req:python.statements+2/test]
+# [spec:pgorm:req:python.statements+3/test]
 class ReturningVersionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use super::table::PyTable;
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:python.statements+2]
+// [spec:pgorm:req:python.statements+3]
 /// A FROM item that is not a named table, owned by Rust's `FromItem`. It is
 /// always aliased, as PostgreSQL requires of every such item, so its columns
 /// are qualified by a name the caller chose. `json_table` builds one.

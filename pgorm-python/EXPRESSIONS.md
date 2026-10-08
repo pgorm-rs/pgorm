@@ -197,8 +197,9 @@ refused rather than dropped. `filter` takes an expression or a `Condition`.
 
 `JSON(..)` is `json_parse` so that importing it cannot shadow Python's `json`
 module. `json_serialize` reads its input through `JSON(..)`, so a `jsonb`
-value serializes as its document on PostgreSQL 18.6. The aggregates' window
-form is not reachable from Python: `Select` has no window clause.
+value serializes as its document on PostgreSQL 18.6. Both aggregates also run
+as window functions, `json_arrayagg(..).over(window)` (see
+[STATEMENTS.md](STATEMENTS.md#window-functions)).
 
 ### JSON_TABLE
 

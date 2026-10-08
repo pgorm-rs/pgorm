@@ -56,6 +56,76 @@ PostgreSQL's non-negative signed-bigint range. Booleans, floats, strings,
 negative values and overflow raise `ConstructionError`. Pass `None` to
 `limit` or `offset` to reset that clause.
 
+## Window functions
+
+A SELECT item calls a function over a window with `expr.over(window)`, which
+returns a `WindowedExpr`; `.as_(name)` names it. `Window` owns a Rust
+`WindowStatement`: `.partition_by(*expressions)`, `.order_by(*orderings)`
+with the same `OrderBy` objects as a statement, and `.frame(frame)`, which
+replaces any frame already set. Each method returns a new window.
+
+```python
+from pgorm import FrameExclusion, FrameType, Table, Window, call, select, window_function
+
+reading = Table("reading", alias="r")
+running = Window().partition_by(reading.col("kind")).order_by(reading.col("at").asc())
+query = select(
+    reading.col("id"),
+    call("sum", reading.col("weight")).over(running).as_("running"),
+    window_function("row_number").over("by_kind").as_("n"),
+    call("avg", reading.col("weight")).over(
+        Window().order_by(reading.col("id").asc())
+        .frame(FrameType.Rows.preceding(1).and_following(1).exclude(FrameExclusion.CurrentRow))
+    ),
+).from_(reading).window("by_kind", Window().partition_by(reading.col("kind")))
+```
+
+`over` takes a `Window`, written inline as `OVER (..)`, or the name of the
+window the statement declares with `.window(name, window)`, written
+`OVER "name"` beside a `WINDOW "name" AS (..)` clause. Rust's builder holds one
+named window, so a second `.window` call replaces the first. Window names are
+identifiers, quoted case-exactly like every other.
+
+PostgreSQL writes `OVER` only after a function call, and Rust's
+`expr_window` takes only a `WindowFunction`: a `FunctionCall` or one of the
+SQL/JSON aggregates. `over` follows that: a call from `call(..)`, a
+`json_arrayagg(..)` or a `json_objectagg(..)` takes a window, and anything
+else — a column, arithmetic, a cast, another SQL/JSON function — raises
+`ConstructionError`. The functions PostgreSQL computes only over a window come
+from `window_function(name, *arguments)`: `row_number`, `rank`, `dense_rank`,
+`percent_rank` and `cume_dist` take no argument, `ntile`, `first_value` and
+`last_value` one, `nth_value` two, and `lag` and `lead` one to three. It
+returns a `WindowFunction`, whose only method is `over`, so such a function
+cannot stand in a query without its window (`42809` from the server). Another
+name or argument count raises `UnsupportedCapabilityError`. Arguments are
+bound like any value; a count PostgreSQL types `integer`, such as `ntile`'s,
+`nth_value`'s or `lag`'s offset, is written with `literal(n)`, because a Python
+`int` is bound as `bigint`.
+
+A frame is begun from its mode, `FrameType.Range`, `Rows` or `Groups`, whose
+four methods name the start: `unbounded_preceding()`, `preceding(offset)`,
+`current_row()` and `following(offset)`. There is no unbounded-following
+start. Each start offers only the ends that may follow it, as Rust's typestate
+does: after a preceding start `and_preceding`, `and_current_row`,
+`and_following` and `and_unbounded_following`; after `current_row()` all but
+`and_preceding`; after a following start only `and_following` and
+`and_unbounded_following`. The missing methods do not exist, so `ROWS BETWEEN
+CURRENT ROW AND 1 PRECEDING` cannot be written. A preceding or current-row
+start stands alone as a whole frame; a following start does not, because
+PostgreSQL reads a lone start as running to the current row behind it, and
+`Window.frame` refuses one with `ConstructionError`. `exclude(FrameExclusion)`
+— `CurrentRow`, `Group`, `Ties` or `NoOthers` — is a method of a frame, never
+of a window.
+
+An offset is any value or expression without a column reference. Under `Rows`
+and `Groups` it is a row or peer-group count; under `Range` it is a distance
+in the ordering column's own values, such as a `Decimal` over a numeric
+column or `literal("1 day").cast(TypeName("interval"))` over a timestamp. The
+builder does not know the ordering column's type, so the server refuses an
+offset type that does not pair with it (`0A000` under `Range`), a `Range`
+offset without exactly one ordering column (`42P20`), and `DISTINCT` in a
+windowed aggregate (`0A000`).
+
 ## Writes
 
 ```python

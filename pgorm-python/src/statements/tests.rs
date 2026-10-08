@@ -1,9 +1,10 @@
 use std::ffi::CString;
 
 use pgorm::pgorm_query::{
-    Asterisk, BinOper, CommonTableExpression, Condition, Expr, Func, IntoNamedTable, JoinType,
-    MatchedAction, MergeInsert, MergeUpdate, Name, NotMatchedAction, NullOrdering, OnConflict,
-    Order, Overriding, Query, ReturningRow, SimpleExpr, Values, WithClause,
+    Asterisk, BinOper, ColumnType, CommonTableExpression, Condition, Expr, FrameExclusion,
+    FrameType, Func, IntoNamedTable, JoinType, MatchedAction, MergeInsert, MergeUpdate, Name,
+    NotMatchedAction, NullOrdering, OnConflict, Order, OverStatement, Overriding, Query,
+    ReturningRow, SimpleExpr, Values, WindowStatement, WithClause,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -14,6 +15,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     crate::values::register(&module)?;
     crate::identifiers::register(&module)?;
     crate::expressions::register(&module)?;
+    crate::json::register(&module)?;
     super::register(&module)?;
     let globals = PyDict::new(py);
     globals.set_item("p", module)?;
@@ -37,7 +39,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -87,7 +89,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -124,7 +126,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -157,7 +159,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -215,7 +217,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -284,7 +286,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -329,7 +331,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -383,7 +385,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -415,6 +417,135 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
         let error = super::compile(&pending).expect_err("a pending MERGE has no statement");
         assert!(error.to_string().contains("needs a WHEN arm"));
         assert!(!pending.hasattr("inspect")?);
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+3/test]
+#[test]
+fn windows_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        let r = |column: &'static str| Expr::col((n("r"), n(column)));
+        py.run(
+            cr#"r = p.Table('reading', alias='r')
+F = p.FrameType
+w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
+     .order_by(r.col('at').desc(nulls=p.Nulls.Last), r.col('id').asc())
+     .frame(F.Groups.preceding(1).and_following(2).exclude(p.FrameExclusion.Ties)))
+"#,
+            Some(&globals),
+            None,
+        )?;
+        let window = || {
+            WindowStatement::new()
+                .partition_by((n("r"), n("kind")))
+                .add_partition_by(r("grade").add(1i64))
+                .order_by_expr_with_nulls(r("at").into(), Order::Desc, NullOrdering::Last)
+                .order_by_expr(r("id").into(), Order::Asc)
+                .frame(
+                    FrameType::Groups
+                        .preceding(1i64)
+                        .and_following(2i64)
+                        .exclude(FrameExclusion::Ties),
+                )
+                .take()
+        };
+        let reading = n("reading").into_named_table().alias(n("r"));
+        parity(
+            py,
+            &globals,
+            "p.Select(r.col('id'), p.call('sum', r.col('weight')).over(w), p.call('count', r.col('id')).over(w).as_('N'), p.window_function('lag', r.col('weight'), p.literal(1), 0).over('W').as_('prev'), p.json_arrayagg(r.col('weight'), returning='jsonb').over(p.Window().order_by(r.col('id').asc())), p.json_objectagg(r.col('kind'), r.col('weight')).over('W')).from_(r).window('W', p.Window().frame(F.Rows.current_row()))",
+            Query::select()
+                .expr(r("id"))
+                .expr_window(Func::sum(r("weight")), window())
+                .expr_window_as(Func::count(r("id")), window(), n("N"))
+                .expr_window_name_as(
+                    Func::named(n("lag")).args([
+                        r("weight").into(),
+                        SimpleExpr::Constant(1i64.into()),
+                        Expr::value(0i64),
+                    ]),
+                    n("W"),
+                    n("prev"),
+                )
+                .expr_window(
+                    Func::json_arrayagg(r("weight")).returning(ColumnType::JsonBinary),
+                    WindowStatement::new()
+                        .order_by_expr(r("id").into(), Order::Asc)
+                        .take(),
+                )
+                .expr_window_name(Func::json_objectagg(r("kind"), r("weight")), n("W"))
+                .from(reading)
+                .window(
+                    n("W"),
+                    WindowStatement::new()
+                        .frame(FrameType::Rows.current_row())
+                        .take(),
+                )
+                .build(),
+        )
+    })
+}
+
+// [spec:pgorm:req:python.statements+3/test]
+#[test]
+fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        for source in [
+            "p.col('weight').over(p.Window())",
+            "(p.col('weight') + 1).over(p.Window())",
+            "p.call('sum', p.col('weight')).cast(p.TypeName('numeric')).over(p.Window())",
+            "p.json_value(p.col('doc'), '$.a').over(p.Window())",
+            "p.Window().frame(p.FrameType.Rows.following(1))",
+            "p.Window().frame(p.col('id'))",
+            "p.Window().partition_by(1)",
+            "p.call('sum', p.col('weight')).over(p.Window()).as_('')",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in [
+            "p.FrameType.Rows.current_row().and_preceding(1)",
+            "p.FrameType.Rows.following(1).and_current_row()",
+            "p.FrameType.Rows.following(1).exclude(p.FrameExclusion.Ties)",
+            "p.FrameType.Rows.unbounded_following()",
+            "p.FrameType.Rows.unbounded_preceding().and_unbounded_preceding()",
+            "p.Window().exclude(p.FrameExclusion.Ties)",
+            "p.window_function('rank').eq(1)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyAttributeError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in [
+            "p.window_function('row_number', 1)",
+            "p.window_function('lag')",
+            "p.window_function('lag', 1, 2, 3, 4)",
+            "p.window_function('nth_value', 1)",
+            "p.window_function('percentile_cont', 1)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::UnsupportedCapabilityError>(py),
+                "{source}: {error}"
+            );
+        }
         Ok(())
     })
 }

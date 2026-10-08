@@ -319,7 +319,7 @@ fn statement_parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn json_table_matches_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -438,7 +438,7 @@ jt = p.json_table(
     })
 }
 
-// [spec:pgorm:req:python.statements+2/test]
+// [spec:pgorm:req:python.statements+3/test]
 #[test]
 fn json_table_refuses_what_its_builder_cannot_take() -> PyResult<()> {
     Python::initialize();

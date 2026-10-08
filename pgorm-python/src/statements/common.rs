@@ -1,6 +1,6 @@
 use pgorm::pgorm_query::{
-    BinOper, Condition, Expr, IntoCondition, Query, ReturningClause, SelectStatement, SimpleExpr,
-    Values,
+    BinOper, Condition, Expr, IntoCondition, OrderedStatement, Query, ReturningClause,
+    SelectStatement, SimpleExpr, Values,
 };
 use pyo3::{
     prelude::*,
@@ -9,7 +9,7 @@ use pyo3::{
 
 use crate::{
     errors::ConstructionError,
-    expressions::{AliasedExpr, Compiled, PyCondition, require_expr},
+    expressions::{AliasedExpr, Compiled, OrderBy, PyCondition, require_expr},
     identifiers::PyIdentifier,
 };
 
@@ -25,9 +25,33 @@ pub(super) fn project(query: &mut SelectStatement, items: &Bound<'_, PyTuple>) -
     for item in items.iter() {
         if let Ok(item) = item.extract::<PyRef<'_, AliasedExpr>>() {
             query.expr_as(item.expr.inner.clone(), item.alias.name());
+        } else if let Ok(item) = item.extract::<PyRef<'_, super::window::PyWindowedExpr>>() {
+            item.project(query);
         } else {
             query.expr(require_expr(&item)?.inner);
         }
+    }
+    Ok(())
+}
+
+/// Append each `OrderBy` to a statement's or a window's ORDER BY.
+pub(super) fn order<S: OrderedStatement>(
+    statement: &mut S,
+    orderings: &Bound<'_, PyTuple>,
+) -> PyResult<()> {
+    for ordering in orderings.iter() {
+        let ordering = ordering
+            .extract::<PyRef<'_, OrderBy>>()
+            .map_err(|_| ConstructionError::new_err("order_by requires OrderBy expressions"))?;
+        match &ordering.nulls {
+            Some(nulls) => statement.order_by_expr_with_nulls(
+                ordering.expr.inner.clone(),
+                ordering.direction.rust_order(),
+                nulls.rust_nulls(),
+            ),
+            None => statement
+                .order_by_expr(ordering.expr.inner.clone(), ordering.direction.rust_order()),
+        };
     }
     Ok(())
 }
