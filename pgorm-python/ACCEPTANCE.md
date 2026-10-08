@@ -65,10 +65,12 @@ silently accept a mismatched report.
 The complete checker passed locally on 2026-10-08 with CPython 3.14.4 and the GIL,
 macOS 26.5.1 arm64, and PostgreSQL 18.6 (the Docker wrapper's
 `postgres:18.6-bookworm`), under macOS's default temporary directory, which is
-reached through the `/var` → `/private/var` symlink. The run included 25 native
-binding tests, eight application Rust tests, 28 direct-builder query programs,
-registered application checks and 124 standalone Python tests on each of two
-installations (direct wheel and source-derived wheel). Both installations passed
+reached through the `/var` → `/private/var` symlink, with SQL/JSON, MERGE,
+RETURNING's row versions and created range types in the binding. The run
+included 34 native binding tests, eight application Rust tests, 32
+direct-builder query programs, registered application checks and 156
+standalone Python tests on each of two installations (direct wheel and
+source-derived wheel). Both installations passed
 strict package/example typing, installed signature checks and 13 expected invalid
 typing cases. The generated application also passed its package typing and
 four expected invalid cases. The default Rust workspace build and nspec
