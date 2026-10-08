@@ -10347,6 +10347,36 @@ children (
                     }
                 )
             }
+
+            {
+                id python-campaign-entity-key-attributes
+                title "Python's registered entities and the generative campaign reach an entity's temporal key and a relation's NOT ENFORCED, deferrability and PERIOD"
+                kind @feat
+                deps (entity-relation-not-enforced entity-temporal-keys)
+                log (
+                    {
+                        at 2026-10-08T22:29:00.804794Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by entity-relation-not-enforced (cc6db4be) and entity-temporal-keys (832ed987), which extended the Rust entity layer and left Python's registered entities and the generative campaign's emitters as they were (both compile unchanged). What Rust now holds: RelationDef carries enforcement (Option<Enforcement>) and deferrability (Option<Deferrability>), set through RelationBuilder and DeriveRelation's enforcement = \"NotEnforced\" / deferrability = \"DeferrableInitiallyDeferred\", and schema generation writes them on the foreign key; a NOT ENFORCED relation's readers take an orphan as having no related row (load_one None, graph optional slot None, required slot drops the row). An entity's primary key may end WITHOUT OVERLAPS (#[pgorm(primary_key, without_overlaps)] on its last key field, PrimaryKeyTrait::without_overlaps()), looked up, updated and deleted by equality with the period part included; a relation may match on a PERIOD pair (ColumnPairs' period slot, RelationBuilder::period, DeriveRelation from_period / to_period), joining by overlap (&&), so a row reaches every version its period overlaps and load_one errors across two. Hypotheses to check, not facts: (1) a Python registered entity whose key has a Range part may not convert a Python range into the key's ValueType for find_by_id / delete_by_id (pgorm-python/src/entities); (2) describe() and the graph slots (pgorm-python/src/graphs/slots.rs) may not report a relation's enforcement, deferrability or period, and a PERIOD relation's graph slot would join by overlap with no Python-visible note; (3) the campaign's Rust emitters (security/generative) generate no relation with these attributes and no temporal key, so the generated corpus never exercises them. Acceptance: Python reaches a temporal-keyed entity by key and a PERIOD relation through a graph, with stubs and the wheel suites against 18.6; the campaign's emitters can declare each attribute (a btree_gist-requiring temporal key needs the extension in the fixture schema) with replay cases. Spec homes: python.entities, entity.relation.def, entity.traits.primary-key, generative.compile-suite."
+                    }
+                )
+            }
+
+            {
+                id python-campaign-write-versions
+                title "Python's registered entities and the generative campaign return an update's rows before and after it and an upsert's per-row action"
+                kind @feat
+                deps (orm-returning-old-new)
+                log (
+                    {
+                        at 2026-10-08T22:29:09.234947Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Filed by orm-returning-old-new (56063739), which gave Rust four version-returning terminals (exec.crud.versions, exec.crud.exec-vocabulary+2): UpdateOne::exec_returning_change -> Change<Model> { old, new }, UpdateMany::exec_returning_changes -> Vec<Change<Model>>, Insert<A, OneRow>::exec_returning_upsert -> Option<Upserted<Model>> and Insert<A, ManyRows>::exec_returning_upserts -> Vec<Upserted<Model>>, Upserted being Inserted(M) | Updated(Change<M>), read off the old row (absent for an inserted row). The list renames the versions WITH (OLD AS \"pgorm_old\", NEW AS \"pgorm_new\") and returns every column of both under o_ / n_ through Returning::exprs_as, the new named-item form (sql.ast.returning+3). Python's registered entities have insert() and update() returning the new model only (pgorm-python/python/pgorm/_registered/entities.pyi), and its statement-level returning(*items) builds aliased items through AliasedExpr as expr AS alias by BinOper::As (pgorm-python/src/statements/common.rs), which a mixed list needs and exprs_as does not cover. Build: a registered-entity update that returns the change, an update-many that returns the changes, and an upsert that returns each row's action (a Python spelling for Change and Upserted, with stubs), parity cases in checks/, and the wheel suites against 18.6, including a table called old. The campaign's emitters generate no call of these terminals; add them where the emitters already exercise update and insert terminals, with replay cases. Spec homes: python.entities, exec.crud.versions, generative.compile-suite."
+                    }
+                )
+            }
         )
         log (
             {
