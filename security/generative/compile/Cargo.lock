@@ -596,6 +596,7 @@ dependencies = [
  "pgorm-query",
  "proc-macro2",
  "quote",
+ "rust_decimal",
  "syn 3.0.5",
  "tracing",
 ]

@@ -1,6 +1,7 @@
 mod active_enum;
 mod base_entity;
 mod column;
+mod column_expr;
 mod conjunct_relation;
 mod created_range;
 mod primary_key;
@@ -11,6 +12,7 @@ mod writer;
 pub use active_enum::*;
 pub use base_entity::*;
 pub use column::*;
+pub(crate) use column_expr::{CastType, ColumnExpr, Operator};
 pub use conjunct_relation::*;
 pub use created_range::*;
 pub use primary_key::*;

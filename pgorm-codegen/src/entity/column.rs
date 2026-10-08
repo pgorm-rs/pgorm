@@ -1,10 +1,12 @@
 use crate::{
-    Error,
+    ColumnExpr, Error,
     entity::created_range::created_range_subtype,
-    util::{escape_rust_keyword, safe_ident},
+    util::{escape_rust_keyword, rust_source, safe_ident},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{ColumnDef, ColumnSpec, ColumnType, IdentityGeneration, RangeType, StringLen};
+use pgorm_query::{
+    ColumnDef, ColumnSpec, ColumnType, GeneratedKind, IdentityGeneration, RangeType, StringLen,
+};
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
 use std::fmt::Write as FmtWrite;
@@ -18,7 +20,16 @@ pub struct Column {
     pub(crate) identity: Option<IdentityGeneration>,
     pub(crate) not_null: bool,
     pub(crate) unique: bool,
+    /// The column's `DEFAULT`, if it has one.
+    // [spec:pgorm:sem:codegen.entity.expressions]
+    pub(crate) default: Option<ColumnExpr>,
+    /// The expression a generated column is computed from, and its kind.
+    // [spec:pgorm:sem:codegen.entity.expressions]
+    pub(crate) generated: Option<Generation>,
 }
+
+/// A generated column's expression and kind.
+pub(crate) type Generation = (ColumnExpr, GeneratedKind);
 
 impl Column {
     /// Reject anything the writer could not render: a type outside the mapping
@@ -116,7 +127,7 @@ impl Column {
     /// instead of ending the literal early and respelling the rest of the
     /// attribute as tokens. `validate_col_type` has already refused any
     /// `Named` shape this one-name spelling could not carry.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+6]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -248,11 +259,43 @@ impl Column {
                 IdentityGeneration::ByDefault => quote! { .identity_by_default() },
             });
         }
+        // [spec:pgorm:sem:codegen.entity.expressions]
+        if let Some(default) = &self.default {
+            let default = default.to_rust();
+            col_def.extend(quote! { .default(#default) });
+        }
+        if let Some((expr, kind)) = &self.generated {
+            let expr = expr.to_rust();
+            let kind = match kind {
+                GeneratedKind::Stored => quote! { Stored },
+                GeneratedKind::Virtual => quote! { Virtual },
+            };
+            col_def.extend(quote! {
+                .generated(#expr, pgorm::pgorm_query::GeneratedKind::#kind)
+            });
+        }
         col_def
     }
 
+    /// The field attribute carrying the column's `DEFAULT` or generation
+    /// expression, as the Rust that builds it: `default_expr = "..."`,
+    /// `generated_stored = "..."` or `generated_virtual = "..."`.
+    // [spec:pgorm:sem:codegen.entity.expressions]
+    pub fn get_expression_attr(&self) -> Option<TokenStream> {
+        if let Some(default) = &self.default {
+            let source = rust_source(&default.to_rust());
+            return Some(quote! { default_expr = #source });
+        }
+        let (expr, kind) = self.generated.as_ref()?;
+        let source = rust_source(&expr.to_rust());
+        Some(match kind {
+            GeneratedKind::Stored => quote! { generated_stored = #source },
+            GeneratedKind::Virtual => quote! { generated_virtual = #source },
+        })
+    }
+
     /// The field attribute declaring the column's identity, if it is one.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+6]
     pub fn get_identity_attr(&self) -> Option<TokenStream> {
         self.identity.map(|identity| match identity {
             IdentityGeneration::Always => quote! { identity },
@@ -435,7 +478,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 
@@ -468,6 +511,7 @@ impl TryFrom<&ColumnDef> for Column {
                 .get_column_spec()
                 .iter()
                 .any(|spec| matches!(spec, ColumnSpec::NotNull { .. }));
+        let (default, generated) = expressions(col_def, &name, auto_increment, identity)?;
         // Uniqueness is a key of the table's, which the transform reads from
         // the table's unique keys.
         let column = Self {
@@ -477,10 +521,57 @@ impl TryFrom<&ColumnDef> for Column {
             identity,
             not_null,
             unique: false,
+            default,
+            generated,
         };
         column.validate()?;
         Ok(column)
     }
+}
+
+/// A column's `DEFAULT` and generation expression, read into the subset, and
+/// refused where PostgreSQL refuses the pair (`42601`): a column takes one of
+/// a default, an identity, a generation expression and the serial family.
+// [spec:pgorm:sem:codegen.entity.expressions]
+fn expressions(
+    col_def: &ColumnDef,
+    name: &str,
+    auto_increment: bool,
+    identity: Option<IdentityGeneration>,
+) -> Result<(Option<ColumnExpr>, Option<Generation>), Error> {
+    let unread = |what: &str, problem: String| {
+        Error::TransformError(format!(
+            "column `{name}`: {what} codegen cannot read: {problem}"
+        ))
+    };
+    let mut default = None;
+    let mut generated = None;
+    for spec in col_def.get_column_spec() {
+        match spec {
+            ColumnSpec::Default(expr) => {
+                default = Some(ColumnExpr::read(expr).map_err(|p| unread("a DEFAULT", p))?);
+            }
+            ColumnSpec::Generated { expr, kind } => {
+                let expr =
+                    ColumnExpr::read(expr).map_err(|p| unread("a generation expression", p))?;
+                generated = Some((expr, *kind));
+            }
+            _ => {}
+        }
+    }
+    let ways = [
+        default.is_some(),
+        generated.is_some(),
+        identity.is_some(),
+        auto_increment,
+    ];
+    if ways.iter().filter(|way| **way).count() > 1 {
+        return Err(Error::TransformError(format!(
+            "column `{name}`: a column takes one of a DEFAULT, a generation expression, an \
+             identity and the serial family; PostgreSQL refuses two"
+        )));
+    }
+    Ok((default, generated))
 }
 
 #[cfg(test)]
@@ -504,6 +595,8 @@ mod tests {
                     identity: None,
                     not_null: false,
                     unique: false,
+                    default: None,
+                    generated: None,
                 }
             };
         }

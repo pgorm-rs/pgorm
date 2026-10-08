@@ -1395,10 +1395,13 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+8]
+> [spec:pgorm:def:sql.ast.func+9]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
-> argument, `args` replaces the argument list. The `Function` enum covers the
+> argument, `args` replaces the argument list. `get_func()` and `get_args()`
+> read the two back, and `is_plain()` says the call carries nothing else — no
+> `DISTINCT` argument and no aggregate clause — which is what a reader that
+> rebuilds a call from those two needs to know (`codegen.entity.transform`). The `Function` enum covers the
 > built-ins with typed constructors on the `Func` helper: aggregates `max`,
 > `min`, `sum`, `avg`, `count`, `count_distinct` (the DISTINCT argument
 > modifier), `bit_and`, `bit_or`; the ordered-set aggregates
@@ -1518,7 +1521,7 @@ today, including panicking edges and deliberate failsafes.
 > `ON ERROR`, `ON NULL`, `WITH UNIQUE KEYS`, `FORMAT JSON`) are grammar between
 > the parentheses, which `Func::named`'s argument list cannot spell. Each form
 > is built by a `Func` constructor returning its own builder, as `Func::grouping`
-> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+8]`): `json_exists`,
+> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+9]`): `json_exists`,
 > `json_value` and `json_query` take a context item and a path; `json_object()`
 > and `json_array()` start empty; `json_array_query(select)`,
 > `json_objectagg(key, value)`, `json_arrayagg(value)`, `json(input)` and

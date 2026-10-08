@@ -1336,12 +1336,34 @@ children (
                 title "Codegen reads a column's expressions: a DEFAULT and a generated column of either kind"
                 kind @feat
                 deps (pg18-virtual-generated)
+                sealed true
                 log (
                     {
                         at 2026-10-06T19:26:59.220945Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found while landing pg18-virtual-generated: the entity model now holds a generated column of either kind (ColumnDefault::Generated; #[pgorm(generated_stored = \"<rust expr>\")] / generated_virtual), but codegen's DDL bridge still refuses both, as it refuses DEFAULT and CHECK (codegen.ddl.unsupported+7: \"a GENERATED clause\" for STORED, \"a VIRTUAL generated column\" for VIRTUAL or a bare GENERATED ALWAYS AS, which 18 reads as virtual). The cause is one gap, not three: the bridge has no reader from PostgreSQL's expression tree. parse_schema's TableCreateStatement needs a SimpleExpr, and SimpleExpr::Raw takes only &'static str, so runtime DDL text cannot ride it; the entity writer needs Rust source spelling the expression, and it cannot print one from a SimpleExpr because FunctionCall's fields are pub(crate). Build a closed-subset reader (ColumnRef, A_Const, A_Expr operators mapped onto BinOper, FuncCall, TypeCast, NullTest, BoolExpr) into a codegen-owned representation that lowers both to a SimpleExpr for the statement and to Rust builder source for the entity, naming anything outside the subset as a refusal. Use it for a column DEFAULT (ColumnDef::default / default_expr) and GENERATED (ColumnDef::generated / generated_stored | generated_virtual, the kind from Constraint.generated_kind 's' / 'v'). Acceptance: a round trip from DDL through generated entity source, compiled, and Schema::create_table_from_entity back to equivalent DDL, checked live on 18. CHECK stays refused, since the entity model holds no CHECK."
+                    }
+
+                    {
+                        at 2026-10-08T21:01:02.183645Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T21:50:20.082917Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Decided 2026-10-08. Codegen reads a column's DEFAULT and generation expression (STORED or VIRTUAL) through a closed subset of its own, ColumnExpr, not SimpleExpr: the writer must print Rust that rebuilds the expression, and a SimpleExpr can hold what no printed Rust rebuilds (typed functions, verbatim types, any operator), while the subset holds exactly what the readers read. The DDL bridge reads the parse tree into it (columns, int/bigint/numeric-as-exact-decimal/text/bool/NULL literals, CURRENT_DATE/TIME/TIMESTAMP, calls by unqualified name with pg_catalog dropped, COALESCE/GREATEST/LEAST/NULLIF as bare calls, casts to plain or one-dimension array types, + - * / % = <> < > <= >= || AND OR NOT, IS [NOT] NULL) and lowers it to the statement's SimpleExpr; the transform reads a statement's SimpleExpr back; the writers print default_expr / generated_stored / generated_virtual (compact) and .default / .generated (expanded), every schema-contributed name or literal as a Rust literal token and columns as gate-validated Column variants. Everything else is named, never approximated. Refused as the server refuses: a column filled two ways (serial, identity, DEFAULT, generation expression; 42601), a DEFAULT reading a column (0A000), a VIRTUAL generated column in a key (0A000, the derive refuses it too); and a generation expression reading a column the table lacks (would not compile). A key whose every column is generated is the database's to fill (auto_increment true), as the derive reads it. Live on 18.6: the schema run as written and the schema its generated entities create have identical pg_get_expr/attgenerated for every construct and a 23-column operator-precedence battery; an all-NotSet insert takes the defaults and computes the generated columns, a generated key included. 18 and 19beta4 agree on every refusal checked. CHECK stays refused (the entity holds none)."
+                    }
+
+                    {
+                        at 2026-10-08T21:50:20.383652Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

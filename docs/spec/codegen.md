@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+13]
+> [spec:pgorm:sem:codegen.entity.transform+14]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -86,7 +86,30 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > identity's form, not its sequence options")``: an entity has no place for
 > them (`macros.derive.entity-model.primary-key`), and dropping them would
 > generate an entity whose schema counts differently from the one it was read
-> from. A column
+> from. A column's `ColumnSpec::Default` and `ColumnSpec::Generated` become
+> its `default` and its generation expression and kind, read back into the
+> subset `codegen.entity.expressions` holds; a part outside it — a typed
+> function such as `Func::uuidv7()`, an operator such as `LIKE`, a qualified
+> column — is ``TransformError("table `<table>` column `<column>`: a DEFAULT
+> codegen cannot read: <part>")`` (or ``a generation expression codegen cannot
+> read``), since the writer has no Rust to print for it and dropping it would
+> generate an entity whose schema fills the column otherwise. So is a column
+> carrying two of a `DEFAULT`, a generation expression, an identity and the
+> serial family, which a statement holds as a list of specs and PostgreSQL
+> refuses (`42601`): ``TransformError("table `<table>` column `<column>`: a
+> column takes one of a DEFAULT, a generation expression, an identity and the
+> serial family; PostgreSQL refuses two")``. Once the table's columns are
+> read, a `DEFAULT` reading a column is refused, as PostgreSQL refuses it
+> (`0A000`): ``TransformError("table `<table>` column `<column>`: its DEFAULT
+> reads column `<x>`; a DEFAULT reads no column")``; so is a generation
+> expression reading a column the table does not have, which the generated
+> `Column::<X>` would not compile against: ``TransformError("table `<table>`
+> column `<column>`: its generation expression reads column `<x>`, which the
+> table does not have")``; and so is a `VIRTUAL` generated column in the
+> primary key or a one-column unique key, which PostgreSQL does not support
+> (`0A000`) and the derive refuses: ``TransformError("table `<table>` column
+> `<column>`: a VIRTUAL generated column cannot be keyed, which PostgreSQL
+> does not support")``. A column
 > with no `ColumnType` yields
 > ``TransformError("table `<table>` column `<column>`: column type should
 > not be empty")``. A key is the table's (`sql.ddl.create-table`), so `unique`
@@ -306,7 +329,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expands the Entity/Column/PrimaryKey machinery that the expanded format
 > spells out.
 
-> [spec:pgorm:def:codegen.entity.expanded+2]
+> [spec:pgorm:def:codegen.entity.expanded+3]
 > The expanded format (`expanded_format == true`) emits per entity, in
 > order: the same imports; `#[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 > pub struct Entity;`; `impl EntityName for Entity` containing
@@ -326,22 +349,30 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > for Column` whose `def()` matches every column to a `ColumnType`
 > expression chain (`ColumnType::X.def()` + `.null()` when nullable +
 > `.unique()` when unique + `.identity()` / `.identity_by_default()` for an
-> identity column, and `<EnumName>::db_type()` for enum columns);
+> identity column + `.default(<expr>)` for a column with a `DEFAULT` and
+> `.generated(<expr>, pgorm::pgorm_query::GeneratedKind::Stored | Virtual)`
+> for a generated one, `<expr>` the Rust `codegen.entity.expressions` prints,
+> and `<EnumName>::db_type()` for enum columns);
 > `impl RelationTrait for Relation` whose `def()` matches every variant to a
 > `RelationDef` expression — or has the body `panic!("No RelationDef")` when
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+5]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+6]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
 > key, followed by `without_overlaps` when it is a temporal key's period, its
 > last column, and otherwise by `auto_increment = false` when that PK column is
-> neither auto-increment nor an identity; `identity` or `identity_by_default` when
-> the column is one, key or not — the derive refuses an identity beside
-> `auto_increment`, so an identity key column carries `primary_key, identity`
-> and nothing more; `column_type = "..."` for exactly the types whose default
+> neither auto-increment, an identity nor a generated column; `identity` or
+> `identity_by_default` when
+> the column is one, key or not — the derive refuses an identity or a
+> generation expression beside `auto_increment`, so an identity key column
+> carries `primary_key, identity` and a generated one `primary_key,
+> generated_stored = "..."`; `default_expr = "..."`, `generated_stored =
+> "..."` or `generated_virtual = "..."` when the column has a `DEFAULT` or is
+> generated, its string the Rust that builds the expression
+> (`codegen.entity.expressions`); `column_type = "..."` for exactly the types whose default
 > mapping is ambiguous — `Float`, `Double`, `Decimal(Some((p, s)))`,
 > `Money`, `Text`, `JsonBinary`, `named("...")`, `Bytea` — with
 > `nullable` appended (only
@@ -364,6 +395,16 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expanded writer (`codegen.entity.types`) spell one name the same way. The
 > shapes that spelling cannot carry are refused before the writer runs
 > (`codegen.entity.types.unsupported`).
+>
+> An expression part's string is program text the same way, the derive
+> parsing it as a Rust expression, and is held to the same discipline: it is
+> printed from the expression's tree, never from the schema's text, and
+> everything the schema contributes to it reaches it as a token of its own —
+> a column as the `Column` variant the gate has already validated
+> (`codegen.entity.keywords`), and a function name, a type name and every
+> string literal as a Rust string literal — so a name or a literal holding a
+> quote, a comment opener or Rust syntax is data inside the program, never
+> program.
 
 > [spec:pgorm:sem:codegen.entity.compact.model+1]
 > `gen_compact_model_struct` emits the compact `Model` as one block: the
@@ -589,17 +630,17 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Primary keys
 
-> [spec:pgorm:sem:codegen.entity.pk+2]
+> [spec:pgorm:sem:codegen.entity.pk+3]
 > In the expanded format, `impl PrimaryKeyTrait for PrimaryKey` sets
 > `type ValueType` to the single PK column's Rust type, or to a tuple
 > `(T1, T2, ...)` of the column types for composite keys, and
 > `fn auto_increment() -> bool` answers whether the database generates the
 > whole key (`entity.traits.primary-key`), and a temporal key adds `fn
 > without_overlaps() -> bool { true }`, reading the key's own columns and
-> no others: true when every key column is an identity, and otherwise only
-> for a one-column key that is auto-increment. A serial column outside the
-> key does not make the key generated, and neither does one identity column
-> of a composite key. This is the reading the derive gives the compact form
+> no others: true when every key column is an identity or a generated
+> column, and otherwise only for a one-column key that is auto-increment. A
+> serial column outside the key does not make the key generated, and neither
+> does one identity column of a composite key. This is the reading the derive gives the compact form
 > (`macros.derive.entity-model.primary-key`), where the same facts surface
 > as the `primary_key` / `auto_increment = false` / `identity` field
 > attributes described in `codegen.entity.compact.attrs`, so the two formats
@@ -613,6 +654,61 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > as a plain key column. The entity still works against the table it was read
 > from, whose `DEFAULT nextval(..)` fills the column an insert leaves `NotSet`;
 > only schema generation from the entity loses the default.
+
+## Column expressions
+
+> [spec:pgorm:sem:codegen.entity.expressions]
+> A column's `DEFAULT`, and the expression a generated column is computed
+> from, are read into one closed subset of PostgreSQL's expressions, which
+> the DDL bridge reads from the parse tree (`codegen.ddl.tables`), the
+> transform reads from a statement's `SimpleExpr` (`codegen.entity.transform`)
+> and the writers print as Rust (`codegen.entity.compact.attrs`,
+> `codegen.entity.expanded`). The subset is: a column of the same table by
+> its unqualified name; an `integer`, `bigint` or `numeric` literal, the last
+> kept as the exact decimal it spells (`1.50` stays `1.50`) within 18 digits;
+> a string literal; `TRUE`, `FALSE` and `NULL`; `CURRENT_DATE`,
+> `CURRENT_TIME` and `CURRENT_TIMESTAMP`; a call of a function by its
+> unqualified name in call syntax, `pg_catalog`'s qualification dropped, and
+> `COALESCE`, `GREATEST`, `LEAST` and `NULLIF`, which the grammar builds
+> itself and pgorm writes bare (`sql.ast.func`); a cast to a type named by
+> its name and schema, with at most one unsized array dimension; the
+> arithmetic operators `+ - * / %`, the comparisons `= <> < > <= >=`, `||`,
+> `AND`, `OR` and `NOT`; and `IS [NOT] NULL`. Everything else is named where
+> it is met, never approximated (`codegen.ddl.unsupported`,
+> `codegen.entity.transform`).
+>
+> The subset is codegen's own type, not `SimpleExpr`. The writer has to print
+> the Rust that builds an expression, and a `SimpleExpr` can hold what no
+> printed Rust rebuilds — a typed function, a verbatim type, any operator —
+> where the subset holds what the reader reads and nothing else, so every
+> expression it holds the writer can print, and the gate can tell a
+> statement's expression it cannot hold from one it can. Lowered, an
+> expression is the `SimpleExpr` the bridged statement carries; printed, it
+> is the Rust that builds that same `SimpleExpr` inside the entity's module:
+> `Expr::col(Column::<X>)`, `Expr::val(..)` (`Decimal::new(m, s)` for a
+> numeric, an `i64`-suffixed literal for a `bigint`),
+> `pgorm::pgorm_query::Keyword::Null`, `Expr::current_date()` and its two
+> siblings, `Func::named(Name::runtime("f"))` with an `.arg(..)` per
+> argument, `.cast_as(Name::runtime("t"))`, or
+> `.cast_as_type(pgorm::pgorm_query::TypeName::new(..)..)` for a qualified or
+> array type, the `Expr` method of each operator (`AND` and `OR` through
+> `.binary(pgorm::pgorm_query::BinOper::And | Or, ..)`), `.not()`,
+> `.is_null()` and `.is_not_null()` — every name either one
+> `pgorm::entity::prelude` exports or a path from `pgorm`. The schema built
+> from the generated entity carries each expression the bridge read, rendered
+> alike, and the live suite holds the server to storing it as it stored the
+> original's.
+>
+> A column the gate passes (`codegen.entity.transform`) — its generation
+> expression reading only columns of its table, its `DEFAULT` reading none,
+> filled one way, and not a keyed `VIRTUAL` generated column — is one the
+> derive accepts and PostgreSQL creates. A key whose every column is
+> generated is the database's to fill (`codegen.entity.pk`). Schema
+> generation from the entity is what the expressions are for: the generated
+> entity reads and writes the table it was read from with or without them,
+> an insert leaving the column `NotSet` taking the server's default either
+> way, so carrying them is what makes the entity a faithful source for the
+> schema it was read from.
 
 ## Relations
 
@@ -819,10 +915,11 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+14]
+> [spec:pgorm:req:codegen.ddl.unsupported+15]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
-> constraints; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
+> constraints, and its `DEFAULT`s and generation expressions within the subset
+> `codegen.entity.expressions` reads; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
 > (`codegen.ddl.objects`); `CREATE INDEX`; and `COMMENT ON TABLE`
 > / `COMMENT ON COLUMN` — with a column's `COLLATE` clause and a `NOT NULL`
 > constraint's name and `NO INHERIT`, which the bridged statement carries and
@@ -834,7 +931,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > 1-based position in the text, and `<what>` names the construct the way its
 > author wrote it — `ALTER TABLE`, `CREATE TRIGGER`,
 > ``a PARTITION BY clause on table `t` ``,
-> ``a DEFAULT clause on column `t`.`c` `` — with `an unrecognised statement` as
+> ``a CHECK constraint on column `t`.`c` `` — with `an unrecognised statement` as
 > the fallback for a statement kind the namer does not know.
 >
 > Named rejections MUST cover at least: every statement other than the five
@@ -844,7 +941,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > storage options, `TABLESPACE`, `USING <access method>`, `ON COMMIT`,
 > catalog-qualified table and collation names and temporary or unlogged
 > tables; column
-> `DEFAULT`, `CHECK`, `GENERATED`,
+> `CHECK`,
 > `STORAGE` and `COMPRESSION` clauses, and an identity's sequence options; table-level `CHECK`
 > and `EXCLUDE` constraints, deferrable keys (a foreign key's deferrability
 > is read, `codegen.ddl.tables`), `NO INHERIT` on any
@@ -860,16 +957,27 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Type spellings outside the vocabulary are named the same way
 > (`codegen.ddl.types`).
 >
-> A generated column is refused for the reason a `DEFAULT` and a `CHECK` are,
-> not because the entity model lacks it — an entity declares either kind
-> (`entity.traits.column-def`) — but because the bridge reads no column
-> expression: the statement it builds carries a `SimpleExpr`, and the entity
-> it writes carries Rust source spelling one, and neither has a reader from
-> PostgreSQL's expression tree yet. Each kind is named as written, so the
-> refusal says which the file declared: `a GENERATED clause` for a `STORED`
-> column, and `a VIRTUAL generated column` for a virtual one, which a bare
-> `GENERATED ALWAYS AS (...)` is too, since 18 reads it as `VIRTUAL` — the
-> grammar's kind is the answer, never the keyword's presence.
+> A column's `DEFAULT` and generation expression are read
+> (`codegen.ddl.tables`), but only within the subset of PostgreSQL's
+> expressions `codegen.entity.expressions` holds; a construct outside it is
+> named with the expression it sits in, ``TransformError("unsupported DDL:
+> <construct> in the DEFAULT of column `<t>`.`<c>` at statement <n>")`` or
+> ``... in the generation expression of column `<t>`.`<c>` ...``, and never read
+> as something near it. The constructs named are a subquery, `CASE` and every
+> other expression kind outside the subset (`an expression codegen does not
+> read`); a cast to a type with a modifier, `SETOF`, `%TYPE` or a sized or
+> multi-dimensional array bound (`a cast to a modified type`); a
+> schema-qualified function other than `pg_catalog`'s (`a schema-qualified
+> function`); an aggregate, window or `VARIADIC` call; a function written in
+> the grammar's own syntax — `substring(s from 2)`, `extract(..)`, `trim(..)`
+> — (`a function written in SQL syntax`); a function the parse tree names
+> `coalesce`, `greatest`, `least` or `nullif`, which only a quoted name
+> reaches and which is some other function than the grammar's construct; an
+> operator outside the subset, a prefix operator and `IN`, `LIKE`, `BETWEEN`
+> and the other operator forms (`an operator codegen does not read`); a float
+> with an exponent, an integer past `bigint` or a numeric wider than 18 digits,
+> and a bit-string (`a literal`); a qualified column reference; and a SQL value
+> function other than `CURRENT_DATE`, `CURRENT_TIME` and `CURRENT_TIMESTAMP`.
 >
 > The file is read with PostgreSQL 18's grammar (`codegen.ddl`), which
 > accepts constraint shapes earlier releases refused. Each resembles a shape
@@ -935,7 +1043,21 @@ compiling the C parser falls on people generating entities and on nobody else.
 > column `<t>`.`<c>` gives its foreign key <clause> twice")``, and one followed
 > by `INITIALLY DEFERRED` after `NOT DEFERRABLE` (`42601`),
 > ``TransformError("statement <n>: INITIALLY DEFERRED on a NOT DEFERRABLE key
-> on column `<t>`.`<c>`")``. A foreign
+> on column `<t>`.`<c>`")``. So is a column filled two ways — two of a serial
+> type, an identity, a `DEFAULT` and a generation expression, or one of them
+> twice — which PostgreSQL refuses (`42601`, *multiple default values
+> specified*, *both default and identity specified*, *both default and
+> generation expression specified*, *multiple generation clauses specified*,
+> *multiple identity specifications*): ``TransformError("statement <n>: column
+> `<t>`.`<c>` is filled by <first> and by <second>; a column takes one")``,
+> each named as `a serial type`, `an identity`, `a DEFAULT` or `a generation
+> expression`. A bridge keeping either would generate an entity whose schema
+> fills the column otherwise than the file; the derive refuses most of the
+> pairs besides (`macros.derive.entity-model.column-def`). And so is a
+> `DEFAULT` reading a column, which PostgreSQL refuses (`0A000`, *cannot use
+> column reference in DEFAULT expression*): ``TransformError("statement <n>:
+> the DEFAULT of column `<t>`.`<c>` reads column `<x>`; a DEFAULT reads no
+> column")``. A foreign
 > key naming a table the file never creates, or a column that table does not
 > have, is refused too, but by the transform gate `entities_from_sql` runs
 > (`codegen.entity.transform`) rather than here: the bridge resolves one
@@ -1001,7 +1123,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+10]
+> [spec:pgorm:sem:codegen.ddl.tables+11]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -1029,6 +1151,22 @@ compiling the C parser falls on people generating entities and on nobody else.
 > are a named rejection (`codegen.ddl.unsupported`): the entity a schema
 > generates declares the identity's form and nothing more
 > (`codegen.entity.transform`).
+>
+> A column's `DEFAULT` becomes the column's default (`ColumnDef::default`)
+> and its `GENERATED ALWAYS AS (..)` the column's generation expression
+> (`ColumnDef::generated`), `STORED` or `VIRTUAL` as the grammar reads it — a
+> bare `GENERATED ALWAYS AS (..)` is `VIRTUAL` in 18, so the grammar's kind is
+> the answer, never the keyword's presence. Each expression is read from the
+> parse tree into the subset `codegen.entity.expressions` holds and lowered to
+> the `SimpleExpr` the statement carries, which renders an expression the
+> server stores as it stores the original: the live suite holds the catalog
+> (`pg_get_expr`, `attgenerated`) of a schema run as written equal to that of
+> the schema its generated entities create, every construct of the subset and
+> every operator nesting whose precedence matters among them. A `DEFAULT NULL`
+> is read as the `NULL` it says; the server stores no default for it either
+> way. A column takes one of a serial type, an identity, a `DEFAULT` and a
+> generation expression, once, and a `DEFAULT` reads no column, as the server
+> holds (`codegen.ddl.unsupported`).
 >
 > A column's `COLLATE` clause becomes the column's collation
 > (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+12]`), bare or

@@ -4,19 +4,19 @@ use crate::{
     util::{escape_rust_keyword, repeated_column},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::TableCreateStatement;
+use pgorm_query::{GeneratedKind, TableCreateStatement};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+2]
@@ -174,6 +174,7 @@ impl EntityTransformer {
                 .rev()
                 .collect();
             refuse_period_before_key(&columns, &primary_keys, without_overlaps, &table_name)?;
+            refuse_unwritable_expressions(&columns, &primary_keys, &table_name)?;
             if primary_keys.len() > MAX_KEY_COLUMNS {
                 return Err(Error::TransformError(format!(
                     "table `{table_name}`: a primary key of {} columns; an entity's key has at \
@@ -349,7 +350,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -371,7 +372,7 @@ pub(crate) fn resolve_reference<'a>(
 /// single columns, and a key ending `WITHOUT OVERLAPS` has two at least, so
 /// read as its columns it would claim a uniqueness the table does not have.
 /// A temporal primary key and a `PERIOD` foreign key the entity holds.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let temporal_unique = table
         .get_unique_keys()
@@ -390,7 +391,7 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
 /// would generate a `PrimaryKey` enum with one variant twice, which does not
 /// compile, and a unique key over `(a, a)` would mark `a` unique on its own;
 /// so it is refused by name, never read as the key without its repeat.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let primary = table
         .get_primary_key()
@@ -415,11 +416,53 @@ fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Resu
     Ok(())
 }
 
+/// A column expression the entity cannot be written with: a `DEFAULT`
+/// reading a column (PostgreSQL refuses a column reference in one, `0A000`),
+/// a generation expression reading a column the table does not have, which
+/// the generated `Column::<name>` would not compile against, and a `VIRTUAL`
+/// generated column in a key, which PostgreSQL does not support (`0A000`)
+/// and the derive refuses.
+// [spec:pgorm:sem:codegen.entity.expressions]
+fn refuse_unwritable_expressions(
+    columns: &[Column],
+    primary_keys: &[PrimaryKey],
+    name: &str,
+) -> Result<(), Error> {
+    for column in columns {
+        let keyed = column.unique || primary_keys.iter().any(|key| key.name == column.name);
+        if keyed && matches!(column.generated, Some((_, GeneratedKind::Virtual))) {
+            return Err(Error::TransformError(format!(
+                "table `{name}` column `{}`: a VIRTUAL generated column cannot be keyed, \
+                 which PostgreSQL does not support",
+                column.name
+            )));
+        }
+        if let Some(read) = column.default.iter().flat_map(|expr| expr.columns()).next() {
+            return Err(Error::TransformError(format!(
+                "table `{name}` column `{}`: its DEFAULT reads column `{read}`; a DEFAULT \
+                 reads no column",
+                column.name
+            )));
+        }
+        let generated = column.generated.iter().flat_map(|(expr, _)| expr.columns());
+        for read in generated {
+            if !columns.iter().any(|other| other.name == read) {
+                return Err(Error::TransformError(format!(
+                    "table `{name}` column `{}`: its generation expression reads column \
+                     `{read}`, which the table does not have",
+                    column.name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// A temporal key whose period column the table declares before another key
 /// column: an entity's key is its key fields in the order they are written,
 /// and the derive takes `WITHOUT OVERLAPS` on the last of them alone, so the
 /// generated entity would not compile.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 fn refuse_period_before_key(
     columns: &[Column],
     primary_keys: &[PrimaryKey],
@@ -468,7 +511,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {

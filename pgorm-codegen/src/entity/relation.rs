@@ -44,7 +44,7 @@ pub struct Relation {
 
 impl Relation {
     /// Which table this relation references.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     pub fn ref_ident(&self) -> TableIdent {
         TableIdent {
             table: self.ref_table.clone(),
@@ -349,7 +349,7 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 impl From<&TableForeignKey> for Relation {
     fn from(tbl_fk: &TableForeignKey) -> Self {
         let ref_table = TableIdent::of(tbl_fk.get_ref_table());

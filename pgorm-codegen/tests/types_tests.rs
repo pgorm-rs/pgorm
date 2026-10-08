@@ -242,7 +242,7 @@ fn attribute_string_value(attr: &str) -> String {
         .value()
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+5/test]    the compact attribute
+// [spec:pgorm:sem:codegen.entity.compact.attrs+6/test]    the compact attribute
 // carries a named type's name as a rendered string literal, so a name holding a
 // quote arrives at the derive as the name that was described rather than as
 // tokens that escaped the literal
@@ -308,7 +308,7 @@ fn hostile_named_type_survives_the_compact_attribute() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+5/test]    and the entity the
+// [spec:pgorm:sem:codegen.entity.compact.attrs+6/test]    and the entity the
 // derive builds from it names the type that was described, character for
 // character
 #[test]
@@ -415,7 +415,7 @@ fn column_conversion_rejects_unsupported_type() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.pk+2/test]    the expanded `ValueType` is the PK
+// [spec:pgorm:sem:codegen.entity.pk+3/test]    the expanded `ValueType` is the PK
 // column's Rust type, or a tuple for a composite key
 #[test]
 fn expanded_pk_value_type_is_type_or_tuple() {
@@ -443,7 +443,7 @@ fn expanded_pk_value_type_is_type_or_tuple() {
     assert_contains(text_key.file("setting.rs"), "type ValueType = String;");
 }
 
-// [spec:pgorm:sem:codegen.entity.pk+2/test]    `auto_increment()` reads the key
+// [spec:pgorm:sem:codegen.entity.pk+3/test]    `auto_increment()` reads the key
 // alone: a serial column outside the key does not flip it, a one-column serial
 // key does, and an identity inside a composite key does not, since the rest of
 // the key is still the caller's
@@ -489,7 +489,7 @@ fn expanded_pk_auto_increment_reads_only_the_key() {
     assert!(auto_increment(&["id"], vec![generated_id]));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+13/test]    an identity is read off
+// [spec:pgorm:sem:codegen.entity.transform+14/test]    an identity is read off
 // the column definition as its form, and makes the column NOT NULL; one
 // carrying sequence options is refused, since an entity declares no options
 #[test]
@@ -517,7 +517,7 @@ fn column_conversion_reads_an_identity() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.pk+2/test]    in the compact format the same facts
+// [spec:pgorm:sem:codegen.entity.pk+3/test]    in the compact format the same facts
 // surface as the `primary_key` / `auto_increment = false` field attributes
 #[test]
 fn compact_primary_key_facts_surface_as_field_attributes() {

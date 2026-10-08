@@ -15,7 +15,7 @@ use crate::{
 ///
 /// Ordered by bare name first, so the entity map — and every output that walks
 /// it — stays alphabetical by table name however the schemas sort.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TableIdent {
     pub table: String,
@@ -24,7 +24,7 @@ pub struct TableIdent {
 
 impl TableIdent {
     /// The identity a DDL statement's table name spells.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     pub fn of(name: &TableName) -> Self {
         Self {
             table: name.table().to_string(),
@@ -34,7 +34,7 @@ impl TableIdent {
 }
 
 /// As the schema wrote it: `schema.table`, or `table` when unqualified.
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 impl fmt::Display for TableIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.schema {
@@ -55,13 +55,13 @@ pub struct Entity {
     pub(crate) primary_keys: Vec<PrimaryKey>,
     /// Whether the last primary-key column is the key's period, PostgreSQL
     /// 18's `WITHOUT OVERLAPS`.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     pub(crate) without_overlaps: bool,
 }
 
 impl Entity {
     /// Which table this entity is generated from.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     pub fn ident(&self) -> TableIdent {
         TableIdent {
             table: self.table_name.clone(),
@@ -72,14 +72,14 @@ impl Entity {
     /// The schema the generated entity names: the source table's own qualifier
     /// when it had one, else the configured default. A fact the schema states
     /// is never overridden by an option.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     pub fn effective_schema<'a>(&'a self, default: &'a Option<String>) -> Option<&'a str> {
         self.schema_name.as_deref().or(default.as_deref())
     }
 
     /// Everything the writer derives from this entity's DB names, checked while
     /// the caller can still be handed the failure.
-    // [spec:pgorm:sem:codegen.entity.transform+13]
+    // [spec:pgorm:sem:codegen.entity.transform+14]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let qualified = self.ident().to_string();
@@ -199,17 +199,18 @@ impl Entity {
     }
 
     /// Whether the database generates the whole key: every key column is an
-    /// identity, or the key is one serial column — the reading the derive
-    /// gives the compact form's attributes.
-    // [spec:pgorm:sem:codegen.entity.pk+2]
+    /// identity or a generated column, or the key is one serial column — the
+    /// reading the derive gives the compact form's attributes.
+    // [spec:pgorm:sem:codegen.entity.pk+3]
     pub fn get_primary_key_auto_increment(&self) -> Ident {
         let keys: Vec<&Column> = self
             .columns
             .iter()
             .filter(|col| self.primary_keys.iter().any(|key| key.name == col.name))
             .collect();
-        let auto_increment = if keys.iter().any(|col| col.identity.is_some()) {
-            keys.iter().all(|col| col.identity.is_some())
+        let generated = |col: &&Column| col.identity.is_some() || col.generated.is_some();
+        let auto_increment = if keys.iter().any(generated) {
+            keys.iter().all(generated)
         } else {
             matches!(keys.as_slice(), [key] if key.auto_increment)
         };
@@ -322,6 +323,8 @@ mod tests {
                     identity: None,
                     not_null: false,
                     unique: false,
+                    default: None,
+                    generated: None,
                 },
                 Column {
                     name: "name".to_owned(),
@@ -330,6 +333,8 @@ mod tests {
                     identity: None,
                     not_null: false,
                     unique: false,
+                    default: None,
+                    generated: None,
                 },
             ],
             relations: vec![

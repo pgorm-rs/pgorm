@@ -1,5 +1,5 @@
 use crate::Error;
-use proc_macro2::{Ident, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Ident, TokenStream, TokenTree};
 use quote::format_ident;
 
 /// `format_ident!` panics on anything that is not a legal Rust identifier, so
@@ -32,8 +32,8 @@ fn is_ident(raw: &str) -> bool {
 /// transform would read from it is not the key written: one `PrimaryKey`
 /// variant twice over, or a unique key whose set of columns is narrower than
 /// its list.
-// [spec:pgorm:req:codegen.ddl.unsupported+14]
-// [spec:pgorm:sem:codegen.entity.transform+13]
+// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:sem:codegen.entity.transform+14]
 pub(crate) fn repeated_column<I>(columns: I) -> Option<String>
 where
     I: IntoIterator<Item = String>,
@@ -42,6 +42,43 @@ where
     columns
         .into_iter()
         .find(|column| !seen.insert(column.clone()))
+}
+
+/// `tokens` as the Rust a person writes: no space around `::`, `.` or
+/// brackets, one after each comma. The writers carry an expression as the
+/// text of an attribute, which no formatter reaches, so it is spaced here.
+// [spec:pgorm:sem:codegen.entity.expressions]
+pub(crate) fn rust_source(tokens: &TokenStream) -> String {
+    let mut source = String::new();
+    write_source(tokens, &mut source);
+    source
+}
+
+fn write_source(tokens: &TokenStream, source: &mut String) {
+    let mut words = false;
+    for token in tokens.clone() {
+        let word = matches!(token, TokenTree::Ident(_) | TokenTree::Literal(_));
+        if word && words {
+            source.push(' ');
+        }
+        words = word;
+        match token {
+            TokenTree::Group(group) => {
+                let (open, close) = match group.delimiter() {
+                    Delimiter::Parenthesis => ("(", ")"),
+                    Delimiter::Bracket => ("[", "]"),
+                    Delimiter::Brace => ("{ ", " }"),
+                    Delimiter::None => ("", ""),
+                };
+                source.push_str(open);
+                write_source(&group.stream(), source);
+                source.push_str(close);
+            }
+            TokenTree::Punct(punct) if punct.as_char() == ',' => source.push_str(", "),
+            TokenTree::Punct(punct) => source.push(punct.as_char()),
+            other => source.push_str(&other.to_string()),
+        }
+    }
 }
 
 // [spec:pgorm:sem:codegen.entity.keywords+1]

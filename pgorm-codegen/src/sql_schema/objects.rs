@@ -155,7 +155,7 @@ pub(super) struct ParsedIndex {
 }
 
 // [spec:pgorm:sem:codegen.ddl.objects+8]
-// [spec:pgorm:req:codegen.ddl.unsupported+14]
+// [spec:pgorm:req:codegen.ddl.unsupported+15]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {

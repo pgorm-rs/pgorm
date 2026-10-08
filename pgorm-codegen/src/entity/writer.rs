@@ -365,7 +365,7 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+2]
+    // [spec:pgorm:def:codegen.entity.expanded+3]
     // [spec:pgorm:sem:codegen.entity.expanded.blocks+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
@@ -474,7 +474,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+2]
+    // [spec:pgorm:def:codegen.entity.expanded+3]
     pub fn gen_impl_entity_name(entity: &Entity, schema_name: &Option<String>) -> TokenStream {
         let schema_name = match Self::gen_schema_name(entity, schema_name) {
             Some(schema_name) => quote! {
@@ -582,11 +582,11 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.pk+2]
+    // [spec:pgorm:sem:codegen.entity.pk+3]
     pub fn gen_impl_primary_key(entity: &Entity) -> TokenStream {
         let primary_key_auto_increment = entity.get_primary_key_auto_increment();
         let value_type = entity.get_primary_key_rs_type();
-        // [spec:pgorm:sem:codegen.entity.pk+2]
+        // [spec:pgorm:sem:codegen.entity.pk+3]
         let without_overlaps = match entity.without_overlaps {
             true => quote! { fn without_overlaps() -> bool { true } },
             false => quote! {},
@@ -730,7 +730,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+6]
     // [spec:pgorm:sem:codegen.entity.compact.model+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
@@ -765,12 +765,18 @@ impl EntityWriter {
                     attrs.push(quote! { primary_key });
                     if entity.without_overlaps && primary_keys.last() == Some(&col.name) {
                         attrs.push(quote! { without_overlaps });
-                    } else if !col.auto_increment && col.identity.is_none() {
+                    } else if !col.auto_increment
+                        && col.identity.is_none()
+                        && col.generated.is_none()
+                    {
                         attrs.push(quote! { auto_increment = false });
                     }
                 }
                 if let Some(identity) = col.get_identity_attr() {
                     attrs.push(identity);
+                }
+                if let Some(expression) = col.get_expression_attr() {
+                    attrs.push(expression);
                 }
                 if let Some(ts) = col.get_col_type_attrs() {
                     attrs.extend([ts]);
@@ -879,6 +885,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "name".to_owned(),
@@ -887,6 +895,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -924,6 +934,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "filling_id".to_owned(),
@@ -932,6 +944,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![
@@ -988,6 +1002,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "filling_id".to_owned(),
@@ -996,6 +1012,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "price".to_owned(),
@@ -1004,6 +1022,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -1043,6 +1063,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "name".to_owned(),
@@ -1051,6 +1073,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
@@ -1074,6 +1098,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "name".to_owned(),
@@ -1082,6 +1108,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "cake_id".to_owned(),
@@ -1090,6 +1118,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![
@@ -1141,6 +1171,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "_name_".to_owned(),
@@ -1149,6 +1181,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "fruitId".to_owned(),
@@ -1157,6 +1191,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -1191,6 +1227,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "testing".to_owned(),
@@ -1199,6 +1237,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "rust".to_owned(),
@@ -1207,6 +1247,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "keywords".to_owned(),
@@ -1215,6 +1257,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "type".to_owned(),
@@ -1223,6 +1267,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "typeof".to_owned(),
@@ -1231,6 +1277,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "crate".to_owned(),
@@ -1239,6 +1287,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "self".to_owned(),
@@ -1247,6 +1297,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "self_id1".to_owned(),
@@ -1255,6 +1307,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "self_id2".to_owned(),
@@ -1263,6 +1317,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "fruit_id1".to_owned(),
@@ -1271,6 +1327,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "fruit_id2".to_owned(),
@@ -1279,6 +1337,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "cake_id".to_owned(),
@@ -1287,6 +1347,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![
@@ -1383,6 +1445,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "name".to_owned(),
@@ -1391,6 +1455,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "price".to_owned(),
@@ -1399,6 +1465,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -1436,6 +1504,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "name".to_owned(),
@@ -1444,6 +1514,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "price".to_owned(),
@@ -1452,6 +1524,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -1489,6 +1563,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "integers".to_owned(),
@@ -1497,6 +1573,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "integers_opt".to_owned(),
@@ -1505,6 +1583,8 @@ mod tests {
                         identity: None,
                         not_null: false,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
@@ -1525,6 +1605,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "floats".to_owned(),
@@ -1533,6 +1615,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "doubles".to_owned(),
@@ -1541,6 +1625,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
@@ -1561,6 +1647,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "id2".to_owned(),
@@ -1569,6 +1657,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -1608,6 +1698,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "parent_id1".to_owned(),
@@ -1616,6 +1708,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "parent_id2".to_owned(),
@@ -1624,6 +1718,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![Relation {
@@ -2274,6 +2370,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "payload".to_owned(),
@@ -2282,6 +2380,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "payload_binary".to_owned(),
@@ -2290,6 +2390,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
@@ -2365,6 +2467,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "first_tea".to_owned(),
@@ -2380,6 +2484,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "second_tea".to_owned(),
@@ -2395,6 +2501,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
@@ -2415,6 +2523,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "first_tea".to_owned(),
@@ -2430,6 +2540,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "second_tea".to_owned(),
@@ -2445,6 +2557,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                     Column {
                         name: "size".to_owned(),
@@ -2461,6 +2575,8 @@ mod tests {
                         identity: None,
                         not_null: true,
                         unique: false,
+                        default: None,
+                        generated: None,
                     },
                 ],
                 relations: vec![],
