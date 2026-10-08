@@ -45,7 +45,7 @@ where
     /// `exec_returning_pks` for the inserted primary keys and
     /// `exec_returning_model` / `exec_returning_models` for the rows.
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     pub async fn exec<C>(self, db: &C) -> Result<TryInsertResult<u64>, Error>
     where
         C: ConnectionTrait,
@@ -81,7 +81,7 @@ where
     A: ActiveModelTrait,
 {
     /// Execute the insert and return the inserted row's primary key.
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     pub async fn exec_returning_pk<C>(
         self,
         db: &C,
@@ -101,7 +101,7 @@ where
     }
 
     /// Execute the insert and return the inserted row as a model.
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     pub async fn exec_returning_model<C>(
         self,
         db: &C,
@@ -132,7 +132,7 @@ where
     /// Execute the insert and return the primary key of every row written, in
     /// the order the database wrote them.
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     pub async fn exec_returning_pks<C>(
         self,
         db: &C,
@@ -152,7 +152,7 @@ where
     /// Execute the insert and return every row written as a model, in the
     /// order the database wrote them.
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     pub async fn exec_returning_models<C>(
         self,
         db: &C,
@@ -189,7 +189,7 @@ where
     /// for the ones that disagree ([`Insert::add`]), and that is reported here
     /// as an error rather than as a smaller count — so a `0` means nothing was
     /// asked for, never that something was asked for and dropped.
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
@@ -214,7 +214,7 @@ where
     /// an `ON CONFLICT DO NOTHING` that skipped it fails with
     /// [`Error::RecordNotInserted`].
     // [spec:pgorm:sem:exec.crud.insert+6]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
     where
@@ -231,7 +231,7 @@ where
     /// An `ON CONFLICT DO NOTHING` that skipped the row fails with
     /// [`Error::RecordNotFound`].
     // [spec:pgorm:sem:exec.crud.insert-returning+3]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     pub async fn exec_returning_model<C>(self, db: &C) -> Result<InsertedModel<A>, Error>
     where
@@ -258,7 +258,7 @@ where
     /// batch whose models do not all set the same columns ([`Insert::add`])
     /// fails before anything is written.
     // [spec:pgorm:sem:exec.crud.insert+6]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
     pub async fn exec_returning_pks<C>(self, db: &C) -> Result<Vec<InsertedPrimaryKey<A>>, Error>
@@ -279,7 +279,7 @@ where
     /// model. A batch whose models do not all set the same columns
     /// ([`Insert::add`]) fails before anything is written.
     // [spec:pgorm:sem:exec.crud.insert-returning+3]
-    // [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+    // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
     pub async fn exec_returning_models<C>(self, db: &C) -> Result<Vec<InsertedModel<A>>, Error>

@@ -10161,12 +10161,34 @@ children (
                 title "An entity update can return each row's previous model, and an upsert can say whether it inserted or updated"
                 kind @feat
                 deps (pg18-returning-old-new)
+                sealed true
                 log (
                     {
                         at 2026-10-07T04:56:03.512269Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by pg18-returning-old-new (947a062a). PostgreSQL 18's RETURNING reads a written row's old and new versions, and pgorm-query now writes both (ReturningRow, ReturningClause::old_as / new_as; sql.ast.returning+1). The ORM's write terminals still return only the new row: UpdateOne::exec and UpdateMany::exec_returning_models (src/executor/update.rs) and the insert terminals exec_returning_pk(s) / exec_returning_model(s) (src/executor/insert.rs) build their RETURNING list from ColumnTrait::into_returning_expr, unqualified, which reads the new row. Two uses are worth weighing, and neither is a one-liner:\n\n(1) An update terminal that returns each row's previous model beside its new one. The decode path reads one model per row, so a pair needs two prefixed model decodes from one row, as the graph's s{i}_ aliases do (bounded to 63 bytes by the shared composition), with old.\"col\" AS \"o_col\" and new.\"col\" AS \"n_col\" in the list.\n\n(2) An upsert (Insert with on_conflict DO UPDATE) that says per row whether it inserted or updated. Verified live on 18.6: a row ON CONFLICT DO UPDATE updated has the existing row as old, and a freshly inserted row's old is NULL in every column, so old.<primary key> IS NULL is exactly \"inserted\". That replaces the xmax = 0 folklore with a documented answer. A DO NOTHING row returns nothing, which the terminal has to report too.\n\nDecide the terminal shapes and their names in the exec vocabulary (exec.crud.exec-vocabulary), what they return for an entity whose table, or a FROM item of the statement, is called old or new (the bare keyword is then taken by that relation without complaint, sql.ast.returning, so the terminal would have to rename with WITH (OLD AS ..)), and whether Python's registered entities and the generative campaign's emitters gain them."
+                    }
+
+                    {
+                        at 2026-10-08T21:51:49.718816Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T22:03:53.952646Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Decided 2026-10-09. Four terminals, named in the exec vocabulary (exec.crud.exec-vocabulary+2) as a fourth column, version-returning: UpdateOne::exec_returning_change -> Change<Model> { old, new }; UpdateMany::exec_returning_changes -> Vec<Change<Model>>; Insert<A, OneRow>::exec_returning_upsert -> Option<Upserted<Model>> (None for a row the statement did not write: DO NOTHING skipped it, or DO UPDATE's WHERE left it); Insert<A, ManyRows>::exec_returning_upserts -> Vec<Upserted<Model>> (skipped rows absent). Upserted is Inserted(M) | Updated(Change<M>), so an inserted row carries no fake old row; into_model() is the row as left. Inserted vs updated is read off the old version, PostgreSQL's documented answer: the old model decodes through from_query_result_optional, whose all-NULL witness is exactly 'no old row' since a primary key is NOT NULL. TryInsert gets no upsert terminal: its Empty/Conflicted would restate the upsert's own None/absence. The RETURNING list is every column of both versions through each column's select_as, aliased o_/n_ by result_column_name (the bounded 63-byte composition), which needed a named-item form in pgorm-query: Returning::expr_as / exprs_as, rendering <expr> AS \"<name>\" (sql.ast.returning+3, sql.render.returning+4, oracle site query/returning.expr-as). The versions are always renamed, RETURNING WITH (OLD AS \"pgorm_old\", NEW AS \"pgorm_new\"): live on 18.6 an entity whose table is old returned (2, 2) for old/new through the bare keywords, and an UPDATE .. FROM item called new captured new.col; with the rename the table called old returns its real old row, and a table called pgorm_old is refused 42712, loud instead of wrong. Live: a raced upsert (waiting on another transaction's uncommitted insert of its key) updates the committed row and reports Updated. Python's registered entities and the generative campaign are not extended here; filed as a follow-up."
+                    }
+
+                    {
+                        at 2026-10-08T22:17:50.237394Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

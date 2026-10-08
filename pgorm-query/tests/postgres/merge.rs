@@ -572,7 +572,7 @@ fn fields(names: &[&str]) -> Vec<String> {
 
 // [spec:pgorm:req:sql.ast.merge+1/test]    `returning` sets the list, read after the arms
 // [spec:pgorm:req:sql.render.merge+1/test]    RETURNING last
-// [spec:pgorm:req:sql.render.returning+3/test]    on a MERGE as on the other writes
+// [spec:pgorm:req:sql.render.returning+4/test]    on a MERGE as on the other writes
 #[test]
 fn returning_follows_the_arms() {
     let sql = merge()
@@ -601,7 +601,7 @@ fn returning_follows_the_arms() {
 
 // [spec:pgorm:req:sql.ast.merge+1/test]    `returning_action` leads the list with
 // `merge_action()`, and alone is the list
-// [spec:pgorm:req:sql.render.returning+3/test]    after the renames, before the caller's list
+// [spec:pgorm:req:sql.render.returning+4/test]    after the renames, before the caller's list
 #[test]
 fn the_action_leads_the_list() {
     let o = alias("o");

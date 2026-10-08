@@ -694,14 +694,16 @@ an ideal Postgres renderer would emit.
 > unrepresentable per `sql.ast.on-conflict`, which is the only guard available
 > since `sql.render.oracle` cannot see it.
 
-> [spec:pgorm:req:sql.render.returning+3]
+> [spec:pgorm:req:sql.render.returning+4]
 > A returning clause on INSERT, UPDATE, DELETE or MERGE MUST render as the
 > final clause ` RETURNING `, then, when the clause renames either version of
 > the written row, `WITH (`, the renames comma-separated with `OLD AS "o"`
 > before `NEW AS "n"` whichever was named first, and `) `; then, on a MERGE
 > that returns its action, `merge_action()`, followed by `, ` when a list
-> follows; then `*`, a comma-separated list of column refs, or a
-> comma-separated list of expressions. A MERGE that returns its action and
+> follows; then `*`, a comma-separated list of column refs, a
+> comma-separated list of expressions, or a comma-separated list of
+> expressions each followed by ` AS ` and its quoted name (`"v" AS "w"`). A
+> MERGE that returns its action and
 > has no list renders ` RETURNING merge_action()`. A clause renaming neither writes no `WITH`. A version's column
 > (`ColumnRef::RowColumn`) renders the version's keyword bare, `.`, and the
 > quoted column (`old."col"`), and every column of a version

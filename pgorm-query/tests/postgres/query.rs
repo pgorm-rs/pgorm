@@ -1600,10 +1600,10 @@ fn insert_on_conflict_both_filters() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.returning+2/test]
+// [spec:pgorm:def:sql.ast.returning+3/test]
 #[test]
 #[allow(clippy::approx_constant)]
-// [spec:pgorm:req:sql.render.returning+3/test]
+// [spec:pgorm:req:sql.render.returning+4/test]
 fn insert_returning_all_columns() {
     assert_eq!(
         Query::insert()

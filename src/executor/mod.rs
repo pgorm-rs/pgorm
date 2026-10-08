@@ -10,6 +10,7 @@ pub(crate) mod result_name;
 mod select;
 mod update;
 mod verify;
+mod versions;
 
 pub use cursor::*;
 pub use decode::*;
@@ -20,3 +21,4 @@ pub use paginator::*;
 pub use query::*;
 pub use select::*;
 pub use verify::*;
+pub use versions::*;

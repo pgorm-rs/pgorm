@@ -8,7 +8,7 @@ impl QueryBuilder {
     /// statement returns anything. `lead` is an item the statement itself
     /// writes ahead of the caller's list, MERGE's `merge_action()`, and the
     /// clause is written when either is present.
-    // [spec:pgorm:req:sql.render.returning+3]
+    // [spec:pgorm:req:sql.render.returning+4]
     pub(crate) fn prepare_returning(
         &self,
         returning: Option<&ReturningClause>,
@@ -64,6 +64,17 @@ impl QueryBuilder {
                         write!(sql, ", ").unwrap()
                     }
                     self.prepare_simple_expr(expr, sql);
+                    false
+                });
+            }
+            ReturningItems::Named(items) => {
+                items.iter().fold(true, |first, (expr, name)| {
+                    if !first {
+                        write!(sql, ", ").unwrap()
+                    }
+                    self.prepare_simple_expr(expr, sql);
+                    write!(sql, " AS ").unwrap();
+                    name.prepare(sql.as_writer());
                     false
                 });
             }

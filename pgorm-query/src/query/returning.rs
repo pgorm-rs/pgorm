@@ -58,7 +58,7 @@ use crate::{Asterisk, ColumnRef, IntoColumnRef, IntoName, Name, SimpleExpr};
 ///     .join(" ")
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReturningClause {
     pub(crate) old: Option<Name>,
@@ -67,12 +67,14 @@ pub struct ReturningClause {
 }
 
 /// What a RETURNING list returns.
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ReturningItems {
     All,
     Columns(Vec<ColumnRef>),
     Exprs(Vec<SimpleExpr>),
+    /// Expressions each returned under a name: `<expr> AS "<name>"`.
+    Named(Vec<(SimpleExpr, Name)>),
 }
 
 impl ReturningClause {
@@ -128,7 +130,7 @@ impl ReturningClause {
 /// A version the statement did not produce reads as NULL in every column.
 /// A plain `INSERT` has no old row, and neither does a row that `ON CONFLICT
 /// DO UPDATE` inserted rather than updated. A `DELETE` has no new row.
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReturningRow {
     /// `old`: the row before the write.
@@ -149,7 +151,7 @@ impl ReturningRow {
     }
 }
 
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 impl<T: 'static> IntoColumnRef for (ReturningRow, T)
 where
     T: IntoName,
@@ -159,7 +161,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 impl IntoColumnRef for (ReturningRow, Asterisk) {
     fn into_column_ref(self) -> ColumnRef {
         ColumnRef::RowAsterisk(self.0)
@@ -167,7 +169,7 @@ impl IntoColumnRef for (ReturningRow, Asterisk) {
 }
 
 /// Shorthand for constructing [`ReturningClause`]
-// [spec:pgorm:def:sql.ast.returning+2]
+// [spec:pgorm:def:sql.ast.returning+3]
 #[derive(Clone, Debug, Default)]
 pub struct Returning;
 
@@ -302,5 +304,56 @@ impl Returning {
         ReturningClause::of(ReturningItems::Exprs(
             exprs.into_iter().map(Into::into).collect(),
         ))
+    }
+
+    /// Return one expression under a name: `RETURNING <expr> AS "<name>"`.
+    ///
+    /// The name is the result column's. It is how a list reading both of a
+    /// written row's versions tells them apart, `old."v"` and `new."v"` both
+    /// being called `v` otherwise:
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::update()
+    ///     .table(Glyph::Table)
+    ///     .value(Glyph::Aspect, Expr::col(Glyph::Aspect).add(1))
+    ///     .and_where(Expr::col(Glyph::Id).eq(1))
+    ///     .returning(Query::returning().exprs_as([
+    ///         (Expr::col((ReturningRow::Old, Glyph::Aspect)), alias("before")),
+    ///         (Expr::col((ReturningRow::New, Glyph::Aspect)), alias("after")),
+    ///     ]))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"UPDATE "glyph" SET "aspect" = "aspect" + 1 WHERE "id" = 1"#,
+    ///         r#"RETURNING old."aspect" AS "before", new."aspect" AS "after""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    pub fn expr_as<T, N>(&self, expr: T, name: N) -> ReturningClause
+    where
+        T: Into<SimpleExpr>,
+        N: IntoName,
+    {
+        ReturningClause::of(ReturningItems::Named(vec![(expr.into(), name.into_name())]))
+    }
+
+    /// Return these expressions, in order, each under the name paired with
+    /// it, on the terms of [`expr_as`](Self::expr_as).
+    pub fn exprs_as<T, N, I>(self, items: I) -> ReturningClause
+    where
+        T: Into<SimpleExpr>,
+        N: IntoName,
+        I: IntoIterator<Item = (T, N)>,
+    {
+        let items = items
+            .into_iter()
+            .map(|(expr, name)| (expr.into(), name.into_name()))
+            .collect();
+        ReturningClause::of(ReturningItems::Named(items))
     }
 }

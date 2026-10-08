@@ -629,7 +629,7 @@ fn primary_key_value_type_errs_on_arity() {
 // [spec:pgorm:sem:exec.crud.update+7/test]    the no-op read reuses the
 // statement's own `WHERE` and never consults `ValueType`, so even a mistyped
 // key declaration re-reads the model successfully
-// [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    the two insert terminals
+// [spec:pgorm:req:exec.crud.exec-vocabulary+2/test]    the two insert terminals
 // differ exactly as their names say: a count needs no key and cannot fail on one
 #[pgorm_macros::test]
 async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {

@@ -960,13 +960,18 @@ today, including panicking edges and deliberate failsafes.
 
 ## RETURNING
 
-> [spec:pgorm:def:sql.ast.returning+2]
+> [spec:pgorm:def:sql.ast.returning+3]
 > `ReturningClause` expresses PostgreSQL's `RETURNING`: a list, and the names
-> the list reads a written row's two versions by. The list has three forms:
-> every column of the target (`RETURNING *`), column references, and
-> expressions. The `Returning` helper (obtained from `Query::returning()`)
-> constructs a clause in one of them via `all()`, `column(..)`,
-> `columns(..)`, `expr(..)`, and `exprs(..)`. Insert, update, and delete
+> the list reads a written row's two versions by. The list has four forms:
+> every column of the target (`RETURNING *`), column references, expressions,
+> and expressions each under a name (`<expr> AS "<name>"`). The `Returning`
+> helper (obtained from `Query::returning()`) constructs a clause in one of
+> them via `all()`, `column(..)`, `columns(..)`, `expr(..)`, `exprs(..)`,
+> `expr_as(expr, name)` and `exprs_as(pairs)`. A name is the result column's,
+> which is how a list reading both versions of a column tells them apart,
+> `old."v"` and `new."v"` both being called `v` otherwise; it is a
+> caller-supplied identifier, quoted like every other name and registered with
+> the identifier oracle (`security.ident-oracle`). Insert, update, and delete
 > statements accept a clause through `returning(..)`, with shorthands
 > `returning_col(..)` and `returning_all()`, and a MERGE through `returning(..)`
 > (`sql.ast.merge`); `SelectStatement` has no RETURNING support. Each call

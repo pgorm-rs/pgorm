@@ -558,7 +558,7 @@ async fn exec_result_is_a_transparent_row_count() {
 /// terminal that is renamed, dropped, or changes shape fails the build. A live
 /// round trip would prove less — these are claims about the surface, not about
 /// the database.
-// [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    `exec` is a count on
+// [spec:pgorm:req:exec.crud.exec-vocabulary+2/test]    `exec` is a count on
 // every builder that has one; each returning form names what it yields, one
 // for a single row and a `Vec` for a batch
 #[allow(dead_code)]

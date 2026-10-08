@@ -678,7 +678,7 @@ impl QueryBuilder {
                 table.prepare(sql.as_writer());
                 write!(sql, ".*").unwrap();
             }
-            // [spec:pgorm:req:sql.render.returning+3] the relation's keyword, bare
+            // [spec:pgorm:req:sql.render.returning+4] the relation's keyword, bare
             ColumnRef::RowColumn(row, column) => {
                 write!(sql, "{}.", row.keyword()).unwrap();
                 column.prepare(sql.as_writer());

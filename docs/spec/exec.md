@@ -448,10 +448,10 @@ These rules capture what the code does today, including known gaps.
 > source graph's terminals through its own selector
 > (`[spec:pgorm:sem:query.graph.terminals+1]`).
 
-> [spec:pgorm:req:exec.crud.exec-vocabulary+1]
+> [spec:pgorm:req:exec.crud.exec-vocabulary+2]
 > A CRUD terminal's name MUST determine the shape of what it returns, so
 > that a reader of the call site needs no knowledge of which constructor
-> produced the builder. Exactly three terminal names exist, each in a
+> produced the builder. Exactly five terminal names exist, each but `exec` in a
 > singular and a plural spelling, and each MUST mean the same thing on every
 > builder that offers it:
 >
@@ -462,6 +462,12 @@ These rules capture what the code does today, including known gaps.
 >   `Vec<ValueType>`, one key per row written.
 > - `exec_returning_model` MUST return exactly one `Model`;
 >   `exec_returning_models` MUST return `Vec<Model>`.
+> - `exec_returning_change` MUST return one `Change<Model>`, the row before
+>   the write and after it; `exec_returning_changes` MUST return
+>   `Vec<Change<Model>>`, one per row changed (`exec.crud.versions`).
+> - `exec_returning_upsert` MUST return `Option<Upserted<Model>>`, `None` for a
+>   row the statement did not write; `exec_returning_upserts` MUST return
+>   `Vec<Upserted<Model>>`, one per row written (`exec.crud.versions`).
 >
 > A builder offers the singular spelling only where it has exactly one row to
 > answer for, and the plural only where it may have any number: the name says
@@ -469,19 +475,22 @@ These rules capture what the code does today, including known gaps.
 > and `TryInsert` carry that count as their row type, `OneRow` or `ManyRows`
 > (`query.build.insert`). The mapping is therefore total:
 >
-> | Builder | `exec` | key-returning | model-returning |
-> | --- | --- | --- | --- |
-> | `Insert<A, OneRow>` | `u64` | `exec_returning_pk` → `ValueType` | `exec_returning_model` → `Model` |
-> | `Insert<A, ManyRows>` | `u64` | `exec_returning_pks` → `Vec<ValueType>` | `exec_returning_models` → `Vec<Model>` |
-> | `TryInsert<A, R>` | `TryInsertResult<u64>` | the `Insert<A, R>` shape in `TryInsertResult` | the `Insert<A, R>` shape in `TryInsertResult` |
-> | `UpdateOne<A>` | *absent* | *absent* | `exec_returning_model` → `Model` |
-> | `UpdateMany<E>` | `u64` | *absent* | `exec_returning_models` → `Vec<Model>` |
-> | `DeleteOne<A>` | `u64` | *absent* | *absent* |
-> | `DeleteMany<E>` | `u64` | *absent* | *absent* |
+> | Builder | `exec` | key-returning | model-returning | version-returning |
+> | --- | --- | --- | --- | --- |
+> | `Insert<A, OneRow>` | `u64` | `exec_returning_pk` → `ValueType` | `exec_returning_model` → `Model` | `exec_returning_upsert` → `Option<Upserted<Model>>` |
+> | `Insert<A, ManyRows>` | `u64` | `exec_returning_pks` → `Vec<ValueType>` | `exec_returning_models` → `Vec<Model>` | `exec_returning_upserts` → `Vec<Upserted<Model>>` |
+> | `TryInsert<A, R>` | `TryInsertResult<u64>` | the `Insert<A, R>` shape in `TryInsertResult` | the `Insert<A, R>` shape in `TryInsertResult` | *absent* |
+> | `UpdateOne<A>` | *absent* | *absent* | `exec_returning_model` → `Model` | `exec_returning_change` → `Change<Model>` |
+> | `UpdateMany<E>` | `u64` | *absent* | `exec_returning_models` → `Vec<Model>` | `exec_returning_changes` → `Vec<Change<Model>>` |
+> | `DeleteOne<A>` | `u64` | *absent* | *absent* | *absent* |
+> | `DeleteMany<E>` | `u64` | *absent* | *absent* | *absent* |
 >
 > `TryInsert`'s wrapper is the receiver type's contract, not a per-method
 > variation: every `TryInsert` terminal MUST wrap the corresponding `Insert`
-> terminal's shape in `TryInsertResult`.
+> terminal's shape in `TryInsertResult`. `TryInsert` offers no upsert
+> terminal: its `Empty` and `Conflicted` say that nothing was written, which
+> the upsert's own answer already says, `None` for the one row and nothing for
+> a row of a batch.
 >
 > The batch spelling exists because the singular one, offered on every
 > insert, answered a batch with whichever row came back: `exec_returning_pk`
@@ -498,6 +507,59 @@ These rules capture what the code does today, including known gaps.
 > `exec_with_returning` is `exec_returning_model` (or `exec_returning_models`
 > on `UpdateMany`); the old `Insert::exec`, which returned a primary key
 > under a name that promised nothing, is `exec_returning_pk`.
+
+> [spec:pgorm:sem:exec.crud.versions]
+> PostgreSQL 18's `RETURNING` reads a written row as it was before the
+> statement wrote it and as the statement left it (`sql.ast.returning`), and
+> four write terminals read both, answering in two types the crate root
+> exports, `Change` and `Upserted`. `UpdateOne::exec_returning_change` returns a
+> `Change<Model>` — `old`, the row before the update, and `new`, the row after
+> it — and `UpdateMany::exec_returning_changes` one per row the update
+> changed, in the order the server returned them. `Insert::exec_returning_upsert`
+> (`OneRow`) and `exec_returning_upserts` (`ManyRows`) return an
+> `Upserted<Model>` per row the insert wrote: `Inserted(model)` for a row it
+> inserted, and `Updated(Change)` for a row whose `ON CONFLICT DO UPDATE`
+> updated the row it conflicted with, before and after. A row the statement
+> did not write — one `DO NOTHING` skipped, or one the `DO UPDATE`'s `WHERE`
+> left as it was — returns nothing, so the singular terminal answers `None`
+> for it and the plural leaves it out; an insert without a conflict clause
+> answers `Inserted` for every row. `Upserted::into_model` is the row as the
+> statement left it, whichever it did.
+>
+> Which an upsert did is read off the old version, the answer PostgreSQL
+> documents: a row the insert wrote has no old row, which reads `NULL` in
+> every column, and a row `DO UPDATE` updated has the row as it stood. The
+> old model decodes through `FromQueryResult::from_query_result_optional`
+> (`exec.decode.absent`), whose all-`NULL` witness is exactly that: an
+> entity's primary key is `NOT NULL`, so an existing row never reads `NULL`
+> in every column. The live suite holds the answer under the race `ON
+> CONFLICT` arbitrates: an upsert waiting on another transaction's
+> uncommitted insert of its key updates the committed row, and says so.
+>
+> The list returns every column of the entity from both versions, each read
+> through the column's `select_as` (`entity.traits.column.enum-cast`), the
+> old one named under the prefix `o_` and the new under `n_` by the bounded
+> composition every prefixed decode reads (`query.graph.writer`), so a
+> column name long enough to reach PostgreSQL's 63-byte identifier bound
+> still decodes. The two versions are always renamed, `RETURNING WITH (OLD AS
+> "pgorm_old", NEW AS "pgorm_new")`: `old` and `new` are scoped like any
+> relation name, and a statement with a relation called either — an entity
+> whose table is called `old`, an `UpdateMany::from` item called `new` — would
+> take the keyword, the server answering `old."col"` from that relation
+> without complaint, so an entity whose table is `old` would report its new
+> row as its old. A relation called `pgorm_old` or `pgorm_new` is refused
+> instead (`42712`), which says so rather than answering wrong.
+>
+> The terminals keep their builders' terms: `exec_returning_change` with
+> nothing to set sends nothing and returns the row its `WHERE` reads as both
+> versions, as `exec_returning_model` returns it; `exec_returning_changes`
+> with nothing to set is `Error::NothingToSet`, as the other many-row
+> terminals are (`exec.crud.update`); and `exec_returning_upserts` holds a
+> batch to uniform columns and answers an insert of no models with nothing,
+> as `exec_returning_models` does (`exec.crud.insert-returning`). An update by
+> key matching no row is `Error::RecordNotFound`. `TryInsert` offers neither
+> upsert terminal: its `Empty` and `Conflicted` are what the upsert's own
+> answer already says, nothing for nothing written.
 
 > [spec:pgorm:sem:exec.crud.insert+6]
 > `Insert::exec_returning_pk` and `exec_returning_pks` append a `RETURNING`

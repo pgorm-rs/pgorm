@@ -183,8 +183,8 @@ async fn a_by_source_arm_cannot_read_the_source(db: &DatabaseConnection) -> Resu
 // [spec:pgorm:req:sql.ast.merge+1/test]    against a live server: `merge_action()` names each
 // row's action, `old` / `new` hold what the action produced, and a bare name both relations
 // have is ambiguous (42702)
-// [spec:pgorm:def:sql.ast.returning+2/test]    on a MERGE
-// [spec:pgorm:req:sql.render.returning+3/test]
+// [spec:pgorm:def:sql.ast.returning+3/test]    on a MERGE
+// [spec:pgorm:req:sql.render.returning+4/test]
 async fn returning_reports_each_row_and_its_action(db: &DatabaseConnection) -> Result<(), Error> {
     reset(db).await?;
     let merge = by_sku()

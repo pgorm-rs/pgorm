@@ -917,6 +917,7 @@ assertions (
     {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}
     {id entity-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:59:31.234043Z}
     {id codegen-column-expressions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T21:50:20.383652Z}
+    {id orm-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:17:50.237394Z}
 )
 
 impl_evidence (

@@ -55,7 +55,7 @@ pub async fn insert_and_delete_repository(db: &DatabaseConnection) -> Result<(),
 
         assert_eq!(err.err(), Some(Error::RecordNotInserted));
 
-        // [spec:pgorm:req:exec.crud.exec-vocabulary+1/test]    `exec` asks for no
+        // [spec:pgorm:req:exec.crud.exec-vocabulary+2/test]    `exec` asks for no
         // key, so a skipped row is a count of zero rather than an error: the
         // terminal's name is the whole difference.
         let skipped = Insert::one(repository)

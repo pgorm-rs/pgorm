@@ -793,6 +793,18 @@ fn query_sites() -> Vec<Site> {
                     .returning(Query::returning().column((ReturningRow::Old, n_(n)))))
             },
         },
+        Site {
+            id: "query/returning.expr-as",
+            api: "Returning::expr_as(expr, Name) / exprs_as — the result column's name",
+            kinds: &["ResTarget.name"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::update()
+                    .table(fixed("t"))
+                    .value(fixed("c"), 1)
+                    .returning(Query::returning().expr_as(Expr::col(fixed("c")), n_(n))))
+            },
+        },
         // -- DELETE --------------------------------------------------------
         Site {
             id: "query/delete.table",
