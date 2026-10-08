@@ -8,7 +8,7 @@ from pgorm import (
 )
 
 
-# [spec:pgorm:req:python.statements/test]
+# [spec:pgorm:req:python.statements+1/test]
 # [spec:pgorm:req:python.raw/test]
 class StatementTests(unittest.TestCase):
     def test_runtime_tables_and_aliases_preserve_identity(self):

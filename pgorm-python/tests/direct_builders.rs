@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use pgorm::pgorm_query::{
-    Condition, Expr, IntoNamedTable, JoinType, Name, NullOrdering, Order, Query, SimpleExpr, Value,
-    Values,
+    BinOper, Condition, Expr, IntoNamedTable, JoinType, MatchedAction, MergeInsert, MergeUpdate,
+    Name, NullOrdering, Order, Query, ReturningRow, SimpleExpr, Value, Values,
 };
 use pgorm_python::values::PyValue;
 use pyo3::prelude::*;
@@ -155,7 +155,7 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
     programs.insert(
         "delete_event",
         Query::delete()
-            .from_table(events)
+            .from_table(events.clone())
             .and_where(Expr::col(Name::runtime("id")).eq(operand(11i64, literal)))
             .build(),
     );
@@ -166,6 +166,44 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
             .from(accounts.clone())
             .and_where(Expr::col(Name::runtime("id")).eq(operand(999i64, literal)))
             .build(),
+    );
+    let target = |column: &str| Expr::col((Name::runtime("e"), Name::runtime(column)));
+    let source = |column: &str| Expr::col((Name::runtime("a"), Name::runtime(column)));
+    let version = |row: ReturningRow, alias: &str| {
+        Expr::col((row, Name::runtime("points")))
+            .binary(BinOper::As, Expr::col(Name::runtime(alias)))
+    };
+    programs.insert(
+        "merge_events",
+        Query::merge(
+            events.clone().alias(Name::runtime("e")),
+            accounts.clone().alias(Name::runtime("a")),
+            target("id").eq(source("id").add(operand(10i64, literal))),
+        )
+        .when_matched_and(
+            target("kind").eq(operand(term, literal)),
+            MergeUpdate::value(
+                Name::runtime("points"),
+                target("points").add(operand(1i64, literal)),
+            ),
+        )
+        .when_not_matched(
+            MergeInsert::value(
+                Name::runtime("id"),
+                source("id").add(operand(10i64, literal)),
+            )
+            .and_value(Name::runtime("account_id"), source("id"))
+            .and_value(Name::runtime("kind"), operand("merged", literal))
+            .and_value(Name::runtime("points"), operand(0i64, literal)),
+        )
+        .when_not_matched_by_source(MatchedAction::Delete)
+        .returning_action()
+        .returning(Query::returning().exprs([
+            target("id").into(),
+            version(ReturningRow::Old, "before"),
+            version(ReturningRow::New, "after"),
+        ]))
+        .build(),
     );
     programs.insert(
         "select_final",
@@ -211,7 +249,7 @@ fn installed_query_evidence_matches_rust_builders() -> TestResult {
         assert_eq!(run["threshold"], if variant == 0 { 0 } else { 15 });
         assert_eq!(
             run["verified"],
-            json!({"inserted_accounts":3,"inserted_events":3,"selected":3-variant,"updated_visits":15+variant,"deleted":[1,0],"missing":true})
+            json!({"inserted_accounts":3,"inserted_events":3,"selected":3-variant,"updated_visits":15+variant,"deleted":[1,0],"missing":true,"merged":4})
         );
         let expected = programs(&report, run)?;
         assert_eq!(

@@ -126,10 +126,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements]
+> [spec:pgorm:req:python.statements+1]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
+> A RETURNING list MUST be able to read a written row's old and new versions
+> and rename them. MERGE MUST follow the Rust typestate: a pending MERGE with no
+> WHEN arm MUST NOT be inspectable or executable, each arm's action MUST be
+> typed by the kind of row the arm takes, with an explicit error for any
+> other, and `merge_action()` MUST be reachable only as the RETURNING list's
+> action column. A MERGE MUST be able to read a common table expression and to
+> be the body of one.
 > Schema/table/column names MUST be runtime inputs; shipped fixture names MUST
 > NOT be required. Execution and SQL inspection MUST use the same Rust builder
 > state, with SQL text and tagged bind values distinguishable in inspection.

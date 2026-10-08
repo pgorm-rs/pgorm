@@ -155,3 +155,8 @@ from ._writes import (
     Insert as Insert, Update as Update, Delete as Delete, RawSQL as RawSQL,
     Conflict as Conflict, ConflictTarget as ConflictTarget, ConflictUpdate as ConflictUpdate,
 )
+from ._merge import (
+    MatchedAction as MatchedAction, NotMatchedAction as NotMatchedAction, Overriding as Overriding,
+    MergeUpdate as MergeUpdate, MergeInsert as MergeInsert, PendingMerge as PendingMerge,
+    Merge as Merge, With as With, ReturningRow as ReturningRow, merge as merge,
+)

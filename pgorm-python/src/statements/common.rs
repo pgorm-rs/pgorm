@@ -10,6 +10,7 @@ use pyo3::{
 use crate::{
     errors::ConstructionError,
     expressions::{AliasedExpr, Compiled, PyCondition, require_expr},
+    identifiers::PyIdentifier,
 };
 
 pub(crate) fn condition(value: &Bound<'_, PyAny>) -> PyResult<Condition> {
@@ -64,7 +65,24 @@ pub(super) fn expressions(items: &Bound<'_, PyTuple>) -> PyResult<Vec<SimpleExpr
         .collect()
 }
 
-pub(super) fn returning(items: &Bound<'_, PyTuple>) -> PyResult<ReturningClause> {
+/// A RETURNING list, `*` when empty, with the written row's versions renamed
+/// when `old_as` or `new_as` names them.
+pub(super) fn returning(
+    items: &Bound<'_, PyTuple>,
+    old_as: Option<&Bound<'_, PyAny>>,
+    new_as: Option<&Bound<'_, PyAny>>,
+) -> PyResult<ReturningClause> {
+    let mut clause = list(items)?;
+    if let Some(name) = old_as {
+        clause = clause.old_as(PyIdentifier::new(name)?.name());
+    }
+    if let Some(name) = new_as {
+        clause = clause.new_as(PyIdentifier::new(name)?.name());
+    }
+    Ok(clause)
+}
+
+fn list(items: &Bound<'_, PyTuple>) -> PyResult<ReturningClause> {
     if items.is_empty() {
         return Ok(Query::returning().all());
     }

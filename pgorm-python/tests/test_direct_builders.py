@@ -109,10 +109,24 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await pool.execute(delete), 0)
         missing = p.select(p.col("id")).from_(a).where_(p.col("id") == operand(999))
         self.assertIsNone(await pool.fetch_optional(record("select_missing", missing)))
+        target, source = e.as_("e"), a.as_("a")
+        merge = (p.merge(target, source, target.col("id") == source.col("id") + operand(10))
+                 .when_matched(p.MergeUpdate("points", target.col("points") + operand(1)),
+                               condition=target.col("kind") == operand(term))
+                 .when_not_matched(p.MergeInsert("id", source.col("id") + operand(10))
+                                   .and_value("account_id", source.col("id"))
+                                   .and_value("kind", operand("merged")).and_value("points", operand(0)))
+                 .when_not_matched_by_source(p.MatchedAction.Delete)
+                 .returning_action()
+                 .returning(target.col("id"), p.ReturningRow.Old.col("points").as_("before"),
+                            p.ReturningRow.New.col("points").as_("after")))
+        merged = sorted(tuple(row.values()) for row in await pool.fetch_all(record("merge_events", merge)))
+        self.assertEqual(merged, [("DELETE", 10, 2, None), ("INSERT", 11, None, 0),
+                                  ("INSERT", 13, None, 0), ("UPDATE", 12, 4, 5)])
         final = p.select(p.col("id"), p.col("visits")).from_(a).order_by(p.col("id").asc())
         self.assertEqual([tuple(row.values()) for row in await pool.fetch_all(record("select_final", final))],
                          [(1, 15 + variant), (2, 20), (3, 30)])
-        run["verified"] = {"inserted_accounts": 3, "inserted_events": 3, "selected": len(expected), "updated_visits": 15 + variant, "deleted": [1, 0], "missing": True}
+        run["verified"] = {"inserted_accounts": 3, "inserted_events": 3, "selected": len(expected), "updated_visits": 15 + variant, "deleted": [1, 0], "missing": True, "merged": len(merged)}
         return run
 
 

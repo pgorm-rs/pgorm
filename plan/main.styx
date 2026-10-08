@@ -10066,12 +10066,27 @@ children (
                 title "Python builds MERGE, and a RETURNING list can read and rename a written row's old and new versions"
                 kind @feat
                 deps (merge-beyond-pg16 pg18-returning-old-new)
+                sealed true
                 log (
                     {
                         at 2026-10-07T06:23:27.026241Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Split from merge-beyond-pg16 (c5acfcaa), whose decision note says why the binding was not built there. pgorm-python exposes no MERGE (python.statements asks for SELECT, INSERT, UPDATE and DELETE), and its INSERT / UPDATE / DELETE returning(*items) cannot read a written row's old and new versions or rename them, which pgorm-query now writes (ReturningRow, ReturningClause::old_as / new_as, sql.ast.returning+2; 947a062a). A raw statement reaches both today.\n\nMERGE needs native objects for the pending statement (no arm yet, so nothing to inspect or execute, as in Rust) and the statement; the three arm kinds, each with an optional condition (when_matched, when_not_matched, when_not_matched_by_source and their conditional forms, the unconditional arm of a kind rendering after its conditional arms, last call wins); the two action types (an update, a delete or nothing for a target row; an insert, a default-values insert or nothing for an unmatched source row, so an insert for a target row is refused by type or by an explicit TypeError); MergeUpdate / MergeInsert as non-empty (column, expression) pairs with overriding; with(), only(); and returning(*items) plus a returning_action flag, never a free merge_action() expression (it resolves only in a MERGE's RETURNING list, sql.ast.merge+1). The row versions need a Python spelling for (ReturningRow, column) and (ReturningRow, star), and the renames as keyword arguments of returning(). Each needs type stubs (a sibling .pyi if _writes.pyi or _statements.pyi would pass the size cap), capability-manifest entries (pgorm-python/src/statements/capabilities.rs), parity cases in checks/direct_builders.py, and live tests; the identifier oracle already covers the names, since Python reaches them only through the Rust APIs. python.statements gains MERGE and the versions in the same change."
+                    }
+
+                    {
+                        at 2026-10-08T16:03:50.562078Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T16:16:36.872555Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

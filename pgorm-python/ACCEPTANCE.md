@@ -43,7 +43,7 @@ point. Package installation occurs in fresh Python environments.
 
 | API or contract | Evidence run by acceptance |
 | --- | --- |
-| No HTTP; direct SELECT/CRUD | `checks/direct_builders.py` installs a wheel and executes 28 query programs against PostgreSQL. `tests/direct_builders.rs` independently constructs the Rust SQL and tagged parameters. Python's query phase rejects process launches; deliberately altered SQL and parameters must fail comparison. |
+| No HTTP; direct SELECT/CRUD | `checks/direct_builders.py` installs a wheel and executes 32 query programs against PostgreSQL. `tests/direct_builders.rs` independently constructs the Rust SQL and tagged parameters. Python's query phase rejects process launches; deliberately altered SQL and parameters must fail comparison. |
 | Values and expressions | Rust tests compare the Python wrappers with Rust value variants and expression constructors. Installed `test_values.py` and `test_expressions.py` cover exact conversion, typed NULL, enum identity, precision rejection and owned builder state. |
 | Statements and raw SQL | Native statement tests compare SQL and parameter order for SELECT, INSERT, UPDATE, DELETE, conflicts and raw templates. Installed statement and direct-builder tests exercise their public Python construction and execution. |
 | Runtime models and schema | Installed model tests cover mapped fields, defaults, CRUD, composite keys and decoding constraints. Rust `tests/schema.rs` compares explicit DDL; application `schema_parity.rs` compares generated statements with real entity traits. Both schema paths execute against PostgreSQL. |

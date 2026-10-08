@@ -29,7 +29,7 @@ rejects process launches during the query phase. Native builders delegate to
 the existing Rust APIs and use the installed extension throughout.
 
 The four programs combine two structural variants with bound and literal
-value paths. Each program tests seven query shapes, giving 28 exact SQL and
+value paths. Each program tests eight query shapes, giving 32 exact SQL and
 parameter comparisons:
 
 | Query shape | Database checks |
@@ -40,6 +40,7 @@ parameter comparisons:
 | UPDATE with RETURNING | Exact updated record and visits count |
 | DELETE | One affected row, then zero on repeating the same builder |
 | SELECT with no matching row | `fetch_optional` returns None |
+| MERGE of events with accounts, every kind of arm, RETURNING `merge_action()` and both row versions | Four rows: a deleted unmatched event, two inserts and a conditional update, each with its old and new points |
 | SELECT final state | Expected surviving accounts and updated values |
 
 Structural variants change predicates and a limit inside the same loaded
@@ -64,7 +65,7 @@ Successful runs leave these reviewable artifacts in
 - The installed wheel.
 - `queries.json`: all runtime inputs, SQL, tagged parameters and verified
   database outcomes, without connection credentials.
-- `summary.json`: pass status, 28 program comparisons, negative-check results
+- `summary.json`: pass status, 32 program comparisons, negative-check results
   and SHA-256 hashes of the wheel and query report.
 
 The temporary Python environment is removed afterward. Construction, database,

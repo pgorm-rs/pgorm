@@ -28,7 +28,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements]
+// [spec:pgorm:req:python.statements+1]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -149,6 +149,14 @@ impl PySelect {
     fn distinct(&self) -> Self {
         let mut next = self.clone();
         next.inner.distinct();
+        next
+    }
+
+    /// Prefix a WITH clause; the last call wins. A MERGE body there is read
+    /// through its RETURNING list.
+    fn with_(&self, clause: PyRef<'_, super::with::PyWith>) -> Self {
+        let mut next = self.clone();
+        next.inner.with(clause.inner.clone());
         next
     }
 
