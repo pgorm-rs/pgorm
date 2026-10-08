@@ -17,7 +17,7 @@ use crate::{errors::ConstructionError, expressions::Compiled};
 type Arg<'a, 'py> = &'a Bound<'py, PyAny>;
 type Opt<'a, 'py> = Option<&'a Bound<'py, PyAny>>;
 
-// [spec:pgorm:req:python.statements+1]
+// [spec:pgorm:req:python.statements+2]
 /// `MERGE INTO target USING source ON condition` before its first WHEN arm.
 #[pyclass(name = "PendingMerge", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]

@@ -1,12 +1,13 @@
-//! SQL/JSON's query functions, constructors and `IS JSON` over the Rust
-//! builders in `pgorm_query`. Each function takes its clauses as keyword
+//! SQL/JSON's query functions, constructors, `IS JSON` and `JSON_TABLE` over
+//! the Rust builders in `pgorm_query`. Each function takes its clauses as keyword
 //! arguments, applies them through the builder's own methods and returns the
-//! finished expression, so the SQL is the Rust renderer's.
+//! finished expression or FROM item, so the SQL is the Rust renderer's.
 
 mod capabilities;
 mod construct;
 mod kinds;
 mod query;
+mod table;
 #[cfg(test)]
 mod tests;
 
@@ -19,6 +20,7 @@ pub use kinds::{
     PyJsonDefault, PyJsonExistsBehavior, PyJsonInput, PyJsonKind, PyJsonQueryBehavior,
     PyJsonValueBehavior,
 };
+pub use table::{PyJsonTableBehavior, PyJsonTableColumn};
 
 /// An expression in a position SQL/JSON reads as JSON: a `JsonInput` from
 /// `format_json`, or anything an expression accepts, unformatted.
@@ -55,9 +57,12 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyJsonValueBehavior>()?;
     module.add_class::<PyJsonQueryBehavior>()?;
     module.add_class::<PyJsonDefault>()?;
+    module.add_class::<PyJsonTableBehavior>()?;
+    module.add_class::<PyJsonTableColumn>()?;
     module.add_function(wrap_pyfunction!(query::json_exists, module)?)?;
     module.add_function(wrap_pyfunction!(query::json_value, module)?)?;
     module.add_function(wrap_pyfunction!(query::json_query, module)?)?;
+    module.add_function(wrap_pyfunction!(table::json_table, module)?)?;
     module.add_function(wrap_pyfunction!(construct::json_object, module)?)?;
     module.add_function(wrap_pyfunction!(construct::json_array, module)?)?;
     module.add_function(wrap_pyfunction!(construct::json_array_query, module)?)?;

@@ -128,10 +128,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+1]
+> [spec:pgorm:req:python.statements+2]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
+> A SELECT's FROM list and joins MUST take a FROM item that is not a named
+> table: `JSON_TABLE`, lowered into `Func::json_table` with each column kind's
+> own clauses and behaviours as the Rust builder types them, its first column
+> and its alias required so an empty column list or an unnamed item cannot be
+> built.
 > A RETURNING list MUST be able to read a written row's old and new versions
 > and rename them. MERGE MUST follow the Rust typestate: a pending MERGE with no
 > WHEN arm MUST NOT be inspectable or executable, each arm's action MUST be

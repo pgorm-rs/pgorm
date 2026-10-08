@@ -1,7 +1,7 @@
 use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement};
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{common, table::PyTable};
+use super::{common, from_item::from_item};
 use crate::{
     errors::ConstructionError,
     expressions::{Compiled, OrderBy},
@@ -28,7 +28,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+1]
+// [spec:pgorm:req:python.statements+2]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -63,10 +63,13 @@ impl PySelect {
         Ok(next)
     }
 
-    fn from_(&self, table: PyRef<'_, PyTable>) -> Self {
+    /// Add a FROM item, a `Table` or a `FromItem`; a second is comma-joined
+    /// and may read the columns of the items before it when it is a function
+    /// such as `JSON_TABLE`, which PostgreSQL makes implicitly LATERAL.
+    fn from_(&self, item: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.from(table.inner.clone());
-        next
+        next.inner.from(from_item(item)?);
+        Ok(next)
     }
 
     fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -75,21 +78,18 @@ impl PySelect {
         Ok(next)
     }
 
-    #[pyo3(signature = (table, on, *, kind=Join::Inner))]
-    fn join(&self, table: PyRef<'_, PyTable>, on: &Bound<'_, PyAny>, kind: Join) -> PyResult<Self> {
+    #[pyo3(signature = (item, on, *, kind=Join::Inner))]
+    fn join(&self, item: &Bound<'_, PyAny>, on: &Bound<'_, PyAny>, kind: Join) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.join(
-            kind.rust_join(),
-            table.inner.clone(),
-            common::condition(on)?,
-        );
+        next.inner
+            .join(kind.rust_join(), from_item(item)?, common::condition(on)?);
         Ok(next)
     }
 
-    fn cross_join(&self, table: PyRef<'_, PyTable>) -> Self {
+    fn cross_join(&self, item: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.cross_join(table.inner.clone());
-        next
+        next.inner.cross_join(from_item(item)?);
+        Ok(next)
     }
 
     #[pyo3(signature = (*expressions))]

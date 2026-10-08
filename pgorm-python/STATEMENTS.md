@@ -38,9 +38,15 @@ limits and quoting rules in [EXPRESSIONS.md](EXPRESSIONS.md).
 
 `select()` starts with `*`. Explicit projections are expressions or
 `expr.as_(name)` aliases. `.select(*items)` replaces the existing projection and
-requires at least one item. `.from_` adds a source. `.join` requires both the
-table and ON expression/condition and accepts `Join.Inner`, `Left`, `Right` or
-`Full`; `.cross_join` takes just its table.
+requires at least one item. `.from_` adds a source; a second is comma-joined.
+`.join` requires both the source and ON expression/condition and accepts
+`Join.Inner`, `Left`, `Right` or `Full`; `.cross_join` takes just its source.
+
+A source is a `Table` or a `FromItem`, a `FROM` item that is not a named table.
+`json_table` builds one (see [EXPRESSIONS.md](EXPRESSIONS.md#json_table)). A
+`FromItem` always has an alias, as PostgreSQL requires of such items, so
+`item.col(name)` and `item.star()` qualify its columns by a name the caller
+chose. Anything else raises `ConstructionError`.
 
 Repeated `.where_` and `.having` calls combine conditions through the Rust
 condition builder. `.group_by` accepts expressions, `.order_by` accepts typed

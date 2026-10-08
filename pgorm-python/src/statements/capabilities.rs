@@ -9,17 +9,28 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         ("table.star", "pgorm_query::ColumnRef::TableAsterisk"),
         ("table.as_", "pgorm_query::NamedTable::alias"),
+        (
+            "from_item.col",
+            "pgorm_query::FromItem::qualifier, ColumnRef::TableColumn",
+        ),
+        (
+            "from_item.star",
+            "pgorm_query::FromItem::qualifier, ColumnRef::TableAsterisk",
+        ),
         ("select", "pgorm_query::Query::select"),
         (
             "select.select",
             "pgorm_query::SelectStatement::clear_selects, expr, expr_as",
         ),
-        ("select.from_", "pgorm_query::SelectStatement::from"),
+        (
+            "select.from_",
+            "pgorm_query::SelectStatement::from, FromItem",
+        ),
         ("select.where_", "pgorm_query::SelectStatement::cond_where"),
-        ("select.join", "pgorm_query::SelectStatement::join"),
+        ("select.join", "pgorm_query::SelectStatement::join, FromItem"),
         (
             "select.cross_join",
-            "pgorm_query::SelectStatement::cross_join",
+            "pgorm_query::SelectStatement::cross_join, FromItem",
         ),
         (
             "select.group_by",

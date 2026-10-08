@@ -15,6 +15,14 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::Func::json_query, JsonQuery::{passing, returning, with_wrapper, with_conditional_wrapper, omit_quotes, on_empty, on_error}",
         ),
         (
+            "json_table",
+            "pgorm_query::Func::json_table, JsonTable::{column, passing, path_name, on_error, alias}, JsonTableBehavior",
+        ),
+        (
+            "json_table_column",
+            "pgorm_query::JsonTableColumn::{ordinality, value, query, exists, nested}, JsonValueColumn::{path, on_empty, on_error}, JsonQueryColumn::{path, with_wrapper, with_conditional_wrapper, omit_quotes, on_empty, on_error}, JsonExistsColumn::{path, on_error}, JsonNestedColumns::{column, path_name}",
+        ),
+        (
             "json_behavior",
             "pgorm_query::{JsonExistsBehavior, JsonValueBehavior, JsonQueryBehavior}",
         ),

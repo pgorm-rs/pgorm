@@ -10685,12 +10685,27 @@ children (
         id python-json-table
         title "Python reads rows out of a JSON document with JSON_TABLE, a FROM item"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-08T16:03:28.361105Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by python-sql-json (f2e880a6), whose node note left JSON_TABLE's half to follow pg17-json-table (983505d0). Rust builds it as Func::json_table(context, path, first_column) -> JsonTable, made a FromItem by alias(name), with JsonTableColumn's five kinds (ordinality, value, query, exists, nested with its own first column), passing, path_name and on_error (JsonTableBehavior: ERROR or EMPTY only); paths are escaped literals because the server refuses a parameter there (0A000 root, 42601 column). Python cannot place it: Select.from_ and Select.join take only a Table (pgorm-python/src/statements/select.rs), so there is no FROM item beyond a named table, no comma-joined second FROM item, and no LEFT JOIN .. ON TRUE over a lateral one. Needs: a Python spelling for a FROM item that is not a table (JSON_TABLE first; a subquery or VALUES list would share the same door), accepted by from_ and the join methods; native objects for the table, its column kinds and their behaviours, reusing python-sql-json's JsonValueBehavior / JsonQueryBehavior / JsonExistsBehavior / JsonDefault where the Rust column kinds take those enums; stubs (a sibling .pyi), capability-manifest entries, parity cases against the Rust builders, live tests on 18.6 (each column kind, NESTED PATH as an outer join, 2203A under ERROR ON ERROR, a hostile path literal, 42712 for a repeated column name), and python.statements gaining the FROM item. The alias and every column, path and PASSING name reach the Rust builder as a Name, so the identifier oracle already covers them."
+            }
+
+            {
+                at 2026-10-08T22:44:02.487435Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-08T23:34:09.315805Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

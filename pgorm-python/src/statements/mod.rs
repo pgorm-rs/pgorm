@@ -3,6 +3,7 @@
 mod capabilities;
 mod common;
 mod conflict;
+mod from_item;
 mod insert;
 mod merge;
 mod merge_action;
@@ -17,6 +18,7 @@ mod write;
 pub(crate) use capabilities::operations as capabilities;
 pub(crate) use common::condition;
 pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
+pub use from_item::PyFromItem;
 pub use insert::PyInsert;
 pub use merge::{PyMerge, PyPendingMerge};
 pub use merge_action::{
@@ -66,6 +68,7 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyTable>()?;
+    module.add_class::<PyFromItem>()?;
     module.add_class::<PySelect>()?;
     module.add_class::<Join>()?;
     module.add_class::<PyInsert>()?;

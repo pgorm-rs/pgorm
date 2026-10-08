@@ -1,8 +1,9 @@
 use std::ffi::CString;
 
 use pgorm::pgorm_query::{
-    ColumnType, Expr, Func, JsonExistsBehavior, JsonKind, JsonQueryBehavior, JsonValueBehavior,
-    JsonValueType, Name, Order, Query, SimpleExpr,
+    Asterisk, ColumnRef, ColumnType, Expr, Func, IntoNamedTable, JoinType, JsonExistsBehavior,
+    JsonKind, JsonQueryBehavior, JsonTableBehavior, JsonTableColumn, JsonValueBehavior,
+    JsonValueType, Name, Order, Query, SelectStatement, SimpleExpr,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -296,6 +297,200 @@ fn unrepresentable_choices_are_refused() -> PyResult<()> {
             ),
         ] {
             refused(py, &globals, source, message);
+        }
+        Ok(())
+    })
+}
+
+/// The SQL and parameters a Python SELECT builds, beside the Rust builder's.
+fn statement_parity(
+    py: Python<'_>,
+    globals: &Bound<'_, PyDict>,
+    source: &str,
+    expected: &SelectStatement,
+) -> PyResult<()> {
+    let built = py
+        .eval(&CString::new(source)?, Some(globals), None)?
+        .call_method0("inspect")?;
+    let built = built.extract::<PyRef<'_, Compiled>>()?;
+    let (sql, values) = expected.build();
+    assert_eq!(built.sql, sql, "{source}");
+    assert_eq!(built.values, values, "{source}");
+    Ok(())
+}
+
+// [spec:pgorm:req:python.statements+2/test]
+#[test]
+fn json_table_matches_the_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        py.run(
+            cr#"d = p.Table('docs', alias='d')
+C = p.JsonTableColumn
+jt = p.json_table(
+    d.col('doc'), '$.items[*] ? (@.n > $Min)', C.ordinality('i'),
+    C.value('n', 'integer', path='$.n', on_empty=p.JsonDefault(-1), on_error=p.JsonValueBehavior.Error),
+    C.query('Tags', 'jsonb', shaping='with_conditional_wrapper',
+            on_empty=p.JsonQueryBehavior.EmptyArray, on_error=p.JsonQueryBehavior.Null),
+    C.exists('flag', 'boolean', path='strict $.flag', on_error=p.JsonExistsBehavior.Unknown),
+    C.nested('$.parts[*]', C.value('part', 'text', path='$'), C.ordinality('j'), path_name='parts'),
+    alias='jt', passing={'Min': 1}, path_name='root', on_error=p.JsonTableBehavior.Error)
+"#,
+            Some(&globals),
+            None,
+        )?;
+        let doc = || Expr::col((n("d"), n("doc")));
+        let table = Func::json_table(
+            doc(),
+            "$.items[*] ? (@.n > $Min)",
+            JsonTableColumn::ordinality(n("i")),
+        )
+        .column(
+            JsonTableColumn::value(n("n"), ColumnType::Integer)
+                .path("$.n")
+                .on_empty(JsonValueBehavior::Default((-1i64).into()))
+                .on_error(JsonValueBehavior::Error),
+        )
+        .column(
+            JsonTableColumn::query(n("Tags"), ColumnType::JsonBinary)
+                .with_conditional_wrapper()
+                .on_empty(JsonQueryBehavior::EmptyArray)
+                .on_error(JsonQueryBehavior::Null),
+        )
+        .column(
+            JsonTableColumn::exists(n("flag"), ColumnType::Boolean)
+                .path("strict $.flag")
+                .on_error(JsonExistsBehavior::Unknown),
+        )
+        .column(
+            JsonTableColumn::nested(
+                "$.parts[*]",
+                JsonTableColumn::value(n("part"), ColumnType::Text).path("$"),
+            )
+            .column(JsonTableColumn::ordinality(n("j")))
+            .path_name(n("parts")),
+        )
+        .passing(1i64, n("Min"))
+        .path_name(n("root"))
+        .on_error(JsonTableBehavior::Error)
+        .alias(n("jt"));
+        let docs = n("docs").into_named_table().alias(n("d"));
+        statement_parity(
+            py,
+            &globals,
+            "p.Select(d.col('id'), jt.col('n'), jt.star()).from_(d).from_(jt)",
+            &Query::select()
+                .expr(Expr::col((n("d"), n("id"))))
+                .expr(Expr::col((n("jt"), n("n"))))
+                .expr(Expr::col(ColumnRef::TableAsterisk(n("jt"))))
+                .from(docs.clone())
+                .from(table)
+                .take(),
+        )?;
+
+        let labels = || {
+            Func::json_table(
+                doc(),
+                "$.items[*]",
+                JsonTableColumn::value(n("label"), ColumnType::Text),
+            )
+            .alias(n("l"))
+        };
+        py.run(
+            c"l = p.json_table(d.col('doc'), '$.items[*]', C.value('label', 'text'), alias='l')",
+            Some(&globals),
+            None,
+        )?;
+        statement_parity(
+            py,
+            &globals,
+            "p.Select(d.col('id'), l.col('label')).from_(d).join(l, p.literal(True), kind=p.Join.Left)",
+            &Query::select()
+                .expr(Expr::col((n("d"), n("id"))))
+                .expr(Expr::col((n("l"), n("label"))))
+                .from(docs.clone())
+                .join(
+                    JoinType::LeftJoin,
+                    labels(),
+                    SimpleExpr::Constant(true.into()),
+                )
+                .take(),
+        )?;
+        statement_parity(
+            py,
+            &globals,
+            "p.Select().from_(d).cross_join(p.json_table(p.format_json(p.col('raw')), '$[*]', C.ordinality('k'), alias='r'))",
+            &Query::select()
+                .column(Asterisk)
+                .from(docs)
+                .cross_join(
+                    Func::json_table(
+                        Expr::col(n("raw")).format_json(),
+                        "$[*]",
+                        JsonTableColumn::ordinality(n("k")),
+                    )
+                    .alias(n("r")),
+                )
+                .take(),
+        )
+    })
+}
+
+// [spec:pgorm:req:python.statements+2/test]
+#[test]
+fn json_table_refuses_what_its_builder_cannot_take() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        for (source, message) in [
+            (
+                "p.JsonTableColumn.value('v', 'integer', on_empty=p.JsonQueryBehavior.EmptyArray)",
+                "JsonValueBehavior or JsonDefault",
+            ),
+            (
+                "p.JsonTableColumn.query('v', 'jsonb', on_error=p.JsonValueBehavior.Error)",
+                "JsonQueryBehavior or JsonDefault",
+            ),
+            (
+                "p.JsonTableColumn.query('v', 'jsonb', shaping='keep_quotes')",
+                "shaping requires",
+            ),
+            (
+                "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality('i'), 'v', alias='t')",
+                "require JsonTableColumn",
+            ),
+            (
+                "p.JsonTableColumn.nested('$', p.JsonTableColumn.ordinality('i'), 'v')",
+                "require JsonTableColumn",
+            ),
+            ("p.Select().from_('docs')", "requires a Table or FromItem"),
+            (
+                "p.Select().from_(p.Table('a')).join(p.col('b'), p.literal(True))",
+                "requires a Table or FromItem",
+            ),
+            (
+                "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality(''), alias='t')",
+                "identifier parts",
+            ),
+        ] {
+            refused(py, &globals, source, message);
+        }
+        for source in [
+            "p.json_table(p.col('doc'), '$', alias='t')",
+            "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality('i'))",
+            "p.JsonTableColumn.nested('$')",
+            "p.JsonTableColumn.exists('v', 'boolean', on_empty=p.JsonExistsBehavior.Error)",
+            "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality('i'), alias='t', on_error=p.JsonValueBehavior.Null)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
+                "{source}: {error}"
+            );
         }
         Ok(())
     })

@@ -198,8 +198,67 @@ refused rather than dropped. `filter` takes an expression or a `Condition`.
 `JSON(..)` is `json_parse` so that importing it cannot shadow Python's `json`
 module. `json_serialize` reads its input through `JSON(..)`, so a `jsonb`
 value serializes as its document on PostgreSQL 18.6. The aggregates' window
-form is not reachable from Python: `Select` has no window clause. `JSON_TABLE`,
-a `FROM` item, is not bound yet either, because `Select.from_` takes a `Table`.
+form is not reachable from Python: `Select` has no window clause.
+
+### JSON_TABLE
+
+`json_table` reads rows out of a JSON document. It is a `FROM` item, not an
+expression: it returns a `FromItem`, which `Select.from_`, `join` and
+`cross_join` take beside a `Table` (see [STATEMENTS.md](STATEMENTS.md)).
+
+```python
+from pgorm import Join, JsonQueryBehavior, JsonTableColumn as C, Table, json_table, literal, select
+
+docs = Table("docs", alias="d")
+items = json_table(
+    docs.col("doc"), "$.items[*] ? (@.n >= $Min)",
+    C.ordinality("i"),
+    C.value("n", "integer"),
+    C.query("tags", "jsonb", on_empty=JsonQueryBehavior.EmptyArray),
+    C.exists("flagged", "boolean", path="$.flag"),
+    C.nested("$.parts[*]", C.value("part", "text", path="$")),
+    alias="jt", passing={"Min": 1},
+)
+query = select(docs.col("id"), items.col("n"), items.col("part")).from_(docs).from_(items)
+labels = json_table(docs.col("doc"), "$.items[*]", C.value("label", "text"), alias="l")
+kept = select(docs.col("id"), labels.col("label")).from_(docs).join(labels, literal(True), kind=Join.Left)
+```
+
+| Python | Rust builder |
+| --- | --- |
+| `json_table(context, path, column, *columns, alias, passing, path_name, on_error)` | `Func::json_table`, `column`, `passing`, `path_name`, `on_error`, `alias` |
+| `JsonTableColumn.ordinality(name)` | `JsonTableColumn::ordinality` |
+| `JsonTableColumn.value(name, kind, *, path, on_empty, on_error)` | `JsonTableColumn::value` |
+| `JsonTableColumn.query(name, kind, *, path, shaping, on_empty, on_error)` | `JsonTableColumn::query` |
+| `JsonTableColumn.exists(name, kind, *, path, on_error)` | `JsonTableColumn::exists` |
+| `JsonTableColumn.nested(path, column, *columns, path_name)` | `JsonTableColumn::nested`, `column`, `path_name` |
+
+The first column and the alias are required arguments, so a table with no
+column (`42601` from the server) or no name cannot be built. Like a function in
+`FROM`, it is implicitly `LATERAL`: its context may read the columns of the
+items before it, after a comma or in a join, and `LEFT JOIN .. ON TRUE` keeps a
+row whose document yields nothing. A nested path's rows join their parent's as
+an outer join would. `items.col(name)` qualifies a column by the alias, and
+`items.star()` selects them all.
+
+Unlike the query functions' paths, these paths are literals: PostgreSQL
+refuses a parameter for the root path (`0A000`) and its grammar takes only a
+string constant for a column's or a nested path (`42601`). Rust writes each as
+an escaped literal, never interpolated; a value the path needs goes through
+`passing`, which binds it. Column names, path names, `PASSING` names and the
+alias are identifiers, quoted case-exactly. A column without `path` reads
+`$."name"`, its own name exactly as written.
+
+Each column kind takes only its own behaviours, as the query function it
+reads like does: `value` takes `JsonValueBehavior` or `JsonDefault`, `query`
+takes `JsonQueryBehavior` or `JsonDefault` and the same `shaping` slot as
+`json_query`, and `exists` takes `JsonExistsBehavior` for `on_error`, with no
+`on_empty` because finding nothing is `false`. The table's own `on_error` is a
+`JsonTableBehavior`, `Error` or `Empty`, the only two PostgreSQL admits there;
+without one, a failing root path yields no rows. The server still refuses
+what the builder does not track: a name used twice across the table and its
+nested levels (`42712`), and `FORMAT JSON` on a `query` column whose type is
+not a string, `json`, `jsonb` or `bytea` (`0A000`).
 
 Run installed expression tests and Rust parity tests from the repository root:
 
