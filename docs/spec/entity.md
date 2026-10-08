@@ -189,7 +189,7 @@ explicit limitations.
 > spelling of the same type: `#[pgorm(save_as = "…")]` generates both, so the
 > scalar and array comparisons of one column cannot disagree about its cast.
 
-> [spec:pgorm:def:entity.traits.primary-key+6]
+> [spec:pgorm:def:entity.traits.primary-key+7]
 > `PrimaryKeyTrait: StaticName + Iterable` (`src/entity/primary_key.rs`) defines an
 > entity's primary key as an iterable enum of key columns. Its `ValueType` associated
 > type is the Rust value form of the whole key and is bound by
@@ -202,7 +202,19 @@ explicit limitations.
 > a stored generated column. A composite key with one
 > generated column — `(tenant_id, id)`, `id` an identity — reports false, because the
 > caller still supplies `tenant_id`; the generated part is that column's fact, carried by
-> its `ColumnDef` (`entity.traits.column-def`). `PrimaryKeyToColumn` maps key variants to columns (`into_column`)
+> its `ColumnDef` (`entity.traits.column-def`). `without_overlaps()`, `false`
+> unless a key overrides it, says the key is PostgreSQL 18's temporal key,
+> its last column the period compared for overlap where the rest are compared
+> for equality (`[spec:pgorm:req:sql.ddl.create-table+16]`). The key value is
+> still the whole key, period included, and a lookup by it is by equality:
+> equal periods overlap and an empty one is refused (`23514`), so at most one
+> row holds a value of the key, and `find_by_id`, an update and a delete by
+> key name one version of a row; which version covers a moment is a filter on
+> the period, not a key lookup. The live suite holds the key generated
+> `WITHOUT OVERLAPS`, refusing an overlapping version (`23P01`) and admitting
+> one that only touches, a lookup by an overlapping but unequal period naming
+> no row, and an update and a delete by key reaching one version.
+> `PrimaryKeyToColumn` maps key variants to columns (`into_column`)
 > and back (`from_column -> Option<Self>`). `PrimaryKeyArity` exposes a
 > `const ARITY: usize`: any single `TryGetable` scalar has arity 1, and tuple impls
 > cover composite keys of 1 through 12 components.
@@ -484,7 +496,7 @@ explicit limitations.
 > `find_related()`, which MUST inner-join `to()` (and `via()` when present, joined in
 > reverse) onto a fresh `Select<R>`.
 
-> [spec:pgorm:def:entity.relation.def+9]
+> [spec:pgorm:def:entity.relation.def+10]
 > `RelationDef` (`src/entity/relation.rs`) is the concrete relation record:
 > `rel_type`, `from_tbl` / `to_tbl` (`FromItem`, since a relation is joined into a
 > query and may be re-aliased), `columns` (`ColumnPairs`),
@@ -560,7 +572,7 @@ explicit limitations.
 > never checked, with no referential triggers — or deferrable, and the
 > relation says so: `RelationBuilder::enforcement(e)` and `deferrability(d)`
 > set the two fields, which `rev()` keeps and the conversion into a foreign
-> key carries (`[spec:pgorm:req:entity.relation.fk+4]`), so the schema
+> key carries (`[spec:pgorm:req:entity.relation.fk+5]`), so the schema
 > generated from an entity creates the key the entity describes rather than
 > one enforced and checked at once. A `NOT ENFORCED` key admits a row whose
 > columns reference nothing, and the relation's readers take such a row as
@@ -571,6 +583,26 @@ explicit limitations.
 > beside the plain key that refuses the orphan (`23503`), and holds a
 > deferred key letting a transaction write a row before the row it
 > references, refusing at `COMMIT` one that never came (`23503`).
+>
+> A relation may match a `PERIOD`, PostgreSQL 18's temporal foreign key
+> `FOREIGN KEY (.., PERIOD p) REFERENCES t (.., PERIOD q)`. `ColumnPairs` holds
+> the period pair as a slot of its own beside the pairs matched for equality,
+> set by `RelationBuilder::period(from, to)` on a builder that has its columns
+> (a period alone is refused, `42601`) and read back by `period()`; `iter()`
+> and the pairs stay the equality pairs, `rev()` swaps the period with them,
+> and `from_key()` / `to_key()` end with the period column, since a row's
+> period is part of what identifies the rows a join reached. The relation
+> joins a row to each row whose period overlaps its own
+> (`[spec:pgorm:sem:query.build.join+4]`), of which there may be several: the
+> versions of a temporal key that together cover the row's period, which the
+> server holds the foreign key to. So the relation's readers reach each such
+> version: `find_related` and a graph slot return each, a required slot
+> pairing the row with each; `load_one` reads the one version a period falls
+> in and reports a period across two as more than one related row, as it
+> reports any `HasOne` that matches two (`query.loader.regroup`); and the
+> versions' `load_many` gives each version the rows it overlaps. Rows of one
+> key in different periods keep apart, the loaders filing a row under its
+> period too. The live suite holds each.
 
 > [spec:pgorm:req:entity.relation.builder+1]
 > `RelationBuilder<E, R, C>` (`src/entity/relation.rs`) accumulates a
@@ -604,12 +636,12 @@ explicit limitations.
 > the walk gives them — the joined side re-aliased `r{i}`, the far side re-pointed
 > at `r{i-1}`, which the innermost hop leaves at whatever identifier its relation
 > already qualifies by — and the join itself is the crate's reverse edge,
-> `QuerySelect::join_as_rev` (`[spec:pgorm:sem:query.build.join+3]`). The ON
+> `QuerySelect::join_as_rev` (`[spec:pgorm:sem:query.build.join+4]`). The ON
 > clause is therefore the one `join_condition` every other join in the crate
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+9]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def+10]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
@@ -641,15 +673,17 @@ explicit limitations.
 > entity related to itself is well-formed where an unaliased join of the
 > `Related` path would name one table twice.
 
-> [spec:pgorm:req:entity.relation.fk+4]
+> [spec:pgorm:req:entity.relation.fk+5]
 > A `RelationDef` converts into DDL foreign-key forms via
 > `From<RelationDef> for ForeignKeyCreateStatement` and `for TableForeignKey`
 > (`src/entity/relation.rs`). The conversion maps every pair in `columns` to a
 > constrained column and its referenced column,
-> applies `on_delete` and `on_update` actions, the `deferrability` and the
-> `enforcement` when present, and names the
+> writes the period pair after them as the key's `PERIOD` pair when the
+> relation has one, applies `on_delete` and `on_update` actions, the
+> `deferrability` and the `enforcement` when present, and names the
 > constraint from `fk_name` when set; otherwise the name MUST be derived as
-> `fk-{from_table}-{from_cols joined with '-'}`. Both conversions unpack the table
+> `fk-{from_table}-{from_cols joined with '-'}`, the from columns being
+> `from_key()`'s, the period's last. Both conversions unpack the table
 > references to bare tables (the schema of a `FromItem`'s `TableName`, and any bound
 > alias, are reduced away by `unpack_table_ref`).
 >

@@ -4,7 +4,7 @@ This chapter covers the N-ary relational read: `SelectGraph<E, S>`
 (`src/query/graph.rs`), a root entity plus a typed list of joined sources,
 one shape at every arity where the inherited surface had a bespoke type per
 pair. Joins are computed from the same `RelationDef`s every other join is
-(`[spec:pgorm:sem:query.build.join+3]`), decoding rides the unchanged absence
+(`[spec:pgorm:sem:query.build.join+4]`), decoding rides the unchanged absence
 witness (`[spec:pgorm:req:exec.decode.absent]`), and the terminals land on the
 ordinary `Selector` machinery — the graph adds a declaration layer, not a
 second execution path. Rules are grouped under `[spec:pgorm:def:query.graph]`.
@@ -46,7 +46,7 @@ chapter is stated twice anywhere else.
 >
 > `via(rel: RelationDef)` joins without declaring a slot: `rel.to_tbl` is
 > LEFT JOINed under `join_condition(rel)` exactly as
-> `[spec:pgorm:sem:query.build.join+3]` computes it — `on_condition` and
+> `[spec:pgorm:sem:query.build.join+4]` computes it — `on_condition` and
 > `condition_type` included — but the hop contributes nothing to the
 > projection or the decode tuple and consumes no prefix index. It is how a
 > junction table or a chain hop enters the graph: joined because the path
@@ -318,13 +318,13 @@ chapter is stated twice anywhere else.
 > Call-site ON predicates have a general mechanism and a sugar. The
 > general mechanism is the relation's own: `rel.on_condition(f)` before
 > handing the def over, the closure receiving the left and right
-> identifiers (`[spec:pgorm:sem:query.build.join+3]`), where the right
+> identifiers (`[spec:pgorm:sem:query.build.join+4]`), where the right
 > identifier IS the alias when the slot is aliased.
 > `join_maybe_filtered(rel, f)` is the sugar: it takes the same closure
 > shape and ANDs the produced condition into the join's ON clause *in
 > addition to* whatever `on_condition` the relation already carries —
 > where `RelationDef::on_condition` replaces
-> (`[spec:pgorm:def:entity.relation.def+9]`), the sugar composes, so a
+> (`[spec:pgorm:def:entity.relation.def+10]`), the sugar composes, so a
 > call-site narrowing cannot silently drop an authored predicate. ON
 > versus WHERE is the point of its existence: under a LEFT JOIN a
 > predicate in ON narrows which rows *match* (unmatched roots survive,
@@ -335,7 +335,7 @@ chapter is stated twice anywhere else.
 > spells it.
 >
 > The standing hazard is the authored closure that ignores its
-> parameters (`[spec:pgorm:def:entity.relation.def+9]`): a hardcoded
+> parameters (`[spec:pgorm:def:entity.relation.def+10]`): a hardcoded
 > table qualification renders verbatim, so under an `_as` slot the
 > predicate constrains the un-aliased name — a table not in the query,
 > or another join of it — and nothing errors client-side. The graph

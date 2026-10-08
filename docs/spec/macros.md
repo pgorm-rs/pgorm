@@ -75,7 +75,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+5]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+6]`).
 >
 > The `json_key()` arm is the one place the derive reads an attribute outside the
 > `#[pgorm(...)]` namespace: the key is the field's own name, put through
@@ -96,7 +96,7 @@ known limitations.
 > have a primary key column. See <https://github.com/pgorm-rs/pgorm/issues/485> for
 > details."
 
-> [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
+> [spec:pgorm:syn:macros.derive.entity-model.attrs+4]
 > Struct-level `#[pgorm(...)]` keys recognised by `DeriveEntityModel`: `table_name = Lit`,
 > `schema_name = Lit`, `comment = Lit`, bare `table_iden`, and `rename_all = "style"`
 > (case styles per the strum-derived list: `camelCase`, `PascalCase`, `kebab-case`,
@@ -106,8 +106,8 @@ known limitations.
 > `#[strum(disabled)]` so `EnumIter` skips it, whose `def()` arm panics with "Table
 > cannot be used as a column".
 >
-> Field-level keys: bare `primary_key`, `nullable`, `indexed`, `unique`, `ignore`,
-> `identity`, `identity_by_default`;
+> Field-level keys: bare `primary_key`, `without_overlaps`, `nullable`, `indexed`,
+> `unique`, `ignore`, `identity`, `identity_by_default`;
 > `auto_increment = bool`; `column_type = "ColumnType expr"`; `column_name = "string"`;
 > `enum_name = "Ident"`; `default_value = Lit`; `default_expr = "expr"`;
 > `generated_stored = "expr"`; `generated_virtual = "expr"`; `comment = Lit`;
@@ -228,7 +228,7 @@ known limitations.
 > `DeriveValueType` too: a newtype over one of the four refused types is the same
 > compile error.
 
-> [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
+> [spec:pgorm:sem:macros.derive.entity-model.primary-key+6]
 > Every `primary_key` field contributes a variant to the generated `PrimaryKey` enum and
 > its type to `PrimaryKeyTrait::ValueType` — a bare type for a single key, a tuple for
 > composite keys. `auto_increment()` reports whether the database generates the whole
@@ -274,6 +274,15 @@ known limitations.
 > wrote. `primary_key` given twice on one field is a compile error spanned at the
 > second: a field is one column of the key, and the repeat used to add its type to
 > `ValueType` twice beside one `PrimaryKey` variant.
+>
+> A field declared `primary_key, without_overlaps` is the key's period,
+> PostgreSQL 18's temporal key (`entity.traits.primary-key`): the derive
+> answers `without_overlaps()` true, and schema generation writes the column
+> `WITHOUT OVERLAPS` after the rest. PostgreSQL takes it on the key's last
+> column alone and refuses a key it is the only column of (both `42601`), so
+> each is a compile error spanned at the key — the period on a field before
+> another key field, the period as the only key field — and so is
+> `without_overlaps` on a field that is not a key column.
 >
 > `DerivePrimaryKey` itself (enums only; other inputs are a compile error) generates
 > `SqlName` delegating to `StaticName::as_str`, an `StaticName` impl mapping each variant
@@ -396,7 +405,7 @@ known limitations.
 
 ## Relations
 
-> [spec:pgorm:syn:macros.derive.relation+2]
+> [spec:pgorm:syn:macros.derive.relation+3]
 > `DeriveRelation` applies to enums only. Each variant requires exactly one of
 > `belongs_to = "path::to::Entity"`, `has_one = "..."`, or `has_many = "..."` (checked
 > in that order; none present is the error "Missing one of 'has_one', 'has_many' or
@@ -420,6 +429,14 @@ known limitations.
 > `"DeferrableInitiallyDeferred"`); any other name is refused at the value, "'enforcement'
 > must be one of Enforced, NotEnforced" and its `deferrability` counterpart, where a
 > mistyped `on_delete` surfaces only as an unknown variant downstream.
+> `from_period = "Column::P"` and `to_period = "Column::Q"` give a temporal
+> relation's period pair (`entity.relation.def`), chained as `.period(P, Q)`
+> after the column pairs: the two come together ("Missing attribute
+> 'to_period'" / "'from_period'"), after a `from` / `to` pair, since a period
+> is matched after the columns compared for equality, and beside no
+> `on_update` / `on_delete` but `"NoAction"`, PostgreSQL 18 refusing every
+> other action on a temporal foreign key (`0A000`) — each refusal a compile
+> error, the last spanned at the action.
 > Non-string literal values are rejected with "attribute must be a string". The
 > expansion is an `impl RelationTrait` whose `def()` matches each variant to
 > `Entity::belongs_to/has_one/has_many(target)` plus the paired column calls, the

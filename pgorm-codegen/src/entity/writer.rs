@@ -582,10 +582,15 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.pk+1]
+    // [spec:pgorm:sem:codegen.entity.pk+2]
     pub fn gen_impl_primary_key(entity: &Entity) -> TokenStream {
         let primary_key_auto_increment = entity.get_primary_key_auto_increment();
         let value_type = entity.get_primary_key_rs_type();
+        // [spec:pgorm:sem:codegen.entity.pk+2]
+        let without_overlaps = match entity.without_overlaps {
+            true => quote! { fn without_overlaps() -> bool { true } },
+            false => quote! {},
+        };
         quote! {
             impl PrimaryKeyTrait for PrimaryKey {
                 type ValueType = #value_type;
@@ -593,6 +598,8 @@ impl EntityWriter {
                 fn auto_increment() -> bool {
                     #primary_key_auto_increment
                 }
+
+                #without_overlaps
             }
         }
     }
@@ -723,7 +730,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
     // [spec:pgorm:sem:codegen.entity.compact.model+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_compact_model_struct(
@@ -756,7 +763,9 @@ impl EntityWriter {
                 }
                 if is_primary_key {
                     attrs.push(quote! { primary_key });
-                    if !col.auto_increment && col.identity.is_none() {
+                    if entity.without_overlaps && primary_keys.last() == Some(&col.name) {
+                        attrs.push(quote! { without_overlaps });
+                    } else if !col.auto_increment && col.identity.is_none() {
                         attrs.push(quote! { auto_increment = false });
                     }
                 }
@@ -890,6 +899,7 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
@@ -898,6 +908,7 @@ mod tests {
                     via: "cake_filling".to_owned(),
                     to: "filling".to_owned(),
                 }],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -934,6 +945,7 @@ mod tests {
                         on_update: Some(ForeignKeyAction::Cascade),
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 0,
                         impl_related: true,
@@ -948,12 +960,14 @@ mod tests {
                         on_update: Some(ForeignKeyAction::Cascade),
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 0,
                         impl_related: true,
                     },
                 ],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![
                     PrimaryKey {
                         name: "cake_id".to_owned(),
@@ -1002,11 +1016,13 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
                 }],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![
                     PrimaryKey {
                         name: "cake_id".to_owned(),
@@ -1042,6 +1058,7 @@ mod tests {
                     via: "cake_filling".to_owned(),
                     to: "cake".to_owned(),
                 }],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1086,6 +1103,7 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 0,
                         impl_related: true,
@@ -1100,12 +1118,14 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 0,
                         impl_related: true,
                     },
                 ],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1149,11 +1169,13 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
                 }],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1278,6 +1300,7 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: true,
                         num_suffix: 1,
                         impl_related: true,
@@ -1292,6 +1315,7 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: true,
                         num_suffix: 2,
                         impl_related: true,
@@ -1306,6 +1330,7 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 1,
                         impl_related: true,
@@ -1320,6 +1345,7 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 2,
                         impl_related: true,
@@ -1334,12 +1360,14 @@ mod tests {
                         on_update: None,
                         enforcement: None,
                         deferrability: None,
+                        period: None,
                         self_referencing: false,
                         num_suffix: 0,
                         impl_related: true,
                     },
                 ],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1383,6 +1411,7 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
@@ -1391,6 +1420,7 @@ mod tests {
                     via: "cake_filling".to_owned(),
                     to: "filling".to_owned(),
                 }],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1434,6 +1464,7 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
@@ -1442,6 +1473,7 @@ mod tests {
                     via: "cake_filling".to_owned(),
                     to: "filling".to_owned(),
                 }],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1477,6 +1509,7 @@ mod tests {
                 ],
                 relations: vec![],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1512,6 +1545,7 @@ mod tests {
                 ],
                 relations: vec![],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -1547,11 +1581,13 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
                 }],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![
                     PrimaryKey {
                         name: "id1".to_owned(),
@@ -1600,11 +1636,13 @@ mod tests {
                     on_update: None,
                     enforcement: None,
                     deferrability: None,
+                    period: None,
                     self_referencing: false,
                     num_suffix: 0,
                     impl_related: true,
                 }],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -2256,6 +2294,7 @@ mod tests {
                 ],
                 relations: vec![],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -2360,6 +2399,7 @@ mod tests {
                 ],
                 relations: vec![],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],
@@ -2425,6 +2465,7 @@ mod tests {
                 ],
                 relations: vec![],
                 conjunct_relations: vec![],
+                without_overlaps: false,
                 primary_keys: vec![PrimaryKey {
                     name: "id".to_owned(),
                 }],

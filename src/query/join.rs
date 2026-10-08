@@ -1,7 +1,7 @@
 use crate::{EntityTrait, QuerySelect, Related, Select};
 pub use pgorm_query::JoinType;
 
-// [spec:pgorm:sem:query.build.join+3]
+// [spec:pgorm:sem:query.build.join+4]
 impl<E> Select<E>
 where
     E: EntityTrait,
@@ -357,7 +357,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:entity.relation.def+9/test]    a condition attached
+    // [spec:pgorm:def:entity.relation.def+10/test]    a condition attached
     // before `rev` keeps its authored roles — the closure's `left` still
     // receives the side it was written against — and a double `rev` renders
     // the same join as the unreversed def

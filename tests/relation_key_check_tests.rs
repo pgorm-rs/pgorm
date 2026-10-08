@@ -158,9 +158,9 @@ async fn create<E: EntityTrait>(db: &DatabaseConnection, entity: E) -> Result<St
 /// having no shelf: `load_one` answers `None` for it, a graph's optional slot
 /// pairs it with `None` and a required slot leaves it out, as the shelf's
 /// `load_many` and `find_related` do.
-// [spec:pgorm:def:entity.relation.def+9/test]    against a live server: a NOT ENFORCED relation
+// [spec:pgorm:def:entity.relation.def+10/test]    against a live server: a NOT ENFORCED relation
 // creates the key unchecked, and its readers take an orphan as having no related row
-// [spec:pgorm:req:entity.relation.fk+4/test]
+// [spec:pgorm:req:entity.relation.fk+5/test]
 #[pgorm_macros::test]
 async fn a_not_enforced_relation_admits_orphans() -> Result<(), Error> {
     let ctx = TestContext::new("relation_not_enforced").await;
@@ -234,9 +234,9 @@ async fn a_not_enforced_relation_admits_orphans() -> Result<(), Error> {
 /// checked at commit: a transaction may write a book before its shelf, and a
 /// book whose shelf never comes is refused at commit (`23503`), where the
 /// plain key refuses the first insert.
-// [spec:pgorm:def:entity.relation.def+9/test]    against a live server: a deferred relation's
+// [spec:pgorm:def:entity.relation.def+10/test]    against a live server: a deferred relation's
 // key is checked at commit
-// [spec:pgorm:req:entity.relation.fk+4/test]
+// [spec:pgorm:req:entity.relation.fk+5/test]
 #[pgorm_macros::test]
 async fn a_deferred_relation_waits_for_commit() -> Result<(), Error> {
     let ctx = TestContext::new("relation_deferred").await;

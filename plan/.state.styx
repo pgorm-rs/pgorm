@@ -915,6 +915,7 @@ assertions (
     {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
     {id composite-attribute-alteration, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:08:16.695854Z}
     {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}
+    {id entity-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:59:31.234043Z}
 )
 
 impl_evidence (

@@ -9,11 +9,17 @@ pub use pgorm_query::{IntoBoundary, IntoKey, Key};
 /// The only constructor takes the first pair, and every extension takes a pair,
 /// so a set of join columns is non-empty and balanced by construction: there is
 /// no unbalanced value to build, pass around, or truncate.
-// [spec:pgorm:def:entity.relation.def+9]
+///
+/// Beside the pairs matched for equality a set may hold one `PERIOD` pair,
+/// PostgreSQL 18's temporal foreign key: the two sides' periods, a range or
+/// multirange each, matched for overlap rather than equality. It is a slot of
+/// its own, never one of the pairs, so it always comes after them.
+// [spec:pgorm:def:entity.relation.def+10]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (Name, Name),
     rest: Vec<(Name, Name)>,
+    period: Option<(Name, Name)>,
 }
 
 impl ColumnPairs {
@@ -26,6 +32,7 @@ impl ColumnPairs {
         Self {
             first: (from.into_name(), to.into_name()),
             rest: Vec::new(),
+            period: None,
         }
     }
 
@@ -49,7 +56,25 @@ impl ColumnPairs {
         self.rest.push((from.into_name(), to.into_name()));
     }
 
-    /// Iterate the pairs in declaration order.
+    /// Match `from` to `to` as periods, replacing any period pair already
+    /// set: the relation joins a row to each row whose period overlaps its own.
+    // [spec:pgorm:def:entity.relation.def+10]
+    pub fn set_period<F, T>(&mut self, from: F, to: T)
+    where
+        F: IntoName,
+        T: IntoName,
+    {
+        self.period = Some((from.into_name(), to.into_name()));
+    }
+
+    /// The `(from, to)` period pair, if the relation is temporal.
+    // [spec:pgorm:def:entity.relation.def+10]
+    pub fn period(&self) -> Option<&(Name, Name)> {
+        self.period.as_ref()
+    }
+
+    /// Iterate the pairs matched for equality in declaration order; the
+    /// period pair is not among them.
     pub fn iter(&self) -> impl Iterator<Item = &(Name, Name)> {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
@@ -59,26 +84,29 @@ impl ColumnPairs {
         &self.first
     }
 
-    /// The number of pairs, which is at least one.
+    /// The number of pairs matched for equality, which is at least one.
     pub fn arity(&self) -> usize {
         1 + self.rest.len()
     }
 
-    /// Swap every pair, so the relation reads in the opposite direction.
+    /// Swap every pair, the period pair with them, so the relation reads in
+    /// the opposite direction.
     #[must_use]
     pub fn rev(self) -> Self {
         Self {
             first: (self.first.1, self.first.0),
             rest: self.rest.into_iter().map(|(f, t)| (t, f)).collect(),
+            period: self.period.map(|(f, t)| (t, f)),
         }
     }
 
-    /// The `from` side of every pair, as an [`Key`].
+    /// The `from` side of every pair, then the `from` period, as a [`Key`]:
+    /// the columns that identify which source rows a join reached.
     pub fn from_key(&self) -> Key {
         self.side_key(|pair| Name::clone(&pair.0))
     }
 
-    /// The `to` side of every pair, as an [`Key`].
+    /// The `to` side of every pair, then the `to` period, as a [`Key`].
     pub fn to_key(&self) -> Key {
         self.side_key(|pair| Name::clone(&pair.1))
     }
@@ -87,7 +115,7 @@ impl ColumnPairs {
     where
         F: Fn(&(Name, Name)) -> Name,
     {
-        self.iter().map(col).collect()
+        self.iter().chain(self.period.iter()).map(col).collect()
     }
 }
 

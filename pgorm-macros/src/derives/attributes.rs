@@ -151,6 +151,8 @@ pub mod field_attr {
             pub condition_type: Option<syn::Lit>,
             pub enforcement: Option<syn::Lit>,
             pub deferrability: Option<syn::Lit>,
+            pub from_period: Option<syn::Lit>,
+            pub to_period: Option<syn::Lit>,
         }
     }
 }

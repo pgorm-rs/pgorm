@@ -10102,12 +10102,34 @@ children (
                 title "An entity can declare a key WITHOUT OVERLAPS and a relation matching on a PERIOD, so codegen can read them"
                 kind @feat
                 deps (pg18-temporal-keys)
+                sealed true
                 log (
                     {
                         at 2026-10-07T02:56:36.865486Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by pg18-temporal-keys (d33e0801). PostgreSQL 18's temporal keys: a primary or unique key ending `c WITHOUT OVERLAPS` (a range or multirange compared for overlap, enforced by a GiST index as an exclusion: an overlap is 23P01, an empty period 23514, btree_gist needed for scalar columns) and a foreign key `FOREIGN KEY (a, PERIOD p) REFERENCES t (a, PERIOD q)` (the child's period covered by the union of the matching parents' periods; ON DELETE / ON UPDATE NO ACTION only, every other action 0A000). pgorm-query writes both (TableKey::without_overlaps, TableForeignKey / ForeignKeyCreateStatement::period; sql.ddl.create-table+14, sql.ddl.foreign-key+8) and Python's key builders take without_overlaps=. Codegen keeps refusing both by name (codegen.ddl.unsupported+10, \"a WITHOUT OVERLAPS key\", \"a PERIOD foreign key\"), and EntityTransformer::transform now refuses them in a caller-built statement (codegen.entity.transform+10), because the entity model matches by equality alone: DeriveEntityModel's primary_key / unique attributes, PrimaryKeyTrait and find_by_id, the ActiveModel's key for update and delete, RelationDef's from/to columns joined by equality in load_one / load_many and the graph, and Schema::create_table_from_entity's key and foreign-key output. Decide what a temporal key means to the ORM (is find_by_id over (id, period) an equality lookup, or a point-in-time lookup by containment? what do update and delete by primary key do when the period is part of the identity?), whether a relation can carry a PERIOD pair and how the loaders and the graph join over it (containment or overlap, `@>` / `&&`, rather than equality), and then the derive attributes, schema generation (which must also say how btree_gist gets created, or document it), codegen's reader and writer, the generative campaign's emitters, and Python's registered entities. entity-relation-not-enforced is the same kind of gap and may share the attribute design."
+                    }
+
+                    {
+                        at 2026-10-08T20:37:11.278313Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-08T20:52:29.863804Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Decided 2026-10-08. A temporal primary key's value is the whole key, period included, and a lookup by it is by equality. Equal non-empty periods overlap, and an empty period is refused (23514), so at most one row holds a given key value. find_by_id, an update by key and a delete by key each name one version. A point-in-time read ('which version covers t') is a filter on the period (contains), not a key lookup, so no new API is built for it. The entity declares the key with #[pgorm(primary_key, without_overlaps)] on its last key field, and PrimaryKeyTrait::without_overlaps() (default false) reports it. The derive refuses the attribute on a non-key field, before another key field, or on a key with no other column (42601 on the server). A relation carries a PERIOD pair as a slot of ColumnPairs (RelationBuilder::period, derive from_period / to_period). The pair joins by overlap (&&), so a row reaches every version its period overlaps, which may be several. find_related and graph slots return each version. load_one keeps its HasOne contract: Some when one version overlaps, Err when several. load_many from the versions gives each version the rows it overlaps. from_key/to_key end with the period, so the loaders file rows of one key under their own periods. The derive refuses a period on one side, a period without from/to, and any action but NoAction (0A000 on 18). Schema generation writes WITHOUT OVERLAPS and PERIOD. It does not create btree_gist, which a scalar column beside the period needs (42704), so that is documented instead. Codegen reads a temporal primary key and a PERIOD foreign key. It still refuses a WITHOUT OVERLAPS unique key, since an entity's unique columns are single columns. It refuses a temporal key whose period column the table declares before another key column, since the compact derive needs the period last. The generative campaign's emitters and Python's registered entities are not extended here; they compile unchanged, and their coverage is filed as a follow-up."
+                    }
+
+                    {
+                        at 2026-10-08T20:59:31.234043Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

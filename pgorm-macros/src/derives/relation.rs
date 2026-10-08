@@ -110,6 +110,7 @@ impl DeriveRelation {
                     }
                     (None, None) => {}
                 }
+                result.extend(Self::period(variant, &attr)?);
 
                 if attr.on_update.is_some() {
                     let on_update = attr
@@ -202,11 +203,56 @@ impl DeriveRelation {
         ))
     }
 
+    /// The `from_period` / `to_period` pair a temporal relation matches for
+    /// overlap, as the builder call that sets it. The two come together and
+    /// after a `from` / `to` pair, since PostgreSQL refuses a period on one
+    /// side alone (42830) and a key the period is the only column of (42601);
+    /// and a temporal foreign key takes no referential action but `NO
+    /// ACTION`, PostgreSQL 18 refusing the rest (0A000).
+    // [spec:pgorm:syn:macros.derive.relation+3]
+    fn period(variant: &syn::Variant, attr: &field_attr::Pgorm) -> syn::Result<TokenStream> {
+        let (from, to) = match (&attr.from_period, &attr.to_period) {
+            (Some(from), Some(to)) => (from, to),
+            (None, None) => return Ok(TokenStream::new()),
+            (Some(_), None) => {
+                return Err(syn::Error::new_spanned(
+                    variant,
+                    "Missing attribute 'to_period'",
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(syn::Error::new_spanned(
+                    variant,
+                    "Missing attribute 'from_period'",
+                ));
+            }
+        };
+        if attr.from.is_none() {
+            return Err(syn::Error::new_spanned(
+                from,
+                "a period is matched after the columns matched for equality; \
+                 give 'from' and 'to' as well",
+            ));
+        }
+        for action in [&attr.on_update, &attr.on_delete].into_iter().flatten() {
+            if !matches!(action, syn::Lit::Str(name) if name.value() == "NoAction") {
+                return Err(syn::Error::new_spanned(
+                    action,
+                    "a PERIOD foreign key takes no referential action but NoAction; \
+                     PostgreSQL 18 refuses the rest",
+                ));
+            }
+        }
+        let from = Self::parse_lit_expr(from)?;
+        let to = Self::parse_lit_expr(to)?;
+        Ok(quote! { .period(#from, #to) })
+    }
+
     /// The `enforcement` and `deferrability` a relation's foreign key is
     /// declared with, as builder calls: each value names a variant of its enum
     /// (`"NotEnforced"`, `"DeferrableInitiallyDeferred"`), and any other name
     /// is refused here, where its span is still known.
-    // [spec:pgorm:syn:macros.derive.relation+2]
+    // [spec:pgorm:syn:macros.derive.relation+3]
     fn key_check(attr: &field_attr::Pgorm) -> syn::Result<TokenStream> {
         let mut calls = TokenStream::new();
         if let Some(lit) = &attr.enforcement {
@@ -303,7 +349,7 @@ impl DeriveRelation {
 }
 
 /// Method to derive a Relation
-// [spec:pgorm:syn:macros.derive.relation+2]
+// [spec:pgorm:syn:macros.derive.relation+3]
 pub fn expand_derive_relation(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     let ident_span = input.ident.span();
 

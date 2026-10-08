@@ -238,7 +238,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+7]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+8]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,7 +257,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+7]
+// [spec:pgorm:sem:schema.from-entity+8]
 pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
 where
     E: EntityTrait,
@@ -275,9 +275,19 @@ where
 
     // A composite key is named `pk-{table}`; a one-column key keeps the name
     // PostgreSQL derives, `{table}_pkey`.
-    let mut primary_keys = E::PrimaryKey::iter();
+    let mut primary_keys: Vec<E::PrimaryKey> = E::PrimaryKey::iter().collect();
+    // A temporal key's period is its last column, which the key writes
+    // `WITHOUT OVERLAPS` after the rest.
+    let period = match E::PrimaryKey::without_overlaps() {
+        true => primary_keys.pop(),
+        false => None,
+    };
+    let mut primary_keys = primary_keys.into_iter();
     if let Some(first) = primary_keys.next() {
-        let key = TableKey::new(first).cols(primary_keys);
+        let mut key = TableKey::new(first).cols(primary_keys);
+        if let Some(period) = period {
+            key = key.without_overlaps(period);
+        }
         if <<E::PrimaryKey as PrimaryKeyTrait>::ValueType as PrimaryKeyArity>::ARITY > 1 {
             stmt.primary_key(key.name(Name::runtime(format!("pk-{}", entity.to_string()))));
         } else {
@@ -301,7 +311,7 @@ where
     stmt.take()
 }
 
-// [spec:pgorm:sem:schema.from-entity+7]    column projection, and the serial family for a one-column key
+// [spec:pgorm:sem:schema.from-entity+8]    column projection, and the serial family for a one-column key
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,

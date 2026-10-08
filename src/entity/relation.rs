@@ -47,7 +47,7 @@ where
 }
 
 /// Defines a relationship
-// [spec:pgorm:def:entity.relation.def+9]
+// [spec:pgorm:def:entity.relation.def+10]
 pub struct RelationDef {
     /// The type of relationship defined in [RelationType]
     pub rel_type: RelationType,
@@ -71,10 +71,10 @@ pub struct RelationDef {
     pub fk_name: Option<String>,
     /// Whether the server holds rows to the foreign key, if the relation
     /// says: a `NOT ENFORCED` key is recorded and never checked.
-    // [spec:pgorm:def:entity.relation.def+9]
+    // [spec:pgorm:def:entity.relation.def+10]
     pub enforcement: Option<Enforcement>,
     /// When the foreign key's check runs, if the relation says.
-    // [spec:pgorm:def:entity.relation.def+9]
+    // [spec:pgorm:def:entity.relation.def+10]
     pub deferrability: Option<Deferrability>,
     /// Condition type of join on expression
     pub condition_type: ConditionType,
@@ -181,7 +181,7 @@ impl RelationDef {
     /// written for `(source, target)` never silently starts receiving
     /// `(target, source)`. A closure attached *after* reversing is authored
     /// against the reversed roles, as its author sees them.
-    // [spec:pgorm:def:entity.relation.def+9]
+    // [spec:pgorm:def:entity.relation.def+10]
     pub fn rev(mut self) -> Self {
         let on_condition = self.on_condition.take().map(|f| {
             Box::new(move |left: Name, right: Name| f(right, left))
@@ -413,6 +413,17 @@ where
         self.columns.push(from, to);
         self
     }
+
+    /// Match `from` to `to` as periods, after every pair matched for equality:
+    /// PostgreSQL 18's temporal foreign key, `FOREIGN KEY (.., PERIOD from)
+    /// REFERENCES .. (.., PERIOD to)`. The relation joins a row to each row
+    /// whose period overlaps its own, of which there may be several — the
+    /// versions of one key whose periods together cover it.
+    // [spec:pgorm:def:entity.relation.def+10]
+    pub fn period(mut self, from: E::Column, to: R::Column) -> Self {
+        self.columns.set_period(from, to);
+        self
+    }
 }
 
 impl<E, R, C> RelationBuilder<E, R, C>
@@ -459,7 +470,7 @@ where
     /// Say whether the server holds rows to the relation's foreign key:
     /// [`Enforcement::NotEnforced`] records the key without checking it, so
     /// the table may hold rows it references nothing for.
-    // [spec:pgorm:def:entity.relation.def+9]
+    // [spec:pgorm:def:entity.relation.def+10]
     pub fn enforcement(mut self, enforcement: Enforcement) -> Self {
         self.enforcement = Some(enforcement);
         self
@@ -467,7 +478,7 @@ where
 
     /// Say when the relation's foreign key is checked
     /// ([`Deferrability::DeferrableInitiallyDeferred`] checks it at commit).
-    // [spec:pgorm:def:entity.relation.def+9]
+    // [spec:pgorm:def:entity.relation.def+10]
     pub fn deferrability(mut self, deferrability: Deferrability) -> Self {
         self.deferrability = Some(deferrability);
         self
@@ -512,6 +523,9 @@ macro_rules! foreign_key_from_relation {
         for (from, to) in $relation.columns.iter().skip(1) {
             foreign_key.col(Name::clone(from), Name::clone(to));
         }
+        if let Some((from, to)) = $relation.columns.period() {
+            foreign_key.period(Name::clone(from), Name::clone(to));
+        }
         if let Some(action) = $relation.on_delete {
             foreign_key.on_delete(action);
         }
@@ -529,8 +543,9 @@ macro_rules! foreign_key_from_relation {
         } else {
             let from_cols: Vec<String> = $relation
                 .columns
+                .from_key()
                 .iter()
-                .map(|(from, _)| from.to_string())
+                .map(|from| from.to_string())
                 .collect();
             format!(
                 "fk-{}-{}",
@@ -543,7 +558,7 @@ macro_rules! foreign_key_from_relation {
     }};
 }
 
-// [spec:pgorm:req:entity.relation.fk+4]
+// [spec:pgorm:req:entity.relation.fk+5]
 impl From<RelationDef> for ForeignKeyCreateStatement {
     fn from(relation: RelationDef) -> Self {
         foreign_key_from_relation!(relation, Self)
@@ -577,7 +592,7 @@ impl From<RelationDef> for ForeignKeyCreateStatement {
 ///     r#"ALTER TABLE "foo" ADD CONSTRAINT "foo-bar" FOREIGN KEY ("bar_id") REFERENCES "bar" ("bar_id")"#
 /// );
 /// ```
-// [spec:pgorm:req:entity.relation.fk+4]
+// [spec:pgorm:req:entity.relation.fk+5]
 impl From<RelationDef> for TableForeignKey {
     fn from(relation: RelationDef) -> Self {
         foreign_key_from_relation!(relation, Self)

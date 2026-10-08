@@ -116,7 +116,7 @@ impl Column {
     /// instead of ending the literal early and respelling the rest of the
     /// attribute as tokens. `validate_col_type` has already refused any
     /// `Named` shape this one-name spelling could not carry.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         let col_type = match &self.col_type {
             ColumnType::Float => Some("Float".to_owned()),
@@ -252,7 +252,7 @@ impl Column {
     }
 
     /// The field attribute declaring the column's identity, if it is one.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+4]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+5]
     pub fn get_identity_attr(&self) -> Option<TokenStream> {
         self.identity.map(|identity| match identity {
             IdentityGeneration::Always => quote! { identity },
@@ -435,7 +435,7 @@ impl TryFrom<ColumnDef> for Column {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 impl TryFrom<&ColumnDef> for Column {
     type Error = Error;
 

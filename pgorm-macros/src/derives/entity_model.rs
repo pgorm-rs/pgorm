@@ -16,7 +16,7 @@ use syn::{
 /// The most columns a primary key can have: `PrimaryKeyTrait::ValueType` is a
 /// tuple for a composite key, and its traits are implemented for tuples of 1
 /// through 12 parts.
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+6]
 const MAX_KEY_ARITY: usize = 12;
 
 /// The field-level `#[pgorm(...)]` configuration of one model field.
@@ -32,6 +32,9 @@ struct FieldAttrs {
     save_as: Option<String>,
     /// Where this field's `primary_key` key was written, when it was.
     primary_key: Option<Span>,
+    /// Where this field's `without_overlaps` key was written: the key's
+    /// period, compared for overlap.
+    without_overlaps: Option<Span>,
     nullable: bool,
     indexed: bool,
     unique: bool,
@@ -88,7 +91,7 @@ impl Generated {
 /// `column_name` carries the name derived before any attribute is read, which an
 /// explicit `column_name` key overrides. `auto_increment` and `primary_key_types`
 /// are entity-wide and accumulate across every field.
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+4]
 fn parse_field_attrs(
     field: &Field,
     column_name: Option<String>,
@@ -209,6 +212,8 @@ fn parse_field_attrs(
                 }
                 parsed.primary_key = Some(meta.path.span());
                 primary_key_types.push(field.ty.clone());
+            } else if meta.path.is_ident("without_overlaps") {
+                parsed.without_overlaps = Some(meta.path.span());
             } else if meta.path.is_ident("nullable") {
                 parsed.nullable = true;
             } else if meta.path.is_ident("indexed") {
@@ -228,7 +233,7 @@ fn parse_field_attrs(
 
 /// Refuse an identity beside anything else that would fill the column or let
 /// it be `NULL`, each a definition PostgreSQL rejects (42601).
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+6]
 fn check_identity(attrs: &FieldAttrs, optional: bool) -> syn::Result<()> {
     let Some((_, span)) = attrs.identity else {
         return Ok(());
@@ -243,6 +248,36 @@ fn check_identity(attrs: &FieldAttrs, optional: bool) -> syn::Result<()> {
         return Ok(());
     };
     Err(syn::Error::new(span, conflict))
+}
+
+/// The `without_overlaps()` a temporal key declares, from where each key
+/// column wrote `without_overlaps`: nothing for a plain key. PostgreSQL takes
+/// `WITHOUT OVERLAPS` on the key's last column alone and refuses a key it is
+/// the only column of (both 42601), so the period is the last key field of
+/// several, and anything else is refused at its key.
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+6]
+fn temporal_key(key_periods: &[Option<Span>]) -> syn::Result<TokenStream> {
+    let last = key_periods.len().saturating_sub(1);
+    if let Some(span) = key_periods[..last].iter().flatten().next() {
+        return Err(syn::Error::new(
+            *span,
+            "`without_overlaps` marks the key's last column, its period; \
+             declare this field after the key's other columns",
+        ));
+    }
+    match key_periods.last() {
+        Some(Some(span)) if key_periods.len() == 1 => Err(syn::Error::new(
+            *span,
+            "a WITHOUT OVERLAPS key needs a column besides its period; \
+             PostgreSQL refuses a key the period is the only column of",
+        )),
+        Some(Some(_)) => Ok(quote! {
+            fn without_overlaps() -> bool {
+                true
+            }
+        }),
+        _ => Ok(TokenStream::new()),
+    }
 }
 
 /// Refuse a generated column beside anything else that would fill it, and a
@@ -355,10 +390,10 @@ fn serde_field_rename(attrs: &[Attribute]) -> syn::Result<Option<String>> {
 
 /// Method to derive an Model
 // [spec:pgorm:sem:macros.derive.entity-model+5]
-// [spec:pgorm:syn:macros.derive.entity-model.attrs+3]
+// [spec:pgorm:syn:macros.derive.entity-model.attrs+4]
 // [spec:pgorm:sem:macros.derive.entity-model.casing+1]
 // [spec:pgorm:sem:macros.derive.entity-model.column-def+7]
-// [spec:pgorm:sem:macros.derive.entity-model.primary-key+5]
+// [spec:pgorm:sem:macros.derive.entity-model.primary-key+6]
 pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Result<TokenStream> {
     // if #[pgorm(table_name = "foo", schema_name = "bar")] specified, create Entity struct
     let mut table_name = None;
@@ -432,6 +467,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
     let mut auto_increment = true;
     let mut key_generated: Vec<bool> = Vec::new();
     let mut key_spans: Vec<Span> = Vec::new();
+    let mut key_periods: Vec<Option<Span>> = Vec::new();
     let mut serial_key_fields: Vec<Span> = Vec::new();
     if table_iden && let Some(table_name) = table_name {
         let table_field_name = Ident::new("Table", Span::call_site());
@@ -484,6 +520,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     select_as,
                     save_as,
                     primary_key,
+                    without_overlaps,
                     mut nullable,
                     indexed,
                     unique,
@@ -523,8 +560,16 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                     columns_json_key.push(quote! { Self::#field_name => #json_key });
                 }
 
+                if let (Some(span), None) = (without_overlaps, primary_key) {
+                    return Err(syn::Error::new(
+                        span,
+                        "`without_overlaps` marks the period of a temporal primary key; \
+                         declare the field `primary_key` too",
+                    ));
+                }
                 if let Some(span) = primary_key {
                     key_spans.push(span);
+                    key_periods.push(without_overlaps);
                     primary_keys.push(quote! {
                         #variant_attrs
                         #field_name
@@ -634,6 +679,7 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
         ));
     }
 
+    let without_overlaps = temporal_key(&key_periods)?;
     let primary_key = {
         // The database generates the whole key: every key column is an
         // identity or a generated column, or the key is one column the serial
@@ -663,6 +709,8 @@ pub fn expand_derive_entity_model(data: Data, attrs: Vec<Attribute>) -> syn::Res
                 fn auto_increment() -> bool {
                     #auto_increment
                 }
+
+                #without_overlaps
             }
         }
     };

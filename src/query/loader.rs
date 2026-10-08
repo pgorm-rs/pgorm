@@ -131,7 +131,7 @@ where
     type Model = M;
 
     // [spec:pgorm:sem:query.loader.batching+7]
-    // [spec:pgorm:sem:query.loader.regroup+5]
+    // [spec:pgorm:sem:query.loader.regroup+6]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -163,7 +163,7 @@ where
     }
 
     // [spec:pgorm:sem:query.loader.batching+7]
-    // [spec:pgorm:sem:query.loader.regroup+5]
+    // [spec:pgorm:sem:query.loader.regroup+6]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,
@@ -273,7 +273,7 @@ where
 /// target is filed under is read back from the source side rather than
 /// re-derived from the target — which is what lets a relation whose
 /// `condition_type` is `Any` file one target under several keys.
-// [spec:pgorm:sem:query.loader.regroup+5]
+// [spec:pgorm:sem:query.loader.regroup+6]
 async fn collect_buckets<R, F, C>(
     graph: SelectGraph<R, (Req<F>,)>,
     keys: &[ValueTuple],
@@ -353,7 +353,7 @@ where
 /// one key are what contradicts the `HasOne` the relation declares. Reported
 /// rather than resolved, because the row a discard would keep is the join's
 /// choice, not the caller's.
-// [spec:pgorm:sem:query.loader.regroup+5]
+// [spec:pgorm:sem:query.loader.regroup+6]
 fn single_target<R>(
     bucket: Vec<R::Model>,
     key: &ValueTuple,
@@ -419,7 +419,7 @@ fn key_columns(identity: &Key) -> String {
         .join(", ")
 }
 
-// [spec:pgorm:sem:query.loader.regroup+5]
+// [spec:pgorm:sem:query.loader.regroup+6]
 fn unmatched_key_err(key: &ValueTuple, input_keys: &[ValueTuple], from_col: &Key) -> Error {
     let sample = match input_keys.first() {
         Some(sample) => format!("{sample:?}"),

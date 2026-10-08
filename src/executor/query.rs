@@ -813,7 +813,7 @@ where
 
 // TryFromU64 //
 /// Try to convert a type to a u64
-// [spec:pgorm:def:exec.decode.from-u64+2]
+// [spec:pgorm:def:exec.decode.from-u64+3]
 pub trait TryFromU64: Sized {
     /// The method to convert the type to a u64
     fn try_from_u64(n: u64) -> Result<Self, Error>;

@@ -1101,7 +1101,7 @@ pub trait QueryFilter: Sized {
     }
 }
 
-// [spec:pgorm:sem:query.build.join+3]
+// [spec:pgorm:sem:query.build.join+4]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
     let from_tbl = Name::clone(rel.from_tbl.qualifier());
@@ -1123,8 +1123,9 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     condition
 }
 
-// [spec:pgorm:sem:query.build.join+3]
+// [spec:pgorm:sem:query.build.join+4]
 fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> Condition {
+    let period = columns.period().cloned();
     let mut cond = Condition::all();
     for (owner_key, foreign_key) in columns {
         cond = cond.add(
@@ -1132,13 +1133,19 @@ fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> 
                 .equals((Name::clone(&to_tbl), foreign_key)),
         );
     }
+    // A temporal relation's periods meet where they overlap: a row is joined
+    // to every row whose period shares a moment with its own.
+    if let Some((from_period, to_period)) = period {
+        cond =
+            cond.add(Expr::col((from_tbl, from_period)).overlaps(Expr::col((to_tbl, to_period))));
+    }
     cond
 }
 
 /// The full table name a [`FromItem`] contributes to a foreign key: schema
 /// qualification included, so a `REFERENCES` clause names the table the
 /// relation actually points at rather than whatever `search_path` resolves.
-// [spec:pgorm:sem:schema.from-entity+7]
+// [spec:pgorm:sem:schema.from-entity+8]
 pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName {
     match from_item {
         FromItem::Table(table) => table.name.clone(),

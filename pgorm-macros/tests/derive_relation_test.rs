@@ -167,6 +167,15 @@ mod book {
             deferrability = "DeferrableInitiallyDeferred"
         )]
         LooseShelf,
+        #[pgorm(
+            belongs_to = "super::shelf::Entity",
+            from = "Column::TenantId",
+            to = "super::shelf::Column::TenantId",
+            from_period = "Column::ShelfId",
+            to_period = "super::shelf::Column::Label",
+            on_delete = "NoAction"
+        )]
+        ShelfOverTime,
     }
 
     impl Related<super::shelf::Entity> for Entity {
@@ -182,7 +191,7 @@ fn cols(id: &Key) -> Vec<String> {
     id.iter().map(|i| SqlName::to_string(&**i)).collect()
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    belongs_to + the mandatory from/to
+// [spec:pgorm:syn:macros.derive.relation+3/test]    belongs_to + the mandatory from/to
 #[test]
 fn belongs_to_builds_a_non_owning_relation_def() {
     let def = fruit::Relation::Cake.def();
@@ -203,7 +212,7 @@ fn belongs_to_builds_a_non_owning_relation_def() {
     assert_eq!(def.condition_type, ConditionType::All);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    the optional builder keys
+// [spec:pgorm:syn:macros.derive.relation+3/test]    the optional builder keys
 #[test]
 fn optional_keys_chain_onto_the_relation_builder() {
     let def = fruit::Relation::DecoratedCake.def();
@@ -224,7 +233,7 @@ fn optional_keys_chain_onto_the_relation_builder() {
     );
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    `enforcement` and `deferrability` name a
+// [spec:pgorm:syn:macros.derive.relation+3/test]    `enforcement` and `deferrability` name a
 // variant of their enum and chain onto the builder, reaching the foreign key schema generation
 // builds from the relation
 #[test]
@@ -251,7 +260,31 @@ fn key_check_attributes_reach_the_foreign_key() {
     assert_eq!(plain.deferrability, None);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    has_many / has_one, where from and to are optional
+// [spec:pgorm:syn:macros.derive.relation+3/test]    `from_period` / `to_period` set the
+// relation's period pair after its equality pairs, which its foreign key writes PERIOD
+#[test]
+fn period_attributes_reach_the_foreign_key() {
+    use pgorm::pgorm_query::ForeignKeyCreateStatement;
+
+    let def = book::Relation::ShelfOverTime.def();
+    let period = def.columns.period().expect("a period pair");
+    assert_eq!(
+        (period.0.to_string(), period.1.to_string()),
+        ("shelf_id".to_owned(), "label".to_owned())
+    );
+    assert_eq!(cols(&def.columns.from_key()), ["tenant_id", "shelf_id"]);
+    assert_eq!(
+        ForeignKeyCreateStatement::from(def).to_string(),
+        [
+            r#"ALTER TABLE "book" ADD CONSTRAINT "fk-book-tenant_id-shelf_id""#,
+            r#"FOREIGN KEY ("tenant_id", PERIOD "shelf_id") REFERENCES "shelf" ("tenant_id", PERIOD "label")"#,
+            r#"ON DELETE NO ACTION"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:syn:macros.derive.relation+3/test]    has_many / has_one, where from and to are optional
 #[test]
 fn has_many_and_has_one_reverse_the_target() {
     let many = cake::Relation::Fruits.def();
@@ -271,7 +304,7 @@ fn has_many_and_has_one_reverse_the_target() {
     assert_eq!(cols(&one.columns.to_key()), vec!["cake_id".to_owned()]);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    container-level entity override
+// [spec:pgorm:syn:macros.derive.relation+3/test]    container-level entity override
 #[test]
 fn the_entity_identifier_is_overridable() {
     let def = entity_override::AltRelation::Fruit.def();
@@ -282,7 +315,7 @@ fn the_entity_identifier_is_overridable() {
     assert_eq!(def.rel_type, RelationType::HasOne);
 }
 
-// [spec:pgorm:syn:macros.derive.relation+2/test]    tuple `from` / `to` pair
+// [spec:pgorm:syn:macros.derive.relation+3/test]    tuple `from` / `to` pair
 // column by column: the def carries every pair in order, and the join it
 // renders, both ways round, constrains every pair rather than the first
 #[test]

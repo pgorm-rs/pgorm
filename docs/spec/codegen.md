@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+12]
+> [spec:pgorm:sem:codegen.entity.transform+13]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -125,9 +125,18 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > so, the first would make its other columns the table's key or a unique
 > column, and the second a relation that joins a row to every period of the
 > row it references, for the reasons `codegen.ddl.unsupported` gives; so each
-> is refused, ``TransformError("table `<table>`: an entity cannot hold a
-> WITHOUT OVERLAPS key")`` and ``TransformError("table `<table>`: an entity
-> cannot hold a PERIOD foreign key")``. So is a primary or unique key naming
+> is read: a temporal primary key becomes the entity's key with its period
+> last and `without_overlaps` set, and a `PERIOD` foreign key a relation
+> carrying the period pair. A unique key ending `WITHOUT OVERLAPS`, whose
+> `get_columns()` is its equality columns alone, is refused, an entity's
+> unique columns being single columns: ``TransformError("table `<table>`: an
+> entity cannot hold a WITHOUT OVERLAPS unique key")``. So is a temporal key
+> whose period the table declares before another key column, since an
+> entity's key follows its fields' order and the derive takes
+> `without_overlaps` on the last key field alone: ``TransformError("table
+> `<table>`: the period `<column>` of a WITHOUT OVERLAPS key is declared before
+> another key column; an entity's key follows its fields' order, its period
+> last")``. So is a primary or unique key naming
 > one column twice, which the builder writes as given and PostgreSQL refuses
 > (`42701`, `sql.ddl.create-table`): read, it would generate a `PrimaryKey`
 > enum with one variant twice, which does not compile, or make the one column
@@ -166,7 +175,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 >
 > Foreign keys become `BelongsTo` relations on the owning table, keeping the
 > FK's columns, referenced columns, `on_update`, and `on_delete` actions, and
-> its `NOT ENFORCED` and deferrability: an explicit `ENFORCED` or `NOT
+> its `NOT ENFORCED`, deferrability and `PERIOD` pair: an explicit `ENFORCED` or `NOT
 > DEFERRABLE` states the default and is kept as nothing said, so the entity
 > is the plain key's. A
 > relation whose referenced table equals its own table is flagged
@@ -323,12 +332,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+4]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+5]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
-> key, followed by `auto_increment = false` when that PK column is neither
-> auto-increment nor an identity; `identity` or `identity_by_default` when
+> key, followed by `without_overlaps` when it is a temporal key's period, its
+> last column, and otherwise by `auto_increment = false` when that PK column is
+> neither auto-increment nor an identity; `identity` or `identity_by_default` when
 > the column is one, key or not — the derive refuses an identity beside
 > `auto_increment`, so an identity key column carries `primary_key, identity`
 > and nothing more; `column_type = "..."` for exactly the types whose default
@@ -579,12 +589,13 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Primary keys
 
-> [spec:pgorm:sem:codegen.entity.pk+1]
+> [spec:pgorm:sem:codegen.entity.pk+2]
 > In the expanded format, `impl PrimaryKeyTrait for PrimaryKey` sets
 > `type ValueType` to the single PK column's Rust type, or to a tuple
 > `(T1, T2, ...)` of the column types for composite keys, and
 > `fn auto_increment() -> bool` answers whether the database generates the
-> whole key (`entity.traits.primary-key`), reading the key's own columns and
+> whole key (`entity.traits.primary-key`), and a temporal key adds `fn
+> without_overlaps() -> bool { true }`, reading the key's own columns and
 > no others: true when every key column is an identity, and otherwise only
 > for a one-column key that is auto-increment. A serial column outside the
 > key does not make the key generated, and neither does one identity column
@@ -605,7 +616,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Relations
 
-> [spec:pgorm:sem:codegen.entity.relations+2]
+> [spec:pgorm:sem:codegen.entity.relations+3]
 > `Relation` enum variants are named by the UpperCamelCase of the referenced
 > table, with two adjustments: a self-referencing relation is named
 > `SelfRef`, and a nonzero `num_suffix` is appended (`Fruit1`, `Fruit2`,
@@ -616,16 +627,18 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > self-referencing), multi-column FKs render `from`/`to` as parenthesized
 > tuples `"(Column::A, Column::B)"`, and `on_update`/`on_delete` appear only
 > when the FK declared an action (`Restrict`, `Cascade`, `SetNull`,
-> `NoAction`, `SetDefault`), followed by `deferrability = "<Deferrability>"`
-> and `enforcement = "NotEnforced"` where the key declared them. Inverse
+> `NoAction`, `SetDefault`), with `from_period = "Column::<Src>"` and
+> `to_period = "<Entity path>Column::<Ref>"` before them for a `PERIOD` foreign
+> key, and followed by `deferrability = "<Deferrability>"` and `enforcement =
+> "NotEnforced"` where the key declared them. Inverse
 > relations emit
 > `#[pgorm(has_one = "...")]` or `#[pgorm(has_many = "...")]` with no
 > `from`/`to`. In the expanded format the same information renders as
 > `RelationTrait::def()` match arms:
 > `Entity::has_many(super::fruit::Entity).into()` and
 > `Entity::belongs_to(...).columns(<src>, <ref>).into()`, with each further
-> column of a composite FK appended as `.and_columns(<src>, <ref>)`, then the
-> key's `.on_update(ForeignKeyAction::<Action>)`,
+> column of a composite FK appended as `.and_columns(<src>, <ref>)`, its period
+> as `.period(<src>, <ref>)`, then the key's `.on_update(ForeignKeyAction::<Action>)`,
 > `.on_delete(ForeignKeyAction::<Action>)`,
 > `.deferrability(pgorm::pgorm_query::Deferrability::<..>)` and
 > `.enforcement(pgorm::pgorm_query::Enforcement::NotEnforced)` where it
@@ -806,7 +819,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+13]
+> [spec:pgorm:req:codegen.ddl.unsupported+14]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
@@ -863,22 +876,21 @@ compiling the C parser falls on people generating entities and on nobody else.
 > the bridge does read, so reading it as that shape would be the quiet
 > reinterpretation this rule forbids, and each is named instead until the
 > entity model can hold it: a
-> primary or unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS key`),
-> which is not the plain key over the same columns; and a foreign key matching
-> on a `PERIOD` (`a PERIOD foreign key`). Each the bridged statement could carry
-> (`sql.ddl.create-table`, `sql.ddl.foreign-key`) and the entity cannot. A
+> unique key ending `WITHOUT OVERLAPS` (`a WITHOUT OVERLAPS unique key`), which
+> is not the plain key over the same columns and has two columns at least,
+> where an entity's unique columns are single columns. The bridged statement
+> could carry it (`sql.ddl.create-table`) and the entity cannot. A temporal
+> primary key and a `PERIOD` foreign key the entity holds, its key ending
+> `without_overlaps` and its relation a period pair (`entity.traits.primary-key`,
+> `entity.relation.def`), and the bridge reads both (`codegen.ddl.tables`); a
+> `PERIOD` on one side of a foreign key alone (`a PERIOD on one side of a
+> foreign key`, `42830`) and a temporal key over its period alone (`a WITHOUT
+> OVERLAPS key over its period alone`, `42601`) stay named, as the server
+> refuses them. A
 > `NOT ENFORCED` foreign key the entity does hold, since its relation says so
 > (`entity.relation.def`), and the bridge reads it (`codegen.ddl.tables`); a
 > `NOT ENFORCED` anywhere else stays named (`a NOT ENFORCED constraint`), where
-> PostgreSQL refuses it too. An entity's primary key, its
-> unique columns and its relations match by equality alone, so a temporal key
-> read as its other columns would claim them unique — `find_by_id` expecting
-> one row of a room that has one per period — and read with its period as one
-> more equal column would admit the overlaps it refuses; a `PERIOD` foreign
-> key read as its other pairs would join a booking to the room's every
-> period, and read with its period as a pair would match a booking only to a
-> period equal to its own; and schema generation from either entity would
-> create the plain key. An explicit `ENFORCED` is
+> PostgreSQL refuses it too. An explicit `ENFORCED` is
 > refused (`an ENFORCED clause`) everywhere PostgreSQL refuses it — after a
 > column's `NOT NULL`, key or `DEFAULT` — and read on a column's
 > `REFERENCES`, where it states the default (`codegen.ddl.tables`). 18's `NOT
@@ -989,7 +1001,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > multi-dimensional array, and a non-integer type modifier are all named
 > rejections per `codegen.ddl.unsupported`.
 
-> [spec:pgorm:sem:codegen.ddl.tables+9]
+> [spec:pgorm:sem:codegen.ddl.tables+10]
 > A `CREATE TABLE` becomes a `TableCreateStatement` carrying the `TableName`
 > its name spells — `Table`, or `SchemaTable` when it is schema-qualified;
 > a catalog-qualified `db.schema.table` names a cross-database reference
@@ -1081,6 +1093,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > and `NOT ENFORCED` `Enforcement::NotEnforced`, each riding on the
 > statement as said. Attribute clauses after anything else — a key, a `NOT
 > NULL` — stay named (`codegen.ddl.unsupported`).
+>
+> A primary key ending `WITHOUT OVERLAPS` becomes the table's temporal key,
+> its period held apart from its other columns (`TableKey::without_overlaps`),
+> and a table-level `FOREIGN KEY (.., PERIOD p) REFERENCES t (.., PERIOD q)`
+> a foreign key whose last pair is its period (`period(p, q)`), the grammar
+> putting `PERIOD` on the last column of each list and nowhere else.
 
 > [spec:pgorm:sem:codegen.ddl.objects+8]
 > Statements are resolved against each other rather than in file order: a

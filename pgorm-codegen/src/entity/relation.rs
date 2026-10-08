@@ -33,6 +33,10 @@ pub struct Relation {
     /// When the key is checked, if it is deferrable; an explicit `NOT
     /// DEFERRABLE` states the default and reads as nothing said.
     pub(crate) deferrability: Option<Deferrability>,
+    /// The `(column, referenced column)` pair a temporal foreign key matches
+    /// as periods, after its pairs.
+    // [spec:pgorm:sem:codegen.entity.relations+3]
+    pub(crate) period: Option<(String, String)>,
     pub(crate) self_referencing: bool,
     pub(crate) num_suffix: usize,
     pub(crate) impl_related: bool,
@@ -40,7 +44,7 @@ pub struct Relation {
 
 impl Relation {
     /// Which table this relation references.
-    // [spec:pgorm:sem:codegen.entity.transform+12]
+    // [spec:pgorm:sem:codegen.entity.transform+13]
     pub fn ref_ident(&self) -> TableIdent {
         TableIdent {
             table: self.ref_table.clone(),
@@ -49,7 +53,7 @@ impl Relation {
     }
 
     // [spec:pgorm:sem:codegen.entity.keywords+1]
-    // [spec:pgorm:sem:codegen.entity.relations+2]
+    // [spec:pgorm:sem:codegen.entity.relations+3]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("relation to `{}`", self.ref_ident());
         safe_ident(
@@ -57,7 +61,16 @@ impl Relation {
             &escape_rust_keyword(self.ref_table.to_snake_case()),
         )?;
         safe_ident(&context, &self.ref_table.to_upper_camel_case())?;
-        for column in self.columns.iter().chain(self.ref_columns.iter()) {
+        let period = self
+            .period
+            .iter()
+            .flat_map(|(column, ref_column)| [column, ref_column]);
+        for column in self
+            .columns
+            .iter()
+            .chain(self.ref_columns.iter())
+            .chain(period)
+        {
             safe_ident(&context, &column.to_upper_camel_case())?;
         }
         if self.columns.len() != self.ref_columns.len() {
@@ -71,7 +84,7 @@ impl Relation {
         Ok(())
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations+2]
+    // [spec:pgorm:sem:codegen.entity.relations+3]
     pub fn get_enum_name(&self) -> Ident {
         let name = if self.self_referencing {
             format_ident!("SelfRef")
@@ -131,13 +144,19 @@ impl Relation {
                     let ref_column = map_ref_column(ref_column);
                     def = quote! { #def.and_columns(Column::#src_column, #ref_column) };
                 }
+                if let Some((src_column, ref_column)) = &self.period {
+                    let src_column = format_ident!("{}", src_column.to_upper_camel_case());
+                    let ref_column =
+                        map_ref_column(format_ident!("{}", ref_column.to_upper_camel_case()));
+                    def = quote! { #def.period(Column::#src_column, #ref_column) };
+                }
                 def.extend(self.get_key_calls());
                 quote! { #def.into() }
             }
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.relations+2]
+    // [spec:pgorm:sem:codegen.entity.relations+3]
     pub fn get_attrs(&self) -> TokenStream {
         let rel_type = self.get_rel_type();
         let module_name = if let Some(module_name) = self.get_module_name() {
@@ -184,11 +203,21 @@ impl Relation {
                     quote! {}
                 };
                 let key_check = self.get_key_attrs();
+                let period = match &self.period {
+                    Some((src_column, ref_column)) => {
+                        let from_period = format!("Column::{}", src_column.to_upper_camel_case());
+                        let to_period =
+                            format!("{module_name}Column::{}", ref_column.to_upper_camel_case());
+                        quote! { from_period = #from_period, to_period = #to_period, }
+                    }
+                    None => quote! {},
+                };
                 quote! {
                     #[pgorm(
                         #rel_type = #ref_entity,
                         from = #from,
                         to = #to,
+                        #period
                         #on_update
                         #on_delete
                         #key_check
@@ -201,7 +230,7 @@ impl Relation {
     /// The owning relation's foreign-key behavior as builder calls, for the
     /// expanded format's `def()`: its actions, then its deferrability and
     /// enforcement where the key declared them.
-    // [spec:pgorm:sem:codegen.entity.relations+2]
+    // [spec:pgorm:sem:codegen.entity.relations+3]
     fn get_key_calls(&self) -> TokenStream {
         let mut calls = TokenStream::new();
         if let Some(action) = &self.on_update {
@@ -227,7 +256,7 @@ impl Relation {
 
     /// The compact format's `deferrability = ".."` and `enforcement = ".."`
     /// attribute keys, where the key declared them.
-    // [spec:pgorm:sem:codegen.entity.relations+2]
+    // [spec:pgorm:sem:codegen.entity.relations+3]
     fn get_key_attrs(&self) -> TokenStream {
         let mut attrs = TokenStream::new();
         if let Some(deferrability) = self.deferrability {
@@ -320,7 +349,7 @@ impl Relation {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 impl From<&TableForeignKey> for Relation {
     fn from(tbl_fk: &TableForeignKey) -> Self {
         let ref_table = TableIdent::of(tbl_fk.get_ref_table());
@@ -338,6 +367,9 @@ impl From<&TableForeignKey> for Relation {
             deferrability: tbl_fk
                 .get_deferrability()
                 .filter(|deferrability| *deferrability != Deferrability::NotDeferrable),
+            period: tbl_fk
+                .get_period()
+                .map(|(column, ref_column)| (column.to_string(), ref_column.to_string())),
             self_referencing: false,
             num_suffix: 0,
             impl_related: true,
@@ -363,6 +395,7 @@ mod tests {
                 on_update: None,
                 enforcement: None,
                 deferrability: None,
+                period: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,
@@ -377,6 +410,7 @@ mod tests {
                 on_update: Some(ForeignKeyAction::Cascade),
                 enforcement: None,
                 deferrability: None,
+                period: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,
@@ -391,6 +425,7 @@ mod tests {
                 on_update: None,
                 enforcement: None,
                 deferrability: None,
+                period: None,
                 self_referencing: false,
                 num_suffix: 0,
                 impl_related: true,

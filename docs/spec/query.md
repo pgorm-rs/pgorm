@@ -220,7 +220,7 @@ is what `EntityTrait::find()` produces.
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
-> [spec:pgorm:sem:query.build.join+3]
+> [spec:pgorm:sem:query.build.join+4]
 > `QuerySelect::join(join_type, rel)` joins `rel.to_tbl`;
 > `join_rev` joins `rel.from_tbl`; `join_as` / `join_as_rev` first re-alias
 > the joined table with a caller-supplied identifier. The ON condition is
@@ -228,10 +228,12 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > `FromItem::qualifier()` — the bound alias if there is one, otherwise the bare
 > table identifier; each `(from, to)` pair of `rel.columns` becomes one
 > `from.col = to.col` equality under `Condition::all()` or
-> `Condition::any()` according to `rel.condition_type`; and any
+> `Condition::any()` according to `rel.condition_type`, a period pair adding
+> `from.p && to.p` among them, so a temporal relation joins each row whose
+> period overlaps (`[spec:pgorm:def:entity.relation.def+10]`); and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+9]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def+10]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -547,10 +549,10 @@ what makes it total over partially-set models.
 > (`[spec:pgorm:sem:query.graph.slots+1]`) under an internal alias, walking the
 > relation backwards because the root is the target rather than the input. The
 > relation therefore reaches SQL through the graph's one edge walker and the
-> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+3]`), whole: its
+> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+4]`), whole: its
 > column pairs, its authored `on_condition` — receiving its two identifiers in
 > the roles it was written with, `RelationDef::rev` itself re-swapping them
-> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+9]`) — and
+> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+10]`) — and
 > its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
 > part of a relation as a predicate of its own, which is what makes dropping a
 > part of one unrepresentable rather than merely unintended.
@@ -566,7 +568,7 @@ what makes it total over partially-set models.
 >
 > Keys are collected in input order: for each input model, `extract_key` walks
 > the from side of the relation's `columns`, projected as an `Key`
-> (`[spec:pgorm:def:entity.relation.def+9]`), into one `ValueTuple` — one walk
+> (`[spec:pgorm:def:entity.relation.def+10]`), into one `ValueTuple` — one walk
 > at every arity, resolving each column name back to the entity's `Column` enum
 > via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
@@ -595,10 +597,13 @@ what makes it total over partially-set models.
 > `[spec:pgorm:sem:query.loader.many-to-many+3]` already pays, for the same
 > reason.
 
-> [spec:pgorm:sem:query.loader.regroup+5]
+> [spec:pgorm:sem:query.loader.regroup+6]
 > Results are regrouped to input order by hashing on the from-side key extracted
 > from the input model each returned row carries back beside its target, not on
-> a key re-derived from the target. Reading the key off the side the input came
+> a key re-derived from the target. The from-side key is the relation's
+> `from_key()`, a temporal relation's period included
+> (`[spec:pgorm:def:entity.relation.def+10]`), so rows of one key in different
+> periods are filed apart, each under the versions its own period overlaps. Reading the key off the side the input came
 > from is what lets the loader honour a relation that files one target under
 > several keys — an `Any` composition, an `on_condition` that is not an equality
 > — since under such a relation the target's own columns no longer say which
@@ -657,7 +662,7 @@ what makes it total over partially-set models.
 > rather than the input entity. That reversal is a direction, not a change of
 > meaning: an authored `on_condition` MUST still receive its two identifiers
 > in the roles the relation was written with
-> (`[spec:pgorm:def:entity.relation.def+9]`), so the loader re-swaps the
+> (`[spec:pgorm:def:entity.relation.def+10]`), so the loader re-swaps the
 > closure's arguments when it reverses a def. The `via()` hop joins LEFT and
 > the slot INNER, which selects the rows two INNER joins did: the slot's ON
 > references the junction's columns and NULLs do not satisfy it.
@@ -675,7 +680,7 @@ what makes it total over partially-set models.
 > absent from the join and so is dropped from the list, and a shared target is
 > cloned into every referencing input. A returned key absent from the seeded
 > buckets is reported as `Err(Error::Query)` on the same terms as
-> `[spec:pgorm:sem:query.loader.regroup+5]`.
+> `[spec:pgorm:sem:query.loader.regroup+6]`.
 >
 > Because the targets are read by one query rather than reassembled from a
 > key map, an `order_by` on the caller's `Select` orders every bucket. Without

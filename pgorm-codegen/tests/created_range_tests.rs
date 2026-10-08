@@ -257,7 +257,7 @@ fn the_expanded_writer_names_the_created_range() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+13/test]    what the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+14/test]    what the bridge cannot
 // carry out of a range type is named: a subtype no newtype can hold, an array
 // of a created range, an option PostgreSQL does not have, a range with no
 // subtype, a serial subtype, and a type declared twice

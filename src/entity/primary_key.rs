@@ -36,7 +36,7 @@ use std::fmt::Debug;
 /// }
 /// ```
 /// See module level docs [crate::entity] for a full example
-// [spec:pgorm:def:entity.traits.primary-key+6]
+// [spec:pgorm:def:entity.traits.primary-key+7]
 pub trait PrimaryKeyTrait: StaticName + Iterable {
     #[allow(missing_docs)]
     type ValueType: Sized
@@ -61,6 +61,21 @@ pub trait PrimaryKeyTrait: StaticName + Iterable {
     /// part is that column's fact, carried by its
     /// [`ColumnDef::identity`](crate::ColumnDef::identity).
     fn auto_increment() -> bool;
+
+    /// Whether the key's last column is its period, PostgreSQL 18's temporal
+    /// key `PRIMARY KEY (.., period WITHOUT OVERLAPS)`: the other columns are
+    /// compared for equality and the period, a range or multirange, for
+    /// overlap, so one key holds a row per period, none overlapping.
+    ///
+    /// The key value is still the whole key, period included, and a lookup by
+    /// it is by equality: two equal periods overlap, so at most one row holds
+    /// a given value of the key, and `find_by_id`, an update or a delete by key
+    /// names one version of a row. Which version covers a moment is a filter
+    /// on the period (`contains`), not a key lookup.
+    // [spec:pgorm:def:entity.traits.primary-key+7]
+    fn without_overlaps() -> bool {
+        false
+    }
 }
 
 /// How to map a Primary Key to a column
@@ -93,7 +108,7 @@ pub trait PrimaryKeyToColumn {
 /// // `cake_filling`'s key is `(i32, i32)`.
 /// cake_filling::Entity::find_by_id((1, 2, 3));
 /// ```
-// [spec:pgorm:def:entity.traits.primary-key+6]
+// [spec:pgorm:def:entity.traits.primary-key+7]
 pub trait IntoPrimaryKey<V> {
     /// The key value, converted part by part.
     fn into_primary_key(self) -> V;
@@ -212,7 +227,7 @@ impl_into_pk!(
 );
 
 /// How many columns this Primary Key comprises
-// [spec:pgorm:def:entity.traits.primary-key+6]
+// [spec:pgorm:def:entity.traits.primary-key+7]
 pub trait PrimaryKeyArity {
     /// Arity of the Primary Key
     const ARITY: usize;

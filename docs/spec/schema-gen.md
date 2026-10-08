@@ -8,7 +8,7 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+7]
+> [spec:pgorm:sem:schema.from-entity+8]
 > `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
 > for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
@@ -22,7 +22,11 @@ executes SQL.
 > primary key becomes the table's, and each `unique` column a one-column
 > unique key, added in `E::Column` order.
 >
-> The primary key is `E::PrimaryKey`'s columns in order, at any arity. A
+> The primary key is `E::PrimaryKey`'s columns in order, at any arity, the
+> last written `WITHOUT OVERLAPS` when `E::PrimaryKey::without_overlaps()`
+> says the key is temporal; a scalar column beside the period needs the
+> `btree_gist` extension, which schema generation does not create
+> (`[spec:pgorm:req:sql.ddl.extension+5]`; `42704` without it). A
 > one-column key is left unnamed, so PostgreSQL names it `{table}_pkey`, and
 > its column is drawn from the serial family when
 > `E::PrimaryKey::auto_increment()` is true and the column holds no default of
@@ -85,7 +89,7 @@ executes SQL.
 > scalar and an array of it, say) yield one statement, because Postgres has no
 > `CREATE TYPE IF NOT EXISTS` and re-creating a type is an error rather than a
 > no-op. Both halves match the generation path
-> (`[spec:pgorm:sem:codegen.entity.transform+12]`), which registers an
+> (`[spec:pgorm:sem:codegen.entity.transform+13]`), which registers an
 > `ActiveEnum` for every column whose array-inner type is `ColumnType::Enum`,
 > keyed by enum name.
 > `Schema::create_enum_from_active_enum::<A>()` builds the same statement from

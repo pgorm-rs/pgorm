@@ -716,7 +716,7 @@ fn order_by_appends_and_never_dedups() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+3/test]    `join` targets `to_tbl`, `join_rev`
+// [spec:pgorm:sem:query.build.join+4/test]    `join` targets `to_tbl`, `join_rev`
 // targets `from_tbl`, and `join_as`/`join_as_rev` re-alias the joined table
 // first; the ON condition is one equality per declared column pair
 #[test]
@@ -789,7 +789,7 @@ fn join_direction_and_alias_choice() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+3/test]    `condition_type` picks `all` or
+// [spec:pgorm:sem:query.build.join+4/test]    `condition_type` picks `all` or
 // `any` for the ON condition, and the `on_condition` closure is added to it
 #[test]
 fn join_condition_type_and_custom_predicate() {
@@ -818,7 +818,7 @@ fn join_condition_type_and_custom_predicate() {
     );
 }
 
-// [spec:pgorm:sem:query.build.join+3/test]    the `Related` helpers join the
+// [spec:pgorm:sem:query.build.join+4/test]    the `Related` helpers join the
 // junction relation first when a `via` exists, and `reverse_join` walks the
 // relation backwards
 #[test]

@@ -57,7 +57,7 @@ fn main() {
     it_impl_traits!(uuid::Uuid);
 }
 
-// [spec:pgorm:def:exec.decode.from-u64+2/test]    checked numeric conversion,
+// [spec:pgorm:def:exec.decode.from-u64+3/test]    checked numeric conversion,
 // `String` via `to_string`, and the unconditional refusal everywhere else
 #[pgorm_macros::test]
 fn try_from_u64_conversions() {

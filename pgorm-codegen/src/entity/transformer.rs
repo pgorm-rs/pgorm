@@ -9,14 +9,14 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+12]
+    // [spec:pgorm:sem:codegen.entity.transform+13]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+2]
@@ -45,17 +45,22 @@ impl EntityTransformer {
                         .collect()
                 })
                 .collect();
+            // A temporal key's period is its last column.
             let primary_keys: Vec<PrimaryKey> = table_create
                 .get_primary_key()
                 .map(|key| {
                     key.get_columns()
                         .iter()
+                        .chain(key.get_without_overlaps())
                         .map(|name| PrimaryKey {
                             name: name.to_string(),
                         })
                         .collect()
                 })
                 .unwrap_or_default();
+            let without_overlaps = table_create
+                .get_primary_key()
+                .is_some_and(|key| key.get_without_overlaps().is_some());
             let mut columns: Vec<Column> = Vec::new();
             for col_def in table_create.get_columns() {
                 let mut col = Column::try_from(col_def).map_err(|err| err.in_table(&table_name))?;
@@ -168,6 +173,7 @@ impl EntityTransformer {
                 })
                 .rev()
                 .collect();
+            refuse_period_before_key(&columns, &primary_keys, without_overlaps, &table_name)?;
             if primary_keys.len() > MAX_KEY_COLUMNS {
                 return Err(Error::TransformError(format!(
                     "table `{table_name}`: a primary key of {} columns; an entity's key has at \
@@ -182,6 +188,7 @@ impl EntityTransformer {
                 relations: relations.clone(),
                 conjunct_relations: vec![],
                 primary_keys,
+                without_overlaps,
             };
             entities.insert(ident.clone(), entity.clone());
             for mut rel in relations.into_iter() {
@@ -342,7 +349,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -360,32 +367,19 @@ pub(crate) fn resolve_reference<'a>(
     by_name.next().is_none().then_some(only)
 }
 
-/// A temporal key or foreign key has no entity form: an entity's key and its
-/// relations match by equality alone. A key ending `WITHOUT OVERLAPS` read as
-/// its other columns would claim they are unique when they are not, and a
-/// `PERIOD` foreign key read as its other pairs would join rows in no period
-/// of each other's — so either is refused, never read without its period.
-// [spec:pgorm:sem:codegen.entity.transform+12]
+/// A temporal unique key has no entity form: an entity's unique columns are
+/// single columns, and a key ending `WITHOUT OVERLAPS` has two at least, so
+/// read as its columns it would claim a uniqueness the table does not have.
+/// A temporal primary key and a `PERIOD` foreign key the entity holds.
+// [spec:pgorm:sem:codegen.entity.transform+13]
 fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
-    let temporal_key = table
-        .get_primary_key()
-        .is_some_and(|key| key.get_without_overlaps().is_some())
-        || table
-            .get_unique_keys()
-            .iter()
-            .any(|key| key.get_without_overlaps().is_some());
-    if temporal_key {
-        return Err(Error::TransformError(format!(
-            "table `{name}`: an entity cannot hold a WITHOUT OVERLAPS key"
-        )));
-    }
-    let period_foreign_key = table
-        .get_foreign_key_create_stmts()
+    let temporal_unique = table
+        .get_unique_keys()
         .iter()
-        .any(|create| create.get_foreign_key().get_period().is_some());
-    if period_foreign_key {
+        .any(|key| key.get_without_overlaps().is_some());
+    if temporal_unique {
         return Err(Error::TransformError(format!(
-            "table `{name}`: an entity cannot hold a PERIOD foreign key"
+            "table `{name}`: an entity cannot hold a WITHOUT OVERLAPS unique key"
         )));
     }
     Ok(())
@@ -396,19 +390,52 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
 /// would generate a `PrimaryKey` enum with one variant twice, which does not
 /// compile, and a unique key over `(a, a)` would mark `a` unique on its own;
 /// so it is refused by name, never read as the key without its repeat.
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
-    let keys = table
+    let primary = table
         .get_primary_key()
-        .map(|key| key.get_columns())
-        .into_iter()
-        .chain(table.get_unique_keys().iter().map(|key| key.get_columns()));
-    for columns in keys {
-        if let Some(column) = repeated_column(columns.iter().map(|column| column.to_string())) {
+        .map(|key| (key.get_columns(), key.get_without_overlaps()));
+    let keys = primary.into_iter().chain(
+        table
+            .get_unique_keys()
+            .iter()
+            .map(|key| (key.get_columns(), key.get_without_overlaps())),
+    );
+    for (columns, period) in keys {
+        let columns = columns
+            .iter()
+            .chain(period)
+            .map(|column| column.to_string());
+        if let Some(column) = repeated_column(columns) {
             return Err(Error::TransformError(format!(
                 "table `{name}`: a key names column `{column}` twice"
             )));
         }
+    }
+    Ok(())
+}
+
+/// A temporal key whose period column the table declares before another key
+/// column: an entity's key is its key fields in the order they are written,
+/// and the derive takes `WITHOUT OVERLAPS` on the last of them alone, so the
+/// generated entity would not compile.
+// [spec:pgorm:sem:codegen.entity.transform+13]
+fn refuse_period_before_key(
+    columns: &[Column],
+    primary_keys: &[PrimaryKey],
+    without_overlaps: bool,
+    name: &str,
+) -> Result<(), Error> {
+    let position = |key: &PrimaryKey| columns.iter().position(|column| column.name == key.name);
+    let Some((period, rest)) = primary_keys.split_last().filter(|_| without_overlaps) else {
+        return Ok(());
+    };
+    if rest.iter().any(|key| position(key) > position(period)) {
+        return Err(Error::TransformError(format!(
+            "table `{name}`: the period `{}` of a WITHOUT OVERLAPS key is declared before \
+             another key column; an entity's key follows its fields' order, its period last",
+            period.name
+        )));
     }
     Ok(())
 }
@@ -441,7 +468,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+12]
+// [spec:pgorm:sem:codegen.entity.transform+13]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {
@@ -452,14 +479,20 @@ fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Er
                     "{context} names a table the schema does not define"
                 )));
             };
-            for column in relation.columns.iter() {
+            let period = relation.period.as_ref();
+            for column in relation
+                .columns
+                .iter()
+                .chain(period.map(|(column, _)| column))
+            {
                 if !entity.columns.iter().any(|col| &col.name == column) {
                     return Err(Error::TransformError(format!(
                         "{context} constrains column `{column}`, which the table does not have"
                     )));
                 }
             }
-            for ref_column in relation.ref_columns.iter() {
+            let ref_period = period.map(|(_, ref_column)| ref_column);
+            for ref_column in relation.ref_columns.iter().chain(ref_period) {
                 if !ref_entity.columns.iter().any(|col| &col.name == ref_column) {
                     return Err(Error::TransformError(format!(
                         "{context} references column `{ref_column}`, which `{ref_table}` does not \
