@@ -112,6 +112,7 @@ export {
   PendingAlterSequence,
   renameSequence,
 } from "./schema-objects.js";
+export * as pipeline from "./pipeline.js";
 export {
   ConnectionError,
   ConstructionError,

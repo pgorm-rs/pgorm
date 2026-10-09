@@ -2125,6 +2125,15 @@ impl_evidence (
         {impl_name main, rule napi.schema-tables}
         {impl_name main, rule napi.schema-types}
     )}
+    {id napi-pipeline, covered_rules (
+        napi.pipeline
+        napi.pipeline-binder
+        napi.pipeline-expressions
+    ), covered_claims (
+        {impl_name main, rule napi.pipeline}
+        {impl_name main, rule napi.pipeline-binder}
+        {impl_name main, rule napi.pipeline-expressions}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

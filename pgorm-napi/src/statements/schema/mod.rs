@@ -21,6 +21,8 @@ mod sequence;
 mod table;
 mod types;
 
+pub(super) use options::integer;
+
 use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,
     IndexCreateStatement, IndexDropStatement, PendingSequenceAlter, PendingTableAlter,

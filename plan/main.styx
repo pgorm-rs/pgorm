@@ -10948,7 +10948,18 @@ children (
                 id napi-pipeline
                 title "JavaScript composes pgorm's PRQL-shaped pipeline over sources"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:napi.pipeline] [spec:pgorm:req:napi.pipeline-expressions] [spec:pgorm:req:napi.pipeline-binder])
+                }
                 deps (napi-statements)
+                log (
+                    {
+                        at 2026-10-09T15:38:42.159141Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

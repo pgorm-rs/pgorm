@@ -286,7 +286,7 @@ pub(super) fn collation_option<'cx>(
 }
 
 /// A 64-bit integer: a safe-integer number or a `bigint` within `i64`.
-pub(super) fn integer<'cx>(
+pub(in crate::statements) fn integer<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
     what: &str,

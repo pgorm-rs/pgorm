@@ -1,0 +1,98 @@
+{
+  "literal": {
+    "sql": "SELECT id, amount FROM items WHERE id > 2 ORDER BY id DESC LIMIT 3",
+    "values": []
+  },
+  "bound-operand": {
+    "sql": "SELECT id, amount FROM items WHERE id > $1 AND category <> $2",
+    "values": [["i64","2"],["text","O'Brien; -- 雪"]]
+  },
+  "literal-string": {
+    "sql": "SELECT * FROM items WHERE category = E'O''Brien; -- \\\\ 雪'",
+    "values": []
+  },
+  "repeated": {
+    "sql": "SELECT * FROM items WHERE id > $1 AND id < $1 + $2",
+    "values": [["i32","2"],["i64","10"]]
+  },
+  "derive": {
+    "sql": "WITH table_0 AS (SELECT *, amount + 2 AS total FROM items) SELECT * FROM table_0 WHERE total > $1",
+    "values": [["i64","5"]]
+  },
+  "derive-with": {
+    "sql": "SELECT *, amount + $1 AS total FROM items",
+    "values": [["i64","2"]]
+  },
+  "select-with": {
+    "sql": "SELECT id, $1 AS payload FROM items",
+    "values": [["text","payload"]]
+  },
+  "group": {
+    "sql": "SELECT category, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS n FROM items GROUP BY category HAVING COALESCE(SUM(amount), 0) > $1",
+    "values": [["i64","3"]]
+  },
+  "group-with": {
+    "sql": "SELECT COALESCE(category, $1), COALESCE(SUM(amount), 0) + $2 AS total FROM items GROUP BY COALESCE(category, $1)",
+    "values": [["text","missing"],["i64","1"]]
+  },
+  "window": {
+    "sql": "WITH table_0 AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY category ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS row_rank FROM items) SELECT * FROM table_0 WHERE row_rank <= 2",
+    "values": []
+  },
+  "window-with": {
+    "sql": "SELECT *, SUM(amount) OVER (ORDER BY id RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) + $1 AS total FROM items ORDER BY id",
+    "values": [["i64","2"]]
+  },
+  "window-functions": {
+    "sql": "SELECT *, RANK() OVER (PARTITION BY category ORDER BY amount DESC) AS r, DENSE_RANK() OVER (PARTITION BY category ORDER BY amount DESC) AS d, LAG(amount, 1) OVER (PARTITION BY category ORDER BY amount DESC) AS \"before\", LEAD(amount, 2) OVER (PARTITION BY category ORDER BY amount DESC) AS \"after\", FIRST_VALUE(amount) OVER (PARTITION BY category ORDER BY amount DESC) AS lowest, LAST_VALUE(amount) OVER (PARTITION BY category ORDER BY amount DESC) AS highest FROM items",
+    "values": []
+  },
+  "sort-with": {
+    "sql": "WITH table_0 AS (SELECT *, id + $1 AS _expr_0 FROM items ORDER BY _expr_0, amount DESC LIMIT 3 OFFSET 1) SELECT * FROM table_0 ORDER BY _expr_0, amount DESC",
+    "values": [["i64","1"]]
+  },
+  "join": {
+    "sql": "SELECT items.id, peer.amount AS peer_amount FROM items LEFT OUTER JOIN items AS peer ON items.id = peer.id",
+    "values": []
+  },
+  "join-with": {
+    "sql": "WITH table_0 AS (SELECT id, category, amount FROM items WHERE id < $2) SELECT items.*, peer.id, peer.category, peer.amount FROM items INNER JOIN table_0 AS peer ON items.id = peer.id AND items.amount > $1",
+    "values": [["i64","1"],["i32","8"]]
+  },
+  "join-roles": {
+    "sql": "WITH table_0 AS (SELECT id, category, amount FROM items WHERE id > $1), table_1 AS (SELECT id, category, amount FROM items WHERE id < $2) SELECT table_0.id, table_0.category, table_0.amount, table_1.id FROM table_0 FULL JOIN table_1 ON table_0.id = table_1.id",
+    "values": [["i32","1"],["i32","8"]]
+  },
+  "append": {
+    "sql": "SELECT id, category, amount FROM items WHERE id > $1 UNION ALL SELECT id, category, amount FROM items WHERE id < $2",
+    "values": [["i32","1"],["i32","8"]]
+  },
+  "intersect": {
+    "sql": "WITH table_0 AS (SELECT id, category, amount FROM items WHERE id < $2) SELECT id, category, amount FROM items WHERE id > $1 INTERSECT ALL SELECT * FROM table_0 AS b",
+    "values": [["i32","1"],["i32","8"]]
+  },
+  "remove": {
+    "sql": "WITH table_0 AS (SELECT id, category, amount FROM items WHERE id < $2) SELECT id, category, amount FROM items WHERE id > $1 EXCEPT ALL SELECT * FROM table_0 AS b",
+    "values": [["i32","1"],["i32","8"]]
+  },
+  "embedded": {
+    "sql": "WITH table_0 AS (SELECT id, category, amount FROM items WHERE id > $1) SELECT id, category, amount FROM table_0 WHERE id > $2",
+    "values": [["i32","1"],["i64","5"]]
+  },
+  "distinct": {
+    "sql": "SELECT DISTINCT category FROM items",
+    "values": []
+  },
+  "schema-source": {
+    "sql": "WITH table_0 AS (SELECT * FROM app.items) SELECT items.*, other.* FROM app.items INNER JOIN table_0 AS other ON items.id = other.id",
+    "values": []
+  },
+  "aggregates": {
+    "sql": "SELECT category, MIN(amount) AS low, MAX(amount) AS high, AVG(amount) AS mean, STDDEV(amount) AS spread, COUNT(amount) AS counted, COUNT(DISTINCT amount) AS kinds FROM items GROUP BY category",
+    "values": []
+  },
+  "expressions": {
+    "sql": "SELECT *, CASE WHEN amount > $1 THEN 'big' WHEN amount IS NULL THEN 'none' ELSE $2 END AS size, CAST(amount AS text) AS spelled, -(((amount - $3) * $4 * 1.0 / $5) % $6) AS arith, NOT category IN ($7, 'b') AS other, id IS NOT NULL OR id >= $8 AS present, COALESCE(amount, NULL) AS filled FROM items",
+    "values": [["i64","10"],["text","small"],["i64","1"],["i64","2"],["i64","3"],["i64","4"],["text","a"],["i64","0"]]
+  }
+}

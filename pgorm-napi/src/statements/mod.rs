@@ -21,6 +21,7 @@ mod json_table;
 mod merge;
 #[cfg(test)]
 mod parity;
+mod pipeline;
 mod returning;
 mod schema;
 mod select;
@@ -97,6 +98,9 @@ pub(crate) enum Node {
     WindowFunction(FunctionCall),
     /// A DDL statement, or a part one is built from.
     Schema(Box<schema::Part>),
+    /// pgorm's pipeline state: a pipeline, a grouping, an expression, a
+    /// source, a window or a binder's scope.
+    Pipeline(Box<pipeline::Part>),
 }
 
 impl Finalize for Node {}
@@ -132,6 +136,7 @@ impl Node {
             Self::Windowed(_) => "a windowed call",
             Self::WindowFunction(_) => "a window function with no window",
             Self::Schema(part) => part.describe(),
+            Self::Pipeline(part) => part.describe(),
         }
     }
 }
@@ -163,7 +168,8 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
             })?;
         }
     }
-    for &(name, build) in schema::EXPORTS.iter().copied().flatten() {
+    let added = schema::EXPORTS.iter().chain(pipeline::EXPORTS);
+    for &(name, build) in added.copied().flatten() {
         cx.export_function(name, move |mut cx| {
             let node = build(&mut cx)?;
             Ok(cx.boxed(node))
@@ -184,6 +190,7 @@ pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String,
     let built = match node {
         Node::Select(select) => select.build(),
         Node::Merge(merge) => merge.build(),
+        Node::Pipeline(part) => pipeline::compile(cx, part)?,
         Node::Schema(part) => match part.statement() {
             Ok(sql) => (sql, Values(Vec::new())),
             Err(reason) => return refuse(cx, reason),

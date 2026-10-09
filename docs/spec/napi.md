@@ -613,6 +613,84 @@ a schema is made of, in the builder conventions the statements above use.
 > `commentOnTable` and `commentOnColumn` its `COMMENT ON`, the text a literal
 > pgorm-query escapes.
 
+## Pipelines
+
+JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as
+pgorm-python does: relation-to-relation stages over sources, compiled through
+prqlc to PostgreSQL SQL, with runtime values entering through a binder whose
+placeholders belong to the stage that minted them.
+
+> [spec:pgorm:req:napi.pipeline]
+> The module's `pipeline` namespace MUST compose `pgorm::pipeline::Pipeline`,
+> each JavaScript object owning the pgorm state it stands for and each stage
+> returning a new pipeline from a copy: `from(source)` and the stages
+> `filter`, `derive`, `select`, `group(..)` followed by `aggregate(..)`,
+> `window(over, ..)`, `sort`, `take(n)`, `takeRange(start, end)`,
+> `join(source, on, { kind })`, `append`, `intersect`, `remove` and
+> `distinct`. A source is a `Table`, schema-qualified and read under its
+> alias when it has one, a table's name, another `Pipeline` embedded whole
+> with its bound values, or `source(relation).named(name)`, which reads a
+> relation under a name of its own. A grouping is no pipeline until it is
+> aggregated, so `group` gives a `Grouped` whose only way back is
+> `aggregate`, and which no terminal runs. A row count is an integer, never
+> an expression, as PRQL refuses a bound `LIMIT`. A registered Rust entity
+> as a source, and the `select_sources` terminal that decodes one, wait on
+> entities registering with the binding and are not offered.
+>
+> A `Pipeline` is a statement for `execute`, `query`, `one`, `optional` and
+> `stream` on a pool, a connection and a transaction, compiled through
+> `Pipeline::into_sql` as `inspect()` compiles it, its values bound as any
+> statement's are, `one` and `optional` keeping their cardinality. What
+> pgorm's compile step judges — a name it cannot write as one, a reserved
+> alias, a relation or column prqlc cannot resolve — MUST be a
+> `ConstructionError` from `inspect()` or the terminal, before anything is
+> sent.
+
+> [spec:pgorm:req:napi.pipeline-expressions]
+> Pipeline expressions MUST be their own objects, lowered into
+> `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
+> statement builders' `Expr`: `col(table, column)`, qualified as prqlc
+> requires; `alias(name)`, a name a stage introduces, read back unqualified;
+> `thisColumn` and `thatColumn`, a join's two sides; the operators `eq` ..
+> `lte`, `and`, `or`, `not`, `neg`, `add` .. `rem`, `coalesce`, `isNull`,
+> `isNotNull`, `inArray`, `cast` over pgorm's closed `CastType` set, `as`,
+> `asc` and `desc`; `caseWhen(arms, otherwise)`; and the aggregates and
+> window functions pgorm's pipeline has, each at the argument count it takes.
+> `over()` builds a window's partition, ordering and `rows` or `range`
+> frame.
+>
+> Values reach a pipeline's SQL by one of two routes, and the spelling says
+> which. `literal(value)` — `null`, a boolean, a safe-integer number or a
+> `bigint` within `bigint`, a finite number, a string — is written into the
+> SQL as pgorm's pipeline writes a literal. Any other value an operand is
+> given MUST be bound: inferred or declared with `Value` as a parameter is,
+> and minted as a placeholder by the binder of the stage that takes it, never
+> written as a literal; a value with no kind (`null`), an interval, and a
+> value whose kind needs a cast pgorm's pipeline cannot write (an enum's or a
+> created range's) are refused with a `ConstructionError` naming the explicit
+> form. A window's partition and ordering take no value, bound or not, as
+> pgorm's `Over` takes none.
+
+> [spec:pgorm:req:napi.pipeline-binder]
+> Each expression-taking stage MUST have a `With` form — `filterWith`,
+> `deriveWith`, `selectWith`, `groupWith`, `aggregateWith`, `windowWith`,
+> `sortWith` and `joinWith` — that calls its function once, synchronously,
+> with a `Binder`, whose `bind(value)` mints one placeholder for one value,
+> reusable within the stage. A placeholder is branded with the scope of the
+> call that minted it, as pgorm's binder brands it with a lifetime: once its
+> function has returned or thrown, the binder MUST refuse to bind, and an
+> expression carrying a placeholder MUST be refused, each with a
+> `LifecycleError`, as any handle used after it closed is; so MUST one that
+> combines two scopes' placeholders, and one given to a stage other than the
+> one its function returns it to — a plain stage, another call's or another
+> pipeline's — or to a window's partition or ordering. The function MUST
+> return synchronously, a promise being a `TypeError`: an operand for a
+> filter or a join condition, and an expression or an array of operands for
+> a list-taking stage, anything else there a `TypeError`. An array of more
+> than 32 is a `ConstructionError`: pgorm's list-taking `_with` stages take a
+> fixed-size array, which the binding dispatches up to that bound, where a
+> stage that binds nothing takes a list of any length.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]
