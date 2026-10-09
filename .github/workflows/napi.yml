@@ -142,6 +142,15 @@ jobs:
           cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all -- --check
           cargo clippy --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --locked --target-dir target --all-targets -- -D warnings
           node pgorm-napi/checks/entities.js
+      # TypeScript generated for an application's registrations: the codegen
+      # fixture's project scaffolded, built and emitted, its declarations held
+      # by deno check and its module by a live suite in both runtimes.
+      # [spec:pgorm:req:napi.codegen]
+      - name: Generated application module
+        run: |
+          cargo fmt --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --all -- --check
+          cargo clippy --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --locked --target-dir target --all-targets -- -D warnings
+          node pgorm-napi/checks/codegen.js
       - name: PostgreSQL log
         if: failure()
         run: cat "$RUNNER_TEMP/postgres.log"

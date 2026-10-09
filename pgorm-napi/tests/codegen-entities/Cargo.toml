@@ -1,0 +1,23 @@
+[package]
+name = "pgorm-napi-codegen-entities"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "An application's entity crate, which pgorm-napi's codegen writes a native module and TypeScript for"
+
+# Its own workspace, as an application's entity crate is.
+[workspace]
+
+[dependencies]
+pgorm = { path = "../../.." }
+async-trait = "0.1.92"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

@@ -2177,6 +2177,13 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule napi.pipeline-sources}
     )}
+    {id napi-codegen, covered_rules (
+        napi.codegen
+        napi.codegen-types
+    ), covered_claims (
+        {impl_name main, rule napi.codegen}
+        {impl_name main, rule napi.codegen-types}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

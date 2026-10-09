@@ -11004,7 +11004,18 @@ children (
                 id napi-codegen
                 title "Codegen produces TypeScript for a schema's entities, as it does Python"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:napi.codegen] [spec:pgorm:req:napi.codegen-types])
+                }
                 deps (napi-entities)
+                log (
+                    {
+                        at 2026-10-09T16:34:50.03968Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

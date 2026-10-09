@@ -12,9 +12,13 @@ publish = false
 # as pgorm-python's does for Python ([spec:pgorm:req:napi.optional]).
 [workspace]
 
+# An rlib, which applications registering their entities link. The addon's
+# own cdylib is asked of `cargo rustc` (scripts/build.mjs): Cargo leaves a
+# cdylib-typed path crate's file names unhashed, so the addon's build and an
+# application's, without the `standalone-module` feature, would write one
+# library file between them, and either could link the other's.
 [lib]
 name = "pgorm_napi"
-crate-type = ["cdylib", "rlib"]
 
 [features]
 # The addon's own module. An application that registers its entities

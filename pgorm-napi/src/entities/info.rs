@@ -88,6 +88,23 @@ pub(crate) struct ColumnInfo {
     pub(crate) nullable: bool,
     pub(crate) primary_key: bool,
     pub(crate) tag: Option<Tag>,
+    pub(crate) labels: Option<Vec<String>>,
+}
+
+/// An enum column's labels, in declaration order, an array of one's
+/// included: what a generated declaration types its values as.
+fn labels(ty: &ColumnType) -> Option<Vec<String>> {
+    use pgorm::pgorm_query::SqlName;
+    match ty {
+        ColumnType::Enum { variants, .. } => Some(
+            variants
+                .iter()
+                .map(|variant| SqlName::to_string(&**variant))
+                .collect(),
+        ),
+        ColumnType::Array(member) => labels(member),
+        _ => None,
+    }
 }
 
 impl ColumnInfo {
@@ -99,6 +116,7 @@ impl ColumnInfo {
             "nullable": self.nullable,
             "primaryKey": self.primary_key,
             "kind": self.tag.as_ref().map(kind_key),
+            "values": self.labels,
         })
     }
 }
@@ -155,6 +173,7 @@ impl EntityInfo {
                 sql_type: format!("{:?}", definition.get_column_type()),
                 nullable: definition.is_null(),
                 tag: column_tag(definition.get_column_type()),
+                labels: labels(definition.get_column_type()),
                 name: column_name,
             });
         }

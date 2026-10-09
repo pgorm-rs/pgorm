@@ -1,5 +1,8 @@
 {
   "nodeModulesDir": "none",
+  "exclude": [
+    "tests/codegen-entities/"
+  ],
   "test": {
     "exclude": [
       "tests/application-binding/"

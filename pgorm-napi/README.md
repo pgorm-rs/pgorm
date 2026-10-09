@@ -541,6 +541,23 @@ const saved = await Account.active().set("id", 1).set("display name", "Ann").ins
 const rows = await graph("app.AccountNotes").find({ aliases: ["n"] }).all(pool);        // [account, note | null][]
 ```
 
+## Generated TypeScript
+
+`pgorm-napi/codegen` builds an application's module from an
+`application.json` naming its entity crate, entities, graphs and source tuples,
+then writes a TypeScript module typing each registration from what the built
+library describes: `AccountRecord` with each column's type, nullability and an
+enum's labels, `AccountInput`, graph and source rows as tuples of records.
+The generated module checks, as it loads, that the library is the one it was
+written from. [CODEGEN.md](CODEGEN.md) has the workflow;
+`node pgorm-napi/checks/codegen.js` runs it on the repository's fixture.
+
+```sh
+node pgorm-napi/codegen/cli.js scaffold application.json --pgorm-source . --output app-module
+node pgorm-napi/codegen/cli.js build app-module
+node pgorm-napi/codegen/cli.js emit app-module    # app-module/lib/app.js and app.d.ts
+```
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript

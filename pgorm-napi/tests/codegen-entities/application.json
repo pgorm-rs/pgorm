@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "module": "app",
+  "entity_crate": ".",
+  "entities": [
+    {"name": "app.Account", "rust": "account::Entity", "typescript": "Account"},
+    {"name": "app.Note", "rust": "note::Entity", "typescript": "Note"},
+    {"name": "app.Sample", "rust": "sample::Entity", "typescript": "Sample"}
+  ],
+  "graphs": [
+    {"name": "app.AccountOnly", "rust": "account_only", "typescript": "AccountOnly"},
+    {"name": "app.AccountNotes", "rust": "optional", "typescript": "AccountNotes"},
+    {"name": "app.MixedNotes", "rust": "mixed", "typescript": "MixedNotes"}
+  ],
+  "sources": [
+    {"name": "app.AccountWithNote", "rust": ["account::Entity", "note::Entity"], "typescript": "AccountWithNote"}
+  ]
+}

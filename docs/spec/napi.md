@@ -958,6 +958,44 @@ the ones compiled in.
 > its library, and run its JavaScript suite against a live server under both
 > `node --test` and `deno test`, failing on any failure; CI runs it.
 
+## Generated TypeScript
+
+An application's registrations are typed by a module generated from its
+built library, as pgorm-python generates typed wrappers for its compiled
+entities.
+
+> [spec:pgorm:req:napi.codegen]
+> `pgorm-napi/codegen` MUST generate an application's module from a build
+> description naming its entity crate and the entities, graphs and source
+> tuples to register, each under a registration name and a TypeScript
+> export, refusing — before anything is written — a description whose Rust
+> paths are not paths to items of the crate, whose names repeat within a
+> kind, whose exports repeat or are not public JavaScript identifiers, whose
+> entity is registered twice or whose source tuple lists an entity it does
+> not describe. `scaffold` MUST write, at a destination that does not exist,
+> a crate registering exactly what is described and installing it from its
+> own `#[neon::main]`, beside a copy of the binding's ES module; `build`
+> places the crate's library as that module's addon; `emit` MUST write the
+> TypeScript module and its declarations from what the built library
+> describes, the same bytes each time from the same library. The generated
+> module MUST check, as it loads, that the addon's version and every
+> registration it names describe as they did when it was written, and refuse
+> to load with a `ConstructionError` otherwise.
+
+> [spec:pgorm:req:napi.codegen-types]
+> The generated declarations MUST type each entity's records as their reads
+> give them — keyed by SQL column name, each column the type its kind decodes
+> as, `| null` where it is nullable, an enum's labels as a union of string
+> literals, an array's items `| null` unless the entity's Rust field is a
+> `Vec` of a type that is no `Option`, and a column of a type the binding has
+> no kind for as `PlainValue` — and what each column takes, so that column
+> comparisons, ActiveModel `set`s, records and the version terminals are typed
+> by the entity. A graph's row MUST be its root's record when it has no slot
+> and otherwise a tuple of every source's record, an `Opt` slot's `| null`;
+> a source tuple's row a tuple of each source's record `| null`. `deno check`
+> MUST hold a consumer of the generated module to these types, its
+> `@ts-expect-error` lines included.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

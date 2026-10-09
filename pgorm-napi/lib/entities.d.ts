@@ -110,6 +110,8 @@ export interface EntityDescription {
     readonly primaryKey: boolean;
     /** The kind its values bind and read as, as a result spells it; `null` for a type that takes a `Value`. */
     readonly kind: string | null;
+    /** An enum column's labels, in declaration order; `null` for any other. */
+    readonly values: readonly string[] | null;
   }[];
   readonly primaryKey: readonly string[];
   /** Whether the key's last column is a period matched `WITHOUT OVERLAPS`. */

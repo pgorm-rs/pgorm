@@ -31,6 +31,7 @@ specs ({
             pgorm-napi/lib/**/*.js
             pgorm-napi/lib/**/*.ts
             pgorm-napi/checks/**/*.js
+            pgorm-napi/codegen/**/*.js
             .github/workflows/napi.yml
         ),
         test_include (

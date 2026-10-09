@@ -184,6 +184,19 @@ platforms (
         }
     }
     {
+        platform "napi-codegen"
+        files (pgorm-napi/tests/codegen-entities/** pgorm-napi/tests/application-binding/src/account.rs pgorm-napi/tests/application-binding/src/note.rs)
+        checks {
+            format {
+                cmd "cargo fmt --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --all"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "napi-native"
         files (pgorm-napi/**/*.rs pgorm-napi/Cargo.toml pgorm-napi/Cargo.lock)
         checks {

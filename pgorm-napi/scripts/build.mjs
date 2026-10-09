@@ -2,10 +2,12 @@
 //
 //   node scripts/build.mjs [--release]
 //
-// Cargo names a cdylib for the platform (libpgorm_napi.dylib, .so,
-// pgorm_napi.dll); Node-API hosts load it from any path, so it is copied to
-// lib/pgorm_napi.node. Builds go to the repository's target directory, which
-// the nplan checks share, unless CARGO_TARGET_DIR says otherwise.
+// The crate is an rlib for the applications that link it, so the addon's
+// cdylib is asked of `cargo rustc`. Cargo names a cdylib for the platform
+// (libpgorm_napi.dylib, .so, pgorm_napi.dll); Node-API hosts load it from any
+// path, so it is copied to lib/pgorm_napi.node. Builds go to the repository's
+// target directory, which the nplan checks share, unless CARGO_TARGET_DIR
+// says otherwise.
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, rmSync } from "node:fs";
@@ -15,11 +17,13 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const release = process.argv.includes("--release");
 const args = [
-  "build",
+  "rustc",
   "--manifest-path",
   join(root, "Cargo.toml"),
   "--locked",
   "--lib",
+  "--crate-type",
+  "cdylib",
   "--message-format=json-render-diagnostics",
 ];
 if (release) args.push("--release");
