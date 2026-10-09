@@ -140,9 +140,14 @@ test("acquiring waits for a free connection within acquireTimeout, then fails wi
 // [spec:pgorm:req:napi.errors+1/test]
 test("a connection runs one operation at a time and refuses a second rather than racing it", async () => {
   await using connection = await pool().acquire();
-  const sleeping = connection.execute("SELECT pg_sleep(0.3)");
-  await assert.rejects(connection.query("SELECT 1"), lifecycle(/busy/));
-  await sleeping;
+  // Refusal follows the order JavaScript calls in, whichever runtime thread
+  // gets to the connection first.
+  for (let round = 0; round < 5; round += 1) {
+    const sleeping = connection.execute("SELECT pg_sleep(0.05)");
+    const refused = Array.from({ length: 50 }, () => connection.query("SELECT 1"));
+    for (const attempt of refused) await assert.rejects(attempt, lifecycle(/busy/));
+    await sleeping;
+  }
   assert.equal((await connection.one("SELECT 4 AS n")).n, 4);
 });
 
@@ -323,9 +328,12 @@ test("a transaction is refused while its savepoint is open, not raced", async ()
 test("a second statement on a transaction already running one is refused, not queued", async () => {
   await using connection = await pool().acquire();
   await connection.transaction(async (tx) => {
-    const sleeping = tx.execute("SELECT pg_sleep(0.3)");
-    await assert.rejects(tx.query("SELECT 1"), lifecycle(/busy/));
-    await sleeping;
+    for (let round = 0; round < 5; round += 1) {
+      const sleeping = tx.execute("SELECT pg_sleep(0.05)");
+      const refused = Array.from({ length: 50 }, () => tx.query("SELECT 1"));
+      for (const attempt of refused) await assert.rejects(attempt, lifecycle(/busy/));
+      await sleeping;
+    }
   });
 });
 

@@ -550,18 +550,20 @@ fn pool_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
     })
 }
 
-/// Run `work` with the connection taken from its slot, failing when the
+/// Run `work` on the connection `operation` took from its slot — taken on
+/// the JavaScript thread as the operation was called, so operations are
+/// refused in the order JavaScript started them — failing when the
 /// connection or pool closes or the caller aborts, in which case the
 /// connection is discarded.
 pub(crate) async fn on_connection<T, W>(
-    state: Arc<ConnectionState>,
+    operation: Operation,
     abort: &Abort,
     work: W,
 ) -> Result<T, Failure>
 where
     W: AsyncFnOnce(&pgorm::DatabaseConnection) -> Result<T, Failure>,
 {
-    let operation = Operation::begin(state.clone())?;
+    let state = operation.state.clone();
     let outcome = tokio::select! {
         biased;
         () = abort.token().cancelled() => return Err(Failure::Cancelled),
@@ -585,8 +587,15 @@ fn connection_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let tagged = cx.argument::<JsBoolean>(4)?.value(&mut cx);
     let abort = abort_argument(&mut cx, 5)?;
     let secrets = state.pool.secrets.clone();
+    let operation = match Operation::begin(state) {
+        Ok(operation) => operation,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
     let work = async move {
-        on_connection(state, &abort, async |db| statement.run(db, &secrets).await).await
+        on_connection(operation, &abort, async |db| {
+            statement.run(db, &secrets).await
+        })
+        .await
     };
     settle::promise(&mut cx, work, move |cx, outcome| {
         outcome.into_js(cx, tagged)
@@ -598,8 +607,12 @@ fn connection_ping(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = connection(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
     let secrets = state.pool.secrets.clone();
+    let operation = match Operation::begin(state) {
+        Ok(operation) => operation,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
     let work = async move {
-        on_connection(state, &abort, async |db| {
+        on_connection(operation, &abort, async |db| {
             let row = db
                 .query_one("SELECT TRUE", &[])
                 .await

@@ -192,7 +192,8 @@ impl State {
     }
 
     /// The frame's lock, refusing rather than waiting when a request or an
-    /// open savepoint holds it.
+    /// open savepoint holds it. Taken on the JavaScript thread as each request
+    /// is made, so requests are refused in the order JavaScript made them.
     // [spec:pgorm:req:napi.transactions]
     fn lock(&self) -> Result<OwnedMutexGuard<()>, Failure> {
         self.ensure_open()?;
@@ -210,8 +211,13 @@ impl State {
             .map_err(|_| Failure::Lifecycle("the transaction has ended".to_owned()))
     }
 
-    async fn run(&self, statement: Statement, abort: &Abort) -> Result<Outcome, Failure> {
-        let _lock = self.lock()?;
+    /// Run a statement, holding the lock taken as JavaScript started it.
+    async fn run(
+        &self,
+        _lock: OwnedMutexGuard<()>,
+        statement: Statement,
+        abort: &Abort,
+    ) -> Result<Outcome, Failure> {
         let (reply, receive) = oneshot::channel();
         let mut pending = Pending::new(self.root.aborted.clone());
         self.send(Command::Run { statement, reply })?;
@@ -226,8 +232,7 @@ impl State {
         outcome
     }
 
-    async fn finish(&self, commit: bool) -> Result<(), Failure> {
-        let _lock = self.lock()?;
+    async fn finish(&self, _lock: OwnedMutexGuard<()>, commit: bool) -> Result<(), Failure> {
         let (reply, receive) = oneshot::channel();
         let mut pending = Pending::new(self.root.aborted.clone());
         self.send(Command::Finish { commit, reply })?;
@@ -241,8 +246,11 @@ impl State {
     }
 
     /// A savepoint, which holds this frame's lock until it finishes.
-    async fn begin(self: &Arc<Self>, abort: &Abort) -> Result<Arc<Self>, Failure> {
-        let parent_lock = self.lock()?;
+    async fn begin(
+        self: &Arc<Self>,
+        parent_lock: OwnedMutexGuard<()>,
+        abort: &Abort,
+    ) -> Result<Arc<Self>, Failure> {
         let (child, receiver) = Self::channel(self.connection.clone(), Some(self));
         let (opened, receive) = oneshot::channel();
         let mut pending = Pending::new(self.root.aborted.clone());
@@ -348,11 +356,11 @@ fn serve<'a>(
 /// task takes the connection out of its slot and owns the transaction.
 // [spec:pgorm:req:napi.transactions]
 async fn begin(
-    connection: Arc<ConnectionState>,
+    mut operation: Operation,
     mode: TransactionMode,
     abort: Abort,
 ) -> Result<Arc<State>, Failure> {
-    let mut operation = Operation::begin(connection.clone())?;
+    let connection = operation.state.clone();
     let (state, receiver) = State::channel(connection, None);
     let (opened, receive) = oneshot::channel::<Result<(), Failure>>();
     let mut pending = Pending::new(state.root.aborted.clone());
@@ -468,7 +476,11 @@ fn connection_begin(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
     let mode = mode(&mut cx, 1)?;
     let abort = abort_argument(&mut cx, 3)?;
-    settle::promise(&mut cx, begin(connection, mode, abort), |cx, state| {
+    let operation = match Operation::begin(connection) {
+        Ok(operation) => operation,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    settle::promise(&mut cx, begin(operation, mode, abort), |cx, state| {
         Ok(cx.boxed(TransactionHandle(state)).upcast())
     })
 }
@@ -479,7 +491,11 @@ fn transaction_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let statement = Statement::read(&mut cx, 1)?;
     let tagged = cx.argument::<JsBoolean>(4)?.value(&mut cx);
     let abort = abort_argument(&mut cx, 5)?;
-    let work = async move { state.run(statement, &abort).await };
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let work = async move { state.run(lock, statement, &abort).await };
     settle::promise(&mut cx, work, move |cx, outcome| {
         outcome.into_js(cx, tagged)
     })
@@ -489,7 +505,11 @@ fn transaction_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
 fn transaction_begin(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
-    let work = async move { state.begin(&abort).await };
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let work = async move { state.begin(lock, &abort).await };
     settle::promise(&mut cx, work, |cx, child| {
         Ok(cx.boxed(TransactionHandle(child)).upcast())
     })
@@ -501,7 +521,11 @@ fn transaction_begin(mut cx: FunctionContext) -> JsResult<JsPromise> {
 fn transaction_finish(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let commit = cx.argument::<JsBoolean>(1)?.value(&mut cx);
-    let work = async move { state.finish(commit).await };
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let work = async move { state.finish(lock, commit).await };
     settle::promise(&mut cx, work, |cx, ()| Ok(cx.undefined().upcast()))
 }
 

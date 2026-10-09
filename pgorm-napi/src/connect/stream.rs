@@ -92,12 +92,12 @@ impl Drop for StreamHandle {
 }
 
 async fn open(
-    connection: Arc<ConnectionState>,
+    operation: Operation,
     sql: String,
     params: Vec<Param>,
     abort: Abort,
 ) -> Result<Arc<StreamState>, Failure> {
-    let operation = Operation::begin(connection.clone())?;
+    let connection = operation.state.clone();
     let secrets = &connection.pool.secrets;
     let rows = tokio::select! {
         biased;
@@ -135,11 +135,13 @@ fn connection_stream(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let codec = Codec::get(&mut cx)?;
     let params = params::read(&mut cx, codec, values)?;
     let abort = abort_argument(&mut cx, 3)?;
-    settle::promise(
-        &mut cx,
-        open(connection, sql, params, abort),
-        |cx, state| Ok(cx.boxed(StreamHandle(state)).upcast()),
-    )
+    let operation = match Operation::begin(connection) {
+        Ok(operation) => operation,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    settle::promise(&mut cx, open(operation, sql, params, abort), |cx, state| {
+        Ok(cx.boxed(StreamHandle(state)).upcast())
+    })
 }
 
 /// The next row, decoded, with the column names on the first; `None` at the
