@@ -32,7 +32,7 @@ use crate::{
     errors::{Failure, Redactions, failure},
     params::{self, Param},
     rows::{self, Decoded},
-    settle,
+    settle, statements,
     values::read,
 };
 
@@ -138,11 +138,7 @@ impl Statement {
     /// The terminal, statement text and parameters at `index` onwards.
     fn read(cx: &mut FunctionContext, index: usize) -> NeonResult<Self> {
         let terminal = Terminal::read(cx, index)?;
-        let sql = cx.argument::<JsValue>(index + 1)?;
-        let sql = read::sql(cx, sql)?;
-        let values = cx.argument::<JsArray>(index + 2)?;
-        let codec = Codec::get(cx)?;
-        let params = params::read(cx, codec, values)?;
+        let (sql, params) = sql_and_params(cx, index + 1)?;
         Ok(Self {
             terminal,
             sql,
@@ -187,6 +183,34 @@ impl Statement {
         }
         rows::decode(&rows).map(Outcome::Rows)
     }
+}
+
+/// The statement at `index` and its parameters at `index + 1`: SQL text and
+/// the values it binds, or a statement JavaScript built, which carries its
+/// own and is built here exactly as `inspect()` builds it.
+// [spec:pgorm:req:napi.statements]
+pub(crate) fn sql_and_params(
+    cx: &mut FunctionContext,
+    index: usize,
+) -> NeonResult<(String, Vec<Param>)> {
+    let sql = cx.argument::<JsValue>(index)?;
+    if let Some(node) = statements::node(cx, sql) {
+        let (sql, values) = statements::compile(cx, &node)?;
+        if sql.contains('\0') {
+            return read::refuse(cx, "statement text cannot contain NUL");
+        }
+        let params = values
+            .0
+            .into_iter()
+            .map(|value| Param::Value(pgorm::ValueHolder(value)))
+            .collect();
+        return Ok((sql, params));
+    }
+    let sql = read::sql(cx, sql)?;
+    let values = cx.argument::<JsArray>(index + 1)?;
+    let codec = Codec::get(cx)?;
+    let params = params::read(cx, codec, values)?;
+    Ok((sql, params))
 }
 
 /// A statement's result: a count, or decoded rows.

@@ -23,9 +23,9 @@ use crate::{
     codec::Codec,
     decode,
     errors::{Failure, failure},
-    params::{self, Param},
+    params::Param,
     rows, settle,
-    values::{Tagged, read},
+    values::Tagged,
 };
 
 pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -129,11 +129,7 @@ async fn open(
 // [spec:pgorm:req:napi.streams]
 fn connection_stream(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
-    let sql = cx.argument::<JsValue>(1)?;
-    let sql = read::sql(&mut cx, sql)?;
-    let values = cx.argument::<JsArray>(2)?;
-    let codec = Codec::get(&mut cx)?;
-    let params = params::read(&mut cx, codec, values)?;
+    let (sql, params) = super::sql_and_params(&mut cx, 1)?;
     let abort = abort_argument(&mut cx, 3)?;
     let operation = match Operation::begin(connection) {
         Ok(operation) => operation,

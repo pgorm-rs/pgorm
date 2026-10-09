@@ -309,6 +309,105 @@ handle, and each is released by being closed.
 > refuses other work meanwhile. A transaction offers no stream, as
 > pgorm-python's does not.
 
+## Statements and expressions
+
+JavaScript builds pgorm-query's statements and expressions as pgorm-python
+does, in JavaScript's conventions: builder objects whose methods return new
+builders, closed choices spelled as strings, and the same terminals that run
+SQL text running a built statement.
+
+> [spec:pgorm:req:napi.statements]
+> JavaScript MUST build pgorm-query's statements and expressions through
+> builder objects that each own the pgorm-query builder state they stand for,
+> held by the addon. A builder MUST be immutable: each method returns a new
+> builder made from a copy of its receiver's state by the pgorm-query method
+> of the same meaning, so a builder reused, or extended in two directions,
+> leaves itself and each extension unchanged. A builder is made only by the
+> module's functions and the constructors it names; an argument a method
+> cannot use MUST be refused as the method is called — a `ConstructionError`,
+> or a `TypeError` for an argument of the wrong JavaScript shape — so a
+> statement that cannot be built never exists to be run.
+>
+> `inspect()` MUST give the SQL and the bound values, in placeholder order and
+> each a `Value` carrying its kind, that running the builder sends: a
+> statement as it runs, an expression as the one item of a `SELECT` and a
+> condition as the `WHERE` of `SELECT TRUE`, as pgorm-python inspects them.
+> `execute`, `query`, `one`, `optional` and `stream`, on a pool, a connection
+> and a transaction, MUST take a built statement where they take SQL text,
+> its options second, and build it with the function `inspect()` uses,
+> binding its values as any parameter is bound; a parameter list passed
+> beside it is a `TypeError`, and an expression or a condition is no statement
+> to run. A statement binding more than 65,535 values MUST be refused with a
+> `ConstructionError` before anything is sent.
+
+> [spec:pgorm:req:napi.expressions]
+> An expression MUST lower into pgorm-query's own builders. `col` is a
+> column, qualified by a table and its schema; an operand that is not an
+> expression is a value bound as a parameter, never interpolated — inferred as
+> a parameter is, or declared with `Value`, an enum's label written cast to its
+> type and a created range's text cast to its range through
+> `Expr::as_range` — and `bind` makes one an expression. A value pgorm's
+> statement values cannot hold MUST be a `ConstructionError` naming the
+> explicit form: `null`, which has no kind, and an interval, which pgorm's
+> `Value` has no variant for. Every identifier — of a column, table, schema,
+> alias, collation, common table expression or type — MUST be a string of
+> 1–63 UTF-8 bytes without NUL, minted with `Name::runtime`, so that it is
+> quoted wherever pgorm-query writes it, a dot in it part of the name.
+>
+> Comparison and arithmetic, `||`, `IS [NOT] DISTINCT FROM`, AND, OR, NOT,
+> `IS [NOT] NULL`, `[NOT] BETWEEN [SYMMETRIC]` and `[NOT] IN` a list — an
+> empty one included, which no value is in — or a subquery MUST each be the
+> pgorm-query method of that meaning, and `Condition.all` and `Condition.any`
+> pgorm-query's `Condition`, empty ones true and false. `like`, `ilike` and
+> their negations take a pattern string, bound, and an optional one-character
+> escape; `startsWith`, `endsWith` and `containsText` read their argument as
+> text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
+> `_` match themselves. `call` reaches only the functions pgorm-query has a
+> constructor for, at the argument counts each takes — `uuidv7` with or
+> without its shift among them — and another name or count is a
+> `ConstructionError`: the name selects a constructor and never reaches SQL.
+> A cast names its type by identifier or `TypeName`; `collate` names a
+> collation, schema-qualifiable; `at` and `slice` subscript an array; a
+> searched or simple `CASE` exists only once it has an arm; `exists` and
+> `scalar` take a `Select`.
+
+> [spec:pgorm:req:napi.select]
+> `select` MUST build pgorm-query's `SelectStatement`: a projection of
+> expressions and aliased expressions, `*` until one is given; FROM items —
+> a `Table`, schema-qualified and aliased, or a `FromItem`, which is always
+> aliased, a subquery among them —; inner, left, right and full joins on a
+> predicate, a lateral subquery among them, and cross joins; WHERE and HAVING,
+> each call ANDed to what is there; GROUP BY; ORDER BY with a direction and
+> NULLS FIRST or LAST; LIMIT and OFFSET, a non-negative integer number or
+> `bigint` within PostgreSQL's `bigint`, or `null` to remove one, anything
+> else a `ConstructionError`; DISTINCT; UNION, INTERSECT and EXCEPT, each with
+> its ALL form; a row lock of one of the four strengths, OF the items named,
+> each by the name it answers to in the statement, and with NOWAIT or SKIP
+> LOCKED; and a WITH clause of common table expressions with column lists and
+> materialization, or `WITH RECURSIVE` of exactly one, with SEARCH and CYCLE.
+
+> [spec:pgorm:req:napi.writes]
+> `insert`, `update` and `deleteFrom` MUST build pgorm-query's INSERT, UPDATE
+> and DELETE. An INSERT names its distinct columns before any row; each
+> `values` call adds one row of exactly as many operands, by pgorm-query's
+> arity check; `select` takes its rows from a `Select` of as many columns
+> instead; and `defaultValues` writes one row of defaults, mixed with
+> neither. `onConflict` takes only a completed action: `Conflict.doNothing()`,
+> answering any conflict, or an arbiter — `Conflict.on` a non-empty list of
+> columns and index expressions, with an optional partial-index predicate, or
+> `Conflict.onConstraint` a constraint by name, which takes no predicate —
+> followed by `doNothing()` or a non-empty update of columns taken from
+> EXCLUDED or set to expressions, with an optional `where`. An UPDATE has at
+> least one assignment, each column once. An INSERT with no row, an UPDATE
+> with no assignment and an UPDATE or DELETE with neither a `where` nor an
+> explicit `allRows()` MUST be refused with a `ConstructionError` when it is
+> inspected or run. `from` and `using` add the items an UPDATE or a DELETE
+> reads. `returning` gives the RETURNING list, every column when it is empty,
+> and reads a written row's old and new versions through `ReturningRow.old`
+> and `ReturningRow.new`, renamed with `oldAs` and `newAs`. Each statement
+> takes a WITH clause, and one with a RETURNING list is a common table
+> expression's body.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

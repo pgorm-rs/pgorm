@@ -7,6 +7,7 @@
 // [spec:pgorm:req:napi.results]
 // [spec:pgorm:req:napi.transactions]
 
+import { statementArgs } from "./builder.js";
 import { abortable, native, queryOptions, row, signalOf, TRUSTED } from "./operations.js";
 import { RowStream } from "./streams.js";
 
@@ -26,7 +27,7 @@ const ABORT = Symbol("abort");
 export class Queryable {
   /**
    * @param {"execute" | "all" | "one" | "optional"} _terminal
-   * @param {string} _sql
+   * @param {unknown} _sql
    * @param {readonly unknown[]} _params
    * @param {boolean} _tagged
    * @param {unknown} _token
@@ -38,61 +39,64 @@ export class Queryable {
 
   /**
    * @param {"all" | "one" | "optional"} terminal
-   * @param {string} sql
-   * @param {readonly unknown[]} params
+   * @param {unknown} statement
+   * @param {unknown} params
    * @param {unknown} options
    * @returns {Promise<Record<string, unknown>[]>}
    */
-  async #rows(terminal, sql, params, options) {
-    const { tagged, signal } = queryOptions(options);
-    const [names, rows] = await abortable(signal, (token) => this[RUN](terminal, sql, params, tagged, token));
+  async #rows(terminal, statement, params, options) {
+    const [sql, values, rest] = statementArgs(statement, params, options);
+    const { tagged, signal } = queryOptions(rest);
+    const [names, rows] = await abortable(signal, (token) => this[RUN](terminal, sql, values, tagged, token));
     return rows.map((/** @type {unknown[]} */ values) => row(names, values));
   }
 
   /**
-   * Run a statement and resolve with the number of rows it affected.
+   * Run a statement — SQL text and its parameters, or a statement a builder
+   * made and its options — and resolve with the number of rows it affected.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    * @returns {Promise<number>}
    */
-  async execute(sql, params = [], options = {}) {
-    const { signal } = queryOptions(options);
-    return await abortable(signal, (token) => this[RUN]("execute", sql, params, false, token));
+  async execute(statement, params, options) {
+    const [sql, values, rest] = statementArgs(statement, params, options);
+    const { signal } = queryOptions(rest);
+    return await abortable(signal, (token) => this[RUN]("execute", sql, values, false, token));
   }
 
   /**
    * Every row.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ tagged?: boolean, signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    */
-  async query(sql, params = [], options = {}) {
-    return await this.#rows("all", sql, params, options);
+  async query(statement, params, options) {
+    return await this.#rows("all", statement, params, options);
   }
 
   /**
    * Exactly one row; any other count is a `DecodeError`.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ tagged?: boolean, signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    */
-  async one(sql, params = [], options = {}) {
-    return (await this.#rows("one", sql, params, options))[0];
+  async one(statement, params, options) {
+    return (await this.#rows("one", statement, params, options))[0];
   }
 
   /**
    * At most one row, or `null`; more is a `DecodeError`.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ tagged?: boolean, signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    */
-  async optional(sql, params = [], options = {}) {
-    return (await this.#rows("optional", sql, params, options))[0] ?? null;
+  async optional(statement, params, options) {
+    return (await this.#rows("optional", statement, params, options))[0] ?? null;
   }
 }
 
@@ -177,23 +181,24 @@ export class Pool extends Queryable {
    * The rows of `sql`, pulled one at a time over a connection the stream
    * holds until its last row or until it is closed.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ tagged?: boolean, signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    * @returns {RowStream}
    */
-  stream(sql, params = [], options = {}) {
+  stream(statement, params, options) {
+    const [sql, values, rest] = statementArgs(statement, params, options);
     const pool = this;
     return new RowStream(async (token) => {
       const connection = new Connection(await native.poolAcquire(pool.#native, token), TRUSTED);
       try {
-        const handle = await native.connectionStream(connectionHandle(connection), sql, params, token);
+        const handle = await native.connectionStream(connectionHandle(connection), sql, values, token);
         return [handle, () => connection.close()];
       } catch (error) {
         await connection.close();
         throw error;
       }
-    }, options, TRUSTED);
+    }, rest, TRUSTED);
   }
 
   /**
@@ -223,7 +228,7 @@ export class Pool extends Queryable {
   /**
    * @override
    * @param {"execute" | "all" | "one" | "optional"} terminal
-   * @param {string} sql
+   * @param {unknown} sql
    * @param {readonly unknown[]} params
    * @param {boolean} tagged
    * @param {unknown} token
@@ -341,16 +346,17 @@ export class Connection extends Queryable {
    * until its last row or until it is closed, and a stream closed early
    * discards it.
    *
-   * @param {string} sql
-   * @param {readonly unknown[]} [params]
-   * @param {{ tagged?: boolean, signal?: AbortSignal }} [options]
+   * @param {unknown} statement
+   * @param {unknown} [params]
+   * @param {unknown} [options]
    * @returns {RowStream}
    */
-  stream(sql, params = [], options = {}) {
+  stream(statement, params, options) {
+    const [sql, values, rest] = statementArgs(statement, params, options);
     const connection = this;
     return new RowStream(
-      async (token) => [await native.connectionStream(connection.#native, sql, params, token), undefined],
-      options,
+      async (token) => [await native.connectionStream(connection.#native, sql, values, token), undefined],
+      rest,
       TRUSTED,
     );
   }
@@ -381,7 +387,7 @@ export class Connection extends Queryable {
   /**
    * @override
    * @param {"execute" | "all" | "one" | "optional"} terminal
-   * @param {string} sql
+   * @param {unknown} sql
    * @param {readonly unknown[]} params
    * @param {boolean} tagged
    * @param {unknown} token
@@ -493,7 +499,7 @@ export class Transaction extends Queryable {
   /**
    * @override
    * @param {"execute" | "all" | "one" | "optional"} terminal
-   * @param {string} sql
+   * @param {unknown} sql
    * @param {readonly unknown[]} params
    * @param {boolean} tagged
    * @param {unknown} token

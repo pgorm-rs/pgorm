@@ -10,7 +10,8 @@ The addon loads in both runtimes, runs pgorm's asynchronous work on a tokio
 runtime of its own, settles a Promise with the outcome, and lets the process
 exit when its work is done. JavaScript connects through pools, runs bound SQL,
 scopes transactions and savepoints and streams rows
-([Connections](#connections)), and every value pgorm holds crosses into and
+([Connections](#connections)), builds pgorm-query's statements
+([Statements](#statements)), and every value pgorm holds crosses into and
 out of JavaScript with a declared type ([Values](#values)). It needs a runtime
 with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or later.
 
@@ -118,6 +119,62 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
 `TimeoutError` is a pool's `acquireTimeout` running out; an `AbortSignal`
 timeout rejects with the signal's own `TimeoutError` `DOMException`.
 
+## Statements
+
+pgorm-query's statements and expressions are built from JavaScript as
+pgorm-python builds them, and run through the same terminals as SQL text:
+
+```js
+import { Condition, call, col, select, Table, With } from "./pgorm-napi/lib/index.js";
+
+const account = new Table("account", { schema: "app", alias: "a" });
+const event = new Table("event", { alias: "e" });
+const clicks = call("count", event.col("id"));
+
+const query = select(account.col("name"), clicks.as("clicks"))
+  .from(account)
+  .join(event, account.col("id").eq(event.col("account_id")), { kind: "left" })
+  .where(Condition.any(account.col("active").eq(true), account.col("mood").isNull()))
+  .groupBy(account.col("name"))
+  .having(clicks.gte(1))
+  .orderBy(clicks.desc({ nulls: "last" }))
+  .limit(10);
+
+query.inspect();               // { sql: 'SELECT "a"."name", COUNT("e"."id") AS ..', values: [Value, ..] }
+await pool.query(query);       // built as inspect() builds it; options come second
+for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
+```
+
+- **Builders never change.** Each method returns a new builder from a copy of
+  its receiver's pgorm-query state, so a base query can be extended in two
+  directions. Builders come from the module's functions (`select`, `col`,
+  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `tuple`) and the
+  `Table` and `With` constructors.
+- **Values are bound, identifiers quoted.** An operand that is not an
+  expression is a parameter, inferred as one is or declared with `Value` — an
+  enum's label is cast to its type. `null` is refused (test with `isNull()`, or
+  bind `Value.null(kind)`), as is an interval, which pgorm's statement values do
+  not hold: `bind(interval.toString()).cast("interval")`. A name is 1–63 bytes,
+  always an identifier, its dots included.
+- **Expressions**: comparisons and arithmetic (`eq` .. `gte`, `add` .. `mod`,
+  `concat`), `and`/`or`/`not` and `Condition.all`/`any`, `isNull`, `isIn` a list
+  or a `Select`, `between` (`{ symmetric }`), `like`/`ilike` with an `escape`,
+  `startsWith`/`endsWith`/`containsText` (text, not patterns), `cast`,
+  `collate`, `at`/`slice`, `caseWhen(..).when(..).else(..)`,
+  `caseOf(x).when(..)`, `call` for the functions pgorm-query constructs
+  (`uuidv7` and its shift among them), `exists` and `scalar`.
+- **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
+  `where`, `groupBy`, `having`, `orderBy`, `limit`/`offset` (`null` removes),
+  `distinct`, `union` .. `exceptAll`, `lock("update", { of, wait })`, `with`, and
+  `as(alias)` to read a query as a FROM item. `new With(name, query, { columns,
+  materialized }).cte(..)` and `With.recursive(name, query, { search, cycle })`
+  are its common table expressions.
+- **Refusals happen as a builder is called**: an argument that cannot be built
+  — an unknown function, a negative limit, a LIKE escape of two characters, an
+  empty tuple — throws a `ConstructionError` there, so a statement that cannot
+  be built never exists. A statement binding more than 65,535 values is refused
+  before anything is sent.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript
@@ -217,10 +274,14 @@ deno check
 runtime under test, which is why Deno's suite needs `--allow-run`, and holds it
 to exiting by itself. `tests/runtime.test.ts` drives a panic on the runtime and
 Neon's drop queue through two exports only debug builds carry, skipped against
-a release build. `tests/values.test.ts` and `tests/connections.test.ts` each
-make a database of their own, named for the runtime and process, and drop it
-when they end. The suite connects in plaintext unless its connection string
-names an `sslmode`; with `PGORM_TEST_CA` naming a PEM CA whose certificate for
-`localhost` the server presents, it also holds verified TLS to that CA, as CI
-does. `deno.json` keeps Deno on its global npm cache, so type
-checking `node:` imports needs no `node_modules`.
+a release build. `tests/values.test.ts`, `tests/connections.test.ts` and
+`tests/statements.test.ts` each make a database of their own, named for the
+runtime and process, and drop it when they end.
+`tests/statements-parity.test.ts` holds each statement family's cases under
+`tests/parity/` to the golden file beside them, which the addon's Rust unit
+tests build the same statements to with pgorm-query directly. The suite
+connects in plaintext unless its connection string names an `sslmode`; with
+`PGORM_TEST_CA` naming a PEM CA whose certificate for `localhost` the server
+presents, it also holds verified TLS to that CA, as CI does. `deno.json` keeps
+Deno on its global npm cache, so type checking `node:` imports needs no
+`node_modules`.

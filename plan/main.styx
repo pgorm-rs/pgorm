@@ -10882,7 +10882,23 @@ children (
                 id napi-statements
                 title "JavaScript builds pgorm-query's statements and expressions: SELECT, INSERT, UPDATE, DELETE, MERGE, ON CONFLICT, RETURNING row versions, SQL/JSON, windows, ranges"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.statements]
+                        [spec:pgorm:req:napi.expressions]
+                        [spec:pgorm:req:napi.select]
+                        [spec:pgorm:req:napi.writes]
+                    )
+                }
                 deps (napi-connections)
+                log (
+                    {
+                        at 2026-10-09T13:49:05.293337Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

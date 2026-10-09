@@ -1,0 +1,94 @@
+{
+  "select-join-group": {
+    "sql": "SELECT \"a\".\"name\", COUNT(\"e\".\"id\") AS \"events\" FROM \"app\".\"account\" AS \"a\" LEFT JOIN \"event\" AS \"e\" ON \"a\".\"id\" = \"e\".\"account_id\" WHERE \"a\".\"active\" = $1 AND (\"e\".\"kind\" = $2 OR \"e\".\"id\" IS NULL) GROUP BY \"a\".\"name\" HAVING COUNT(\"e\".\"id\") > $3 ORDER BY COUNT(\"e\".\"id\") DESC NULLS LAST, \"a\".\"name\" ASC NULLS FIRST LIMIT $4 OFFSET $5",
+    "values": [["bool","true"], ["text","click"], ["i64","2"], ["u64","5"], ["u64","10"]]
+  },
+  "select-star-distinct": {
+    "sql": "SELECT DISTINCT \"t\".*, \"id\" AS \"key\" FROM \"t\"",
+    "values": []
+  },
+  "joins-every-kind": {
+    "sql": "SELECT * FROM \"t\" INNER JOIN \"u\" ON \"t\".\"a\" = \"u\".\"a\" RIGHT JOIN \"s\".\"v\" ON \"s\".\"v\".\"b\" > $1 FULL OUTER JOIN \"w\" ON FALSE CROSS JOIN \"x\"",
+    "values": [["i64","1"]]
+  },
+  "operators": {
+    "sql": "SELECT (\"a\" + $1) * $2, \"b\" || $3, \"c\" % $4, (\"d\" / $5) - $6, (\"e\" <> \"f\" AND \"g\" <= $7) OR (NOT \"h\" >= $8), \"i\" IS DISTINCT FROM $9, \"j\" IS NOT DISTINCT FROM $10",
+    "values": [["i64","1"], ["i64","2"], ["text","x"], ["i64","3"], ["i32","2"], ["f64","1.5"], ["i64","4"], ["i64","5"], ["i64","1"], ["text","k"]]
+  },
+  "membership": {
+    "sql": "SELECT * FROM \"t\" WHERE $1 = $2 AND $3 = $4 AND \"id\" IN ($5, $6) AND \"kind\" NOT IN ($7) AND (\"a\", \"b\") IN (($8, $9)) AND \"id\" IN (SELECT \"id\" FROM \"u\") AND \"id\" NOT IN (SELECT \"id\" FROM \"v\")",
+    "values": [["text","a"], ["text","b"], ["text","a"], ["text","a"], ["i64","1"], ["i64","2"], ["text","a"], ["i64","1"], ["text","x"]]
+  },
+  "between": {
+    "sql": "SELECT * FROM \"t\" WHERE (\"a\" BETWEEN $1 AND $2) AND (\"b\" NOT BETWEEN $3 AND $4) AND (\"c\" BETWEEN SYMMETRIC $5 AND $6) AND (\"d\" NOT BETWEEN SYMMETRIC $7 AND $8)",
+    "values": [["i64","1"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","1"]]
+  },
+  "patterns": {
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" LIKE $1 OR \"b\" NOT LIKE $2 ESCAPE E'\\\\' OR (\"c\" ILIKE $3) OR (\"d\" NOT ILIKE $4 ESCAPE '!') OR STARTS_WITH(\"e\", $5) OR \"right\"(\"f\", CHAR_LENGTH($6)) = $7 OR strpos(\"g\", $8) > 0",
+    "values": [["text","A%"], ["text","50\\%%"], ["text","x_y"], ["text","%z"], ["text","50%_"], ["text","O'Brien"], ["text","O'Brien"], ["text","\\"]]
+  },
+  "casts-collations-subscripts": {
+    "sql": "SELECT CAST(\"a\" AS integer), CAST(\"b\" AS app.\"Mood\"[]), CAST($1::text AS interval), (\"c\" COLLATE \"C\"), (\"d\" COLLATE \"pg_catalog\".\"de-x-icu\"), \"e\"[$2], \"f\"[$3][$4], \"g\"[$5:$6], \"h\"[:$7], \"i\"[$8:], \"j\"[:]",
+    "values": [["text","1 day"], ["i64","1"], ["i64","1"], ["i32","2"], ["i64","2"], ["i64","3"], ["i64","3"], ["i64","2"]]
+  },
+  "case": {
+    "sql": "SELECT (CASE WHEN (\"x\" > $1) THEN $2 WHEN (\"x\" < $3 AND \"y\" IS NOT NULL) THEN $4 END), (CASE WHEN (\"x\" IS NULL) THEN $5 ELSE \"x\" END) AS \"filled\", (CASE \"kind\" WHEN $6 THEN $7 WHEN $8 THEN $9 END), (CASE \"kind\" WHEN $10 THEN $11 ELSE $12 END)",
+    "values": [["i64","0"], ["text","positive"], ["i64","0"], ["text","negative"], ["i64","0"], ["text","a"], ["i64","1"], ["text","b"], ["i64","2"], ["text","a"], ["i64","1"], ["i64","-1"]]
+  },
+  "values": {
+    "sql": "SELECT $1 + $2, CAST($3::text AS app.mood), CAST($4::text[] AS mood[]), $5, $6, $7, $8, $9, $10",
+    "values": [["i16","7"], ["i64","3"], ["text","calm"], ["array","[calm,glad]"], ["decimal","19.9900"], ["uuid","0190a7a6-8c8e-7000-8000-000000000001"], ["date","2026-10-09"], ["datetime_utc","2026-10-09T12:00:00Z"], ["bool","true"], ["array","[1,2,3]"]]
+  },
+  "functions": {
+    "sql": "SELECT LOWER(\"a\"), UPPER(\"a\"), ABS(\"b\"), CHAR_LENGTH(\"a\"), COUNT(DISTINCT \"a\"), SUM(\"b\"), AVG(\"b\"), MIN(\"b\"), MAX(\"b\"), ROUND(\"b\"), ROUND(\"b\", $1), COALESCE(\"a\", $2), RANDOM(), GEN_RANDOM_UUID(), UUIDV4(), UUIDV7(), UUIDV7(CAST($3::text AS interval)), UUID_EXTRACT_TIMESTAMP(\"u\"), UUID_EXTRACT_VERSION(\"u\")",
+    "values": [["i32","2"], ["text","none"], ["text","-1 hour"]]
+  },
+  "subqueries": {
+    "sql": "SELECT \"a\".\"id\", (SELECT MAX(\"at\") FROM \"event\") AS \"last\" FROM \"app\".\"account\" AS \"a\" LEFT JOIN LATERAL (SELECT \"id\", \"at\" FROM \"event\" WHERE \"event\".\"account\" = \"a\".\"id\") AS \"l\" ON TRUE WHERE EXISTS(SELECT $1 FROM \"flag\" WHERE \"account\" = \"a\".\"id\")",
+    "values": [["i64","1"]]
+  },
+  "from-subquery": {
+    "sql": "SELECT \"sub\".\"id\", \"sub\".* FROM (SELECT \"id\", \"kind\" FROM \"t\" WHERE \"kind\" <> $1) AS \"sub\" CROSS JOIN \"u\"",
+    "values": [["text","x"]]
+  },
+  "set-operations": {
+    "sql": "SELECT \"id\" FROM \"t\" UNION (SELECT \"id\" FROM \"u\") UNION ALL (SELECT \"id\" FROM \"v\") INTERSECT (SELECT \"id\" FROM \"w\") INTERSECT ALL (SELECT \"id\" FROM \"x\") EXCEPT (SELECT \"id\" FROM \"y\") EXCEPT ALL (SELECT \"id\" FROM \"z\")",
+    "values": []
+  },
+  "locks": {
+    "sql": "SELECT * FROM \"app\".\"account\" AS \"a\" INNER JOIN \"event\" AS \"e\" ON \"a\".\"id\" = \"e\".\"account_id\" FOR UPDATE OF \"a\" SKIP LOCKED",
+    "values": []
+  },
+  "lock-share": {
+    "sql": "SELECT * FROM \"t\" FOR KEY SHARE NOWAIT",
+    "values": []
+  },
+  "lock-no-key": {
+    "sql": "SELECT * FROM \"t\" FOR SHARE",
+    "values": []
+  },
+  "with": {
+    "sql": "WITH \"recent\" (\"id\") AS  MATERIALIZED (SELECT \"id\" FROM \"t\" WHERE \"at\" > $1) , \"older\" AS NOT MATERIALIZED (SELECT \"id\" FROM \"recent\") SELECT * FROM \"older\"",
+    "values": [["i64","1"]]
+  },
+  "with-recursive": {
+    "sql": "WITH RECURSIVE \"r\" (\"n\") AS (SELECT $1 AS \"n\" UNION ALL (SELECT \"n\" + $2 FROM \"r\" WHERE \"n\" < $3)) SEARCH DEPTH FIRST BY \"n\" SET \"ord\" CYCLE \"n\" SET \"looped\" USING \"path\" SELECT \"n\" FROM \"r\"",
+    "values": [["i32","1"], ["i64","1"], ["i64","5"]]
+  },
+  "limits-reset": {
+    "sql": "SELECT * FROM \"t\" LIMIT $1",
+    "values": [["u64","9007199254740991"]]
+  },
+  "conditions": {
+    "sql": "SELECT * FROM \"t\" WHERE FALSE AND (\"b\" = $1 OR \"c\" = $2 OR (\"d\" = $3 AND \"e\" = $4)) HAVING NOT \"a\" = $5",
+    "values": [["i64","2"], ["i64","3"], ["i64","4"], ["i64","5"], ["i64","1"]]
+  },
+  "expression-inspect": {
+    "sql": "SELECT \"x\" + $1",
+    "values": [["i16","7"]]
+  },
+  "condition-inspect": {
+    "sql": "SELECT TRUE WHERE \"a\" = $1 OR \"b\" IS NULL",
+    "values": [["i64","1"]]
+  }
+}

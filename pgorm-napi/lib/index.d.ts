@@ -6,6 +6,11 @@
 
 // [spec:pgorm:req:napi.typing]
 
+import type { Select } from "./select.d.ts";
+
+export * from "./expressions.d.ts";
+export * from "./select.d.ts";
+
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
 
@@ -426,18 +431,30 @@ export interface TransactionOptions extends OperationOptions {
   readonly isolation?: "readUncommitted" | "readCommitted" | "repeatableRead" | "serializable" | null;
 }
 
+// [spec:pgorm:req:napi.statements]
 /**
- * What a pool, a connection and a transaction run bound SQL through. A
- * parameter is bound, never interpolated.
+ * A statement a builder made, which a terminal runs as `inspect()` builds it,
+ * its values bound.
+ */
+export type Statement = Select;
+
+/**
+ * What a pool, a connection and a transaction run bound SQL through: SQL text
+ * and its parameters, or a {@link Statement} and its options. A parameter is
+ * bound, never interpolated.
  */
 export declare abstract class Queryable {
   /** Run a statement and resolve with the number of rows it affected. */
+  execute(statement: Statement, options?: OperationOptions): Promise<number>;
   execute(sql: string, params?: readonly Param[], options?: OperationOptions): Promise<number>;
   /** Every row. */
+  query<O extends QueryOptions = QueryOptions>(statement: Statement, options?: O): Promise<RowFor<O>[]>;
   query<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): Promise<RowFor<O>[]>;
   /** Exactly one row; any other count is a {@link DecodeError}. */
+  one<O extends QueryOptions = QueryOptions>(statement: Statement, options?: O): Promise<RowFor<O>>;
   one<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): Promise<RowFor<O>>;
   /** At most one row, or `null`; more is a {@link DecodeError}. */
+  optional<O extends QueryOptions = QueryOptions>(statement: Statement, options?: O): Promise<RowFor<O> | null>;
   optional<O extends QueryOptions = QueryOptions>(
     sql: string,
     params?: readonly Param[],
@@ -462,7 +479,8 @@ export declare class Pool extends Queryable implements AsyncDisposable {
   connection<T>(use: (connection: Connection) => Promise<T>, options?: OperationOptions): Promise<T>;
   /** Run `use` in a transaction on a connection of its own: committed when it resolves, rolled back when it throws. */
   transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: TransactionOptions): Promise<T>;
-  /** The rows of `sql`, one per pull, over a connection the stream holds until it ends. */
+  /** The rows of a statement, one per pull, over a connection the stream holds until it ends. */
+  stream<O extends QueryOptions = QueryOptions>(statement: Statement, options?: O): RowStream<RowFor<O>>;
   stream<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): RowStream<RowFor<O>>;
   /** Whether the server answers. */
   ping(options?: OperationOptions): Promise<boolean>;
@@ -490,6 +508,7 @@ export declare class Connection extends Queryable implements AsyncDisposable {
    * The rows of `sql`, one per pull. The stream holds the connection until its
    * last row, which frees it, or until it is closed early, which discards it.
    */
+  stream<O extends QueryOptions = QueryOptions>(statement: Statement, options?: O): RowStream<RowFor<O>>;
   stream<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): RowStream<RowFor<O>>;
   ping(options?: OperationOptions): Promise<boolean>;
   /** Return the connection to its pool, ending a transaction or stream that holds it; resolves once released. */

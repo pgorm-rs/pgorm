@@ -16,6 +16,7 @@ mod probes;
 mod rows;
 mod runtime;
 mod settle;
+mod statements;
 mod values;
 
 use neon::prelude::*;
@@ -30,6 +31,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setCodec", codec::set_codec)?;
     connect::export(&mut cx)?;
     values::export(&mut cx)?;
+    statements::export(&mut cx)?;
     #[cfg(debug_assertions)]
     probes::export(&mut cx)?;
     let version = cx.string(env!("CARGO_PKG_VERSION"));
