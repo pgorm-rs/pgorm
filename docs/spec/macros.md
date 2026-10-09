@@ -735,8 +735,8 @@ build-time checking of the finished statement.
 > The macro lives in `pgorm-sql-macro` beside `sql!` rather than in a third proc-macro
 > crate: both macros end at the libpg_query oracle and share its diagnostic plumbing,
 > and a crate split would buy a second build unit and nothing else. The proc-macro
-> crate carries its own `prqlc = "=0.13.14"`, `default-features = false` — the same
-> exact pin as the root crate's runtime pipeline, the one sanctioned exception to the
+> crate carries its own `prqlc` dependency on the fork, `default-features = false` — the
+> same pinned revision as the root crate's runtime pipeline, the one sanctioned exception to the
 > adapter's confinement rule (`[spec:pgorm:def:pipeline.adapter+2]`) — and the two
 > pins MUST move in lockstep so the text macro and the typed pipeline emit through one
 > compiler.
