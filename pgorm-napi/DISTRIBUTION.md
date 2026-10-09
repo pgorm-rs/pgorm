@@ -85,8 +85,8 @@ a release builds, and which have been tested:
 
 | Platform | Package | Release | Packaging check passed on |
 | --- | --- | --- | --- |
-| macOS arm64 | `pgorm-napi-darwin-arm64` | yes; CI builds it on `macos-15` | macOS 26.5.1, Node.js 26.11.1, Deno 2.9.5 |
-| Linux x86-64, glibc | `pgorm-napi-linux-x64-gnu` | yes; CI builds it on `ubuntu-24.04` | not yet recorded |
+| macOS arm64 | `pgorm-napi-darwin-arm64` | yes; CI builds it on `macos-15` | macOS 15 in CI and macOS 26.5.1 locally; Node.js 26.11.1; Deno 2.9.7 and 2.9.5 |
+| Linux x86-64, glibc | `pgorm-napi-linux-x64-gnu` | yes; CI builds it on `ubuntu-24.04` | Ubuntu 24.04 in CI; Node.js 26.11.1; Deno 2.9.7 |
 | Linux arm64, glibc | `pgorm-napi-linux-arm64-gnu` | no | untested |
 | Linux x86-64, musl | `pgorm-napi-linux-x64-musl` | no | untested |
 | Linux arm64, musl | `pgorm-napi-linux-arm64-musl` | no | untested |
