@@ -10909,7 +10909,25 @@ children (
                 id napi-schema
                 title "JavaScript builds DDL: tables, keys, constraints, types, sequences, indexes and their alterations"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.schema]
+                        [spec:pgorm:req:napi.schema-tables]
+                        [spec:pgorm:req:napi.schema-alter]
+                        [spec:pgorm:req:napi.schema-indexes]
+                        [spec:pgorm:req:napi.schema-types]
+                        [spec:pgorm:req:napi.schema-sequences]
+                    )
+                }
                 deps (napi-statements)
+                log (
+                    {
+                        at 2026-10-09T15:04:11.602908Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

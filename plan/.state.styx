@@ -2110,6 +2110,21 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id napi-schema, covered_rules (
+        napi.schema
+        napi.schema-alter
+        napi.schema-indexes
+        napi.schema-sequences
+        napi.schema-tables
+        napi.schema-types
+    ), covered_claims (
+        {impl_name main, rule napi.schema}
+        {impl_name main, rule napi.schema-alter}
+        {impl_name main, rule napi.schema-indexes}
+        {impl_name main, rule napi.schema-sequences}
+        {impl_name main, rule napi.schema-tables}
+        {impl_name main, rule napi.schema-types}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

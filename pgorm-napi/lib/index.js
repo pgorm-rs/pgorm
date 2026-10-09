@@ -76,6 +76,43 @@ export {
   windowFunction,
 } from "./windows.js";
 export {
+  ColumnDef,
+  commentOnColumn,
+  commentOnTable,
+  createTable,
+  CreateTable,
+  dropTable,
+  renameColumn,
+  renameConstraint,
+  renameTable,
+  SchemaStatement,
+  truncateTable,
+} from "./schema.js";
+export { AlterTable, alterTable, PendingAlterTable } from "./schema-alter.js";
+export {
+  AlterComposite,
+  alterType,
+  createType,
+  CreateType,
+  dropType,
+  PendingAlterType,
+  RenameAttribute,
+} from "./schema-types.js";
+export {
+  AlterSequence,
+  alterSequence,
+  createExtension,
+  createIndex,
+  CreateIndex,
+  createSequence,
+  CreateSequence,
+  dropExtension,
+  dropIndex,
+  dropSequence,
+  PendingAlterSequence,
+  renameSequence,
+} from "./schema-objects.js";
+export {
   ConnectionError,
   ConstructionError,
   DatabaseError,

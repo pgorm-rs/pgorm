@@ -9,10 +9,12 @@
 import type { Select } from "./select.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
+import type { SchemaStatement } from "./schema.d.ts";
 
 export * from "./expressions.d.ts";
 export * from "./json.d.ts";
 export * from "./merge.d.ts";
+export * from "./schema.d.ts";
 export * from "./windows.d.ts";
 export * from "./select.d.ts";
 export * from "./writes.d.ts";
@@ -442,7 +444,7 @@ export interface TransactionOptions extends OperationOptions {
  * A statement a builder made, which a terminal runs as `inspect()` builds it,
  * its values bound.
  */
-export type Statement = Select | Insert | Update | Delete | Merge;
+export type Statement = Select | Insert | Update | Delete | Merge | SchemaStatement;
 
 /**
  * What a pool, a connection and a transaction run bound SQL through: SQL text
