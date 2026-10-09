@@ -1,12 +1,12 @@
-from hashlib import sha256
 import json
 import sys
 import unittest
+from hashlib import sha256
 
 from pgorm_campaign import wire
 from pgorm_campaign.author import Author
 from pgorm_campaign.corpus import Input, encoded
-from pgorm_campaign.corpus_builtin import builtin, ENUM, FLOATS, STRINGS
+from pgorm_campaign.corpus_builtin import ENUM, FLOATS, STRINGS, builtin
 from pgorm_campaign.corpus_random import sample
 
 

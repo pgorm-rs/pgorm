@@ -1,8 +1,8 @@
 """Runtime programs cannot launch build tools or any other subprocess."""
 
+import sys
 from contextlib import contextmanager
 from contextvars import ContextVar
-import sys
 
 _active = ContextVar("pgorm_campaign_runtime", default=None)
 _installed = False

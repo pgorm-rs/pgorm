@@ -1,14 +1,17 @@
 """Execute portable programs in the independent fixture using Psycopg."""
 
 import asyncio
-from dataclasses import replace
 import time
 import uuid
+from dataclasses import replace
 
+from . import reference_versions
 from .comparison import InvalidOracle
-from .reference_active import active_node, write as active_write
+from .reference_active import active_node
+from .reference_active import write as active_write
 from .reference_codec import Codec
-from .reference_cursor import cursor_node, prepare as cursor_prepare
+from .reference_cursor import cursor_node
+from .reference_cursor import prepare as cursor_prepare
 from .reference_expr import scalar_node
 from .reference_models import model_node, reshape
 from .reference_pipeline import Relation, pipeline_node
@@ -16,8 +19,6 @@ from .reference_schema import DDL, ENUM_HELPER, schema_node
 from .reference_sql import SQL, Query, Rejection, query_node
 from .reference_template import Raw, validate_types
 from .reference_values import install, qualified, quote
-from . import reference_versions
-
 
 VERSIONED = ("entity.change", "entity.changes", "entity.upsert")
 

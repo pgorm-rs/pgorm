@@ -18,8 +18,8 @@ tried and lost.
 import argparse
 import asyncio
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from . import acceptance, acceptance_regressions
 from .build import ROOT
@@ -38,7 +38,7 @@ def _document(path):
         return None
     try:
         return json.loads(Path(path).read_text())
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
 
 

@@ -14,10 +14,10 @@ batch through the real crate writer, locks it through the runner's own lock
 step, and reads the lockfile that step wrote.
 """
 
-from pathlib import Path
 import tempfile
 import tomllib
 import unittest
+from pathlib import Path
 
 from pgorm_campaign import compile_crate, compile_runner
 from pgorm_campaign.compile_case import CompileCase

@@ -3,10 +3,10 @@
 import asyncio
 import copy
 import json
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from pgorm_campaign import campaign_plan, campaign_runner, profiles
 from pgorm_campaign.campaign_artifacts import Artifacts

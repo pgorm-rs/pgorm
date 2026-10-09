@@ -48,21 +48,21 @@ jobs:
       CARGO_BUILD_JOBS: '2'
       NO_COLOR: '1'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # The binding's dates and times are Temporal's, a global from
           # Node.js 26, which also strips TypeScript types without a flag.
-          node-version: '26.11.1'
+          node-version: '26'
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          deno-version: '2.9.5'
+          deno-version: 'v2.x'
       - name: Prepare Rust
         run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy,rustfmt
-          rustup default 1.97.1
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
       - name: Linux native build and PostgreSQL tools
         if: runner.os == 'Linux'
         run: |

@@ -1,11 +1,13 @@
 """Optional offline importer: python -m pgorm_campaign.sqlmap_import --help."""
 
 import argparse
-from hashlib import sha256
 import json
+from hashlib import sha256
 from pathlib import Path
 
-from . import sqlmap_archive as archive, sqlmap_context as transform, wire
+from . import sqlmap_archive as archive
+from . import sqlmap_context as transform
+from . import wire
 from .corpus import Input, encoded
 from .sqlmap_inventory import inventory
 

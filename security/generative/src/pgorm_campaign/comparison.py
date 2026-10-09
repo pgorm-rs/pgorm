@@ -1,9 +1,9 @@
 """Compare typed observations with explicit ordering and multiset semantics."""
 
+import json
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time
-import json
 
 from . import wire
 

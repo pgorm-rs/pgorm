@@ -1,8 +1,8 @@
 """Materialize portable data only through public pgorm Value constructors."""
 
+import struct
 from datetime import date, datetime, time
 from decimal import Decimal
-import struct
 from uuid import UUID
 
 from . import wire

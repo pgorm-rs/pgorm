@@ -190,7 +190,8 @@ def temporal_key_cases():
     """A key `WITHOUT OVERLAPS`: its period is the key's last part, so the
     `ValueType` a lookup takes still ends with a range."""
     room = _temporal("temporal_room")
-    alone = "\n".join(
+    # One item per generated line, as `_temporal` writes its module.
+    alone = "\n".join(  # noqa: FLY002
         [
             PRELUDE,
             "",
@@ -419,11 +420,13 @@ def negative_cases():
     variants = (
         (
             "entity-active-value-type",
-            "    pub fn build() -> ActiveModel {\n"
-            "        ActiveModel {\n"
-            "            label: pgorm::set(7_i32),\n"
-            "            ..Default::default()\n"
-            "        }\n    }",
+            (
+                "    pub fn build() -> ActiveModel {\n"
+                "        ActiveModel {\n"
+                "            label: pgorm::set(7_i32),\n"
+                "            ..Default::default()\n"
+                "        }\n    }"
+            ),
             entity,
             rejects("E0277"),
             "a column's Rust type refuses a value it has no conversion from",
@@ -437,8 +440,10 @@ def negative_cases():
         ),
         (
             "entity-key-arity",
-            "    pub fn lookup() -> Select<Entity> {\n"
-            "        Entity::find_by_id(1_i32)\n    }",
+            (
+                "    pub fn lookup() -> Select<Entity> {\n"
+                "        Entity::find_by_id(1_i32)\n    }"
+            ),
             composite,
             # `find_by_id` is bounded by `Into<ValueType>`, so a key of the
             # wrong shape is an unsatisfied conversion rather than a type
@@ -448,8 +453,10 @@ def negative_cases():
         ),
         (
             "entity-key-value-type",
-            "    pub fn lookup() -> Select<Entity> {\n"
-            '        Entity::find_by_id("1")\n    }',
+            (
+                "    pub fn lookup() -> Select<Entity> {\n"
+                '        Entity::find_by_id("1")\n    }'
+            ),
             entity,
             rejects("E0277"),
             "a key lookup is typed by the declared primary key",

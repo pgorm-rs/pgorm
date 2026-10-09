@@ -14,7 +14,6 @@ import sys
 
 from pgorm_campaign.campaign_main import main, parse
 
-
 # [spec:pgorm:req:generative.profiles/test]
 # [spec:pgorm:req:generative.verdict/test]
 # [spec:pgorm:req:generative.artifacts/test]

@@ -51,8 +51,8 @@ application extension wheels cannot be stacked in the same process.
 
 ## Build and generate
 
-Start with the matching standalone pgorm wheel installed, Maturin 1.15.0 and
-CPython 3.14. Set `PGORM_SOURCE` to the repository checkout and `APP_CONFIG` to
+Start with the matching standalone pgorm wheel installed, Maturin 1 (1.15 or
+later) and CPython 3.14. Set `PGORM_SOURCE` to the repository checkout and `APP_CONFIG` to
 your application JSON file. Choose a new output directory:
 
 ```sh
@@ -153,6 +153,6 @@ target/python-dev/bin/python pgorm-python/tests/with_postgres.py \
 The checker creates three fresh installations, compiles a downstream entity
 crate, emits twice to check determinism, executes generated CRUD and graph
 queries against PostgreSQL, checks import compatibility failures and runs
-valid and invalid consumers through pinned mypy 1.18.2. It also checks that
+valid and invalid consumers through the latest mypy release. It also checks that
 scaffolding from a final application wheel omits its previous generated module.
 Evidence and the final wheel are written to `target/python-codegen`.

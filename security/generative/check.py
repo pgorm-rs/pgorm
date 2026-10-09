@@ -9,9 +9,9 @@ front of every commit. The campaigns themselves stay out of both.
 """
 
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]

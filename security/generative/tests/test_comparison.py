@@ -1,6 +1,7 @@
 import unittest
 
-from pgorm_campaign import comparison as c, wire
+from pgorm_campaign import comparison as c
+from pgorm_campaign import wire
 
 
 def row(value, name="value"):

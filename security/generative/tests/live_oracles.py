@@ -2,21 +2,20 @@
 
 import asyncio
 import json
-from pathlib import Path
 import uuid
+from pathlib import Path
+
+import execution_cases as cases
+import execution_pipeline as pipelines
+import execution_variants as variants
+import oracle_cases
+import oracle_pipeline_cases
+import oracle_window_cases
 
 from pgorm_campaign.executor import Executor
 from pgorm_campaign.fixtures import Fixture
 from pgorm_campaign.oracles import Checker
 from pgorm_campaign.program import Program
-
-import execution_cases as cases
-import execution_variants as variants
-import execution_pipeline as pipelines
-import oracle_cases
-import oracle_pipeline_cases
-import oracle_window_cases
-
 
 KNOWN_DEFECTS = {
     "known-set-precedence",
@@ -118,32 +117,32 @@ async def main():
     )
     programs.append(("known-set-precedence", Program(finding.read_text())))
     (output / "build.json").write_text(json.dumps(build, indent=2) + "\n")
-    async with Fixture(output / "fixture") as fixture:
-        async with Executor(
+    async with (
+        Fixture(output / "fixture") as fixture,
+        Executor(
             fixture, expected_native_sha256=build["installed"]["native_sha256"]
-        ) as executor:
-            checker = Checker(executor)
-            for name, program in programs:
-                report = await checker.run(program)
-                (output / (name + ".program.json")).write_text(program.encoded + "\n")
-                (output / (name + ".json")).write_text(
-                    json.dumps(report, indent=2) + "\n"
-                )
-                result = {
-                    "name": name,
-                    "status": report["status"],
-                    "expected": "defect"
-                    if name in KNOWN_DEFECTS
-                    else "expected-rejection"
-                    if name == "sqlstate"
-                    else "pass",
-                    "error": report.get("error"),
-                    "differences": [
-                        item for item in report["comparisons"] if not item["equal"]
-                    ],
-                }
-                summary["results"].append(result)
-                print(json.dumps(result), flush=True)
+        ) as executor,
+    ):
+        checker = Checker(executor)
+        for name, program in programs:
+            report = await checker.run(program)
+            (output / (name + ".program.json")).write_text(program.encoded + "\n")
+            (output / (name + ".json")).write_text(json.dumps(report, indent=2) + "\n")
+            result = {
+                "name": name,
+                "status": report["status"],
+                "expected": "defect"
+                if name in KNOWN_DEFECTS
+                else "expected-rejection"
+                if name == "sqlstate"
+                else "pass",
+                "error": report.get("error"),
+                "differences": [
+                    item for item in report["comparisons"] if not item["equal"]
+                ],
+            }
+            summary["results"].append(result)
+            print(json.dumps(result), flush=True)
     summary["passed"] = all(
         item["status"] == item["expected"] for item in summary["results"]
     )

@@ -6,8 +6,8 @@ PostgreSQL returned; a compile case is judged by what rustc *refused*, and a
 refusal only counts when the compiler names the rejection the case predicted.
 """
 
-from dataclasses import dataclass, field
 import hashlib
+from dataclasses import dataclass, field
 
 # rustc reaches these in order, and a body that fails at one never reaches the
 # next. The suppression is per body, not per crate: a measured run of every

@@ -1,13 +1,13 @@
 """Generate bound/literal type contexts without erasing exact input tags."""
 
-from functools import lru_cache
 import math
 import struct
+from functools import lru_cache
 
 from . import matrix, wire
 from .corpus_builtin import ENUM
-from .emit_rust_models import readable
 from .corpus_random import sample
+from .emit_rust_models import readable
 from .grammar_state import DEFAULT_INPUTS
 
 ROWS = {row["kind"]: row for row in matrix.load()["value_matrix"]}

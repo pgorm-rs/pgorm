@@ -14,8 +14,8 @@ is never a pass.
 """
 
 import json
-from pathlib import Path
 import time
+from pathlib import Path
 
 from . import process
 from .compile_crate import group, write

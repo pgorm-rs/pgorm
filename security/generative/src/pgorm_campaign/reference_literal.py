@@ -5,11 +5,11 @@ parameters let PostgreSQL infer the type from the consuming expression. Numeric
 parameters carry the type implied by the literal's documented decimal spelling.
 """
 
-from datetime import datetime, time
-from decimal import Decimal
 import json
 import math
 import struct
+from datetime import datetime, time
+from decimal import Decimal
 
 from . import wire
 from .comparison import InvalidOracle

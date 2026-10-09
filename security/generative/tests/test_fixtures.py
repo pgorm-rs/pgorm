@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 from pgorm_campaign import baseline
 from pgorm_campaign.fixtures import (

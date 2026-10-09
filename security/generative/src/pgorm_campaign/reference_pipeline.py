@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass, field, replace
 
+from . import reference_order as order
 from .catalog import OPERATIONS
 from .comparison import InvalidOracle
 from .reference_models import Model, registered
-from . import reference_order as order
 from .reference_pexpr import Expression, window
 from .reference_sql import SQL, Rejection, Table, join
 from .reference_values import qualified, quote

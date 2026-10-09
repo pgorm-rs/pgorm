@@ -12,10 +12,10 @@ would let a million constructor calls be read as a million checked database
 programs, so no accessor here ever returns their sum.
 """
 
-from dataclasses import dataclass
 import hashlib
-from importlib.resources import files
 import json
+from dataclasses import dataclass
+from importlib.resources import files
 
 from .grammar_state import Limits
 
@@ -362,9 +362,9 @@ __all__ = [
     "CLASSES",
     "COVERAGE_OBLIGATIONS",
     "LIVE_CLASSES",
+    "VERSION",
     "Profile",
     "ProfileError",
-    "VERSION",
     "claims",
     "load",
     "names",

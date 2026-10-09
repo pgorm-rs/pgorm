@@ -1,10 +1,10 @@
 """Evidence directories are fresh, and every document is verified as written."""
 
 import json
-from pathlib import Path
 import tempfile
 import unittest
 import unittest.mock
+from pathlib import Path
 
 from pgorm_campaign import campaign_artifacts
 

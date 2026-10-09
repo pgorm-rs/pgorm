@@ -1,9 +1,9 @@
 import asyncio
 import os
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from pgorm_campaign.process import ProcessFailure, run
 

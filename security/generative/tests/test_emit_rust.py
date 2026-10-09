@@ -375,7 +375,7 @@ class EmitRustTests(unittest.TestCase):
         # time, which is exactly why this is checked against the enum itself.
         source = (ROOT / "pgorm-query/src/table/column.rs").read_text()
         body = source.split("pub enum ColumnType {", 1)[1].split("\n}", 1)[0]
-        variants = set(re.findall(r"^ {4}([A-Z]\w*)", body, re.M))
+        variants = set(re.findall(r"^ {4}([A-Z]\w*)", body, re.MULTILINE))
         self.assertIn("Timestamp", variants)
         for kind, named in emit_rust_expr.SCHEMA_TYPES.items():
             with self.subTest(kind=kind):

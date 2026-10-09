@@ -56,14 +56,17 @@ platforms (
         files (security/generative/*.py security/generative/src/**/*.py security/generative/tests/**/*.py security/generative/pyproject.toml)
         checks {
             format {
-                cmd "uv tool run --from ruff==0.12.12 ruff format --check security/generative"
-                fix "uv tool run --from ruff==0.12.12 ruff format security/generative"
+                cmd "uv tool run ruff@latest format --check security/generative"
+                fix "uv tool run ruff@latest format security/generative"
             }
             lint {
-                cmd "uv tool run --from ruff==0.12.12 ruff check security/generative"
+                cmd "uv tool run ruff@latest check security/generative"
             }
+            // The package requires Python 3.14 and is written in its syntax
+            // (unparenthesized `except A, B:`), so the suite names that
+            // interpreter rather than whatever `python3` resolves to.
             unit {
-                cmd "env PYTHONPATH=security/generative/src python3 -m unittest discover -s security/generative/tests"
+                cmd "env PYTHONPATH=security/generative/src python3.14 -m unittest discover -s security/generative/tests"
             }
         }
     }
@@ -81,7 +84,7 @@ platforms (
         files (pgorm-python/python/pgorm/**/*.py pgorm-python/python/pgorm/**/*.pyi)
         checks {
             typing {
-                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-types-mypy pgorm-python/python/pgorm"
+                cmd "uv tool run --from mypy@latest mypy --strict --cache-dir target/python-types-mypy pgorm-python/python/pgorm"
             }
         }
     }
@@ -90,7 +93,7 @@ platforms (
         files (pgorm-python/python/pgorm/transactions.py pgorm-python/python/pgorm/runtime.py pgorm-python/python/pgorm/_native.pyi)
         checks {
             typing {
-                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-transactions-mypy pgorm-python/python/pgorm/transactions.py pgorm-python/python/pgorm/runtime.py"
+                cmd "uv tool run --from mypy@latest mypy --strict --cache-dir target/python-transactions-mypy pgorm-python/python/pgorm/transactions.py pgorm-python/python/pgorm/runtime.py"
             }
         }
     }
@@ -99,7 +102,7 @@ platforms (
         files (pgorm-python/python/pgorm/schema/**/*.py pgorm-python/python/pgorm/_schema.pyi)
         checks {
             typing {
-                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-schema-mypy pgorm-python/python/pgorm/schema"
+                cmd "uv tool run --from mypy@latest mypy --strict --cache-dir target/python-schema-mypy pgorm-python/python/pgorm/schema"
             }
         }
     }
@@ -108,7 +111,7 @@ platforms (
         files (pgorm-python/python/pgorm/pipeline/**/*.py pgorm-python/python/pgorm/_pipeline_*.pyi)
         checks {
             typing {
-                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-pipeline-mypy pgorm-python/python/pgorm/pipeline"
+                cmd "uv tool run --from mypy@latest mypy --strict --cache-dir target/python-pipeline-mypy pgorm-python/python/pgorm/pipeline"
             }
         }
     }
@@ -117,7 +120,7 @@ platforms (
         files (pgorm-python/python/pgorm/**/*.py pgorm-python/python/pgorm/**/*.pyi)
         checks {
             typing {
-                cmd "uv tool run --from mypy==1.18.2 mypy --strict --cache-dir target/python-models-mypy pgorm-python/python/pgorm/models"
+                cmd "uv tool run --from mypy@latest mypy --strict --cache-dir target/python-models-mypy pgorm-python/python/pgorm/models"
             }
         }
     }

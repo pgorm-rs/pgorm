@@ -1,7 +1,7 @@
 import json
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 
 from pgorm_campaign.build import content_identity
 from pgorm_campaign.campaign_main import StaleBuild, record_run, refuse_stale

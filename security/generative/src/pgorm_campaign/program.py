@@ -1,8 +1,8 @@
 """Versioned operation graphs, ordered effects and explicit observation contracts."""
 
-from dataclasses import dataclass
 import hashlib
 import json
+from dataclasses import dataclass
 
 from . import baseline, catalog, parameters, wire
 
@@ -101,11 +101,12 @@ def _nodes(program, binders):
             raise wire.FormatError("unknown operation: " + str(node["op"]))
         parameters.options(node["data"], operation.data)
         parameters.inputs(node["inputs"], operation.inputs, types)
-        if node["op"] in ("table", "expr.column", "expr.alias"):
-            if ("name" in node["data"]) == ("name" in node["inputs"]):
-                raise wire.FormatError(
-                    "a name requires exactly one data or identifier-node input"
-                )
+        if node["op"] in ("table", "expr.column", "expr.alias") and (
+            "name" in node["data"]
+        ) == ("name" in node["inputs"]):
+            raise wire.FormatError(
+                "a name requires exactly one data or identifier-node input"
+            )
         _scope(node, nodes, binders)
         references = list(parameters.input_ids(node["inputs"]))
         depths[identity] = 1 + max((depths[ref] for ref in references), default=0)

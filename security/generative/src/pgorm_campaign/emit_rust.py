@@ -19,8 +19,8 @@ from .emit_rust_pipeline import PipelineEmitter
 from .emit_rust_values import (
     PL,
     PRELUDE,
-    Q,
     REPLAY,
+    Q,
     UnsupportedInstruction,
     ValueEmitter,
     literal,

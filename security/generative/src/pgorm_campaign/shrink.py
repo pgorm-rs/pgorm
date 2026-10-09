@@ -222,7 +222,7 @@ def _candidate(data):
     """Validate a rewritten document, discarding anything the format rejects."""
     try:
         return Program.from_dict(_repair(data))
-    except (wire.FormatError, ValueError, KeyError, TypeError):
+    except wire.FormatError, ValueError, KeyError, TypeError:
         return None
 
 
@@ -515,7 +515,7 @@ async def reduce(checker, program, *, budget=None, report=None, observer=None):
             )
             if not progressed or deadline.exhausted():
                 break
-    except (asyncio.CancelledError, KeyboardInterrupt):
+    except asyncio.CancelledError, KeyboardInterrupt:
         interrupted = True
     return Result(
         original=program,

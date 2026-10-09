@@ -2,7 +2,7 @@
 
 The installed package includes `py.typed`, native `.pyi` declarations and typed
 Python resource/model wrappers. Use CPython 3.14. The public API is checked with
-mypy 1.18.2 in strict mode against an installed wheel.
+the latest mypy release in strict mode against an installed wheel.
 
 [The ordinary application](examples/application.py) uses only `import pgorm`
 and its `schema` and `pipeline` modules. It creates two uniquely named tables,
@@ -17,7 +17,7 @@ repository root:
 ```sh
 export PGORM_TEST_DSN="$DATABASE_URL"
 python -I pgorm-python/examples/application.py
-uv tool run --from mypy==1.18.2 mypy --strict \
+uv tool run --from mypy@latest mypy --strict \
   --python-executable "$(command -v python)" pgorm-python/examples/application.py
 ```
 

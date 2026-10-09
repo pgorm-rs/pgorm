@@ -2,7 +2,8 @@
 
 import unittest
 
-from pgorm_campaign import campaign_plan, campaign_verdict as verdict, profiles
+from pgorm_campaign import campaign_plan, profiles
+from pgorm_campaign import campaign_verdict as verdict
 
 
 def record(identity, run_class="runtime", **fields):

@@ -8,9 +8,11 @@ def row(value):
         return {"kind": "absent"}
     if isinstance(value, tuple):
         return {"kind": "tuple", "items": [row(item) for item in value]}
+    # A native row or model, not a dict: `keys()` is the accessor its stubs
+    # declare, and nothing here relies on how the object iterates.
     fields = [
         {"name": name, "value": wire.validate(value.tagged(name).snapshot())}
-        for name in value.keys()
+        for name in value.keys()  # noqa: SIM118
     ]
     result = {"kind": "record", "fields": fields}
     if hasattr(value, "entity_name"):

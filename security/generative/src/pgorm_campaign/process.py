@@ -1,10 +1,10 @@
 """Bounded subprocesses whose descendants are stopped on timeout or cancellation."""
 
 import asyncio
-from dataclasses import dataclass
 import os
-from pathlib import Path
 import signal
+from dataclasses import dataclass
+from pathlib import Path
 
 
 class ProcessFailure(RuntimeError):
@@ -33,7 +33,7 @@ async def _write(stream, data):
     try:
         stream.write(data)
         await stream.drain()
-    except (BrokenPipeError, ConnectionResetError):
+    except BrokenPipeError, ConnectionResetError:
         pass
     finally:
         stream.close()

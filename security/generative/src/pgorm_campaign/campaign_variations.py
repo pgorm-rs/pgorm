@@ -165,9 +165,13 @@ def _crud(e):
         columns = node["data"].get("columns") or []
         # An omitted write needs a row to omit a column from: an empty batch
         # names columns too, but writes nothing for any of them.
-        if declared is not None and columns and e.reaches(node, {"insert.row"}):
-            if {item["name"] for item in declared["columns"]} - set(columns):
-                tokens.add("omitted-write")
+        if (
+            declared is not None
+            and columns
+            and e.reaches(node, {"insert.row"})
+            and {item["name"] for item in declared["columns"]} - set(columns)
+        ):
+            tokens.add("omitted-write")
     if e.present("update.set"):
         tokens.add("update-values")
     for node in e.each("write.filter"):
@@ -258,9 +262,12 @@ def _tenant_guard(e, node):
         if child["data"]["operator"] != "eq":
             continue
         left = e.input(child, "left")
-        if left is not None and left["op"] == "expr.column":
-            if left["data"].get("name") == "tenant":
-                return True
+        if (
+            left is not None
+            and left["op"] == "expr.column"
+            and left["data"].get("name") == "tenant"
+        ):
+            return True
     return False
 
 
@@ -589,9 +596,10 @@ def _dollar_quoted(text):
         end = text.find("$", index + 1)
         if end != -1 and text[index + 1 : end].isalpha() is not False:
             tag = text[index : end + 1]
-            if tag[1:-1].isidentifier() or tag == "$$":
-                if text.find(tag, end + 1) != -1:
-                    return True
+            if (tag[1:-1].isidentifier() or tag == "$$") and text.find(
+                tag, end + 1
+            ) != -1:
+                return True
         index = text.find("$", index + 1)
     return False
 
@@ -758,4 +766,4 @@ def observed(program, built, steps):
     return tokens
 
 
-__all__ = ["Evidence", "FAMILIES", "observed", "quoted"]
+__all__ = ["FAMILIES", "Evidence", "observed", "quoted"]

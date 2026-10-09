@@ -2,8 +2,8 @@
 
 from .emit_rust_models import GRAPH_SHAPES
 from .emit_rust_values import (
-    Q,
     REPLAY,
+    Q,
     UnsupportedInstruction,
     char_literal,
     literal,
@@ -451,8 +451,10 @@ class ExprEmitter:
                 first, *rest = d["columns"]
                 table = self.ddl_table(i["table"])
                 body = [
-                    f"    let mut statement = {Q}::Index::create("
-                    f"{table}, {Q}::Name::runtime({literal(first)}));",
+                    (
+                        f"    let mut statement = {Q}::Index::create("
+                        f"{table}, {Q}::Name::runtime({literal(first)}));"
+                    ),
                     f"    statement.name({Q}::Name::runtime({literal(d['name'])}));",
                 ]
                 for column in rest:
@@ -468,8 +470,10 @@ class ExprEmitter:
                     f"{Q}::Name::runtime({literal(label)})" for label in d["labels"]
                 )
                 body = [
-                    f"    let mut statement = {Q}::extension::Type::create("
-                    f"{type_ref(d['name'], d['schema'])});",
+                    (
+                        f"    let mut statement = {Q}::extension::Type::create("
+                        f"{type_ref(d['name'], d['schema'])});"
+                    ),
                     f"    statement.as_enum().values(vec![{labels}]);",
                     "    statement.to_string()",
                 ]

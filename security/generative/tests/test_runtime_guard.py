@@ -35,7 +35,9 @@ class RuntimeGuardTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError, "runtime program attempted"):
                 await asyncio.create_subprocess_exec(sys.executable, "-c", "pass")
             self.assertEqual(attempts, ["subprocess.Popen"])
-        result = subprocess.run([sys.executable, "-c", "pass"], check=False)
+        # The synchronous call the guard patches, in the task that held it:
+        # once its scope exits, a process starts again.
+        result = subprocess.run([sys.executable, "-c", "pass"], check=False)  # noqa: ASYNC221
         self.assertEqual(result.returncode, 0)
 
     async def test_policy_does_not_capture_other_tasks(self):

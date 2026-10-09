@@ -1,12 +1,13 @@
 """Owned PostgreSQL containers and deterministic subject/reference baselines."""
 
 import asyncio
-from dataclasses import dataclass, field
+import contextlib
 import json
 import os
-from pathlib import Path
 import secrets
 import time
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import baseline, process
 
@@ -290,14 +291,12 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
         if not self._attempted or self.report["state"] == "closed":
             return
         errors = []
-        try:
+        # Failure to read diagnostics does not excuse leaving the container alive.
+        with contextlib.suppress(Exception):
             result = await self._docker(
                 "logs", self.name, check=False, output_limit=8 * 2**20
             )
             (self.artifacts / "postgres.log").write_text(result.stdout + result.stderr)
-        except Exception:
-            # Failure to read diagnostics does not excuse leaving the container alive.
-            pass
         try:
             result = await self._docker("inspect", self.name, check=False)
             if result.returncode:

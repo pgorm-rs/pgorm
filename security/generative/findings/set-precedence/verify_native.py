@@ -3,11 +3,11 @@
 import asyncio
 import hashlib
 import json
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 from pgorm_campaign import baseline, comparison, process
-from pgorm_campaign.build import content_identity, ROOT
+from pgorm_campaign.build import ROOT, content_identity
 from pgorm_campaign.fixtures import Fixture
 from pgorm_campaign.reference import Driver
 from pgorm_campaign.reference_sql import SQL
@@ -52,25 +52,27 @@ async def main():
     results = []
     async with Fixture(output / "fixture") as fixture:
         await fixture.reset(0, baseline.default(), rebuild=True)
-        async with await Driver.connect(fixture, side="subject") as subject:
-            async with await Driver.connect(fixture) as independent:
-                for label, actual, expected in zip(
-                    ("append", "intersect", "remove"), native, reference, strict=True
-                ):
-                    rows, _ = await subject.query(SQL((actual,)))
-                    wanted, _ = await independent.query(SQL((expected,)))
-                    result = comparison.rows(rows, wanted, ordered=False)
-                    results.append(
-                        {
-                            "operation": label,
-                            "native_sql": actual,
-                            "reference_sql": expected,
-                            "native_rows": rows,
-                            "reference_rows": wanted,
-                            "equal": result.equal,
-                            "reason": result.reason,
-                        }
-                    )
+        async with (
+            await Driver.connect(fixture, side="subject") as subject,
+            await Driver.connect(fixture) as independent,
+        ):
+            for label, actual, expected in zip(
+                ("append", "intersect", "remove"), native, reference, strict=True
+            ):
+                rows, _ = await subject.query(SQL((actual,)))
+                wanted, _ = await independent.query(SQL((expected,)))
+                result = comparison.rows(rows, wanted, ordered=False)
+                results.append(
+                    {
+                        "operation": label,
+                        "native_sql": actual,
+                        "reference_sql": expected,
+                        "native_rows": rows,
+                        "reference_rows": wanted,
+                        "equal": result.equal,
+                        "reason": result.reason,
+                    }
+                )
     # Detection evidence for the open native-renderer finding, not a clean program.
     if content_identity(ROOT) != source_identity:
         raise RuntimeError("native source changed during diagnostic execution")

@@ -1,5 +1,5 @@
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from pgorm_campaign import compile_crate, compile_suite
 from pgorm_campaign.compile_case import (
@@ -190,7 +190,7 @@ class BatchingTests(unittest.TestCase):
         manifest = compile_crate.render_manifest(batch, crate="x-1", root=".")
         spelled = manifest.split('pgorm = { path = "')[1].split('"')[0]
         self.assertTrue(Path(spelled).is_absolute())
-        self.assertEqual(Path(spelled), Path().resolve())
+        self.assertEqual(Path(spelled), Path.cwd().resolve())
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 import unittest
 
+from oracle_pipeline_cases import ordered
+
 from pgorm_campaign.comparison import InvalidOracle
 from pgorm_campaign.reference import Resolution
-
-from oracle_pipeline_cases import ordered
 
 
 class PipelineReferenceTests(unittest.TestCase):

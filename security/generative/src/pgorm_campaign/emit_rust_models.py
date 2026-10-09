@@ -2,9 +2,9 @@
 
 from .emit_rust_values import (
     PRELUDE,
-    Q,
     REPLAY,
     VARIANTS,
+    Q,
     UnsupportedInstruction,
     literal,
 )
@@ -473,8 +473,10 @@ class ModelEmitter:
         values = [self.coerce(value) for value in i["values"]]
         if method == "insert":
             body = [
-                f"    let mut query = {Q}::Query::insert()"
-                f".into_table({table}).to_owned();"
+                (
+                    f"    let mut query = {Q}::Query::insert()"
+                    f".into_table({table}).to_owned();"
+                )
             ]
             if columns:
                 self.helpers.add("arity")
@@ -501,8 +503,10 @@ class ModelEmitter:
                 )
         else:
             body = [
-                f"    let mut query = {Q}::Query::delete()"
-                f".from_table({table}).to_owned();"
+                (
+                    f"    let mut query = {Q}::Query::delete()"
+                    f".from_table({table}).to_owned();"
+                )
             ]
         if "predicate" in i:
             body.append(f"    query.cond_where({self.predicate(i['predicate'])});")
@@ -520,8 +524,10 @@ class ModelEmitter:
             )
         body = [
             f"    let mut query = {self.use(i['query'])};",
-            f"    query.returning({Q}::Query::returning()"
-            f".exprs(vec![{', '.join(items)}]));",
+            (
+                f"    query.returning({Q}::Query::returning()"
+                f".exprs(vec![{', '.join(items)}]));"
+            ),
         ]
         return "{\n" + "\n".join(body) + "\n    query\n    }"
 
@@ -539,8 +545,10 @@ class ModelEmitter:
         column = self.entity_column(registration, d["column"])
         rows = "r_" + d["step"]
         body = [
-            f"    let found = pgorm::ModelTrait::get("
-            f"&decoded(&{rows}, {int(d['row'])}usize)?, {column});",
+            (
+                f"    let found = pgorm::ModelTrait::get("
+                f"&decoded(&{rows}, {int(d['row'])}usize)?, {column});"
+            ),
             f"    if !matches!(found, {Q}::Value::{variant}(_)) {{",
             f"        return Err(Error::Format({REPLAY}::FormatError::new(",
             '            "result reference type differs from the declared value tag",',

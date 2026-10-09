@@ -14,9 +14,9 @@ with the reason. Nothing here retries until it finds a family member it likes.
 import argparse
 import asyncio
 import json
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 from . import campaign_identity, grammar, profiles, replay
 from .build import ROOT
@@ -121,11 +121,15 @@ def assemble(results, *, identity, seconds, seed, limits, indices):
         "seconds": seconds,
         "families": results,
         "does_not_establish": [
-            "Parity is agreement between two runs of the same program. It is "
-            "not evidence that either run is correct, and a program both sides "
-            "get wrong identically has parity.",
-            "One program per family is a family-level demonstration, not "
-            "coverage of the family's operations, shapes or values.",
+            (
+                "Parity is agreement between two runs of the same program. It is "
+                "not evidence that either run is correct, and a program both sides "
+                "get wrong identically has parity."
+            ),
+            (
+                "One program per family is a family-level demonstration, not "
+                "coverage of the family's operations, shapes or values."
+            ),
         ],
     }
 

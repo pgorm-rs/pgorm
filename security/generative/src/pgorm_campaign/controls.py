@@ -3,7 +3,9 @@
 import asyncio
 import time
 
-from . import control_mutations as mutations, control_verdict as verdict, oracles
+from . import control_mutations as mutations
+from . import control_verdict as verdict
+from . import oracles
 from .comparison import InvalidOracle
 from .reference import Driver, Reference
 from .reference_state import snapshot

@@ -6,7 +6,7 @@ pgorm API exercised by each protected route and its vulnerable control.
 
 ## Run locally
 
-Use Docker, Rust (CI uses 1.97.1), a C compiler/libclang, and the exact Python
+Use Docker, Rust (CI uses the stable toolchain), a C compiler/libclang, and the exact Python
 version in `pins.json`. The runner verifies the upstream archive digest and
 uses the pinned PostgreSQL image. It accepts no external scan target.
 

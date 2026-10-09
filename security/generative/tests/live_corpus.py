@@ -1,12 +1,13 @@
 """Verify optional pinned input import and retention; no database or scanner."""
 
 import argparse
-from hashlib import sha256
 import json
-from pathlib import Path
 import tempfile
+from hashlib import sha256
+from pathlib import Path
 
-from pgorm_campaign import sqlmap_archive as archive, sqlmap_context as transform
+from pgorm_campaign import sqlmap_archive as archive
+from pgorm_campaign import sqlmap_context as transform
 from pgorm_campaign.corpus import encoded
 from pgorm_campaign.sqlmap_import import import_archive, load
 

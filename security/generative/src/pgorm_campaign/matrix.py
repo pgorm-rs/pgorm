@@ -1,7 +1,7 @@
 """Versioned coverage obligations, separated from observed execution evidence."""
 
-from importlib.resources import files
 import json
+from importlib.resources import files
 
 from . import catalog, wire
 

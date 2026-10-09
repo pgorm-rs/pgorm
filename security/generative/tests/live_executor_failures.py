@@ -6,10 +6,11 @@ import subprocess
 import sys
 from unittest.mock import patch
 
+from execution_cases import Case, select_case
+
 from pgorm_campaign import resolution
 from pgorm_campaign.effects import Effects
 from pgorm_campaign.executor import Executor
-from execution_cases import Case, select_case
 
 
 def slow_case():
