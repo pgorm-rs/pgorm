@@ -213,6 +213,38 @@ await pool.query(deleteFrom(account).where(col("active").eq(false)).returning([R
   with neither `where` nor `allRows()` are refused, by `inspect()` and the
   terminals alike, before anything is sent.
 
+### MERGE
+
+```js
+import { merge, MergeAction, ReturningRow, Table } from "./pgorm-napi/lib/index.js";
+
+const target = new Table("account", { alias: "t" });
+const source = new Table("staged", { alias: "s" });
+
+await pool.query(
+  merge(target, source, target.col("id").eq(source.col("id")))
+    .whenMatched(MergeAction.update("name", source.col("name")).set("visits", target.col("visits").add(1)))
+    .whenMatched(MergeAction.delete(), { condition: source.col("name").isNull() })
+    .whenNotMatched(MergeAction.insert("id", source.col("id")).set("name", source.col("name")))
+    .whenNotMatchedBySource(MergeAction.delete())
+    .returningAction()
+    .returning([target.col("id"), ReturningRow.old.col("name").as("was")]),
+);
+```
+
+`merge(target, source, on)` gives a `PendingMerge`, which has no `inspect()`
+and which every terminal refuses: PostgreSQL refuses a MERGE with no WHEN arm.
+Its first arm gives the `Merge`. An arm takes only what its kind of row can
+take — a target row (`whenMatched`, `whenNotMatchedBySource`) is updated,
+deleted or left alone, a source row (`whenNotMatched`) is inserted or skipped —
+and anything else is a `ConstructionError`. `MergeAction.update` and `.insert`
+take their first column at once, so neither is ever empty. Within a kind of
+row, a row takes the first conditional arm whose condition holds, otherwise the
+one unconditional arm, which renders last; `returningAction()` puts
+`merge_action()` first in the RETURNING list, `only()` writes `ONLY`, and a
+MERGE takes a plain WITH clause and is one's body when it returns rows. The
+source may be a `Table` or a `FromItem`, a subquery among them.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript

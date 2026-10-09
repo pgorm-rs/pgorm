@@ -1,0 +1,26 @@
+{
+  "merge-every-arm": {
+    "sql": "MERGE INTO \"app\".\"account\" AS \"t\" USING \"staged\" AS \"s\" ON \"t\".\"id\" = \"s\".\"id\" WHEN MATCHED AND \"s\".\"name\" IS NULL THEN DELETE WHEN MATCHED THEN UPDATE SET \"name\" = \"s\".\"name\", \"visits\" = \"t\".\"visits\" + $1 WHEN NOT MATCHED THEN INSERT (\"id\", \"name\") VALUES (\"s\".\"id\", \"s\".\"name\") WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING merge_action(), \"t\".\"id\", old.\"name\" AS \"was\"",
+    "values": [["i64","1"]]
+  },
+  "merge-unconditional-last": {
+    "sql": "MERGE INTO \"app\".\"account\" AS \"t\" USING \"staged\" AS \"s\" ON \"t\".\"id\" = \"s\".\"id\" WHEN MATCHED AND \"s\".\"kind\" = $1 THEN UPDATE SET \"name\" = $2 WHEN MATCHED THEN DELETE WHEN NOT MATCHED AND \"s\".\"kind\" = $3 THEN DO NOTHING WHEN NOT MATCHED THEN INSERT DEFAULT VALUES",
+    "values": [["text","rename"], ["text","x"], ["text","skip"]]
+  },
+  "merge-overriding-only": {
+    "sql": "MERGE INTO ONLY \"app\".\"account\" AS \"t\" USING \"staged\" AS \"s\" ON \"t\".\"id\" = \"s\".\"id\" WHEN NOT MATCHED THEN INSERT (\"id\") OVERRIDING SYSTEM VALUE VALUES ($1) WHEN NOT MATCHED BY SOURCE AND \"t\".\"active\" = $2 THEN UPDATE SET \"active\" = $3",
+    "values": [["i32","7"], ["bool","true"], ["bool","false"]]
+  },
+  "merge-with-source": {
+    "sql": "WITH \"fresh\" AS (SELECT \"id\" FROM \"staged\" WHERE \"id\" > $1) MERGE INTO \"app\".\"account\" AS \"t\" USING \"fresh\" ON \"t\".\"id\" = \"fresh\".\"id\" WHEN NOT MATCHED THEN INSERT (\"id\") VALUES (\"fresh\".\"id\") RETURNING *",
+    "values": [["i64","10"]]
+  },
+  "merge-subquery-source": {
+    "sql": "MERGE INTO \"app\".\"account\" AS \"t\" USING (SELECT \"id\", \"name\" FROM \"staged\") AS \"s\" ON \"t\".\"id\" = \"s\".\"id\" WHEN MATCHED THEN UPDATE SET \"name\" = \"s\".\"name\"",
+    "values": []
+  },
+  "merge-as-cte": {
+    "sql": "WITH \"changed\" AS (MERGE INTO \"app\".\"account\" AS \"t\" USING \"staged\" AS \"s\" ON \"t\".\"id\" = \"s\".\"id\" WHEN MATCHED THEN UPDATE SET \"name\" = \"s\".\"name\" WHEN NOT MATCHED THEN INSERT (\"id\", \"name\") VALUES (\"s\".\"id\", \"s\".\"name\") RETURNING merge_action(), \"t\".\"id\") SELECT \"merge_action\", \"id\" FROM \"changed\"",
+    "values": []
+  }
+}

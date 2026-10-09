@@ -15,6 +15,7 @@
 mod args;
 mod conflict;
 mod expr;
+mod merge;
 #[cfg(test)]
 mod parity;
 mod returning;
@@ -25,8 +26,8 @@ mod write;
 
 use neon::{prelude::*, types::Finalize};
 use pgorm::pgorm_query::{
-    AnyWithClause, Condition, ConflictUpdate, FromItem, NamedTable, NullOrdering, OnConflict,
-    Order, Query, SelectStatement, SimpleExpr, Values,
+    AnyWithClause, Condition, ConflictUpdate, FromItem, MergeStatement, NamedTable, NullOrdering,
+    OnConflict, Order, PendingMerge, Query, SelectStatement, SimpleExpr, Values,
 };
 
 use crate::{codec::Codec, rows, values::Tagged};
@@ -71,6 +72,10 @@ pub(crate) enum Node {
     ConflictUpdate(ConflictUpdate),
     /// A completed conflict action.
     Conflict(OnConflict),
+    /// A MERGE before its first WHEN arm, which PostgreSQL refuses.
+    PendingMerge(Box<PendingMerge>),
+    Merge(Box<MergeStatement>),
+    MergeAction(merge::Action),
 }
 
 impl Finalize for Node {}
@@ -93,6 +98,9 @@ impl Node {
             Self::Delete(_) => "a DELETE",
             Self::Arbiter(_) => "a conflict target with no action",
             Self::ConflictUpdate(_) | Self::Conflict(_) => "a conflict action",
+            Self::PendingMerge(_) => "a MERGE with no WHEN arm",
+            Self::Merge(_) => "a MERGE",
+            Self::MergeAction(_) => "a MERGE action",
         }
     }
 }
@@ -111,6 +119,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
         write::EXPORTS,
         conflict::EXPORTS,
         returning::EXPORTS,
+        merge::EXPORTS,
     ] {
         for &(name, build) in exports {
             cx.export_function(name, move |mut cx| {
@@ -133,6 +142,14 @@ const MAX_PARAMETERS: usize = 65_535;
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
         Node::Select(select) => select.build(),
+        Node::Merge(merge) => merge.build(),
+        Node::PendingMerge(_) => {
+            return refuse(
+                cx,
+                "a MERGE needs a WHEN arm before it can be inspected or run: whenMatched(..), \
+                 whenNotMatched(..) or whenNotMatchedBySource(..)",
+            );
+        }
         other => match write::built(other) {
             Some(Ok(built)) => built,
             Some(Err(reason)) => return refuse(cx, reason),

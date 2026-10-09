@@ -427,6 +427,32 @@ SQL text running a built statement.
 > one is refused, as PostgreSQL refuses it — and with a RETURNING list is a
 > common table expression's body.
 
+> [spec:pgorm:req:napi.sql-json]
+> SQL/JSON's query functions `jsonExists`, `jsonValue` and `jsonQuery`, its
+> constructors `jsonObject`, `jsonArray`, `jsonArrayQuery`, `jsonObjectAgg`,
+> `jsonArrayAgg`, `jsonParse` (`JSON(..)`), `jsonScalar` and `jsonSerialize`,
+> `formatJson`, and `isJson` and `isNotJson` MUST lower into pgorm-query's
+> SQL/JSON builders, each option applied through the builder's own method. A
+> path is a string pgorm-query binds as text cast to `jsonpath`; PASSING takes
+> an object of variable names, each an identifier, to values. Behaviours are
+> typed per function, and a choice PostgreSQL refuses for a function is a
+> `ConstructionError`: `jsonExists` takes `"true"`, `"false"`, `"unknown"` or
+> `"error"`; `jsonValue` `"null"`, `"error"` or a `jsonDefault(value)`;
+> `jsonQuery` those and `"emptyArray"` or `"emptyObject"`, and one `shaping`
+> of `"withWrapper"`, `"withConditionalWrapper"` or `"omitQuotes"`. A DEFAULT
+> value is written as an escaped literal, because PostgreSQL refuses a
+> parameter there, and one that carries an enum's or a created range's cast is
+> refused. RETURNING takes a `DataType` or a built-in type's name, and
+> `jsonValue` refuses `json` and `jsonb`. `jsonArrayAgg`'s ordering takes no
+> NULLS placement, and one that asks for it is refused rather than dropped.
+>
+> `jsonTable(context, path, columns, { alias, .. })` MUST build a FROM item
+> through `Func::json_table`: its columns a non-empty list of
+> `JsonTableColumn.ordinality`, `.value`, `.query`, `.exists` and `.nested`,
+> each taking only the clauses its kind of column admits, its alias required,
+> its paths written as escaped literals and its PASSING values bound. Its
+> `onError` is `"error"` or `"empty"`.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

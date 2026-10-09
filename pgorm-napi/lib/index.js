@@ -42,6 +42,7 @@ export { Builder } from "./builder.js";
 export { FromItem, Select, select, Table, With } from "./select.js";
 export { Delete, deleteFrom, Insert, insert, ReturningRow, Update, update } from "./writes.js";
 export { Conflict, ConflictTarget, ConflictUpdate } from "./conflicts.js";
+export { Merge, merge, MergeAction, MergeInsert, MergeUpdate, PendingMerge } from "./merge.js";
 export {
   ConnectionError,
   ConstructionError,

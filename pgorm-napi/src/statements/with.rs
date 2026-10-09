@@ -34,6 +34,7 @@ fn expression<'cx>(
         Some(Node::Insert(insert)) => CommonTableExpression::new(table, insert.inner),
         Some(Node::Update(update)) => CommonTableExpression::new(table, update.inner),
         Some(Node::Delete(delete)) => CommonTableExpression::new(table, delete.inner),
+        Some(Node::Merge(merge)) => CommonTableExpression::new(table, *merge),
         Some(other) => {
             let what = other.describe();
             return refuse(

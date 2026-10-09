@@ -3,6 +3,7 @@
 //! values `tests/parity/<family>.json` holds, which the JavaScript suite holds
 //! its own builders to in both runtimes. A case missing on either side fails.
 
+mod merge;
 mod select;
 mod writes;
 
@@ -116,5 +117,14 @@ fn writes_family_matches_its_golden_file() {
     check(
         include_str!("../../../tests/parity/writes.json"),
         writes::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.merge/test]
+#[test]
+fn merge_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/merge.json"),
+        merge::cases(),
     );
 }

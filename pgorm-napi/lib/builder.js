@@ -12,11 +12,14 @@ import { native } from "./operations.js";
 /** Marks a construction from a native half the addon made. */
 export const TRUSTED = Symbol("pgorm-napi builder state");
 
-/** @type {(builder: Builder) => unknown} */
+/** @type {(holder: Handle) => unknown} */
 let handleOf;
 
-/** The base of every builder class; its native half is private. */
-export class Builder {
+/**
+ * What holds pgorm-query builder state for JavaScript: its native half,
+ * private. A `PendingMerge` is one, and has nothing to inspect.
+ */
+export class Handle {
   /** @type {unknown} */
   #handle;
 
@@ -26,9 +29,12 @@ export class Builder {
   }
 
   static {
-    handleOf = (builder) => builder.#handle;
+    handleOf = (holder) => holder.#handle;
   }
+}
 
+/** The base of every builder class that can be inspected. */
+export class Builder extends Handle {
   /**
    * The SQL and bound values the builder makes, exactly as running it would:
    * a statement as it runs, an expression as the one item of a `SELECT`, a
@@ -37,7 +43,7 @@ export class Builder {
    * @returns {import("./index.d.ts").Compiled}
    */
   inspect() {
-    const [sql, values] = native.statementInspect(this.#handle);
+    const [sql, values] = native.statementInspect(handleOf(this));
     return Object.freeze({ sql, values: Object.freeze(values) });
   }
 }
@@ -50,7 +56,7 @@ export class Builder {
  * @returns {unknown}
  */
 export function arg(value) {
-  return value instanceof Builder ? handleOf(value) : value;
+  return value instanceof Handle ? handleOf(value) : value;
 }
 
 /**
@@ -85,7 +91,7 @@ export function trusted(trusted, name, madeBy) {
  * @returns {[unknown, readonly unknown[], unknown]}
  */
 export function statementArgs(statement, params, options) {
-  if (statement instanceof Builder) {
+  if (statement instanceof Handle) {
     if (Array.isArray(params)) {
       throw new TypeError("a built statement binds its own values: pass its options second");
     }

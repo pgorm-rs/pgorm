@@ -8,6 +8,7 @@
 // [spec:pgorm:req:napi.select]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
+import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 /** A table, schema-qualified and aliased when the options say. Its names are identifiers, quoted. */
@@ -85,7 +86,7 @@ export interface CteOptions {
 }
 
 /** What a common table expression's rows come from: a query, or a write's RETURNING list. */
-export type CteBody = Select | Insert | Update | Delete;
+export type CteBody = Select | Insert | Update | Delete | Merge;
 
 /** A WITH clause: common table expressions a statement reads by name. */
 export declare class With extends Builder {
