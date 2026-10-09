@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 
 from . import wire
 from .comparison import InvalidOracle
-from .reference_models import registered
+from .reference_models import key, registered
 from .reference_sql import Query, binary
 
 
@@ -80,14 +80,18 @@ def write(active, method):
             defaults=not names,
             returning=model.projection(),
         )
-    if "id" not in values:
+    keys = key(model.entity)
+    if any(name not in values for name in keys):
         raise InvalidOracle("independent active write needs a primary key")
-    query = replace(query, filters=(binary(model.column("id"), values["id"], "eq"),))
+    query = replace(
+        query,
+        filters=tuple(binary(model.column(name), values[name], "eq") for name in keys),
+    )
     if method == "update":
         assignments = tuple(
             (name, values[name])
             for name, _ in model.fields
-            if name != "id" and states[name] == "set"
+            if name not in keys and states[name] == "set"
         )
         if not assignments:
             # The API reads the persisted model when no field requires an update.

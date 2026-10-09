@@ -33,6 +33,15 @@ VARIANTS = {
     "mac_address": "MacAddress",
     "vector": "Vector",
 }
+# `wire.RANGES` names to the pgorm_query::RangeType each one is.
+RANGE_TYPES = {
+    "int4range": "Int4",
+    "int8range": "Int8",
+    "numrange": "Numeric",
+    "daterange": "Date",
+    "tsrange": "Timestamp",
+    "tstzrange": "TimestampTz",
+}
 INTEGER_SUFFIX = {
     "i8": "i8",
     "i16": "i16",
@@ -215,12 +224,32 @@ class ValueEmitter:
                 return f"{Q}::Value::Array({element}, None)"
             items = ", ".join(self.value_source(item) for item in snapshot["data"])
             return f"{Q}::Value::Array({element}, Some(Box::new(vec![{items}])))"
+        if tag["kind"] in RANGE_TYPES:
+            range_type = f"{Q}::RangeType::{RANGE_TYPES[tag['kind']]}"
+            if snapshot["sql_null"]:
+                return f"{Q}::Value::Range({range_type}, None)"
+            bounds = self.range_source(tag, snapshot["data"])
+            return f"{Q}::Value::Range({range_type}, Some(Box::new({bounds})))"
         variant = VARIANTS.get(tag["kind"])
         if variant is None:
             raise UnsupportedInstruction("value kind has no Rust value variant")
         if snapshot["sql_null"]:
             return f"{Q}::Value::{variant}(None)"
         return f"{Q}::Value::{variant}(Some({self.scalar(tag, snapshot['data'])}))"
+
+    def range_source(self, tag, data):
+        """A `Range` of the bound values, each built as its own scalar is."""
+        if data == {"empty": True}:
+            return f"{Q}::Range::Empty"
+        sides = []
+        for side, closed in (("lower", "["), ("upper", "]")):
+            if data[side] is None:
+                sides.append("std::ops::Bound::Unbounded")
+                continue
+            bound = self.value_source(wire.scalar(wire.RANGES[tag["kind"]], data[side]))
+            which = "Included" if closed in data["bounds"] else "Excluded"
+            sides.append(f"std::ops::Bound::{which}({bound})")
+        return f"{Q}::Range::new({sides[0]}, {sides[1]})"
 
     def value_tag(self, reference):
         """The declared tag of a value-producing node, for its enum cast."""

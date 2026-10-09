@@ -24,7 +24,7 @@ pub struct Registry {
 impl Registry {
     /// Register the real entity, model, columns and ActiveModel implementation.
     /// Duplicate names or duplicate Rust entity types are rejected atomically.
-    // [spec:pgorm:req:python.entities]
+    // [spec:pgorm:req:python.entities+1]
     pub fn entity<E>(&mut self, name: &str) -> PyResult<&mut Self>
     where
         E: EntityTrait + Send + Sync + 'static,

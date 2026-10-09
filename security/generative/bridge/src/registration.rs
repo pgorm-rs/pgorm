@@ -1,4 +1,4 @@
-use crate::{account, graphs, note};
+use crate::{account, graphs, note, room, stay};
 use pgorm::EntityTrait;
 use pgorm_python::entities::Registry;
 use pyo3::prelude::*;
@@ -7,6 +7,8 @@ use pyo3::prelude::*;
 pub fn register(registry: &mut Registry) -> PyResult<()> {
     registry.entity::<account::Entity>("campaign.Account")?;
     registry.entity::<note::Entity>("campaign.Note")?;
+    registry.entity::<room::Entity>("campaign.Room")?;
+    registry.entity::<stay::Entity>("campaign.Stay")?;
     registry
         .graph::<account::Entity, (), _>("campaign.AccountOnly", |_| account::Entity::graph())?;
     registry.graph("campaign.OptionalNotes", graphs::optional)?;
@@ -17,6 +19,8 @@ pub fn register(registry: &mut Registry) -> PyResult<()> {
     registry.graph("campaign.Arity5", graphs::arity5)?;
     registry.graph("campaign.Arity6", graphs::arity6)?;
     registry.graph("campaign.Arity7", graphs::arity7)?;
+    registry.graph("campaign.StayRooms", graphs::stay_rooms)?;
+    registry.graph("campaign.StayGuests", graphs::stay_guests)?;
     registry.sources::<(account::Entity,)>("campaign.Sources1")?;
     registry.sources::<(account::Entity, note::Entity)>("campaign.Sources2")?;
     registry.sources::<(account::Entity, note::Entity, note::Entity)>("campaign.Sources3")?;

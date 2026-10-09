@@ -41,7 +41,7 @@ class PackageTests(unittest.TestCase):
             self.assertNotIn("security/", str(path))
             self.assertNotIn("fixtures/", str(path))
 
-    # [spec:pgorm:req:python.entities/test]
+    # [spec:pgorm:req:python.entities+1/test]
     # [spec:pgorm:req:python.graph/test]
     def test_standalone_registry_has_no_application_entities(self):
         self.assertEqual(pgorm.capabilities()["registrations"]["entities"], [])

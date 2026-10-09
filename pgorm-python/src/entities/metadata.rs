@@ -1,5 +1,8 @@
 use pgorm::pgorm_query::{ColumnType, Value};
-use pgorm::{ColumnTrait, EntityTrait, FromQueryResult, Iterable, PrimaryKeyToColumn, StaticName};
+use pgorm::{
+    ColumnTrait, EntityTrait, FromQueryResult, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait,
+    StaticName,
+};
 use pyo3::{prelude::*, types::PyString};
 use serde_json::{Value as Json, json};
 
@@ -188,6 +191,10 @@ pub(crate) struct EntityInfo {
     pub(crate) active_type: &'static str,
     pub(crate) columns: Vec<ColumnInfo>,
     pub(crate) primary_keys: Vec<String>,
+    /// Whether the key's last part is a period matched `WITHOUT OVERLAPS`.
+    /// A lookup, update or delete by the key still compares it for equality.
+    pub(crate) without_overlaps: bool,
+    pub(crate) relations: Vec<Json>,
 }
 
 impl EntityInfo {
@@ -245,6 +252,8 @@ impl EntityInfo {
             table,
             columns,
             primary_keys: keys,
+            without_overlaps: <E::PrimaryKey as PrimaryKeyTrait>::without_overlaps(),
+            relations: super::relations::describe::<E>(),
             entity_type: std::any::type_name::<E>(),
             column_type: std::any::type_name::<E::Column>(),
             model_type: std::any::type_name::<E::Model>(),
@@ -264,6 +273,8 @@ impl EntityInfo {
             "rust_entity": self.entity_type, "rust_column": self.column_type, "rust_model": self.model_type, "rust_active_model": self.active_type,
             "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Vec<_>>(),
             "primary_keys": self.primary_keys,
+            "primary_key_without_overlaps": self.without_overlaps,
+            "relations": self.relations,
             "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete"],
             "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"})
     }
@@ -276,7 +287,7 @@ mod tests {
     use pgorm::pgorm_query::{ArrayType, Range, RangeType};
     use std::sync::Arc;
 
-    // [spec:pgorm:req:python.entities/test]    a range column hints its range kind, so a
+    // [spec:pgorm:req:python.entities+1/test]    a range column hints its range kind, so a
     // registered entity's range field takes a `pgorm.Range` as its value
     #[test]
     fn range_columns_hint_their_range_kind() -> PyResult<()> {
@@ -323,7 +334,7 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:python.entities/test]    a created range column hints its created kind,
+    // [spec:pgorm:req:python.entities+1/test]    a created range column hints its created kind,
     // so a registered entity's field takes a `pgorm.Range` and reads back tagged with the type
     #[test]
     fn created_range_columns_hint_their_created_kind() -> PyResult<()> {

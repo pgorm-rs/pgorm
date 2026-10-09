@@ -2,6 +2,8 @@ pub mod account;
 pub mod graphs;
 pub mod note;
 mod registration;
+pub mod room;
+pub mod stay;
 
 use pyo3::prelude::*;
 

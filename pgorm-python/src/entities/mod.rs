@@ -9,6 +9,7 @@ pub(crate) mod metadata;
 mod model;
 pub(crate) mod query;
 mod registry;
+mod relations;
 
 pub use active::{ActiveState, PyActiveModel, PyActiveValue};
 pub use column::PyEntityColumn;

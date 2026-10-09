@@ -5,7 +5,9 @@ pub mod booking;
 pub mod graphs;
 pub mod membership;
 pub mod note;
+pub mod room;
 pub mod sources;
+pub mod stay;
 
 #[cfg(test)]
 mod graph_parity;
@@ -16,7 +18,7 @@ mod schema_parity;
 
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.entities/test]
+// [spec:pgorm:req:python.entities+1/test]
 #[pymodule(gil_used = true)]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let mut registry = pgorm_python::entities::Registry::default();
@@ -24,6 +26,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     registry.entity::<note::Entity>("app.Note")?;
     registry.entity::<membership::Entity>("app.Membership")?;
     registry.entity::<booking::Entity>("app.Booking")?;
+    registry.entity::<room::Entity>("app.Room")?;
+    registry.entity::<stay::Entity>("app.Stay")?;
     graphs::register(&mut registry)?;
     sources::register(&mut registry)?;
     pgorm_python::install(module, registry)
@@ -33,7 +37,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
 
-    // [spec:pgorm:req:python.entities/test]
+    // [spec:pgorm:req:python.entities+1/test]
     #[test]
     fn registry_refuses_name_and_type_collisions() -> PyResult<()> {
         Python::initialize();

@@ -64,7 +64,10 @@ DEFINITIONS = {
         SELECT n.nspname, p.proname, pg_get_function_identity_arguments(p.oid),
                pg_get_functiondef(p.oid)
         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE p.prokind IN ('f','p') AND
+        WHERE p.prokind IN ('f','p') AND NOT EXISTS (
+            SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass
+            AND d.objid = p.oid AND d.deptype = 'e'
+        ) AND
     """
     + USER_SCHEMA
     + " ORDER BY 1,2,3",

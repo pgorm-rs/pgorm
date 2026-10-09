@@ -35,6 +35,19 @@ SCALARS = frozenset(INTEGER_BITS) | {
     "vector",
 }
 
+# The built-in range types, each by the scalar kind of its bounds. A range is
+# not a scalar of the value matrix: its bounds are, and a range's payload is
+# two of them, so it travels as pgorm's own snapshot of one does.
+RANGES = {
+    "int4range": "i32",
+    "int8range": "i64",
+    "numrange": "decimal",
+    "daterange": "date",
+    "tsrange": "datetime",
+    "tstzrange": "datetime_utc",
+}
+RANGE_BOUNDS = frozenset(("[)", "[]", "()", "(]"))
+
 
 class FormatError(ValueError):
     """A portable artifact is malformed or outside its declared limits."""
@@ -53,7 +66,7 @@ def type_tag(tag):
     if not isinstance(tag, dict) or not isinstance(tag.get("kind"), str):
         raise FormatError("a type tag requires a kind")
     kind = tag["kind"]
-    if kind in SCALARS:
+    if kind in SCALARS or kind in RANGES:
         fields(tag, {"kind"})
     elif kind == "enum":
         fields(tag, {"kind", "name", "schema"})
@@ -225,6 +238,21 @@ def _scalar(kind, data):
             _bits(item, 8)
 
 
+def _range(kind, data):
+    """The empty range, or two bounds of the range's scalar kind, either absent."""
+    if data == {"empty": True}:
+        return
+    fields(data, {"lower", "upper", "bounds"})
+    if data["bounds"] not in RANGE_BOUNDS:
+        raise FormatError("range bounds must be one of [), [], () and (]")
+    for side, closed in (("lower", "["), ("upper", "]")):
+        if data[side] is None:
+            if closed in data["bounds"]:
+                raise FormatError("an unbounded side of a range cannot be inclusive")
+        else:
+            _scalar(RANGES[kind], data[side])
+
+
 # [spec:pgorm:req:generative.format]
 def validate(value):
     """Validate tagged data without importing pgorm or constructing native objects."""
@@ -244,6 +272,8 @@ def validate(value):
             validate(item)
             if item["type"] != tag["element"]:
                 raise FormatError("array element has a different type identity")
+    elif tag["kind"] in RANGES:
+        _range(tag["kind"], value["data"])
     else:
         _scalar(tag["kind"], value["data"])
     return value

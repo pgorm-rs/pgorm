@@ -56,7 +56,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         manifest = p.capabilities()
         self.assertEqual(manifest["graph_policy"]["source_arities"], list(range(1, 8)))
         graphs = {graph["name"]: graph for graph in manifest["registrations"]["graphs"]}
-        self.assertEqual(len(graphs), 9)
+        self.assertEqual(len(graphs), 12)
         self.assertEqual([source["slot"] for source in graphs["app.MixedNotes"]["sources"]], ["root", "Req", "Opt"])
         self.assertEqual(graphs["app.AccountNotes"]["terminals"], ["all", "one_opt", "cursor.all"])
         self.assertEqual(graphs["app.AccountNotes"]["sources"][1]["entity"], "app.Note")

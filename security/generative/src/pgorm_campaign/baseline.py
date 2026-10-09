@@ -23,6 +23,19 @@ KINDS = {
     "timestamptz": "timestamptz",
     "text[]": "text[]",
     "i32[]": "integer[]",
+    "daterange": "daterange",
+}
+TABLE_FIELDS = {"schema", "name", "columns", "rows"}
+# A key `WITHOUT OVERLAPS` names its period; foreign keys are each a
+# `FOREIGN KEY .. REFERENCES` clause of the table that declares them.
+TABLE_OPTIONS = {"without_overlaps", "foreign_keys"}
+FOREIGN_KEY_FIELDS = {
+    "columns",
+    "table",
+    "references",
+    "period",
+    "enforced",
+    "deferred",
 }
 
 
@@ -78,8 +91,43 @@ def value_sql(value, kind, enums):
     return text(encoded) + "::" + sql_type
 
 
+def _names(values):
+    if not isinstance(values, list) or not 1 <= len(values) <= 32:
+        raise ValueError("fixture key columns must be a bounded nonempty list")
+    return ",".join(identifier(value) for value in values)
+
+
+def _foreign_key(key):
+    """`FOREIGN KEY (..) REFERENCES ..` with PostgreSQL 18's optional PERIOD
+    pair, `NOT ENFORCED`, and a check deferred to commit."""
+    if not isinstance(key, dict) or set(key) != FOREIGN_KEY_FIELDS:
+        raise ValueError("unexpected fixture foreign key fields")
+    if type(key["enforced"]) is not bool or type(key["deferred"]) is not bool:
+        raise ValueError("fixture foreign key flags must be booleans")
+    source, target = _names(key["columns"]), _names(key["references"])
+    if key["period"] is not None:
+        if not isinstance(key["period"], list) or len(key["period"]) != 2:
+            raise ValueError("a fixture foreign key period names two columns")
+        source += ",PERIOD " + identifier(key["period"][0])
+        target += ",PERIOD " + identifier(key["period"][1])
+    if not isinstance(key["table"], list) or len(key["table"]) != 2:
+        raise ValueError("a fixture foreign key names its table's schema and name")
+    clause = (
+        "FOREIGN KEY ("
+        + source
+        + ") REFERENCES "
+        + qualified(*key["table"])
+        + " ("
+        + target
+        + ")"
+    )
+    if key["deferred"]:
+        clause += " DEFERRABLE INITIALLY DEFERRED"
+    return clause + ("" if key["enforced"] else " NOT ENFORCED")
+
+
 def _table_sql(table, enums):
-    if set(table) != {"schema", "name", "columns", "rows"}:
+    if not TABLE_FIELDS <= set(table) <= TABLE_FIELDS | TABLE_OPTIONS:
         raise ValueError("unexpected fixture table fields")
     name = qualified(table["schema"], table["name"])
     columns = table["columns"]
@@ -102,8 +150,17 @@ def _table_sql(table, enums):
         definitions.append(definition + ("" if column["nullable"] else " NOT NULL"))
         if column["primary"]:
             primary.append(column_name)
+    period = table.get("without_overlaps")
+    if period is not None:
+        if not primary or primary[-1] != identifier(period) or len(primary) < 2:
+            raise ValueError(
+                "WITHOUT OVERLAPS names the last of two or more key columns"
+            )
+        primary[-1] += " WITHOUT OVERLAPS"
     if primary:
         definitions.append("PRIMARY KEY (" + ",".join(primary) + ")")
+    for key in table.get("foreign_keys", []):
+        definitions.append(_foreign_key(key))
     statements = ["CREATE TABLE " + name + " (" + ",".join(definitions) + ");"]
     if rows:
         rendered = []
@@ -116,6 +173,16 @@ def _table_sql(table, enums):
             rendered.append("(" + ",".join(items) + ")")
         statements.append("INSERT INTO " + name + " VALUES " + ",".join(rendered) + ";")
     return statements
+
+
+def extensions(tables):
+    """btree_gist, in the fixture's own schema, when a key `WITHOUT OVERLAPS`
+    has a scalar part: its GiST operator classes are what such a key indexes
+    the scalar with. It is trusted, so the campaign role installs it, and the
+    schema's reset drops it again."""
+    if any("without_overlaps" in table for table in tables):
+        return ['CREATE EXTENSION IF NOT EXISTS btree_gist SCHEMA "fixture";']
+    return []
 
 
 # [spec:pgorm:req:generative.fixtures]
@@ -180,7 +247,12 @@ def render(definition):
     for schema in sorted(schemas | {"fixture", "other"}):
         setup.append("CREATE SCHEMA " + identifier(schema) + " AUTHORIZATION campaign;")
     return "\n".join(
-        setup + ["SET LOCAL ROLE campaign;"] + enum_sql + statements + ["COMMIT;"]
+        setup
+        + ["SET LOCAL ROLE campaign;"]
+        + extensions(tables)
+        + enum_sql
+        + statements
+        + ["COMMIT;"]
     )
 
 

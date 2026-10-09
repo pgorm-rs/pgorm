@@ -33,6 +33,17 @@ KINDS = {
     "macaddr": "mac_address",
 }
 
+# Each built-in range type by its subtype's catalog name.
+RANGE_SUBTYPES = {
+    "int4range": "int4",
+    "int8range": "int8",
+    "numrange": "numeric",
+    "daterange": "date",
+    "tsrange": "timestamp",
+    "tstzrange": "timestamptz",
+}
+RANGE_EMPTY, RANGE_LB_INC, RANGE_UB_INC, RANGE_LB_INF, RANGE_UB_INF = 1, 2, 4, 8, 16
+
 CATALOG = """
 SELECT t.oid, n.nspname, t.typname, t.typtype, t.typelem, t.typcategory
 FROM pg_catalog.pg_type t
@@ -56,6 +67,8 @@ class Codec:
             return {"kind": "array", "element": self.tag(element)}
         if category == "e":
             return {"kind": "enum", "schema": schema, "name": name}
+        if category == "r" and schema == "pg_catalog" and name in RANGE_SUBTYPES:
+            return {"kind": name}
         if schema != "pg_catalog" or name not in KINDS:
             raise InvalidOracle(
                 "unsupported reference result type: " + schema + "." + name
@@ -95,6 +108,41 @@ class Codec:
         if offset != len(raw) or any(v["type"] != tag["element"] for v in result):
             raise InvalidOracle("array data or element type mismatch")
         return result
+
+    def range(self, raw, kind):
+        """PostgreSQL's binary range: a flag byte, then each finite bound."""
+        if not raw:
+            raise InvalidOracle("truncated PostgreSQL range")
+        flags, offset = raw[0], 1
+        if flags & RANGE_EMPTY:
+            if len(raw) != 1:
+                raise InvalidOracle("empty range has trailing data")
+            return {"empty": True}
+        subtype = next(
+            oid
+            for oid, row in self.types.items()
+            if row[:2] == ("pg_catalog", RANGE_SUBTYPES[kind])
+        )
+        bounds = {}
+        for side, infinite in (("lower", RANGE_LB_INF), ("upper", RANGE_UB_INF)):
+            if flags & infinite:
+                bounds[side] = None
+                continue
+            if offset + 4 > len(raw):
+                raise InvalidOracle("truncated range bound length")
+            size = struct.unpack("!i", raw[offset : offset + 4])[0]
+            offset += 4
+            if size < 0 or offset + size > len(raw):
+                raise InvalidOracle("truncated range bound")
+            bound = raw[offset : offset + size]
+            bounds[side] = self.scalar(subtype, bound, wire.RANGES[kind])
+            offset += size
+        if offset != len(raw):
+            raise InvalidOracle("range has trailing data")
+        bounds["bounds"] = ("[" if flags & RANGE_LB_INC else "(") + (
+            "]" if flags & RANGE_UB_INC else ")"
+        )
+        return bounds
 
     def scalar(self, oid, raw, kind):
         if kind in ("f32", "f64"):
@@ -136,11 +184,12 @@ class Codec:
         data = None
         if raw is not None:
             raw = bytes(raw)
-            data = (
-                self.array(raw, tag, self.types[oid][3])
-                if tag["kind"] == "array"
-                else self.scalar(oid, raw, tag["kind"])
-            )
+            if tag["kind"] == "array":
+                data = self.array(raw, tag, self.types[oid][3])
+            elif tag["kind"] in wire.RANGES:
+                data = self.range(raw, tag["kind"])
+            else:
+                data = self.scalar(oid, raw, tag["kind"])
         return wire.validate(
             {"version": 1, "type": tag, "sql_null": raw is None, "data": data}
         )

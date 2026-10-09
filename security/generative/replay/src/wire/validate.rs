@@ -14,7 +14,9 @@ use pgorm::pgorm_query::IpNetwork;
 use serde_json::{Map, Value as Json};
 use uuid::Uuid;
 
-use super::{SCALAR_NAMES, parse_date, parse_datetime_utc, parse_naive_datetime, parse_time};
+use super::{
+    RANGES, SCALAR_NAMES, parse_date, parse_datetime_utc, parse_naive_datetime, parse_time,
+};
 use crate::FormatError;
 
 const TEXT_BYTES: usize = 65_536;
@@ -69,8 +71,52 @@ pub fn validate(value: &Json) -> Result<(), FormatError> {
                 ));
             }
         }
+    } else if let Some(bounds) = range_bounds(kind) {
+        range(bounds, data)?;
     } else {
         scalar(kind, data)?;
+    }
+    Ok(())
+}
+
+/// The scalar kind of a range type's bounds, if `kind` names a range type.
+fn range_bounds(kind: &str) -> Option<&'static str> {
+    RANGES
+        .iter()
+        .find(|(ty, _)| ty.range_type_name() == kind)
+        .map(|(_, bounds)| *bounds)
+}
+
+/// The empty range, or two bounds of the range's scalar kind, either absent;
+/// an absent side is never inclusive.
+fn range(bounds: &str, data: &Json) -> Result<(), FormatError> {
+    if data
+        .as_object()
+        .is_some_and(|object| object.len() == 1 && object.get("empty") == Some(&Json::Bool(true)))
+    {
+        return Ok(());
+    }
+    let object = fields(data, &["lower", "upper", "bounds"], &[])?;
+    let spelling = object
+        .get("bounds")
+        .and_then(Json::as_str)
+        .unwrap_or_default();
+    if !["[)", "[]", "()", "(]"].contains(&spelling) {
+        return Err(FormatError::new(
+            "range bounds must be one of [), [], () and (]",
+        ));
+    }
+    for (side, closed) in [("lower", '['), ("upper", ']')] {
+        match object.get(side) {
+            Some(Json::Null) if spelling.contains(closed) => {
+                return Err(FormatError::new(
+                    "an unbounded side of a range cannot be inclusive",
+                ));
+            }
+            Some(Json::Null) => {}
+            Some(value) => scalar(bounds, value)?,
+            None => return Err(unexpected(&["lower", "upper", "bounds"])),
+        }
     }
     Ok(())
 }
@@ -106,7 +152,7 @@ fn type_tag(tag: &Json) -> Result<&str, FormatError> {
         .get("kind")
         .and_then(Json::as_str)
         .ok_or_else(|| FormatError::new("a type tag requires a kind"))?;
-    if SCALAR_NAMES.contains(&kind) {
+    if SCALAR_NAMES.contains(&kind) || range_bounds(kind).is_some() {
         fields(tag, &["kind"], &[])?;
     } else if kind == "enum" {
         fields(tag, &["kind", "name", "schema"], &[])?;

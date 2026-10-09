@@ -131,6 +131,19 @@ the same type, and the field reads back as the range, tagged with the kind. The
 Rust newtype writes it as its text cast to the type and reads a multirange
 through its text, so both read through `find`.
 
+`describe()` also reports `primary_key_without_overlaps`, true when the key's
+last column is a period declared `without_overlaps` (`PRIMARY KEY (id, valid_at
+WITHOUT OVERLAPS)`): the server holds a row per period, none overlapping, yet a
+lookup, an update and a delete by the key still compare the period for
+equality, so each names exactly one version. A filter on the whole key reads
+one version back; which version covers a moment is a filter on the period, not
+a key lookup. `relations` lists every variant of the entity's `Relation` enum
+with its `type`, `from` and `to` tables, the `columns` paired for equality, the
+`period` pair a temporal foreign key matches for overlap, and its
+`enforcement` (`"not_enforced"` for a key the server never checks) and
+`deferrability` (`"deferrable_initially_deferred"` for one checked at commit),
+each `None` where the relation does not say.
+
 `dict(model)` returns Python values, and `model.tagged("id")` retains the Rust
 value tag. `model.with_value(column, value)` clones and calls `ModelTrait::set`;
 it changes the detached model and performs no database write. `into_active()`

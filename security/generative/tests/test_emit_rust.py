@@ -147,7 +147,13 @@ class EmitRustTests(unittest.TestCase):
             with self.subTest(family=family):
                 self.assertIn("::observe::model::<", source)
                 found = literals(source)
-                self.assertTrue({"campaign.Account", "campaign.Note"} & found)
+                registered = {
+                    "campaign.Account",
+                    "campaign.Note",
+                    "campaign.Room",
+                    "campaign.Stay",
+                }
+                self.assertTrue(registered & found)
         # A compiled column is named at runtime and resolved against the entity.
         for family in ("entity", "active", "cursor"):
             with self.subTest(family=family, resolved=True):
@@ -276,6 +282,40 @@ class EmitRustTests(unittest.TestCase):
         for line in source.splitlines():
             if "Value::Double" in line or "Value::Float" in line:
                 self.assertIn("from_bits", line)
+
+    def test_temporal_programs_build_ranges_and_period_graphs(self):
+        found = {}
+        for family in ("active", "graph"):
+            for index in range(60):
+                program = generate(20260913, index, family=family).program
+                names = {
+                    node["data"].get("name")
+                    for node in program.data()["nodes"]
+                    if node["op"] in ("entity", "graph")
+                }
+                for name in (
+                    "campaign.Room",
+                    "campaign.StayRooms",
+                    "campaign.StayGuests",
+                ):
+                    if name in names:
+                        found.setdefault(name, emit_rust.render(program))
+        room = found["campaign.Room"]
+        self.assertIn(
+            "pgorm::pgorm_query::Value::Range(pgorm::pgorm_query::RangeType::Date, Some(",
+            room,
+        )
+        self.assertIn(
+            "std::ops::Bound::Included(pgorm::pgorm_query::Value::Date(", room
+        )
+        self.assertIn(
+            "std::ops::Bound::Excluded(pgorm::pgorm_query::Value::Date(", room
+        )
+        self.assertIn("::entities::room::Entity", room)
+        self.assertIn("::entities::graphs::stay_rooms", found["campaign.StayRooms"])
+        self.assertIn("::observe::model::<", found["campaign.StayRooms"])
+        self.assertIn("campaign.Stay", literals(found["campaign.StayRooms"]))
+        self.assertIn("::entities::graphs::stay_guests", found["campaign.StayGuests"])
 
     def test_enum_values_carry_their_qualified_cast(self):
         source = emit_rust.render(hostile_program())

@@ -1,6 +1,6 @@
 """Effect steps and transaction scopes over the named pgorm terminals."""
 
-from .emit_rust_models import ACCOUNT, TYPED_ROWS
+from .emit_rust_models import TYPED_ROWS, graph_root
 from .emit_rust_values import (
     PL,
     Q,
@@ -65,13 +65,18 @@ class EffectEmitter:
                 f"{REPLAY}::observe::model::<{entity}>(row, {literal(registration)})?"
             )
         if kind in ("graph_query", "cursor"):
-            _, _, slots = self.graph_shape(reference)
-            root = self.entity_type(ACCOUNT)
+            name, _, slots = self.graph_shape(reference)
+            registration = graph_root(name)
+            root = self.entity_type(registration)
             if not slots:
                 # A root-only graph decodes to the model itself, and the binding
                 # reports it as the record rather than as a one-slot tuple.
-                return f"{REPLAY}::observe::model::<{root}>(row, {literal(ACCOUNT)})?"
-            items = [f"{REPLAY}::observe::model::<{root}>(&row.0, {literal(ACCOUNT)})?"]
+                return (
+                    f"{REPLAY}::observe::model::<{root}>(row, {literal(registration)})?"
+                )
+            items = [
+                f"{REPLAY}::observe::model::<{root}>(&row.0, {literal(registration)})?"
+            ]
             for index, (registration, required) in enumerate(slots, 1):
                 entity = self.entity_type(registration)
                 name = literal(registration)

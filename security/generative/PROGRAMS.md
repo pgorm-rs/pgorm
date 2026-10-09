@@ -12,6 +12,9 @@ A program contains:
 - `version`, `capability_version` and an unsigned 64-bit `seed`.
 - `fixture`: the complete portable baseline, including schema, column kinds,
   nullability, keys, enums and ordered rows for subject and reference execution.
+  A table may also declare a key ending `WITHOUT OVERLAPS` (which installs
+  `btree_gist` in the fixture schema) and foreign keys with an optional `PERIOD`
+  pair, `NOT ENFORCED` and a check deferred to commit.
 - `nodes`: a topologically ordered operation graph. Each node has an `id`,
   closed-catalog `op`, binder `scope`, typed `inputs` referencing earlier nodes,
   and validated `data` options. References preserve shared subexpressions.
@@ -49,7 +52,13 @@ non-zero offset is rejected rather than converted. No kind carries an offset,
 so the campaign asserts nothing about non-UTC offsets — an accepted gap, since
 PostgreSQL preserves the instant and never stored the offset either.
 Enum tags carry the schema and type name; array elements retain their full
-tags, including SQL NULL and JSON null as distinct values.
+tags, including SQL NULL and JSON null as distinct values. A built-in range
+(`int4range`, `int8range`, `numrange`, `daterange`, `tsrange`, `tstzrange`) is
+tagged by its catalogue name and carries pgorm's own snapshot of one:
+`{"empty": true}`, or `lower` and `upper`, each its bound kind's payload or
+`null` for an unbounded side, and `bounds`, one of `[)`, `[]`, `()` and `(]`,
+never inclusive on an unbounded side. A range is not a value-matrix scalar;
+its bounds are.
 
 Names remain identifier data in their declared contexts, including quotes,
 Unicode and schema identity. They are not converted to SQL operators. Raw

@@ -9,11 +9,21 @@ from .emit_rust_values import (
     literal,
 )
 
-ENTITIES = {"campaign.Account": "account", "campaign.Note": "note"}
+ENTITIES = {
+    "campaign.Account": "account",
+    "campaign.Note": "note",
+    "campaign.Room": "room",
+    "campaign.Stay": "stay",
+}
 # The physical table each registered entity is declared against, which is the
 # qualifier a graph gives its root source.
-ENTITY_TABLES = {"campaign.Account": "accounts", "campaign.Note": "notes"}
-ACCOUNT, NOTE = "campaign.Account", "campaign.Note"
+ENTITY_TABLES = {
+    "campaign.Account": "accounts",
+    "campaign.Note": "notes",
+    "campaign.Room": "rooms",
+    "campaign.Stay": "stays",
+}
+ACCOUNT, NOTE, ROOM = "campaign.Account", "campaign.Note", "campaign.Room"
 # Each registered graph: the harness factory that builds it, and one entry per
 # joined slot — the entity it decodes into, and whether the slot is required.
 # `security/generative/replay/src/entities.rs` holds the compiled shapes and
@@ -23,6 +33,8 @@ GRAPH_SHAPES = {
     "campaign.OptionalNotes": ("optional", ((NOTE, False),)),
     "campaign.RequiredNotes": ("required", ((NOTE, True),)),
     "campaign.SelfJoin": ("self_join", ((ACCOUNT, False),)),
+    "campaign.StayRooms": ("stay_rooms", ((ROOM, False),)),
+    "campaign.StayGuests": ("stay_guests", ((ACCOUNT, False),)),
     **{
         "campaign.Arity" + str(arity): (
             "arity" + str(arity),
@@ -31,6 +43,18 @@ GRAPH_SHAPES = {
         for arity in range(3, 8)
     },
 }
+# The entity a graph is rooted at, where it is not an account.
+GRAPH_ROOTS = {
+    "campaign.StayRooms": "campaign.Stay",
+    "campaign.StayGuests": "campaign.Stay",
+}
+
+
+def graph_root(name):
+    """The registration a graph's root source decodes into."""
+    return GRAPH_ROOTS.get(name, ACCOUNT)
+
+
 # Each registered source tuple, as `registration.rs` declares it: one entity per
 # listed position, every position decoding into `Option<Model>`.
 SOURCE_SHAPES = {
@@ -192,17 +216,17 @@ class ModelEmitter:
             raise UnsupportedInstruction(
                 "entity.result requires a compiled model read, not a " + kind
             )
-        _, _, slots = self.graph_shape(query)
+        name, _, slots = self.graph_shape(query)
         if not slots:
             if index:
                 raise UnsupportedInstruction("this graph has one source slot")
-            return ACCOUNT, access
+            return graph_root(name), access
         if index is None:
             raise UnsupportedInstruction(
                 "a joined graph row needs the source slot to read"
             )
         if index == 0:
-            return ACCOUNT, access + ".0"
+            return graph_root(name), access + ".0"
         if index > len(slots):
             raise UnsupportedInstruction("source slot is outside the graph shape")
         entity, required = slots[index - 1]
@@ -342,11 +366,12 @@ class ModelEmitter:
         the find supplied.
         """
         d, i = node["data"], node["inputs"]
-        _, aliases, slots = self.graph_shape(i["query"])
+        name, aliases, slots = self.graph_shape(i["query"])
         index = d["source"]
         if index > len(slots):
             raise UnsupportedInstruction("source is outside the registered graph shape")
-        qualifier = ENTITY_TABLES[ACCOUNT] if index == 0 else aliases[index - 1]
+        root = ENTITY_TABLES[graph_root(name)]
+        qualifier = root if index == 0 else aliases[index - 1]
         reference = (
             f"({Q}::Name::runtime({literal(qualifier)}), "
             f"{Q}::Name::runtime({literal(d['column'])}))"

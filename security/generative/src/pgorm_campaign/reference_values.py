@@ -64,6 +64,8 @@ TYPES = {
 
 def sql_type(tag):
     kind = tag["kind"]
+    if kind in wire.RANGES:
+        return kind
     if kind == "enum":
         return qualified(tag["name"], tag["schema"])
     if kind == "array":
@@ -95,7 +97,23 @@ def argument(value):
         return vector_text(value)
     if kind == "array":
         raise InvalidOracle("reference arrays require explicit element parameters")
+    if kind in wire.RANGES:
+        return range_text(kind, data)
     return data
+
+
+def range_text(kind, data):
+    """PostgreSQL's text input for a range, each bound double-quoted."""
+    if data == {"empty": True}:
+        return "empty"
+    bound = wire.RANGES[kind]
+    sides = []
+    for side in ("lower", "upper"):
+        value = data[side]
+        if value is not None and bound.startswith("datetime"):
+            value = wire.temporal_text(value)
+        sides.append("" if value is None else '"' + value + '"')
+    return data["bounds"][0] + ",".join(sides) + data["bounds"][1]
 
 
 def vector_text(value):

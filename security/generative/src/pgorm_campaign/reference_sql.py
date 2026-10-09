@@ -125,6 +125,7 @@ def binary(left, right, operator):
         "mod": "%",
         "and": "AND",
         "or": "OR",
+        "overlaps": "&&",
     }
     return (
         "(" + expression(left) + " " + symbols[operator] + " " + expression(right) + ")"

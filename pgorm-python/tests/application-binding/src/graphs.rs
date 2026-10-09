@@ -1,7 +1,7 @@
-use crate::{account, membership, note};
+use crate::{account, membership, note, room, stay};
 
 use pgorm::pgorm_query::Name;
-use pgorm::{EntityTrait, Opt, RelationDef, Req, SelectGraph};
+use pgorm::{EntityTrait, Opt, RelationDef, RelationTrait, Req, SelectGraph};
 use pyo3::prelude::*;
 
 pub fn relation() -> RelationDef {
@@ -24,6 +24,13 @@ pub fn required(aliases: &[String]) -> SelectGraph<account::Entity, (Req<note::E
     account::Entity::graph().join_one_as::<note::Entity>(relation(), Name::runtime(&aliases[0]))
 }
 
+/// A stay and every version of its room whose period overlaps the stay's: the
+/// temporal relation joins by `&&` beside the key's equality.
+pub fn stay_rooms(aliases: &[String]) -> SelectGraph<stay::Entity, (Opt<room::Entity>,)> {
+    stay::Entity::graph()
+        .join_maybe_as::<room::Entity>(stay::Relation::Room.def(), Name::runtime(&aliases[0]))
+}
+
 // [spec:pgorm:req:python.graph/test]
 pub fn register(registry: &mut pgorm_python::entities::Registry) -> PyResult<()> {
     registry.graph::<account::Entity, (), _>("app.AccountOnly", |_| account::Entity::graph())?;
@@ -31,6 +38,17 @@ pub fn register(registry: &mut pgorm_python::entities::Registry) -> PyResult<()>
         membership::Entity::graph()
     })?;
     registry.graph("app.AccountNotes", optional)?;
+    registry.graph("app.StayRooms", stay_rooms)?;
+    registry.graph("app.StayGuest", |aliases| {
+        stay::Entity::graph().join_maybe_as::<account::Entity>(
+            stay::Relation::Guest.def(),
+            Name::runtime(&aliases[0]),
+        )
+    })?;
+    registry.graph("app.StayGuestRequired", |aliases| {
+        stay::Entity::graph()
+            .join_one_as::<account::Entity>(stay::Relation::Guest.def(), Name::runtime(&aliases[0]))
+    })?;
     registry.graph("app.RequiredNotes", required)?;
     registry.graph("app.MixedNotes", |aliases| {
         required(&aliases[..1])

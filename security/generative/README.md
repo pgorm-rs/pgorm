@@ -70,7 +70,13 @@ Cargo target to avoid mixing application and standalone extension outputs.
 
 The private Rust crate registers `campaign.Account`, `campaign.Note`, required,
 optional and self-join graphs through seven sources, and pipeline `SourceList`
-tuples through six. Its Rust modules remain usable by standalone replay without
+tuples through six. `campaign.Room` is keyed `(id, valid_at WITHOUT OVERLAPS)`
+and `campaign.Stay` references a room over its own period, a temporal foreign
+key checked at commit, and an account the server never checks; the
+`campaign.StayRooms` and `campaign.StayGuests` graphs join by those two
+relations. A program that uses them appends `rooms` and `stays` to its own
+fixture, with `btree_gist` installed in the fixture schema for the room key's
+scalar part, so the shared baseline is unchanged for every other program. Its Rust modules remain usable by standalone replay without
 Python registration code. The Account projection includes scalar, enum, JSON,
 decimal, UUID and temporal fields. The nullable-element `tags` array is exercised
 through public records/runtime descriptors; it is not a field of this compiled

@@ -73,6 +73,43 @@ class WireTests(unittest.TestCase):
             ):
                 wire.scalar(kind, data)
 
+    def test_ranges_carry_their_bounds_payloads(self):
+        for kind, data in (
+            (
+                "daterange",
+                {"lower": "2026-01-01", "upper": "2026-02-01", "bounds": "[)"},
+            ),
+            ("int4range", {"lower": None, "upper": "5", "bounds": "(]"}),
+            (
+                "tstzrange",
+                {"lower": "2024-01-02T03:04:05Z", "upper": None, "bounds": "[)"},
+            ),
+            ("numrange", {"empty": True}),
+        ):
+            value = wire.scalar(kind, data)
+            self.assertEqual(value, wire.validate(json.loads(json.dumps(value))))
+        array = wire.scalar(
+            {"kind": "array", "element": {"kind": "daterange"}},
+            [wire.scalar("daterange", {"empty": True})],
+        )
+        self.assertEqual(len(array["data"]), 1)
+        for kind, data in (
+            ("daterange", {"lower": None, "upper": "2026-02-01", "bounds": "[)"}),
+            (
+                "daterange",
+                {"lower": "2026-01-01", "upper": "2026-02-01", "bounds": "{)"},
+            ),
+            ("daterange", {"lower": "2026-1-1", "upper": None, "bounds": "[)"}),
+            ("daterange", {"empty": False}),
+            ("int4range", {"lower": "1.5", "upper": None, "bounds": "[)"}),
+            ("datemultirange", []),
+        ):
+            with (
+                self.subTest(kind=kind, data=data),
+                self.assertRaises(wire.FormatError),
+            ):
+                wire.scalar(kind, data)
+
 
 if __name__ == "__main__":
     unittest.main()

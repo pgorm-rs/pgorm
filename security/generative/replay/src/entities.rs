@@ -1,6 +1,6 @@
 //! The campaign's entity, model and graph declarations.
 //!
-//! A copy of `security/generative/bridge/src/{account,note,graphs}.rs`, which
+//! A copy of `security/generative/bridge/src/{account,note,room,stay,graphs}.rs`, which
 //! is already PyO3-free — only the module paths differ. The hostile enum name
 //! and the `before_save` hook are part of what the campaign tests, so they are
 //! reproduced exactly rather than tidied: a replay whose entities are milder
@@ -110,12 +110,55 @@ pub mod note {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
+/// A room's rate over time, keyed `(id, valid_at WITHOUT OVERLAPS)`.
+pub mod room {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "rooms", schema_name = "fixture")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        #[pgorm(primary_key, without_overlaps)]
+        pub valid_at: Range<Date>,
+        pub rate: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// A guest's stay in a room.
+pub mod stay {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "stays", schema_name = "fixture")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub room_id: i32,
+        pub guest_id: i32,
+        pub during: Range<Date>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 /// The registered graph shapes, by arity, each aliasing its joined sources with
 /// caller-supplied names so hostile aliases reach the quoting path.
 pub mod graphs {
-    use super::{account, note};
+    use super::{account, note, room, stay};
 
-    use pgorm::{EntityTrait, Opt, RelationDef, Req, SelectGraph, pgorm_query::Name};
+    use pgorm::{
+        EntityTrait, Opt, RelationDef, Req, SelectGraph,
+        pgorm_query::{Deferrability, Enforcement, Name},
+    };
 
     pub fn relation() -> RelationDef {
         note::Entity::belongs_to(account::Entity)
@@ -209,5 +252,31 @@ pub mod graphs {
             .join_maybe_as::<note::Entity>(relation().rev(), Name::runtime(&aliases[3]))
             .join_maybe_as::<note::Entity>(relation().rev(), Name::runtime(&aliases[4]))
             .join_maybe_as::<note::Entity>(relation().rev(), Name::runtime(&aliases[5]))
+    }
+
+    /// A stay's room: every version whose period overlaps the stay's.
+    pub fn stay_room() -> RelationDef {
+        stay::Entity::belongs_to(room::Entity)
+            .columns(stay::Column::RoomId, room::Column::Id)
+            .period(stay::Column::During, room::Column::ValidAt)
+            .deferrability(Deferrability::DeferrableInitiallyDeferred)
+            .into()
+    }
+
+    /// A stay's guest, an account the server never checks.
+    pub fn stay_guest() -> RelationDef {
+        stay::Entity::belongs_to(account::Entity)
+            .columns(stay::Column::GuestId, account::Column::Id)
+            .enforcement(Enforcement::NotEnforced)
+            .into()
+    }
+
+    pub fn stay_rooms(aliases: &[String]) -> SelectGraph<stay::Entity, (Opt<room::Entity>,)> {
+        stay::Entity::graph().join_maybe_as::<room::Entity>(stay_room(), Name::runtime(&aliases[0]))
+    }
+
+    pub fn stay_guests(aliases: &[String]) -> SelectGraph<stay::Entity, (Opt<account::Entity>,)> {
+        stay::Entity::graph()
+            .join_maybe_as::<account::Entity>(stay_guest(), Name::runtime(&aliases[0]))
     }
 }

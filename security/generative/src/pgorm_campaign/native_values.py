@@ -37,6 +37,18 @@ def data_value(tag, data):
     return data
 
 
+def range_value(tag, data, p):
+    """A public ``pgorm.Range`` holding a portable range payload's bounds."""
+    if data == {"empty": True}:
+        return p.Range.empty()
+    bound = {"kind": wire.RANGES[tag["kind"]]}
+    lower, upper = (
+        None if data[side] is None else data_value(bound, data[side])
+        for side in ("lower", "upper")
+    )
+    return p.Range(lower, upper, data["bounds"])
+
+
 def equivalent_snapshot(expected, actual):
     """Only alternate spellings of the same temporal value may compare equal."""
     if expected == actual:
@@ -74,6 +86,8 @@ def materialize(snapshot, p):
         result = p.Value.null(kind(tag, p))
     elif tag["kind"] == "json":
         result = p.Value.json(snapshot["data"])
+    elif tag["kind"] in wire.RANGES:
+        result = p.Value(range_value(tag, snapshot["data"], p), tag["kind"])
     else:
         result = p.Value(data_value(tag, snapshot["data"]), kind(tag, p))
     if not equivalent_snapshot(snapshot, result.snapshot()):

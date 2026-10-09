@@ -423,7 +423,21 @@ def value_source(snapshot):
         return f"p.Value.null({kind_source(tag)})"
     if tag["kind"] == "json":
         return f"p.Value.json({literal(snapshot['data'])})"
+    if tag["kind"] in wire.RANGES:
+        return f"p.Value({range_source(tag, snapshot['data'])}, {kind_source(tag)})"
     return f"p.Value({scalar_source(tag, snapshot['data'])}, {kind_source(tag)})"
+
+
+def range_source(tag, data):
+    """A public ``pgorm.Range`` of the payload's bounds."""
+    if data == {"empty": True}:
+        return "p.Range.empty()"
+    bound = {"kind": wire.RANGES[tag["kind"]]}
+    lower, upper = (
+        "None" if data[side] is None else scalar_source(bound, data[side])
+        for side in ("lower", "upper")
+    )
+    return f"p.Range({lower}, {upper}, {literal(data['bounds'])})"
 
 
 def datatype_source(kind):

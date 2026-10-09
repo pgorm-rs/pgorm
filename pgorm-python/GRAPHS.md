@@ -77,6 +77,17 @@ Models retain their registered columns, value tags and `into_active` behavior.
 An absent optional source is distinct from no graph row. A present source whose
 model cannot decode raises `DecodeError`; it does not become absent.
 
+The relation a factory joins by is the application's, attributes included. A
+relation matching on a `PERIOD` (`from_period` / `to_period`, PostgreSQL 18's
+temporal foreign key) joins by equality on its key columns and by overlap
+(`&&`) on the two periods, so a row reaches every version of its target whose
+period overlaps its own: one root row per overlapping version. A relation the
+server does not enforce (`enforcement = "NotEnforced"`) may name a row that does
+not exist; an optional slot then holds `None` and a required slot drops the
+root row, as for any unmatched join. Deferrability changes when the server
+checks the key, never what a join reads. The entity's `describe()` reports each
+of these on its `relations` (see [ENTITIES.md](ENTITIES.md)).
+
 `inspect()` returns Rust-built SQL and tagged parameters for `all`.
 `inspect(terminal="one_opt")` includes that terminal's limit. Execution uses
 the same owned `SelectGraph` builder state and calls its actual Rust terminal.

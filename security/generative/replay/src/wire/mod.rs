@@ -21,8 +21,9 @@ pub use temporal::{
 };
 pub use validate::validate;
 
-use pgorm::pgorm_query::{ArrayType, Value};
+use pgorm::pgorm_query::{ArrayType, Range, RangeType, Value};
 use serde_json::{Value as Json, json};
+use std::ops::Bound;
 
 use crate::FormatError;
 
@@ -104,13 +105,13 @@ macro_rules! scalar_kinds {
 
         /// The portable name of a Rust scalar variant.
         ///
-        /// A range or multirange has a name here so the function is total,
-        /// but no portable kind: neither name is in `wire.SCALARS`, so
-        /// [`validate`] refuses a value tagged with one.
+        /// A range is named by its catalogue type, as `wire.RANGES` names it. A
+        /// multirange has a name here so the function is total, but no portable
+        /// kind, so [`validate`] refuses a value tagged with one.
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
             match kind {
                 $(ArrayType::$variant => $name,)+
-                ArrayType::Range(_) => "range",
+                ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(_) => "multirange",
             }
         }
@@ -165,6 +166,49 @@ scalar_kinds! {
     Date => "date", Time => "time", DateTime => "datetime",
     DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
     MacAddress => "mac_address", Vector => "vector",
+}
+
+/// Every built-in range type by its portable name and the scalar kind of its
+/// bounds, matching `wire.RANGES`.
+pub const RANGES: &[(RangeType, &str)] = &[
+    (RangeType::Int4, "i32"),
+    (RangeType::Int8, "i64"),
+    (RangeType::Numeric, "decimal"),
+    (RangeType::Date, "date"),
+    (RangeType::Timestamp, "datetime"),
+    (RangeType::TimestampTz, "datetime_utc"),
+];
+
+/// A range's payload: `{"empty": true}`, or each bound's own payload (absent
+/// where unbounded) and the two inclusivity characters.
+fn range_payload(range: &Range<Value>) -> Json {
+    let (lower, upper) = match range {
+        Range::Empty => return json!({"empty": true}),
+        Range::Bounds { lower, upper } => (lower, upper),
+    };
+    let side = |bound: &Bound<Value>| match bound {
+        Bound::Included(value) | Bound::Excluded(value) => Tagged {
+            tag: rust_tag(value),
+            inner: value.clone(),
+        }
+        .payload(),
+        Bound::Unbounded => Json::Null,
+    };
+    let opening = if matches!(lower, Bound::Included(_)) {
+        '['
+    } else {
+        '('
+    };
+    let closing = if matches!(upper, Bound::Included(_)) {
+        ']'
+    } else {
+        ')'
+    };
+    json!({
+        "lower": side(lower),
+        "upper": side(upper),
+        "bounds": format!("{opening}{closing}"),
+    })
 }
 
 /// A Rust value together with the identity its payload alone cannot carry.
@@ -291,10 +335,12 @@ impl Tagged {
                     })
                     .collect::<Vec<_>>()
             })),
+            Value::Range(_, value) => value
+                .as_ref()
+                .map_or(Json::Null, |range| range_payload(range)),
             // No portable encoding exists, and the kind is refused by
             // `validate`; the data is the value's SQL literal, a description
             // rather than an invented payload.
-            Value::Range(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
             Value::Multirange(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
         }
     }

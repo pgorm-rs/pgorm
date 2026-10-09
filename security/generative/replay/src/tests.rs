@@ -597,3 +597,78 @@ fn the_copied_graphs_quote_their_given_aliases() {
     let (sql, _) = entities::graphs::arity7(&many).build();
     assert_eq!(sql.matches("LEFT JOIN").count(), 6, "{sql}");
 }
+
+fn days(from: (i8, i8), to: (i8, i8)) -> pgorm::pgorm_query::Range<jiff::civil::Date> {
+    pgorm::pgorm_query::Range::from(
+        jiff::civil::date(2026, from.0, from.1)..jiff::civil::date(2026, to.0, to.1),
+    )
+}
+
+// [spec:pgorm:req:generative.replay/test]    a temporal key's period observes as pgorm's own
+// range snapshot, which the Python wire accepts
+#[test]
+fn room_period_observes_as_a_range() -> TestResult {
+    let version = entities::room::Model {
+        id: 1,
+        valid_at: days((1, 1), (2, 1)),
+        rate: 100,
+    };
+    let observed = observe::model::<entities::room::Entity>(&version, "campaign.Room")?;
+    assert_eq!(
+        observed["fields"][1]["value"],
+        json!({
+            "version": 1,
+            "type": {"kind": "daterange"},
+            "sql_null": false,
+            "data": {"lower": "2026-01-01", "upper": "2026-02-01", "bounds": "[)"},
+        })
+    );
+    let empty = Value::Range(
+        pgorm::pgorm_query::RangeType::Int4,
+        Some(Box::new(pgorm::pgorm_query::Range::Empty)),
+    );
+    assert_eq!(encoded(empty)?["data"], json!({"empty": true}));
+    let open = Value::Range(
+        pgorm::pgorm_query::RangeType::Int4,
+        Some(Box::new(pgorm::pgorm_query::Range::new(
+            std::ops::Bound::Unbounded,
+            std::ops::Bound::Included(Value::Int(Some(5))),
+        ))),
+    );
+    assert_eq!(
+        encoded(open)?["data"],
+        json!({"lower": Json::Null, "upper": "5", "bounds": "(]"})
+    );
+    Ok(())
+}
+
+// [spec:pgorm:req:generative.replay/test]
+#[test]
+fn range_validation_rejects_what_the_python_format_rejects() {
+    let range = |data: Json| json!({"version": 1, "type": {"kind": "daterange"}, "sql_null": false, "data": data});
+    for data in [
+        json!({"lower": Json::Null, "upper": "2026-02-01", "bounds": "[)"}),
+        json!({"lower": "2026-1-1", "upper": Json::Null, "bounds": "[)"}),
+        json!({"lower": "2026-01-01", "upper": "2026-02-01", "bounds": "[["}),
+        json!({"empty": false}),
+        json!({"lower": "2026-01-01", "upper": "2026-02-01"}),
+    ] {
+        assert!(validate(&range(data.clone())).is_err(), "{data}");
+    }
+    assert!(validate(&range(json!({"empty": true}))).is_ok());
+}
+
+// [spec:pgorm:req:generative.replay/test]    the copied temporal graphs join by key and
+// overlapping period, and by a key the server does not enforce
+#[test]
+fn temporal_graphs_join_by_period_and_key() {
+    use pgorm::QueryTrait;
+
+    let aliases = vec!["r\" 雪".to_owned()];
+    let (sql, _) = entities::graphs::stay_rooms(&aliases).build();
+    assert!(sql.contains(r#""during" && "r"" 雪"."valid_at""#), "{sql}");
+    assert!(sql.contains("LEFT JOIN"), "{sql}");
+    let (sql, _) = entities::graphs::stay_guests(&aliases).build();
+    assert!(sql.contains(r#""guest_id" = "r"" 雪"."id""#), "{sql}");
+    assert!(!sql.contains("&&"), "{sql}");
+}

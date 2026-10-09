@@ -24,6 +24,16 @@ ACCOUNT = (
     "state",
 )
 NOTE = ("id", "account_id", "tenant", "body")
+ROOM = ("id", "valid_at", "rate")
+STAY = ("id", "room_id", "guest_id", "during")
+# Each registration's table, columns and primary key; a room's key ends with
+# its period, compared for equality by a lookup or a write by key.
+REGISTERED = {
+    "campaign.Account": ("accounts", ACCOUNT, ("id",)),
+    "campaign.Note": ("notes", NOTE, ("id",)),
+    "campaign.Room": ("rooms", ROOM, ("id", "valid_at")),
+    "campaign.Stay": ("stays", STAY, ("id",)),
+}
 
 
 @dataclass(frozen=True)
@@ -56,14 +66,15 @@ class Model:
 
 
 def registered(name):
-    if name not in ("campaign.Account", "campaign.Note"):
+    if name not in REGISTERED:
         raise InvalidOracle("independent model registration unavailable: " + name)
-    columns = ACCOUNT if name == "campaign.Account" else NOTE
-    return Model(
-        Table("accounts" if name == "campaign.Account" else "notes", "fixture"),
-        tuple((name, name) for name in columns),
-        name,
-    )
+    table, columns, _ = REGISTERED[name]
+    return Model(Table(table, "fixture"), tuple((name, name) for name in columns), name)
+
+
+def key(name):
+    """The columns a write by key filters on, in key order."""
+    return REGISTERED[name][2]
 
 
 def descriptor(table, mapping, fixture):
@@ -88,17 +99,50 @@ def descriptor(table, mapping, fixture):
     return Model(table, tuple(fields.items()))
 
 
+def stay_graph(short, aliases):
+    """A stay and its room versions by key and overlapping period, or its
+    guest, an account the server never checks: each joined LEFT."""
+    root = registered("campaign.Stay")
+    target = registered("campaign.Room" if short == "StayRooms" else "campaign.Account")
+    target = replace(target, table=replace(target.table, alias=aliases[0]))
+    if short == "StayRooms":
+        on = binary(
+            binary(root.column("room_id"), target.column("id"), "eq"),
+            binary(root.column("during"), target.column("valid_at"), "overlaps"),
+            "and",
+        )
+    else:
+        on = binary(root.column("guest_id"), target.column("id"), "eq")
+    models = [root, target]
+    columns = tuple(
+        model.table.column(physical) + " AS " + quote(f"slot_{slot}_{index}")
+        for slot, model in enumerate(models)
+        for index, (_, physical) in enumerate(model.fields)
+    )
+    return Query(
+        "select",
+        columns=columns,
+        tables=(root.table,),
+        joins=((target.table, "left", on),),
+        shape={"slots": models},
+    )
+
+
 def graph(name, aliases):
     arities = {
         "AccountOnly": 1,
         "OptionalNotes": 2,
         "RequiredNotes": 2,
         "SelfJoin": 2,
+        "StayRooms": 2,
+        "StayGuests": 2,
         **{"Arity" + str(n): n for n in range(3, 8)},
     }
     short = name.removeprefix("campaign.")
     if short not in arities or len(aliases) != arities[short] - 1:
         raise InvalidOracle("independent graph shape/alias count unsupported")
+    if short in ("StayRooms", "StayGuests"):
+        return stay_graph(short, aliases)
     root = registered("campaign.Account")
     models = [root]
     joins = []

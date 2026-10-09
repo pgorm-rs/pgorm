@@ -162,6 +162,154 @@ def key_cases():
     ]
 
 
+def _temporal(table):
+    """A room keyed `(id, valid_at WITHOUT OVERLAPS)`, its period last."""
+    return "\n".join(
+        [
+            PRELUDE,
+            "",
+            "    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]",
+            f'    #[pgorm(table_name = "{table}")]',
+            "    pub struct Model {",
+            "        #[pgorm(primary_key, auto_increment = false)]",
+            "        pub id: i32,",
+            "        #[pgorm(primary_key, without_overlaps)]",
+            "        pub valid_at: Range<Date>,",
+            "        pub rate: i32,",
+            "    }",
+            "",
+            "    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]",
+            "    pub enum Relation {}",
+            "",
+            "    impl ActiveModelBehavior for ActiveModel {}",
+        ]
+    )
+
+
+def temporal_key_cases():
+    """A key `WITHOUT OVERLAPS`: its period is the key's last part, so the
+    `ValueType` a lookup takes still ends with a range."""
+    room = _temporal("temporal_room")
+    alone = "\n".join(
+        [
+            PRELUDE,
+            "",
+            "    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]",
+            '    #[pgorm(table_name = "temporal_alone")]',
+            "    pub struct Model {",
+            "        #[pgorm(primary_key, without_overlaps)]",
+            "        pub valid_at: Range<Date>,",
+            "        pub rate: i32,",
+            "    }",
+            "",
+            "    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]",
+            "    pub enum Relation {}",
+            "",
+            "    impl ActiveModelBehavior for ActiveModel {}",
+        ]
+    )
+    return [
+        _accept("entity-key-temporal", room, "a period ends the key, WITHOUT OVERLAPS"),
+        _accept(
+            "entity-key-temporal-lookup",
+            room + "\n\n    pub fn version(valid_at: Range<Date>) -> Select<Entity> {\n"
+            "        Entity::find_by_id((1_i32, valid_at))\n    }",
+            "a lookup by key names one version: the period is part of its value",
+        ),
+        CompileCase(
+            id="entity-key-temporal-alone",
+            obligation=OBLIGATION,
+            verdict="reject",
+            phase="typeck",
+            source=alone,
+            expects=rejects(
+                message="a WITHOUT OVERLAPS key needs a column besides its period"
+            ),
+            note="the derive refuses the key PostgreSQL would: a period and nothing else",
+        ),
+    ]
+
+
+def key_check_cases():
+    """A relation's NOT ENFORCED, deferral and PERIOD, which the derive reads
+    into the relation and schema generation writes on the foreign key."""
+    room = _temporal("checked_room")
+    stay = entity_module(
+        table="checked_stay",
+        columns=(
+            ("room_id", "i32", ""),
+            ("guest_id", "i32", ""),
+            ("during", "Range<Date>", ""),
+        ),
+        relation=(
+            '        #[pgorm(belongs_to = "super::room::Entity", from = "Column::RoomId", '
+            'to = "super::room::Column::Id", from_period = "Column::During", '
+            'to_period = "super::room::Column::ValidAt", '
+            'deferrability = "DeferrableInitiallyDeferred")]\n'
+            "        Room,\n"
+            '        #[pgorm(belongs_to = "super::room::Entity", from = "Column::GuestId", '
+            'to = "super::room::Column::Id", enforcement = "NotEnforced")]\n'
+            "        Unchecked,"
+        ),
+    )
+    accepted = "\n\n".join(
+        [
+            _nested("room", room),
+            _nested(
+                "stay",
+                stay
+                + "\n\n    pub fn statement() -> pgorm::pgorm_query::TableCreateStatement {\n"
+                "        pgorm::Schema::new().create_table_from_entity(Entity)\n    }",
+            ),
+        ]
+    )
+    unknown = entity_module(
+        table="checked_unknown",
+        columns=(("parent_id", "i32", ""),),
+        relation=(
+            '        #[pgorm(belongs_to = "Entity", from = "Column::ParentId", '
+            'to = "Column::Id", enforcement = "Lax")]\n'
+            "        Parent,"
+        ),
+    )
+    half = entity_module(
+        table="checked_half",
+        columns=(("parent_id", "i32", ""), ("during", "Range<Date>", "")),
+        relation=(
+            '        #[pgorm(belongs_to = "Entity", from = "Column::ParentId", '
+            'to = "Column::Id", from_period = "Column::During")]\n'
+            "        Parent,"
+        ),
+    )
+    return [
+        _accept(
+            "entity-relation-key-checks",
+            accepted,
+            "a deferred PERIOD foreign key and one the server never enforces",
+        ),
+        CompileCase(
+            id="entity-relation-enforcement-unknown",
+            obligation=OBLIGATION,
+            verdict="reject",
+            phase="typeck",
+            source=unknown,
+            expects=rejects(
+                message="'enforcement' must be one of Enforced, NotEnforced"
+            ),
+            note="enforcement takes the two states PostgreSQL has, by name",
+        ),
+        CompileCase(
+            id="entity-relation-period-half",
+            obligation=OBLIGATION,
+            verdict="reject",
+            phase="typeck",
+            source=half,
+            expects=rejects(message="Missing attribute 'to_period'"),
+            note="a PERIOD pairs a period on each side",
+        ),
+    ]
+
+
 def enum_cases():
     """`DeriveActiveEnum`, including the schema-qualified identity."""
     body = (
@@ -327,8 +475,10 @@ def cases():
         column_cases()
         + naming_cases()
         + key_cases()
+        + temporal_key_cases()
         + enum_cases()
         + relation_cases()
+        + key_check_cases()
         + negative_cases()
     )
 

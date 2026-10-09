@@ -304,11 +304,73 @@ def _entities(e):
         tokens.add("active-" + step["data"]["method"])
         if _hooked(e, step):
             tokens.add("hooks")
+        if _written_entity(e, step["inputs"]["model"]) == "campaign.Room":
+            tokens.add("temporal-key")
+    if _deferred(e):
+        tokens.add("deferred-key")
     for node in e.each("entity.predicate"):
         value = e.payload(e.refs(node, "value")[0]) if e.refs(node, "value") else None
         if value is not None and value["type"]["kind"] == "enum":
             tokens.add("typed-enum-predicate")
     return tokens
+
+
+def _written_entity(e, reference):
+    """The registration an active model chain was begun from, if one is named.
+
+    A chain begins at `entity.active`, which names its entity, or at
+    `entity.into_active` over an earlier step's model: an entity read or
+    another active write, followed back the same way.
+    """
+    seen = set()
+    while reference is not None and reference not in seen:
+        seen.add(reference)
+        node = e.nodes.get(reference)
+        if node is None:
+            return None
+        if node["op"] == "active.set":
+            reference = node["inputs"].get("model")
+        elif node["op"] in ("entity.active", "entity.find"):
+            entity = e.input(node, "entity")
+            return None if entity is None else entity["data"].get("name")
+        elif node["op"] in ("entity.filter", "entity.order", "entity.page"):
+            reference = node["inputs"].get("query")
+        elif node["op"] == "entity.into_active":
+            result = e.input(node, "model")
+            step = next(
+                (
+                    item
+                    for item in e.steps
+                    if item["id"] == (result or {}).get("data", {}).get("step")
+                ),
+                None,
+            )
+            if step is None:
+                return None
+            reference = step["inputs"].get(
+                "model" if step["op"] == "active.write" else "query"
+            )
+        else:
+            return None
+    return None
+
+
+def _deferred(e):
+    """A stay inserted before the room version it references, in one
+    transaction that then commits: the temporal key's check waited."""
+    pending = {}
+    for step in e.steps:
+        scope = step.get("scope")
+        if step["op"] == "active.write" and step["data"]["method"] == "insert":
+            entity = _written_entity(e, step["inputs"]["model"])
+            if entity == "campaign.Stay" and scope != "root":
+                pending.setdefault(scope, "stay")
+            elif entity == "campaign.Room" and pending.get(scope) == "stay":
+                pending[scope] = "room"
+        elif step["op"] == "commit" and pending.get(scope) == "room":
+            if (step.get("observation") or {}).get("kind") != "error":
+                return True
+    return False
 
 
 def _declared_name(e, reference):
@@ -357,6 +419,10 @@ def _graph(e):
             tokens.add("optional-join")
         elif name == "SelfJoin":
             tokens.add("self-join")
+        elif name == "StayRooms":
+            tokens.add("period-relation")
+        elif name == "StayGuests":
+            tokens.add("not-enforced-relation")
     for node in e.each("graph.find"):
         aliases = node["data"].get("aliases") or []
         arity = len(aliases) + 1

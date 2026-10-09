@@ -14,7 +14,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     Ok(module)
 }
 
-// [spec:pgorm:req:python.entities/test]
+// [spec:pgorm:req:python.entities+1/test]
 #[test]
 fn query_sql_and_values_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -114,7 +114,7 @@ fn assert_active(native: &Bound<'_, PyAny>, rust: &account::ActiveModel) -> PyRe
     Ok(())
 }
 
-// [spec:pgorm:req:python.entities/test]
+// [spec:pgorm:req:python.entities+1/test]
 #[test]
 fn active_state_and_values_match_rust() -> PyResult<()> {
     Python::initialize();

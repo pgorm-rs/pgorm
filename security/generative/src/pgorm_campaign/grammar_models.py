@@ -7,6 +7,7 @@ from .corpus_builtin import ENUM
 from .grammar_expr import predicate
 from .grammar_sequence import account_row
 from .grammar_state import Field, Source
+from . import grammar_temporal as temporal
 
 GRAPHS = ("AccountOnly", "OptionalNotes", "RequiredNotes", "SelfJoin") + tuple(
     "Arity" + str(n) for n in range(3, 8)
@@ -135,6 +136,11 @@ def _active_read(state, source, scope):
 
 
 def active(state):
+    shape = state.choices.take(("registered", "registered", "temporal", "deferred"))
+    if shape == "temporal":
+        return temporal.temporal_key(state)
+    if shape == "deferred":
+        return temporal.deferred_key(state)
     source = entity_source(state, state.choices.take(("Account", "Note")))
     scope = "root"
     if state.choices.take((False, True)):
@@ -178,15 +184,20 @@ def active(state):
 
 # [spec:pgorm:req:generative.grammar]
 def graph(state, *, cursor=False):
-    name = state.choices.take(GRAPHS)
+    # A cursor pages an account root by its id or rank, so a stay-rooted graph
+    # is drawn only for an ordered read.
+    name = state.choices.take(GRAPHS if cursor else GRAPHS + temporal.GRAPHS)
     arity = (
         1 if name == "AccountOnly" else int(name[-1]) if name.startswith("Arity") else 2
     )
     aliases = [state.name("slot" + str(index)) for index in range(1, arity)]
     registration = state.node("graph", data={"name": "campaign." + name})
     query = state.node("graph.find", {"graph": registration}, {"aliases": aliases})
-    sources = [Source(query, "Account", fields(state, "accounts"), "graph")]
-    for index, alias in enumerate(aliases, 1):
+    if name in temporal.GRAPHS:
+        sources = temporal.graph_sources(state, name, query, aliases[0])
+    else:
+        sources = [Source(query, "Account", fields(state, "accounts"), "graph")]
+    for index, alias in enumerate(aliases if name not in temporal.GRAPHS else (), 1):
         table = "accounts" if name == "SelfJoin" else "notes"
         sources.append(
             Source(

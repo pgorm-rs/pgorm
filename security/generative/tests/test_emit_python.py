@@ -1,7 +1,7 @@
 import ast
 import unittest
 
-from pgorm_campaign import baseline, emit_python
+from pgorm_campaign import baseline, emit_python, wire
 from pgorm_campaign.author import Author
 from pgorm_campaign.grammar import FAMILIES, generate
 
@@ -162,6 +162,19 @@ class EmitPythonTests(unittest.TestCase):
         self.assertIn("_descriptor(n_n0, None)", ast.unparse(tree))
         tables = constant(tree, "FIXTURE_TABLES")
         self.assertIn("accounts", [table["name"] for table in tables])
+
+    def test_ranges_rebuild_through_public_range_values(self):
+        value = wire.scalar(
+            "daterange", {"lower": "2026-01-01", "upper": None, "bounds": "[)"}
+        )
+        self.assertEqual(
+            emit_python.value_source(value),
+            "p.Value(p.Range(date.fromisoformat('2026-01-01'), None, '[)'), 'daterange')",
+        )
+        empty = wire.scalar("int4range", {"empty": True})
+        self.assertEqual(
+            emit_python.value_source(empty), "p.Value(p.Range.empty(), 'int4range')"
+        )
 
     def test_render_accepts_program_dict_and_text(self):
         program = generate(20260911, 3, family="select").program
