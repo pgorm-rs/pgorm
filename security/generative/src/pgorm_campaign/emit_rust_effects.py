@@ -234,6 +234,8 @@ class EffectEmitter:
                     else f"{pad}    Ok(observation)"
                 )
                 self.record(step, body, lines, pad, rows=keep)
+        elif name in ("entity.change", "entity.changes", "entity.upsert"):
+            self.record(step, self.versions(step, connection, pad), lines, pad)
         elif name == "execute":
             self.helpers.add("params")
             body = [
@@ -259,6 +261,89 @@ class EffectEmitter:
             self.record(step, body, lines, pad)
         else:
             raise UnsupportedInstruction("no standalone Rust source for " + name)
+
+    def versions(self, step, connection, pad):
+        """A version-returning write: each row its pair, old (absent for a
+        row an upsert inserted) then new, read through the Rust terminal."""
+        name, d, i = step["op"], step["data"], step["inputs"]
+        key = {"entity.change": "model", "entity.changes": "entity"}.get(name)
+        registration = self.registration(i[key] if key else i["models"][0])
+        entity = self.entity_type(registration)
+        label = literal(registration)
+        pair = (
+            f"{REPLAY}::observe::tuple(vec![{REPLAY}::observe::model::<{entity}>("
+            f"&change.old, {label})?, {REPLAY}::observe::model::<{entity}>("
+            f"&change.new, {label})?])"
+        )
+        if name == "entity.change":
+            return [
+                f"{pad}    let change = pgorm::Update::one({self.use(i['model'])})?"
+                f".exec_returning_change(&{connection}).await?;",
+                f"{pad}    Ok({REPLAY}::observe::collected(vec![{pair}]))",
+            ]
+        if name == "entity.changes":
+            body = [
+                f"{pad}    let mut update = pgorm::Update::many(<{entity} as Default>::default());"
+            ]
+            for column, value in zip(d["columns"], i["values"], strict=True):
+                body.append(
+                    f"{pad}    let column = {self.entity_column(registration, column)};"
+                )
+                body.append(
+                    f"{pad}    update = update.col_expr(column, pgorm::ColumnTrait::save_as("
+                    f"&column, {Q}::Expr::val({self.use(value)})));"
+                )
+            body.extend(
+                [
+                    f"{pad}    let changes = pgorm::QueryFilter::filter(update, "
+                    f"{self.predicate(i['predicate'])})"
+                    f".exec_returning_changes(&{connection}).await?;",
+                    f"{pad}    let mut rows = Vec::new();",
+                    f"{pad}    for change in changes {{",
+                    f"{pad}        rows.push({pair});",
+                    f"{pad}    }}",
+                    f"{pad}    Ok({REPLAY}::observe::collected(rows))",
+                ]
+            )
+            return body
+        target = (
+            f"{Q}::OnConflict::column({Q}::Name::runtime({literal(d['conflict'][0])}))"
+        )
+        for column in d["conflict"][1:]:
+            target += f".and_column({Q}::Name::runtime({literal(column)}))"
+        if d["update"]:
+            action = target + "".join(
+                f".update_column({Q}::Name::runtime({literal(column)}))"
+                for column in d["update"]
+            )
+            action = f"{Q}::OnConflict::from({action})"
+        else:
+            action = target + ".do_nothing()"
+        models = ", ".join(self.use(model) for model in i["models"])
+        if d["rows"] == "one":
+            if len(i["models"]) != 1:
+                raise UnsupportedInstruction("an upsert of one row takes one model")
+            insert = (
+                f"pgorm::Insert::one({models}).on_conflict({action})"
+                f".exec_returning_upsert(&{connection}).await?.into_iter().collect::<Vec<_>>()"
+            )
+        else:
+            insert = (
+                f"pgorm::Insert::many(vec![{models}]).on_conflict({action})"
+                f".exec_returning_upserts(&{connection}).await?"
+            )
+        return [
+            f"{pad}    let written = {insert};",
+            f"{pad}    let mut rows = Vec::new();",
+            f"{pad}    for row in written {{",
+            f"{pad}        rows.push(match row {{",
+            f"{pad}            pgorm::Upserted::Inserted(model) => {REPLAY}::observe::tuple(vec!["
+            f"{REPLAY}::observe::absent(), {REPLAY}::observe::model::<{entity}>(&model, {label})?]),",
+            f"{pad}            pgorm::Upserted::Updated(change) => {pair},",
+            f"{pad}        }});",
+            f"{pad}    }}",
+            f"{pad}    Ok({REPLAY}::observe::collected(rows))",
+        ]
 
     def record(self, step, body, lines, pad, *, rows=False):
         rendered = ", ".join(literal(path) for path in self.paths(step))
@@ -301,6 +386,13 @@ class EffectEmitter:
             return ["pgorm::ConnectionTrait::query_raw", "tokio_postgres::RowStream"]
         if name == "active.write":
             return ["pgorm::ActiveModelTrait::" + d["method"]]
+        if name == "entity.change":
+            return ["pgorm::UpdateOne::exec_returning_change"]
+        if name == "entity.changes":
+            return ["pgorm::UpdateMany::exec_returning_changes"]
+        if name == "entity.upsert":
+            terminal = "upsert" if d["rows"] == "one" else "upserts"
+            return ["pgorm::Insert::exec_returning_" + terminal]
         if name == "inspect":
             if self.types[i["query"]] in ("pipeline", "sources"):
                 return [f"{PL}::Pipeline::into_sql"]

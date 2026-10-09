@@ -127,6 +127,8 @@ class FamilyVariationTest(unittest.TestCase):
         # and covered by the runtime campaign instead.
         observed_only = {
             "entities.hooks",
+            "entities.upsert-inserted",
+            "entities.upsert-updated",
             "graph.absent-source",
             "graph.model-decode",
             "sequences.stream-cancel",
@@ -187,6 +189,36 @@ class FamilyVariationTest(unittest.TestCase):
         self.assertIn("entities.hooks", self.hooked("|hook"))
         self.assertNotIn("entities.hooks", self.hooked(""))
         self.assertNotIn("entities.hooks", self.hooked("|other"))
+
+    def upserted(self, old):
+        """An upsert whose one observed row's old version is `old`."""
+        for index in range(60):
+            program = grammar.generate(20260913, index, family="active").program
+            data = program.data()
+            positions = [
+                position
+                for position, step in enumerate(data["steps"])
+                if step["op"] == "entity.upsert"
+            ]
+            if not positions:
+                continue
+            report = executed(program)
+            record = {"kind": "record", "fields": []}
+            report["subject"]["steps"][positions[0]]["observation"] = {
+                "kind": "rows",
+                "rows": [{"kind": "tuple", "items": [old, record]}],
+            }
+            return campaign_coverage.observed(data, report)
+        self.fail("the active family never upserted")
+
+    # [spec:pgorm:req:generative.matrix/test]
+    def test_upsert_action_read_off_old_row(self):
+        inserted = self.upserted({"kind": "absent"})
+        self.assertIn("entities.upsert-inserted", inserted)
+        self.assertNotIn("entities.upsert-updated", inserted)
+        updated = self.upserted({"kind": "record", "fields": []})
+        self.assertIn("entities.upsert-updated", updated)
+        self.assertNotIn("entities.upsert-inserted", updated)
 
     # [spec:pgorm:req:generative.verdict/test]
     def test_an_unrun_program_attributes_no_variation(self):

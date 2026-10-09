@@ -50,7 +50,7 @@ compile-time verification of derives, lifetimes and generic shapes.
 | --- | --- |
 | CRUD | SELECT, insert values, update values and guards, delete guards, conflict/RETURNING, empty batches, omitted/NULL/set writes |
 | Conditions | Nested AND/OR/NOT, empty membership/disjunction, NULLs, tenant guards and predicate grouping |
-| Entities | Registered accounts and notes, ActiveModel insert/update/delete with set, unchanged and not-set states, hooks and typed enum predicates, a temporal key's versions written by their whole key, and a stay inserted before its room under a key checked at commit |
+| Entities | Registered accounts and notes, ActiveModel insert/update/delete with set, unchanged and not-set states, hooks and typed enum predicates, a temporal key's versions written by their whole key, a stay inserted before its room under a key checked at commit, and the writes that return each row before and after: an update by key, an update of many rows, and an upsert telling an inserted row from an updated one |
 | Graph | Required/optional joins, self-joins, hostile aliases, absent sources, model decode, cursor bounds, duplicate sort keys, a relation matching on a PERIOD and one the server does not enforce |
 | Pipeline | Literal/binder paths, projections, grouping/HAVING, windows, joins, composed sources, select_sources and set operations |
 | Names | Schema/table/column/alias, ORDER/GROUP selection, function/type/qualified-enum names and enum DDL |

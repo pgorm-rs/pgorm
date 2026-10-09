@@ -10,6 +10,7 @@ mod model;
 pub(crate) mod query;
 mod registry;
 mod relations;
+mod versions;
 
 pub use active::{ActiveState, PyActiveModel, PyActiveValue};
 pub use column::PyEntityColumn;
@@ -17,6 +18,10 @@ pub use model::PyEntityModel;
 pub use query::PyEntityQuery;
 pub(crate) use registry::NativeRegistry;
 pub use registry::Registry;
+pub(crate) use versions::TERMINALS as version_terminals;
+pub use versions::{
+    PyChange, PyEntityInsert, PyEntityInsertMany, PyEntityUpdate, PyEntityUpdateMany, PyUpserted,
+};
 
 use crate::identifiers::PyIdentifier;
 use pyo3::prelude::*;
@@ -61,6 +66,29 @@ impl PyEntity {
         }
     }
 
+    /// An update by the ActiveModel's key, whose terminal returns the row
+    /// before and after it.
+    fn update(&self, active: PyRef<'_, PyActiveModel>) -> PyResult<PyEntityUpdate> {
+        PyEntityUpdate::new(self.backend.clone(), &active)
+    }
+
+    /// An update of every row its filters admit, whose terminal returns each
+    /// changed row before and after.
+    fn update_many(&self) -> PyEntityUpdateMany {
+        PyEntityUpdateMany::new(self.backend.clone())
+    }
+
+    /// An insert of one ActiveModel, whose terminal says what it did.
+    fn insert(&self, active: PyRef<'_, PyActiveModel>) -> PyResult<PyEntityInsert> {
+        PyEntityInsert::new(self.backend.clone(), active)
+    }
+
+    /// An insert of a batch of ActiveModels, whose terminal says what it did
+    /// with each row.
+    fn insert_many(&self, actives: Vec<PyRef<'_, PyActiveModel>>) -> PyResult<PyEntityInsertMany> {
+        PyEntityInsertMany::new(self.backend.clone(), &actives)
+    }
+
     fn __repr__(&self) -> String {
         format!("Entity({:?})", self.name())
     }
@@ -74,6 +102,12 @@ pub(crate) fn install(module: &Bound<'_, PyModule>, registry: Registry) -> PyRes
     module.add_class::<PyActiveModel>()?;
     module.add_class::<PyActiveValue>()?;
     module.add_class::<ActiveState>()?;
+    module.add_class::<PyChange>()?;
+    module.add_class::<PyUpserted>()?;
+    module.add_class::<PyEntityUpdate>()?;
+    module.add_class::<PyEntityUpdateMany>()?;
+    module.add_class::<PyEntityInsert>()?;
+    module.add_class::<PyEntityInsertMany>()?;
     module.add("_registry", registry::NativeRegistry(registry))?;
     module.add_function(wrap_pyfunction!(registry::entity, module)?)?;
     Ok(())

@@ -6,7 +6,7 @@ use pgorm::pgorm_query::{Deferrability, Enforcement, FromItem};
 use pgorm::{EntityTrait, Iterable, RelationDef, RelationTrait, RelationType};
 use serde_json::{Value as Json, json};
 
-// [spec:pgorm:req:python.entities+1]
+// [spec:pgorm:req:python.entities+2]
 /// Every relation the entity's `Relation` enum declares, in declaration order.
 pub(super) fn describe<E: EntityTrait>() -> Vec<Json> {
     E::Relation::iter()

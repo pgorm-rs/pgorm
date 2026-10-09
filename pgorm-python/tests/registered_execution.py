@@ -135,8 +135,61 @@ async def models(db):
     }
 
 
+def change(value):
+    return [model(value.old), model(value.new)]
+
+
+def upserted(row):
+    if isinstance(row, p.Upserted.Inserted):
+        return ["inserted", model(row.model)]
+    return ["updated", change(row.change)]
+
+
+async def versions(db):
+    await db.execute(
+        p.RawSQL("TRUNCATE python_entities.notes, python_entities.accounts")
+    )
+    account = p.entity("app.Account")
+    first = await active(1, "Native").insert(db)
+    await active(2, "Other").insert(db)
+    renamed = p.ConflictTarget("id").update("display name")
+    updated = await account.update(
+        first.into_active().set("note", "change 雪")
+    ).returning_change(db)
+    many = await (
+        account.update_many()
+        .set("note", "bulk")
+        .filter(account.col("id") == 2)
+        .returning_changes(db)
+    )
+    one = await (
+        account.insert(active(1, "upserted")).on_conflict(renamed).returning_upsert(db)
+    )
+    batch = await (
+        account.insert_many([active(2, "again"), active(7, "seven")])
+        .on_conflict(renamed)
+        .returning_upserts(db)
+    )
+    skipped = await (
+        account.insert(active(1, "skipped"))
+        .on_conflict(p.ConflictTarget("id").ignore())
+        .returning_upsert(db)
+    )
+    return {
+        "change": change(updated),
+        "changes": [change(item) for item in many],
+        "upsert": upserted(one),
+        "upserts": [upserted(row) for row in batch],
+        "skipped": skipped is None,
+    }
+
+
 async def exercise(db):
-    return {"runtime": await runtime(db), "models": await models(db)}
+    return {
+        "runtime": await runtime(db),
+        "models": await models(db),
+        "versions": await versions(db),
+    }
 
 
 # [spec:pgorm:req:python.acceptance+1/test]

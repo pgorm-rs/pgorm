@@ -13,7 +13,7 @@ def days(start, end):
     return p.Range(date(2026, *start), date(2026, *end))
 
 
-# [spec:pgorm:req:python.entities+1/test]
+# [spec:pgorm:req:python.entities+2/test]
 # [spec:pgorm:req:python.graph/test]
 class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

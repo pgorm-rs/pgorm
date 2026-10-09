@@ -66,6 +66,49 @@ async def stream(query, data, connection):
     }
 
 
+def conflict(data, p):
+    """The ON CONFLICT action an upsert declares: update the named columns
+    from the proposed row, or, naming none, do nothing."""
+    target = p.ConflictTarget(*data["conflict"])
+    return target.update(*data["update"]) if data["update"] else target.ignore()
+
+
+async def versions(name, inputs, data, connection, p):
+    """A version-returning write's rows, each the pair (old, new); old is
+    `None` for a row an upsert inserted."""
+    if name == "entity.change":
+        model = inputs["model"]
+        entity = p.entity(model.entity_name)
+        change = await entity.update(model).returning_change(connection)
+        return [(change.old, change.new)], ["pgorm::UpdateOne::exec_returning_change"]
+    if name == "entity.changes":
+        update = inputs["entity"].update_many()
+        for column, value in zip(data["columns"], inputs["values"], strict=True):
+            update = update.set(column, value)
+        changes = await update.filter(inputs["predicate"]).returning_changes(connection)
+        return [(change.old, change.new) for change in changes], [
+            "pgorm::UpdateMany::exec_returning_changes"
+        ]
+    models = inputs["models"]
+    entity = p.entity(models[0].entity_name)
+    if data["rows"] == "one":
+        insert = entity.insert(models[0]).on_conflict(conflict(data, p))
+        row = await insert.returning_upsert(connection)
+        rows, path = ([] if row is None else [row]), "exec_returning_upsert"
+    else:
+        insert = entity.insert_many(models).on_conflict(conflict(data, p))
+        rows, path = (
+            await insert.returning_upserts(connection),
+            "exec_returning_upserts",
+        )
+    return [
+        (None, row.model)
+        if isinstance(row, p.Upserted.Inserted)
+        else (row.change.old, row.change.new)
+        for row in rows
+    ], ["pgorm::Insert::" + path]
+
+
 class Effects:
     def __init__(self, resolution, connection):
         self.resolution = resolution
@@ -75,7 +118,12 @@ class Effects:
 
     async def perform(self, step):
         name, d = step["op"], step["data"]
-        inputs = {key: self.resolution.get(ref) for key, ref in step["inputs"].items()}
+        inputs = {
+            key: [self.resolution.get(item) for item in ref]
+            if isinstance(ref, list)
+            else self.resolution.get(ref)
+            for key, ref in step["inputs"].items()
+        }
         connection = self.scopes[step["scope"]]
         query = inputs.get("query")
         match name:
@@ -108,6 +156,13 @@ class Effects:
                     [] if d["method"] == "delete" else [value]
                 )
                 return result, ["pgorm::ActiveModelTrait::" + d["method"]]
+            case "entity.change" | "entity.changes" | "entity.upsert":
+                rows, paths = await versions(name, inputs, d, connection, self.p)
+                self.resolution.results[step["id"]] = rows
+                return {
+                    "kind": "rows",
+                    "rows": [observations.row(row) for row in rows],
+                }, paths
             case "begin":
                 if step["scope"] == "root":
                     isolation = None if d["isolation"] == "default" else d["isolation"]

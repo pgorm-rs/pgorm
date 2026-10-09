@@ -169,6 +169,43 @@ async def _active(model, method, connection):
     return {"kind": "rows", "rows": [_row(value)]}, paths, [value]
 
 
+def _conflict(conflict, update):
+    target = p.ConflictTarget(*conflict)
+    return target.update(*update) if update else target.ignore()
+
+
+async def _versions(name, inputs, data, connection):
+    if name == "entity.change":
+        model = inputs["model"]
+        change = await p.entity(model.entity_name).update(model).returning_change(connection)
+        rows, paths = [(change.old, change.new)], ["pgorm::UpdateOne::exec_returning_change"]
+    elif name == "entity.changes":
+        update = inputs["entity"].update_many()
+        for column, value in zip(data["columns"], inputs["values"], strict=True):
+            update = update.set(column, value)
+        changes = await update.filter(inputs["predicate"]).returning_changes(connection)
+        rows = [(change.old, change.new) for change in changes]
+        paths = ["pgorm::UpdateMany::exec_returning_changes"]
+    else:
+        models = inputs["models"]
+        entity = p.entity(models[0].entity_name)
+        action = _conflict(data["conflict"], data["update"])
+        if data["rows"] == "one":
+            row = await entity.insert(models[0]).on_conflict(action).returning_upsert(connection)
+            written, path = ([] if row is None else [row]), "exec_returning_upsert"
+        else:
+            insert = entity.insert_many(models).on_conflict(action)
+            written, path = await insert.returning_upserts(connection), "exec_returning_upserts"
+        rows = [
+            (None, row.model)
+            if isinstance(row, p.Upserted.Inserted)
+            else (row.change.old, row.change.new)
+            for row in written
+        ]
+        paths = ["pgorm::Insert::" + path]
+    return {"kind": "rows", "rows": [_row(row) for row in rows]}, paths, rows
+
+
 def _inspect(query):
     if not hasattr(query, "inspect"):
         raise p.UnsupportedCapabilityError("query has no public inspect terminal")
@@ -942,6 +979,20 @@ class Emitter:
             case "active.write":
                 model = self.var(i["model"])
                 result = f"await _active({model}, {literal(d['method'])}, {connection})"
+            case "entity.change" | "entity.changes" | "entity.upsert":
+                inputs = ", ".join(
+                    f"{literal(key)}: "
+                    + (
+                        "[" + ", ".join(self.var(item) for item in value) + "]"
+                        if isinstance(value, list)
+                        else self.var(value)
+                    )
+                    for key, value in i.items()
+                )
+                result = (
+                    f"await _versions({literal(name)}, {{{inputs}}}, "
+                    f"{literal(d)}, {connection})"
+                )
             case "stream":
                 result = (
                     f"await _stream({query}, {literal(d['take'])}, "

@@ -216,6 +216,12 @@ fn manifest() -> Value {
         operations.extend(crate::statements::capabilities());
         operations.extend(crate::results::capabilities());
         operations.extend(crate::entities::capabilities());
+        for (name, api) in crate::entities::version_terminals {
+            operations.insert(
+                name.to_owned(),
+                json!({"rust_api": api, "features": [], "registration_required": true}),
+            );
+        }
         operations.extend(crate::graphs::capabilities());
         operations.extend(crate::pipeline::capabilities());
         operations.extend(crate::schema::capabilities());

@@ -308,6 +308,21 @@ def _entities(e):
             tokens.add("temporal-key")
     if _deferred(e):
         tokens.add("deferred-key")
+    if e.dispatched("entity.change"):
+        tokens.add("update-change")
+    if e.dispatched("entity.changes"):
+        tokens.add("update-changes")
+    for step in e.dispatched("entity.upsert"):
+        # Which an upsert did is read off the row as it stood before the
+        # write, as the terminal decides it: absent for a row it inserted.
+        for row in _rows(step.get("observation")):
+            items = row.get("items") or []
+            if row.get("kind") == "tuple" and len(items) == 2:
+                tokens.add(
+                    "upsert-inserted"
+                    if items[0].get("kind") == "absent"
+                    else "upsert-updated"
+                )
     for node in e.each("entity.predicate"):
         value = e.payload(e.refs(node, "value")[0]) if e.refs(node, "value") else None
         if value is not None and value["type"]["kind"] == "enum":

@@ -164,13 +164,18 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > MUST be explicit errors. Dynamic descriptors MUST NOT claim to instantiate
 > Rust derives, EntityTrait implementations or ActiveModelBehavior hooks.
 
-> [spec:pgorm:req:python.entities+1]
+> [spec:pgorm:req:python.entities+2]
 > Concrete compiled entity registrations MUST expose their actual Rust entity,
 > model, column and ActiveModel operations, including write-state and hook
 > semantics. Registration MUST declare its types and supported terminals, and
 > the declared attributes that change what a key or a join means: a key ending
 > `WITHOUT OVERLAPS`, and each relation's columns, `PERIOD` pair, enforcement
-> and deferrability.
+> and deferrability. The write terminals that read a row's two versions —
+> `UpdateOne::exec_returning_change`, `UpdateMany::exec_returning_changes` and
+> `Insert::exec_returning_upsert(s)` — MUST be reachable as the statement
+> terminals they are in Rust, without ActiveModel hooks, answering a `Change`
+> of two models and an `Upserted` that is either the inserted model or the
+> updated row's change.
 > Python MUST NOT fabricate new generic instantiations at runtime. A supported
 > registration mechanism MUST permit downstream application entities; the
 > public package MUST NOT be limited to this repository's test fixtures.

@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pgorm as p
 from pgorm import app
 from pgorm._registered.compat import check
+from pgorm._registered.entities import Change, Inserted, Updated
 import registered_entities as fixture
 
 
@@ -60,6 +61,43 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(query.inspect().params[0].kind, "i32")
                 self.assertEqual(await updated.into_active().delete(connection), 1)
                 self.assertIsNone(await query.one_opt(connection))
+
+    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.entities+2/test]
+    async def test_generated_views_return_typed_versions(self):
+        def active(identity, name):
+            return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
+
+        renamed = p.ConflictTarget("id").update("display name")
+        async with self.pool.connection() as connection:
+            first = await app.Account.insert(active(1, "One")).returning_upsert(connection)
+            self.assertIsInstance(first, Inserted)
+            self.assertIsInstance(first.model, app.AccountModel)
+            change = await app.Account.update(
+                first.model.into_active().set_note("noted")
+            ).returning_change(connection)
+            self.assertIsInstance(change, Change)
+            self.assertIsInstance(change.new, app.AccountModel)
+            self.assertEqual((change.old.note, change.new.note), (None, "noted"))
+            changes = await (
+                app.Account.update_many()
+                .set("note", "bulk")
+                .filter(app.Account.col("id") == 1)
+                .returning_changes(connection)
+            )
+            self.assertEqual([(c.old.note, c.new.note) for c in changes], [("noted", "bulk")])
+            rows = await (
+                app.Account.insert_many([active(1, "Again"), active(2, "Two")])
+                .on_conflict(renamed)
+                .returning_upserts(connection)
+            )
+            match rows:
+                case [Updated(change), Inserted(model)]:
+                    self.assertIsInstance(change.old, app.AccountModel)
+                    self.assertEqual((change.old.display_name, change.new.display_name), ("One", "Again"))
+                    self.assertEqual(model.display_name, "Two")
+                case other:
+                    self.fail(f"expected an update then an insert, got {other!r}")
 
     # [spec:pgorm:req:python.codegen/test]
     async def test_graph_views_keep_optional_models(self):

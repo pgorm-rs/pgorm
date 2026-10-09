@@ -4,6 +4,15 @@ from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
 from .. import _native as native_types
+from .versions import (
+    Change,
+    InsertManyView,
+    InsertView,
+    Inserted,
+    UpdateManyView,
+    UpdateView,
+    Updated,
+)
 
 M = TypeVar("M", bound="ModelView")
 A = TypeVar("A", bound="ActiveView")
@@ -117,6 +126,23 @@ class EntityView(Generic[M, A]):
 
     def active(self) -> A:
         return self._active_class(self._entity.active())
+
+    def update(self, active) -> "UpdateView[M]":
+        return UpdateView(self._entity.update(_native_active(active)), self._model_class)
+
+    def update_many(self) -> "UpdateManyView[M]":
+        return UpdateManyView(self._entity.update_many(), self._model_class)
+
+    def insert(self, active) -> "InsertView[M]":
+        return InsertView(self._entity.insert(_native_active(active)), self._model_class)
+
+    def insert_many(self, actives) -> "InsertManyView[M]":
+        native = [_native_active(active) for active in actives]
+        return InsertManyView(self._entity.insert_many(native), self._model_class)
+
+
+def _native_active(active):
+    return active.native if isinstance(active, ActiveView) else active
 
 
 class QueryView(Generic[M]):

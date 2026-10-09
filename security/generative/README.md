@@ -92,9 +92,14 @@ rows, optional tuple members, stream state, errors and affected-row counts.
 `executed` means observations were collected; an independent oracle must still
 decide correctness. It is not a passing campaign verdict.
 
-The 41 handwritten live probes exercise all 89 declared instructions and eight
-effects, plus timeout, cancellation, invalid-input, inactive-dispatch and build
-prohibition checks. They verify 125 exact scalar/null/array value snapshots and
+The 41 handwritten live probes exercise all 89 declared instructions and the
+eight effects they were written for, plus timeout, cancellation, invalid-input,
+inactive-dispatch and build prohibition checks. The three version-returning
+write effects added since (`entity.change`, `entity.changes` and
+`entity.upsert`: `UpdateOne::exec_returning_change`,
+`UpdateMany::exec_returning_changes` and `Insert::exec_returning_upsert(s)`,
+each row observed as its old and new versions, the old one absent for a row
+an upsert inserted) are exercised by the generated active-family programs. They verify 125 exact scalar/null/array value snapshots and
 pool reuse separately. Each executor run has a fresh evidence directory under
 `target/generative-executor/`. This is executor validation, not the generated
 full campaign or million-program stress proof.

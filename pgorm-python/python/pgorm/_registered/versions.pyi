@@ -1,0 +1,50 @@
+from typing import Any, Generic, TypeVar
+from .. import _native as native_types
+from ..runtime import Connection
+from ..transactions import Transaction
+
+M = TypeVar("M")
+Column = str | native_types.Identifier | native_types.EntityColumn
+
+class Change(Generic[M]):
+    old: M
+    new: M
+    def __init__(self, old: M, new: M) -> None: ...
+
+class Inserted(Generic[M]):
+    __match_args__ = ("model",)
+    model: M
+    def __init__(self, model: M) -> None: ...
+
+class Updated(Generic[M]):
+    __match_args__ = ("change",)
+    change: Change[M]
+    def __init__(self, change: Change[M]) -> None: ...
+
+class UpdateView(Generic[M]):
+    def __init__(self, update: native_types.EntityUpdate, model: type[M]) -> None: ...
+    async def returning_change(self, connection: Connection | Transaction) -> Change[M]: ...
+
+class UpdateManyView(Generic[M]):
+    def __init__(self, update: native_types.EntityUpdateMany, model: type[M]) -> None: ...
+    def set(self, column: Column, value: Any) -> UpdateManyView[M]: ...
+    def filter(self, predicate: native_types.Expr | native_types.Condition) -> UpdateManyView[M]: ...
+    async def returning_changes(self, connection: Connection | Transaction) -> list[Change[M]]: ...
+
+class InsertView(Generic[M]):
+    def __init__(self, insert: native_types.EntityInsert, model: type[M]) -> None: ...
+    def on_conflict(
+        self, action: native_types.Conflict | native_types.ConflictUpdate
+    ) -> InsertView[M]: ...
+    async def returning_upsert(
+        self, connection: Connection | Transaction
+    ) -> Inserted[M] | Updated[M] | None: ...
+
+class InsertManyView(Generic[M]):
+    def __init__(self, insert: native_types.EntityInsertMany, model: type[M]) -> None: ...
+    def on_conflict(
+        self, action: native_types.Conflict | native_types.ConflictUpdate
+    ) -> InsertManyView[M]: ...
+    async def returning_upserts(
+        self, connection: Connection | Transaction
+    ) -> list[Inserted[M] | Updated[M]]: ...

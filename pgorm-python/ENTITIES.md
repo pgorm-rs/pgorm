@@ -115,6 +115,56 @@ semantics; the dynamic `fetch_one` terminal has its own strict cardinality
 contract. Entity streams and arbitrary partial entity projections are not
 advertised by this registration API.
 
+## Writes that return both versions
+
+PostgreSQL 18's `RETURNING` reads a written row as it was and as the write
+left it. Four entity terminals return both, through the Rust terminals that
+do:
+
+```python
+Account = p.entity("app.Account")
+change = await Account.update(model.into_active().set("note", "x")).returning_change(connection)
+print(change.old["note"], change.new["note"])
+changes = await (Account.update_many().set("note", "bulk")
+                 .filter(Account.col("id") >= 2).returning_changes(connection))
+renamed = p.ConflictTarget("id").update("display name")
+match await Account.insert(active).on_conflict(renamed).returning_upsert(connection):
+    case p.Upserted.Inserted(model): ...
+    case p.Upserted.Updated(change): ...
+    case None: ...  # the conflict clause wrote nothing
+rows = await Account.insert_many([a, b]).on_conflict(renamed).returning_upserts(connection)
+```
+
+| Python | Rust |
+| --- | --- |
+| `entity.update(active).returning_change(connection)` | `Update::one(active)?.exec_returning_change` |
+| `entity.update_many().set(..).filter(..).returning_changes(connection)` | `Update::many(entity).col_expr(..).filter(..).exec_returning_changes` |
+| `entity.insert(active).on_conflict(..).returning_upsert(connection)` | `Insert::one(active).on_conflict(..).exec_returning_upsert` |
+| `entity.insert_many(actives).on_conflict(..).returning_upserts(connection)` | `Insert::many(actives).on_conflict(..).exec_returning_upserts` |
+
+A `Change` holds `old` and `new`, each an `EntityModel`. `Upserted` is
+`Upserted.Inserted(model)` for a row the insert wrote or `Upserted.Updated(change)`
+for the row its `ON CONFLICT DO UPDATE` updated; `into_model()` is the row as
+the statement left it either way. `returning_upsert` answers `None`, and
+`returning_upserts` leaves out the row, when the conflict clause did not write
+it (`DO NOTHING`, or a `DO UPDATE` whose `WHERE` held it back). The conflict
+action is the statement builders' own `Conflict` or `ConflictUpdate`.
+
+These are statement terminals, as they are in Rust, so no `ActiveModelBehavior`
+hook runs around them: an `update` returning its change does not bump what a
+`before_save` would. With nothing set, `returning_change` sends nothing and
+returns the row its key reads as both versions; a key matching no row raises
+`DatabaseError`, as does `returning_changes` with nothing set (Rust's
+`NothingToSet`). `update_many().set(column, value)` converts a value by the
+column's declared type and writes it through the column's `save_as`, or takes
+an `Expr` as written. An insert of models that set different columns is
+refused, and a batch of none writes and answers nothing. Rust renames the two
+versions in `RETURNING`, so an entity whose table is called `old` or `new`
+still reports them in order. An ActiveModel of another registration raises
+`LifecycleError`. A generated module's typed views return `Change`,
+`Inserted` and `Updated` from `pgorm._registered.entities` holding its typed
+models.
+
 ## Values, state and hooks
 
 Column lookup and model keys use SQL names. `describe()` also reports the

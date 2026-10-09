@@ -120,7 +120,7 @@ impl PyConflictUpdate {
     }
 }
 
-pub(super) fn clause(value: &Bound<'_, PyAny>) -> PyResult<OnConflict> {
+pub(crate) fn clause(value: &Bound<'_, PyAny>) -> PyResult<OnConflict> {
     if let Ok(value) = value.extract::<PyRef<'_, PyConflict>>() {
         Ok(value.inner.clone())
     } else if let Ok(value) = value.extract::<PyRef<'_, PyConflictUpdate>>() {

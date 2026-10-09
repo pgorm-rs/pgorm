@@ -6,9 +6,9 @@ use std::{marker::PhantomData, sync::Arc};
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{Expr, SimpleExpr, Value, Values};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Error,
-    IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait,
-    StaticName,
+    ActiveModelBehavior, ActiveModelTrait, ActiveValue, Change as RustChange, ColumnTrait,
+    EntityTrait, Error, Insert, IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder,
+    QuerySelect, QueryTrait, StaticName, Update, Upserted,
 };
 
 use super::{backend::*, metadata::EntityInfo};
@@ -25,7 +25,7 @@ pub(crate) struct EntityAdapter<E> {
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:req:python.entities+1]
+// [spec:pgorm:req:python.entities+2]
 impl<E> EntityBackend for EntityAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -99,6 +99,122 @@ where
             Comparison::Lt => column.lt(value),
             Comparison::Le => column.lte(value),
         })
+    }
+
+    fn versions<'a>(
+        &'a self,
+        db: Database<'a>,
+        write: VersionWrite,
+    ) -> BoxFuture<'a, Result<Vec<Versions>, Error>> {
+        Box::pin(self.write_versions(db, write))
+    }
+}
+
+/// The compiled ActiveModel a type-erased handle holds, refused if it was
+/// minted by another registration.
+fn concrete<E>(active: &Active) -> Result<E::ActiveModel, Error>
+where
+    E: EntityTrait + Send + Sync + 'static,
+    E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static,
+    E::ActiveModel: Send + Sync + 'static,
+{
+    active
+        .as_any()
+        .downcast_ref::<ActiveAdapter<E>>()
+        .map(|adapter| adapter.value.clone())
+        .ok_or_else(|| Error::Type("ActiveModel belongs to another entity registration".to_owned()))
+}
+
+impl<E> EntityAdapter<E>
+where
+    E: EntityTrait + Send + Sync + 'static,
+    E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static,
+    E::ActiveModel: Send + Sync + 'static,
+{
+    fn model(&self, value: E::Model) -> Model {
+        Arc::new(ModelAdapter::<E> {
+            value,
+            info: self.info.clone(),
+        })
+    }
+
+    fn change(&self, change: RustChange<E::Model>) -> Versions {
+        Versions {
+            old: Some(self.model(change.old)),
+            new: self.model(change.new),
+        }
+    }
+
+    fn upserted(&self, upserted: Upserted<E::Model>) -> Versions {
+        match upserted {
+            Upserted::Inserted(model) => Versions {
+                old: None,
+                new: self.model(model),
+            },
+            Upserted::Updated(change) => self.change(change),
+        }
+    }
+
+    async fn write_versions(
+        &self,
+        db: Database<'_>,
+        write: VersionWrite,
+    ) -> Result<Vec<Versions>, Error> {
+        match write {
+            VersionWrite::Change(active) => {
+                let change = Update::one(concrete::<E>(&active)?)?
+                    .exec_returning_change(&db)
+                    .await?;
+                Ok(vec![self.change(change)])
+            }
+            VersionWrite::Changes(assignments, filter) => {
+                let mut update = Update::many(E::default());
+                for (name, assignment) in assignments {
+                    let column = column::<E>(&name)?;
+                    let expression = match assignment {
+                        Assignment::Value(value) => column.save_as(Expr::val(value)),
+                        Assignment::Expr(expression) => expression,
+                    };
+                    update = update.col_expr(column, expression);
+                }
+                let changes = update.filter(filter).exec_returning_changes(&db).await?;
+                Ok(changes
+                    .into_iter()
+                    .map(|change| self.change(change))
+                    .collect())
+            }
+            VersionWrite::Upserts {
+                actives,
+                conflict,
+                one,
+            } => {
+                let models = actives
+                    .iter()
+                    .map(concrete::<E>)
+                    .collect::<Result<Vec<_>, _>>()?;
+                let upserted = if one {
+                    let model = models.into_iter().next().ok_or_else(|| {
+                        Error::Type("an upsert of one row needs one ActiveModel".to_owned())
+                    })?;
+                    let mut insert = Insert::one(model);
+                    if let Some(conflict) = conflict {
+                        insert = insert.on_conflict(*conflict);
+                    }
+                    insert
+                        .exec_returning_upsert(&db)
+                        .await?
+                        .into_iter()
+                        .collect()
+                } else {
+                    let mut insert = Insert::many(models);
+                    if let Some(conflict) = conflict {
+                        insert = insert.on_conflict(*conflict);
+                    }
+                    insert.exec_returning_upserts(&db).await?
+                };
+                Ok(upserted.into_iter().map(|row| self.upserted(row)).collect())
+            }
+        }
     }
 }
 
@@ -238,6 +354,10 @@ where
 
     fn run<'a>(&'a self, db: Database<'a>, write: Write) -> BoxFuture<'a, Result<Written, Error>> {
         Box::pin(self.write(db, write))
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

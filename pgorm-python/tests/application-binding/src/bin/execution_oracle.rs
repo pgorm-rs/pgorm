@@ -1,12 +1,12 @@
 //! Compare installed Python execution with independent Rust operations.
 use _native::{account, graphs, note};
 use futures_util::TryStreamExt;
-use pgorm::pgorm_query::{ColumnDef, ColumnType, Expr, Name, Order, Query, Table};
+use pgorm::pgorm_query::{ColumnDef, ColumnType, Expr, Name, OnConflict, Order, Query, Table};
 use pgorm::pipeline::{self as pl, ExprOps, IntoSource, JoinSide};
 use pgorm::{
-    ActiveModelBehavior, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, ModelTrait, QueryFilter, QueryOrder, Schema, TransactionMode, TransactionTrait,
-    ValueHolder, Values, set,
+    ActiveModelBehavior, ActiveModelTrait, Change, ColumnTrait, ConnectionTrait,
+    DatabaseConnection, EntityTrait, Insert, ModelTrait, QueryFilter, QueryOrder, Schema,
+    TransactionMode, TransactionTrait, Update, Upserted, ValueHolder, Values, set,
 };
 use serde_json::{Value, json};
 
@@ -200,8 +200,71 @@ async fn models<C: ConnectionTrait>(db: &C) -> Result<Value> {
     )
 }
 
+fn change(value: Change<account::Model>) -> Value {
+    json!([model(value.old), model(value.new)])
+}
+
+fn upserted(row: Upserted<account::Model>) -> Value {
+    match row {
+        Upserted::Inserted(row) => json!(["inserted", model(row)]),
+        Upserted::Updated(value) => json!(["updated", change(value)]),
+    }
+}
+
+fn renamed() -> OnConflict {
+    OnConflict::column(account::Column::Id)
+        .update_column(account::Column::Name)
+        .into()
+}
+
+async fn versions<C: ConnectionTrait>(db: &C) -> Result<Value> {
+    db.execute(
+        "TRUNCATE python_entities.notes, python_entities.accounts",
+        &[],
+    )
+    .await?;
+    let first = active(1, "Native").insert(db).await?;
+    active(2, "Other").insert(db).await?;
+    let mut changed = first.into_active();
+    changed.note = set(Some("change 雪".to_owned()));
+    let updated = Update::one(changed)?.exec_returning_change(db).await?;
+    let many = Update::many(account::Entity)
+        .col_expr(
+            account::Column::Note,
+            account::Column::Note.save_as(Expr::val("bulk")),
+        )
+        .filter(ColumnTrait::eq(&account::Column::Id, 2))
+        .exec_returning_changes(db)
+        .await?;
+    let one = Insert::one(active(1, "upserted"))
+        .on_conflict(renamed())
+        .exec_returning_upsert(db)
+        .await?
+        .ok_or("expected the upsert to write its row")?;
+    let batch = Insert::many([active(2, "again"), active(7, "seven")])
+        .on_conflict(renamed())
+        .exec_returning_upserts(db)
+        .await?;
+    let skipped = Insert::one(active(1, "skipped"))
+        .on_conflict(OnConflict::column(account::Column::Id).do_nothing())
+        .exec_returning_upsert(db)
+        .await?
+        .is_none();
+    Ok(json!({
+        "change": change(updated),
+        "changes": many.into_iter().map(change).collect::<Vec<_>>(),
+        "upsert": upserted(one),
+        "upserts": batch.into_iter().map(upserted).collect::<Vec<_>>(),
+        "skipped": skipped,
+    }))
+}
+
 async fn exercise<C: ConnectionTrait>(db: &C) -> Result<Value> {
-    Ok(json!({"runtime": runtime(db).await?, "models": models(db).await?}))
+    Ok(json!({
+        "runtime": runtime(db).await?,
+        "models": models(db).await?,
+        "versions": versions(db).await?,
+    }))
 }
 
 async fn compare(db: &mut DatabaseConnection, report: &Value) -> Result {

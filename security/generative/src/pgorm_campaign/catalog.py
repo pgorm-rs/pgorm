@@ -667,6 +667,30 @@ EFFECTS = {
         "pgorm::ActiveModelTrait",
         "entities",
     ),
+    # The write terminals that read a written row's two versions: each row is
+    # a pair, the row before the write (absent for a row an upsert inserted)
+    # and the row the write left. No ActiveModel hook runs around them.
+    "entity.change": op(
+        "rows",
+        {"model": "active"},
+        {},
+        "pgorm::Update::one;pgorm::UpdateOne::exec_returning_change",
+        "entities",
+    ),
+    "entity.changes": op(
+        "rows",
+        {"entity": "entity", "values": "value*", "predicate": PREDICATE},
+        {"columns": "identifiers"},
+        "pgorm::Update::many;pgorm::UpdateMany::col_expr;pgorm::UpdateMany::exec_returning_changes",
+        "entities",
+    ),
+    "entity.upsert": op(
+        "rows",
+        {"models": "active*"},
+        {"rows": ("one", "many"), "conflict": "identifiers", "update": "identifiers"},
+        "pgorm::Insert::on_conflict;pgorm::Insert::exec_returning_upsert;pgorm::Insert::exec_returning_upserts",
+        "entities",
+    ),
     "begin": op(
         "transaction",
         {},

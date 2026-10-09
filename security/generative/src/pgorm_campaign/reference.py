@@ -16,6 +16,27 @@ from .reference_schema import DDL, ENUM_HELPER, schema_node
 from .reference_sql import SQL, Query, Rejection, query_node
 from .reference_template import Raw, validate_types
 from .reference_values import install, qualified, quote
+from . import reference_versions
+
+
+VERSIONED = ("entity.change", "entity.changes", "entity.upsert")
+
+
+def versioned(name, step, data, resolution):
+    """The independent statement a version-returning write effect runs."""
+    inputs = step["inputs"]
+    if name == "entity.change":
+        return reference_versions.change(resolution.get(inputs["model"]))
+    if name == "entity.changes":
+        return reference_versions.changes(
+            resolution.get(inputs["entity"]),
+            data["columns"],
+            [resolution.get(value) for value in inputs["values"]],
+            resolution.get(inputs["predicate"]),
+        )
+    return reference_versions.upsert(
+        [resolution.get(model) for model in inputs["models"]], data
+    )
 
 
 class Resolution:
@@ -209,13 +230,16 @@ class Reference:
                     await validate_types(self.driver, query)
                 rows, _ = await self.driver.query(statement)
             return {"kind": "rows", "rows": rows}
-        if name not in ("fetch", "execute", "stream", "active.write"):
+        if name not in ("fetch", "execute", "stream", "active.write", *VERSIONED):
             raise InvalidOracle("independent effect semantics uncovered: " + name)
-        query = (
-            active_write(resolution.get(step["inputs"]["model"]), data["method"])
-            if name == "active.write"
-            else resolution.get(step["inputs"]["query"])
-        )
+        if name in VERSIONED:
+            query = versioned(name, step, data, resolution)
+        elif name == "active.write":
+            query = active_write(
+                resolution.get(step["inputs"]["model"]), data["method"]
+            )
+        else:
+            query = resolution.get(step["inputs"]["query"])
         if isinstance(query, DDL):
             if name != "execute":
                 raise InvalidOracle("DDL oracle requires an execute effect")

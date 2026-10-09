@@ -317,6 +317,24 @@ class EmitRustTests(unittest.TestCase):
         self.assertIn("campaign.Stay", literals(found["campaign.StayRooms"]))
         self.assertIn("::entities::graphs::stay_guests", found["campaign.StayGuests"])
 
+    def test_version_writes_call_their_rust_terminals(self):
+        found = {}
+        for index in range(60):
+            program = generate(20260913, index, family="active").program
+            for step in program.data()["steps"]:
+                if step["op"].startswith("entity."):
+                    found.setdefault(step["op"], emit_rust.render(program))
+        self.assertIn(".exec_returning_change(&", found["entity.change"])
+        self.assertIn("::observe::tuple(vec![", found["entity.change"])
+        changes = found["entity.changes"]
+        self.assertIn("pgorm::Update::many(", changes)
+        self.assertIn("pgorm::ColumnTrait::save_as(", changes)
+        self.assertIn(".exec_returning_changes(&", changes)
+        upsert = found["entity.upsert"]
+        self.assertIn(".on_conflict(", upsert)
+        self.assertIn("pgorm::Upserted::Inserted(model)", upsert)
+        self.assertIn("::observe::absent()", upsert)
+
     def test_enum_values_carry_their_qualified_cast(self):
         source = emit_rust.render(hostile_program())
         name = emit_rust.literal('State" 雪')

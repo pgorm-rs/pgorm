@@ -176,6 +176,17 @@ class EmitPythonTests(unittest.TestCase):
             emit_python.value_source(empty), "p.Value(p.Range.empty(), 'int4range')"
         )
 
+    def test_version_writes_reach_the_public_terminals(self):
+        for index in range(60):
+            program = generate(20260913, index, family="active").program
+            if any(step["op"] == "entity.upsert" for step in program.data()["steps"]):
+                source = emit_python.render(program)
+                ast.parse(source)
+                self.assertIn("await _versions('entity.upsert', ", source)
+                self.assertIn(".returning_upserts(connection)", source)
+                return
+        self.fail("no generated active program upserts")
+
     def test_render_accepts_program_dict_and_text(self):
         program = generate(20260911, 3, family="select").program
         source = emit_python.render(program)

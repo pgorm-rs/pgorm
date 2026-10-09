@@ -2,7 +2,7 @@ use crate::execution::Database;
 use std::{fmt::Debug, sync::Arc};
 
 use futures_util::future::BoxFuture;
-use pgorm::pgorm_query::{Condition, NullOrdering, Order, SimpleExpr, Value, Values};
+use pgorm::pgorm_query::{Condition, NullOrdering, OnConflict, Order, SimpleExpr, Value, Values};
 use pgorm::{ActiveValue, Error};
 
 use super::metadata::EntityInfo;
@@ -55,6 +55,41 @@ pub(crate) trait EntityBackend: Debug + Send + Sync {
         comparison: Comparison,
         value: Value,
     ) -> Result<SimpleExpr, Error>;
+    fn versions<'a>(
+        &'a self,
+        db: Database<'a>,
+        write: VersionWrite,
+    ) -> BoxFuture<'a, Result<Vec<Versions>, Error>>;
+}
+
+/// What an `UpdateMany` sets a column to: a value, written through the
+/// column's `save_as`, or an expression, written as it is.
+#[derive(Clone, Debug)]
+pub(crate) enum Assignment {
+    Value(Value),
+    Expr(SimpleExpr),
+}
+
+/// A write whose terminal reads the written rows' two versions.
+#[derive(Clone, Debug)]
+pub(crate) enum VersionWrite {
+    /// `UpdateOne::exec_returning_change`.
+    Change(Active),
+    /// `UpdateMany::exec_returning_changes`.
+    Changes(Vec<(String, Assignment)>, Condition),
+    /// `Insert::exec_returning_upsert` for one model, `exec_returning_upserts`
+    /// for a batch.
+    Upserts {
+        actives: Vec<Active>,
+        conflict: Option<Box<OnConflict>>,
+        one: bool,
+    },
+}
+
+/// A written row's versions: `old` absent for a row an upsert inserted.
+pub(crate) struct Versions {
+    pub(crate) old: Option<Model>,
+    pub(crate) new: Model,
 }
 
 pub(crate) trait SelectBackend: Debug + Send + Sync {
@@ -87,4 +122,7 @@ pub(crate) trait ActiveBackend: Debug + Send + Sync {
     fn not_set(&self, column: &str) -> Result<Active, Error>;
     fn reset(&self, column: &str) -> Result<Active, Error>;
     fn run<'a>(&'a self, db: Database<'a>, write: Write) -> BoxFuture<'a, Result<Written, Error>>;
+    /// The concrete adapter, so an entity's batch write can take its own
+    /// models back out of type-erased handles.
+    fn as_any(&self) -> &dyn std::any::Any;
 }

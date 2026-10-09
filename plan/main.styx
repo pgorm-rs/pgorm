@@ -10383,12 +10383,27 @@ children (
                 title "Python's registered entities and the generative campaign return an update's rows before and after it and an upsert's per-row action"
                 kind @feat
                 deps (orm-returning-old-new)
+                sealed true
                 log (
                     {
                         at 2026-10-08T22:29:09.234947Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed by orm-returning-old-new (56063739), which gave Rust four version-returning terminals (exec.crud.versions, exec.crud.exec-vocabulary+2): UpdateOne::exec_returning_change -> Change<Model> { old, new }, UpdateMany::exec_returning_changes -> Vec<Change<Model>>, Insert<A, OneRow>::exec_returning_upsert -> Option<Upserted<Model>> and Insert<A, ManyRows>::exec_returning_upserts -> Vec<Upserted<Model>>, Upserted being Inserted(M) | Updated(Change<M>), read off the old row (absent for an inserted row). The list renames the versions WITH (OLD AS \"pgorm_old\", NEW AS \"pgorm_new\") and returns every column of both under o_ / n_ through Returning::exprs_as, the new named-item form (sql.ast.returning+3). Python's registered entities have insert() and update() returning the new model only (pgorm-python/python/pgorm/_registered/entities.pyi), and its statement-level returning(*items) builds aliased items through AliasedExpr as expr AS alias by BinOper::As (pgorm-python/src/statements/common.rs), which a mixed list needs and exprs_as does not cover. Build: a registered-entity update that returns the change, an update-many that returns the changes, and an upsert that returns each row's action (a Python spelling for Change and Upserted, with stubs), parity cases in checks/, and the wheel suites against 18.6, including a table called old. The campaign's emitters generate no call of these terminals; add them where the emitters already exercise update and insert terminals, with replay cases. Spec homes: python.entities, exec.crud.versions, generative.compile-suite."
+                    }
+
+                    {
+                        at 2026-10-09T00:38:08.360036Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-09T01:01:46.308791Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

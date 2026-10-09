@@ -162,6 +162,11 @@ from ._json import (
 )
 from ._results import Record as Record, Field as Field
 from ._entities import Entity as Entity, EntityColumn as EntityColumn, EntityQuery as EntityQuery, entity as entity
+from ._versions import (
+    Change as Change, Upserted as Upserted, EntityUpdate as EntityUpdate,
+    EntityUpdateMany as EntityUpdateMany, EntityInsert as EntityInsert,
+    EntityInsertMany as EntityInsertMany,
+)
 from ._graphs import Graph as Graph, GraphQuery as GraphQuery, GraphCursor as GraphCursor, graph as graph
 from ._entity_models import EntityModel as EntityModel, ActiveModel as ActiveModel, ActiveValue as ActiveValue, ActiveState as ActiveState
 from ._writes import (

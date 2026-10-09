@@ -275,7 +275,9 @@ impl EntityInfo {
             "primary_keys": self.primary_keys,
             "primary_key_without_overlaps": self.without_overlaps,
             "relations": self.relations,
-            "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete"],
+            "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete",
+                "update.returning_change", "update_many.returning_changes",
+                "insert.returning_upsert", "insert_many.returning_upserts"],
             "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"})
     }
 }
@@ -287,7 +289,7 @@ mod tests {
     use pgorm::pgorm_query::{ArrayType, Range, RangeType};
     use std::sync::Arc;
 
-    // [spec:pgorm:req:python.entities+1/test]    a range column hints its range kind, so a
+    // [spec:pgorm:req:python.entities+2/test]    a range column hints its range kind, so a
     // registered entity's range field takes a `pgorm.Range` as its value
     #[test]
     fn range_columns_hint_their_range_kind() -> PyResult<()> {
@@ -334,7 +336,7 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:python.entities+1/test]    a created range column hints its created kind,
+    // [spec:pgorm:req:python.entities+2/test]    a created range column hints its created kind,
     // so a registered entity's field takes a `pgorm.Range` and reads back tagged with the type
     #[test]
     fn created_range_columns_hint_their_created_kind() -> PyResult<()> {

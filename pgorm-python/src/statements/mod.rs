@@ -18,6 +18,7 @@ mod write;
 
 pub(crate) use capabilities::operations as capabilities;
 pub(crate) use common::condition;
+pub(crate) use conflict::clause as conflict_clause;
 pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
 pub use from_item::PyFromItem;
 pub use insert::PyInsert;

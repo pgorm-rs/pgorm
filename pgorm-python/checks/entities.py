@@ -58,7 +58,7 @@ def reject_execution_mismatch(project, output, environment):
         )
 
 
-# [spec:pgorm:req:python.entities+1/test]
+# [spec:pgorm:req:python.entities+2/test]
 # [spec:pgorm:req:python.graph/test]
 # [spec:pgorm:req:python.pipeline/test]
 def main():
@@ -203,6 +203,15 @@ def main():
             [
                 str(python),
                 "-I",
+                str(root / "pgorm-python/tests/registered_versions.py"),
+                "-v",
+            ],
+            environment,
+        )
+        run(
+            [
+                str(python),
+                "-I",
                 str(root / "pgorm-python/tests/registered_schema.py"),
                 "-v",
             ],
@@ -247,6 +256,7 @@ def main():
                     "app.Booking",
                     "app.Membership",
                     "app.Note",
+                    "app.Old",
                     "app.Room",
                     "app.Stay",
                 ],
@@ -254,6 +264,7 @@ def main():
                 "pipeline_source_arities": list(range(1, 7)),
                 "rust_cursor_parity_cases": 8,
                 "registered_temporal": True,
+                "registered_versions": True,
                 "registered_schema": True,
                 "registered_transactions": True,
                 "rust_execution_parity": True,

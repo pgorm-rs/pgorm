@@ -83,7 +83,8 @@ def entity(state):
         state.fetch(query)
 
 
-def _active_insert(state, source, scope):
+def _new_active(state, source, identity):
+    """An ActiveModel setting every column the registration writes."""
     if source.alias == "Account":
         # This registered entity intentionally omits tags; the declared fixture
         # admits that omitted column while retaining its existing array rows.
@@ -92,7 +93,7 @@ def _active_insert(state, source, scope):
             for column in state.author.fixture["tables"][0]["columns"]
             if column["name"] == "tags"
         )["nullable"] = True
-        columns, values = account_row(state, 100 + state.index)
+        columns, values = account_row(state, identity)
         assignments = [
             (column, value)
             for column, value in zip(columns, values, strict=True)
@@ -102,7 +103,7 @@ def _active_insert(state, source, scope):
         assignments = [
             (column, state.value(kind, value))
             for column, kind, value in (
-                ("id", "i32", 100 + state.index),
+                ("id", "i32", identity),
                 ("account_id", "i32", 1),
                 ("tenant", "i32", 1),
                 ("body", "text", state.text()),
@@ -115,9 +116,73 @@ def _active_insert(state, source, scope):
             {"model": active, "value": value},
             {"column": column, "state": "set"},
         )
+    return active
+
+
+def _active_insert(state, source, scope):
+    active = _new_active(state, source, 100 + state.index)
     return state.author.effect(
         "active.write", {"model": active}, {"method": "insert"}, scope=scope
     )
+
+
+# [spec:pgorm:req:generative.grammar]
+def versions(state):
+    """Writes whose terminals read each row before and after: an update by
+    key, an update of many rows, and an upsert of one model or a batch that
+    meets an existing key and a new one."""
+    source = entity_source(state, state.choices.take(("Account", "Note")))
+    text = "name" if source.alias == "Account" else "body"
+    scope = "root"
+    if state.choices.take((False, True)):
+        state.author.effect(
+            "begin",
+            data={"child": "tx", "mode": "read_write", "isolation": "read_committed"},
+        )
+        scope = "tx"
+    for attempt in range(state.choices.integer(1, 3)):
+        shape = state.choices.take(("change", "changes", "upsert"))
+        if shape == "change":
+            model = state.node(
+                "entity.result",
+                data={"step": _active_read(state, source, scope), "row": 0},
+            )
+            active = state.node("entity.into_active", {"model": model})
+            choice = state.choices.take(("set", "set", "not_set"))
+            inputs = {"model": active}
+            if choice == "set":
+                inputs["value"] = state.value("text", str(state.index) + state.text())
+            active = state.node("active.set", inputs, {"column": text, "state": choice})
+            state.author.effect("entity.change", {"model": active}, scope=scope)
+        elif shape == "changes":
+            tenant = _equal(state, source, "tenant", state.value("i32", 1))
+            state.author.effect(
+                "entity.changes",
+                {
+                    "entity": source.node,
+                    "values": [state.value("text", str(state.index) + state.text())],
+                    "predicate": tenant,
+                },
+                {"columns": [text]},
+                scope=scope,
+            )
+        else:
+            existing = (1, 2, 4) if source.alias == "Account" else (11, 12, 14)
+            identities = [state.choices.take(existing)]
+            if state.choices.take((False, True)):
+                identities.append(200 + state.index * 4 + attempt)
+            state.author.effect(
+                "entity.upsert",
+                {"models": [_new_active(state, source, i) for i in identities]},
+                {
+                    "rows": "one" if len(identities) == 1 else "many",
+                    "conflict": ["id"],
+                    "update": state.choices.take(([text], [text], [])),
+                },
+                scope=scope,
+            )
+    if scope != "root":
+        state.author.effect(state.choices.take(("commit", "rollback")), scope=scope)
 
 
 def _active_read(state, source, scope):
@@ -136,11 +201,15 @@ def _active_read(state, source, scope):
 
 
 def active(state):
-    shape = state.choices.take(("registered", "registered", "temporal", "deferred"))
+    shape = state.choices.take(
+        ("registered", "registered", "temporal", "deferred", "versions")
+    )
     if shape == "temporal":
         return temporal.temporal_key(state)
     if shape == "deferred":
         return temporal.deferred_key(state)
+    if shape == "versions":
+        return versions(state)
     source = entity_source(state, state.choices.take(("Account", "Note")))
     scope = "root"
     if state.choices.take((False, True)):
