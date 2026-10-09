@@ -10941,4 +10941,18 @@ children (
             }
         )
     }
+
+    {
+        id supply-chain-detached-workspaces
+        title "The supply-chain check audits the detached pgorm-python and pgorm-napi workspaces, and pgorm-python's TLS stack passes it"
+        kind @fix
+        log (
+            {
+                at 2026-10-09T13:05:04.850184Z
+                author "brendan@necessary.nu"
+                kind @blocker
+                text "Found while adding TLS to pgorm-napi (napi-connections, 2026-10-09). The supply-chain workflow runs `cargo deny check` over the root workspace only, after `cargo generate-lockfile` there; pgorm-python and pgorm-napi are their own Cargo workspaces with committed lockfiles, and nothing audits them. Run by hand with the root policy — `cargo deny --manifest-path pgorm-python/Cargo.toml check --config deny.toml` (cargo-deny 0.19.9 does not find the root deny.toml from a detached workspace by itself, so `--config` is needed) — pgorm-python fails three ways: (1) advisory RUSTSEC-2026-0285, rustls 0.23.44 accepts TLS 1.3 handshake messages across encryption-level boundaries, fixed in 0.23.45; (2) RUSTSEC-2025-0134, rustls-pemfile 2.2.0 is unmaintained (rustls-pki-types' PemObject replaces it); (3) license: webpki-roots 1.0.9 is CDLA-Permissive-2.0, which deny.toml does not allow. pgorm-napi passes at 0f95d938: it pins rustls 0.23.45, reads PEM through rustls-pki-types and takes roots from the platform through rustls-native-certs rather than webpki-roots. Acceptance: the workflow audits all three workspaces, each against its committed lockfile; pgorm-python passes (rustls bumped, rustls-pemfile replaced, and the webpki-roots license either allowed in deny.toml with a written reason or the bundled roots replaced — an operator decision, since it changes where pgorm-python's default trust comes from)."
+            }
+        )
+    }
 )
