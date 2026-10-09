@@ -1908,6 +1908,27 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id napi-proof, covered_rules (
+        napi.api
+        napi.errors
+        napi.exit
+        napi.loading
+        napi.optional
+        napi.promises
+        napi.runtime
+        napi.runtimes
+        napi.typing
+    ), covered_claims (
+        {impl_name main, rule napi.api}
+        {impl_name main, rule napi.errors}
+        {impl_name main, rule napi.exit}
+        {impl_name main, rule napi.loading}
+        {impl_name main, rule napi.optional}
+        {impl_name main, rule napi.promises}
+        {impl_name main, rule napi.runtime}
+        {impl_name main, rule napi.runtimes}
+        {impl_name main, rule napi.typing}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

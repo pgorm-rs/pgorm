@@ -1,0 +1,117 @@
+name: Node-API binding
+
+# Work lands on main by direct push, so a pull_request trigger alone never
+# fires; the weekly run catches drift no commit triggers, a new runner image
+# or a moved PostgreSQL package among it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'pgorm-napi/**'
+      - '.github/workflows/napi.yml'
+  pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'pgorm-napi/**'
+      - '.github/workflows/napi.yml'
+  schedule:
+    - cron: '41 3 * * 4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: napi-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtimes:
+    name: ${{ matrix.name }} / Node.js 22 and Deno 2
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-15
+          - name: linux-x86_64
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_BUILD_JOBS: '2'
+      NO_COLOR: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22.15.0'
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: '2.9.5'
+      - name: Prepare Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy,rustfmt
+          rustup default 1.97.1
+      - name: Linux native build and PostgreSQL tools
+        if: runner.os == 'Linux'
+        run: |
+          # The Python workflow's PostgreSQL apt setup; its comment says why.
+          key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo install -d "$(dirname "$key")"
+          sudo curl --fail --silent --show-error --location --output "$key" \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          fingerprint=$(GNUPGHOME="$(mktemp -d)" gpg --show-keys --with-colons "$key" \
+            | awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')
+          test "$fingerprint" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          . /etc/os-release
+          printf '%s\n' 'Types: deb' 'URIs: https://apt.postgresql.org/pub/repos/apt' \
+            "Suites: ${VERSION_CODENAME}-pgdg" "Architectures: $(dpkg --print-architecture)" \
+            'Components: main' "Signed-By: $key" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.sources
+          sudo apt-get update
+          sudo apt-get install --yes clang libclang-dev postgresql-18
+          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
+      - name: macOS native build and PostgreSQL tools
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm postgresql@18
+          echo "PGORM_TEST_PG_BIN=$(brew --prefix postgresql@18)/bin" >> "$GITHUB_ENV"
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+      - name: Start PostgreSQL 18
+        run: |
+          # A cluster owned by this job, on loopback only, so the suite
+          # needs no credentials and nothing else on the runner shares it.
+          data="$RUNNER_TEMP/pgdata"
+          "$PGORM_TEST_PG_BIN/initdb" -D "$data" -U postgres --auth=trust --encoding=UTF8 --no-locale
+          "$PGORM_TEST_PG_BIN/pg_ctl" -D "$data" -l "$RUNNER_TEMP/postgres.log" -w -t 30 \
+            -o "-c listen_addresses=127.0.0.1 -c port=54329 -c unix_socket_directories=$RUNNER_TEMP" start
+          "$PGORM_TEST_PG_BIN/psql" -h 127.0.0.1 -p 54329 -U postgres -Atc 'SELECT version()'
+          echo 'PGORM_TEST_DSN=postgres://postgres@127.0.0.1:54329/postgres' >> "$GITHUB_ENV"
+      - name: Check the addon's Rust
+        run: |
+          cargo fmt --manifest-path pgorm-napi/Cargo.toml --all -- --check
+          cargo clippy --manifest-path pgorm-napi/Cargo.toml --locked --target-dir target --all-targets -- -D warnings
+          cargo test --manifest-path pgorm-napi/Cargo.toml --locked --target-dir target --lib
+      - name: Build the addon
+        run: node pgorm-napi/scripts/build.mjs
+      - name: Type-check the declarations, module and suite
+        working-directory: pgorm-napi
+        run: deno check
+      - name: Live suite under Node.js
+        working-directory: pgorm-napi
+        run: node --test --experimental-strip-types --disable-warning=ExperimentalWarning "tests/*.test.ts"
+      - name: Live suite under Deno
+        working-directory: pgorm-napi
+        run: deno test --allow-ffi --allow-read --allow-env --allow-run tests/
+      - name: PostgreSQL log
+        if: failure()
+        run: cat "$RUNNER_TEMP/postgres.log"

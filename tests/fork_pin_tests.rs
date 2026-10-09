@@ -7,8 +7,9 @@
 //! grammar ahead of upstream's release — and a dependency travels with pgorm
 //! into every crate that depends on it: the crates here that declare their own
 //! `[workspace]` (`pgorm-python`, so that Python configuration stays out of
-//! ordinary Rust builds ([spec:pgorm:req:python.optional]), and the campaign's
-//! bridge, codegen runner, replay harness, sqlmap adapter and standalone
+//! ordinary Rust builds ([spec:pgorm:req:python.optional]), `pgorm-napi`, for
+//! the same reason on Node-API's side ([spec:pgorm:req:napi.optional]), and
+//! the campaign's bridge, codegen runner, replay harness, sqlmap adapter and standalone
 //! reproducers, so that their dependencies stay out of an ordinary pgorm
 //! build), the compile-suite crates the campaign generates at run time, and
 //! downstream consumers.
@@ -67,8 +68,9 @@ struct Fork {
 }
 
 /// The detached crates that reach pgorm's runtime, and so both forks.
-const RUNTIME_DETACHED: [&str; 7] = [
+const RUNTIME_DETACHED: [&str; 8] = [
     "pgorm-python",
+    "pgorm-napi",
     "security/generative/bridge",
     "security/sqlmap/adapter",
     "security/generative/replay",
@@ -105,6 +107,7 @@ const PG_QUERY: Fork = Fork {
     // links it where it links no prqlc.
     detached: &[
         "pgorm-python",
+        "pgorm-napi",
         "security/generative/bridge",
         "security/sqlmap/adapter",
         "security/generative/replay",
@@ -483,6 +486,7 @@ fn every_declaration_names_the_roots_revision() {
 
 // [spec:pgorm:req:python.optional/test]    a separate workspace receives the
 // pinned revision through pgorm's own dependency, never through a patch
+// [spec:pgorm:req:napi.optional/test]
 /// A patch is read only by the workspace that declares it, so one anywhere in
 /// the checkout would decide the fork for some builds and not others: a second
 /// source of truth, which is the thing the git dependency replaced.
@@ -508,6 +512,7 @@ fn nothing_in_the_checkout_patches_a_fork() {
 
 // [spec:pgorm:req:python.optional/test]    and every lockfile resolves the
 // pinned revision, which is what a `--locked` build reads
+// [spec:pgorm:req:napi.optional/test]
 #[test]
 fn every_lockfile_resolves_each_fork_from_its_revision() {
     let checkout = Checkout::read();
@@ -555,6 +560,7 @@ fn every_lockfile_resolves_each_fork_from_its_revision() {
 
 // [spec:pgorm:req:python.optional/test]    a detached workspace linking a fork
 // commits the lockfile its `--locked` builds read
+// [spec:pgorm:req:napi.optional/test]
 #[test]
 fn detached_crates_linking_a_fork_commit_lockfiles() {
     let checkout = Checkout::read();

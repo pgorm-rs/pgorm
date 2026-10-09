@@ -3,6 +3,7 @@ firedbg
 Cargo.lock
 !security/sqlmap/adapter/Cargo.lock
 !pgorm-python/Cargo.lock
+!pgorm-napi/Cargo.lock
 !security/generative/bridge/Cargo.lock
 !security/generative/replay/Cargo.lock
 !security/generative/compile/Cargo.lock
@@ -18,3 +19,6 @@ __pycache__/
 pgorm-python/python/pgorm/*.so
 pgorm-python/python/pgorm/*.pyd
 pgorm-python/python/pgorm/*.dylib
+# The Node-API addon `pgorm-napi/scripts/build.mjs` copies beside the module
+# that loads it
+pgorm-napi/lib/*.node

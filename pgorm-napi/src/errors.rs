@@ -1,0 +1,279 @@
+//! Failures leave Rust as data and become JavaScript errors on the JavaScript
+//! thread.
+//!
+//! A query fails on a runtime thread, where no JavaScript value can be made, so
+//! its failure is captured as a [`Failure`] and turned into an error object in
+//! the closure that settles the promise. The error classes are JavaScript's:
+//! `lib/index.js` defines them and hands the addon a factory that builds one,
+//! so an error the addon rejects with is an instance of the class the
+//! declarations name.
+
+use std::sync::{Mutex, PoisonError};
+
+use neon::{prelude::*, thread::LocalKey};
+
+/// The factory `lib/index.js` registers: `(kind, message, details) => Error`.
+///
+/// Instance-local because a class belongs to one JavaScript realm: a worker
+/// thread loading the addon registers its own.
+static ERROR_FACTORY: LocalKey<Mutex<Option<Root<JsFunction>>>> = LocalKey::new();
+
+/// Connection secrets never enter an error message, nested causes included.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Redactions(Vec<String>);
+
+impl Redactions {
+    pub(crate) fn from_config(config: &pgorm::Config) -> Self {
+        let mut values = Vec::new();
+        if let Some(user) = config.get_user().filter(|user| !user.is_empty()) {
+            values.push(user.to_owned());
+        }
+        if let Some(password) = config
+            .get_password()
+            .filter(|password| !password.is_empty())
+        {
+            values.push(String::from_utf8_lossy(password).into_owned());
+        }
+        values.sort_by_key(|value| std::cmp::Reverse(value.len()));
+        Self(values)
+    }
+
+    fn apply(&self, input: &str) -> String {
+        self.0.iter().fold(input.to_owned(), |text, secret| {
+            text.replace(secret, "[redacted]")
+        })
+    }
+}
+
+/// The diagnostic fields of an error PostgreSQL reported.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Diagnostics {
+    pub(crate) sqlstate: String,
+    pub(crate) message: String,
+    pub(crate) severity: String,
+    pub(crate) detail: Option<String>,
+    pub(crate) hint: Option<String>,
+    pub(crate) schema: Option<String>,
+    pub(crate) table: Option<String>,
+    pub(crate) column: Option<String>,
+    pub(crate) constraint: Option<String>,
+}
+
+/// Why an operation failed, in the terms the JavaScript error classes carry.
+// [spec:pgorm:req:napi.errors]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Failure {
+    /// PostgreSQL rejected the statement; becomes a `DatabaseError` carrying
+    /// the SQLSTATE.
+    Database(Box<Diagnostics>),
+    /// The server could not be reached, or the connection broke; becomes a
+    /// `ConnectionError`.
+    Connection(String),
+    /// A result could not be decoded into the JavaScript value asked for;
+    /// becomes a `DecodeError`.
+    Decode(String),
+    /// A value could not be sent as the parameter its placeholder declares;
+    /// becomes a `ConstructionError`.
+    Construction(String),
+    /// pgorm or the binding failed in a way no input should cause — a panic
+    /// on the runtime; becomes an `InternalError`.
+    Internal(String),
+}
+
+impl Failure {
+    /// The class name `lib/index.js` maps the failure to.
+    pub(crate) fn kind(&self) -> &'static str {
+        match self {
+            Self::Database(_) => "DatabaseError",
+            Self::Connection(_) => "ConnectionError",
+            Self::Decode(_) => "DecodeError",
+            Self::Construction(_) => "ConstructionError",
+            Self::Internal(_) => "InternalError",
+        }
+    }
+
+    pub(crate) fn message(&self) -> &str {
+        match self {
+            Self::Database(diagnostics) => &diagnostics.message,
+            Self::Connection(message)
+            | Self::Decode(message)
+            | Self::Construction(message)
+            | Self::Internal(message) => message,
+        }
+    }
+
+    /// The error object a promise rejects with.
+    pub(crate) fn into_js<'cx>(self, cx: &mut Cx<'cx>) -> JsResult<'cx, JsValue> {
+        let details = cx.empty_object();
+        if let Self::Database(diagnostics) = &self {
+            let fields = [
+                ("sqlstate", Some(&diagnostics.sqlstate)),
+                ("severity", Some(&diagnostics.severity)),
+                ("detail", diagnostics.detail.as_ref()),
+                ("hint", diagnostics.hint.as_ref()),
+                ("schema", diagnostics.schema.as_ref()),
+                ("table", diagnostics.table.as_ref()),
+                ("column", diagnostics.column.as_ref()),
+                ("constraint", diagnostics.constraint.as_ref()),
+            ];
+            for (name, value) in fields {
+                let value: Handle<JsValue> = match value {
+                    Some(text) => cx.string(text).upcast(),
+                    None => cx.null().upcast(),
+                };
+                details.prop(cx, name).set(value)?;
+            }
+        }
+        let factory = ERROR_FACTORY.get(cx).and_then(|slot| {
+            slot.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .as_ref()
+                .map(|root| root.to_inner(cx))
+        });
+        match factory {
+            Some(factory) => factory
+                .bind(cx)
+                .arg(self.kind())?
+                .arg(self.message())?
+                .arg(details)?
+                .call(),
+            // The addon loaded without `lib/index.js`: a plain `Error` named
+            // for the class, carrying the same fields.
+            None => {
+                let error = cx.error(self.message())?;
+                error.prop(cx, "name").set(self.kind())?;
+                for name in details.get_own_property_names(cx)?.to_vec(cx)? {
+                    let name = name.downcast_or_throw::<JsString, _>(cx)?;
+                    let value: Handle<JsValue> = details.get(cx, name)?;
+                    error.set(cx, name, value)?;
+                }
+                Ok(error.upcast())
+            }
+        }
+    }
+}
+
+/// Classify a pgorm error. A PostgreSQL error anywhere in its cause chain
+/// decides the class, so a server's refusal during connection (a bad password,
+/// a missing database) carries its SQLSTATE like any other.
+// [spec:pgorm:req:napi.errors]
+pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
+    let mut source: &(dyn std::error::Error + 'static) = error;
+    loop {
+        if let Some(postgres) = source.downcast_ref::<tokio_postgres::Error>() {
+            return postgres_failure(postgres, secrets);
+        }
+        match source.source() {
+            Some(next) => source = next,
+            None => break,
+        }
+    }
+    match error {
+        pgorm::Error::Pool(_) => Failure::Connection("PostgreSQL pool acquisition failed".into()),
+        pgorm::Error::Conversion { .. } | pgorm::Error::Type(_) | pgorm::Error::Json(_) => {
+            Failure::Decode(secrets.apply(&error.to_string()))
+        }
+        _ => Failure::Connection(secrets.apply(&error.to_string())),
+    }
+}
+
+fn postgres_failure(error: &tokio_postgres::Error, secrets: &Redactions) -> Failure {
+    let Some(db) = error.as_db_error() else {
+        // tokio-postgres exposes no public error kind for its client-side
+        // failures, so the phase is read from its top-level message, never
+        // from a nested cause a caller could have shaped.
+        let phase = error.to_string();
+        return if phase.starts_with("error deserializing column ")
+            || phase.starts_with("invalid column `")
+            || phase == "query returned an unexpected number of columns"
+            || phase == "query returned an unexpected number of rows"
+        {
+            Failure::Decode(secrets.apply(&phase))
+        } else if phase.starts_with("error serializing parameter ") {
+            Failure::Construction(secrets.apply(&phase))
+        } else {
+            Failure::Connection(format!(
+                "PostgreSQL connection or protocol failure: {}",
+                secrets.apply(&phase)
+            ))
+        };
+    };
+    let optional = |field: Option<&str>| field.map(|text| secrets.apply(text));
+    Failure::Database(Box::new(Diagnostics {
+        sqlstate: db.code().code().to_owned(),
+        message: secrets.apply(db.message()),
+        severity: db.severity().to_owned(),
+        detail: optional(db.detail()),
+        hint: optional(db.hint()),
+        schema: optional(db.schema()),
+        table: optional(db.table()),
+        column: optional(db.column()),
+        constraint: optional(db.constraint()),
+    }))
+}
+
+/// `setErrorFactory(factory)`: register the function failures are built
+/// with. `lib/index.js` calls it once as it loads; a later call replaces it.
+pub(crate) fn set_error_factory(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let factory = cx.argument::<JsFunction>(0)?.root(&mut cx);
+    let slot = ERROR_FACTORY.get_or_init(&mut cx, Default::default);
+    let previous = slot
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .replace(factory);
+    if let Some(previous) = previous {
+        previous.drop(&mut cx);
+    }
+    Ok(cx.undefined())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redactions_remove_the_user_and_password() {
+        let config: pgorm::Config = match "postgres://alice:s3cret@localhost/db".parse() {
+            Ok(config) => config,
+            Err(error) => panic!("the DSN parses: {error}"),
+        };
+        let secrets = Redactions::from_config(&config);
+        assert_eq!(
+            secrets.apply("password authentication failed for alice using s3cret"),
+            "password authentication failed for [redacted] using [redacted]"
+        );
+    }
+
+    #[test]
+    fn a_failure_names_the_class_it_becomes() {
+        let database = Failure::Database(Box::new(Diagnostics {
+            sqlstate: "22003".into(),
+            message: "integer out of range".into(),
+            severity: "ERROR".into(),
+            detail: None,
+            hint: None,
+            schema: None,
+            table: None,
+            column: None,
+            constraint: None,
+        }));
+        assert_eq!(database.kind(), "DatabaseError");
+        assert_eq!(database.message(), "integer out of range");
+        assert_eq!(Failure::Connection("x".into()).kind(), "ConnectionError");
+        assert_eq!(Failure::Decode("x".into()).kind(), "DecodeError");
+        assert_eq!(
+            Failure::Construction("x".into()).kind(),
+            "ConstructionError"
+        );
+        assert_eq!(Failure::Internal("x".into()).kind(), "InternalError");
+    }
+
+    #[test]
+    fn a_type_error_is_a_decode_failure() {
+        let error = pgorm::Error::Type("not an int4".into());
+        assert_eq!(
+            failure(&error, &Redactions::default()),
+            Failure::Decode("Type Error: not an int4".into())
+        );
+    }
+}

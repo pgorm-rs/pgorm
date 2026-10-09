@@ -1,0 +1,31 @@
+[package]
+name = "pgorm-napi"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Asynchronous PostgreSQL access through pgorm from Node.js and Deno, over Node-API"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pgorm-rs/pgorm"
+publish = false
+
+# A separate workspace keeps the Node-API addon out of ordinary Rust builds,
+# as pgorm-python's does for Python ([spec:pgorm:req:napi.optional]).
+[workspace]
+
+[lib]
+name = "pgorm_napi"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pgorm = { version = "=0.2.0", path = ".." }
+neon = { version = "=1.1.2", default-features = false, features = ["napi-6"] }
+tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
+tokio-postgres = "=0.7.18"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

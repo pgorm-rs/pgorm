@@ -3,7 +3,7 @@ specs ({
     include (docs/spec/**/*.md),
     impls ({
         name main,
-        languages (@rust @python),
+        languages (@rust @python @javascript @typescript),
         include (
             src/**/*.rs
             pgorm-macros/src/**/*.rs
@@ -27,6 +27,10 @@ specs ({
             security/generative/replay/src/**/*.rs
             security/generative/compile/src/**/*.rs
             .github/workflows/generative*.yml
+            pgorm-napi/src/**/*.rs
+            pgorm-napi/lib/**/*.js
+            pgorm-napi/lib/**/*.ts
+            .github/workflows/napi.yml
         ),
         test_include (
             tests/**/*.rs
@@ -43,6 +47,7 @@ specs ({
             pgorm-python/tests/**/*.py
             security/generative/tests/**/*.py
             security/generative/bridge/tests/**/*.rs
+            pgorm-napi/tests/**/*.ts
         ),
         exclude (
             target/**

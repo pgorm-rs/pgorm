@@ -10786,12 +10786,39 @@ children (
                 id napi-proof
                 title "The pgorm-napi addon loads in Deno and Node, resolves an async query as a Promise from pgorm's runtime, and lets the process exit cleanly"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:def:napi.api]
+                        [spec:pgorm:req:napi.optional]
+                        [spec:pgorm:req:napi.loading]
+                        [spec:pgorm:req:napi.runtime]
+                        [spec:pgorm:req:napi.promises]
+                        [spec:pgorm:req:napi.errors]
+                        [spec:pgorm:req:napi.exit]
+                        [spec:pgorm:req:napi.typing]
+                        [spec:pgorm:req:napi.runtimes]
+                    )
+                }
                 log (
                     {
                         at 2026-10-09T10:47:56.219684Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Acceptance:\n- The pgorm-napi crate (own workspace, cdylib, Neon 1.x) builds a .node that both `node` and `deno` load from a local path. Settle and document how each runtime loads it, e.g. Deno through node:module createRequire with --allow-ffi, or whatever works cleanly.\n- The addon owns a tokio runtime and runs pgorm's async work on it. One exported async function connects to the test server and runs a bound query, e.g. SELECT $1::int + 1, resolving a JS Promise with the result through Neon's Channel / promise API; a failure rejects with a typed JS error carrying the SQLSTATE.\n- Many concurrent calls resolve correctly in both runtimes.\n- A process that finished its work exits on its own in both runtimes, with no hang from the addon's threadsafe functions or tokio runtime, and no crash at shutdown. This is the known risk, so test it explicitly.\n- A test harness runs the same suite under `node --test` and `deno test` (the operator allowed deno test for this binding), and `deno check` covers the .d.ts and test files.\n- An `nplan check` platform for pgorm-napi (cargo check, clippy and fmt on its workspace, plus `deno check`) runs within the commit check budget. CI: add a job (Linux and macOS) running both runtimes' suites against a PostgreSQL 18 service, following the python.yml pattern (push to main with path filters, weekly, dispatch).\n- A docs/spec/napi.md rule set opens with the targeting and loading model.\n\nIf Deno's threadsafe-function support turns out broken for Neon, stop and report with a minimal reproduction instead of working around it silently; the operator decides whether to switch approach."
+                    }
+
+                    {
+                        at 2026-10-09T10:49:38.807406Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-09T11:13:41.829753Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Proved on deno 2.9.5 and node 22.15.0 (macOS arm64) with Neon 1.1.2, napi-6: the same .node loads in both (lib/index.js, an ES module, requires it through node:module createRequire; Deno needs --allow-ffi and --allow-read, no --allow-net). One process-wide tokio runtime (LazyLock, never shut down) runs pgorm's work; each promise settles through the instance's shared Channel, ref'd while in flight. Both runtimes pass the same 26 tests: bound query, 100 concurrent, eight overlapping pg_sleep queries, DatabaseError with SQLSTATE (22003, 42601), ConnectionError, ConstructionError, DecodeError, TypeError, a panic on the runtime rejecting with InternalError, and twelve exit cases in fresh processes (idle load, settled, 100 concurrent, pending at script end, handled and unhandled rejection, process.exit mid-query, exit while settlements stream in x5, worker thread finish and terminate-mid-query with settlement into the torn-down instance, drop-queue held/unheld). One behavioural difference found: Neon's drop queue is an unref'd threadsafe function; with nothing else holding the loop, Node exits with its deliveries pending (0/10 delivered) while Deno delivers them first (10/10). Both exit cleanly, so it is not a hang, but no operation may rely on the drop queue to settle a promise; settle.rs settles explicitly and turns a panic into InternalError."
                     }
                 )
             }
