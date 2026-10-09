@@ -28,7 +28,7 @@ async function scalar(sql: string, params: readonly (number | bigint | string)[]
   return (await pool.one(sql, params)).n;
 }
 
-// [spec:pgorm:req:napi.loading/test]
+// [spec:pgorm:req:napi.loading+1/test]
 test("the addon loads and reports the pgorm release it was built from", () => {
   assert.match(version, /^\d+\.\d+\.\d+/);
 });

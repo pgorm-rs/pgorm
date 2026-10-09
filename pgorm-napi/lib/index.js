@@ -6,14 +6,8 @@
 // what an application imports.
 // [spec:pgorm:def:napi.api+1]
 // [spec:pgorm:req:napi.typing]
-//
-// The addon is a Node-API module, loaded through CommonJS `require` because
-// that is the one loader both runtimes give a `.node` file: Node's own, and in
-// Deno the node:module compatibility layer's, which needs --allow-ffi to open
-// a native library and --allow-read to resolve its path.
 
-import { createRequire } from "node:module";
-
+import { loadAddon } from "./native.js";
 import { installConnections } from "./operations.js";
 import { makeError } from "./errors.js";
 import { install } from "./values.js";
@@ -26,9 +20,7 @@ if (typeof globalThis.Temporal !== "object") {
   );
 }
 
-// [spec:pgorm:req:napi.loading]
-const require = createRequire(import.meta.url);
-const native = require("./pgorm_napi.node");
+const native = loadAddon();
 
 native.setErrorFactory(makeError);
 install(native);

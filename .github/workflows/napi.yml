@@ -154,3 +154,174 @@ jobs:
       - name: PostgreSQL log
         if: failure()
         run: cat "$RUNNER_TEMP/postgres.log"
+
+  # The npm packages, as a release would make them: each release platform's
+  # addon built on its own runner, the whole set packed once, and that set
+  # installed on each platform from a registry serving only its tarballs,
+  # into fresh Node.js and Deno projects running the smoke suite. Nothing
+  # here publishes; the tarballs are kept for review.
+  # [spec:pgorm:req:napi.distribution]
+  addon:
+    name: ${{ matrix.name }} / release addon
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-arm64
+            os: macos-15
+          - name: linux-x64-gnu
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: never
+      CARGO_BUILD_JOBS: '2'
+      NO_COLOR: '1'
+      EXPECTED_PLATFORM: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - name: Prepare Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Linux native build tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang libclang-dev
+      - name: macOS native build tools
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm
+          echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+      - name: Build and check the release addon
+        run: |
+          node pgorm-napi/checks/package.js build
+          test -f "target/napi-package/binaries/$EXPECTED_PLATFORM/binary.json"
+      - name: Retain the addon
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pgorm-napi-addon-${{ matrix.name }}-${{ github.run_id }}
+          path: target/napi-package/binaries/
+          if-no-files-found: error
+          retention-days: 14
+
+  packages:
+    name: npm packages
+    needs: addon
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: never
+      NO_COLOR: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      # Cargo reads the locked graph the notices are checked against.
+      - name: Prepare Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: pgorm-napi-addon-*-${{ github.run_id }}
+          path: target/napi-package/binaries
+          merge-multiple: true
+      - name: Pack every release platform's package and the main package
+        run: node pgorm-napi/checks/package.js pack
+      - name: Retain the packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pgorm-napi-packages-${{ github.run_id }}
+          path: target/napi-package/tarballs/
+          if-no-files-found: error
+          retention-days: 14
+
+  install:
+    name: ${{ matrix.name }} / installed packages, Node.js 26 and Deno 2
+    needs: packages
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: darwin-arm64
+            os: macos-15
+          - name: linux-x64-gnu
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      NO_COLOR: '1'
+      EXPECTED_PLATFORM: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 'v2.x'
+      - name: Linux PostgreSQL tools
+        if: runner.os == 'Linux'
+        run: |
+          # The Python workflow's PostgreSQL apt setup; its comment says why.
+          key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          sudo install -d "$(dirname "$key")"
+          sudo curl --fail --silent --show-error --location --output "$key" \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          fingerprint=$(GNUPGHOME="$(mktemp -d)" gpg --show-keys --with-colons "$key" \
+            | awk -F: '$1 == "pub" { primary = 1; next } $1 == "fpr" && primary { print $10; primary = 0 }')
+          test "$fingerprint" = B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+          . /etc/os-release
+          printf '%s\n' 'Types: deb' 'URIs: https://apt.postgresql.org/pub/repos/apt' \
+            "Suites: ${VERSION_CODENAME}-pgdg" "Architectures: $(dpkg --print-architecture)" \
+            'Components: main' "Signed-By: $key" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.sources
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-18
+          echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
+      - name: macOS PostgreSQL tools
+        if: runner.os == 'macOS'
+        run: |
+          brew install postgresql@18
+          echo "PGORM_TEST_PG_BIN=$(brew --prefix postgresql@18)/bin" >> "$GITHUB_ENV"
+      - name: Start PostgreSQL 18
+        run: |
+          # A cluster owned by this job, on loopback only; the smoke suite
+          # connects in plaintext.
+          data="$RUNNER_TEMP/pgdata"
+          "$PGORM_TEST_PG_BIN/initdb" -D "$data" -U postgres --auth=trust --encoding=UTF8 --no-locale
+          "$PGORM_TEST_PG_BIN/pg_ctl" -D "$data" -l "$RUNNER_TEMP/postgres.log" -w -t 30 \
+            -o "-c listen_addresses=127.0.0.1 -c port=54329 -c unix_socket_directories=$RUNNER_TEMP" start
+          "$PGORM_TEST_PG_BIN/psql" -h 127.0.0.1 -p 54329 -U postgres -Atc 'SELECT version()'
+          echo 'PGORM_TEST_DSN=postgres://postgres@127.0.0.1:54329/postgres' >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pgorm-napi-packages-${{ github.run_id }}
+          path: target/napi-package/tarballs
+      - name: Install the packages and run the smoke suite in both runtimes
+        run: |
+          node pgorm-napi/checks/package.js install
+          node -e 'const r = require("./target/napi-package/report.json"); if (!r.passed || r.partial || r.platform !== process.env.EXPECTED_PLATFORM) { console.error(r); process.exit(1); }'
+      - name: Retain the install report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pgorm-napi-install-${{ matrix.name }}-${{ github.run_id }}
+          path: target/napi-package/report.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: PostgreSQL log
+        if: failure()
+        run: cat "$RUNNER_TEMP/postgres.log"

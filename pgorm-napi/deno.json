@@ -5,7 +5,8 @@
   ],
   "test": {
     "exclude": [
-      "tests/application-binding/"
+      "tests/application-binding/",
+      "tests/package/"
     ]
   }
 }

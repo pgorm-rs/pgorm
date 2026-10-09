@@ -30,7 +30,7 @@ pub use entities::{GraphSlots, RegistrationError, Registry};
 /// [`install`].
 // [spec:pgorm:def:napi.api+1]
 // [spec:pgorm:req:napi.optional]
-// [spec:pgorm:req:napi.loading]
+// [spec:pgorm:req:napi.loading+1]
 #[cfg(feature = "standalone-module")]
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {

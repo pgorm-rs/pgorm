@@ -18,6 +18,31 @@ into and out of JavaScript with a declared type ([Values](#values)). It needs
 a runtime with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or
 later.
 
+## Installing
+
+pgorm-napi is packaged for npm: a main package, `pgorm-napi`, of JavaScript
+and declarations, and a package per platform holding its prebuilt addon,
+which npm and Deno install beside it — macOS arm64 and Linux x86-64 (glibc)
+today.
+
+```sh
+npm install pgorm-napi
+```
+
+```json
+{
+  "nodeModulesDir": "auto",
+  "imports": { "pgorm-napi": "npm:pgorm-napi@^0.2.0" }
+}
+```
+
+The second is a Deno project's `deno.json`; `deno install` then fetches the
+packages. CI builds the packages, installs them in both runtimes and keeps the
+tarballs, but nothing is published to npm yet, and the package names are
+provisional until then; meanwhile, build from a checkout. [DISTRIBUTION.md](DISTRIBUTION.md)
+covers the packages, the platforms, what Deno's `--allow-ffi` grants, the
+dependency notices and how the packages are built and checked.
+
 ## Building
 
 ```sh
@@ -29,14 +54,16 @@ The script runs Cargo (into the repository's `target/` unless
 `CARGO_TARGET_DIR` says otherwise) and copies the library it produces to
 `pgorm-napi/lib/pgorm_napi.node`, which git ignores. The addon targets
 Node-API 6 and resolves its Node-API symbols from whichever runtime loads it,
-so one build serves both.
+so one build serves both. The module loads a library it finds there before
+looking for an installed platform package, so a checkout runs its own build.
 
 ## Loading
 
-Import the module, never the `.node` file:
+Import the module, never the `.node` file — `pgorm-napi` once installed, as
+the examples here do, or `./pgorm-napi/lib/index.js` from a checkout:
 
 ```js
-import { DatabaseError, Pool } from "./pgorm-napi/lib/index.js";
+import { DatabaseError, Pool } from "pgorm-napi";
 
 await using pool = new Pool("postgres://postgres@localhost/postgres?sslmode=disable");
 try {
@@ -61,7 +88,7 @@ try {
 ## Connections
 
 ```js
-import { connect } from "./pgorm-napi/lib/index.js";
+import { connect } from "pgorm-napi";
 
 await using pool = await connect(process.env.DATABASE_URL, { maxSize: 10 });
 
@@ -128,7 +155,7 @@ pgorm-query's statements and expressions are built from JavaScript as
 pgorm-python builds them, and run through the same terminals as SQL text:
 
 ```js
-import { Condition, call, col, select, Table, With } from "./pgorm-napi/lib/index.js";
+import { Condition, call, col, select, Table, With } from "pgorm-napi";
 
 const account = new Table("account", { schema: "app", alias: "a" });
 const event = new Table("event", { alias: "e" });
@@ -181,7 +208,7 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 ### Writes
 
 ```js
-import { col, Conflict, deleteFrom, insert, ReturningRow, Table, update } from "./pgorm-napi/lib/index.js";
+import { col, Conflict, deleteFrom, insert, ReturningRow, Table, update } from "pgorm-napi";
 
 const account = new Table("account", { schema: "app" });
 
@@ -219,7 +246,7 @@ await pool.query(deleteFrom(account).where(col("active").eq(false)).returning([R
 ### MERGE
 
 ```js
-import { merge, MergeAction, ReturningRow, Table } from "./pgorm-napi/lib/index.js";
+import { merge, MergeAction, ReturningRow, Table } from "pgorm-napi";
 
 const target = new Table("account", { alias: "t" });
 const source = new Table("staged", { alias: "s" });
@@ -254,7 +281,7 @@ source may be a `Table` or a `FromItem`, a subquery among them.
 import {
   call, col, FrameType, jsonDefault, jsonExists, jsonTable, JsonTableColumn as C, jsonValue,
   Range, select, Table, Value, Window, windowFunction,
-} from "./pgorm-napi/lib/index.js";
+} from "pgorm-napi";
 
 const docs = new Table("docs", { alias: "d" });
 const size = jsonValue(docs.col("doc"), "$.size", { returning: "integer", onEmpty: jsonDefault(0), onError: "error" });
@@ -306,7 +333,7 @@ and pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 `Paginator`, down to the SQL they write.
 
 ```ts
-import { column, Conflict, model, type RowOf, TypeName } from "./pgorm-napi/lib/index.js";
+import { column, Conflict, model, type RowOf, TypeName } from "pgorm-napi";
 
 const Account = model("account", {
   schema: "app",
@@ -399,7 +426,7 @@ builders, and runs through `execute`:
 import {
   alterTable, col, ColumnDef, createIndex, createSequence, createTable, createType, DataType,
   Table, TypeName, Value,
-} from "./pgorm-napi/lib/index.js";
+} from "pgorm-napi";
 
 const mood = new TypeName("mood", { schema: "app" });
 const booking = new Table("booking", { schema: "app" });
@@ -469,7 +496,7 @@ relation-to-relation stages over sources, compiled through prqlc to
 PostgreSQL SQL and run as any statement is.
 
 ```js
-import { pipeline as pl, Table } from "./pgorm-napi/lib/index.js";
+import { pipeline as pl, Table } from "pgorm-napi";
 
 const items = new Table("items", { schema: "app" });
 const category = pl.col("items", "category");
@@ -613,7 +640,7 @@ its items' one kind. For anything else, declare the kind with `Value`, using
 pgorm-python's kind names:
 
 ```js
-import { Range, TypeName, Value } from "./pgorm-napi/lib/index.js";
+import { Range, TypeName, Value } from "pgorm-napi";
 
 new Value(5, "i16");                                  // an int2
 Value.null("uuid");                                   // a typed NULL
@@ -668,6 +695,12 @@ connects in plaintext unless its connection string names an `sslmode`; with
 presents, it also holds verified TLS to that CA, as CI does. `deno.json` keeps
 Deno on its global npm cache, so type checking `node:` imports needs no
 `node_modules`.
+
+`tests/package/` is the installed packages' smoke suite. It imports
+`pgorm-napi` by name and runs only in the projects `checks/package.js`
+installs the packed packages into ([DISTRIBUTION.md](DISTRIBUTION.md#build-and-verify)),
+so `deno test` leaves it out here, while `deno check` holds it to the
+declarations through the package's own name.
 
 `tests/models.test.ts` and `tests/graphs.test.ts` make their databases
 through `tests/model-fixtures.ts`. `tests/models-parity.test.ts` holds the

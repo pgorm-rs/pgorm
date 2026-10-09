@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "rust_crate": "pgorm-napi",
+  "npm_package": "pgorm-napi",
+  "package_names": "provisional: the operator decides the final npm names, and whether they take a scope, before anything is published",
+  "node_api_version": 6,
+  "runtimes": {
+    "node": ">=26",
+    "deno": ">=2.9.5"
+  },
+  "platforms": [
+    {
+      "platform": "darwin-arm64",
+      "package": "pgorm-napi-darwin-arm64",
+      "os": "darwin",
+      "cpu": "arm64",
+      "rust_target": "aarch64-apple-darwin",
+      "release": true,
+      "ci_runner": "macos-15"
+    },
+    {
+      "platform": "linux-x64-gnu",
+      "package": "pgorm-napi-linux-x64-gnu",
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "glibc",
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "release": true,
+      "ci_runner": "ubuntu-24.04"
+    },
+    {
+      "platform": "linux-arm64-gnu",
+      "package": "pgorm-napi-linux-arm64-gnu",
+      "os": "linux",
+      "cpu": "arm64",
+      "libc": "glibc",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "release": false
+    },
+    {
+      "platform": "linux-x64-musl",
+      "package": "pgorm-napi-linux-x64-musl",
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "musl",
+      "rust_target": "x86_64-unknown-linux-musl",
+      "release": false
+    },
+    {
+      "platform": "linux-arm64-musl",
+      "package": "pgorm-napi-linux-arm64-musl",
+      "os": "linux",
+      "cpu": "arm64",
+      "libc": "musl",
+      "rust_target": "aarch64-unknown-linux-musl",
+      "release": false
+    },
+    {
+      "platform": "darwin-x64",
+      "package": "pgorm-napi-darwin-x64",
+      "os": "darwin",
+      "cpu": "x64",
+      "rust_target": "x86_64-apple-darwin",
+      "release": false
+    },
+    {
+      "platform": "win32-x64",
+      "package": "pgorm-napi-win32-x64",
+      "os": "win32",
+      "cpu": "x64",
+      "rust_target": "x86_64-pc-windows-msvc",
+      "release": false
+    }
+  ],
+  "tested_combinations": [
+    {
+      "platform": "darwin-arm64",
+      "os": "macOS 26.5.1",
+      "node": "26.11.1",
+      "deno": "2.9.5",
+      "postgresql": "18.6",
+      "verification": "checks/package.js all --partial: release addon built and checked, packages packed, installed from a local registry into fresh Node.js and Deno projects, smoke suite and loader refusals in both runtimes"
+    }
+  ],
+  "registry_publication": "not requested; nothing has been published, and CI never publishes"
+}

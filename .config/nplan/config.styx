@@ -233,6 +233,20 @@ platforms (
         }
     }
     {
+        platform "napi-distribution"
+        files (pgorm-napi/Cargo.toml pgorm-napi/Cargo.lock Cargo.toml pgorm-*/Cargo.toml pgorm-query/pgorm-query-attr/Cargo.toml pgorm-query/pgorm-query-derive/Cargo.toml pgorm-napi/package.json pgorm-napi/support.json pgorm-napi/checks/notices.js pgorm-napi/checks/package.js pgorm-napi/licenses/** pgorm-napi/notices/**)
+        checks {
+            // The packages' notices against the lockfile, and the npm
+            // version, the crate's and support.json against each other.
+            // Building, packing and installing the packages takes a server
+            // and minutes, so it runs in CI, as pgorm-python's distribution
+            // check does.
+            manifests {
+                cmd "node pgorm-napi/checks/package.js manifests"
+            }
+        }
+    }
+    {
         platform "rust"
         files (src/**/*.rs pgorm-macros/**/*.rs pgorm-codegen/**/*.rs pgorm-migration/**/*.rs pgorm-pool/**/*.rs pgorm-query/**/*.rs pgorm-sql-macro/**/*.rs tests/**/*.rs)
         checks {

@@ -2184,6 +2184,21 @@ impl_evidence (
         {impl_name main, rule napi.codegen}
         {impl_name main, rule napi.codegen-types}
     )}
+    {id napi-packaging, covered_rules (
+        napi.distribution
+        napi.notices
+        napi.packages
+        napi.platform-loading
+        napi.release-builds
+        napi.support
+    ), covered_claims (
+        {impl_name main, rule napi.distribution}
+        {impl_name main, rule napi.notices}
+        {impl_name main, rule napi.packages}
+        {impl_name main, rule napi.platform-loading}
+        {impl_name main, rule napi.release-builds}
+        {impl_name main, rule napi.support}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

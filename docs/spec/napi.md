@@ -31,17 +31,21 @@ process's clean exit in both runtimes.
 
 ## Targeting and loading
 
-> [spec:pgorm:req:napi.loading]
+> [spec:pgorm:req:napi.loading+1]
 > The addon MUST target Node-API version 6 — the lowest that carries
 > per-instance data, which the shared channel, instance-local values and the
 > dropped-handle queue rest on — and MUST NOT link against a particular
 > runtime's executable: its Node-API symbols are resolved from the host process
 > when it loads, so the one build serves Node.js and Deno.
 >
-> The built library is copied to `lib/pgorm_napi.node`, beside the module that
-> loads it, and kept out of version control. `lib/index.js` loads it through a
-> CommonJS `require` made with `node:module`'s `createRequire`, the one loader
-> both runtimes give a `.node` file. Node.js needs no flag to load it. Deno
+> A checkout's build is copied to `lib/pgorm_napi.node`, beside the module, and
+> kept out of version control. `lib/native.js`, which `lib/index.js` imports,
+> loads the addon through a CommonJS `require` made with `node:module`'s
+> `createRequire`, the one loader both runtimes give a `.node` file: a library
+> beside the module — a checkout's own build, or an application's
+> (`napi.application`) — before anything else, and otherwise the
+> addon of the installed platform package (`napi.platform-loading`).
+> Node.js needs no flag to load it. Deno
 > MUST be granted `--allow-ffi`, to open a native library, and `--allow-read`,
 > to resolve its path; `--allow-net` is not needed and does not confine the
 > addon. Native code runs outside Deno's permission checks, so granting
@@ -1037,3 +1041,78 @@ entities.
 > the runtime under test, each held to exiting by itself before a deadline. CI
 > MUST run the suite in both runtimes, Node.js 26 and Deno, against PostgreSQL
 > 18 on Linux and macOS.
+
+## Distribution
+
+pgorm-napi reaches applications as npm packages with prebuilt addons, the
+layout Node-API modules use: a main package of JavaScript, and a package per
+platform holding that platform's native code, which a package manager selects
+by the platform it runs on. [DISTRIBUTION.md](../../pgorm-napi/DISTRIBUTION.md)
+is the user-facing account of it.
+
+> [spec:pgorm:req:napi.packages]
+> pgorm-napi MUST be distributed as npm packages released together at one
+> version, the crate's: a main package holding the ES module, its
+> declarations, `DISTRIBUTION.md`, `support.json` and pgorm's licences, and no
+> native code; and one package per release platform holding that platform's
+> release addon as `pgorm_napi.node`, pgorm's licences and the Rust dependency
+> notices `napi.notices` requires. A platform package is named for
+> the main package and its platform, `<main>-<os>-<cpu>` with `-gnu` or
+> `-musl` added on Linux, in Node.js's `process.platform` and `process.arch`
+> vocabulary, and declares the `os`, `cpu` and, on Linux, `libc` a package
+> manager selects it by. The main package MUST list exactly the release
+> platforms' packages as optional dependencies, each at the main package's own
+> version exactly — the one exact requirement the packages carry, because a
+> module and the addon built with it are one release. The checkout's own
+> `package.json` stays private: the packages are made by the packaging check,
+> never by packing the checkout. Their names are provisional until the operator
+> chooses them, before anything is published.
+
+> [spec:pgorm:req:napi.platform-loading]
+> Without a library beside it, the module MUST load the addon from the
+> platform package for the running process: `process.platform` and
+> `process.arch`, and on Linux the C library the runtime links, read from
+> Node.js's diagnostic report or, under Deno, whose report needs
+> `--allow-sys`, from `Deno.build.env`. Loading MUST throw an Error naming the
+> platform and the main package's version rather than fail later: when the
+> platform's package is not installed, saying so and how to install it; when
+> the main package offers no package for the platform, naming the platforms it
+> does; and when the installed platform package's version, or its addon's
+> `version`, differs from the main package's, naming both.
+
+> [spec:pgorm:req:napi.release-builds]
+> A platform package MUST hold a release build of the addon. The packaging
+> check MUST refuse an addon carrying the debug-only probe exports, both by
+> loading it on the platform that built it and by finding their names in its
+> bytes, which any runner can check for any platform's binary, and MUST refuse
+> one whose `version` is not the package version.
+
+> [spec:pgorm:req:napi.notices]
+> Each platform package MUST carry an inventory and the notice texts of the
+> committed lockfile's whole Cargo graph — build and platform-conditional
+> dependencies included, so a superset of what one addon links — and of the C
+> components bundled through it, generated from Cargo's package metadata and
+> the notice files each package ships. A text a crate archive omits MUST be
+> recorded beside the generator with its upstream source and hash. Packing
+> MUST refuse notices that no longer match the lockfile, and the lockfile MUST
+> pass `cargo deny` under the repository's policy.
+
+> [spec:pgorm:req:napi.support]
+> `pgorm-napi/support.json` MUST list every platform the packages are named
+> for, whether a release builds it, and the combinations the packaging check
+> has passed on. Only release platforms are offered as optional dependencies,
+> so the main package never names a package no release publishes, and
+> documentation MUST NOT describe a platform as tested before the packaging
+> check has passed on it.
+
+> [spec:pgorm:req:napi.distribution]
+> CI MUST build the release addon on each release platform's own runner, pack
+> the full set of packages once, and on each release platform install that set
+> from a registry serving only its tarballs into fresh projects — `npm install`
+> for Node.js, and `npm:` in a `nodeModulesDir: "auto"` project for Deno — then
+> run a smoke suite against PostgreSQL 18 in both runtimes: connecting, a bound
+> query, a built statement, a model, a committed and a rolled-back
+> transaction, `Temporal`, `bigint` and `Decimal` round trips, and a process
+> exiting on its own. It MUST hold the loader to the refusals
+> `napi.platform-loading` requires in both runtimes, and retain the
+> tarballs for review. CI MUST NOT publish to a registry.

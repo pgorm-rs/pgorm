@@ -11022,11 +11022,29 @@ children (
                 id napi-packaging
                 title "pgorm-napi ships as an npm package with prebuilt per-platform binaries, importable from Deno as npm:"
                 kind @build
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.packages]
+                        [spec:pgorm:req:napi.platform-loading]
+                        [spec:pgorm:req:napi.release-builds]
+                        [spec:pgorm:req:napi.notices]
+                        [spec:pgorm:req:napi.support]
+                        [spec:pgorm:req:napi.distribution]
+                    )
+                }
                 deps (
                     napi-entities
                     napi-schema
                     napi-pipeline
                     napi-codegen
+                )
+                log (
+                    {
+                        at 2026-10-09T17:08:49.234706Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
                 )
             }
 
