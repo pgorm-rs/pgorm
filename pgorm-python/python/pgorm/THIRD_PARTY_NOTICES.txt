@@ -7278,6 +7278,29 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 
+===== SHA-256 91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69 =====
+The MIT License (MIT)
+
+Copyright (c) 2015 Steven Fackler
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
 ===== SHA-256 92b81db30f7ab6d693e0af5661a40d273ca1947e891123ed823924192c10cbc7 =====
 Copyrights in the Rand project are retained by their contributors. No
 copyright assignment is required to contribute to the Rand project.
@@ -8492,6 +8515,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 
+===== SHA-256 aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551 =====
+Copyright (c) 2015 steffengy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
 ===== SHA-256 aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf =====
                               Apache License
                         Version 2.0, January 2004
@@ -9475,19 +9508,6 @@ Except as otherwise noted (below and/or in individual files), Rust is
 licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
-
-
-===== SHA-256 c5dae4585d8520d1bc3d435dc5dd813be63046ebccc3c4eb866044eff304f0f0 =====
-rustls-pemfile is distributed under the following three licenses:
-
-- Apache License version 2.0.
-- MIT license.
-- ISC license.
-
-These are included as LICENSE-APACHE, LICENSE-MIT and LICENSE-ISC
-respectively.  You may use this software under the terms of any
-of these licenses, at your option.
-
 
 
 ===== SHA-256 c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08 =====
@@ -11041,6 +11061,19 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 
+===== SHA-256 d75967ce788187f83c3bd3328210974acfc443d4dc44909f1d7e34f21623a0c6 =====
+Rustls is distributed under the following three licenses:
+
+- Apache License version 2.0.
+- MIT license.
+- ISC license.
+
+These are included as LICENSE-APACHE, LICENSE-MIT and LICENSE-ISC
+respectively.  You may use this software under the terms of any
+of these licenses, at your option.
+
+
+
 ===== SHA-256 d9771b8c6cf4426d3846de54c1febe20907f1eeadf7adfb5ade89a83bd9ea77f =====
 (C) Copyright 2016 Jethro G. Beekman
 
@@ -11166,70 +11199,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
-
-===== SHA-256 e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8 =====
-# Community Data License Agreement - Permissive - Version 2.0
-
-This is the Community Data License Agreement - Permissive, Version
-2.0 (the "agreement"). Data Provider(s) and Data Recipient(s) agree
-as follows:
-
-## 1. Provision of the Data
-
-1.1. A Data Recipient may use, modify, and share the Data made
-available by Data Provider(s) under this agreement if that Data
-Recipient follows the terms of this agreement.
-
-1.2. This agreement does not impose any restriction on a Data
-Recipient's use, modification, or sharing of any portions of the
-Data that are in the public domain or that may be used, modified,
-or shared under any other legal exception or limitation.
-
-## 2. Conditions for Sharing Data
-
-2.1. A Data Recipient may share Data, with or without modifications, so
-long as the Data Recipient makes available the text of this agreement
-with the shared Data.
-
-## 3. No Restrictions on Results
-
-3.1. This agreement does not impose any restriction or obligations
-with respect to the use, modification, or sharing of Results.
-
-## 4. No Warranty; Limitation of Liability
-
-4.1. All Data Recipients receive the Data subject to the following
-terms:
-
-THE DATA IS PROVIDED ON AN "AS IS" BASIS, WITHOUT REPRESENTATIONS,
-WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED
-INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE,
-NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
-
-NO DATA PROVIDER SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING
-WITHOUT LIMITATION LOST PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE DATA OR RESULTS,
-EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-## 5. Definitions
-
-5.1. "Data" means the material received by a Data Recipient under
-this agreement.
-
-5.2. "Data Provider" means any person who is the source of Data
-provided under this agreement and in reliance on a Data Recipient's
-agreement to its terms.
-
-5.3. "Data Recipient" means any person who receives Data directly
-or indirectly from a Data Provider and agrees to the terms of this
-agreement.
-
-5.4. "Results" means any outcome obtained by computational analysis
-of Data, including for example machine learning models and models'
-insights.
 
 
 ===== SHA-256 e27fb2953c088c71285a4f2f54a0ac53323460ee7c2b1b838d563bd2687a38af =====

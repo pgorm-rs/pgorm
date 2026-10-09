@@ -1,11 +1,38 @@
 """Native PostgreSQL resource tests; require PGORM_TEST_DSN for a disposable DB."""
 
 import asyncio
+from contextlib import contextmanager
 import os
+from pathlib import Path
+import tempfile
 import unittest
 from urllib.parse import urlsplit, urlunsplit, quote
 
 import pgorm
+
+
+TRUST_STORE_VARIABLES = ("SSL_CERT_FILE", "SSL_CERT_DIR")
+
+
+@contextmanager
+def trust_store(**variables):
+    """Run with SSL_CERT_FILE and SSL_CERT_DIR exactly as given, unset otherwise.
+
+    With neither given the pool reads the platform's own certificate store;
+    either one replaces that store entirely.
+    """
+    saved = {name: os.environ.get(name) for name in TRUST_STORE_VARIABLES}
+    try:
+        for name in TRUST_STORE_VARIABLES:
+            os.environ.pop(name, None)
+        os.environ.update({name.upper(): str(value) for name, value in variables.items()})
+        yield
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 class RuntimeTests(unittest.IsolatedAsyncioTestCase):
@@ -119,6 +146,53 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await pool.ping()
         finally:
             await pool.close()
+
+    # [spec:pgorm:req:python.connections/test]
+    async def test_platform_store_refuses_an_unknown_ca(self):
+        # The test server's certificate is signed by a CA minted for this run,
+        # which no platform store holds: without cafile it must be refused.
+        # Connection failures are reported without their cause, so the control
+        # is the next test: the same pool, with that CA in the store, connects.
+        with trust_store():
+            pool = pgorm.Pool(self.dsn, tls="verify-full")
+        try:
+            with self.assertRaises(pgorm.ConnectionError):
+                await pool.ping()
+        finally:
+            await pool.close()
+
+    # [spec:pgorm:req:python.connections/test]
+    async def test_default_trust_is_the_certificate_store(self):
+        # SSL_CERT_FILE replaces the platform's store, so naming the test CA
+        # there and passing no cafile shows the default trust is the store's.
+        with trust_store(ssl_cert_file=os.environ["PGORM_TEST_CA"]):
+            pool = pgorm.Pool(self.dsn, tls="verify-full")
+        async with pool:
+            self.assertTrue(await pool.ping())
+
+    # [spec:pgorm:req:python.connections/test]
+    async def test_rootless_store_fails_construction(self):
+        with tempfile.TemporaryDirectory(prefix="pgorm-python-empty-store-") as directory:
+            empty_file = Path(directory) / "none.pem"
+            empty_file.write_text("")
+            empty_dir = Path(directory) / "certs"
+            empty_dir.mkdir()
+            for variables in (
+                {"ssl_cert_file": empty_file},
+                {"ssl_cert_dir": empty_dir},
+                {"ssl_cert_file": Path(directory) / "missing.pem"},
+            ):
+                with self.subTest(variables=variables), trust_store(**variables):
+                    with self.assertRaises(pgorm.ConstructionError) as caught:
+                        pgorm.Pool(self.dsn, tls="verify-full")
+                    self.assertIn("no usable root certificate", str(caught.exception))
+                    async with pgorm.Pool(
+                        self.dsn, tls="verify-full", cafile=os.environ["PGORM_TEST_CA"]
+                    ) as pool:
+                        self.assertTrue(await pool.ping())
+            with trust_store(ssl_cert_file=empty_file):
+                async with pgorm.Pool(self.dsn) as pool:
+                    self.assertTrue(await pool.ping())
 
     # [spec:pgorm:req:python.connections/test]
     async def test_verified_tls_accepts_the_configured_ca(self):

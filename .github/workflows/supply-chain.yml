@@ -4,8 +4,19 @@ name: supply chain
 # dependency does not have to change to acquire an advisory: the tree can sit
 # untouched for a month and become vulnerable because someone else published a
 # finding. A check that only ran on PRs would stay green through exactly that.
+#
+# Work lands on main by push as well as by pull request, so a push there that
+# changes a manifest, a lockfile or the policy is audited at once rather than
+# at the next scheduled run.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'deny.toml'
+      - '.github/workflows/supply-chain.yml'
   pull_request:
     paths:
       - '**/Cargo.toml'
@@ -40,12 +51,50 @@ jobs:
         # the one it shipped with. A tool that audits supply chain should not
         # float its own.
         run: cargo install cargo-deny --version 0.19.9 --locked
-      - name: Resolve the dependency tree
+      - name: Fetch the advisory database
+        # Once, so that every workspace below is judged against one snapshot of
+        # it rather than whatever was published between two of their checks.
+        run: cargo deny fetch db --config deny.toml
+      - name: Resolve the root dependency tree
         # The root Cargo.lock is not tracked (see .gitignore), so there is
         # nothing on disk to audit until it is resolved here.
         run: cargo generate-lockfile
-      - name: Check advisories, licenses, sources and bans
-        run: cargo deny check
+      - name: Check advisories, licenses, sources and bans in every workspace
+        # The root workspace is not the whole supply chain. pgorm-python and
+        # pgorm-napi ship from their own workspaces, and the Python test
+        # fixtures and the security campaigns' crates each resolve their own
+        # graph too; none of them is in the root's tree. Each is audited
+        # against its own committed lockfile (`--locked`: a lockfile its
+        # manifest has moved past fails rather than being re-resolved here)
+        # under the one policy in deny.toml, which cargo-deny does not find
+        # from a detached workspace by itself. The lockfiles are discovered
+        # rather than listed, so a workspace committed tomorrow is audited on
+        # its first run. Every workspace is checked before the step fails, so
+        # one run names them all.
+        run: |
+          workspaces=(.)
+          while IFS= read -r lockfile; do
+            workspaces+=("$(dirname "$lockfile")")
+          done < <(git ls-files -- '*Cargo.lock')
+          if [ "${#workspaces[@]}" -lt 2 ]; then
+            echo "::error::found no committed Cargo.lock to audit"
+            exit 1
+          fi
+          failed=()
+          for workspace in "${workspaces[@]}"; do
+            echo "::group::$workspace"
+            if ! cargo deny --locked --manifest-path "$workspace/Cargo.toml" \
+                check --disable-fetch --config deny.toml; then
+              failed+=("$workspace")
+              echo "::error file=$workspace/Cargo.toml::cargo deny check failed for $workspace"
+            fi
+            echo "::endgroup::"
+          done
+          echo "audited ${#workspaces[@]} workspaces"
+          if [ "${#failed[@]}" -gt 0 ]; then
+            printf 'failed: %s\n' "${failed[@]}"
+            exit 1
+          fi
       - name: Retain the audited lockfile
         # Without this the run reports on a tree that cannot be reconstructed
         # afterwards, which is the same gap that cost the campaign its baseline.

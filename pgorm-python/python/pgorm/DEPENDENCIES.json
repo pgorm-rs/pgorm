@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Locked Cargo graph, including build and platform-conditional dependencies; a superset of any one wheel",
-  "cargo_lock_sha256": "59642b0d07cd742e448794c3324a8c656bbe08e46811a6c650c322bc24e275c9",
+  "cargo_lock_sha256": "07d6e69e1e8181ce24af5b485cc86a741c235ac3324edfeae0b1eb2c5b24fc0f",
   "python_runtime_dependencies": [],
   "packages": [
     {
@@ -640,6 +640,23 @@
         {
           "source": "LICENSE-MIT",
           "sha256": "bada9e7ed8dc00d63502053c455d7c8d7575dfb7e8277a2a832531844d900682"
+        }
+      ]
+    },
+    {
+      "name": "core-foundation",
+      "version": "0.10.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/servo/core-foundation-rs",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "notices": [
+        {
+          "source": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "source": "LICENSE-MIT",
+          "sha256": "62065228e42caebca7e7d7db1204cbb867033de5982ca4009928915e4095f3a3"
         }
       ]
     },
@@ -2418,6 +2435,23 @@
       ]
     },
     {
+      "name": "openssl-probe",
+      "version": "0.2.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rustls/openssl-probe",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "notices": [
+        {
+          "source": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "source": "LICENSE-MIT",
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+        }
+      ]
+    },
+    {
       "name": "parking_lot",
       "version": "0.12.5",
       "license": "MIT OR Apache-2.0",
@@ -3496,7 +3530,7 @@
     },
     {
       "name": "rustls",
-      "version": "0.23.44",
+      "version": "0.23.45",
       "license": "Apache-2.0 OR ISC OR MIT",
       "repository": "https://github.com/rustls/rustls",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3516,15 +3550,15 @@
       ]
     },
     {
-      "name": "rustls-pemfile",
-      "version": "2.2.0",
+      "name": "rustls-native-certs",
+      "version": "0.8.4",
       "license": "Apache-2.0 OR ISC OR MIT",
-      "repository": "https://github.com/rustls/pemfile",
+      "repository": "https://github.com/rustls/rustls-native-certs",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "notices": [
         {
           "source": "LICENSE",
-          "sha256": "c5dae4585d8520d1bc3d435dc5dd813be63046ebccc3c4eb866044eff304f0f0"
+          "sha256": "d75967ce788187f83c3bd3328210974acfc443d4dc44909f1d7e34f21623a0c6"
         },
         {
           "source": "LICENSE-APACHE",
@@ -3605,6 +3639,19 @@
       ]
     },
     {
+      "name": "schannel",
+      "version": "0.1.29",
+      "license": "MIT",
+      "repository": "https://github.com/steffengy/schannel-rs",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "notices": [
+        {
+          "source": "LICENSE.md",
+          "sha256": "aa72991ac35b4de0034da0afe943e62b48c4092fc2ba13ae47806d8e9a4ad551"
+        }
+      ]
+    },
+    {
       "name": "schemars",
       "version": "1.2.2",
       "license": "MIT",
@@ -3644,6 +3691,40 @@
         {
           "source": "LICENSE-MIT",
           "sha256": "fb77f0a9c53e473abe5103c8632ef9f0f2874d4fb3f17cb2d8c661aab9cee9d7"
+        }
+      ]
+    },
+    {
+      "name": "security-framework",
+      "version": "3.7.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/kornelski/rust-security-framework",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "notices": [
+        {
+          "source": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "source": "LICENSE-MIT",
+          "sha256": "91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69"
+        }
+      ]
+    },
+    {
+      "name": "security-framework-sys",
+      "version": "2.17.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/kornelski/rust-security-framework",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "notices": [
+        {
+          "source": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "source": "LICENSE-MIT",
+          "sha256": "91e934255ba3b2f21103d68c5581c23ef34aa95c4628e4405b8c901935e11c69"
         }
       ]
     },
@@ -5022,19 +5103,6 @@
         {
           "source": "LICENSE-MIT",
           "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
-        }
-      ]
-    },
-    {
-      "name": "webpki-roots",
-      "version": "1.0.9",
-      "license": "CDLA-Permissive-2.0",
-      "repository": "https://github.com/rustls/webpki-roots",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
-      "notices": [
-        {
-          "source": "LICENSE",
-          "sha256": "e271993808fec50ab29350b39539cdec611a9103f827e0aa26d61da70e2d33f8"
         }
       ]
     },

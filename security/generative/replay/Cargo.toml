@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 publish = false
+license = "MIT OR Apache-2.0"
 description = "Standalone replay harness for the pgorm generated-program campaign"
 
 # A detached workspace: the harness resolves against its own lock, depends on

@@ -1,6 +1,7 @@
-use std::{io::Cursor, num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 use pyo3::PyResult;
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use tokio_postgres::config::SslMode;
 use tokio_postgres_rustls::MakeRustlsConnect;
 
@@ -88,10 +89,12 @@ impl PoolConfig {
     }
 }
 
+/// A rustls connector trusting `ca_pem` when given, and the platform's trust
+/// store otherwise.
 fn tls_connector(ca_pem: Option<&[u8]>) -> PyResult<MakeRustlsConnect> {
     let mut roots = rustls::RootCertStore::empty();
     if let Some(pem) = ca_pem {
-        let certificates = rustls_pemfile::certs(&mut Cursor::new(pem))
+        let certificates = CertificateDer::pem_slice_iter(pem)
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| ConstructionError::new_err("invalid PEM certificate data"))?;
         if certificates.is_empty() {
@@ -105,7 +108,7 @@ fn tls_connector(ca_pem: Option<&[u8]>) -> PyResult<MakeRustlsConnect> {
                 .map_err(|_| ConstructionError::new_err("invalid CA certificate"))?;
         }
     } else {
-        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        platform_roots(&mut roots)?;
     }
     let client = rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
@@ -115,4 +118,51 @@ fn tls_connector(ca_pem: Option<&[u8]>) -> PyResult<MakeRustlsConnect> {
     .with_root_certificates(roots)
     .with_no_client_auth();
     Ok(MakeRustlsConnect::new(client))
+}
+
+/// Adds the platform's trusted roots to `roots`: the system keychain's on
+/// macOS, the system store's on Windows, and elsewhere the CA bundle and
+/// directory OpenSSL would use. `SSL_CERT_FILE` and `SSL_CERT_DIR`, when set,
+/// replace the platform's store entirely.
+///
+/// A store that yields no usable root fails here, at construction, naming
+/// what the loader reported; it never leaves a pool that trusts nothing and
+/// so fails every connection later with an unexplained certificate error.
+/// The loader also reports conditions that are routine on a working host,
+/// such as macOS having no per-user trust settings, so its errors are only
+/// surfaced when no root was found.
+///
+/// The load reads the process environment, so it runs with the interpreter
+/// attached: Python code cannot then rewrite `os.environ` underneath it.
+fn platform_roots(roots: &mut rustls::RootCertStore) -> PyResult<()> {
+    let found = rustls_native_certs::load_native_certs();
+    let (added, _) = roots.add_parsable_certificates(found.certs);
+    if added > 0 {
+        return Ok(());
+    }
+    let reported = found
+        .errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    let detail = if reported.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", reported.join("; "))
+    };
+    let replaced = std::env::var_os("SSL_CERT_FILE").is_some()
+        || std::env::var_os("SSL_CERT_DIR").is_some_and(|dirs| {
+            std::env::split_paths(&dirs).any(|dir| !dir.as_os_str().is_empty())
+        });
+    Err(ConstructionError::new_err(if replaced {
+        format!(
+            "SSL_CERT_FILE and SSL_CERT_DIR, which replace the platform's certificate store, \
+             name no usable root certificate{detail}; pass cafile, or point them at a CA bundle"
+        )
+    } else {
+        format!(
+            "the platform's certificate store holds no usable root certificate{detail}; \
+             pass cafile, or point SSL_CERT_FILE or SSL_CERT_DIR at a CA bundle"
+        )
+    }))
 }

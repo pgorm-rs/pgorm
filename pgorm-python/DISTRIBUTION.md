@@ -88,6 +88,37 @@ The locally verified combination is macOS 26.5.1 on arm64 with CPython 3.14.4.
 The configured macOS 15 and Linux jobs remain candidates until their own runs
 provide passing evidence; this checkout does not claim they have run.
 
+## TLS trust
+
+A wheel carries no list of certificate authorities. A pool verifying TLS
+without `cafile` trusts the roots of the host it runs on, read from the
+platform's certificate store through rustls-native-certs each time such a pool
+is constructed; the [README](README.md#connections) says which store that is on
+each platform. The same wheel therefore trusts different authorities on
+different hosts, and follows the host's own additions and removals, such as a
+corporate CA or a distrusted root, without a rebuild. Earlier builds bundled
+Mozilla's root list through the webpki-roots crate, fixed when the wheel was
+built; that crate is no longer in the dependency graph. Reading the store links
+the extension against the Security framework on macOS and the crypt32
+certificate-store library on Windows; on Linux it reads files and links nothing
+further.
+
+A deployment relying on the default trust must provide a CA bundle: on Debian
+and Ubuntu images the `ca-certificates` package, which slim and distroless
+images can lack, or a bundle named by `SSL_CERT_FILE` or `SSL_CERT_DIR`, which
+then replace the platform's store. Where no usable root is found, constructing
+a verifying pool without `cafile` raises `ConstructionError` naming what the
+store reported, such as a missing file, rather than producing a pool that
+trusts nothing or skips verification. Pools given `cafile` trust exactly that
+file and never read the store, and plaintext pools (`tls="disable"`) are
+unaffected.
+
+The database wrappers' test CA is created per run and is in no platform store,
+so the installed tests check both directions: the test server is refused under
+the platform's store, and the same server is accepted through `cafile` and
+through `SSL_CERT_FILE`. An empty, missing or root-less store is checked to
+fail construction.
+
 ## Dependencies and notices
 
 There are no Python runtime package dependencies. Rust and native components
@@ -113,3 +144,8 @@ files omitted from some crate archives. Missing or changed evidence fails
 verification. Review and update those inputs when updating the corresponding
 dependencies. The generated package files and supplemental texts are committed
 so installed applications do not need network access to read their notices.
+
+The [supply-chain workflow](../.github/workflows/supply-chain.yml) audits this
+lockfile with `cargo deny` against the repository's `deny.toml` (advisories,
+licences, sources and bans), weekly and on pull requests that touch a manifest
+or lockfile, as it does every other committed lockfile in the repository.
