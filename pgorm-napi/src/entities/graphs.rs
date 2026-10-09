@@ -199,6 +199,17 @@ fn query_inspect(mut cx: FunctionContext) -> JsResult<JsValue> {
     inspected(&mut cx, compiled)
 }
 
+/// Each row's models, out of the graph's own wrapper.
+fn unwrapped(rows: Vec<super::graph::Row>) -> Vec<Vec<Option<super::adapter::Model>>> {
+    rows.into_iter()
+        .map(|row| {
+            row.into_iter()
+                .map(|model| model.map(|model| model.0))
+                .collect()
+        })
+        .collect()
+}
+
 fn sources(query: &Query) -> Vec<Arc<super::info::EntityInfo>> {
     query
         .info()
@@ -219,7 +230,7 @@ fn query_job(mut cx: FunctionContext) -> JsResult<JsValue> {
                 .run(db, optional)
                 .await
                 .map_err(|error| entity_failure(&error, secrets))?;
-            Ok(Box::new(GraphRows(sources(&query), rows)) as Output)
+            Ok(Box::new(GraphRows(sources(&query), unwrapped(rows))) as Output)
         })
     });
     Ok(cx.boxed(JobHandle::new(job)).upcast())
@@ -325,7 +336,7 @@ fn cursor_job(mut cx: FunctionContext) -> JsResult<JsValue> {
                 .cursor(db, plan)
                 .await
                 .map_err(|error| entity_failure(&error, secrets))?;
-            Ok(Box::new(GraphRows(sources(&query), rows)) as Output)
+            Ok(Box::new(GraphRows(sources(&query), unwrapped(rows))) as Output)
         })
     });
     Ok(cx.boxed(JobHandle::new(job)).upcast())

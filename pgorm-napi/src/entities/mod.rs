@@ -29,6 +29,8 @@ mod graph;
 mod graphs;
 mod info;
 mod registry;
+mod selected;
+mod sources;
 mod versions;
 
 use std::sync::Arc;
@@ -40,6 +42,7 @@ use adapter::{Active, Change, Comparison, EntityBackend, Read, Select, Write};
 use convert::{ModelHandle, Records, Wrote, column_value, entity_failure, names, record};
 pub use graph::{GraphBindings, GraphModel, GraphSlots, RegisteredSlot, Source};
 pub use registry::{RegistrationError, Registry};
+pub use sources::{SourceBindings, SourceModel, SourceTypes};
 
 use crate::{
     codec::Codec,
@@ -78,6 +81,7 @@ pub(crate) fn install(cx: &mut ModuleContext, registry: Registry) -> NeonResult<
     }
     versions::export(cx)?;
     graphs::export(cx)?;
+    selected::export(cx)?;
     let registry = cx.boxed(RegistryHandle(Arc::new(registry)));
     cx.export_value("registry", registry)?;
     Ok(())
@@ -153,6 +157,29 @@ pub(crate) fn condition<'cx>(
         Some(Node::Condition(condition)) => Ok(condition),
         _ => read::refuse(cx, "a condition is an expression or a Condition"),
     }
+}
+
+/// A registered entity as a pipeline reads it: its own `IntoSource`, so its
+/// table and schema are the ones its Rust declaration names.
+#[derive(Debug, Clone)]
+pub(crate) struct EntitySource(Arc<dyn EntityBackend>);
+
+impl EntitySource {
+    /// The entity's table as a pipeline source.
+    // [spec:pgorm:req:napi.pipeline-sources]
+    pub(crate) fn source(&self) -> pgorm::pipeline::Source {
+        self.0.source()
+    }
+}
+
+/// The registered entity `value` is, as a pipeline source, or `None` when
+/// `value` is no entity.
+pub(crate) fn entity_source<'cx>(
+    cx: &mut Cx<'cx>,
+    value: Handle<'cx, JsValue>,
+) -> Option<EntitySource> {
+    let entity = value.downcast::<JsBox<EntityHandle>, _>(cx).ok()?;
+    Some(EntitySource(entity.0.clone()))
 }
 
 /// `entityNames(registry)`: every registered entity's name.

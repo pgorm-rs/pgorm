@@ -9,7 +9,7 @@
 // `intoActive` converts the real model rather than rebuilding one.
 // [spec:pgorm:req:napi.entities]
 
-import { TRUSTED } from "./builder.js";
+import { Handle, TRUSTED } from "./builder.js";
 import { Condition } from "./conditions.js";
 import { runJob } from "./connections.js";
 import { ConstructionError } from "./errors.js";
@@ -96,7 +96,7 @@ export function entity(name) {
  * A registered entity: its queries, ActiveModels and the writes that return
  * a row's two versions.
  */
-export class Entity {
+export class Entity extends Handle {
   /** @type {unknown} */
   #native;
   /** @type {string} */
@@ -109,6 +109,7 @@ export class Entity {
    */
   constructor(handle, name, token) {
     if (token !== MADE) throw new TypeError("an Entity comes from entity(name)");
+    super(handle);
     this.#native = handle;
     this.#name = name;
     Object.freeze(this);

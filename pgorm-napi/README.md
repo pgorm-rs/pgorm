@@ -526,8 +526,9 @@ API and its registrations, from a `#[neon::main]` of its own that calls
 `pgorm_napi::install`. JavaScript then reaches each by name, and every
 operation is the entity's own Rust API: `Select<E>` and its terminals,
 `ActiveModelTrait`'s writes with the application's hooks, the terminals that
-return a row's two versions, and `SelectGraph` with its cursor. The binding's
-own module registers nothing. [ENTITIES.md](ENTITIES.md) shows how to build
+return a row's two versions, `SelectGraph` with its cursor, and pipelines
+that read an entity's table and decode a registered source tuple's rows
+through `select_sources`. The binding's own module registers nothing. [ENTITIES.md](ENTITIES.md) shows how to build
 the module and use it; `node pgorm-napi/checks/entities.js` builds the
 repository's application fixture and runs its suite in both runtimes.
 

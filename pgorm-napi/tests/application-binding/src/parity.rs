@@ -11,7 +11,9 @@ use pgorm::{
 };
 use serde_json::Value as Json;
 
-use crate::{account, graphs, membership};
+use pgorm::pipeline as pl;
+
+use crate::{account, graphs, membership, note};
 
 fn built<Q: QueryTrait>(query: &Q) -> (String, Values)
 where
@@ -82,13 +84,74 @@ fn cases() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
+/// A pipeline's SQL and values, as pgorm compiles them.
+fn compiled(built: Result<(String, Values), pl::PipelineError>) -> (String, Values) {
+    match built {
+        Ok(built) => built,
+        Err(error) => panic!("the pipeline compiles: {error}"),
+    }
+}
+
+fn pipelines() -> Vec<(&'static str, (String, Values))> {
+    use pl::ExprOps;
+    let joined = || {
+        pl::Pipeline::from(account::Entity).join(
+            pl::JoinSide::Left,
+            pl::named_runtime(note::Entity, Name::runtime("n")),
+            pl::col(Name::runtime("accounts"), Name::runtime("id"))
+                .eq(pl::col(Name::runtime("n"), Name::runtime("account_id"))),
+        )
+    };
+    vec![
+        (
+            "pipeline-entity",
+            compiled(pl::Pipeline::from(account::Entity).into_sql()),
+        ),
+        (
+            "sources-single",
+            compiled(
+                pl::Pipeline::from(account::Entity)
+                    .select_sources(pl::named_runtime(
+                        account::Entity,
+                        Name::runtime("accounts"),
+                    ))
+                    .into_sql(),
+            ),
+        ),
+        (
+            "sources-joined",
+            compiled(
+                joined()
+                    .select_sources((
+                        pl::named_runtime(account::Entity, Name::runtime("accounts")),
+                        pl::named_runtime(note::Entity, Name::runtime("n")),
+                    ))
+                    .into_sql(),
+            ),
+        ),
+        (
+            "sources-joined-one",
+            compiled(
+                joined()
+                    .take(1)
+                    .select_sources((
+                        pl::named_runtime(account::Entity, Name::runtime("accounts")),
+                        pl::named_runtime(note::Entity, Name::runtime("n")),
+                    ))
+                    .into_sql(),
+            ),
+        ),
+    ]
+}
+
 // [spec:pgorm:req:napi.entity-reads/test]
 // [spec:pgorm:req:napi.entity-graphs/test]
+// [spec:pgorm:req:napi.pipeline-sources/test]
 #[test]
 fn entity_statements_match_the_golden_file() {
     let golden: BTreeMap<String, Json> = serde_json::from_str(include_str!("../tests/parity.json"))
         .expect("the golden file is JSON");
-    let cases = cases();
+    let cases = [cases(), pipelines()].concat();
     let mut names: Vec<&str> = cases.iter().map(|(name, _)| *name).collect();
     names.sort_unstable();
     assert_eq!(names, golden.keys().map(String::as_str).collect::<Vec<_>>());

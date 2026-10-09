@@ -169,3 +169,28 @@ nothing. `col(source, column)` qualifies a column as the query names it.
 `cursor(column)` is `SelectGraph::cursor_by` on a root column: `before` and
 `after` bound that column, `beforeWith` and `afterWith` the whole key — the
 column, the root's other key columns, then each slot's.
+
+## Pipelines over registered entities
+
+A registered entity is a pipeline source wherever a relation is, read through
+its own `IntoSource`. A registered tuple of one to six entity types —
+`registry.sources::<(account::Entity, note::Entity)>("app.AccountWithNote")` —
+is a pipeline's last stage, its rows decoded into the entities' models as
+pgorm's `select_sources` decodes them:
+
+```js
+import { entity, pipeline as pl } from "./lib/index.js";
+
+const Account = entity("app.Account");
+const rows = await pl.from(Account)
+  .join(pl.source(entity("app.Note")).named("n"), pl.col("accounts", "id").eq(pl.col("n", "account_id")), { kind: "left" })
+  .selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] })
+  .all(pool);                                 // [account | null, note | null][]
+```
+
+Each source is projected under the qualifier given for it, or its table's
+name. A row's source that the join left empty is `null`, read through the
+entity's absence witness. A pipeline reshaped before the selection — a
+`select`, an aggregate — is refused with the `ConstructionError` pgorm's
+refusal names, before anything is sent.
+

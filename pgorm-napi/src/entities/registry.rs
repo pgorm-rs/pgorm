@@ -44,6 +44,7 @@ pub struct Registry {
     pub(crate) entities: BTreeMap<String, Arc<dyn EntityBackend>>,
     types: HashMap<TypeId, String>,
     pub(crate) graphs: BTreeMap<String, Arc<dyn Factory>>,
+    pub(crate) sources: BTreeMap<String, Arc<dyn super::sources::SourcesFactory>>,
 }
 
 impl Registry {

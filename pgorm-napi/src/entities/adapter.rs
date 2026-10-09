@@ -99,6 +99,8 @@ pub(crate) struct Versions {
 
 pub(crate) trait EntityBackend: Debug + Send + Sync {
     fn info(&self) -> &Arc<EntityInfo>;
+    /// The entity as a pipeline source, by its own `IntoSource`.
+    fn source(&self) -> pgorm::pipeline::Source;
     fn select(&self) -> Select;
     fn active(&self) -> Active;
     fn column(&self, column: &str) -> Result<SimpleExpr, Failure>;
@@ -163,6 +165,10 @@ where
 {
     fn info(&self) -> &Arc<EntityInfo> {
         &self.info
+    }
+
+    fn source(&self) -> pgorm::pipeline::Source {
+        pgorm::pipeline::IntoSource::into_source(E::default())
     }
 
     fn select(&self) -> Select {

@@ -248,9 +248,17 @@ fn pipeline_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<p
 }
 
 /// A relation: a `Table`, read under its alias when it has one, a table's
-/// name, a `Pipeline` embedded whole, or a `Source`.
+/// name, a `Pipeline` embedded whole, a `Source`, or a registered entity's
+/// table, its schema from the registration.
 // [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:napi.pipeline-sources]
 fn relation<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Source> {
+    if let Some(entity) = crate::entities::entity_source(cx, value) {
+        return Ok(Source {
+            relation: Relation::Entity(entity),
+            alias: None,
+        });
+    }
     if value.is_a::<JsString, _>(cx) {
         let name = super::super::args::name(cx, value)?;
         return Ok(Source {

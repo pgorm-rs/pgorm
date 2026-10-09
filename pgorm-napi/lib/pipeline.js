@@ -10,6 +10,7 @@
 import { arg, args, Builder, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
 import { PipelineExpr } from "./pipeline-expressions.js";
+import { selectSourcesOf } from "./entity-sources.js";
 
 export {
   alias,
@@ -317,6 +318,18 @@ export class Pipeline extends Builder {
     return pipelineOf(native.pipelineSet(arg(this), "remove", arg(source)));
   }
 
+  /**
+   * The pipeline's last stage: a registered source tuple's sources, each
+   * read under the qualifier given for it or its table's name, decoded into
+   * their models by the terminals of what this returns.
+   *
+   * @param {import("./entity-sources.js").SourceSelection} selection
+   * @param {{ qualifiers?: readonly string[] }} [options]
+   */
+  selectSources(selection, options) {
+    return selectSourcesOf(this, selection, options);
+  }
+
   distinct() {
     return pipelineOf(native.pipelineDistinct(arg(this)));
   }
@@ -335,3 +348,5 @@ export function source(relation) {
 export function over() {
   return new Over(native.pipelineOver(), TRUSTED);
 }
+
+export { SelectedSources, SourceSelection, sources, sourceTuples } from "./entity-sources.js";

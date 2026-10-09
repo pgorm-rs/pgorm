@@ -30,5 +30,21 @@
   "graph-filtered": {
     "sql": "SELECT \"accounts\".\"id\" AS \"s0_id\", \"accounts\".\"display name\" AS \"s0_display name\", \"accounts\".\"note\" AS \"s0_note\", \"accounts\".\"version\" AS \"s0_version\", CAST(\"accounts\".\"mood\" AS text) AS \"s0_mood\", \"n\".\"id\" AS \"s1_id\", \"n\".\"account_id\" AS \"s1_account_id\", \"n\".\"body\" AS \"s1_body\" FROM \"napi_entities\".\"accounts\" LEFT JOIN \"napi_entities\".\"notes\" AS \"n\" ON \"accounts\".\"id\" = \"n\".\"account_id\" WHERE \"n\".\"body\" = $1 ORDER BY \"accounts\".\"id\" ASC",
     "values": [["text","x"]]
+  },
+  "pipeline-entity": {
+    "sql": "SELECT * FROM napi_entities.accounts",
+    "values": []
+  },
+  "sources-single": {
+    "sql": "SELECT id AS s0_id, \"display name\" AS \"s0_display name\", note AS s0_note, version AS s0_version, CAST(mood AS text) AS s0_mood FROM napi_entities.accounts",
+    "values": []
+  },
+  "sources-joined": {
+    "sql": "SELECT accounts.id AS s0_id, accounts.\"display name\" AS \"s0_display name\", accounts.note AS s0_note, accounts.version AS s0_version, CAST(accounts.mood AS text) AS s0_mood, n.id AS s1_id, n.account_id AS s1_account_id, n.body AS s1_body FROM napi_entities.accounts LEFT OUTER JOIN napi_entities.notes AS n ON accounts.id = n.account_id",
+    "values": []
+  },
+  "sources-joined-one": {
+    "sql": "SELECT accounts.id AS s0_id, accounts.\"display name\" AS \"s0_display name\", accounts.note AS s0_note, accounts.version AS s0_version, CAST(accounts.mood AS text) AS s0_mood, n.id AS s1_id, n.account_id AS s1_account_id, n.body AS s1_body FROM napi_entities.accounts LEFT OUTER JOIN napi_entities.notes AS n ON accounts.id = n.account_id LIMIT 1",
+    "values": []
   }
 }

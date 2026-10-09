@@ -2172,6 +2172,11 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id napi-pipeline-sources, covered_rules (
+        napi.pipeline-sources
+    ), covered_claims (
+        {impl_name main, rule napi.pipeline-sources}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

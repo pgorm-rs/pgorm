@@ -8,7 +8,6 @@ use pgorm::pgorm_query::{ArrayType, Value};
 
 use super::{
     adapter::{Model, Versions, Written},
-    graph::Row,
     info::{ColumnInfo, EntityInfo},
 };
 use crate::{
@@ -229,10 +228,11 @@ impl Settled for VersionRows {
     }
 }
 
-/// A graph's rows: `[columns per source, ([values, model] | null)[][]]`.
+/// Rows of several sources — a graph's, or a pipeline's selected sources —
+/// as `[columns per source, ([values, model] | null)[][]]`.
 pub(crate) struct GraphRows(
     pub(crate) Vec<std::sync::Arc<EntityInfo>>,
-    pub(crate) Vec<Row>,
+    pub(crate) Vec<Vec<Option<Model>>>,
 );
 
 impl Settled for GraphRows {
@@ -241,7 +241,7 @@ impl Settled for GraphRows {
         let columns = list(cx, sources, |cx, info| Ok(names(cx, &info)?.upcast()))?;
         let rows = list(cx, rows, |cx, row| {
             Ok(list(cx, row, |cx, model| match model {
-                Some(model) => record(cx, model.0),
+                Some(model) => record(cx, model),
                 None => Ok(cx.null().upcast()),
             })?
             .upcast())

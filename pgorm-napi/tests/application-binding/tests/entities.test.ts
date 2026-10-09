@@ -16,6 +16,7 @@ import {
   graph,
   graphs,
   LifecycleError,
+  pipeline as pl,
   Pool,
   TypeName,
 } from "../../../lib/index.js";
@@ -292,4 +293,54 @@ test("an entity's operations run on a connection or a transaction, with a statem
   const signal = AbortSignal.abort(new Error("stop"));
   await assert.rejects(Account.find().all(pool(), { signal }), /stop/);
   await assert.rejects(Account.find().all({} as never), TypeError);
+});
+
+// [spec:pgorm:req:napi.pipeline-sources/test]
+test("a pipeline reads a registered entity's table, and selects registered sources into their models", async () => {
+  await seed();
+  const ids = await pool().query(pl.from(Account).filter(pl.col("accounts", "id").gt(1)).sort(pl.col("accounts", "id")));
+  assert.deepStrictEqual(ids.map((row) => row.id), [2, 3]);
+  const joined = pl.from(Account)
+    .join(pl.source(Note).named("n"), pl.col("accounts", "id").eq(pl.col("n", "account_id")), { kind: "left" })
+    .sort(pl.col("accounts", "id"), pl.col("n", "id"));
+  const rows = await joined.selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).all(pool());
+  assert.deepStrictEqual(rows.map(([account, note]) => [account?.id, note?.body ?? null]), [
+    [1, "a1"],
+    [1, "a2"],
+    [2, "b1"],
+    [3, null],
+  ]);
+  const [account, note] = rows[0]!;
+  assert.ok(account && note && Object.isFrozen(account));
+  assert.deepStrictEqual(Account.intoActive(account).get("display name"), { state: "unchanged", value: "Ann" });
+  assert.equal(Note.tagged(note, "body").kind, "text");
+  const single = pl.from(Account).sort(pl.col("accounts", "id")).selectSources(pl.sources("app.SingleAccount"));
+  assert.deepStrictEqual((await single.all(pool())).map(([only]) => only?.id), [1, 2, 3]);
+  assert.equal((await single.oneOpt(pool()))?.[0]?.id, 1);
+  assert.equal((await single.one(pool()))[0]?.id, 1);
+  const none = pl.from(Account).filter(pl.col("accounts", "id").gt(9)).selectSources(pl.sources("app.SingleAccount"));
+  assert.equal(await none.oneOpt(pool()), null);
+  await assert.rejects(none.one(pool()), DecodeError);
+  assert.deepStrictEqual(pl.sources("app.SixSources").describe().entities, [
+    "app.Account",
+    "app.Note",
+    "app.Note",
+    "app.Note",
+    "app.Note",
+    "app.Note",
+  ]);
+  assert.deepStrictEqual(pl.sourceTuples(), ["app.AccountWithNote", "app.SingleAccount", "app.SixSources"]);
+});
+
+// [spec:pgorm:req:napi.pipeline-sources/test]
+test("a selection refuses a reshaped pipeline, a wrong count of qualifiers and a tuple the module does not register", async () => {
+  const reshaped = pl.from(Account).select(pl.col("accounts", "id")).selectSources(pl.sources("app.SingleAccount"));
+  assert.throws(() => reshaped.inspect(), refused(/select/));
+  await assert.rejects(reshaped.all(pool()), refused(/select/));
+  assert.throws(
+    () => pl.from(Account).selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts"] }),
+    refused(/2 sources, and 1 qualifiers/),
+  );
+  assert.throws(() => pl.sources("app.Missing"), refused(/no source tuple is registered as "app.Missing"/));
+  assert.throws(() => pl.from(Account).selectSources({} as never), TypeError);
 });

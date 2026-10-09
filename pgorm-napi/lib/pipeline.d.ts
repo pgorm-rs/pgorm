@@ -14,14 +14,20 @@
 // [spec:pgorm:req:napi.typing]
 // [spec:pgorm:req:napi.pipeline]
 
-import type { Builder, BindValue } from "./expressions.d.ts";
+import type { Builder, BindValue, Compiled } from "./expressions.d.ts";
 import type { Table } from "./select.d.ts";
+import type { Entity, EntityRecord, SourceRegistrations } from "./entities.d.ts";
+import type { OperationOptions, Queryable } from "./index.d.ts";
 
 /** An operand: a pipeline expression, or a value the stage that takes it binds. */
 export type PipelineOperand = PipelineExpr | BindValue;
 
-/** A relation a pipeline reads: a table, read under its alias when it has one, a table's name, a pipeline, or a named source. */
-export type SourceInput = Table | string | Pipeline | Source;
+/**
+ * A relation a pipeline reads: a table, read under its alias when it has one,
+ * a table's name, a pipeline, a named source, or a registered entity's table,
+ * its schema from the registration.
+ */
+export type SourceInput = Table | string | Pipeline | Source | Entity<any>;
 
 /** A name a stage introduces or a column has: an identifier, or an {@link alias}. */
 export type PipelineName = string | PipelineExpr;
@@ -198,6 +204,50 @@ export declare class Pipeline extends Builder {
   /** The rows the other relation does not have: `EXCEPT`. */
   remove(source: SourceInput): Pipeline;
   distinct(): Pipeline;
+  /**
+   * The last stage: a registered source tuple's sources, each read under the
+   * qualifier given for it or its table's name, decoded into their models
+   * by the terminals of what this returns.
+   */
+  selectSources<Row extends readonly unknown[]>(
+    selection: SourceSelection<Row>,
+    options?: { readonly qualifiers?: readonly string[] },
+  ): SelectedSources<Row>;
+}
+
+/** The names `sources` takes: any string, until a generated module lists them. */
+export type SourceTupleName = [keyof SourceRegistrations] extends [never] ? string : keyof SourceRegistrations & string;
+
+/** The row of the source tuple registered as `N`: a tuple of each source's record or `null`. */
+export type SourceRowOf<N> = N extends keyof SourceRegistrations ? SourceRegistrations[N] : (EntityRecord | null)[];
+
+/** The names of the source tuples this module registers. */
+export declare function sourceTuples(): string[];
+
+/** The source tuple this module registers as `name`; another name is a `ConstructionError`. */
+export declare function sources<N extends SourceTupleName>(name: N): SourceSelection<SourceRowOf<N>>;
+
+/** A registered tuple of one to six entity types a pipeline's rows decode as. */
+export declare class SourceSelection<Row extends readonly unknown[] = (EntityRecord | null)[]> {
+  private constructor();
+  readonly name: string;
+  describe(): { readonly name: string; readonly rustShape: string; readonly entities: readonly string[] };
+  /** The row type, for the types alone. */
+  private readonly row?: Row;
+}
+
+/**
+ * A pipeline whose last stage selects a registered tuple's sources: each row
+ * a tuple of the sources' records, a source the row does not carry `null`.
+ * A pipeline reshaped before the selection is a `ConstructionError`.
+ */
+export declare class SelectedSources<Row extends readonly unknown[] = (EntityRecord | null)[]> {
+  private constructor();
+  inspect(terminal?: "all" | "one" | "oneOpt"): Compiled;
+  all(db: Queryable, options?: OperationOptions): Promise<Row[]>;
+  /** Exactly one row; none is a `DecodeError`. */
+  one(db: Queryable, options?: OperationOptions): Promise<Row>;
+  oneOpt(db: Queryable, options?: OperationOptions): Promise<Row | null>;
 }
 
 /** A pipeline reading `source`; a pipeline source is embedded whole, its bound values with it. */

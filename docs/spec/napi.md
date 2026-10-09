@@ -930,6 +930,22 @@ the ones compiled in.
 > converted to its column's declared kind and any other count refused; `first`,
 > `last`, `asc` and `desc` are the cursor's own.
 
+> [spec:pgorm:req:napi.pipeline-sources]
+> A registered entity MUST be a pipeline source wherever a relation is, read
+> through its own `IntoSource`, so its table and schema are the ones its Rust
+> declaration names. A `Registry` MUST register source tuples of one to six
+> entity types — `sources::<T>(name)`, each entity registered first, a name
+> registered twice refused — and `pipeline.sources(name)` gives one, another
+> name a `ConstructionError`. `pipeline.selectSources(selection, {
+> qualifiers })` MUST be pgorm's `select_sources` as the pipeline's last
+> stage, each source projected under the qualifier given for it or its
+> table's name, a count of qualifiers other than the sources' refused; its
+> `all`, `one` and `oneOpt` are `SelectedSources`'s, `one` and `oneOpt` taking
+> one row, each row a tuple of the sources' records decoded through each
+> entity's absence witness, a source a row does not carry `null`, and a
+> pipeline reshaped before the selection is the `ConstructionError` pgorm's
+> refusal names, before anything is sent.
+
 > [spec:pgorm:req:napi.application]
 > An application crate outside the binding's workspace MUST build the module:
 > it depends on pgorm-napi without default features, on the same checkout's

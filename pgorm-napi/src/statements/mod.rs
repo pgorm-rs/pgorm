@@ -21,7 +21,7 @@ mod json_table;
 mod merge;
 #[cfg(test)]
 pub(crate) mod parity;
-mod pipeline;
+pub(crate) mod pipeline;
 mod returning;
 mod schema;
 mod select;

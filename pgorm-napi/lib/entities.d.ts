@@ -42,6 +42,13 @@ export interface Registrations {}
 // deno-lint-ignore no-empty-interface
 export interface GraphRegistrations {}
 
+/**
+ * Each registered source tuple's row, by registration name: a tuple of each
+ * source's record or `null`. Augmented as {@link Registrations} is.
+ */
+// deno-lint-ignore no-empty-interface
+export interface SourceRegistrations {}
+
 /** The names `entity` takes: any string, until a generated module lists them. */
 export type EntityName = [keyof Registrations] extends [never] ? string : keyof Registrations & string;
 

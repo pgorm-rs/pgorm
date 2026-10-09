@@ -40,6 +40,8 @@ pub(crate) struct PlExpr {
 enum Relation {
     Table(TableName),
     Pipeline(Box<pl::Pipeline>),
+    /// A registered entity's table, as its own `IntoSource` names it.
+    Entity(crate::entities::EntitySource),
 }
 
 /// A relation, and the name it is read under when it has one of its own.
@@ -75,6 +77,7 @@ impl Source {
             )
             .into_source(),
             Relation::Pipeline(pipeline) => (**pipeline).clone().into_source(),
+            Relation::Entity(entity) => entity.source(),
         };
         match &self.alias {
             Some(alias) => pl::named_runtime(source, alias.clone()).into_source(),

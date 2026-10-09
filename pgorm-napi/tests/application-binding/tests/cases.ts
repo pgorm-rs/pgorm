@@ -3,12 +3,16 @@
 // application crate's Rust test builds with its entities directly.
 // [spec:pgorm:req:napi.entity-reads/test]
 
-import { type Compiled, entity, graph } from "../../../lib/index.js";
+import { type Compiled, entity, graph, pipeline as pl } from "../../../lib/index.js";
 
 export function cases(): Record<string, () => Compiled> {
   const Account = entity("app.Account");
   const Membership = entity("app.Membership");
   const notes = graph("app.AccountNotes").find({ aliases: ["n"] });
+  const joined = () =>
+    pl.from(Account).join(pl.source(entity("app.Note")).named("n"), pl.col("accounts", "id").eq(pl.col("n", "account_id")), {
+      kind: "left",
+    });
   return {
     "find": () => Account.find().inspect(),
     "find-filtered": () =>
@@ -20,5 +24,11 @@ export function cases(): Record<string, () => Compiled> {
     "graph-notes": () => notes.inspect(),
     "graph-mixed-default-aliases": () => graph("app.MixedNotes").find().inspect(),
     "graph-filtered": () => notes.where(notes.col(1, "body").eq("x")).orderBy(notes.col(0, "id").asc()).inspect(),
+    "pipeline-entity": () => pl.from(Account).inspect(),
+    "sources-single": () => pl.from(Account).selectSources(pl.sources("app.SingleAccount")).inspect(),
+    "sources-joined": () =>
+      joined().selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).inspect(),
+    "sources-joined-one": () =>
+      joined().selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).inspect("oneOpt"),
   };
 }
