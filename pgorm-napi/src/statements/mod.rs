@@ -20,7 +20,7 @@ mod json;
 mod json_table;
 mod merge;
 #[cfg(test)]
-mod parity;
+pub(crate) mod parity;
 mod returning;
 mod select;
 mod table;

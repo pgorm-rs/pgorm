@@ -8,6 +8,7 @@ use crate::{
     codec::Codec,
     decode,
     errors::Failure,
+    models,
     values::{Tagged, write},
 };
 
@@ -50,8 +51,22 @@ pub(crate) fn value<'cx>(
     }
 }
 
-/// `[names, rows]`, each row an array of its values in column order.
+/// Each column's kind as `models::kind_key` spells it, read off the first
+/// row: every row of a column holds its type's kind, NULLs included.
+pub(crate) fn kinds<'cx>(cx: &mut Cx<'cx>, row: Option<&[Tagged]>) -> JsResult<'cx, JsArray> {
+    let row = row.unwrap_or_default();
+    let kinds = JsArray::new(cx, row.len());
+    for (at, value) in row.iter().enumerate() {
+        let kind = cx.string(models::kind_key(&value.tag));
+        kinds.set(cx, index(at), kind)?;
+    }
+    Ok(kinds)
+}
+
+/// `[names, rows, kinds]`, each row an array of its values in column order,
+/// and each column's kind for a model to hold to its declaration.
 // [spec:pgorm:req:napi.rows]
+// [spec:pgorm:req:napi.model-records]
 pub(crate) fn to_js<'cx>(
     cx: &mut Cx<'cx>,
     decoded: Decoded,
@@ -63,6 +78,7 @@ pub(crate) fn to_js<'cx>(
         let name = cx.string(name);
         names.set(cx, index(at), name)?;
     }
+    let kinds = kinds(cx, decoded.rows.first().map(Vec::as_slice))?;
     let rows = JsArray::new(cx, decoded.rows.len());
     for (at, row) in decoded.rows.into_iter().enumerate() {
         let values = JsArray::new(cx, row.len());
@@ -72,8 +88,9 @@ pub(crate) fn to_js<'cx>(
         }
         rows.set(cx, index(at), values)?;
     }
-    let result = JsArray::new(cx, 2);
+    let result = JsArray::new(cx, 3);
     result.set(cx, 0, names)?;
     result.set(cx, 1, rows)?;
+    result.set(cx, 2, kinds)?;
     Ok(result.upcast())
 }

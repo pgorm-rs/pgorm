@@ -100,6 +100,27 @@ export class Queryable {
   }
 }
 
+/**
+ * Run a built statement and resolve with its result as the addon gives it,
+ * `[names, rows, kinds]` — each row an array of values in column order, and
+ * each column's kind — for a model to decode against its declaration.
+ * [spec:pgorm:req:napi.model-records]
+ *
+ * @param {unknown} db
+ * @param {"execute" | "all" | "one" | "optional"} terminal
+ * @param {import("./builder.js").Handle} statement
+ * @param {unknown} options
+ * @returns {Promise<any>}
+ */
+export async function runStatement(db, terminal, statement, options) {
+  if (!(db instanceof Queryable)) {
+    throw new TypeError("a model's statement runs on a Pool, a Connection or a Transaction");
+  }
+  const [handle, , rest] = statementArgs(statement, undefined, options);
+  const { signal } = queryOptions(rest);
+  return await abortable(signal, (token) => db[RUN](terminal, handle, [], false, token));
+}
+
 /** @type {(connection: Connection) => unknown} */
 let connectionHandle;
 

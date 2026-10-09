@@ -1,0 +1,498 @@
+// @ts-check
+
+// A model's writes: INSERT, UPDATE and DELETE of its fields, each value
+// converted through its column's declared kind, a field left out apart from
+// one set to NULL; RETURNING the fields as records; and the terminals that
+// read a written row's two versions, as pgorm's `exec_returning_change(s)`
+// and `exec_returning_upsert(s)` read them.
+// [spec:pgorm:req:napi.model-writes]
+
+import { runStatement } from "./connections.js";
+import { ConstructionError, DecodeError } from "./errors.js";
+import { col } from "./expressions.js";
+import { columnValue } from "./model-columns.js";
+import { decodeAll, decodeOne, decodeOptional } from "./model-decode.js";
+import { fieldOf } from "./model-shape.js";
+import { native } from "./operations.js";
+import { predicateOf } from "./model-queries.js";
+import { Conflict, ConflictUpdate } from "./conflicts.js";
+import { deleteFrom, insert, update } from "./writes.js";
+
+/** Marks a construction from within the module. */
+const MADE = Symbol("pgorm-napi model write");
+
+/**
+ * The names a RETURNING list reads a written row's versions by: always
+ * renamed, as pgorm renames them, so a table called `old` or `new` cannot
+ * take the keyword.
+ */
+const OLD = "pgorm_old";
+const NEW = "pgorm_new";
+
+/**
+ * The fields `values` sets, in declaration order whatever order it names
+ * them in, each with the value it becomes.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ * @param {unknown} values
+ * @param {"insert" | "update"} write
+ * @returns {[import("./model-shape.js").Field, unknown][]}
+ */
+function assignments(shape, values, write) {
+  if (typeof values !== "object" || values === null || Array.isArray(values)) {
+    throw new TypeError(`an ${write} takes an object of the fields it sets`);
+  }
+  const given = /** @type {Record<string, unknown>} */ (values);
+  for (const name of Object.keys(given)) {
+    const field = fieldOf(shape, name);
+    if (field.column.generated === "always") {
+      throw new ConstructionError(`${field.field} is generated always: the server writes it`);
+    }
+  }
+  if (write === "insert") {
+    for (const field of shape.fields) {
+      const { column } = field;
+      const optional = column.nullable || column.default || column.generated !== null;
+      if (!optional && !Object.hasOwn(given, field.field)) {
+        throw new ConstructionError(`${field.field} is required: it is not nullable and has no default`);
+      }
+    }
+  }
+  return shape.fields
+    .filter((field) => Object.hasOwn(given, field.field))
+    .map((field) => [field, columnValue(field.column, field.field, given[field.field])]);
+}
+
+/**
+ * The RETURNING items reading `fields` as the records decode them.
+ *
+ * @param {readonly import("./model-shape.js").Field[]} fields
+ */
+function returned(fields) {
+  return fields.map((field) => col(field.sql));
+}
+
+/**
+ * The RETURNING list of both versions of every field, the old under `o_` and
+ * the new under `n_`, and the sources they decode as.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ */
+function versions(shape) {
+  /** @type {import("./model-decode.js").Source[]} */
+  const sources = [];
+  const items = [[OLD, "o_"], [NEW, "n_"]].flatMap(([row, prefix]) => {
+    const names = shape.fields.map((field) => native.modelResultName(prefix, field.sql));
+    sources.push({ fields: shape.fields, names, optional: row === OLD });
+    return shape.fields.map((field, index) => col(field.sql, { table: row }).as(/** @type {string} */ (names[index])));
+  });
+  return { items, sources };
+}
+
+/**
+ * @param {unknown} pair
+ */
+function change(pair) {
+  const [old, now] = /** @type {[unknown, unknown]} */ (pair);
+  if (old === null) throw new DecodeError("an updated row returned no old version");
+  return Object.freeze({ old, new: now });
+}
+
+/**
+ * @param {unknown} pair
+ */
+function upserted(pair) {
+  const [old, now] = /** @type {[unknown, unknown]} */ (pair);
+  return Object.freeze(old === null ? { kind: "inserted", new: now } : { kind: "updated", old, new: now });
+}
+
+/**
+ * The fields `names` picks out of `shape`, every field when it names none.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ * @param {readonly unknown[]} names
+ */
+export function picked(shape, names) {
+  const fields = names.length === 0 ? shape.fields : names.map((name) => fieldOf(shape, name));
+  if (new Set(fields).size !== fields.length) throw new ConstructionError("a field is selected once");
+  return fields;
+}
+
+/**
+ * A write with a RETURNING list of a model's fields: its terminals decode
+ * each returned row into a record.
+ */
+export class ModelRows {
+  /** @type {import("./writes.js").Insert | import("./writes.js").Update | import("./writes.js").Delete | null} */
+  #statement;
+  /** @type {import("./model-decode.js").Source[]} */
+  #sources;
+
+  /**
+   * @param {import("./writes.js").Insert | import("./writes.js").Update | import("./writes.js").Delete | null} statement
+   * @param {readonly import("./model-shape.js").Field[]} fields
+   * @param {symbol} token
+   */
+  constructor(statement, fields, token) {
+    if (token !== MADE) throw new TypeError("ModelRows come from a model write's returning()");
+    this.#statement = statement;
+    this.#sources = [{ fields, names: fields.map((field) => field.sql), optional: false }];
+  }
+
+  get statement() {
+    return written(this.#statement);
+  }
+
+  inspect() {
+    return written(this.#statement).inspect();
+  }
+
+  /**
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async all(db, options) {
+    if (this.#statement === null) return [];
+    return await decodeAll(db, this.#statement, this.#sources, options);
+  }
+
+  /**
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async one(db, options) {
+    if (this.#statement === null) throw new DecodeError("expected exactly one row, and the insert wrote none");
+    return await decodeOne(db, this.#statement, this.#sources, options);
+  }
+
+  /**
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async optional(db, options) {
+    if (this.#statement === null) return null;
+    return await decodeOptional(db, this.#statement, this.#sources, options);
+  }
+}
+
+/**
+ * @template T
+ * @param {T | null} statement
+ * @returns {T}
+ */
+function written(statement) {
+  if (statement === null) throw new ConstructionError("an insert of no rows writes nothing and has no statement");
+  return statement;
+}
+
+/** A model's INSERT. */
+export class ModelInsert {
+  /** @type {import("./model-shape.js").Shape} */
+  #shape;
+  /** @type {import("./writes.js").Insert | null} */
+  #statement;
+
+  /**
+   * @param {import("./model-shape.js").Shape} shape
+   * @param {import("./writes.js").Insert | null} statement
+   * @param {symbol} token
+   */
+  constructor(shape, statement, token) {
+    if (token !== MADE) throw new TypeError("a ModelInsert comes from a model's insert() or insertMany()");
+    this.#shape = shape;
+    this.#statement = statement;
+  }
+
+  get statement() {
+    return written(this.#statement);
+  }
+
+  /**
+   * The SQL and values it runs, or the ones the upsert terminals run.
+   *
+   * @param {"returningUpsert" | "returningUpserts"} [terminal]
+   */
+  inspect(terminal) {
+    if (terminal === undefined) return written(this.#statement).inspect();
+    if (terminal === "returningUpsert" || terminal === "returningUpserts") {
+      return written(this.#upserts().statement).inspect();
+    }
+    throw new TypeError('an insert inspects itself, or its "returningUpsert" or "returningUpserts"');
+  }
+
+  /**
+   * What a conflict does: the statement builders' `Conflict`, naming SQL
+   * columns.
+   *
+   * @param {unknown} action
+   */
+  onConflict(action) {
+    if (!(action instanceof Conflict) && !(action instanceof ConflictUpdate)) {
+      throw new TypeError("a conflict's action is Conflict.doNothing(), or a target's doNothing() or update(..)");
+    }
+    return new ModelInsert(this.#shape, written(this.#statement).onConflict(action), MADE);
+  }
+
+  /** @param {...string} fields */
+  returning(...fields) {
+    const picks = picked(this.#shape, fields);
+    return new ModelRows(this.#statement && this.#statement.returning(returned(picks)), picks, MADE);
+  }
+
+  /**
+   * The rows written; an insert of no rows sends nothing and writes none.
+   *
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async execute(db, options) {
+    if (this.#statement === null) return 0;
+    return await runStatement(db, "execute", this.#statement, options);
+  }
+
+  #upserts() {
+    const { items, sources } = versions(this.#shape);
+    const statement = this.#statement && this.#statement.returning(items, { oldAs: OLD, newAs: NEW });
+    return { statement, sources };
+  }
+
+  /**
+   * What the insert did with its one row: inserted it, updated the row that
+   * was there, or — null — wrote nothing, its conflict clause holding it
+   * back.
+   *
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async returningUpsert(db, options) {
+    const { statement, sources } = this.#upserts();
+    if (statement === null) return null;
+    const pair = await decodeOptional(db, statement, sources, options);
+    return pair === null ? null : upserted(pair);
+  }
+
+  /**
+   * What the insert did with each row it wrote; a row its conflict clause
+   * held back is left out.
+   *
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async returningUpserts(db, options) {
+    const { statement, sources } = this.#upserts();
+    if (statement === null) return [];
+    return (await decodeAll(db, statement, sources, options)).map(upserted);
+  }
+}
+
+/** A model's UPDATE. */
+export class ModelUpdate {
+  /** @type {import("./model-shape.js").Shape} */
+  #shape;
+  /** @type {import("./writes.js").Update} */
+  #statement;
+
+  /**
+   * @param {import("./model-shape.js").Shape} shape
+   * @param {import("./writes.js").Update} statement
+   * @param {symbol} token
+   */
+  constructor(shape, statement, token) {
+    if (token !== MADE) throw new TypeError("a ModelUpdate comes from a model's update()");
+    this.#shape = shape;
+    this.#statement = statement;
+  }
+
+  get statement() {
+    return this.#statement;
+  }
+
+  /**
+   * The SQL and values it runs, or the ones the change terminals run.
+   *
+   * @param {"returningChange" | "returningChanges"} [terminal]
+   */
+  inspect(terminal) {
+    if (terminal === undefined) return this.#statement.inspect();
+    if (terminal === "returningChange" || terminal === "returningChanges") return this.#versions().statement.inspect();
+    throw new TypeError('an update inspects itself, or its "returningChange" or "returningChanges"');
+  }
+
+  /** @param {unknown} predicate */
+  where(predicate) {
+    return new ModelUpdate(this.#shape, this.#statement.where(predicateOf(predicate)), MADE);
+  }
+
+  allRows() {
+    return new ModelUpdate(this.#shape, this.#statement.allRows(), MADE);
+  }
+
+  /** @param {...string} fields */
+  returning(...fields) {
+    const picks = picked(this.#shape, fields);
+    return new ModelRows(this.#statement.returning(returned(picks)), picks, MADE);
+  }
+
+  /**
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async execute(db, options) {
+    return await runStatement(db, "execute", this.#statement, options);
+  }
+
+  #versions() {
+    const { items, sources } = versions(this.#shape);
+    return { statement: this.#statement.returning(items, { oldAs: OLD, newAs: NEW }), sources };
+  }
+
+  /**
+   * The one row the update wrote, before and after; any other count is a
+   * `DecodeError`.
+   *
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async returningChange(db, options) {
+    const { statement, sources } = this.#versions();
+    return change(await decodeOne(db, statement, sources, options));
+  }
+
+  /**
+   * Every row the update wrote, before and after.
+   *
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async returningChanges(db, options) {
+    const { statement, sources } = this.#versions();
+    return (await decodeAll(db, statement, sources, options)).map(change);
+  }
+}
+
+/** A model's DELETE. */
+export class ModelDelete {
+  /** @type {import("./model-shape.js").Shape} */
+  #shape;
+  /** @type {import("./writes.js").Delete} */
+  #statement;
+
+  /**
+   * @param {import("./model-shape.js").Shape} shape
+   * @param {import("./writes.js").Delete} statement
+   * @param {symbol} token
+   */
+  constructor(shape, statement, token) {
+    if (token !== MADE) throw new TypeError("a ModelDelete comes from a model's delete()");
+    this.#shape = shape;
+    this.#statement = statement;
+  }
+
+  get statement() {
+    return this.#statement;
+  }
+
+  inspect() {
+    return this.#statement.inspect();
+  }
+
+  /** @param {unknown} predicate */
+  where(predicate) {
+    return new ModelDelete(this.#shape, this.#statement.where(predicateOf(predicate)), MADE);
+  }
+
+  allRows() {
+    return new ModelDelete(this.#shape, this.#statement.allRows(), MADE);
+  }
+
+  /** @param {...string} fields */
+  returning(...fields) {
+    const picks = picked(this.#shape, fields);
+    return new ModelRows(this.#statement.returning(returned(picks)), picks, MADE);
+  }
+
+  /**
+   * @param {unknown} db
+   * @param {{ signal?: AbortSignal }} [options]
+   */
+  async execute(db, options) {
+    return await runStatement(db, "execute", this.#statement, options);
+  }
+}
+
+/**
+ * @param {import("./model-shape.js").Shape} shape
+ */
+function unaliased(shape) {
+  if (shape.alias !== null) throw new ConstructionError("an insert names its model's table, unaliased");
+}
+
+/**
+ * An INSERT of one row.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ * @param {unknown} values
+ */
+export function insertOne(shape, values) {
+  unaliased(shape);
+  const set = assignments(shape, values, "insert");
+  const statement = insert(shape.table);
+  if (set.length === 0) return new ModelInsert(shape, statement.defaultValues(), MADE);
+  return new ModelInsert(
+    shape,
+    statement.columns(...set.map(([field]) => field.sql)).values(...set.map(([, value]) => value)),
+    MADE,
+  );
+}
+
+/**
+ * An INSERT of every row of `rows`, which set the same fields; no rows
+ * writes nothing.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ * @param {unknown} rows
+ */
+export function insertMany(shape, rows) {
+  unaliased(shape);
+  if (!Array.isArray(rows)) throw new TypeError("insertMany takes an array of rows");
+  const sets = rows.map((row) => assignments(shape, row, "insert"));
+  const first = sets[0];
+  if (first === undefined) return new ModelInsert(shape, null, MADE);
+  const columns = first.map(([field]) => field.sql);
+  if (columns.length === 0) {
+    if (sets.length > 1) throw new ConstructionError("rows that set no field are inserted one at a time");
+    return new ModelInsert(shape, insert(shape.table).defaultValues(), MADE);
+  }
+  let statement = insert(shape.table).columns(...columns);
+  for (const set of sets) {
+    if (set.length !== columns.length || set.some(([field], index) => field.sql !== columns[index])) {
+      throw new ConstructionError("every row of an insert sets the same fields");
+    }
+    statement = statement.values(...set.map(([, value]) => value));
+  }
+  return new ModelInsert(shape, statement, MADE);
+}
+
+/**
+ * An UPDATE setting the fields `values` names; it needs a `where` or
+ * `allRows()` before it runs.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ * @param {unknown} values
+ */
+export function updateSet(shape, values) {
+  const set = assignments(shape, values, "update");
+  if (set.length === 0) throw new ConstructionError("an update sets at least one field");
+  let statement = update(shape.table);
+  for (const [field, value] of set) statement = statement.set(field.sql, value);
+  return new ModelUpdate(shape, statement, MADE);
+}
+
+/**
+ * A DELETE; it needs a `where` or `allRows()` before it runs.
+ *
+ * @param {import("./model-shape.js").Shape} shape
+ */
+export function deleteRows(shape) {
+  return new ModelDelete(shape, deleteFrom(shape.table), MADE);
+}

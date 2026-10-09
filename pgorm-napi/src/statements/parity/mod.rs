@@ -17,7 +17,7 @@ use serde_json::Value as Json;
 use crate::values::value_tag;
 
 /// A name the binding would take as an identifier: 1–63 bytes without NUL.
-pub(super) fn n(name: &str) -> Name {
+pub(crate) fn n(name: &str) -> Name {
     assert!(
         (1..=63).contains(&name.len()) && !name.contains('\0'),
         "{name:?} is no identifier the binding takes"
@@ -110,7 +110,7 @@ fn golden(file: &str) -> BTreeMap<String, (String, Vec<[String; 2]>)> {
 }
 
 /// Hold `built`, a family's cases built with pgorm-query, to its golden file.
-fn check(file: &str, built: Vec<(&str, (String, Values))>) {
+pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
     let golden = golden(file);
     let names: Vec<&str> = built.iter().map(|(name, _)| *name).collect();
     let expected: Vec<&str> = golden.keys().map(String::as_str).collect();

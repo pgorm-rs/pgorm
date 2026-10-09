@@ -10,6 +10,7 @@ mod codec;
 mod connect;
 mod decode;
 mod errors;
+mod models;
 mod params;
 #[cfg(debug_assertions)]
 mod probes;
@@ -32,6 +33,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     connect::export(&mut cx)?;
     values::export(&mut cx)?;
     statements::export(&mut cx)?;
+    models::export(&mut cx)?;
     #[cfg(debug_assertions)]
     probes::export(&mut cx)?;
     let version = cx.string(env!("CARGO_PKG_VERSION"));

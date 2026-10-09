@@ -477,6 +477,158 @@ SQL text running a built statement.
 > `Expr::as_range` — and a `Range` or `Multirange` passed without one MUST be a
 > `ConstructionError`, a range's kind never being inferred.
 
+## Models
+
+A model is JavaScript data: a table and its columns' declarations, made by
+`model(name, { schema, columns })` and lowered into the statement builders,
+as pgorm-python's `Model` is Python data over its native builders. Its
+reads and writes decode into records of its fields, and its relations,
+graphs, cursors and pages follow pgorm's own `RelationDef`, `SelectGraph`,
+`Cursor` and `Paginator`.
+
+> [spec:pgorm:req:napi.models]
+> `model(name, { schema, columns })` MUST declare a model of a table,
+> schema-qualified when `schema` is given, from an object of fields, each a
+> `column(kind, options)`: a kind every result decodes as — any value kind
+> but `u64` and `char`, which no column decodes as — or a schema-qualified
+> `TypeName`, `CreatedRange` or `CreatedMultirange`, as a decoded row names
+> each type; and the options `name` (the SQL column, the field's own name by
+> default), `nullable`, `array`, `primaryKey`, `default`, `generated`
+> (`"always"` or `"byDefault"`) and an enum's `values`. Anything else — an
+> unknown option, a key column that is nullable, a generated column with a
+> default, labels on a column that is no enum, two fields of one column, an
+> enum or created range without its schema, an identifier pgorm would not
+> take — MUST be a `ConstructionError` thrown as the model is declared.
+> Declaring a model MUST send nothing, run no DDL and claim no Rust entity:
+> no derive, `EntityTrait` or ActiveModel hook is behind it. A model and its
+> columns never change; `as(alias)` gives another model reading the table
+> under an alias. Its columns are qualified as pgorm qualifies an entity's,
+> by the table's alias or else its name, never its schema. The TypeScript
+> declarations MUST type a model from its declaration alone: `RowOf`, a
+> record's fields and their types, a nullable column's `| null` and an array
+> column's items, an enum's listed values as a union of their labels;
+> `InsertOf`, requiring every field neither nullable, defaulted nor
+> generated and refusing a field generated always; `UpdateOf`; and `KeyOf`.
+
+> [spec:pgorm:req:napi.model-records]
+> A model's terminals MUST decode each row into a record: a plain object
+> keyed by field, in declaration order, its values those `napi.values`
+> declares. Each field MUST be found by the result column its statement
+> projected it under, and the result's columns MUST be exactly those; each
+> column's kind MUST be the kind its field declares, compared as the addon
+> spells a decoded column's kind — a scalar's name, an enum's
+> schema-qualified type, a created range's type and subtype, an array's
+> element — so an `int8` read into an `i32` field, or another schema's enum,
+> is a `DecodeError` rather than a value of the wrong type. A NULL in a field
+> not nullable, and a label an enum field does not list, MUST be a
+> `DecodeError`, never a value. A model's rows stream from a pool or a
+> connection as records, through the same decode.
+
+> [spec:pgorm:req:napi.model-reads]
+> `find()` MUST select every field, `select(..)` the fields it names, and
+> `findByKey(key)` the row of a primary key, through pgorm-query's
+> `SelectStatement`; `where` ANDs a condition, `orderBy`, `limit` and
+> `offset` are the builder's, and `join(relation)` joins a relation's far
+> end, from the query's model or a table it joined, without reading its
+> columns. `col(field)` MUST be the field's column as an expression whose
+> comparisons convert a value through the field's declared kind — an enum's
+> label bound cast to its type, as pgorm's column comparisons cast through
+> `save_as` — and take an expression as written, a `Value` only of the
+> field's own kind, and `null` never, which `isNull()` tests. `key(values)`
+> MUST match every primary-key field and no other. `all`, `one`,
+> `optional` and `count` run on a pool, a connection or a transaction —
+> `one` exactly one row and `optional` at most one, any other count a
+> `DecodeError` — and `count` counts as `napi.pagination` does.
+
+> [spec:pgorm:req:napi.model-writes]
+> `insert(values)`, `insertMany(rows)`, `update(values)` and `delete()` MUST
+> build pgorm-query's INSERT, UPDATE and DELETE of a model's table. A field
+> left out of `values` MUST stay out of the statement — an insert takes the
+> table's default, an update leaves the column as it is — and a field set to
+> `null` MUST be written as SQL NULL, which only a nullable field takes; each
+> value converts through its field's declared kind as a comparison's does,
+> and the fields set are written in declaration order whatever order the
+> object names them in. An unknown field, an `undefined` value, a field
+> generated always, an insert leaving out a field neither nullable,
+> defaulted nor generated, an update setting nothing and rows of one insert
+> setting different fields MUST be `ConstructionError`s, and an insert into
+> an aliased model is refused. An insert of no rows sends nothing:
+> `execute` resolves with 0 and the returning terminals with no rows. An
+> UPDATE or DELETE MUST have a `where` or `allRows()` before it runs, as
+> `napi.writes` requires. `returning(..)` reads the fields written as
+> records. `returningChange` and `returningChanges` on an update, and
+> `returningUpsert` and `returningUpserts` on an insert, MUST read each
+> written row's two versions as pgorm's `exec_returning_change(s)` and
+> `exec_returning_upsert(s)` do: every field of both versions in a
+> `RETURNING WITH (OLD AS pgorm_old, NEW AS pgorm_new)` list, the old under
+> `o_` and the new under `n_`, a change being `{ old, new }` and an upsert
+> `{ kind: "inserted", new }` where the old version is NULL in every column
+> and `{ kind: "updated", old, new }` otherwise; a row an insert's conflict
+> clause did not write is `null` from `returningUpsert` and left out of
+> `returningUpserts`.
+
+> [spec:pgorm:req:napi.relations]
+> A model's `belongsTo`, `hasOne` and `hasMany` MUST make a relation to
+> another model pairing fields of each, one or a non-empty list of equal
+> length, in order. A join along it MUST be the condition pgorm's
+> `join_condition` writes for a relation's columns, each pair equal and the
+> pairs ANDed, between the tables as the join names them. `find(row)` MUST
+> read the far end's rows whose paired fields equal the row's, and none
+> when one of the row's is NULL. `load(db, rows)` MUST read the far end of
+> every row in one query of the distinct keys: a list of records per row for
+> `hasMany`; otherwise a record per row, or `null` where the row's key holds
+> a NULL; a key nothing at the far end matches, or that a `hasOne` relation
+> matches twice, MUST be a `DecodeError`, never a missing row.
+
+> [spec:pgorm:req:napi.graphs]
+> `graph()` MUST read a model's rows with the rows its relations reach as
+> pgorm's `SelectGraph` does, its SQL the SQL `SelectGraph` writes for the
+> same tables, relations and aliases. The slot kind MUST be the join type
+> and the decode shape: `joinOne` an INNER JOIN decoded as a record,
+> `joinMaybe` a LEFT JOIN decoded as a record or `null`, and `via` a LEFT
+> JOIN of a table no record reads. A relation is joined from the first
+> table of its model the graph reads, or the decoded source `from` names,
+> and a slot or hop answers to its table's name or the `alias` it is given;
+> a second table answering to a name already read MUST be a
+> `ConstructionError`. Every decoded source is projected under its own
+> prefix, `s0_` for the root and `s{i}_` for the i-th slot, each name
+> composed as pgorm's `result_column_name` composes it — under 63 bytes as
+> it stands, otherwise bounded with its FNV-1a hash. A slotless graph
+> decodes as the root's record and a graph with slots as a tuple of the
+> root's and each slot's, an optional slot `null` exactly where every
+> column it reads is NULL, as pgorm's absence witness reads it; a present
+> slot that does not decode MUST be a `DecodeError`, never an absent one.
+> `col(source, field)` qualifies a field as a decoded source is named.
+> `allGrouped` reads a graph of one slot as each root with its slot's
+> records, ordering by the root's primary key behind the graph's ordering
+> and grouping by the decoded root's key, as pgorm's `all_grouped` does.
+
+> [spec:pgorm:req:napi.cursors]
+> `cursor(..fields)` on a model query or a graph MUST page by keyset as
+> pgorm's `Cursor` does: ordered by its fields, then — on a graph — by the
+> root's primary key and each slot's, in declaration order, as tiebreaks, a
+> root key field already ordered by not repeated; that ordering replacing the
+> query's. `after` and `before` take a boundary of the order fields' values,
+> `afterWith` and `beforeWith` of the order fields' or the whole key's,
+> each converted through its field's declared kind and any other arity a
+> `ConstructionError`. A boundary of n values MUST be the row-value
+> comparison written out as n disjuncts, the k-th holding the first k-1
+> columns equal and comparing the k-th — greater past an ascending
+> cursor's `after`, less short of its `before`, the reverse when it
+> descends. `first(n)` and `last(n)` limit the window, a `last` window
+> read in the reversed order and returned in the cursor's own, and each
+> replaces the other; `asc()` and `desc()` choose the direction.
+
+> [spec:pgorm:req:napi.pagination]
+> `paginate(pageSize)` on a model query or a graph MUST read page `n` as
+> the query with a limit of `pageSize` and an offset of `pageSize × n`,
+> replacing its own, as pgorm's `Paginator` does, a page size of at least 1
+> and an offset past `Number.MAX_SAFE_INTEGER` refused. `numItems` and a
+> query's `count` MUST count the query's rows with its limit, offset and
+> ordering dropped, `SELECT COUNT(*) AS "num_items" FROM (..) AS
+> "sub_query"`, and resolve with an exact number; `numPages` rounds the
+> pages up; `pages` yields each page from the first until one is empty.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

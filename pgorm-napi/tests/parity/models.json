@@ -1,0 +1,110 @@
+{
+  "find": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\"",
+    "values": []
+  },
+  "find-filtered": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" WHERE \"account\".\"id\" >= $1 ORDER BY \"account\".\"name\" DESC LIMIT $2 OFFSET $3",
+    "values": [["i64","10"], ["u64","5"], ["u64","10"]]
+  },
+  "select-fields": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\" FROM \"app\".\"account\"",
+    "values": []
+  },
+  "find-by-key": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" WHERE \"account\".\"id\" = $1",
+    "values": [["i64","7"]]
+  },
+  "find-by-composite-key": {
+    "sql": "SELECT \"version\".\"doc\", \"version\".\"rev\", \"version\".\"body\" FROM \"app\".\"version\" WHERE \"version\".\"doc\" = $1 AND \"version\".\"rev\" = $2",
+    "values": [["i32","1"], ["i32","2"]]
+  },
+  "find-joined": {
+    "sql": "SELECT \"post\".\"id\", \"post\".\"author_id\", \"post\".\"title\" FROM \"app\".\"post\" INNER JOIN \"app\".\"account\" ON \"post\".\"author_id\" = \"account\".\"id\" WHERE \"account\".\"name\" = $1",
+    "values": [["text","Ann"]]
+  },
+  "enum-comparison": {
+    "sql": "SELECT \"moody\".\"id\", \"moody\".\"mood\" FROM \"app\".\"moody\" WHERE \"moody\".\"mood\" = CAST($1::text AS app.mood)",
+    "values": [["text","calm"]]
+  },
+  "insert": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"name\", \"display_name\") VALUES ($1, $2)",
+    "values": [["text","Ann"], ["text","null"]]
+  },
+  "insert-many": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"name\") VALUES ($1), ($2)",
+    "values": [["text","Ann"], ["text","Bob"]]
+  },
+  "insert-defaults": {
+    "sql": "INSERT INTO \"ticket\" VALUES (DEFAULT)",
+    "values": []
+  },
+  "insert-returning": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"name\", \"display_name\") VALUES ($1, $2) RETURNING \"id\", \"name\"",
+    "values": [["text","Ann"], ["text","A"]]
+  },
+  "update": {
+    "sql": "UPDATE \"app\".\"account\" SET \"name\" = $1 WHERE \"account\".\"id\" = $2",
+    "values": [["text","x"], ["i64","1"]]
+  },
+  "delete": {
+    "sql": "DELETE FROM \"app\".\"account\" WHERE \"account\".\"name\" = $1",
+    "values": [["text","x"]]
+  },
+  "update-changes": {
+    "sql": "UPDATE \"app\".\"account\" SET \"name\" = $1 WHERE \"account\".\"id\" >= $2 RETURNING WITH (OLD AS \"pgorm_old\", NEW AS \"pgorm_new\") \"pgorm_old\".\"id\" AS \"o_id\", \"pgorm_old\".\"name\" AS \"o_name\", \"pgorm_old\".\"display_name\" AS \"o_display_name\", \"pgorm_new\".\"id\" AS \"n_id\", \"pgorm_new\".\"name\" AS \"n_name\", \"pgorm_new\".\"display_name\" AS \"n_display_name\"",
+    "values": [["text","x"], ["i64","2"]]
+  },
+  "insert-upserts": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"id\", \"name\") VALUES ($1, $2) ON CONFLICT (\"id\") DO UPDATE SET \"name\" = \"excluded\".\"name\" RETURNING WITH (OLD AS \"pgorm_old\", NEW AS \"pgorm_new\") \"pgorm_old\".\"id\" AS \"o_id\", \"pgorm_old\".\"name\" AS \"o_name\", \"pgorm_old\".\"display_name\" AS \"o_display_name\", \"pgorm_new\".\"id\" AS \"n_id\", \"pgorm_new\".\"name\" AS \"n_name\", \"pgorm_new\".\"display_name\" AS \"n_display_name\"",
+    "values": [["i64","1"], ["text","Ann"]]
+  },
+  "relation-find": {
+    "sql": "SELECT \"post\".\"id\", \"post\".\"author_id\", \"post\".\"title\" FROM \"app\".\"post\" WHERE \"post\".\"author_id\" = $1",
+    "values": [["i64","3"]]
+  },
+  "graph": {
+    "sql": "SELECT \"post\".\"id\" AS \"s0_id\", \"post\".\"author_id\" AS \"s0_author_id\", \"post\".\"title\" AS \"s0_title\", \"account\".\"id\" AS \"s1_id\", \"account\".\"name\" AS \"s1_name\", \"account\".\"display_name\" AS \"s1_display_name\" FROM \"app\".\"post\" INNER JOIN \"app\".\"account\" ON \"post\".\"author_id\" = \"account\".\"id\"",
+    "values": []
+  },
+  "graph-maybe-alias": {
+    "sql": "SELECT \"account\".\"id\" AS \"s0_id\", \"account\".\"name\" AS \"s0_name\", \"account\".\"display_name\" AS \"s0_display_name\", \"p\".\"id\" AS \"s1_id\", \"p\".\"author_id\" AS \"s1_author_id\", \"p\".\"title\" AS \"s1_title\" FROM \"app\".\"account\" LEFT JOIN \"app\".\"post\" AS \"p\" ON \"account\".\"id\" = \"p\".\"author_id\"",
+    "values": []
+  },
+  "graph-via": {
+    "sql": "SELECT \"post\".\"id\" AS \"s0_id\", \"post\".\"author_id\" AS \"s0_author_id\", \"post\".\"title\" AS \"s0_title\", \"tag\".\"id\" AS \"s1_id\", \"tag\".\"label\" AS \"s1_label\" FROM \"app\".\"post\" LEFT JOIN \"app\".\"post_tag\" ON \"post\".\"id\" = \"post_tag\".\"post_id\" LEFT JOIN \"app\".\"tag\" ON \"post_tag\".\"tag_id\" = \"tag\".\"id\"",
+    "values": []
+  },
+  "graph-filtered": {
+    "sql": "SELECT \"post\".\"id\" AS \"s0_id\", \"post\".\"author_id\" AS \"s0_author_id\", \"post\".\"title\" AS \"s0_title\", \"account\".\"id\" AS \"s1_id\", \"account\".\"name\" AS \"s1_name\", \"account\".\"display_name\" AS \"s1_display_name\" FROM \"app\".\"post\" INNER JOIN \"app\".\"account\" ON \"post\".\"author_id\" = \"account\".\"id\" WHERE \"post\".\"title\" = $1 ORDER BY \"post\".\"id\" ASC",
+    "values": [["text","x"]]
+  },
+  "graph-long-name": {
+    "sql": "SELECT \"long_names\".\"id\" AS \"s0_id\", \"long_names\".\"column_with_a_name_long_enough_to_need_bounding_in_a_graph_xx\" AS \"s0_column_with_a_name_long_enough_to_need_bound3d82b6a86a37c3b4\" FROM \"long_names\"",
+    "values": []
+  },
+  "graph-grouped": {
+    "sql": "SELECT \"account\".\"id\" AS \"s0_id\", \"account\".\"name\" AS \"s0_name\", \"account\".\"display_name\" AS \"s0_display_name\", \"post\".\"id\" AS \"s1_id\", \"post\".\"author_id\" AS \"s1_author_id\", \"post\".\"title\" AS \"s1_title\" FROM \"app\".\"account\" LEFT JOIN \"app\".\"post\" ON \"account\".\"id\" = \"post\".\"author_id\" ORDER BY \"account\".\"name\" DESC, \"account\".\"id\" ASC",
+    "values": []
+  },
+  "cursor-after-first": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" WHERE \"account\".\"id\" > $1 ORDER BY \"account\".\"id\" ASC LIMIT $2",
+    "values": [["i64","5"], ["u64","10"]]
+  },
+  "cursor-composite-last-desc": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" WHERE (\"account\".\"name\" = $1 AND \"account\".\"id\" > $2) OR \"account\".\"name\" > $3 ORDER BY \"account\".\"name\" ASC, \"account\".\"id\" ASC LIMIT $4",
+    "values": [["text","m"], ["i64","4"], ["text","m"], ["u64","3"]]
+  },
+  "graph-cursor-with": {
+    "sql": "SELECT \"post\".\"id\" AS \"s0_id\", \"post\".\"author_id\" AS \"s0_author_id\", \"post\".\"title\" AS \"s0_title\", \"account\".\"id\" AS \"s1_id\", \"account\".\"name\" AS \"s1_name\", \"account\".\"display_name\" AS \"s1_display_name\" FROM \"app\".\"post\" LEFT JOIN \"app\".\"account\" ON \"post\".\"author_id\" = \"account\".\"id\" WHERE (\"post\".\"title\" = $1 AND \"post\".\"id\" = $2 AND \"account\".\"id\" > $3) OR (\"post\".\"title\" = $4 AND \"post\".\"id\" > $5) OR \"post\".\"title\" > $6 ORDER BY \"post\".\"title\" ASC, \"post\".\"id\" ASC, \"account\".\"id\" ASC LIMIT $7",
+    "values": [["text","t"], ["i64","1"], ["i64","2"], ["text","t"], ["i64","1"], ["text","t"], ["u64","2"]]
+  },
+  "page": {
+    "sql": "SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" ORDER BY \"account\".\"id\" ASC LIMIT $1 OFFSET $2",
+    "values": [["u64","10"], ["u64","20"]]
+  },
+  "count": {
+    "sql": "SELECT COUNT(*) AS \"num_items\" FROM (SELECT \"account\".\"id\", \"account\".\"name\", \"account\".\"display_name\" FROM \"app\".\"account\" WHERE \"account\".\"name\" <> $1) AS \"sub_query\"",
+    "values": [["text","x"]]
+  }
+}

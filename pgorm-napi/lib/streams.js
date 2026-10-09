@@ -7,6 +7,29 @@ import { LifecycleError } from "./errors.js";
 import { abortable, native, queryOptions, row, TRUSTED } from "./operations.js";
 
 /**
+ * How a stream makes each item from a row's values, given the result's
+ * column names and kinds: a row object, unless a model decodes it.
+ *
+ * @typedef {(names: string[], values: unknown[], kinds: string[]) => unknown} Decode
+ */
+
+/** @type {(stream: RowStream, decode: Decode) => RowStream} */
+let decoding;
+
+/**
+ * `stream`, its items made by `decode` rather than as row objects: how a
+ * model streams its records. Only the module calls this, before the first
+ * pull.
+ * [spec:pgorm:req:napi.model-records]
+ *
+ * @param {RowStream} stream
+ * @param {Decode} decode
+ */
+export function decodedWith(stream, decode) {
+  return decoding(stream, decode);
+}
+
+/**
  * A statement's rows as an async iterator, one row per pull, so the server is
  * held back while nothing asks. Its connection is released at the last row,
  * by `close()`, or when a `for await` loop leaves early.
@@ -22,6 +45,10 @@ export class RowStream {
   #release;
   /** @type {string[]} */
   #names = [];
+  /** @type {string[]} */
+  #kinds = [];
+  /** @type {Decode} */
+  #decode = row;
   #tagged;
   /** @type {AbortSignal | undefined} */
   #signal;
@@ -39,6 +66,14 @@ export class RowStream {
     this.#open = open;
     this.#tagged = tagged;
     this.#signal = signal;
+  }
+
+  static {
+    decoding = (stream, decode) => {
+      if (stream.#native !== null || stream.#done) throw new TypeError("the stream has been pulled");
+      stream.#decode = decode;
+      return stream;
+    };
   }
 
   /** @returns {boolean} */
@@ -59,9 +94,12 @@ export class RowStream {
           await this.#finish();
           return { done: true, value: undefined };
         }
-        const [values, names] = item;
-        if (names) this.#names = names;
-        return { done: false, value: row(this.#names, values) };
+        const [values, names, kinds] = item;
+        if (names) [this.#names, this.#kinds] = [names, kinds];
+        return {
+          done: false,
+          value: /** @type {Record<string, unknown>} */ (this.#decode(this.#names, values, this.#kinds)),
+        };
       });
     } catch (error) {
       await this.#finish();

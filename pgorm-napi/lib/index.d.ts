@@ -16,6 +16,8 @@ export * from "./merge.d.ts";
 export * from "./windows.d.ts";
 export * from "./select.d.ts";
 export * from "./writes.d.ts";
+export * from "./models.d.ts";
+export * from "./graphs.d.ts";
 
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
@@ -218,6 +220,7 @@ export type TaggedRow = { [column: string]: Value };
 
 /** A PostgreSQL type named by identifier, optionally schema-qualified: an enum's type. */
 export declare class TypeName {
+  #private;
   constructor(name: string, options?: { schema?: string | null });
   readonly name: string;
   readonly schema: string | null;
@@ -246,18 +249,20 @@ export type CreatedSubtype =
  * text form, so a statement reads it from text and casts it:
  * `CAST($1::text AS measure.floatrange)`.
  */
-export declare class CreatedRange {
-  constructor(name: string, subtype: CreatedSubtype, options?: { schema?: string | null });
+export declare class CreatedRange<S extends CreatedSubtype = CreatedSubtype> {
+  #private;
+  constructor(name: string, subtype: S, options?: { schema?: string | null });
   readonly name: string;
-  readonly subtype: CreatedSubtype;
+  readonly subtype: S;
   readonly schema: string | null;
 }
 
 /** The multirange type PostgreSQL creates beside a created range type, named by its own name. */
-export declare class CreatedMultirange {
-  constructor(name: string, subtype: CreatedSubtype, options?: { schema?: string | null });
+export declare class CreatedMultirange<S extends CreatedSubtype = CreatedSubtype> {
+  #private;
+  constructor(name: string, subtype: S, options?: { schema?: string | null });
   readonly name: string;
-  readonly subtype: CreatedSubtype;
+  readonly subtype: S;
   readonly schema: string | null;
 }
 

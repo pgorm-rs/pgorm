@@ -188,8 +188,8 @@ async fn next(
     }
 }
 
-/// `streamNext(stream, tagged, abort)`: `[values, names?]`, or `null` at the
-/// end. A failure, an abort or a decode error discards the connection.
+/// `streamNext(stream, tagged, abort)`: `[values, names?, kinds?]`, the
+/// names and kinds on the first row, or `null` at the end. A failure, an abort or a decode error discards the connection.
 // [spec:pgorm:req:napi.streams]
 fn stream_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = cx.argument::<JsBox<StreamHandle>>(0)?.0.clone();
@@ -200,13 +200,7 @@ fn stream_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
             return Ok(cx.null().upcast());
         };
         let codec = Codec::get(cx)?;
-        let array = JsArray::new(cx, values.len());
-        for (index, value) in values.into_iter().enumerate() {
-            let value = rows::value(cx, codec, value, tagged)?;
-            array.set(cx, u32::try_from(index).unwrap_or(u32::MAX), value)?;
-        }
-        let pair = JsArray::new(cx, 2);
-        pair.set(cx, 0, array)?;
+        let pair = JsArray::new(cx, 3);
         if let Some(names) = names {
             let list = JsArray::new(cx, names.len());
             for (index, name) in names.iter().enumerate() {
@@ -214,7 +208,15 @@ fn stream_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 list.set(cx, u32::try_from(index).unwrap_or(u32::MAX), name)?;
             }
             pair.set(cx, 1, list)?;
+            let kinds = rows::kinds(cx, Some(&values))?;
+            pair.set(cx, 2, kinds)?;
         }
+        let array = JsArray::new(cx, values.len());
+        for (index, value) in values.into_iter().enumerate() {
+            let value = rows::value(cx, codec, value, tagged)?;
+            array.set(cx, u32::try_from(index).unwrap_or(u32::MAX), value)?;
+        }
+        pair.set(cx, 0, array)?;
         Ok(pair.upcast())
     })
 }

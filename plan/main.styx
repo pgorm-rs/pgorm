@@ -10916,7 +10916,27 @@ children (
                 id napi-models
                 title "JavaScript declares models and uses them: CRUD, relations, graphs, cursors and pagination"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.models]
+                        [spec:pgorm:req:napi.model-records]
+                        [spec:pgorm:req:napi.model-reads]
+                        [spec:pgorm:req:napi.model-writes]
+                        [spec:pgorm:req:napi.relations]
+                        [spec:pgorm:req:napi.graphs]
+                        [spec:pgorm:req:napi.cursors]
+                        [spec:pgorm:req:napi.pagination]
+                    )
+                }
                 deps (napi-statements)
+                log (
+                    {
+                        at 2026-10-09T15:11:22.062663Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {
