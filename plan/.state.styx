@@ -1942,6 +1942,19 @@ impl_evidence (
         {impl_name main, rule napi.value-tags}
         {impl_name main, rule napi.values}
     )}
+    {id napi-connections, covered_rules (
+        napi.cancellation
+        napi.connections
+        napi.results
+        napi.streams
+        napi.transactions
+    ), covered_claims (
+        {impl_name main, rule napi.cancellation}
+        {impl_name main, rule napi.connections}
+        {impl_name main, rule napi.results}
+        {impl_name main, rule napi.streams}
+        {impl_name main, rule napi.transactions}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

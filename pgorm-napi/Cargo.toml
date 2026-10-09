@@ -30,6 +30,14 @@ postgres-protocol = "=0.6.12"
 rust_decimal = "=1.43.0"
 serde_json = { version = "=1.0.151", features = ["raw_value", "float_roundtrip"] }
 uuid = "=1.26.0"
+# Connections: the cancellation pgorm-python's runtime uses, row streams, and
+# TLS through rustls verifying against the platform's trust store, or a CA the
+# caller supplies.
+futures-util = "=0.3.34"
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "=0.8.4"
+tokio-postgres-rustls = "=0.13.0"
+tokio-util = "=0.7.19"
 
 [lints.rust]
 unsafe_code = "forbid"

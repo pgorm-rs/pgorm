@@ -3,13 +3,14 @@
 
 import process from "node:process";
 
-import { query } from "../../lib/index.js";
+import { Pool } from "../../lib/index.js";
 
 const dsn = process.env.PGORM_TEST_DSN ?? "";
+const pool = new Pool(dsn);
 let settled = 0;
 
 function next(): void {
-  query(dsn, "SELECT $1::int + 1 AS n", [settled]).then(() => {
+  pool.query("SELECT $1::int + 1 AS n", [settled]).then(() => {
     settled += 1;
     next();
   });

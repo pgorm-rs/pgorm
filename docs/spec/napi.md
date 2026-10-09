@@ -74,7 +74,7 @@ process's clean exit in both runtimes.
 > loop open, and Node.js finishes a loop with its deliveries still pending
 > where Deno delivers them first, so a promise left to it may never settle.
 
-> [spec:pgorm:req:napi.errors]
+> [spec:pgorm:req:napi.errors+1]
 > Failures MUST reject with instances of the module's error classes, all
 > derived from `PgormError` and `Error`: `DatabaseError` when PostgreSQL
 > reports an error, carrying its SQLSTATE as `sqlstate` with its severity and
@@ -82,7 +82,10 @@ process's clean exit in both runtimes.
 > `constraint`, each a string or `null`); `ConnectionError` when the server
 > cannot be reached or the connection breaks; `ConstructionError` for an
 > argument that cannot become the value pgorm sends; `DecodeError` for a result
-> that cannot become the JavaScript value asked for; `InternalError` when pgorm
+> that cannot become the JavaScript value asked for; `LifecycleError` for a
+> pool, connection, transaction or stream used after it closed or while
+> another operation holds it; `TimeoutError` when no connection becomes free
+> within a pool's acquire budget; `InternalError` when pgorm
 > or the binding fails in a way no input should cause, a panic on the runtime
 > above all, which MUST reject its promise rather than leave it pending or be
 > classified as an expected input rejection. An error from PostgreSQL
@@ -222,6 +225,89 @@ reaches JavaScript exactly or not at all.
 > rather than the row's prototype. Two columns of one name MUST be a
 > `DecodeError`, not one key for both. A statement that returns no rows
 > resolves with an empty array.
+
+## Connections
+
+A `Pool` holds the connections, a `Connection` is one of them checked out, a
+`Transaction` is a transaction or savepoint on one, and a `RowStream` pulls a
+statement's rows over one. Each is a JavaScript object over a boxed native
+handle, and each is released by being closed.
+
+> [spec:pgorm:req:napi.connections]
+> A `Pool` MUST be built from a connection string and options — TLS mode, CA,
+> size, connect and acquire timeouts, statement-cache size and recycling — by
+> a constructor that sends nothing and throws a `ConstructionError` for an
+> unusable string or option; `connect` resolves with a pool whose server
+> answered. TLS MUST default to `verify-full`, verifying the server's
+> certificate and host name against the CA given or the platform's trust
+> store, with no silent fallback to plaintext; only `sslmode=disable` or
+> `tls: "disable"` connects in plaintext. A pool lends a `Connection` with
+> `acquire`, and runs a statement of its own on a connection lent to it alone.
+>
+> Each handle — pool, connection, transaction, stream — MUST be closable
+> explicitly, by `close()` or `await using`, and what it holds MUST be
+> released by that close, never left to garbage collection or Neon's drop
+> queue: closing a connection returns it to its pool at once, and closing a
+> pool refuses new work, cancels what runs and resolves once every connection
+> is released. A handle collected unclosed releases only what is idle — an
+> idle transaction rolled back, an idle connection returned to its pool —
+> never cutting short work still running on it, and a transaction keeps the
+> connection or transaction it borrows reachable. A connection runs one
+> operation at a time: a second, or any while a transaction or stream holds
+> it, MUST be refused with a `LifecycleError` rather than queued or raced, as
+> is any use after close. Acquiring past `acquireTimeout` MUST reject with a
+> `TimeoutError`. Connections live on the runtime and hold nothing a
+> JavaScript event loop waits on, so a process that ends holding open
+> handles still exits.
+
+> [spec:pgorm:req:napi.results]
+> A pool, a connection and a transaction MUST run bound SQL through pgorm's
+> cached `ConnectionTrait` path with the same terminals: `execute` resolves
+> with the affected-row count as an exact number; `query` with every row;
+> `one` with exactly one row; and `optional` with at most one, or `null`. Any
+> other count is a `DecodeError`, decided after the query and never in place
+> of a database or decode failure. `{ tagged: true }` gives each column as a
+> `Value`, as `napi.value-tags` describes.
+
+> [spec:pgorm:req:napi.transactions]
+> Transactions MUST run through pgorm's `DatabaseTransaction` and its
+> savepoints, a task on the runtime owning each borrowed scope and JavaScript
+> sending it owned commands. `begin` opens one explicitly, its `commit` or
+> `rollback` usable once; `transaction(fn)` on a pool, a connection or a
+> transaction commits when `fn` resolves and rolls back when it throws,
+> rejecting with `fn`'s own error whatever the rollback does, and a commit
+> that fails ends the transaction and discards its connection. On a
+> transaction, `begin` and `transaction` open a savepoint. pgorm's rule that a
+> transaction borrows its parent exclusively MUST hold: while a transaction is
+> open its connection refuses other work; while a savepoint is open its
+> transaction refuses statements, commits, rollbacks and other savepoints;
+> and a statement started while another runs on the same transaction is
+> refused — each with a `LifecycleError`, never queued or raced. A callback
+> that settles with a savepoint still open fails, and commits nothing.
+> `mode` and `isolation` select pgorm's `TransactionMode`, the combinations
+> PostgreSQL acts on; a savepoint takes neither. Nothing is retried.
+
+> [spec:pgorm:req:napi.cancellation]
+> Acquiring a connection, running a statement, opening a transaction or a
+> savepoint, and pulling a stream's rows MUST each take an `AbortSignal`. An
+> aborted operation rejects with the signal's reason. Its outcome is unknown — a write may or may not
+> have happened — so the connection it ran on MUST be discarded rather than
+> returned to its pool, and a transaction it ran in ends with nothing
+> committed; an operation whose signal fired before it started sends nothing.
+> Closing a pool or a connection MUST likewise interrupt what runs on it,
+> idle transactions and streams included, without waiting for them.
+
+> [spec:pgorm:req:napi.streams]
+> `stream` on a pool or a connection MUST return an async iterator over a
+> bound statement's rows through pgorm's `query_raw`, pulling one row per
+> `next()`, so that the driver's bounded buffer and the socket hold the server
+> back while nothing pulls, and refusing a second pull while one is pending.
+> The stream holds its connection until its last row, which frees it, or
+> until `return()` — a `for await` loop leaving early — or `close()`, which
+> discard it if rows remained; a pool's stream returns or discards a
+> connection of its own. A connection's stream reserves that connection, which
+> refuses other work meanwhile. A transaction offers no stream, as
+> pgorm-python's does not.
 
 ## Clean exit
 

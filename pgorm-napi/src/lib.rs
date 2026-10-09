@@ -7,12 +7,12 @@
 //! settling a promise on the instance's JavaScript thread.
 
 mod codec;
+mod connect;
 mod decode;
 mod errors;
 mod params;
 #[cfg(debug_assertions)]
 mod probes;
-mod query;
 mod rows;
 mod runtime;
 mod settle;
@@ -28,7 +28,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     runtime::runtime(&mut cx)?;
     cx.export_function("setErrorFactory", errors::set_error_factory)?;
     cx.export_function("setCodec", codec::set_codec)?;
-    cx.export_function("query", query::query)?;
+    connect::export(&mut cx)?;
     values::export(&mut cx)?;
     #[cfg(debug_assertions)]
     probes::export(&mut cx)?;

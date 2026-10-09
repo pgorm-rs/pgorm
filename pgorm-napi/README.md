@@ -8,9 +8,11 @@ are [docs/spec/napi.md](../docs/spec/napi.md).
 
 The addon loads in both runtimes, runs pgorm's asynchronous work on a tokio
 runtime of its own, settles a Promise with the outcome, and lets the process
-exit when its work is done. Every value pgorm holds crosses into and out of
-JavaScript with a declared type ([Values](#values)). It needs a runtime with
-`Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or later.
+exit when its work is done. JavaScript connects through pools, runs bound SQL,
+scopes transactions and savepoints and streams rows
+([Connections](#connections)), and every value pgorm holds crosses into and
+out of JavaScript with a declared type ([Values](#values)). It needs a runtime
+with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or later.
 
 ## Building
 
@@ -30,10 +32,11 @@ so one build serves both.
 Import the module, never the `.node` file:
 
 ```js
-import { DatabaseError, query } from "./pgorm-napi/lib/index.js";
+import { DatabaseError, Pool } from "./pgorm-napi/lib/index.js";
 
+await using pool = new Pool("postgres://postgres@localhost/postgres?sslmode=disable");
 try {
-  const [row] = await query("postgres://postgres@localhost/postgres", "SELECT $1::int8 + 1 AS n", [41]);
+  const row = await pool.one("SELECT $1::int8 + 1 AS n", [41]);
   console.log(row.n); // 42n
 } catch (error) {
   if (error instanceof DatabaseError) console.error(error.sqlstate, error.message);
@@ -50,6 +53,70 @@ try {
 
 `lib/index.d.ts` declares every export, and Deno finds it through the module's
 `@ts-self-types` directive.
+
+## Connections
+
+```js
+import { connect } from "./pgorm-napi/lib/index.js";
+
+await using pool = await connect(process.env.DATABASE_URL, { maxSize: 10 });
+
+await pool.execute("UPDATE accounts SET visits = visits + 1 WHERE id = $1", [7]);  // affected rows
+const rows = await pool.query("SELECT id, name FROM accounts WHERE id = ANY($1)", [[1, 2, 3]]);
+const row = await pool.one("SELECT now() AS at");               // exactly one row
+const maybe = await pool.optional("SELECT 1 WHERE false");       // null
+
+await pool.transaction(async (tx) => {                           // commits, or rolls back on throw
+  await tx.execute("INSERT INTO audit VALUES ($1)", ["visit"]);
+  await tx.transaction(async (savepoint) => { /* rolled back alone if it throws */ });
+});
+
+for await (const account of pool.stream("SELECT * FROM accounts")) {
+  if (account.id === 100) break;                                // releases the connection
+}
+
+await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000) });  // rejects after 1 s
+```
+
+- **`Pool`** builds from a connection string and options (`tls`, `ca`,
+  `maxSize`, `connectTimeout`, `acquireTimeout`, `statementCacheSize`,
+  `recycle`; durations in milliseconds) without sending anything; `connect`
+  also pings. TLS is `verify-full` — certificate and host name checked against
+  `ca` or the platform's trust store — unless the string says
+  `sslmode=disable` or `tls` is `"disable"`, and never falls back to plaintext.
+  A statement run on a pool takes a connection for itself alone.
+- **`Connection`** (from `pool.acquire()`) is the caller's until closed, and
+  runs one operation at a time; another meanwhile is a `LifecycleError`, not a
+  queue.
+- **`Transaction`** comes from `begin()` (then `commit()` or `rollback()`) or
+  `transaction(fn)`, which commits when `fn` resolves and rolls back when it
+  throws, rejecting with `fn`'s own error. On a transaction, `begin` and
+  `transaction` open savepoints. A transaction borrows its parent exclusively,
+  as in Rust: while a savepoint is open its transaction refuses statements,
+  commits and other savepoints, and while a transaction is open its connection
+  refuses other work — refused with a `LifecycleError`, never raced. `mode`
+  (`"readWrite"`, `"readOnly"`, `"deferrable"`) and `isolation` choose how it
+  opens.
+- **`execute`, `query`, `one`, `optional`** are on all three; `one` and
+  `optional` reject a row count they do not admit with a `DecodeError`.
+  `{ tagged: true }` gives `Value`s.
+- **`stream`** on a pool or connection is an async iterator pulling one row
+  per `next()`, so an unread result holds the server back. Its connection is
+  freed at the last row; leaving the loop early, `return()` or `close()`
+  discards it, because rows were left unread on it.
+- **`signal`**: acquiring, running a statement, opening a transaction or
+  savepoint and pulling a stream's rows each take an `AbortSignal`. Aborting
+  rejects with the signal's reason and discards the connection the operation
+  ran on — its outcome is unknown — ending any transaction on it.
+- **Releasing**: every handle has `close()` and works with `await using`.
+  Closing a connection returns it to its pool at once; closing a pool cancels
+  what runs and waits until every connection is released. Nothing waits on
+  garbage collection: a handle collected unclosed releases only what is idle,
+  rolling back an idle transaction and returning an idle connection, and never
+  cuts short work still running.
+
+`TimeoutError` is a pool's `acquireTimeout` running out; an `AbortSignal`
+timeout rejects with the signal's own `TimeoutError` `DOMException`.
 
 ## Values
 
@@ -116,7 +183,7 @@ new Value(new Range(1, 5), "int4range");              // a range's kind is never
 new Value("calm", new TypeName("mood", { schema: "app" }));
 ```
 
-`query(dsn, sql, params, { tagged: true })` gives each column as a `Value`
+`{ tagged: true }` gives each column as a `Value`
 carrying its kind, which tells an `int2` from an `int8` and SQL NULL from JSON's
 `null`. A range type a schema created is a `CreatedRange` kind; its value
 travels as text for the statement to cast, `CAST($1::text AS app.floatrange)`,
@@ -128,7 +195,9 @@ Every failure rejects with a subclass of `PgormError`: `DatabaseError` when
 PostgreSQL refuses a statement, with its `sqlstate`, `severity` and optional
 diagnostic fields; `ConnectionError` when the server cannot be reached;
 `ConstructionError` for an argument pgorm cannot send; `DecodeError` for a
-result that does not decode. Credentials never appear in a message.
+result that does not decode; `LifecycleError` for a handle used after it
+closed or while another operation holds it; `TimeoutError` when no connection
+frees up in time. Credentials never appear in a message.
 
 ## Tests
 
@@ -148,6 +217,10 @@ deno check
 runtime under test, which is why Deno's suite needs `--allow-run`, and holds it
 to exiting by itself. `tests/runtime.test.ts` drives a panic on the runtime and
 Neon's drop queue through two exports only debug builds carry, skipped against
-a release build. `tests/values.test.ts` makes a database of its own, named for
-the runtime and process, and drops it when it ends. `deno.json` keeps Deno on its global npm cache, so type
+a release build. `tests/values.test.ts` and `tests/connections.test.ts` each
+make a database of their own, named for the runtime and process, and drop it
+when they end. The suite connects in plaintext unless its connection string
+names an `sslmode`; with `PGORM_TEST_CA` naming a PEM CA whose certificate for
+`localhost` the server presents, it also holds verified TLS to that CA, as CI
+does. `deno.json` keeps Deno on its global npm cache, so type
 checking `node:` imports needs no `node_modules`.

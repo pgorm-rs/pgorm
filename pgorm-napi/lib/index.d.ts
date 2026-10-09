@@ -27,6 +27,16 @@ export declare class DecodeError extends PgormError {}
  */
 export declare class InternalError extends PgormError {}
 
+/**
+ * A pool, connection, transaction or stream was used after it closed, or
+ * while another operation held it: a second statement on a busy connection, a
+ * parent transaction used while a savepoint of it is open.
+ */
+export declare class LifecycleError extends PgormError {}
+
+/** No connection became free within the pool's `acquireTimeout`. */
+export declare class TimeoutError extends PgormError {}
+
 /** The diagnostic fields of an error PostgreSQL reported. */
 export interface DatabaseErrorDetails {
   /** The five-character SQLSTATE, e.g. `"22003"` for numeric_value_out_of_range. */
@@ -352,30 +362,175 @@ export declare class Value {
   toString(): string;
 }
 
+// [spec:pgorm:req:napi.connections]
+/** How a {@link Pool} connects. Durations are in milliseconds. */
+export interface PoolOptions {
+  /**
+   * `"verify-full"`, the default unless the connection string says
+   * `sslmode=disable`, verifies the server's certificate and host name and
+   * never falls back to plaintext; `"disable"` connects in plaintext.
+   */
+  readonly tls?: "verify-full" | "disable";
+  /** PEM certificates to trust instead of the platform's trust store. */
+  readonly ca?: string | Uint8Array;
+  /** Connections the pool keeps at most; 10 by default. */
+  readonly maxSize?: number;
+  /** How long opening a connection may take; 10 000 by default. */
+  readonly connectTimeout?: number;
+  /** How long `acquire` waits for a free connection before a {@link TimeoutError}; 30 000 by default. */
+  readonly acquireTimeout?: number;
+  /** Prepared statements each connection caches; 0 disables the cache; 128 by default. */
+  readonly statementCacheSize?: number;
+  /** How a returned connection is checked before reuse: `"verified"` (the default) or `"fast"`. */
+  readonly recycle?: "verified" | "fast";
+}
+
+/** A snapshot of a pool's capacity and use. */
+export interface PoolStatus {
+  readonly maxSize: number;
+  readonly size: number;
+  readonly available: number;
+  readonly waiting: number;
+}
+
+// [spec:pgorm:req:napi.cancellation]
+/** Options of the operations that wait on the server or the pool: an `AbortSignal` that ends one. */
+export interface OperationOptions {
+  /**
+   * Aborting rejects with the signal's reason. The operation's outcome is
+   * then unknown — a write may or may not have happened — so its connection
+   * is discarded, and a transaction it ran in ends.
+   */
+  readonly signal?: AbortSignal;
+}
+
+// [spec:pgorm:req:napi.results]
+/** Options of the row terminals. */
+export interface QueryOptions extends OperationOptions {
+  /** Give each column as a {@link Value} carrying its kind. */
+  readonly tagged?: boolean;
+}
+
+/** The row a terminal gives for its options. */
+export type RowFor<O extends QueryOptions> = O extends { readonly tagged: true } ? TaggedRow : Row;
+
+// [spec:pgorm:req:napi.transactions]
+/** How a transaction opens; a savepoint inherits its transaction's. */
+export interface TransactionOptions extends OperationOptions {
+  /**
+   * `"default"` inherits the session's; `"readWrite"` and `"readOnly"` set the
+   * access mode; `"deferrable"` is `SERIALIZABLE READ ONLY DEFERRABLE`.
+   */
+  readonly mode?: "default" | "readWrite" | "readOnly" | "deferrable";
+  /** An isolation level, with `"readWrite"` or `"readOnly"` only. */
+  readonly isolation?: "readUncommitted" | "readCommitted" | "repeatableRead" | "serializable" | null;
+}
+
 /**
- * Run `sql` on the pool for `dsn`, with `params` bound, and resolve with its
- * rows, each an object keyed by column name. With `{ tagged: true }` each
- * column's value is a {@link Value} carrying its kind.
- *
- * The pool for a connection string is opened on first use and shared by every
- * later call that names it.
- *
- * Rejects with a {@link DatabaseError} carrying the SQLSTATE when PostgreSQL
- * refuses the statement, a {@link ConnectionError} when the server cannot be
- * reached, a {@link ConstructionError} for an unusable connection string or a
- * parameter that cannot become the value its placeholder takes, and a
- * {@link DecodeError} for a column the binding cannot decode exactly or a
- * result with two columns of one name.
+ * What a pool, a connection and a transaction run bound SQL through. A
+ * parameter is bound, never interpolated.
  */
-export declare function query(
-  dsn: string,
-  sql: string,
-  params?: readonly Param[],
-  options?: { tagged?: false },
-): Promise<Row[]>;
-export declare function query(
-  dsn: string,
-  sql: string,
-  params: readonly Param[],
-  options: { tagged: true },
-): Promise<TaggedRow[]>;
+export declare abstract class Queryable {
+  /** Run a statement and resolve with the number of rows it affected. */
+  execute(sql: string, params?: readonly Param[], options?: OperationOptions): Promise<number>;
+  /** Every row. */
+  query<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): Promise<RowFor<O>[]>;
+  /** Exactly one row; any other count is a {@link DecodeError}. */
+  one<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): Promise<RowFor<O>>;
+  /** At most one row, or `null`; more is a {@link DecodeError}. */
+  optional<O extends QueryOptions = QueryOptions>(
+    sql: string,
+    params?: readonly Param[],
+    options?: O,
+  ): Promise<RowFor<O> | null>;
+}
+
+/**
+ * A pool of connections to one server, opened as they are first needed: the
+ * constructor sends nothing, and throws a {@link ConstructionError} for an
+ * unusable connection string or option. Its statements each run on a
+ * connection of their own. Close it to release its connections; it is also
+ * `await using`-disposable.
+ */
+export declare class Pool extends Queryable implements AsyncDisposable {
+  constructor(dsn: string, options?: PoolOptions);
+  readonly closed: boolean;
+  status(): PoolStatus;
+  /** A connection of the caller's own until it closes it. */
+  acquire(options?: OperationOptions): Promise<Connection>;
+  /** Run `use` with a connection, closed when it settles. */
+  connection<T>(use: (connection: Connection) => Promise<T>, options?: OperationOptions): Promise<T>;
+  /** Run `use` in a transaction on a connection of its own: committed when it resolves, rolled back when it throws. */
+  transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: TransactionOptions): Promise<T>;
+  /** The rows of `sql`, one per pull, over a connection the stream holds until it ends. */
+  stream<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): RowStream<RowFor<O>>;
+  /** Whether the server answers. */
+  ping(options?: OperationOptions): Promise<boolean>;
+  /** Refuse new work, cancel what runs, and resolve once every connection is released. */
+  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
+}
+
+/** A {@link Pool} whose server has answered a ping. */
+export declare function connect(dsn: string, options?: PoolOptions): Promise<Pool>;
+
+/**
+ * One connection checked out of a pool, the caller's until it closes it. One
+ * operation runs on it at a time: another started meanwhile is a
+ * {@link LifecycleError}, as is any while a transaction or stream holds it.
+ */
+export declare class Connection extends Queryable implements AsyncDisposable {
+  private constructor();
+  readonly closed: boolean;
+  /** Open a transaction, which holds the connection until it commits or rolls back. */
+  begin(options?: TransactionOptions): Promise<Transaction>;
+  /** Run `use` in a transaction: committed when it resolves, rolled back when it throws. */
+  transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: TransactionOptions): Promise<T>;
+  /**
+   * The rows of `sql`, one per pull. The stream holds the connection until its
+   * last row, which frees it, or until it is closed early, which discards it.
+   */
+  stream<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): RowStream<RowFor<O>>;
+  ping(options?: OperationOptions): Promise<boolean>;
+  /** Return the connection to its pool, ending a transaction or stream that holds it; resolves once released. */
+  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
+}
+
+/**
+ * A transaction, or a savepoint inside one. It borrows its parent
+ * exclusively: while a savepoint is open, its transaction refuses statements,
+ * commits, rollbacks and other savepoints with a {@link LifecycleError}, and
+ * so does a transaction already running a statement.
+ */
+export declare class Transaction extends Queryable implements AsyncDisposable {
+  private constructor();
+  readonly closed: boolean;
+  /** The connection, or for a savepoint the transaction, this one borrows. */
+  readonly parent: Connection | Transaction;
+  /** Open a savepoint, which holds this transaction until it finishes. */
+  begin(options?: OperationOptions): Promise<Transaction>;
+  /** Run `use` in a savepoint: released when it resolves, rolled back to when it throws. */
+  transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: OperationOptions): Promise<T>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  /** Roll back if still open, and resolve once the parent is free. */
+  close(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
+}
+
+// [spec:pgorm:req:napi.streams]
+/**
+ * A statement's rows as an async iterator, one row per pull. Its connection
+ * is released at the last row, by `close()`, or when a `for await` loop leaves
+ * early; closed before its last row, the connection is discarded.
+ */
+export declare class RowStream<R = Row> implements AsyncIterableIterator<R>, AsyncDisposable {
+  private constructor();
+  readonly closed: boolean;
+  next(): Promise<IteratorResult<R, undefined>>;
+  return(): Promise<IteratorResult<R, undefined>>;
+  close(): Promise<void>;
+  [Symbol.asyncIterator](): AsyncIterableIterator<R>;
+  [Symbol.asyncDispose](): Promise<void>;
+}

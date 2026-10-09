@@ -60,7 +60,7 @@ pub(crate) struct Diagnostics {
 }
 
 /// Why an operation failed, in the terms the JavaScript error classes carry.
-// [spec:pgorm:req:napi.errors]
+// [spec:pgorm:req:napi.errors+1]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Failure {
     /// PostgreSQL rejected the statement; becomes a `DatabaseError` carrying
@@ -78,6 +78,14 @@ pub(crate) enum Failure {
     /// pgorm or the binding failed in a way no input should cause — a panic
     /// on the runtime; becomes an `InternalError`.
     Internal(String),
+    /// A pool, connection, transaction or stream was used after it closed,
+    /// or while another operation held it; becomes a `LifecycleError`.
+    Lifecycle(String),
+    /// Acquiring a connection outlasted its budget; becomes a `TimeoutError`.
+    Timeout(String),
+    /// The caller's `AbortSignal` fired. `lib/index.js` rejects with the
+    /// signal's reason instead.
+    Cancelled,
 }
 
 impl Failure {
@@ -89,6 +97,9 @@ impl Failure {
             Self::Decode(_) => "DecodeError",
             Self::Construction(_) => "ConstructionError",
             Self::Internal(_) => "InternalError",
+            Self::Lifecycle(_) => "LifecycleError",
+            Self::Timeout(_) => "TimeoutError",
+            Self::Cancelled => "CancelledError",
         }
     }
 
@@ -98,7 +109,10 @@ impl Failure {
             Self::Connection(message)
             | Self::Decode(message)
             | Self::Construction(message)
-            | Self::Internal(message) => message,
+            | Self::Internal(message)
+            | Self::Lifecycle(message)
+            | Self::Timeout(message) => message,
+            Self::Cancelled => "the operation was aborted",
         }
     }
 
@@ -156,7 +170,7 @@ impl Failure {
 /// Classify a pgorm error. A PostgreSQL error anywhere in its cause chain
 /// decides the class, so a server's refusal during connection (a bad password,
 /// a missing database) carries its SQLSTATE like any other.
-// [spec:pgorm:req:napi.errors]
+// [spec:pgorm:req:napi.errors+1]
 pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
     let mut source: &(dyn std::error::Error + 'static) = error;
     loop {

@@ -61,6 +61,12 @@ test("promises left to the drop queue never hold a process open", async () => {
 });
 
 // [spec:pgorm:req:napi.exit/test]
+// [spec:pgorm:req:napi.connections/test]
+test("a process that ends holding a transaction and a stream open exits", async () => {
+  exitedCleanly(await runFixture("holding", DEADLINE), "holding 1 false\n");
+});
+
+// [spec:pgorm:req:napi.exit/test]
 test("a process whose rejected query was handled exits", async () => {
   exitedCleanly(await runFixture("rejected", DEADLINE), "rejected 22003\n");
 });

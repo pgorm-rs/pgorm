@@ -53,18 +53,6 @@ where
     Ok(promise)
 }
 
-/// A promise already rejected with `failure`, for an operation refused before
-/// any work could start.
-pub(crate) fn rejected<'cx>(
-    cx: &mut FunctionContext<'cx>,
-    failure: Failure,
-) -> JsResult<'cx, JsPromise> {
-    let (deferred, promise) = cx.promise();
-    let error = failure.into_js(cx)?;
-    deferred.reject(cx, error);
-    Ok(promise)
-}
-
 fn panic_message(payload: &(dyn Any + Send)) -> &str {
     payload
         .downcast_ref::<&str>()

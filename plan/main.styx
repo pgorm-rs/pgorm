@@ -10858,7 +10858,24 @@ children (
                 id napi-connections
                 title "JavaScript connects, pools, runs bound SQL, and scopes transactions and savepoints"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.connections]
+                        [spec:pgorm:req:napi.results]
+                        [spec:pgorm:req:napi.transactions]
+                        [spec:pgorm:req:napi.cancellation]
+                        [spec:pgorm:req:napi.streams]
+                    )
+                }
                 deps (napi-values)
+                log (
+                    {
+                        at 2026-10-09T12:36:58.256413Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

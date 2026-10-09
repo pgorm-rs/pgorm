@@ -82,22 +82,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes clang libclang-dev postgresql-18
           echo 'PGORM_TEST_PG_BIN=/usr/lib/postgresql/18/bin' >> "$GITHUB_ENV"
+          echo 'OPENSSL=openssl' >> "$GITHUB_ENV"
       - name: macOS native build and PostgreSQL tools
         if: runner.os == 'macOS'
         run: |
-          brew install llvm postgresql@18
+          brew install llvm postgresql@18 openssl@3
           echo "PGORM_TEST_PG_BIN=$(brew --prefix postgresql@18)/bin" >> "$GITHUB_ENV"
           echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+          # The system's LibreSSL is not the OpenSSL the certificate commands
+          # below are written for.
+          echo "OPENSSL=$(brew --prefix openssl@3)/bin/openssl" >> "$GITHUB_ENV"
       - name: Start PostgreSQL 18
         run: |
           # A cluster owned by this job, on loopback only, so the suite
           # needs no credentials and nothing else on the runner shares it.
+          # It serves TLS with a certificate for localhost from a CA of the
+          # job's own, which the suite's verified-TLS case trusts; its other
+          # cases connect in plaintext.
           data="$RUNNER_TEMP/pgdata"
+          tls="$RUNNER_TEMP/tls"
+          mkdir -p "$tls"
+          "$OPENSSL" req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=pgorm-napi-test-ca \
+            -addext basicConstraints=critical,CA:TRUE -keyout "$tls/ca.key" -out "$tls/ca.pem"
+          "$OPENSSL" req -newkey rsa:2048 -nodes -subj /CN=localhost \
+            -keyout "$tls/server.key" -out "$tls/server.csr"
+          printf '%s\n' 'subjectAltName=DNS:localhost,IP:127.0.0.1' 'basicConstraints=critical,CA:FALSE' \
+            'keyUsage=critical,digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' > "$tls/server.ext"
+          "$OPENSSL" x509 -req -in "$tls/server.csr" -CA "$tls/ca.pem" -CAkey "$tls/ca.key" -CAcreateserial \
+            -days 2 -extfile "$tls/server.ext" -out "$tls/server.crt"
+          chmod 600 "$tls/server.key"
           "$PGORM_TEST_PG_BIN/initdb" -D "$data" -U postgres --auth=trust --encoding=UTF8 --no-locale
           "$PGORM_TEST_PG_BIN/pg_ctl" -D "$data" -l "$RUNNER_TEMP/postgres.log" -w -t 30 \
-            -o "-c listen_addresses=127.0.0.1 -c port=54329 -c unix_socket_directories=$RUNNER_TEMP" start
+            -o "-c listen_addresses=127.0.0.1 -c port=54329 -c unix_socket_directories=$RUNNER_TEMP -c ssl=on -c ssl_cert_file=$tls/server.crt -c ssl_key_file=$tls/server.key" start
           "$PGORM_TEST_PG_BIN/psql" -h 127.0.0.1 -p 54329 -U postgres -Atc 'SELECT version()'
           echo 'PGORM_TEST_DSN=postgres://postgres@127.0.0.1:54329/postgres' >> "$GITHUB_ENV"
+          echo "PGORM_TEST_CA=$tls/ca.pem" >> "$GITHUB_ENV"
       - name: Check the addon's Rust
         run: |
           cargo fmt --manifest-path pgorm-napi/Cargo.toml --all -- --check

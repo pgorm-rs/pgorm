@@ -1,7 +1,7 @@
 // @ts-check
 
 // The error classes every failure rejects or throws with.
-// [spec:pgorm:req:napi.errors]
+// [spec:pgorm:req:napi.errors+1]
 
 /** The base class of every error pgorm-napi rejects with. */
 export class PgormError extends Error {}
@@ -17,6 +17,12 @@ export class DecodeError extends PgormError {}
 
 /** pgorm or the binding failed in a way no input should cause. */
 export class InternalError extends PgormError {}
+
+/** A pool, connection, transaction or stream was used after it closed, or while another operation held it. */
+export class LifecycleError extends PgormError {}
+
+/** No connection became free within the pool's acquire budget. */
+export class TimeoutError extends PgormError {}
 
 /** PostgreSQL rejected the statement. */
 export class DatabaseError extends PgormError {
@@ -37,7 +43,18 @@ export class DatabaseError extends PgormError {
   }
 }
 
-for (const type of [PgormError, ConnectionError, ConstructionError, DecodeError, InternalError, DatabaseError]) {
+for (
+  const type of [
+    PgormError,
+    ConnectionError,
+    ConstructionError,
+    DecodeError,
+    InternalError,
+    LifecycleError,
+    TimeoutError,
+    DatabaseError,
+  ]
+) {
   Object.defineProperty(type.prototype, "name", {
     value: type.name,
     writable: true,
@@ -46,7 +63,15 @@ for (const type of [PgormError, ConnectionError, ConstructionError, DecodeError,
 }
 
 /** @type {Record<string, new (message: string, details: any) => PgormError>} */
-const classes = { ConnectionError, ConstructionError, DecodeError, InternalError, DatabaseError };
+const classes = {
+  ConnectionError,
+  ConstructionError,
+  DecodeError,
+  InternalError,
+  LifecycleError,
+  TimeoutError,
+  DatabaseError,
+};
 
 /**
  * Build the error a failure of `kind` rejects or throws with.

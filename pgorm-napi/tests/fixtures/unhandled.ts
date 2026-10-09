@@ -3,6 +3,8 @@
 
 import process from "node:process";
 
-import { query } from "../../lib/index.js";
+import { Pool } from "../../lib/index.js";
 
-query(process.env.PGORM_TEST_DSN ?? "", "SELECT $1::int + 1 AS n", [2147483647]);
+const pool = new Pool(process.env.PGORM_TEST_DSN ?? "");
+
+pool.query("SELECT $1::int + 1 AS n", [2147483647]);

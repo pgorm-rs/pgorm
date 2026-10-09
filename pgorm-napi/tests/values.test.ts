@@ -17,7 +17,7 @@ import {
   Interval,
   Multirange,
   type Param,
-  query,
+  Pool,
   Range,
   type Row,
   TypeName,
@@ -27,10 +27,11 @@ import {
 import { same, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
+let pool: Pool | undefined;
 
-function dsn(): string {
-  if (!database) throw new Error("the scratch database was not created");
-  return database.dsn;
+function db(): Pool {
+  if (!pool) throw new Error("the scratch database was not created");
+  return pool;
 }
 
 const mood = new TypeName("mood", { schema: "app" });
@@ -39,6 +40,7 @@ const floatmultirange = new CreatedMultirange("floatmultirange", "f64", { schema
 
 before(async () => {
   database = await scratchDatabase("pgorm_napi_values");
+  pool = new Pool(database.dsn);
   for (
     const statement of [
       "CREATE SCHEMA app",
@@ -49,18 +51,17 @@ before(async () => {
       "CREATE DOMAIN app.span AS interval",
     ]
   ) {
-    await query(dsn(), statement);
+    await db().execute(statement);
   }
 });
 
 after(async () => {
+  await pool?.close();
   await database?.drop();
 });
 
 async function one(sql: string, params: readonly Param[] = []): Promise<Row> {
-  const rows = await query(dsn(), sql, params);
-  assert.equal(rows.length, 1);
-  return rows[0] as Row;
+  return await db().one(sql, params);
 }
 
 /** `value` bound to a placeholder of `type`, and read back. */
@@ -77,7 +78,7 @@ async function refused(pending: Promise<unknown>, pattern?: RegExp): Promise<voi
 }
 
 async function undecodable(sql: string, pattern?: RegExp): Promise<void> {
-  await assert.rejects(query(dsn(), sql), (error: unknown) => {
+  await assert.rejects(db().query(sql), (error: unknown) => {
     assert.ok(error instanceof DecodeError, `expected a DecodeError, got ${error}`);
     if (pattern) assert.match(error.message, pattern);
     return true;
@@ -171,7 +172,7 @@ test("text round trips any Unicode, and a lone surrogate or NUL is refused", asy
     assert.equal(error.sqlstate, "22021");
     return true;
   });
-  await refused(query(dsn(), "SELECT 'a\u0000b'"), /NUL/);
+  await refused(db().query("SELECT 'a\u0000b'"), /NUL/);
   assert.equal(await roundTrip("text", new Value("é", "char")), "é");
   throwsConstruction(() => new Value("ab", "char"), /exactly one code point/);
 });
@@ -273,12 +274,12 @@ test("inet, cidr and macaddr round trip", async () => {
 
 // [spec:pgorm:req:napi.values/test]
 test("vector round trips as a Float32Array where pgvector is installed", async (context) => {
-  const rows = await query(dsn(), "SELECT 1 FROM pg_available_extensions WHERE name = 'vector'");
+  const rows = await db().query("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'");
   if (rows.length === 0) {
     context.skip("pgvector is not installed on the server");
     return;
   }
-  await query(dsn(), "CREATE EXTENSION IF NOT EXISTS vector");
+  await db().query("CREATE EXTENSION IF NOT EXISTS vector");
   const vector = new Float32Array([1.5, -0, 3.25]);
   same(await roundTrip("vector", new Value(vector, "vector")), vector);
   throwsConstruction(() => new Value([0.1], "vector"), /no exact f32 form/);
@@ -368,7 +369,7 @@ test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () =>
     t: "null",
   });
   same(await one("SELECT $1::jsonb IS NULL AS sql_null", [Value.null("json")]), { sql_null: true });
-  const [row] = await query(dsn(), "SELECT NULL::jsonb AS sql_null, 'null'::jsonb AS json_null", [], { tagged: true });
+  const [row] = await db().query("SELECT NULL::jsonb AS sql_null, 'null'::jsonb AS json_null", [], { tagged: true });
   assert.ok(row);
   assert.equal(row.sql_null?.isNull, true);
   assert.equal(row.json_null?.isNull, false);
@@ -378,8 +379,7 @@ test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () =>
 // [spec:pgorm:req:napi.value-tags/test]
 // [spec:pgorm:req:napi.rows/test]
 test("tagged rows carry each column's kind, an integer's width and an enum's type included", async () => {
-  const [row] = await query(
-    dsn(),
+  const [row] = await db().query(
     "SELECT 1::int2 AS a, 1::int8 AS b, NULL::int4 AS c, 'calm'::app.mood AS d, ARRAY[]::int4[] AS e, NULL::int4[] AS f",
     [],
     { tagged: true },
@@ -445,7 +445,7 @@ test("a created range converts each bound through its subtype and travels as its
   assert.equal(read, "[1.5,2.5)");
   same((await one("SELECT CAST($1::text AS app.floatrange) AS v", [value])).v, new Range(1.5, 2.5));
   same(new Value("[1.5, 2.5]", floatrange).value, new Range(1.5, 2.5, "[]"));
-  const [tagged] = await query(dsn(), "SELECT '[1,5]'::app.slot AS v", [], { tagged: true });
+  const [tagged] = await db().query("SELECT '[1,5]'::app.slot AS v", [], { tagged: true });
   assert.equal(tagged?.v?.kind, "created_range");
   assert.deepEqual(tagged?.v?.createdType, new CreatedRange("slot", "i32", { schema: "app" }));
   same(tagged?.v?.value, new Range(1, 5, "[]"));
@@ -603,12 +603,12 @@ test("timetz is refused with a DecodeError naming why", async () => {
 
 // [spec:pgorm:req:napi.rows/test]
 test("rows are objects keyed by column name, in column order", async () => {
-  const rows = await query(dsn(), "SELECT 1 AS b, 2 AS a, 3 AS c UNION ALL SELECT 4, 5, 6");
+  const rows = await db().query("SELECT 1 AS b, 2 AS a, 3 AS c UNION ALL SELECT 4, 5, 6");
   assert.equal(rows.length, 2);
   assert.deepEqual(rows.map((row) => Object.keys(row)), [["b", "a", "c"], ["b", "a", "c"]]);
   assert.deepEqual(rows[1], { b: 4, a: 5, c: 6 });
   assert.equal(Object.getPrototypeOf(rows[0]), Object.prototype);
-  assert.deepEqual(await query(dsn(), "SELECT 1 AS a WHERE false"), []);
+  assert.deepEqual(await db().query("SELECT 1 AS a WHERE false"), []);
 });
 
 // [spec:pgorm:req:napi.rows/test]

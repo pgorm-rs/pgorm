@@ -20,7 +20,7 @@ const native = createRequire(import.meta.url)("../lib/pgorm_napi.node") as Probe
 const release = native.probePanic === undefined && "the probes exist only in debug builds";
 
 // [spec:pgorm:req:napi.promises/test]
-// [spec:pgorm:req:napi.errors/test]
+// [spec:pgorm:req:napi.errors+1/test]
 test("a panic on the runtime rejects its promise with an InternalError", { skip: release }, async () => {
   await assert.rejects(native.probePanic?.() ?? Promise.resolve(), (error: unknown) => {
     assert.ok(error instanceof InternalError);

@@ -35,11 +35,11 @@ function fromEnvFile(name: string): string | undefined {
  * otherwise the server `DATABASE_URL` names — from the environment, or from
  * the checkout's `.env.local` or `.env` as the Rust suite reads it — and its
  * `postgres` maintenance database, which the queries here leave untouched.
+ * A pool verifies TLS unless told otherwise, so a string that does not say
+ * gains `sslmode=disable`; the TLS tests use {@link tlsCa} instead.
  */
 export function dsn(): string {
-  const explicit = process.env.PGORM_TEST_DSN;
-  if (explicit) return explicit;
-  const server = process.env.DATABASE_URL ?? fromEnvFile("DATABASE_URL");
+  const server = process.env.PGORM_TEST_DSN ?? process.env.DATABASE_URL ?? fromEnvFile("DATABASE_URL");
   if (!server) {
     throw new Error(
       "set PGORM_TEST_DSN, or DATABASE_URL to a PostgreSQL server URL, to run the live suite",
@@ -47,7 +47,18 @@ export function dsn(): string {
   }
   const url = new URL(server);
   if (url.pathname === "" || url.pathname === "/") url.pathname = "/postgres";
+  if (!url.searchParams.has("sslmode")) url.searchParams.set("sslmode", "disable");
   return url.toString();
+}
+
+/**
+ * The PEM certificate authority `PGORM_TEST_CA` names, whose certificate for
+ * `localhost` the server presents when it runs with TLS, or `undefined` when
+ * the server does not.
+ */
+export function tlsCa(): string | undefined {
+  const path = process.env.PGORM_TEST_CA;
+  return path ? readFileSync(path, "utf8") : undefined;
 }
 
 /** What a child process did. */
@@ -64,14 +75,20 @@ export interface Outcome {
 
 /**
  * Run `tests/fixtures/<name>.ts` in a fresh process of the runtime running
- * the suite, with the permissions a native addon needs under Deno, and kill
- * it if it has not exited by `deadline` milliseconds.
+ * the suite, with the permissions a native addon needs under Deno — and, with
+ * `exposeGc`, a `gc()` global — and kill it if it has not exited by `deadline`
+ * milliseconds.
  */
-export function runFixture(name: string, deadline: number, env: Record<string, string> = {}): Promise<Outcome> {
+export function runFixture(
+  name: string,
+  deadline: number,
+  env: Record<string, string> = {},
+  { exposeGc = false }: { exposeGc?: boolean } = {},
+): Promise<Outcome> {
   const script = join(here, "fixtures", `${name}.ts`);
   const args = deno
-    ? ["run", "--allow-ffi", "--allow-read", "--allow-env", script]
-    : [script];
+    ? ["run", "--allow-ffi", "--allow-read", "--allow-env", ...(exposeGc ? ["--v8-flags=--expose-gc"] : []), script]
+    : [...(exposeGc ? ["--expose-gc"] : []), script];
   const started = performance.now();
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
@@ -104,17 +121,21 @@ export function runFixture(name: string, deadline: number, env: Record<string, s
  * {@link dsn} names and dropped by `drop`.
  */
 export async function scratchDatabase(prefix: string): Promise<{ dsn: string; drop(): Promise<void> }> {
-  const { query } = await import("../lib/index.js");
+  const { Pool } = await import("../lib/index.js");
   const name = `${prefix}_${deno ? "deno" : "node"}_${process.pid}`;
   const server = dsn();
-  await query(server, `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
-  await query(server, `CREATE DATABASE ${name}`);
+  const maintenance = async (sql: string) => {
+    await using pool = new Pool(server, { maxSize: 1 });
+    await pool.execute(sql);
+  };
+  await maintenance(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await maintenance(`CREATE DATABASE ${name}`);
   const url = new URL(server);
   url.pathname = `/${name}`;
   return {
     dsn: url.toString(),
     async drop() {
-      await query(server, `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await maintenance(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
     },
   };
 }

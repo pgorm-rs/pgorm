@@ -14,6 +14,7 @@
 
 import { createRequire } from "node:module";
 
+import { installConnections } from "./operations.js";
 import { makeError } from "./errors.js";
 import { install } from "./values.js";
 
@@ -31,14 +32,19 @@ const native = require("./pgorm_napi.node");
 
 native.setErrorFactory(makeError);
 install(native);
+installConnections(native);
 
+export { connect, Connection, Pool, Queryable, Transaction } from "./connections.js";
+export { RowStream } from "./streams.js";
 export {
   ConnectionError,
   ConstructionError,
   DatabaseError,
   DecodeError,
   InternalError,
+  LifecycleError,
   PgormError,
+  TimeoutError,
 } from "./errors.js";
 export {
   CreatedMultirange,
@@ -54,34 +60,3 @@ export {
 
 /** @type {string} */
 export const version = native.version;
-
-/**
- * Each row an object keyed by column name, in column order. Built with
- * `Object.fromEntries`, which defines its keys, so a column named
- * `__proto__` is a property like any other rather than the object's
- * prototype.
- * [spec:pgorm:req:napi.rows]
- *
- * @param {string[]} names
- * @param {unknown[][]} rows
- */
-function objects(names, rows) {
-  return rows.map((values) => Object.fromEntries(names.map((name, index) => [name, values[index]])));
-}
-
-// An async function, so an argument the addon refuses synchronously rejects
-// the promise rather than throwing at the call site.
-// [spec:pgorm:req:napi.promises]
-/**
- * @param {string} dsn
- * @param {string} sql
- * @param {readonly unknown[]} [params]
- * @param {{ tagged?: boolean }} [options]
- * @returns {Promise<any[]>}
- */
-export async function query(dsn, sql, params = [], options = {}) {
-  const tagged = options.tagged ?? false;
-  if (typeof tagged !== "boolean") throw new TypeError("options.tagged is a boolean");
-  const [names, rows] = await native.query(dsn, sql, params, tagged);
-  return objects(names, rows);
-}
