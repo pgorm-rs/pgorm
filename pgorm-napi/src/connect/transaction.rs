@@ -17,6 +17,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     Abort, ConnectionHandle, ConnectionState, Operation, Outcome, Statement, abort_argument,
+    job::{Database, Job, Output, taken},
 };
 use crate::{
     errors::{Failure, failure},
@@ -31,6 +32,7 @@ pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("transactionAbort", transaction_abort)?;
     cx.export_function("transactionWaitClosed", transaction_wait_closed)?;
     cx.export_function("transactionClosed", transaction_closed)?;
+    cx.export_function("transactionJob", transaction_job)?;
     Ok(())
 }
 
@@ -40,6 +42,10 @@ enum Command {
     Run {
         statement: Statement,
         reply: oneshot::Sender<Result<Outcome, Failure>>,
+    },
+    Job {
+        job: Job,
+        reply: oneshot::Sender<Result<Output, Failure>>,
     },
     Finish {
         commit: bool,
@@ -232,6 +238,28 @@ impl State {
         outcome
     }
 
+    /// Run a registered entity's job, holding the lock taken as JavaScript
+    /// started it, as a statement holds it.
+    async fn run_job(
+        &self,
+        _lock: OwnedMutexGuard<()>,
+        job: Job,
+        abort: &Abort,
+    ) -> Result<Output, Failure> {
+        let (reply, receive) = oneshot::channel();
+        let mut pending = Pending::new(self.root.aborted.clone());
+        self.send(Command::Job { job, reply })?;
+        let outcome = abort
+            .guard(async {
+                receive
+                    .await
+                    .map_err(|_| Failure::Lifecycle("the transaction has ended".to_owned()))
+            })
+            .await?;
+        pending.complete();
+        outcome
+    }
+
     async fn finish(&self, _lock: OwnedMutexGuard<()>, commit: bool) -> Result<(), Failure> {
         let (reply, receive) = oneshot::channel();
         let mut pending = Pending::new(self.root.aborted.clone());
@@ -303,6 +331,15 @@ fn serve<'a>(
                     let outcome = tokio::select! {
                         () = state.abandoned.cancelled() => return Completion::discarded(),
                         outcome = statement.run(&tx, &secrets) => outcome,
+                    };
+                    if reply.send(outcome).is_err() {
+                        return Completion::discarded();
+                    }
+                }
+                Command::Job { job, reply } => {
+                    let outcome = tokio::select! {
+                        () = state.abandoned.cancelled() => return Completion::discarded(),
+                        outcome = job(Database::Transaction(&tx), &secrets) => outcome,
                     };
                     if reply.send(outcome).is_err() {
                         return Completion::discarded();
@@ -558,4 +595,22 @@ fn transaction_wait_closed(mut cx: FunctionContext) -> JsResult<JsPromise> {
 fn transaction_closed(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let closed = state(&mut cx)?.closed();
     Ok(cx.boolean(closed))
+}
+
+/// `transactionJob(transaction, job, abort)`: a registered entity's job in
+/// the transaction, holding its lock as a statement does.
+// [spec:pgorm:req:napi.entities]
+fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let state = state(&mut cx)?;
+    let job = match taken(&mut cx, 1)? {
+        Ok(job) => job,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let abort = abort_argument(&mut cx, 2)?;
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let work = async move { state.run_job(lock, job, &abort).await };
+    settle::promise(&mut cx, work, |cx, output| output.into_js(cx))
 }

@@ -1048,6 +1048,7 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id napi-entities, kind @doing, author "brendan@necessary.nu", at 2026-10-09T16:09:42.135283Z}
 )
 
 impl_evidence (

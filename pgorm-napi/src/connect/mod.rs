@@ -12,6 +12,7 @@
 //! what it holds only as a backstop.
 
 mod config;
+pub(crate) mod job;
 mod stream;
 mod transaction;
 
@@ -53,6 +54,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("connectionClosed", connection_closed)?;
     transaction::export(cx)?;
     stream::export(cx)?;
+    job::export(cx)?;
     Ok(())
 }
 

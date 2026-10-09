@@ -518,6 +518,28 @@ await pool.query(top);
   What prqlc cannot compile — an alias it reserves, a name it cannot write —
   is a `ConstructionError` before anything is sent.
 
+## Registered entities
+
+An application with pgorm entities in Rust registers them, and its graph
+shapes, in a `Registry` and builds one native module carrying the binding's
+API and its registrations, from a `#[neon::main]` of its own that calls
+`pgorm_napi::install`. JavaScript then reaches each by name, and every
+operation is the entity's own Rust API: `Select<E>` and its terminals,
+`ActiveModelTrait`'s writes with the application's hooks, the terminals that
+return a row's two versions, and `SelectGraph` with its cursor. The binding's
+own module registers nothing. [ENTITIES.md](ENTITIES.md) shows how to build
+the module and use it; `node pgorm-napi/checks/entities.js` builds the
+repository's application fixture and runs its suite in both runtimes.
+
+```js
+import { entity, graph } from "./lib/index.js";
+
+const Account = entity("app.Account");
+const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool);
+const saved = await Account.active().set("id", 1).set("display name", "Ann").insert(pool);  // hooks run
+const rows = await graph("app.AccountNotes").find({ aliases: ["n"] }).all(pool);        // [account, note | null][]
+```
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript

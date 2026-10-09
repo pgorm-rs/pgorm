@@ -22,6 +22,7 @@ export * from "./select.d.ts";
 export * from "./writes.d.ts";
 export * from "./models.d.ts";
 export * from "./graphs.d.ts";
+export * from "./entities.d.ts";
 
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;

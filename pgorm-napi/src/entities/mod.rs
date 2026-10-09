@@ -1,0 +1,454 @@
+//! Rust entities an application registers with the binding, which
+//! JavaScript reaches by name. One native module carries both: the binding's
+//! whole API, and the application's [`Registry`] of concrete entities and
+//! graph shapes, installed together by [`crate::install`] from the
+//! application's own `#[neon::main]`, as pgorm-python's application module
+//! installs its registry. JavaScript cannot instantiate a Rust generic; it
+//! uses the ones the application compiled in.
+
+/// The native half of the handle of type `$handle` at argument `$index`.
+macro_rules! held {
+    ($cx:expr, $handle:ty, $index:expr) => {
+        $cx.argument::<neon::types::JsBox<$handle>>($index)?
+            .0
+            .clone()
+    };
+}
+
+/// The string at argument `$index`.
+macro_rules! text {
+    ($cx:expr, $index:expr) => {
+        $cx.argument::<neon::types::JsString>($index)?
+            .value(&mut $cx)
+    };
+}
+
+mod adapter;
+mod convert;
+mod graph;
+mod graphs;
+mod info;
+mod registry;
+mod versions;
+
+use std::sync::Arc;
+
+use neon::{prelude::*, types::Finalize};
+use pgorm::{ActiveValue, pgorm_query::Condition};
+
+use adapter::{Active, Change, Comparison, EntityBackend, Read, Select, Write};
+use convert::{ModelHandle, Records, Wrote, column_value, entity_failure, names, record};
+pub use graph::{GraphBindings, GraphModel, GraphSlots, RegisteredSlot, Source};
+pub use registry::{RegistrationError, Registry};
+
+use crate::{
+    codec::Codec,
+    connect::job::{JobHandle, Output},
+    errors::Failure,
+    rows,
+    statements::{self, Node},
+    values::read,
+};
+
+/// The registry as JavaScript holds it: the module's own, exported as
+/// `registry`.
+#[derive(Debug)]
+pub(crate) struct RegistryHandle(pub(crate) Arc<Registry>);
+
+impl Finalize for RegistryHandle {}
+
+#[derive(Debug)]
+pub(crate) struct EntityHandle(pub(crate) Arc<dyn EntityBackend>);
+
+impl Finalize for EntityHandle {}
+
+#[derive(Debug)]
+pub(crate) struct SelectHandle(Select);
+
+impl Finalize for SelectHandle {}
+
+#[derive(Debug)]
+pub(crate) struct ActiveHandle(pub(crate) Active);
+
+impl Finalize for ActiveHandle {}
+
+pub(crate) fn install(cx: &mut ModuleContext, registry: Registry) -> NeonResult<()> {
+    for (name, export) in EXPORTS {
+        cx.export_function(name, *export)?;
+    }
+    versions::export(cx)?;
+    graphs::export(cx)?;
+    let registry = cx.boxed(RegistryHandle(Arc::new(registry)));
+    cx.export_value("registry", registry)?;
+    Ok(())
+}
+
+type Export = fn(FunctionContext) -> JsResult<JsValue>;
+
+const EXPORTS: &[(&str, Export)] = &[
+    ("entityNames", entity_names),
+    ("entityGet", entity_get),
+    ("entityDescribe", entity_describe),
+    ("entityColumns", entity_columns),
+    ("entityCol", entity_col),
+    ("entityCompare", entity_compare),
+    ("entityFind", entity_find),
+    ("entityActive", entity_active),
+    ("entitySelectChange", select_change),
+    ("entitySelectInspect", select_inspect),
+    ("entitySelectJob", select_job),
+    ("entityModelSet", model_set),
+    ("entityModelActive", model_active),
+    ("entityModelTagged", model_tagged),
+    ("entityActiveName", active_name),
+    ("entityActiveGet", active_get),
+    ("entityActiveChange", active_change),
+    ("entityActiveJob", active_job),
+];
+
+fn throw<'cx, T>(cx: &mut Cx<'cx>, failure: Failure) -> NeonResult<T> {
+    let error = failure.into_js(cx)?;
+    cx.throw(error)
+}
+
+/// A list of names as a JavaScript array.
+fn strings<'cx>(
+    cx: &mut Cx<'cx>,
+    items: impl ExactSizeIterator<Item = String>,
+) -> JsResult<'cx, JsValue> {
+    let array = JsArray::new(cx, items.len());
+    for (index, item) in items.enumerate() {
+        let item = cx.string(item);
+        array.set(cx, u32::try_from(index).unwrap_or(u32::MAX), item)?;
+    }
+    Ok(array.upcast())
+}
+
+/// `[sql, values]`, each value a tagged `Value`, as `statementInspect`
+/// gives them.
+pub(crate) fn inspected<'cx>(
+    cx: &mut Cx<'cx>,
+    (sql, values): (String, pgorm::pgorm_query::Values),
+) -> JsResult<'cx, JsValue> {
+    let codec = Codec::get(cx)?;
+    let list = JsArray::new(cx, values.0.len());
+    for (at, value) in values.0.into_iter().enumerate() {
+        let value = rows::value(cx, codec, crate::values::Tagged::value(value), true)?;
+        list.set(cx, u32::try_from(at).unwrap_or(u32::MAX), value)?;
+    }
+    let pair = JsArray::new(cx, 2);
+    let sql = cx.string(sql);
+    pair.set(cx, 0, sql)?;
+    pair.set(cx, 1, list)?;
+    Ok(pair.upcast())
+}
+
+/// The condition `value` is, an expression or a `Condition`.
+pub(crate) fn condition<'cx>(
+    cx: &mut Cx<'cx>,
+    value: Handle<'cx, JsValue>,
+) -> NeonResult<Condition> {
+    match statements::node(cx, value) {
+        Some(Node::Expr(expr)) => Ok(Condition::all().add(expr)),
+        Some(Node::Condition(condition)) => Ok(condition),
+        _ => read::refuse(cx, "a condition is an expression or a Condition"),
+    }
+}
+
+/// `entityNames(registry)`: every registered entity's name.
+fn entity_names(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let registry = held!(cx, RegistryHandle, 0);
+    strings(
+        &mut cx,
+        registry
+            .entities
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter(),
+    )
+}
+
+/// `entityGet(registry, name)`: the entity registered as `name`.
+// [spec:pgorm:req:napi.entities]
+fn entity_get(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let registry = held!(cx, RegistryHandle, 0);
+    let name = text!(cx, 1);
+    match registry.entities.get(&name) {
+        Some(entity) => Ok(cx.boxed(EntityHandle(entity.clone())).upcast()),
+        None => throw(
+            &mut cx,
+            Failure::Construction(format!(
+                "no entity is registered as {name:?} in this module"
+            )),
+        ),
+    }
+}
+
+/// `entityDescribe(entity)`: the registration as JSON text.
+fn entity_describe(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    Ok(cx.string(entity.info().describe().to_string()).upcast())
+}
+
+fn entity_columns(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    Ok(names(&mut cx, entity.info())?.upcast())
+}
+
+/// `entityCol(entity, column)`: the column as the entity's own
+/// `ColumnTrait` names it, an expression any builder takes.
+fn entity_col(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    let column = text!(cx, 1);
+    match entity.column(&column) {
+        Ok(expr) => Ok(cx.boxed(Node::Expr(expr)).upcast()),
+        Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+/// `entityCompare(entity, column, operator, value)`: the column compared
+/// through its `ColumnTrait` method, the value converted to the column's
+/// declared kind and written through its `save_as`.
+// [spec:pgorm:req:napi.entity-reads]
+fn entity_compare(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    let column = text!(cx, 1);
+    let comparison = match text!(cx, 2).as_str() {
+        "eq" => Comparison::Eq,
+        "ne" => Comparison::Ne,
+        "gt" => Comparison::Gt,
+        "gte" => Comparison::Ge,
+        "lt" => Comparison::Lt,
+        "lte" => Comparison::Le,
+        _ => return cx.throw_type_error("unknown comparison"),
+    };
+    let info = match entity.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let data = cx.argument::<JsValue>(3)?;
+    if data.is_a::<JsNull, _>(&mut cx) {
+        return read::refuse(
+            &mut cx,
+            format!("{column} compared with null is never true: test it with isNull()"),
+        );
+    }
+    let value = column_value(&mut cx, &info, data)?;
+    match entity.compare(&column, comparison, value) {
+        Ok(expr) => Ok(cx.boxed(Node::Expr(expr)).upcast()),
+        Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+fn entity_find(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    Ok(cx.boxed(SelectHandle(entity.select())).upcast())
+}
+
+/// `entityActive(entity)`: an ActiveModel from `ActiveModelBehavior::new`,
+/// its defaults included.
+fn entity_active(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    Ok(cx.boxed(ActiveHandle(entity.active())).upcast())
+}
+
+/// A count a query takes: a non-negative integer, or `null` to remove it.
+fn count_at(cx: &mut FunctionContext, index: usize) -> NeonResult<Option<u64>> {
+    let value = cx.argument::<JsValue>(index)?;
+    if value.is_a::<JsNull, _>(cx) {
+        return Ok(None);
+    }
+    let number = value.downcast_or_throw::<JsNumber, _>(cx)?.value(cx);
+    if number.fract() != 0.0 || !(0.0..=9_007_199_254_740_991.0).contains(&number) {
+        return read::refuse(cx, "a limit or offset is a non-negative integer, or null");
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    Ok(Some(number as u64))
+}
+
+/// `entitySelectChange(select, step, argument)`: the query with one more
+/// step — `where`, `orderBy`, `limit` or `offset` — as `Select<E>` takes it.
+// [spec:pgorm:req:napi.entity-reads]
+fn select_change(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let select = held!(cx, SelectHandle, 0);
+    let change = step(&mut cx)?;
+    Ok(cx.boxed(SelectHandle(select.change(change))).upcast())
+}
+
+/// The step at arguments 1 and 2 — `where` a condition, `orderBy` an
+/// ordering, `limit` or `offset` a count — as the query method of its
+/// meaning takes it.
+pub(crate) fn step(cx: &mut FunctionContext) -> NeonResult<Change> {
+    let step = cx.argument::<JsString>(1)?.value(cx);
+    let argument = cx.argument::<JsValue>(2)?;
+    Ok(match step.as_str() {
+        "where" => Change::Filter(condition(cx, argument)?),
+        "orderBy" => match statements::node(cx, argument) {
+            Some(Node::Ordering(ordering)) => {
+                Change::Order(ordering.expr, ordering.order, ordering.nulls)
+            }
+            _ => return read::refuse(cx, "an ordering is expr.asc() or expr.desc()"),
+        },
+        "limit" => Change::Limit(count_at(cx, 2)?),
+        "offset" => Change::Offset(count_at(cx, 2)?),
+        _ => return cx.throw_type_error("unknown query step"),
+    })
+}
+
+fn read_terminal(cx: &mut FunctionContext, index: usize) -> NeonResult<Read> {
+    match cx.argument::<JsString>(index)?.value(cx).as_str() {
+        "all" => Ok(Read::All),
+        "one" => Ok(Read::One),
+        "oneOpt" => Ok(Read::OneOpt),
+        _ => cx.throw_type_error("a read terminal is all, one or oneOpt"),
+    }
+}
+
+/// `entitySelectInspect(select, terminal)`: the SQL and values the terminal
+/// sends, `one` and `oneOpt` with the `LIMIT 1` Rust's terminals add.
+fn select_inspect(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let select = held!(cx, SelectHandle, 0);
+    let read = read_terminal(&mut cx, 1)?;
+    let compiled = select.compile(read);
+    inspected(&mut cx, compiled)
+}
+
+/// `entitySelectJob(select, terminal)`: the read, as a job any executor runs.
+fn select_job(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let select = held!(cx, SelectHandle, 0);
+    let read = read_terminal(&mut cx, 1)?;
+    let job: crate::connect::job::Job = Box::new(move |db, secrets| {
+        Box::pin(async move {
+            let models = select
+                .run(db, read)
+                .await
+                .map_err(|error| entity_failure(&error, secrets))?;
+            Ok(Box::new(Records(select.info().clone(), models)) as Output)
+        })
+    });
+    Ok(cx.boxed(JobHandle::new(job)).upcast())
+}
+
+/// `entityModelSet(model, column, value)`: `[values, model]` of a clone
+/// with `ModelTrait::set` applied. Nothing is written.
+// [spec:pgorm:req:napi.entity-writes]
+fn model_set(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model = held!(cx, ModelHandle, 0);
+    let column = text!(cx, 1);
+    let info = match model.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let data = cx.argument::<JsValue>(2)?;
+    let value = column_value(&mut cx, &info, data)?;
+    match model.set(&column, value) {
+        Ok(model) => record(&mut cx, model),
+        Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+/// `entityModelActive(model)`: the model's ActiveModel, by its real
+/// `IntoActiveModel`, every column `Unchanged`.
+fn model_active(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model = held!(cx, ModelHandle, 0);
+    Ok(cx.boxed(ActiveHandle(model.active())).upcast())
+}
+
+/// `entityModelTagged(model, column)`: the column's value as a `Value`.
+fn model_tagged(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let model = held!(cx, ModelHandle, 0);
+    let column = text!(cx, 1);
+    let info = match model.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let value = match model.get(&column) {
+        Ok(value) => value,
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let codec = Codec::get(&mut cx)?;
+    rows::value(&mut cx, codec, convert::tagged(&info, value), true)
+}
+
+/// `entityActiveName(active)`: the registration that made the ActiveModel.
+fn active_name(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let active = held!(cx, ActiveHandle, 0);
+    Ok(cx.string(&active.info().name).upcast())
+}
+
+/// `entityActiveGet(active, column)`: `[state, value]`, the state one of
+/// `notSet`, `set` and `unchanged`, the value absent for `notSet`.
+fn active_get(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let active = held!(cx, ActiveHandle, 0);
+    let column = text!(cx, 1);
+    let info = match active.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let (state, value) = match active.get(&column) {
+        Ok(ActiveValue::NotSet) => ("notSet", None),
+        Ok(ActiveValue::Set(value)) => ("set", Some(value)),
+        Ok(ActiveValue::Unchanged(value)) => ("unchanged", Some(value)),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let codec = Codec::get(&mut cx)?;
+    let pair = JsArray::new(&mut cx, 2);
+    let state = cx.string(state);
+    pair.set(&mut cx, 0, state)?;
+    if let Some(value) = value {
+        let value = rows::value(&mut cx, codec, convert::tagged(&info, value), false)?;
+        pair.set(&mut cx, 1, value)?;
+    }
+    Ok(pair.upcast())
+}
+
+/// `entityActiveChange(active, step, column, value?)`: a new ActiveModel
+/// with one column `set` to a value, `notSet` or `reset`.
+// [spec:pgorm:req:napi.entity-writes]
+fn active_change(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let active = held!(cx, ActiveHandle, 0);
+    let step = text!(cx, 1);
+    let column = text!(cx, 2);
+    let info = match active.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let changed = match step.as_str() {
+        "set" => {
+            let data = cx.argument::<JsValue>(3)?;
+            let value = column_value(&mut cx, &info, data)?;
+            active.set(&column, value)
+        }
+        "notSet" => active.not_set(&column),
+        "reset" => active.reset(&column),
+        _ => return cx.throw_type_error("unknown ActiveModel step"),
+    };
+    match changed {
+        Ok(active) => Ok(cx.boxed(ActiveHandle(active)).upcast()),
+        Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+/// `entityActiveJob(active, write)`: `insert`, `update` or `delete` through
+/// `ActiveModelTrait`, its `ActiveModelBehavior` hooks around it.
+// [spec:pgorm:req:napi.entity-writes]
+fn active_job(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let active = held!(cx, ActiveHandle, 0);
+    let write = match text!(cx, 1).as_str() {
+        "insert" => Write::Insert,
+        "update" => Write::Update,
+        "delete" => Write::Delete,
+        _ => return cx.throw_type_error("a write is insert, update or delete"),
+    };
+    let job: crate::connect::job::Job = Box::new(move |db, secrets| {
+        Box::pin(async move {
+            let written = active
+                .run(db, write)
+                .await
+                .map_err(|error| entity_failure(&error, secrets))?;
+            Ok(Box::new(Wrote(written)) as Output)
+        })
+    });
+    Ok(cx.boxed(JobHandle::new(job)).upcast())
+}

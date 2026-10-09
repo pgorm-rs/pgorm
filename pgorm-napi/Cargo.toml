@@ -16,6 +16,12 @@ publish = false
 name = "pgorm_napi"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# The addon's own module. An application that registers its entities
+# disables it and exports a module of its own that calls `install`.
+default = ["standalone-module"]
+standalone-module = []
+
 [dependencies]
 pgorm = { version = "0.2.0", path = ".." }
 neon = { version = "1.1.2", default-features = false, features = ["napi-6"] }

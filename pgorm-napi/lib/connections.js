@@ -17,6 +17,9 @@ const RUN = Symbol("run");
 /** Ends a transaction at once, discarding its connection. */
 const ABORT = Symbol("abort");
 
+/** The job runner each class implements, keyed privately. */
+const JOB = Symbol("job");
+
 /**
  * What a pool, a connection and a transaction run statements through: bound
  * SQL, its result decoded to rows. Every method that does I/O is an async
@@ -119,6 +122,26 @@ export async function runStatement(db, terminal, statement, options) {
   const [handle, , rest] = statementArgs(statement, undefined, options);
   const { signal } = queryOptions(rest);
   return await abortable(signal, (token) => db[RUN](terminal, handle, [], false, token));
+}
+
+/**
+ * Run a registered entity's job — one of pgorm's own terminals, built by the
+ * addon — on a pool's connection, a connection or a transaction, with the
+ * operation a statement gets around it: the busy refusal, the abort, the
+ * discard of a connection an abort left in an unknown state.
+ * [spec:pgorm:req:napi.entities]
+ *
+ * @param {unknown} db
+ * @param {unknown} job
+ * @param {unknown} options
+ * @returns {Promise<any>}
+ */
+export async function runJob(db, job, options) {
+  if (!(db instanceof Pool || db instanceof Connection || db instanceof Transaction)) {
+    throw new TypeError("a registered entity runs on a Pool, a Connection or a Transaction");
+  }
+  const { signal } = queryOptions(options ?? {});
+  return await abortable(signal, (token) => db[JOB](job, token));
 }
 
 /** @type {(connection: Connection) => unknown} */
@@ -256,6 +279,14 @@ export class Pool extends Queryable {
    */
   [RUN](terminal, sql, params, tagged, token) {
     return native.poolRun(this.#native, terminal, sql, params, tagged, token);
+  }
+
+  /**
+   * @param {unknown} job
+   * @param {unknown} token
+   */
+  [JOB](job, token) {
+    return native.poolJob(this.#native, job, token);
   }
 }
 
@@ -416,6 +447,14 @@ export class Connection extends Queryable {
   [RUN](terminal, sql, params, tagged, token) {
     return native.connectionRun(this.#native, terminal, sql, params, tagged, token);
   }
+
+  /**
+   * @param {unknown} job
+   * @param {unknown} token
+   */
+  [JOB](job, token) {
+    return native.connectionJob(this.#native, job, token);
+  }
 }
 
 /**
@@ -527,5 +566,13 @@ export class Transaction extends Queryable {
    */
   [RUN](terminal, sql, params, tagged, token) {
     return native.transactionRun(this.#native, terminal, sql, params, tagged, token);
+  }
+
+  /**
+   * @param {unknown} job
+   * @param {unknown} token
+   */
+  [JOB](job, token) {
+    return native.transactionJob(this.#native, job, token);
   }
 }

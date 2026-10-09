@@ -10961,7 +10961,25 @@ children (
                 id napi-entities
                 title "A Rust application registers its entities with the binding, and JavaScript uses them through it"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.entities]
+                        [spec:pgorm:req:napi.entity-reads]
+                        [spec:pgorm:req:napi.entity-writes]
+                        [spec:pgorm:req:napi.entity-versions]
+                        [spec:pgorm:req:napi.entity-graphs]
+                        [spec:pgorm:req:napi.application]
+                    )
+                }
                 deps (napi-models)
+                log (
+                    {
+                        at 2026-10-09T16:09:42.135283Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

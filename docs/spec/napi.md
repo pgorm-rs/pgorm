@@ -843,6 +843,105 @@ placeholders belong to the stage that minted them.
 > fixed-size array, which the binding dispatches up to that bound, where a
 > stage that binds nothing takes a list of any length.
 
+## Registered entities
+
+A Rust application that already has pgorm entities registers them with the
+binding and builds one native module carrying both: the binding's whole API
+and its registrations. JavaScript reaches each by name, and every operation
+on one is the entity's own Rust API, as pgorm-python's compiled entity
+registrations are; JavaScript cannot instantiate a Rust generic, only use
+the ones compiled in.
+
+> [spec:pgorm:req:napi.entities]
+> pgorm-napi MUST let a downstream application crate register its own
+> entities and `SelectGraph` shapes in a `Registry` — `entity::<E>(name)` for
+> any `E: EntityTrait` whose model converts into its ActiveModel, and
+> `graph::<E, S, _>(name, factory)` — and build one native module through
+> `install(cx, registry)`, called from the application's own `#[neon::main]`
+> with the binding's `standalone-module` feature off; the binding's own
+> module is that feature's, with an empty registry. A name or a Rust entity
+> registered twice, a name outside 1–255 bytes, and a graph whose source
+> entities are not registered MUST be refused as they are registered.
+> `entities()` and `graphs()` list the module's registrations and `entity(name)`
+> and `graph(name)` give one, a name the module does not register being a
+> `ConstructionError`. `describe()` reports a registration's table, each
+> column's SQL name, type, nullability, key membership and the kind its values
+> bind and read as, its primary key, whether that key ends `WITHOUT
+> OVERLAPS`, its relations with their columns, period, enforcement and
+> deferrability, and the Rust types behind it. A registered entity's records
+> MUST be frozen plain objects keyed by SQL column name, behind each of which
+> the module keeps the Rust model it was read as. Every operation runs on a
+> pool's connection, a connection or a transaction with the operation a
+> statement of SQL text gets — refused while another holds the connection,
+> aborted by its `AbortSignal`, the connection discarded when an abort leaves
+> its state unknown — and a failure from PostgreSQL anywhere in its causes is
+> the error `napi.errors` classifies.
+
+> [spec:pgorm:req:napi.entity-reads]
+> `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
+> and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
+> `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
+> adding the `LIMIT 1` Rust adds, and `one` finding no row a `DecodeError`.
+> `inspect(terminal)` gives the SQL and values the terminal sends. `col(name)`
+> is the column as the entity's `ColumnTrait` names it, and its comparisons
+> MUST be that trait's methods, a value converted to the column's declared
+> kind and written through the column's `save_as` — an enum's label cast to
+> its type — an expression compared as written, and `null` refused.
+
+> [spec:pgorm:req:napi.entity-writes]
+> `active()` MUST be the entity's `ActiveModelBehavior::new`, its defaults
+> included, and `intoActive(record)` the real `IntoActiveModel` of the model
+> behind the record. An ActiveModel MUST report each column as `notSet`,
+> `set` or `unchanged`, and `set`, `notSet` and `reset` return a new one, a
+> value converted to the column's declared kind or refused. Its `insert`,
+> `update` and `delete` MUST be `ActiveModelTrait`'s, the application's
+> `ActiveModelBehavior` hooks running around them, and a hook's refusal a
+> `ConstructionError`. `withValue(record, column, value)` is
+> `ModelTrait::set` on a copy, writing nothing, and `tagged(record, column)`
+> a column's value with the kind the entity declares. A record or an
+> ActiveModel of another registration MUST be refused.
+
+> [spec:pgorm:req:napi.entity-versions]
+> `update(active).returningChange`, `updateMany().set(..).where(..)
+> .returningChanges`, `insert(active).returningUpsert` and
+> `insertMany(actives).returningUpserts` MUST be
+> `UpdateOne::exec_returning_change`, `UpdateMany::exec_returning_changes`,
+> `Insert::exec_returning_upsert` and `Insert::exec_returning_upserts`, the
+> statement terminals they are in Rust, so no `ActiveModelBehavior` hook runs
+> around them: a change `{ old, new }` of two records, an upsert `{ kind:
+> "inserted", new }` or `{ kind: "updated", old, new }`, and a row a conflict
+> clause held back `null` or left out. `updateMany().set` writes a value
+> through the column's `save_as` and takes an expression as written, and needs
+> `where` or `allRows()` before it runs.
+
+> [spec:pgorm:req:napi.entity-graphs]
+> `graph(name).find({ aliases })` MUST build the registered `SelectGraph` with
+> the application's factory, each joined slot under the alias given for it,
+> `g1`, `g2`, .. by default, an alias count other than the slots', an alias
+> repeated or naming the root's table refused. Its rows MUST be decoded by
+> `GraphRow`: a slotless graph's as the root's record, otherwise a tuple of
+> each source's record, an `Opt` slot `null` where it matched nothing and a
+> present slot that does not decode a `DecodeError`. `col(source, column)`
+> qualifies a column of a decoded source as the query names it; `where` and
+> `orderBy` are `SelectGraph`'s; `all` and `oneOpt` its terminals. `cursor(column)`
+> MUST be `SelectGraph::cursor_by` on a root column: `before` and `after`
+> bound that column, `beforeWith` and `afterWith` the whole key — the
+> column, the root's other key columns, then each slot's — each value
+> converted to its column's declared kind and any other count refused; `first`,
+> `last`, `asc` and `desc` are the cursor's own.
+
+> [spec:pgorm:req:napi.application]
+> An application crate outside the binding's workspace MUST build the module:
+> it depends on pgorm-napi without default features, on the same checkout's
+> pgorm and on Neon, registers its entities and graphs, and exports a
+> `#[neon::main]` calling `install`. The binding's ES module, copied beside
+> the application's library as `lib/pgorm_napi.node`, is then the module an
+> application imports. `checks/entities.js` MUST build the repository's
+> application fixture — its own entities, hooks and graphs, none of the
+> binding's test tables — run its Rust tests, materialize the module beside
+> its library, and run its JavaScript suite against a live server under both
+> `node --test` and `deno test`, failing on any failure; CI runs it.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

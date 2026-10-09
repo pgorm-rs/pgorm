@@ -82,6 +82,10 @@ export { ModelDelete, ModelInsert, ModelRows, ModelUpdate } from "./model-writes
 export { Relation } from "./relations.js";
 export { Graph } from "./graphs.js";
 export { Cursor, Paginator } from "./cursors.js";
+export { ActiveModel, entities, Entity, entity } from "./entities.js";
+export { EntityColumn, EntityQuery } from "./entity-queries.js";
+export { EntityInsert, EntityUpdate, EntityUpdateMany } from "./entity-versions.js";
+export { EntityGraph, EntityGraphCursor, EntityGraphQuery, graph, graphs } from "./entity-graphs.js";
 export {
   ColumnDef,
   commentOnColumn,
