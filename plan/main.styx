@@ -11040,4 +11040,18 @@ children (
             }
         )
     }
+
+    {
+        id statement-interval-value
+        title "A built statement binds an interval value, from Rust, Python and JavaScript"
+        kind @feat
+        log (
+            {
+                at 2026-10-09T14:58:04.236735Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by napi-statements (757ed91e, 2026-10-09). pgorm-query's statement values have no interval variant, so a built statement cannot bind one. pgorm-napi refuses an Interval in a built statement with a ConstructionError naming the workaround, which is raw SQL with a bound parameter, where napi-connections' interval codec already round-trips months/days/microseconds exactly. pgorm-python has the same gap. Acceptance: a Value variant (or a typed value path) carrying PostgreSQL's months/days/microseconds triple exactly, bound in binary and rendered as an escaped literal; it reaches pgorm-query builders, the ORM's ActiveValue if an entity field can be an interval, pgorm-python and pgorm-napi built statements; live round trips including mixed signs (1 mon -2 days). Every exhaustive Value consumer is updated (pgorm-python, the generative replay and emitters)."
+            }
+        )
+    }
 )
