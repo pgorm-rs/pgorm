@@ -10,7 +10,7 @@ documentation = "https://docs.rs/pgorm-sql-macro"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["postgres", "sql", "macro"]
-rust-version = "1.88"
+rust-version = "1.89"
 
 [lib]
 name = "pgorm_sql_macro"
@@ -34,4 +34,4 @@ syn = { version = "3", default-features = false, features = ["full", "parsing", 
 [dev-dependencies]
 pgorm = { path = ".." }
 pgorm-sql-macro = { path = "." }
-trybuild = "1.0.120"
+trybuild = "1.0.122"

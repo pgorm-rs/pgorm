@@ -1,7 +1,7 @@
 """Repository-owned hostile inputs and lossless native type boundaries."""
 
 from . import wire
-from .corpus import Input, VERSION
+from .corpus import VERSION, Input
 
 ENUM = {"kind": "enum", "schema": "fixture", "name": 'State" 雪'}
 STRINGS = {

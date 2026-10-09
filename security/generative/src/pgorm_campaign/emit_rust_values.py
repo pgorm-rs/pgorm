@@ -85,7 +85,7 @@ def literal(text):
         elif 0xD800 <= point <= 0xDFFF:
             raise UnsupportedInstruction("a lone surrogate has no Rust literal")
         else:
-            parts.append("\\u{%x}" % point)
+            parts.append(f"\\u{{{point:x}}}")
     parts.append('"')
     return "".join(parts)
 
@@ -93,7 +93,7 @@ def literal(text):
 def char_literal(text):
     if len(text) != 1:
         raise UnsupportedInstruction("a character payload holds one scalar")
-    return "'\\u{%x}'" % ord(text)
+    return f"'\\u{{{ord(text):x}}}'"
 
 
 def integer(value, kind):

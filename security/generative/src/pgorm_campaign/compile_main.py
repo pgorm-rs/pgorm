@@ -10,9 +10,9 @@ refused has no crate to build. Only what the generator produced reaches rustc.
 import argparse
 import asyncio
 import json
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 from . import compile_driver, compile_report, compile_suite
 from .build import ROOT, content_identity

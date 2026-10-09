@@ -1,9 +1,9 @@
 """Independent parameter adaptation; no pgorm conversions or rendered literals."""
 
-from dataclasses import dataclass
 import json
 import math
 import struct
+from dataclasses import dataclass
 
 from . import wire
 from .comparison import InvalidOracle

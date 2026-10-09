@@ -10,7 +10,7 @@ documentation = "https://docs.rs/pgorm-macros"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = [ "database" ]
 keywords = ["async", "orm", "postgres"]
-rust-version = "1.88"
+rust-version = "1.89"
 
 [lib]
 name = "pgorm_macros"
@@ -22,13 +22,13 @@ syn = { version = "3", default-features = false, features = ["parsing", "proc-ma
 quote = { version = "1.0.47", default-features = false }
 heck = { version = "0.5", default-features = false }
 proc-macro2 = { version = "1.0.107", default-features = false }
-unicode-ident = { version = "1.0.24" }
+unicode-ident = { version = "1.0.26" }
 
 [dev-dependencies]
 pgorm = { path = "../", features = ["macros", "tests-cfg"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151" }
-trybuild = "1.0.120"
+trybuild = "1.0.122"
 
 [features]
 default = ["derive"]

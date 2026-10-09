@@ -1,7 +1,7 @@
 """Build once, install cleanly, run direct Python queries, verify Rust parity.
 
 Use with_postgres.py for a disposable database or supply PGORM_TEST_DSN.
-Requires the pinned Maturin in the invoking Python environment, Cargo and uv.
+Requires Maturin in the invoking Python environment, Cargo and uv.
 """
 
 import argparse

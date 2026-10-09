@@ -1,7 +1,7 @@
 """Protected native baselines for closed, fixture-owned sensitivity controls."""
 
-from .author import Author
 from . import wire
+from .author import Author
 
 PAYLOAD = "' OR TRUE --"
 IDENTIFIER = 'found" FROM fixture.accounts WHERE TRUE --'

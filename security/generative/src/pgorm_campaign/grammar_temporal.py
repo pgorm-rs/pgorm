@@ -29,8 +29,8 @@ GRAPHS = ("StayRooms", "StayGuests")
 def days(start, end):
     """`[start, end)` in 2026, each a `(month, day)` pair, as a range payload."""
     return {
-        "lower": "2026-%02d-%02d" % start,
-        "upper": "2026-%02d-%02d" % end,
+        "lower": "2026-{:02d}-{:02d}".format(*start),
+        "upper": "2026-{:02d}-{:02d}".format(*end),
         "bounds": "[)",
     }
 

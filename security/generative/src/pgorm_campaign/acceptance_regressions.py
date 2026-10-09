@@ -10,9 +10,9 @@ never in the source tree, and it is removed whether or not the experiment
 worked. Nothing here edits the checkout it was launched from.
 """
 
-from pathlib import Path
 import shutil
 import time
+from pathlib import Path
 
 from . import process
 

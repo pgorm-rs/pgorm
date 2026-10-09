@@ -31,7 +31,8 @@ def one(directory, pattern):
 
 
 def build(source, destination, environment, *formats):
-    # uv creates a fresh PEP 517 environment using the pinned Maturin backend.
+    # uv creates a fresh PEP 517 environment with the Maturin backend the
+    # build requirements name.
     run(
         [
             "uv",

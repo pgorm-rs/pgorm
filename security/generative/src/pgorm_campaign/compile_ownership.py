@@ -120,57 +120,67 @@ def transaction_reject_cases():
     variants = (
         (
             "txn-commit-twice",
-            "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-            "        let tx = conn.begin().await?;\n"
-            "        tx.commit().await?;\n"
-            "        tx.rollback().await?;\n"
-            "        Ok(())\n    }",
+            (
+                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
+                "        let tx = conn.begin().await?;\n"
+                "        tx.commit().await?;\n"
+                "        tx.rollback().await?;\n"
+                "        Ok(())\n    }"
+            ),
             rejects("E0382"),
             "commit consumes the handle, so there is no second outcome",
         ),
         (
             "txn-conn-while-open",
-            "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-            "        let tx = conn.begin().await?;\n"
-            '        conn.batch_execute("SELECT 1").await?;\n'
-            "        tx.commit().await?;\n"
-            "        Ok(())\n    }",
+            (
+                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
+                "        let tx = conn.begin().await?;\n"
+                '        conn.batch_execute("SELECT 1").await?;\n'
+                "        tx.commit().await?;\n"
+                "        Ok(())\n    }"
+            ),
             rejects("E0502"),
             "the open transaction holds the connection exclusively",
         ),
         (
             "txn-begin-twice",
-            "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-            "        let first = conn.begin().await?;\n"
-            "        let second = conn.begin().await?;\n"
-            "        second.commit().await?;\n"
-            "        first.commit().await?;\n"
-            "        Ok(())\n    }",
+            (
+                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
+                "        let first = conn.begin().await?;\n"
+                "        let second = conn.begin().await?;\n"
+                "        second.commit().await?;\n"
+                "        first.commit().await?;\n"
+                "        Ok(())\n    }"
+            ),
             rejects("E0499"),
             "two live transactions on one connection is two mutable borrows",
         ),
         (
             "txn-escapes-connection",
-            "    pub async fn run(pool: &DatabasePool)\n"
-            "        -> Result<DatabaseTransaction<'static>, Error> {\n"
-            "        let mut conn = pool.get().await?;\n"
-            "        let tx = conn.begin().await?;\n"
-            "        Ok(tx)\n    }",
+            (
+                "    pub async fn run(pool: &DatabasePool)\n"
+                "        -> Result<DatabaseTransaction<'static>, Error> {\n"
+                "        let mut conn = pool.get().await?;\n"
+                "        let tx = conn.begin().await?;\n"
+                "        Ok(tx)\n    }"
+            ),
             rejects("E0515"),
             "a transaction cannot outlive the connection it began on",
         ),
         (
             "txn-stored-past-connection",
-            "    pub async fn run(pool: &DatabasePool) -> Result<(), Error> {\n"
-            "        let mut held: Option<DatabaseTransaction<'_>> = None;\n"
-            "        {\n"
-            "            let mut conn = pool.get().await?;\n"
-            "            held = Some(conn.begin().await?);\n"
-            "        }\n"
-            "        if let Some(tx) = held {\n"
-            "            tx.commit().await?;\n"
-            "        }\n"
-            "        Ok(())\n    }",
+            (
+                "    pub async fn run(pool: &DatabasePool) -> Result<(), Error> {\n"
+                "        let mut held: Option<DatabaseTransaction<'_>> = None;\n"
+                "        {\n"
+                "            let mut conn = pool.get().await?;\n"
+                "            held = Some(conn.begin().await?);\n"
+                "        }\n"
+                "        if let Some(tx) = held {\n"
+                "            tx.commit().await?;\n"
+                "        }\n"
+                "        Ok(())\n    }"
+            ),
             rejects("E0597", "E0505"),
             "storing the handle does not extend the connection's life",
         ),

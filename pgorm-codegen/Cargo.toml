@@ -10,7 +10,7 @@ documentation = "https://docs.rs/pgorm-codegen"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["sql", "postgres", "codegen"]
-rust-version = "1.88"
+rust-version = "1.89"
 
 [lib]
 name = "pgorm_codegen"

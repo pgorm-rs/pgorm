@@ -1,8 +1,10 @@
 import copy
-from decimal import Decimal
 import struct
 import unittest
+from decimal import Decimal
 from unittest.mock import Mock
+
+from execution_cases import select_case
 
 from pgorm_campaign import comparison, wire
 from pgorm_campaign.oracles import compare
@@ -13,8 +15,6 @@ from pgorm_campaign.reference_literal import literal
 from pgorm_campaign.reference_sql import SQL, bound
 from pgorm_campaign.reference_template import Raw, template
 from pgorm_campaign.reference_values import Float32, qualified
-
-from execution_cases import select_case
 
 
 class ReferenceTests(unittest.TestCase):

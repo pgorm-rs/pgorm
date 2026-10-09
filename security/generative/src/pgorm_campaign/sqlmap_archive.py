@@ -1,10 +1,10 @@
 """Read selected data from an immutable archive without loading scanner code."""
 
+import tarfile
+import xml.etree.ElementTree as ET
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
-import tarfile
-import xml.etree.ElementTree as ET
 
 REVISION = "d486742eec47ba96940d35bf2dc176f60868efdd"
 PIN = {

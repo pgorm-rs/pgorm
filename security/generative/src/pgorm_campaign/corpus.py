@@ -1,7 +1,7 @@
 """Immutable input data; corpus text never becomes a program operation."""
 
-from dataclasses import dataclass
 import json
+from dataclasses import dataclass
 
 from . import wire
 

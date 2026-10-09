@@ -55,7 +55,7 @@ class PipelineEmitter:
             table = "accounts" if name == "campaign.Account" else "notes"
             return ("table", "fixture", table)
         if kind == "table":
-            schema, name, alias = self.table_identity(reference)
+            schema, name, _alias = self.table_identity(reference)
             return ("table", schema, name)
         if kind == "source":
             node = self.nodes[reference]

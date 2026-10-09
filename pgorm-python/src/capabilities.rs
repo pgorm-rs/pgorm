@@ -66,7 +66,7 @@ fn manifest() -> Value {
         "schema_version": 1,
         "package_version": env!("CARGO_PKG_VERSION"),
         "pgorm_version": env!("PGORM_VERSION"),
-        "binding": {"name": "pyo3", "version": "0.29.2", "registry_abi": 1},
+        "binding": {"name": "pyo3", "version": env!("PGORM_PYO3_VERSION"), "registry_abi": 1},
         "target": env!("PGORM_BINDING_TARGET"),
         "features": ["macros", "with-json", "with-jiff", "with-uuid", "postgres-array", "runtime-tokio"],
         "transport": "in-process",

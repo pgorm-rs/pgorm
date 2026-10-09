@@ -8,8 +8,8 @@ fault of the run, not a detail discovered later by whoever reads the report.
 
 import hashlib
 import json
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 
 class ArtifactError(RuntimeError):

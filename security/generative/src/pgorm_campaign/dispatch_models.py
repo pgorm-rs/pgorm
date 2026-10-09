@@ -13,7 +13,7 @@ def column_kind(kind, p):
 
 
 def descriptor(table, fields, fixture, p):
-    from pgorm.models import Model, Column
+    from pgorm.models import Column, Model
 
     definition = next(
         (

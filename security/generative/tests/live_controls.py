@@ -2,11 +2,11 @@
 
 import asyncio
 import json
-from pathlib import Path
 import uuid
 import zipfile
+from pathlib import Path
 
-from pgorm_campaign.control_catalog import catalog, VERSION
+from pgorm_campaign.control_catalog import VERSION, catalog
 from pgorm_campaign.control_verdict import summary
 from pgorm_campaign.controls import Controls
 from pgorm_campaign.executor import Executor
@@ -32,29 +32,31 @@ async def main():
             )
     (output / "build.json").write_text(json.dumps(build, indent=2) + "\n")
     specs, reports = catalog(), []
-    async with Fixture(output / "fixture") as fixture:
-        async with Executor(
+    async with (
+        Fixture(output / "fixture") as fixture,
+        Executor(
             fixture, expected_native_sha256=build["installed"]["native_sha256"]
-        ) as executor:
-            controls = Controls(executor)
-            for spec in specs:
-                report = await controls.run(spec)
-                reports.append(report)
-                (output / (spec.id + ".program.json")).write_text(
-                    spec.program.encoded + "\n"
-                )
-                (output / (spec.id + ".json")).write_text(
-                    json.dumps(report, indent=2) + "\n"
-                )
-                print(
-                    json.dumps(
-                        {
-                            key: report.get(key)
-                            for key in ("id", "status", "reason", "error")
-                        }
-                    ),
-                    flush=True,
-                )
+        ) as executor,
+    ):
+        controls = Controls(executor)
+        for spec in specs:
+            report = await controls.run(spec)
+            reports.append(report)
+            (output / (spec.id + ".program.json")).write_text(
+                spec.program.encoded + "\n"
+            )
+            (output / (spec.id + ".json")).write_text(
+                json.dumps(report, indent=2) + "\n"
+            )
+            print(
+                json.dumps(
+                    {
+                        key: report.get(key)
+                        for key in ("id", "status", "reason", "error")
+                    }
+                ),
+                flush=True,
+            )
     result = {
         **summary(specs, reports),
         "version": VERSION,

@@ -11,7 +11,7 @@ from .reference_template import Raw, template
 
 
 def read_statement(query, operation):
-    if isinstance(query, Raw) and re.match(r"\s*SELECT\b", query.text, re.I):
+    if isinstance(query, Raw) and re.match(r"\s*SELECT\b", query.text, re.IGNORECASE):
         return query.sql()
     if isinstance(query, Query) and query.kind == "select" and not query.shape:
         return query.sql()

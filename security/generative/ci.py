@@ -3,8 +3,8 @@
 
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # The run classes whose separation this gate enforces. A report that folded
 # compile invocations into the live count would read as a far larger body of
@@ -44,7 +44,7 @@ def _load(artifacts):
         report = json.loads((directory / "campaign.json").read_text())
     except FileNotFoundError:
         return None, ("fail", "the campaign started and never wrote its report")
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None, ("incomplete", "campaign report is unreadable")
     if not isinstance(report, dict):
         return None, ("incomplete", "campaign report is malformed")

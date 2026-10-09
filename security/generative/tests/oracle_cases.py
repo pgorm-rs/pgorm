@@ -1,9 +1,9 @@
 """Semantic probes independent of the executor's dispatch smoke cases."""
 
+from execution_cases import Case
+
 from pgorm_campaign import wire
 from pgorm_campaign.program import Program
-
-from execution_cases import Case
 
 
 def three_valued(mode):

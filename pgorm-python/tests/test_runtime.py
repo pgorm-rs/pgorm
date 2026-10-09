@@ -200,6 +200,25 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await pool.ping())
 
     # [spec:pgorm:req:python.connections/test]
+    async def test_verified_tls_binds_scram_to_the_certificate(self):
+        # channel_binding=require refuses SCRAM unless it is bound to the TLS
+        # session (SCRAM-SHA-256-PLUS over the server certificate's
+        # tls-server-end-point hash), so the TLS connector has to report that
+        # binding for this to connect. Plaintext has nothing to bind to, and
+        # the same setting refuses it.
+        parts = urlsplit(self.dsn)
+        query = f"{parts.query}&channel_binding=require"
+        dsn = urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+        async with pgorm.Pool(dsn, tls="verify-full", cafile=os.environ["PGORM_TEST_CA"]) as pool:
+            self.assertTrue(await pool.ping())
+        pool = pgorm.Pool(dsn, tls="disable")
+        try:
+            with self.assertRaises(pgorm.PgOrmError):
+                await pool.ping()
+        finally:
+            await pool.close()
+
+    # [spec:pgorm:req:python.connections/test]
     async def test_certificate_hostname_is_verified(self):
         parts = urlsplit(self.dsn)
         netloc = f"{parts.username}:{quote(parts.password)}@wrong.test:{parts.port}"

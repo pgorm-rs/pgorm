@@ -12,8 +12,8 @@ comparing two independently produced lists.
 """
 
 import asyncio
-from pathlib import Path
 import time
+from pathlib import Path
 
 from . import (
     campaign_coverage,

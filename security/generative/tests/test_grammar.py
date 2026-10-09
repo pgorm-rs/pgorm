@@ -6,10 +6,10 @@ from pgorm_campaign.catalog import EFFECTS, OPERATIONS
 from pgorm_campaign.grammar import FAMILIES, generate
 from pgorm_campaign.grammar_pipeline import Column, Pipeline
 from pgorm_campaign.grammar_rejection import RULES
-from pgorm_campaign.refusals import EMPTY_INSERT, UNSERIALIZABLE
 from pgorm_campaign.grammar_state import Limits, State
 from pgorm_campaign.parameters import input_ids
 from pgorm_campaign.program import Program
+from pgorm_campaign.refusals import EMPTY_INSERT, UNSERIALIZABLE
 
 
 def _reachable(nodes, step):

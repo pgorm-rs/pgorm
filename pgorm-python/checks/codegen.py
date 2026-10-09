@@ -143,19 +143,22 @@ def main():
             ],
             environment,
         )
+        launcher = ["uv", "tool", "run", "--from", "mypy@latest", "mypy"]
         mypy = [
-            "uv",
-            "tool",
-            "run",
-            "--from",
-            "mypy==1.18.2",
-            "mypy",
+            *launcher,
             "--strict",
             "--python-executable",
             str(final),
             "--cache-dir",
             str(temporary / "mypy-cache"),
         ]
+        checker = subprocess.run(
+            [*launcher, "--version"],
+            env=environment,
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.split(" (")[0]
         run([*mypy, root / "pgorm-python/tests/codegen_types.py"], environment)
         run([*mypy, "--package", "pgorm"], environment)
         invalid = subprocess.run(
@@ -208,7 +211,7 @@ def main():
                 "database_cases": 3,
                 "deterministic_emission": True,
                 "compatibility_checked": True,
-                "type_checker": "mypy==1.18.2",
+                "type_checker": checker,
                 "invalid_typing_cases": 4,
                 "installed_signatures": True,
                 "package_typing": True,

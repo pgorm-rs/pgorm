@@ -99,13 +99,9 @@ def main():
     )
     application = root / "pgorm-python/examples/application.py"
     with tempfile.TemporaryDirectory(prefix="pgorm-typing-") as temporary:
+        launcher = ["uv", "tool", "run", "--from", "mypy@latest", "mypy"]
         mypy = [
-            "uv",
-            "tool",
-            "run",
-            "--from",
-            "mypy==1.18.2",
-            "mypy",
+            *launcher,
             "--strict",
             "--no-incremental",
             "--no-pretty",
@@ -116,6 +112,9 @@ def main():
             "--cache-dir",
             temporary,
         ]
+        checker = run(
+            [*launcher, "--version"], environment, capture=True
+        ).stdout.split(" (")[0]
         run([*mypy, application], environment)
         run([*mypy, "--package", "pgorm"], environment)
         rejected = reject_invalid(
@@ -128,7 +127,7 @@ def main():
         "passed": True,
         "installed": metadata,
         "native_signatures": True,
-        "type_checker": "mypy==1.18.2",
+        "type_checker": checker,
         "invalid_typing_cases": rejected,
         "application": result,
     }

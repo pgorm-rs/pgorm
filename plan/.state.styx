@@ -736,6 +736,7 @@ assertions (
     {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}
     {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
     {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
+    {id codegen-column-expressions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T21:50:20.383652Z}
     {id codegen-datetime-crate-option, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:54:18.092258Z}
     {id codegen-identity-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:22.63481Z}
     {id codegen-junction-detection, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:30.231473Z}
@@ -743,12 +744,16 @@ assertions (
     {id codegen-relation-cardinality, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:26.312596Z}
     {id codegen-relation-integrity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:19.739973Z}
     {id codegen-schema-qualifiers, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:21:48.870962Z}
+    {id composite-attribute-alteration, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:08:16.695854Z}
+    {id composite-key-arity-tests, kind @complete, author "brendan@necessary.nu", at 2026-10-08T18:31:39.94185Z}
     {id composite-key-edge-coverage, kind @complete, author "brendan@necessary.nu", at 2026-10-05T21:16:37.554772Z}
     {id composite-key-generated-column, kind @complete, author "brendan@necessary.nu", at 2026-10-05T10:57:22.968642Z}
     {id composite-key-refusals, kind @complete, author "brendan@necessary.nu", at 2026-10-05T19:06:49.235085Z}
     {id composite-key-writes, kind @complete, author "brendan@necessary.nu", at 2026-10-05T13:28:02.338181Z}
     {id connect-manager-options, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:14.642639Z}
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
+    {id constraint-drop-rename, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:25:32.290402Z}
+    {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
     {id coverage-remaining-gaps, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:04:46.850667Z}
@@ -766,6 +771,7 @@ assertions (
     {id decide.statement, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:07.694429Z}
     {id decide.turso, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:54:51.122793Z}
     {id decimal-scale-returned, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:22.880525Z}
+    {id deps-refresh-2026-10, kind @complete, author "brendan@necessary.nu", at 2026-10-09T14:33:12.059842Z}
     {id distinct-drops-collided-name, kind @complete, author "brendan@necessary.nu", at 2026-09-15T13:12:24.939449Z}
     {id distinct-drops-computed-column, kind @complete, author "brendan@necessary.nu", at 2026-09-15T13:12:22.724195Z}
     {id distinct-drops-sort-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T13:12:26.319579Z}
@@ -774,6 +780,8 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
     {id empty-insert-batch, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:50:38.839369Z}
+    {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}
+    {id entity-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:59:31.234043Z}
     {id enum-schema-codegen, kind @complete, author "brendan@necessary.nu", at 2026-09-07T15:32:00.624163Z}
     {id enum-schema-surface, kind @complete, author "brendan@necessary.nu", at 2026-09-07T15:12:53.594408Z}
     {id ergo.eq-any, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:19:37.671298Z}
@@ -854,6 +862,8 @@ assertions (
     {id nopanic.value-tuple, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:46:15.258382Z}
     {id nullable-projection-absence, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:08:20.541646Z}
     {id on-conflict-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:15:11.139777Z}
+    {id orm-merge-sync, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:28:04.904937Z}
+    {id orm-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:17:50.237394Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}
     {id orm.value-decode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T00:11:29.672668Z}
     {id outer-ordering-qualifier, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:17.205808Z}
@@ -910,10 +920,15 @@ assertions (
     {id prqlc-literal-ordinal, kind @complete, author "brendan@necessary.nu", at 2026-09-24T14:38:45.551826Z}
     {id prqlc-pin-incomplete, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:22.817775Z}
     {id prqlc-wildcard-distinct-key, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:00:20.568828Z}
+    {id python-acceptance-emcc-probe, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:42:02.931055Z}
     {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
+    {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
+    {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
+    {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
+    {id python-select-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:54:27.016683Z}
     {id python-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:02:37.335682Z}
     {id python-typing-check-symlinked-tmp, kind @complete, author "brendan@necessary.nu", at 2026-10-08T15:48:34.504635Z}
     {id python.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:14.867381Z}
@@ -983,6 +998,7 @@ assertions (
     {id sqlmap.controls.literal, kind @complete, author "brendan@necessary.nu", at 2026-09-14T16:58:53.144613Z}
     {id sqlmap.controls.verify, kind @complete, author "brendan@necessary.nu", at 2026-09-14T19:51:44.825902Z}
     {id sqlmap.spec, kind @complete, author "brendan@necessary.nu", at 2026-09-08T10:06:16.052903Z}
+    {id supply-chain-detached-workspaces, kind @complete, author "brendan@necessary.nu", at 2026-10-09T13:39:40.322092Z}
     {id supply-chain-unscanned, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:22:29.034891Z}
     {id table-key-distinct-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-08T17:00:43.03556Z}
     {id tokenizer-backslash-standard, kind @complete, author "brendan@necessary.nu", at 2026-09-23T23:26:31.551166Z}
@@ -1019,21 +1035,6 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id composite-key-arity-tests, kind @complete, author "brendan@necessary.nu", at 2026-10-08T18:31:39.94185Z}
-    {id constraint-drop-rename, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:25:32.290402Z}
-    {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
-    {id composite-attribute-alteration, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:08:16.695854Z}
-    {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}
-    {id entity-temporal-keys, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:59:31.234043Z}
-    {id codegen-column-expressions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T21:50:20.383652Z}
-    {id orm-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:17:50.237394Z}
-    {id orm-merge-sync, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:28:04.904937Z}
-    {id python-acceptance-emcc-probe, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:42:02.931055Z}
-    {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
-    {id python-select-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:54:27.016683Z}
-    {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
-    {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
-    {id supply-chain-detached-workspaces, kind @complete, author "brendan@necessary.nu", at 2026-10-09T13:39:40.322092Z}
 )
 
 impl_evidence (
@@ -1174,6 +1175,8 @@ impl_evidence (
         {impl_name main, rule generative.acceptance}
     ), rule_versions_seen (
         {id generative.acceptance, version 0}
+        {id generative.build-amortization, version 0}
+        {id generative.replay-parity, version 0}
     )}
     {id generative.ci, covered_rules (
         generative.ci
@@ -1368,6 +1371,7 @@ impl_evidence (
     ), rule_versions_seen (
         {id conn.tx.closure, version 2}
         {id conn.tx.retry, version 1}
+        {id entity.relation.linked, version 4}
     )}
     {id napi-connections, covered_rules (
         napi.cancellation
@@ -1727,7 +1731,9 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.results}
     ), rule_versions_seen (
+        {id python.cancellation, version 0}
         {id python.results, version 0}
+        {id python.value-tags, version 0}
     )}
     {id python.runtime, covered_rules (
         python.connections
@@ -1791,6 +1797,7 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.surface}
     ), rule_versions_seen (
+        {id macros.derive.enum-def, version 1}
         {id sql.surface, version 0}
     )}
     {id query-second-tier, covered_rules (
@@ -1798,7 +1805,18 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.scope}
     ), rule_versions_seen (
+        {id sql.ast.expr.operators, version 3}
+        {id sql.ast.insert, version 3}
+        {id sql.ast.select.union, version 1}
+        {id sql.ast.window-statement, version 4}
+        {id sql.ddl.foreign-key, version 5}
+        {id sql.render.insert, version 2}
+        {id sql.render.operators, version 5}
+        {id sql.render.parens, version 3}
+        {id sql.render.precedence, version 3}
+        {id sql.render.window, version 4}
         {id sql.scope, version 0}
+        {id sql.types.opers, version 4}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape
@@ -2010,10 +2028,19 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.matrix}
         {impl_name main, rule security.sqlmap.observability}
     ), rule_versions_seen (
+        {id security.sqlmap, version 0}
         {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
         {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
         {id security.sqlmap.matrix, version 0}
         {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.ci, covered_rules (
         security.sqlmap.ci
@@ -2032,8 +2059,18 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.isolation}
     ), rule_versions_seen (
         {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
+        {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
+        {id security.sqlmap.execution, version 0}
         {id security.sqlmap.fixtures, version 0}
         {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
+        {id security.sqlmap.pin, version 0}
+        {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.runner, covered_rules (
         security.sqlmap.artifacts
@@ -2046,10 +2083,19 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.pin}
         {impl_name main, rule security.sqlmap.profiles}
     ), rule_versions_seen (
+        {id security.sqlmap, version 0}
+        {id security.sqlmap.adapter, version 0}
         {id security.sqlmap.artifacts, version 0}
+        {id security.sqlmap.controls, version 0}
         {id security.sqlmap.execution, version 0}
+        {id security.sqlmap.fixtures, version 0}
+        {id security.sqlmap.isolation, version 0}
+        {id security.sqlmap.matrix, version 0}
+        {id security.sqlmap.observability, version 0}
+        {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.pin, version 0}
         {id security.sqlmap.profiles, version 0}
+        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.verdict, covered_rules (
         security.sqlmap.outcomes

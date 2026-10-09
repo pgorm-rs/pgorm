@@ -6,6 +6,8 @@ executor-shaped report. Identifiers and values travel as Python literals; a
 builder operation is never replaced by captured SQL.
 """
 
+import math
+
 from . import baseline, catalog, parameters, wire
 from .program import CALLBACK_INPUTS, Program
 
@@ -378,7 +380,7 @@ def literal(value):
     if value is None or isinstance(value, (str, bool, int)):
         return repr(value)
     if isinstance(value, float):
-        if value != value or value in (float("inf"), float("-inf")):
+        if not math.isfinite(value):
             raise UnsupportedInstruction("a nonfinite float has no Python literal")
         return repr(value)
     if isinstance(value, (list, tuple)):

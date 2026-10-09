@@ -4,7 +4,6 @@ import hashlib
 import json
 import math
 
-
 KINDS = {
     "i16": "smallint",
     "i32": "integer",
@@ -229,7 +228,9 @@ def render(definition):
             raise ValueError("duplicate fixture table")
         for key in table.get("foreign_keys", []):
             if not isinstance(key, dict) or not isinstance(key.get("table"), list):
-                raise ValueError("unexpected fixture foreign key fields")
+                # Every malformed fixture is a ValueError, whatever part of it
+                # is wrong; the loader's callers catch that one class.
+                raise ValueError("unexpected fixture foreign key fields")  # noqa: TRY004
             if qualified(*key["table"]) not in names:
                 raise ValueError(
                     "a fixture foreign key must reference an earlier table"
@@ -245,11 +246,13 @@ def render(definition):
     setup = [
         "SET standard_conforming_strings = on;",
         "BEGIN;",
-        "DO $reset$ DECLARE owned text; BEGIN "
-        "FOR owned IN SELECT nspname FROM pg_catalog.pg_namespace "
-        "WHERE nspowner = 'campaign'::regrole LOOP "
-        "EXECUTE pg_catalog.format('DROP SCHEMA %I CASCADE', owned); "
-        "END LOOP; END $reset$;",
+        (
+            "DO $reset$ DECLARE owned text; BEGIN "
+            "FOR owned IN SELECT nspname FROM pg_catalog.pg_namespace "
+            "WHERE nspowner = 'campaign'::regrole LOOP "
+            "EXECUTE pg_catalog.format('DROP SCHEMA %I CASCADE', owned); "
+            "END LOOP; END $reset$;"
+        ),
     ]
     for schema in sorted(schemas | {"fixture", "other"}):
         setup.append("CREATE SCHEMA " + identifier(schema) + " AUTHORIZATION campaign;")

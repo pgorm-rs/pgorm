@@ -3,7 +3,6 @@ import json
 import unittest
 
 from pgorm_campaign import matrix, program, wire
-
 from pgorm_campaign.baseline import default
 
 

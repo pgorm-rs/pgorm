@@ -4,9 +4,9 @@ import argparse
 import asyncio
 import json
 import os
-from pathlib import Path
 import time
 import uuid
+from pathlib import Path
 
 from pgorm_campaign import shrink
 from pgorm_campaign.executor import Executor
@@ -43,32 +43,32 @@ async def main(path, seed, index, family, candidates, seconds, timeout):
     (output / "original.program.json").write_text(program.encoded + "\n")
     print(str(output), flush=True)
     summary = {"passed": False, "origin": origin}
-    async with Fixture(output / "fixture") as fixture:
-        async with Executor(
+    async with (
+        Fixture(output / "fixture") as fixture,
+        Executor(
             fixture, expected_native_sha256=build["installed"]["native_sha256"]
-        ) as executor:
-            checker = Checker(executor)
-            baseline = await checker.run(program, timeout=timeout)
-            (output / "original.json").write_text(json.dumps(baseline, indent=2) + "\n")
-            if baseline["status"] not in shrink.FAILING:
-                summary["reason"] = (
-                    "the program did not reproduce a failure to shrink: "
-                    + baseline["status"]
-                )
-                (output / "summary.json").write_text(
-                    json.dumps(summary, indent=2) + "\n"
-                )
-                print(json.dumps(summary), flush=True)
-                raise SystemExit(1)
-            result = await shrink.reduce(
-                checker,
-                program,
-                budget=budget,
-                report=baseline,
-                observer=lambda item: print(json.dumps(item), flush=True),
+        ) as executor,
+    ):
+        checker = Checker(executor)
+        baseline = await checker.run(program, timeout=timeout)
+        (output / "original.json").write_text(json.dumps(baseline, indent=2) + "\n")
+        if baseline["status"] not in shrink.FAILING:
+            summary["reason"] = (
+                "the program did not reproduce a failure to shrink: "
+                + baseline["status"]
             )
-            report = result.report()
-            confirmation = await checker.run(result.best, timeout=timeout)
+            (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+            print(json.dumps(summary), flush=True)
+            raise SystemExit(1)
+        result = await shrink.reduce(
+            checker,
+            program,
+            budget=budget,
+            report=baseline,
+            observer=lambda item: print(json.dumps(item), flush=True),
+        )
+        report = result.report()
+        confirmation = await checker.run(result.best, timeout=timeout)
     (output / "best.program.json").write_text(result.best.encoded + "\n")
     (output / "best.json").write_text(json.dumps(confirmation, indent=2) + "\n")
     (output / "shrink.json").write_text(json.dumps(report, indent=2) + "\n")

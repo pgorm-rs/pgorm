@@ -5,10 +5,10 @@ import asyncio
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import sys
 import time
+from pathlib import Path
 
 from . import dependencies, process
 
@@ -96,13 +96,20 @@ async def prepare(output, *, root=ROOT, python=sys.executable):
         "import platform,sysconfig; print(platform.python_version(),sysconfig.get_config_var('SOABI'))",
     )
     toolchain = (await process.run("rustc", "--version")).stdout.strip()
+    # Whatever Maturin the interpreter has is the one that builds, so its
+    # release is part of the build's identity rather than a requirement on it.
+    maturin = (
+        await process.run(str(python), "-I", "-m", "maturin", "--version")
+    ).stdout.strip()
+    if not maturin.startswith("maturin "):
+        raise RuntimeError("unrecognised maturin version report: " + maturin)
     identity = {
         "source_sha256": source,
         "revision": revision,
         "interpreter": interpreter.stdout.strip(),
         "rustc": toolchain,
         "features": ["extension-module"],
-        "maturin": "1.15.0",
+        "maturin": maturin.removeprefix("maturin "),
     }
     manifest = output / "build.json"
     installed = output / "venv/bin/python"
@@ -130,11 +137,6 @@ async def prepare(output, *, root=ROOT, python=sys.executable):
         "CARGO_TARGET_DIR": str(root / "target/generative-native"),
     }
     environment.pop("PYTHONPATH", None)
-    version = await process.run(
-        str(python), "-m", "maturin", "--version", environment=environment
-    )
-    if version.stdout.strip() != "maturin 1.15.0":
-        raise RuntimeError("campaign build requires maturin 1.15.0")
     wheels = output / "dist"
     if wheels.exists():
         shutil.rmtree(wheels)

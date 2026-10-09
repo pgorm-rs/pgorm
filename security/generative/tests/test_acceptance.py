@@ -1,9 +1,9 @@
 """Acceptance must not read as complete when a component or obligation is missing."""
 
-from pathlib import Path
 import tempfile
 import unittest
 import unittest.mock
+from pathlib import Path
 
 from pgorm_campaign import acceptance, acceptance_regressions
 

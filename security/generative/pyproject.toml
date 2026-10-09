@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -7,7 +7,7 @@ name = "pgorm-campaign"
 version = "0.1.0"
 description = "Generated pgorm programs and independent PostgreSQL checks"
 requires-python = ">=3.14,<3.15"
-dependencies = ["psycopg[binary]==3.3.5"]
+dependencies = ["psycopg[binary]>=3.3,<4"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pgorm_campaign"]
@@ -15,3 +15,10 @@ packages = ["src/pgorm_campaign"]
 [tool.ruff]
 target-version = "py314"
 line-length = 88
+
+[tool.ruff.lint]
+# The campaign runs code under test and records whatever that code raises as
+# evidence (a status, and the exception's class and cause) instead of
+# stopping. Catching `Exception` is that contract at every site this rule
+# names, so it is off for the package rather than waived at each of them.
+ignore = ["BLE001"]

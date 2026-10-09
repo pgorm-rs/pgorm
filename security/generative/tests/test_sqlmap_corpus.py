@@ -1,8 +1,9 @@
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from pgorm_campaign import sqlmap_archive as archive, sqlmap_context as transform
+from pgorm_campaign import sqlmap_archive as archive
+from pgorm_campaign import sqlmap_context as transform
 from pgorm_campaign.sqlmap_inventory import inventory
 
 

@@ -52,8 +52,8 @@ generated-program coverage or the complete campaign's acceptance.
 
 ## Native executor
 
-Build the private application extension with the pinned Maturin interpreter,
-then run probes in its installed environment:
+Build the private application extension with an interpreter that has Maturin
+installed, then run probes in its installed environment:
 
 ```sh
 PYTHONPATH=security/generative/src target/python-dev/bin/python -m pgorm_campaign.build
@@ -120,11 +120,11 @@ PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
   security/generative/tests/live_oracles.py
 ```
 
-`Checker` runs the public native executor and a separate Psycopg 3.3.5 reference
+`Checker` runs the public native executor and a separate Psycopg 3 reference
 against the paired fixture databases. The reference interprets the operation
 graph using its own SQL algebra, quoting, bound values and binary result decoder.
 It observes final rows and schema definitions on both sides through Psycopg.
-The native build preparation installs the pinned oracle dependency separately;
+The native build preparation installs the oracle dependency separately;
 dependency preparation does not invalidate the native compilation cache.
 
 The current probes cover CRUD and result reuse, runtime and compiled models,

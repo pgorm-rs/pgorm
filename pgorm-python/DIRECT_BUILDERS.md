@@ -5,8 +5,8 @@ its real Rust builders in Python, and execute them against PostgreSQL in the
 same process. The public API and database queries do not need HTTP, a query
 dispatcher or compilation per query.
 
-From the repository root, after installing the pinned build environment from
-the package README:
+From the repository root, after installing the build environment from the
+package README:
 
 ```sh
 target/python-dev/bin/python pgorm-python/tests/with_postgres.py \

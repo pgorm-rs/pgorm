@@ -3,11 +3,11 @@
 from dataclasses import replace
 
 from . import baseline
+from . import grammar_temporal as temporal
 from .corpus_builtin import ENUM
 from .grammar_expr import predicate
 from .grammar_sequence import account_row
 from .grammar_state import Field, Source
-from . import grammar_temporal as temporal
 
 GRAPHS = ("AccountOnly", "OptionalNotes", "RequiredNotes", "SelfJoin") + tuple(
     "Arity" + str(n) for n in range(3, 8)

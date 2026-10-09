@@ -3,8 +3,8 @@
 from .emit_rust_models import TYPED_ROWS, graph_root
 from .emit_rust_values import (
     PL,
-    Q,
     REPLAY,
+    Q,
     UnsupportedInstruction,
     boolean,
     literal,
@@ -173,8 +173,10 @@ class EffectEmitter:
                 body = [
                     f"{pad}    let (sql, values) = {self.compile_query(i['query'])};",
                     f"{pad}    let held = holders(&values);",
-                    f"{pad}    let rows = pgorm::ConnectionTrait::{method}("
-                    f"&{connection}, &sql, &params(&held)).await?;",
+                    (
+                        f"{pad}    let rows = pgorm::ConnectionTrait::{method}("
+                        f"&{connection}, &sql, &params(&held)).await?;"
+                    ),
                 ]
                 if wrap is not None:
                     body.append(f"{pad}    let rows = {wrap};")
@@ -193,12 +195,18 @@ class EffectEmitter:
             body = [
                 f"{pad}    let (sql, values) = {self.compile_query(i['query'])};",
                 f"{pad}    let held = holders(&values);",
-                f"{pad}    let opened = pgorm::ConnectionTrait::query_raw("
-                f"&{connection}, &sql, params(&held)).await?;",
-                f"{pad}    let drained = {REPLAY}::stream::drain(opened, "
-                f"{int(d['take'])}usize, {boolean(d['cancel'])}).await?;",
-                f"{pad}    let observation = {REPLAY}::observe::stream("
-                "&drained.rows, drained.complete, drained.cancelled, drained.closed)?;",
+                (
+                    f"{pad}    let opened = pgorm::ConnectionTrait::query_raw("
+                    f"&{connection}, &sql, params(&held)).await?;"
+                ),
+                (
+                    f"{pad}    let drained = {REPLAY}::stream::drain(opened, "
+                    f"{int(d['take'])}usize, {boolean(d['cancel'])}).await?;"
+                ),
+                (
+                    f"{pad}    let observation = {REPLAY}::observe::stream("
+                    "&drained.rows, drained.complete, drained.cancelled, drained.closed)?;"
+                ),
                 f"{pad}    let rows = drained.rows;",
             ]
             body.append(
@@ -212,8 +220,10 @@ class EffectEmitter:
             model = self.use(i["model"])
             if d["method"] == "delete":
                 body = [
-                    f"{pad}    let count = pgorm::ActiveModelTrait::delete("
-                    f"{model}, &{connection}).await?;",
+                    (
+                        f"{pad}    let count = pgorm::ActiveModelTrait::delete("
+                        f"{model}, &{connection}).await?;"
+                    ),
                     f"{pad}    Ok({REPLAY}::observe::count(count))",
                 ]
                 self.record(step, body, lines, pad)
@@ -221,11 +231,15 @@ class EffectEmitter:
                 keep = step["id"] in self.results
                 entity = self.entity_type(registration)
                 body = [
-                    f"{pad}    let written = pgorm::ActiveModelTrait::{d['method']}("
-                    f"{model}, &{connection}).await?;",
+                    (
+                        f"{pad}    let written = pgorm::ActiveModelTrait::{d['method']}("
+                        f"{model}, &{connection}).await?;"
+                    ),
                     f"{pad}    let observation = {REPLAY}::observe::collected(vec![",
-                    f"{pad}        {REPLAY}::observe::model::<{entity}>("
-                    f"&written, {literal(registration)})?,",
+                    (
+                        f"{pad}        {REPLAY}::observe::model::<{entity}>("
+                        f"&written, {literal(registration)})?,"
+                    ),
                     f"{pad}    ]);",
                 ]
                 body.append(
@@ -241,8 +255,10 @@ class EffectEmitter:
             body = [
                 f"{pad}    let (sql, values) = {self.compile_query(i['query'])};",
                 f"{pad}    let held = holders(&values);",
-                f"{pad}    let count = pgorm::ConnectionTrait::execute("
-                f"&{connection}, &sql, &params(&held)).await?;",
+                (
+                    f"{pad}    let count = pgorm::ConnectionTrait::execute("
+                    f"&{connection}, &sql, &params(&held)).await?;"
+                ),
                 f"{pad}    Ok({REPLAY}::observe::count(count))",
             ]
             self.record(step, body, lines, pad)
@@ -277,8 +293,10 @@ class EffectEmitter:
         )
         if name == "entity.change":
             return [
-                f"{pad}    let change = pgorm::Update::one({self.use(i['model'])})?"
-                f".exec_returning_change(&{connection}).await?;",
+                (
+                    f"{pad}    let change = pgorm::Update::one({self.use(i['model'])})?"
+                    f".exec_returning_change(&{connection}).await?;"
+                ),
                 f"{pad}    Ok({REPLAY}::observe::collected(vec![{pair}]))",
             ]
         if name == "entity.changes":
@@ -295,9 +313,11 @@ class EffectEmitter:
                 )
             body.extend(
                 [
-                    f"{pad}    let changes = pgorm::QueryFilter::filter(update, "
-                    f"{self.predicate(i['predicate'])})"
-                    f".exec_returning_changes(&{connection}).await?;",
+                    (
+                        f"{pad}    let changes = pgorm::QueryFilter::filter(update, "
+                        f"{self.predicate(i['predicate'])})"
+                        f".exec_returning_changes(&{connection}).await?;"
+                    ),
                     f"{pad}    let mut rows = Vec::new();",
                     f"{pad}    for change in changes {{",
                     f"{pad}        rows.push({pair});",
@@ -337,8 +357,10 @@ class EffectEmitter:
             f"{pad}    let mut rows = Vec::new();",
             f"{pad}    for row in written {{",
             f"{pad}        rows.push(match row {{",
-            f"{pad}            pgorm::Upserted::Inserted(model) => {REPLAY}::observe::tuple(vec!["
-            f"{REPLAY}::observe::absent(), {REPLAY}::observe::model::<{entity}>(&model, {label})?]),",
+            (
+                f"{pad}            pgorm::Upserted::Inserted(model) => {REPLAY}::observe::tuple(vec!["
+                f"{REPLAY}::observe::absent(), {REPLAY}::observe::model::<{entity}>(&model, {label})?]),"
+            ),
             f"{pad}            pgorm::Upserted::Updated(change) => {pair},",
             f"{pad}        }});",
             f"{pad}    }}",

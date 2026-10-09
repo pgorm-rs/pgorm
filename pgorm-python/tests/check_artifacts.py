@@ -8,6 +8,17 @@ import tomllib
 import zipfile
 
 
+# The binding's own lockfile in this checkout, which the source distribution
+# has to carry: Cargo.toml asks for a compatible PyO3, the lockfile fixes one.
+CHECKOUT_LOCK = tomllib.loads(
+    (Path(__file__).resolve().parents[1] / "Cargo.lock").read_text()
+)["package"]
+
+
+def pyo3_releases(packages: list[dict]) -> list[str]:
+    return sorted(p["version"] for p in packages if p["name"] == "pyo3")
+
+
 # [spec:pgorm:req:python.optional/test]
 # [spec:pgorm:req:python.package/test]
 # [spec:pgorm:req:python.distribution/test]
@@ -31,7 +42,7 @@ def check_source(path: Path) -> None:
         lock_file = source.extractfile(f"{root}/{native_root}/Cargo.lock")
         assert lock_file is not None
         packages = tomllib.loads(lock_file.read().decode())["package"]
-        assert any(p["name"] == "pyo3" and p["version"] == "0.29.2" for p in packages)
+        assert pyo3_releases(packages) == pyo3_releases(CHECKOUT_LOCK), packages
         assert any(name.endswith("/examples/application.py") for name in names)
         assert any(name.endswith("/licenses/supplemental.json") for name in names)
         assert any(name.endswith("/pgorm/THIRD_PARTY_NOTICES.txt") for name in names)

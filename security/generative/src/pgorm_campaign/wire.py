@@ -1,10 +1,10 @@
 """Lossless tagged values for portable programs, independent of native loading."""
 
-from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
 import ipaddress
 import re
 import uuid
+from datetime import date, datetime, time
+from decimal import Decimal, InvalidOperation
 
 from .baseline import identifier
 

@@ -19,13 +19,14 @@ of the crate, compiled in every build. Rules are grouped under
 >
 > The PL AST is not a stable API, so the boundary is confined: every `prqlc`
 > import in the root crate lives in the private `src/pipeline/adapter.rs`,
-> the dependency is pinned exact (`prqlc = "=0.13.14"`, `default-features =
-> false`), and no prqlc type appears in the public API. A compiler bump is
+> the dependency is pinned to one revision of the necessary-nu fork (`prqlc =
+> { git = ..., rev = ... }`, `default-features = false`), and no prqlc type
+> appears in the public API. A compiler bump is
 > absorbed by rewriting the adapter alone. prqlc is a plain dependency of the
 > root crate by operator decision — the pipeline is part of the permanent
 > story, and every build pays its compile, the same posture as `pg_query` —
 > and it MUST NOT appear in any other workspace crate's dependencies, with
-> exactly one exception: `pgorm-sql-macro` carries the same exact pin for the
+> exactly one exception: `pgorm-sql-macro` carries the same pinned revision for the
 > `prql!` macro (`[spec:pgorm:def:macros.prql]`), which runs the compiler at
 > build time over PRQL text. The two pins MUST stay identical, so the typed
 > pipeline and the text macro emit through one compiler version and a bump

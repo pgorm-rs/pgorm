@@ -1,6 +1,7 @@
 """Account for every upstream template and boundary, including unsupported data."""
 
-from . import sqlmap_archive as archive, sqlmap_context as transform
+from . import sqlmap_archive as archive
+from . import sqlmap_context as transform
 
 
 def metadata(element):

@@ -98,7 +98,7 @@ def verified(spec, report):
             and checks == report["comparisons"]
             and assess(spec, report)[0] == "valid-control"
         )
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return False
 
 

@@ -214,10 +214,10 @@ def shard(seed, indices, p, *, limits, generate=grammar.generate, build=construc
 
 __all__ = [
     "CLAIM",
-    "Digests",
     "LIVE_RESULT_OPS",
     "PREFIX_BYTES",
     "VERSION",
+    "Digests",
     "blank",
     "construct",
     "deferred",

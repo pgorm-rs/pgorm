@@ -13,14 +13,14 @@ this command fails because a run was slow.
 """
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
-from dataclasses import asdict
 import hashlib
 import json
 import os
-from pathlib import Path
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import asdict
+from pathlib import Path
 
 from . import profiles, stress
 from .build import ROOT
@@ -32,14 +32,20 @@ TARGET = 1_000_000
 # What a construction-only demonstration cannot be read as, stated in the
 # document itself so a reader cannot arrive at the numbers without it.
 LIMITS = (
-    "This demonstration is construction through the native binding only. It is "
-    "not live coverage: no program here reached PostgreSQL and none was decided "
-    "by an oracle, so it neither replaces the full runtime campaign nor proves "
-    "any ORM program safe.",
-    "Distinctness is program-digest distinctness at the recorded generation "
-    "limits. It is not a claim that a million distinct behaviours were covered.",
-    "Throughput is a measurement of this machine on this run. No speed target "
-    "is imposed and no run fails for being slow.",
+    (
+        "This demonstration is construction through the native binding only. It is "
+        "not live coverage: no program here reached PostgreSQL and none was decided "
+        "by an oracle, so it neither replaces the full runtime campaign nor proves "
+        "any ORM program safe."
+    ),
+    (
+        "Distinctness is program-digest distinctness at the recorded generation "
+        "limits. It is not a claim that a million distinct behaviours were covered."
+    ),
+    (
+        "Throughput is a measurement of this machine on this run. No speed target "
+        "is imposed and no run fails for being slow."
+    ),
 )
 
 

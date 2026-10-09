@@ -1,10 +1,10 @@
 import copy
-from types import SimpleNamespace
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from pgorm_campaign import comparison, control_mutations, control_verdict, oracles, wire
-from pgorm_campaign.control_catalog import catalog, REQUIRED_FAMILIES
+from pgorm_campaign.control_catalog import REQUIRED_FAMILIES, catalog
 from pgorm_campaign.controls import Controls
 
 

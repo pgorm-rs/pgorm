@@ -5,9 +5,9 @@ import asyncio
 import hashlib
 import json
 import os
-from pathlib import Path
-import uuid
 import time
+import uuid
+from pathlib import Path
 
 from pgorm_campaign.executor import Executor
 from pgorm_campaign.fixtures import Fixture
@@ -68,48 +68,44 @@ async def main(count, seed, path=None, family=None, corpus_path=None):
     }
     (output / "build.json").write_text(json.dumps(build, indent=2) + "\n")
     print(str(output), flush=True)
-    async with Fixture(output / "fixture") as fixture:
-        async with Executor(
-            fixture, expected_native_sha256=summary["native_sha256"]
-        ) as executor:
-            checker = Checker(executor)
-            for index, (program, recipe) in enumerate(
-                programs(count, seed, path, family, corpus)
-            ):
-                (output / f"{index}.program.json").write_text(program.encoded + "\n")
-                (output / f"{index}.recipe.json").write_text(
-                    json.dumps(recipe, indent=2) + "\n"
+    async with (
+        Fixture(output / "fixture") as fixture,
+        Executor(fixture, expected_native_sha256=summary["native_sha256"]) as executor,
+    ):
+        checker = Checker(executor)
+        for index, (program, recipe) in enumerate(
+            programs(count, seed, path, family, corpus)
+        ):
+            (output / f"{index}.program.json").write_text(program.encoded + "\n")
+            (output / f"{index}.recipe.json").write_text(
+                json.dumps(recipe, indent=2) + "\n"
+            )
+            report = await checker.run(program)
+            (output / f"{index}.json").write_text(json.dumps(report, indent=2) + "\n")
+            result = {
+                "index": index,
+                "production": recipe["family"],
+                "status": report["status"],
+                "expected": "expected-rejection"
+                if any(
+                    item["oracle"] == "exact-error"
+                    for item in program.data()["observations"]
                 )
-                report = await checker.run(program)
-                (output / f"{index}.json").write_text(
-                    json.dumps(report, indent=2) + "\n"
+                else "pass",
+                "shape": structure(program),
+                "differences": [
+                    item for item in report.get("comparisons", []) if not item["equal"]
+                ],
+                "error": report.get("error"),
+            }
+            summary["results"].append(result)
+            if result["status"] != result["expected"]:
+                print(json.dumps(result), flush=True)
+            elif (index + 1) % 100 == 0:
+                print(
+                    json.dumps({"executed": index + 1, "expected": count}),
+                    flush=True,
                 )
-                result = {
-                    "index": index,
-                    "production": recipe["family"],
-                    "status": report["status"],
-                    "expected": "expected-rejection"
-                    if any(
-                        item["oracle"] == "exact-error"
-                        for item in program.data()["observations"]
-                    )
-                    else "pass",
-                    "shape": structure(program),
-                    "differences": [
-                        item
-                        for item in report.get("comparisons", [])
-                        if not item["equal"]
-                    ],
-                    "error": report.get("error"),
-                }
-                summary["results"].append(result)
-                if result["status"] != result["expected"]:
-                    print(json.dumps(result), flush=True)
-                elif (index + 1) % 100 == 0:
-                    print(
-                        json.dumps({"executed": index + 1, "expected": count}),
-                        flush=True,
-                    )
     summary["passed"] = len(summary["results"]) == count and all(
         item["status"] == item["expected"] for item in summary["results"]
     )

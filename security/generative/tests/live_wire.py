@@ -1,11 +1,11 @@
 """Check portable value records against every installed native scalar tag."""
 
-from datetime import date, datetime, time, timezone
-from decimal import Decimal
 import hashlib
 import json
-from pathlib import Path
 import uuid
+from datetime import UTC, date, datetime, time
+from decimal import Decimal
+from pathlib import Path
 
 import pgorm as p
 import pgorm._native as native
@@ -35,8 +35,9 @@ def main():
         "uuid": uuid.UUID("12345678-1234-5678-1234-567812345678"),
         "date": date(2024, 1, 2),
         "time": time(3, 4, 5, 123000),
-        "datetime": datetime(2024, 1, 2, 3, 4, 5, 123456),
-        "datetime_utc": datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
+        # Naive on purpose: the `timestamp without time zone` round trip.
+        "datetime": datetime(2024, 1, 2, 3, 4, 5, 123456),  # noqa: DTZ001
+        "datetime_utc": datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC),
         "ipnetwork": "192.0.2.129/24",
         "mac_address": b"\x00\x11\x22\x33\x44\xff",
         "vector": [1.5, -0.0],

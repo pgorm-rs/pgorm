@@ -279,10 +279,10 @@ def families(program):
 
 
 __all__ = [
+    "VERSION",
     "InvalidOracle",
     "Replay",
     "ReplayError",
-    "VERSION",
     "compared",
     "emit",
     "families",

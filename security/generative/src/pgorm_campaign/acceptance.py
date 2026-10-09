@@ -117,15 +117,23 @@ FINDINGS = {
 COMPONENTS = ("runtime", "parity", "compile", "regressions", "stress")
 
 DISCLAIMERS = (
-    "The stress demonstration is construction through one native build only. "
-    "It does not replace full live coverage and does not prove that all ORM "
-    "programs are safe.",
-    "A construction count and an oracle decision are different claims and are "
-    "never added together anywhere in this document.",
-    "Open findings below are unresolved defects in the library or its "
-    "dependencies. Acceptance records them; it does not close them.",
-    "Coverage obligations reported as outstanding were not discharged by the "
-    "runs this document assembles.",
+    (
+        "The stress demonstration is construction through one native build only. "
+        "It does not replace full live coverage and does not prove that all ORM "
+        "programs are safe."
+    ),
+    (
+        "A construction count and an oracle decision are different claims and are "
+        "never added together anywhere in this document."
+    ),
+    (
+        "Open findings below are unresolved defects in the library or its "
+        "dependencies. Acceptance records them; it does not close them."
+    ),
+    (
+        "Coverage obligations reported as outstanding were not discharged by the "
+        "runs this document assembles."
+    ),
 )
 
 

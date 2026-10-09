@@ -96,9 +96,9 @@ crate-type = ["cdylib", "rlib"]
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pgorm-python = {{ path = {quote(str(source / "pgorm-python"))}, version = {quote("=" + version)}, default-features = false }}
-pgorm = {{ path = {quote(str(source))}, version = {quote("=" + pgorm_version)} }}
-pyo3 = "=0.29.2"
+pgorm-python = {{ path = {quote(str(source / "pgorm-python"))}, version = {quote(version)}, default-features = false }}
+pgorm = {{ path = {quote(str(source))}, version = {quote(pgorm_version)} }}
+pyo3 = {quote(installed["binding"]["version"])}
 app_entities = {{ package = {quote(description["entity_package"])}, path = {quote(description["entity_crate"])} }}
 
 [lints.rust]
@@ -106,7 +106,7 @@ unsafe_code = "forbid"
 """
     (destination / "Cargo.toml").write_text(cargo)
     pyproject = f"""[build-system]
-requires = ["maturin==1.15.0"]
+requires = ["maturin>=1.15,<2"]
 build-backend = "maturin"
 
 [project]

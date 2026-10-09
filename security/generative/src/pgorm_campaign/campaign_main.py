@@ -13,9 +13,9 @@ import argparse
 import asyncio
 import json
 import os
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 from . import campaign_identity, campaign_plan, campaign_report, profiles
 from .build import ROOT, content_identity

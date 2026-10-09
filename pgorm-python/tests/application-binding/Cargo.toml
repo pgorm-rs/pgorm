@@ -17,12 +17,12 @@ extension-module = ["pyo3/extension-module"]
 [dependencies]
 pgorm-python = { path = "../..", default-features = false }
 pgorm = { path = "../../.." }
-pyo3 = "=0.29.2"
-serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
-async-trait = "=0.1.92"
-tokio = { version = "=1.53.1", features = ["time"] }
-futures-util = "=0.3.34"
+pyo3 = "0.29.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+async-trait = "0.1.92"
+tokio = { version = "1.53.2", features = ["time"] }
+futures-util = "0.3.34"
 
 [lints.rust]
 unsafe_code = "forbid"
