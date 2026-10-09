@@ -355,10 +355,29 @@ def _payload(data, identity):
     raise ShrinkError("value instruction disappeared during reduction")
 
 
+def _referenced(tables, *, enforced):
+    """Tables another declared table's foreign key points at.
+
+    A referenced table cannot go, since the key that names it would name
+    nothing. Rows of it cannot go either while the key is enforced: the
+    referencing rows would point nowhere and the fixture reset would fail,
+    losing the fixture rather than rejecting the candidate. Rows of a
+    referencing table can always go.
+    """
+    return {
+        (key["table"][0], key["table"][1])
+        for table in tables
+        for key in table.get("foreign_keys", [])
+        if key["enforced"] or not enforced
+    }
+
+
 def _fixture_reductions(data):
     """Reduce the declared baseline: fewer rows first, then whole tables."""
     tables = data["fixture"]["tables"]
     for index, table in enumerate(tables):
+        if (table["schema"], table["name"]) in _referenced(tables, enforced=True):
+            continue
         rows = table["rows"]
         for keep in sorted({0, len(rows) // 2}):
             if keep >= len(rows):
@@ -377,6 +396,8 @@ def _fixture_reductions(data):
     for index, table in enumerate(tables):
         if len(tables) == 1:
             break
+        if (table["schema"], table["name"]) in _referenced(tables, enforced=False):
+            continue
         candidate = copy.deepcopy(data)
         del candidate["fixture"]["tables"][index]
         yield "drop table " + table["schema"] + "." + table["name"], candidate

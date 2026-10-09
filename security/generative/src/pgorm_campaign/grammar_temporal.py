@@ -162,7 +162,8 @@ def temporal_key(state):
             data={"child": "tx", "mode": "read_write", "isolation": "read_committed"},
         )
         scope = "tx"
-    if state.choices.take((False, True)):
+    inserted = state.choices.take((False, True))
+    if inserted:
         # A new version after room 1's, or room 2's February.
         room, period = state.choices.take(
             ((1, ((3, 1), (4, 1))), (2, ((2, 1), (3, 1))))
@@ -193,7 +194,10 @@ def temporal_key(state):
         step = state.author.effect(
             "active.write", {"model": active}, {"method": "update"}, scope=scope
         )
-    if state.choices.take((False, True)):
+    # Only the version this program wrote is deleted: every version the
+    # fixture holds is referenced by a stay, which the deferred temporal key
+    # would refuse at commit.
+    if inserted and state.choices.take((False, True)):
         model = state.node("entity.result", data={"step": step, "row": 0})
         active = state.node("entity.into_active", {"model": model})
         state.author.effect(

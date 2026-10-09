@@ -1,8 +1,10 @@
 import copy
 import json
 import unittest
+from types import SimpleNamespace
 
 from pgorm_campaign import baseline as b
+from pgorm_campaign import grammar_temporal
 
 
 # [spec:pgorm:req:generative.fixtures/test]
@@ -71,6 +73,26 @@ class BaselineTests(unittest.TestCase):
             change(value)
             with self.subTest(value=value), self.assertRaises(ValueError):
                 b.render(value)
+
+    def test_a_foreign_key_names_an_earlier_table(self):
+        value = b.default()
+        grammar_temporal.tables(SimpleNamespace(author=SimpleNamespace(fixture=value)))
+        self.assertIn('REFERENCES "fixture"."rooms"', b.render(value))
+
+        def rooms(v):
+            return next(table for table in v["tables"] if table["name"] == "rooms")
+
+        for change in (
+            lambda v: v["tables"].append(v["tables"].pop(v["tables"].index(rooms(v)))),
+            lambda v: v["tables"].remove(rooms(v)),
+            lambda v: v["tables"][-1]["foreign_keys"][0].update(
+                table=["fixture", "nowhere"]
+            ),
+        ):
+            changed = copy.deepcopy(value)
+            change(changed)
+            with self.subTest(value=changed), self.assertRaises(ValueError):
+                b.render(changed)
 
 
 if __name__ == "__main__":

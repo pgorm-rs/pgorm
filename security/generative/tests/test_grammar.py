@@ -8,7 +8,32 @@ from pgorm_campaign.grammar_pipeline import Column, Pipeline
 from pgorm_campaign.grammar_rejection import RULES
 from pgorm_campaign.refusals import EMPTY_INSERT, UNSERIALIZABLE
 from pgorm_campaign.grammar_state import Limits, State
+from pgorm_campaign.parameters import input_ids
 from pgorm_campaign.program import Program
+
+
+def _reachable(nodes, step):
+    """Every node a step's inputs reach, through the nodes' own inputs."""
+    pending, reached = list(input_ids(step["inputs"])), []
+    while pending:
+        node = nodes[pending.pop()]
+        reached.append(node)
+        pending.extend(input_ids(node["inputs"]))
+    return reached
+
+
+def _written_from(data, step):
+    """The step a written model's chain of reads and writes began with, and
+    the entities that step names."""
+    nodes = {node["id"]: node for node in data["nodes"]}
+    steps = {item["id"]: item for item in data["steps"]}
+    while step["op"] == "active.write" and step["data"]["method"] != "insert":
+        result = next(
+            node for node in _reachable(nodes, step) if node["op"] == "entity.result"
+        )
+        step = steps[result["data"]["step"]]
+    reached = _reachable(nodes, step)
+    return step, {node["data"]["name"] for node in reached if node["op"] == "entity"}
 
 
 # [spec:pgorm:req:generative.grammar/test]
@@ -205,6 +230,21 @@ class GrammarTests(unittest.TestCase):
         )
         with self.assertRaises(wire.FormatError):
             Program.from_dict(data)
+
+    def test_temporal_deletes_only_remove_written_versions(self):
+        # Every room version in the fixture is referenced by a stay, so
+        # deleting one is refused when the deferred temporal key is checked.
+        deletes = 0
+        for index in range(400):
+            data = generate(20260913, index, family="active").program.data()
+            for step in data["steps"]:
+                if step["op"] != "active.write" or step["data"]["method"] != "delete":
+                    continue
+                origin, entities = _written_from(data, step)
+                if "campaign.Room" in entities:
+                    deletes += 1
+                    self.assertEqual(origin["data"].get("method"), "insert", index)
+        self.assertGreater(deletes, 0)
 
     def test_reused_results_require_the_original_producer(self):
         result = generate(22, 4, family="sequence")

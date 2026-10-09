@@ -14,7 +14,8 @@ A program contains:
   nullability, keys, enums and ordered rows for subject and reference execution.
   A table may also declare a key ending `WITHOUT OVERLAPS` (which installs
   `btree_gist` in the fixture schema) and foreign keys with an optional `PERIOD`
-  pair, `NOT ENFORCED` and a check deferred to commit.
+  pair, `NOT ENFORCED` and a check deferred to commit. A foreign key names a
+  table declared before its own.
 - `nodes`: a topologically ordered operation graph. Each node has an `id`,
   closed-catalog `op`, binder `scope`, typed `inputs` referencing earlier nodes,
   and validated `data` options. References preserve shared subexpressions.

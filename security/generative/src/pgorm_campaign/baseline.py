@@ -227,6 +227,13 @@ def render(definition):
         name = qualified(table["schema"], table["name"])
         if name in names:
             raise ValueError("duplicate fixture table")
+        for key in table.get("foreign_keys", []):
+            if not isinstance(key, dict) or not isinstance(key.get("table"), list):
+                raise ValueError("unexpected fixture foreign key fields")
+            if qualified(*key["table"]) not in names:
+                raise ValueError(
+                    "a fixture foreign key must reference an earlier table"
+                )
         names.add(name)
         schemas.add(table["schema"])
         statements.extend(_table_sql(table, enums))

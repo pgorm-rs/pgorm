@@ -363,6 +363,11 @@ every candidate against the portable format before running it. Each candidate
 goes through the same `Checker`, which restores its own declared baseline on
 both databases first, so no attempt inherits the previous one's state.
 
+A fixture reduction never drops a table another table's foreign key names, nor
+rows from a table an enforced key points at. The referencing rows would point
+nowhere and the baseline reset itself would fail, and a reset that fails
+retires the fixture for the rest of the run rather than one candidate.
+
 The predicate is frozen from a completed independent baseline run and is more
 than the comparison verdict: it records the subject's own account of the failing
 step — observation category, error class and SQLSTATE. A candidate that stops

@@ -210,6 +210,32 @@ class CandidateTests(unittest.TestCase):
                     observed, {step["id"] for step in data["steps"]} | {"final"}
                 )
 
+    def test_fixture_reductions_keep_what_enforced_keys_reference(self):
+        source = next(
+            program
+            for program in (
+                generate(20260911, index, family="active").program
+                for index in range(80)
+            )
+            if any(
+                table["name"] == "rooms"
+                for table in program.data()["fixture"]["tables"]
+            )
+        )
+        offered = {
+            description
+            for description, rewritten in shrink._fixture_reductions(source.data())
+            if shrink._candidate(rewritten) is not None
+        }
+        self.assertNotIn("keep 0 rows in fixture.rooms", offered)
+        self.assertNotIn("drop table fixture.rooms", offered)
+        self.assertNotIn("drop table fixture.accounts", offered)
+        # Stays reference rooms through an enforced key and accounts through
+        # one the server never checks: both of those can lose rows.
+        self.assertIn("keep 0 rows in fixture.stays", offered)
+        self.assertIn("keep 0 rows in fixture.accounts", offered)
+        self.assertIn("drop table fixture.stays", offered)
+
     def test_a_reduction_never_returns_the_program_unchanged(self):
         source = generate(20260911, 3).program
         for _, reduction in shrink.REDUCTIONS:
