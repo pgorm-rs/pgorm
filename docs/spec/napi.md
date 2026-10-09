@@ -629,6 +629,220 @@ graphs, cursors and pages follow pgorm's own `RelationDef`, `SelectGraph`,
 > "sub_query"`, and resolve with an exact number; `numPages` rounds the
 > pages up; `pages` yields each page from the first until one is empty.
 
+## Schema
+
+JavaScript builds DDL through pgorm-query's DDL builders as pgorm-python's
+schema surface does, and further: every statement `sql-ddl.md` specifies that
+a schema is made of, in the builder conventions the statements above use.
+
+> [spec:pgorm:req:napi.schema]
+> Tables, their columns, keys and constraints and their alterations, indexes,
+> types, sequences, extensions and comments MUST be built through
+> pgorm-query's DDL builders, each JavaScript object owning the builder state
+> it stands for, immutable as a statement builder is: a method returns a new
+> builder from a copy, and an argument it cannot use is refused as it is
+> called — a `ConstructionError`, or a `TypeError` for an argument of the
+> wrong JavaScript shape, an options object holding a key the builder does
+> not know among them, so that a misspelt option is never left out of a
+> statement. Constructing one does no I/O, and nothing runs DDL but a
+> terminal.
+>
+> PostgreSQL takes no parameters in DDL, so a DDL statement MUST render
+> through pgorm-query's own rendering, which writes every value it carries —
+> a `DEFAULT`, a `CHECK`'s operands, an enum label, a comment, an extension's
+> version — as an escaped literal, and MUST run through `execute` and the
+> other terminals as that SQL text with no values beside it; `inspect()` gives
+> the same SQL and an empty value list. No name or value is concatenated into
+> SQL by the binding: every identifier is minted with `Name::runtime` and
+> quoted where pgorm-query writes it. A table or sequence is named by a
+> string or by a `Table`, whose schema qualifies it and which MUST NOT carry an
+> alias; a type by a string or a `TypeName`.
+>
+> pgorm-query's typestates hold: `alterTable`, `alterType` and
+> `alterSequence` name their object and nothing more, since PostgreSQL parses
+> no `ALTER` without an action, so each MUST have no `inspect()`, every
+> terminal MUST refuse it with a `ConstructionError`, and its first action
+> gives the statement. A `ColumnDef` is no statement, and a terminal refuses
+> it likewise.
+
+> [spec:pgorm:req:napi.schema-tables]
+> `createTable(table)` MUST build pgorm-query's `TableCreateStatement`:
+> columns, each a `ColumnDef` with a type, `ifNotExists`, the table's one
+> primary key — a later `primaryKey` replacing it — any number of unique
+> keys, foreign keys and `CHECK` constraints. A key is a column or a
+> non-empty list of them, with a name, `INCLUDE`d columns, a deferrability
+> and PostgreSQL 18's `withoutOverlaps` column, which pgorm-query writes last
+> as `"c" WITHOUT OVERLAPS`; `nullsNotDistinct` is the unique key's alone. A
+> foreign key pairs its columns in order with as many referenced columns,
+> anything else refused, and takes a name, `onDelete` and `onUpdate`
+> actions, a deferrability, an enforcement and PostgreSQL 18's `PERIOD` pair,
+> written last on both sides. A `CHECK` is an expression with a name, an
+> enforcement and `noInherit`. Deferrability is `"notDeferrable"`,
+> `"deferrableInitiallyImmediate"` or `"deferrableInitiallyDeferred"`, and
+> enforcement `"enforced"` or `"notEnforced"`; neither is written unless it
+> is given.
+>
+> `new ColumnDef(name, type)` takes a `DataType`, a built-in type's name, a
+> `TypeName` or a created range, and the clauses pgorm-query writes in the
+> order they are added: `notNull`, the column's one `NOT NULL` constraint,
+> with a name and `noInherit`; `null`; `default`, an expression or a value;
+> `check`; `generated(expression, "stored" | "virtual")`, whose kind MUST be
+> named, PostgreSQL 17 refusing a generated column without one and 18
+> reading it as virtual; `identity("always" | "byDefault", options)`, its
+> sequence's options those `napi.schema-sequences` gives; `autoIncrement`,
+> the serial family; and `collate`, the column's one collation. A column
+> with no type is refused where a table is created or a column added.
+> `dropTable` (one or more tables, `ifExists`, a behavior), `renameTable`,
+> whose new name is bare, `renameColumn`, `renameConstraint` and
+> `truncateTable` MUST build the statements pgorm-query has for each.
+
+> [spec:pgorm:req:napi.schema-alter]
+> The first action on `alterTable(table)` MUST give pgorm-query's
+> `TableAlterStatement`, which takes more, each the pgorm-query action of
+> its name: `addColumn` (with `ifNotExists`), `modifyColumn`, `dropColumn`,
+> `addPrimaryKey`, `addUnique`, `addForeignKey`, `addCheck`, `addNotNull`
+> (PostgreSQL 18's table-level `NOT NULL`, with a name and `noInherit`),
+> `dropConstraint` of any kind by name (with `ifExists` and a behavior),
+> `validateConstraint`, `alterConstraint` (`"inherit"`, `"noInherit"`,
+> `"enforced"` or `"notEnforced"`), `setExpression` and `dropExpression`
+> (with `ifExists`). `notValid` belongs to the three actions PostgreSQL takes
+> it on — `addForeignKey`, `addCheck` and `addNotNull` — and leaves the rows
+> already there unchecked until `validateConstraint` checks them, while new
+> rows are held to the constraint at once.
+>
+> `modifyColumn` writes each aspect its column carries as pgorm-query writes
+> it — a retype with its collation, `SET` or `DROP NOT NULL`, a named `NOT
+> NULL` added, `SET DEFAULT`, a `CHECK` added, an identity added. An aspect
+> no such action writes MUST be refused rather than dropped: a generated
+> expression (which `setExpression` and `dropExpression` change), the serial
+> family, and a collation without the type it is given with; so MUST a
+> column that changes nothing.
+
+> [spec:pgorm:req:napi.schema-indexes]
+> `createIndex(table, entry, { name })` MUST build pgorm-query's
+> `IndexCreateStatement` over its first entry, and `column` appends more. An
+> entry is a column's name, an expression, or `{ on, order, operatorClass }`
+> over either, `order` being `"asc"` or `"desc"`. The index takes `unique`,
+> `nullsNotDistinct` — which PostgreSQL defines for a unique index alone, and
+> so makes the index unique rather than be written for nothing — `ifNotExists`,
+> `using(method)`, an access method by identifier, `include` and `where`, a
+> partial index's predicate ANDed to one already there. `CONCURRENTLY` is not
+> offered, PostgreSQL refusing it in a transaction. `dropIndex(table, name)`
+> drops the index from its table's schema, with `ifExists`.
+
+> [spec:pgorm:req:napi.schema-types]
+> `createType(name)` MUST build pgorm-query's `TypeCreateStatement`, a shell
+> type until a kind is chosen, its kind one slot as pgorm-query holds it:
+> `asEnum` and `values(labels)`, which appends; `asComposite` and
+> `attribute(name, type, { collation })`, which appends; or `asRange(subtype,
+> { subtypeOpclass, collation, subtypeDiff, multirangeTypeName })`. An enum
+> label is data, written as a literal, and MUST be at most 63 bytes without
+> NUL, as PostgreSQL stores it; the empty label is one.
+>
+> The change on `alterType(name)` MUST give its statement: `addValue(label, {
+> before } | { after })`, never both; `renameTo`, whose new name is bare;
+> `renameValue`; `renameAttribute`, a statement of its own with a behavior; or
+> a composite's `addAttribute`, `dropAttribute` (with `ifExists`) and
+> `alterAttribute`, which give a statement that takes more of them and a
+> behavior, `"cascade"` carrying the changes into typed tables.
+> `dropType(names, { ifExists, behavior })` drops one or more types.
+> A collation is a name, or `{ name, schema }`.
+
+> [spec:pgorm:req:napi.schema-sequences]
+> A sequence's options MUST be one vocabulary for a standalone sequence and
+> an identity column, pgorm-query's `SequenceOptions`: `{ incrementBy,
+> minValue, maxValue, startWith, cache, cycle }`, each number a safe-integer
+> number or a `bigint` within `bigint`, a bound's `null` its `NO` form, and a
+> key outside them a `TypeError`. `createSequence(name)` takes
+> `ifNotExists`, `asType` (`"smallint"`, `"integer"` or `"bigint"`),
+> `options`, which merges at least one option into those set, and `ownedBy(table,
+> column)`, `ownedBy(null)` being `OWNED BY NONE`; the first clause on
+> `alterSequence(name)` gives its statement, which takes the same clauses,
+> `restart(value?)` and `ifExists`. `dropSequence` and `renameSequence` build
+> pgorm-query's statements. `createExtension(name, { ifNotExists, schema,
+> version, cascade })` and `dropExtension(name, { ifExists, behavior })` build
+> pgorm-query's extension statements, the version a literal; and
+> `commentOnTable` and `commentOnColumn` its `COMMENT ON`, the text a literal
+> pgorm-query escapes.
+
+## Pipelines
+
+JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as
+pgorm-python does: relation-to-relation stages over sources, compiled through
+prqlc to PostgreSQL SQL, with runtime values entering through a binder whose
+placeholders belong to the stage that minted them.
+
+> [spec:pgorm:req:napi.pipeline]
+> The module's `pipeline` namespace MUST compose `pgorm::pipeline::Pipeline`,
+> each JavaScript object owning the pgorm state it stands for and each stage
+> returning a new pipeline from a copy: `from(source)` and the stages
+> `filter`, `derive`, `select`, `group(..)` followed by `aggregate(..)`,
+> `window(over, ..)`, `sort`, `take(n)`, `takeRange(start, end)`,
+> `join(source, on, { kind })`, `append`, `intersect`, `remove` and
+> `distinct`. A source is a `Table`, schema-qualified and read under its
+> alias when it has one, a table's name, another `Pipeline` embedded whole
+> with its bound values, or `source(relation).named(name)`, which reads a
+> relation under a name of its own. A grouping is no pipeline until it is
+> aggregated, so `group` gives a `Grouped` whose only way back is
+> `aggregate`, and which no terminal runs. A row count is an integer, never
+> an expression, as PRQL refuses a bound `LIMIT`. A registered Rust entity
+> as a source, and the `select_sources` terminal that decodes one, wait on
+> entities registering with the binding and are not offered.
+>
+> A `Pipeline` is a statement for `execute`, `query`, `one`, `optional` and
+> `stream` on a pool, a connection and a transaction, compiled through
+> `Pipeline::into_sql` as `inspect()` compiles it, its values bound as any
+> statement's are, `one` and `optional` keeping their cardinality. What
+> pgorm's compile step judges — a name it cannot write as one, a reserved
+> alias, a relation or column prqlc cannot resolve — MUST be a
+> `ConstructionError` from `inspect()` or the terminal, before anything is
+> sent.
+
+> [spec:pgorm:req:napi.pipeline-expressions]
+> Pipeline expressions MUST be their own objects, lowered into
+> `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
+> statement builders' `Expr`: `col(table, column)`, qualified as prqlc
+> requires; `alias(name)`, a name a stage introduces, read back unqualified;
+> `thisColumn` and `thatColumn`, a join's two sides; the operators `eq` ..
+> `lte`, `and`, `or`, `not`, `neg`, `add` .. `rem`, `coalesce`, `isNull`,
+> `isNotNull`, `inArray`, `cast` over pgorm's closed `CastType` set, `as`,
+> `asc` and `desc`; `caseWhen(arms, otherwise)`; and the aggregates and
+> window functions pgorm's pipeline has, each at the argument count it takes.
+> `over()` builds a window's partition, ordering and `rows` or `range`
+> frame.
+>
+> Values reach a pipeline's SQL by one of two routes, and the spelling says
+> which. `literal(value)` — `null`, a boolean, a safe-integer number or a
+> `bigint` within `bigint`, a finite number, a string — is written into the
+> SQL as pgorm's pipeline writes a literal. Any other value an operand is
+> given MUST be bound: inferred or declared with `Value` as a parameter is,
+> and minted as a placeholder by the binder of the stage that takes it, never
+> written as a literal; a value with no kind (`null`), an interval, and a
+> value whose kind needs a cast pgorm's pipeline cannot write (an enum's or a
+> created range's) are refused with a `ConstructionError` naming the explicit
+> form. A window's partition and ordering take no value, bound or not, as
+> pgorm's `Over` takes none.
+
+> [spec:pgorm:req:napi.pipeline-binder]
+> Each expression-taking stage MUST have a `With` form — `filterWith`,
+> `deriveWith`, `selectWith`, `groupWith`, `aggregateWith`, `windowWith`,
+> `sortWith` and `joinWith` — that calls its function once, synchronously,
+> with a `Binder`, whose `bind(value)` mints one placeholder for one value,
+> reusable within the stage. A placeholder is branded with the scope of the
+> call that minted it, as pgorm's binder brands it with a lifetime: once its
+> function has returned or thrown, the binder MUST refuse to bind, and an
+> expression carrying a placeholder MUST be refused, each with a
+> `LifecycleError`, as any handle used after it closed is; so MUST one that
+> combines two scopes' placeholders, and one given to a stage other than the
+> one its function returns it to — a plain stage, another call's or another
+> pipeline's — or to a window's partition or ordering. The function MUST
+> return synchronously, a promise being a `TypeError`: an operand for a
+> filter or a join condition, and an expression or an array of operands for
+> a list-taking stage, anything else there a `TypeError`. An array of more
+> than 32 is a `ConstructionError`: pgorm's list-taking `_with` stages take a
+> fixed-size array, which the binding dispatches up to that bound, where a
+> stage that binds nothing takes a list of any length.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

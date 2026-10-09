@@ -11,7 +11,8 @@ runtime of its own, settles a Promise with the outcome, and lets the process
 exit when its work is done. JavaScript connects through pools, runs bound SQL,
 scopes transactions and savepoints and streams rows
 ([Connections](#connections)), builds pgorm-query's statements
-([Statements](#statements)), declares models and reads and writes them, their
+([Statements](#statements)), DDL ([Schema](#schema)) and pipelines
+([Pipelines](#pipelines)), declares models and reads and writes them, their
 relations and graphs ([Models](#models)), and every value pgorm holds crosses
 into and out of JavaScript with a declared type ([Values](#values)). It needs
 a runtime with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or
@@ -389,6 +390,134 @@ const pages = Account.find().orderBy(Account.col("id").asc()).paginate(50);
   `numPages` and `pages()`. `inspect("count")`, `inspect("returningChanges")`
   and the like show what a terminal sends.
 
+## Schema
+
+DDL is built from JavaScript as the statements are, through pgorm-query's DDL
+builders, and runs through `execute`:
+
+```js
+import {
+  alterTable, col, ColumnDef, createIndex, createSequence, createTable, createType, DataType,
+  Table, TypeName, Value,
+} from "./pgorm-napi/lib/index.js";
+
+const mood = new TypeName("mood", { schema: "app" });
+const booking = new Table("booking", { schema: "app" });
+
+await pool.execute(createType(mood).values(["calm", "tense"]));
+await pool.execute(
+  createTable(booking)
+    .column(new ColumnDef("id", "bigint").identity("always", { startWith: 1000 }))
+    .column(new ColumnDef("room", "integer").notNull({ name: "room_present" }))
+    .column(new ColumnDef("during", "tstzrange").notNull())
+    .column(new ColumnDef("mood", mood).default(new Value("calm", mood)))
+    .column(new ColumnDef("price", new DataType("numeric", { precision: 8, scale: 2 })).check(col("price").gte(0)))
+    .primaryKey("id")
+    .unique("room", { withoutOverlaps: "during", name: "no_double_booking" })
+    .foreignKey("room", new Table("room", { schema: "app" }), "id", { onDelete: "cascade" }),
+);
+await pool.execute(alterTable(booking).addCheck(col("room").lt(500), { name: "small", notValid: true }));
+await pool.execute(createIndex(booking, { on: "during", order: "desc" }).using("gist").where(col("room").gt(0)));
+await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue: null }));
+```
+
+- **A statement renders as it runs.** PostgreSQL takes no parameters in DDL,
+  so a value a statement carries — a `DEFAULT`, a `CHECK`'s operands, an enum
+  label, a comment — is written as pgorm-query's escaped literal, and
+  `inspect()` gives `{ sql, values: [] }`. Names are identifiers, quoted.
+  Nothing runs until a terminal runs it.
+- **Tables**: `createTable(table)` with `column`, `primaryKey` (one; a later
+  call replaces it), `unique`, `foreignKey` and `check`. A key takes `name`,
+  `include`, `deferrability` and PostgreSQL 18's `withoutOverlaps` (its period
+  column, written last); a unique key `nullsNotDistinct`. A foreign key pairs
+  its columns with as many referenced ones and takes `onDelete`, `onUpdate`,
+  `deferrability`, `enforcement` and PostgreSQL 18's `period: [column,
+  referenced]`. A `ColumnDef` takes `notNull({ name, noInherit })`, `null`,
+  `default`, `check`, `generated(expr, "stored" | "virtual")`,
+  `identity("always" | "byDefault", sequenceOptions)`, `autoIncrement` and
+  `collate`. `dropTable`, `renameTable`, `renameColumn`, `renameConstraint`
+  and `truncateTable`; `commentOnTable` and `commentOnColumn`.
+- **Alterations**: `alterTable(table)` has no action and so nothing to run;
+  its first of `addColumn`, `modifyColumn`, `dropColumn`, `addPrimaryKey`,
+  `addUnique`, `addForeignKey`, `addCheck`, `addNotNull`, `dropConstraint`,
+  `validateConstraint`, `alterConstraint`, `setExpression` and
+  `dropExpression` gives the statement, which takes more. `notValid` adds a
+  foreign key, `CHECK` or `NOT NULL` without checking the rows already there,
+  which `validateConstraint` checks later. A `modifyColumn` refuses what no
+  `ALTER COLUMN` writes, a generated expression among it.
+- **Indexes**: `createIndex(table, entry, { name })` over columns, expressions
+  and `{ on, order, operatorClass }`, with `unique`, `nullsNotDistinct`,
+  `ifNotExists`, `using(method)`, `include` and `where`; `dropIndex(table,
+  name)`.
+- **Types**: `createType(name)` — `.values(labels)` for an enumeration,
+  `.attribute(name, type)` for a composite, `.asRange(subtype, { .. })` for a
+  range — and `alterType(name)` with `addValue`, `renameTo`, `renameValue`,
+  `renameAttribute` and a composite's `addAttribute`, `dropAttribute` and
+  `alterAttribute`; `dropType`.
+- **Sequences and extensions**: `createSequence(name)` and
+  `alterSequence(name)` with `asType`, `options({ incrementBy, minValue,
+  maxValue, startWith, cache, cycle })` — the options an identity column
+  takes, `null` a bound's `NO` form — `ownedBy` and, altering, `restart`;
+  `dropSequence` and `renameSequence`; `createExtension` and `dropExtension`.
+- An options object holding a key its builder does not know is a
+  `TypeError`, so a misspelt option is never left out.
+
+## Pipelines
+
+pgorm's PRQL-shaped pipeline is the module's `pipeline` namespace:
+relation-to-relation stages over sources, compiled through prqlc to
+PostgreSQL SQL and run as any statement is.
+
+```js
+import { pipeline as pl, Table } from "./pgorm-napi/lib/index.js";
+
+const items = new Table("items", { schema: "app" });
+const category = pl.col("items", "category");
+const amount = pl.col("items", "amount");
+const total = pl.alias("total");
+
+const minimum = 10;
+const top = pl.from(items)
+  .filterWith((binder) => amount.gt(binder.bind(minimum)))   // $1, minted by this stage's binder
+  .group(category)
+  .aggregate(pl.sum(amount).as(total))
+  .filter(total.gt(100))                                      // $2: a value is bound, not written
+  .sort(total.desc())
+  .take(5);                                                   // LIMIT 5: a count is no expression
+
+top.inspect();               // { sql: "SELECT category, COALESCE(SUM(amount), 0) AS total ..", values: [..] }
+await pool.query(top);
+```
+
+- **Stages**: `from(source)`, then `filter`, `derive`, `select`, `group(..)`
+  and `aggregate(..)`, `window(over, ..)`, `sort`, `take`, `takeRange`,
+  `join(source, on, { kind })`, `append`, `intersect`, `remove` and
+  `distinct`, each returning a new pipeline. A source is a `Table` (read under
+  its alias if it has one), a table's name, another pipeline — embedded whole,
+  its bound values with it — or `pl.source(relation).named(name)`, which is
+  how a relation meets itself.
+- **Expressions** are the pipeline's own, not the statement builders':
+  `pl.col(table, column)` (prqlc has no catalog, so columns are qualified),
+  `pl.alias(name)` for a name a stage introduces, `pl.thisColumn` and
+  `pl.thatColumn` for a join's sides, the comparison, logical and arithmetic
+  methods, `coalesce`, `isNull`, `inArray`, `cast`, `as`, `asc`/`desc`,
+  `pl.caseWhen`, the aggregates (`sum`, `min`, `max`, `average`, `stddev`,
+  `count`, `countDistinct`, `countRows`) and the window functions
+  (`rowNumber`, `rank`, `rankDense`, `lag`, `lead`, `first`, `last`) over
+  `pl.over().by(..).sortBy(..).rows(start, end)`.
+- **Values**: `pl.literal(v)` writes a value into the SQL; any other value an
+  operand is given is bound, by the stage that takes it.
+- **Binders**: each stage has a `With` form whose function is called once
+  with a `Binder`; `bind(v)` mints one placeholder, reusable in the
+  expressions the function returns. Like pgorm's lifetime-branded binder, it
+  binds only while its function runs, and a placeholder anywhere but its own
+  stage — a plain stage, another binder's, another pipeline, a window's keys —
+  is a `LifecycleError`.
+- **Terminals** are the pool's, connection's and transaction's, with their
+  cardinality: `one` wants exactly one row, so ask for it with `.take(1)`.
+  What prqlc cannot compile — an alias it reserves, a name it cannot write —
+  is a `ConstructionError` before anything is sent.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript
@@ -488,8 +617,8 @@ deno check
 runtime under test, which is why Deno's suite needs `--allow-run`, and holds it
 to exiting by itself. `tests/runtime.test.ts` drives a panic on the runtime and
 Neon's drop queue through two exports only debug builds carry, skipped against
-a release build. `tests/values.test.ts`, `tests/connections.test.ts` and
-`tests/statements.test.ts` each make a database of their own, named for the
+a release build. `tests/values.test.ts`, `tests/connections.test.ts`, `tests/statements.test.ts`
+and the other live files each make a database of their own, named for the
 runtime and process, and drop it when they end.
 `tests/statements-parity.test.ts` holds each statement family's cases under
 `tests/parity/` to the golden file beside them, which the addon's Rust unit

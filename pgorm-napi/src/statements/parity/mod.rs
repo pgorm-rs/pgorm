@@ -5,6 +5,8 @@
 
 mod json;
 mod merge;
+mod pipeline;
+mod schema;
 mod select;
 mod windows;
 mod writes;
@@ -172,5 +174,30 @@ fn window_and_range_family_matches_its_golden_file() {
     check(
         include_str!("../../../tests/parity/windows.json"),
         windows::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.schema/test]
+// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:napi.schema-alter/test]
+// [spec:pgorm:req:napi.schema-indexes/test]
+// [spec:pgorm:req:napi.schema-types/test]
+// [spec:pgorm:req:napi.schema-sequences/test]
+#[test]
+fn schema_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/schema.json"),
+        schema::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:napi.pipeline-expressions/test]
+// [spec:pgorm:req:napi.pipeline-binder/test]
+#[test]
+fn pipeline_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/pipeline.json"),
+        pipeline::cases(),
     );
 }

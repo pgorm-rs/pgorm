@@ -10909,7 +10909,25 @@ children (
                 id napi-schema
                 title "JavaScript builds DDL: tables, keys, constraints, types, sequences, indexes and their alterations"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.schema]
+                        [spec:pgorm:req:napi.schema-tables]
+                        [spec:pgorm:req:napi.schema-alter]
+                        [spec:pgorm:req:napi.schema-indexes]
+                        [spec:pgorm:req:napi.schema-types]
+                        [spec:pgorm:req:napi.schema-sequences]
+                    )
+                }
                 deps (napi-statements)
+                log (
+                    {
+                        at 2026-10-09T15:04:11.602908Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {
@@ -10950,7 +10968,18 @@ children (
                 id napi-pipeline
                 title "JavaScript composes pgorm's PRQL-shaped pipeline over sources"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:napi.pipeline] [spec:pgorm:req:napi.pipeline-expressions] [spec:pgorm:req:napi.pipeline-binder])
+                }
                 deps (napi-statements)
+                log (
+                    {
+                        at 2026-10-09T15:38:42.159141Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {
@@ -10969,6 +10998,21 @@ children (
                     napi-schema
                     napi-pipeline
                     napi-codegen
+                )
+            }
+
+            {
+                id napi-pipeline-sources
+                title "JavaScript pipelines read registered Rust entities as sources and decode them into their models through select_sources"
+                kind @feat
+                deps (napi-pipeline napi-entities)
+                log (
+                    {
+                        at 2026-10-09T15:54:39.911344Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "napi-pipeline offers every source pgorm-python's pipeline does except a registered Rust entity: pgorm-python's `from_` and `source` take a registered `Entity`, and its `select_sources(pl.sources(\"app.AccountNotes\"), qualifiers=[..])` terminal decodes each row into the registered entities' real Rust models (one to six sources, every position optional) through `SelectedSources`. Both need entity registration with the binding, which is napi-entities. Acceptance: a registered entity is a pipeline source, its table and schema from the registration; a registered source tuple is a terminal that decodes rows into the registered models in both runtimes, refusing a reshaped pipeline as pgorm's `select_sources` does; parity with pgorm-python's registered-source programs; live tests under Node.js and Deno."
+                    }
                 )
             }
         )
