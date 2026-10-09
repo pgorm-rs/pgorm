@@ -11,9 +11,11 @@ runtime of its own, settles a Promise with the outcome, and lets the process
 exit when its work is done. JavaScript connects through pools, runs bound SQL,
 scopes transactions and savepoints and streams rows
 ([Connections](#connections)), builds pgorm-query's statements
-([Statements](#statements)), and every value pgorm holds crosses into and
-out of JavaScript with a declared type ([Values](#values)). It needs a runtime
-with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or later.
+([Statements](#statements)), declares models and reads and writes them, their
+relations and graphs ([Models](#models)), and every value pgorm holds crosses
+into and out of JavaScript with a declared type ([Values](#values)). It needs
+a runtime with `Temporal` as a global: Node.js 26 or later, or Deno 2.9.5 or
+later.
 
 ## Building
 
@@ -293,6 +295,100 @@ await pool.query(select().from(new Table("booking"))
   over ranges, multiranges and arrays. A range binds as a `Value` naming its
   kind — a built-in one or a `CreatedRange` — never inferred.
 
+## Models
+
+A model is a table and its columns, declared in JavaScript and lowered into
+the statement builders, as pgorm-python's `Model` is: declaring one sends
+nothing, runs no DDL and stands for no Rust entity. Its reads decode into
+records — plain objects keyed by field — and its relations, graphs, cursors
+and pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
+`Paginator`, down to the SQL they write.
+
+```ts
+import { column, Conflict, model, type RowOf, TypeName } from "./pgorm-napi/lib/index.js";
+
+const Account = model("account", {
+  schema: "app",
+  columns: {
+    id: column("i64", { primaryKey: true, generated: "byDefault" }),
+    name: column("text"),
+    displayName: column("text", { name: "display_name", nullable: true }),
+    mood: column(new TypeName("mood", { schema: "app" }), { values: ["calm", "glad"], nullable: true }),
+    tags: column("text", { array: true, default: true }),
+  },
+});
+const Post = model("post", {
+  schema: "app",
+  columns: { id: column("i64", { primaryKey: true }), authorId: column("i64", { name: "author_id" }), title: column("text") },
+});
+const posts = Account.hasMany(Post, { from: "id", to: "authorId" });
+const author = Post.belongsTo(Account, { from: "authorId", to: "id" });
+
+type Account = RowOf<typeof Account>; // { id: bigint; name: string; displayName: string | null; mood: "calm" | "glad" | null; .. }
+
+const ann = await Account.insert({ name: "Ann", mood: "calm" }).returning().one(pool);
+await Account.update({ displayName: null }).where(Account.key({ id: ann.id })).execute(pool);
+const { old, new: now } = await Account.update({ name: "Anne" }).where(Account.key({ id: ann.id })).returningChange(pool);
+const upserted = await Account.insert({ id: 1, name: "Ann" }).onConflict(Conflict.on("id").update("name")).returningUpsert(pool);
+
+const calm = await Account.find().where(Account.col("mood").eq("calm")).orderBy(Account.col("id").asc()).all(pool);
+const authored = await posts.load(pool, calm);                         // one query: a list of posts per account
+for (const [post, by] of await Post.graph().joinOne(author).all(pool)) { /* .. */ }
+const page = await Account.find().cursor("name", "id").after("Ann", 1n).first(20).all(pool);
+const pages = Account.find().orderBy(Account.col("id").asc()).paginate(50);
+```
+
+- **Why a factory.** `model(name, { columns })` infers everything from one
+  object literal: the TypeScript declarations derive a record's type
+  (`RowOf`), an insert's (`InsertOf`, requiring each field neither nullable,
+  defaulted nor generated), an update's (`UpdateOf`) and a key's (`KeyOf`)
+  from the columns alone, an enum's listed values becoming a union of its
+  labels. A class declared with decorators or static fields would need the
+  types written twice, and Node.js runs TypeScript by stripping types, which
+  decorators are not.
+- **Columns** take a kind every result decodes as — any value kind but `u64`
+  and `char` — or a schema-qualified `TypeName`, `CreatedRange` or
+  `CreatedMultirange`, and the options `name`, `nullable`, `array`,
+  `primaryKey` (each such column, in order, makes the key), `default`,
+  `generated` (`"always"`, which no write sets, or `"byDefault"`) and an
+  enum's `values`. A declaration that cannot be used throws a
+  `ConstructionError` as it is made.
+- **Records** are checked against the declaration as they decode: the
+  result's columns are exactly the ones selected, each of its declared kind —
+  an `int8` read into an `i32` field, or another schema's enum, is a
+  `DecodeError` — with no NULL where the field is not nullable and no label an
+  enum field does not list.
+- **Reads**: `find()`, `select(..fields)`, `findByKey(key)`; `where`,
+  `orderBy`, `limit`, `offset`, and `join(relation)` to filter on a related
+  row; `all`, `one`, `optional`, `count` on a pool, connection or
+  transaction, and `stream` on a pool or connection. `col(field)` compares
+  through the field's kind — an enum's label binds cast to its type — and
+  refuses `null`, which `isNull()` tests.
+- **Writes**: a field left out stays out — the table's default on insert,
+  the column unchanged on update — and one set to `null` writes NULL. An
+  update or delete needs `where` or `allRows()`. `returning(..fields)` reads
+  the rows written; `returningChange(s)` an update's rows before and after,
+  and `returningUpsert(s)` whether an insert inserted each row or updated
+  the one its conflict found, as pgorm's `exec_returning_change(s)` and
+  `exec_returning_upsert(s)` read them.
+- **Relations** (`belongsTo`, `hasOne`, `hasMany`) pair fields of two
+  models. `relation.find(row)` reads the far end of a record and
+  `relation.load(db, rows)` the far end of many in one query; a key nothing
+  matches is a `DecodeError`, never a missing row.
+- **Graphs**: `graph().joinOne(relation)` is an INNER JOIN decoded as a
+  record, `joinMaybe` a LEFT JOIN decoded as a record or `null`, `via` a
+  junction no record reads, each source projected under `s0_`, `s1_`, .. as
+  pgorm's `SelectGraph` projects it; a row is the root's record alone, or a
+  tuple of every source's. `alias` names a second table of one model, `from`
+  the source a relation starts at, and `allGrouped` gathers a one-slot
+  graph's records under each root.
+- **Cursors and pages**: `cursor(..fields)` pages by keyset — `after`,
+  `before`, `first`, `last`, `asc`, `desc`, and on a graph the slots'
+  primary keys as tiebreaks, with `afterWith` resuming inside a run of one
+  root — and `paginate(size)` by limit and offset, with `numItems`,
+  `numPages` and `pages()`. `inspect("count")`, `inspect("returningChanges")`
+  and the like show what a terminal sends.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript
@@ -403,3 +499,13 @@ connects in plaintext unless its connection string names an `sslmode`; with
 presents, it also holds verified TLS to that CA, as CI does. `deno.json` keeps
 Deno on its global npm cache, so type checking `node:` imports needs no
 `node_modules`.
+
+`tests/models.test.ts` and `tests/graphs.test.ts` make their databases
+through `tests/model-fixtures.ts`. `tests/models-parity.test.ts` holds the
+models' statements to `tests/parity/models.json`, which the Rust test
+`models::parity` builds with pgorm's own entities — `find`, `Insert`,
+`Update::many`, `Delete::many` and `SelectGraph` — and, where pgorm composes a
+statement inside a terminal, with pgorm-query as the terminal does.
+`tests/model-types.test.ts` is held by `deno check`: it type-checks only while
+the declarations type a model's records, writes, keys, graphs and cursors from
+its columns, and refuse what the binding refuses.
