@@ -14,20 +14,25 @@
 
 mod args;
 mod conflict;
+mod data_type;
 mod expr;
+mod json;
+mod json_table;
 mod merge;
 #[cfg(test)]
 mod parity;
 mod returning;
 mod select;
 mod table;
+mod window;
 mod with;
 mod write;
 
 use neon::{prelude::*, types::Finalize};
 use pgorm::pgorm_query::{
-    AnyWithClause, Condition, ConflictUpdate, FromItem, MergeStatement, NamedTable, NullOrdering,
-    OnConflict, Order, PendingMerge, Query, SelectStatement, SimpleExpr, Values,
+    AnyWithClause, ColumnType, Condition, ConflictUpdate, FrameClause, FromItem, FunctionCall,
+    JsonInput, JsonTableColumn, MergeStatement, NamedTable, NullOrdering, OnConflict, Order,
+    PendingMerge, Query, SelectStatement, SimpleExpr, Value, Values, WindowStatement,
 };
 
 use crate::{codec::Codec, rows, values::Tagged};
@@ -76,6 +81,19 @@ pub(crate) enum Node {
     PendingMerge(Box<PendingMerge>),
     Merge(Box<MergeStatement>),
     MergeAction(merge::Action),
+    DataType(ColumnType),
+    /// An operand marked `FORMAT JSON`, read only where SQL/JSON reads JSON.
+    JsonInput(JsonInput),
+    /// A JSON function's `DEFAULT`, written as a literal.
+    JsonDefault(Value),
+    JsonTableColumn(JsonTableColumn),
+    Window(WindowStatement),
+    FrameStart(window::Start),
+    Frame(FrameClause),
+    Windowed(window::Windowed),
+    /// A function PostgreSQL computes only over a window, which has no form
+    /// but `over`.
+    WindowFunction(FunctionCall),
 }
 
 impl Finalize for Node {}
@@ -101,6 +119,15 @@ impl Node {
             Self::PendingMerge(_) => "a MERGE with no WHEN arm",
             Self::Merge(_) => "a MERGE",
             Self::MergeAction(_) => "a MERGE action",
+            Self::DataType(_) => "a DataType",
+            Self::JsonInput(_) => "a FORMAT JSON input",
+            Self::JsonDefault(_) => "a JSON DEFAULT",
+            Self::JsonTableColumn(_) => "a JSON_TABLE column",
+            Self::Window(_) => "a Window",
+            Self::FrameStart(_) => "a frame's start",
+            Self::Frame(_) => "a frame",
+            Self::Windowed(_) => "a windowed call",
+            Self::WindowFunction(_) => "a window function with no window",
         }
     }
 }
@@ -120,6 +147,10 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
         conflict::EXPORTS,
         returning::EXPORTS,
         merge::EXPORTS,
+        data_type::EXPORTS,
+        json::EXPORTS,
+        json_table::EXPORTS,
+        window::EXPORTS,
     ] {
         for &(name, build) in exports {
             cx.export_function(name, move |mut cx| {

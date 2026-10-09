@@ -94,7 +94,7 @@ export class Select extends Builder {
   /**
    * The projection replaced: at least one expression or `expr.as(name)`.
    *
-   * @param {...(Expr | import("./expressions.js").Aliased)} items
+   * @param {...(Expr | import("./expressions.js").Aliased | import("./windows.js").Windowed)} items
    */
   select(...items) {
     return new Select(native.selectProject(arg(this), args(items)), TRUSTED);
@@ -199,6 +199,17 @@ export class Select extends Builder {
   }
 
   /**
+   * The statement's named window, `WINDOW "name" AS (..)`, which `over(name)`
+   * reads; the last call wins.
+   *
+   * @param {string} name
+   * @param {import("./windows.js").Window} window
+   */
+  window(name, window) {
+    return new Select(native.selectWindow(arg(this), name, arg(window)), TRUSTED);
+  }
+
+  /**
    * This query as a FROM item, `(SELECT ..) AS "alias"`.
    *
    * @param {string} alias
@@ -211,7 +222,7 @@ export class Select extends Builder {
 /**
  * `SELECT items`, or `SELECT *` when there are none.
  *
- * @param {...(Expr | import("./expressions.js").Aliased)} items
+ * @param {...(Expr | import("./expressions.js").Aliased | import("./windows.js").Windowed)} items
  */
 export function select(...items) {
   return new Select(native.selectNew(args(items)), TRUSTED);

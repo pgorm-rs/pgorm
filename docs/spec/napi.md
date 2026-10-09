@@ -453,6 +453,30 @@ SQL text running a built statement.
 > its paths written as escaped literals and its PASSING values bound. Its
 > `onError` is `"error"` or `"empty"`.
 
+> [spec:pgorm:req:napi.windows]
+> `over` MUST attach a window only to what pgorm-query's `WindowFunction`
+> admits — a function call, or `jsonArrayAgg` or `jsonObjectAgg` — and
+> anything else is a `ConstructionError`; the call under it is a projection
+> item, named with `as`. Its window is a `Window`, written inline, or the name
+> of the one the SELECT declares with `window(name, window)`. A `Window`
+> builds pgorm-query's `WindowStatement` with PARTITION BY, ORDER BY and a
+> frame, and a frame MUST follow pgorm-query's frame typestate: a start from
+> `FrameType.rows`, `.range` or `.groups` offers only the ends that may follow
+> it, so no frame whose end comes before its start can be built; a following
+> start does not stand alone as a frame; and `exclude` belongs to a frame.
+> `windowFunction` builds PostgreSQL's general-purpose window functions at the
+> argument counts each takes, usable only through `over`, which the server
+> requires of them; another name or count is a `ConstructionError`.
+
+> [spec:pgorm:req:napi.ranges]
+> `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`) MUST compare
+> ranges, multiranges and arrays through pgorm-query's operators of that
+> meaning. A range or multirange operand is bound as the `Value` that declares
+> its kind — a built-in range or multirange kind, or a `CreatedRange` or
+> `CreatedMultirange`, whose text is cast to its type through
+> `Expr::as_range` — and a `Range` or `Multirange` passed without one MUST be a
+> `ConstructionError`, a range's kind never being inferred.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

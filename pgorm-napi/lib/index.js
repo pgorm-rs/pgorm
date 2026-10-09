@@ -43,6 +43,38 @@ export { FromItem, Select, select, Table, With } from "./select.js";
 export { Delete, deleteFrom, Insert, insert, ReturningRow, Update, update } from "./writes.js";
 export { Conflict, ConflictTarget, ConflictUpdate } from "./conflicts.js";
 export { Merge, merge, MergeAction, MergeInsert, MergeUpdate, PendingMerge } from "./merge.js";
+export { DataType } from "./data-type.js";
+export {
+  formatJson,
+  isJson,
+  isNotJson,
+  jsonArray,
+  jsonArrayAgg,
+  jsonArrayQuery,
+  JsonDefault,
+  jsonDefault,
+  jsonExists,
+  JsonInput,
+  jsonObject,
+  jsonObjectAgg,
+  jsonParse,
+  jsonQuery,
+  jsonScalar,
+  jsonSerialize,
+  jsonValue,
+} from "./json.js";
+export { jsonTable, JsonTableColumn } from "./json-table.js";
+export {
+  Frame,
+  FrameCurrentRowStart,
+  FrameFollowingStart,
+  FramePrecedingStart,
+  FrameType,
+  Window,
+  Windowed,
+  WindowFunction,
+  windowFunction,
+} from "./windows.js";
 export {
   ConnectionError,
   ConstructionError,

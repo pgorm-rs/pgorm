@@ -245,6 +245,54 @@ one unconditional arm, which renders last; `returningAction()` puts
 MERGE takes a plain WITH clause and is one's body when it returns rows. The
 source may be a `Table` or a `FromItem`, a subquery among them.
 
+### SQL/JSON, windows and ranges
+
+```js
+import {
+  call, col, FrameType, jsonDefault, jsonExists, jsonTable, JsonTableColumn as C, jsonValue,
+  Range, select, Table, Value, Window, windowFunction,
+} from "./pgorm-napi/lib/index.js";
+
+const docs = new Table("docs", { alias: "d" });
+const size = jsonValue(docs.col("doc"), "$.size", { returning: "integer", onEmpty: jsonDefault(0), onError: "error" });
+const blue = jsonExists(docs.col("doc"), "$.tags[*] ? (@ == $Tag)", { passing: { Tag: "blue" } });
+const items = jsonTable(docs.col("doc"), "$.items[*]", [C.ordinality("i"), C.value("n", "integer")], { alias: "jt" });
+await pool.query(select(docs.col("id"), size.as("size"), items.col("n")).from(docs).from(items).where(blue));
+
+const running = new Window().partitionBy(col("kind")).orderBy(col("at").asc())
+  .frame(FrameType.rows.preceding(1).andFollowing(1).exclude("currentRow"));
+await pool.query(select(call("sum", col("weight")).over(running).as("around"), windowFunction("rank").over("w"))
+  .from(new Table("reading")).window("w", new Window().orderBy(col("weight").desc())));
+
+await pool.query(select().from(new Table("booking"))
+  .where(col("seats").overlaps(new Value(new Range(1, 10, "[]"), "int4range"))));
+```
+
+- **SQL/JSON**: `jsonExists`, `jsonValue`, `jsonQuery`, `jsonObject`,
+  `jsonArray`, `jsonArrayQuery`, `jsonObjectAgg`, `jsonArrayAgg`, `jsonParse`
+  (`JSON(..)`), `jsonScalar`, `jsonSerialize`, `formatJson` and
+  `isJson`/`isNotJson`. A path is bound as `jsonpath`, PASSING takes an object
+  of names to values, and each function takes only its own behaviours —
+  `jsonExists` `"true" | "false" | "unknown" | "error"`, `jsonValue` `"null" |
+  "error" | jsonDefault(v)`, `jsonQuery` those and `"emptyArray" |
+  "emptyObject"`, with one `shaping`. `jsonValue` refuses to return `json` or
+  `jsonb`; `jsonQuery` reads JSON out instead. RETURNING and JSON_TABLE's
+  columns take a `DataType` — `new DataType("numeric", { precision, scale })`,
+  `.array()` — or a built-in type's name.
+- **JSON_TABLE** is a FROM item: `jsonTable(context, path, columns, { alias,
+  passing, pathName, onError })`, its columns `JsonTableColumn.ordinality`,
+  `.value`, `.query`, `.exists` and `.nested`, each with its own options. It
+  needs a column and an alias, and is implicitly LATERAL, so `join(items,
+  bind(true), { kind: "left" })` keeps a row whose document yields nothing.
+- **Windows**: `expr.over(window | name)` on a function call or a JSON
+  aggregate; `new Window().partitionBy(..).orderBy(..).frame(..)`; frames from
+  `FrameType.rows`, `.range` or `.groups` offer only the ends that may follow
+  their start; `windowFunction(name, ..)` for `row_number`, `rank`, `lag` and
+  the others, usable only with `over`.
+- **Ranges**: `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`)
+  over ranges, multiranges and arrays. A range binds as a `Value` naming its
+  kind — a built-in one or a `CreatedRange` — never inferred.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript

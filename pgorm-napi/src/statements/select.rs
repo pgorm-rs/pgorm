@@ -31,6 +31,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
     ("selectSetOperation", select_set_operation),
     ("selectLock", select_lock),
     ("selectWith", select_with),
+    ("selectWindow", select_window),
 ];
 
 fn receiver<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<SelectStatement> {
@@ -49,8 +50,13 @@ fn project<'cx>(
 ) -> NeonResult<()> {
     for item in list(cx, index)? {
         match node(cx, item) {
-            Some(Node::Expr(expr)) => select.expr(expr),
-            Some(Node::Aliased(aliased)) => select.expr_as(aliased.expr, aliased.alias),
+            Some(Node::Expr(expr)) => {
+                select.expr(expr);
+            }
+            Some(Node::Aliased(aliased)) => {
+                select.expr_as(aliased.expr, aliased.alias);
+            }
+            Some(Node::Windowed(windowed)) => windowed.project(select),
             Some(other) => {
                 let what = other.describe();
                 return refuse(cx, format!("a projection is an expression, not {what}"));
@@ -61,7 +67,7 @@ fn project<'cx>(
                     "a projection is an expression: bind a value with bind(value)",
                 );
             }
-        };
+        }
     }
     Ok(())
 }
@@ -279,5 +285,21 @@ fn select_with(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let clause = with::clause_at(cx, 1)?;
     select.with(clause);
+    Ok(Node::Select(select))
+}
+
+/// `selectWindow(select, name, window)`: the statement's named window,
+/// `WINDOW "name" AS (..)`, which `over(name)` reads. pgorm-query's builder
+/// holds one, so the last call wins.
+// [spec:pgorm:req:napi.windows]
+fn select_window(cx: &mut FunctionContext) -> NeonResult<Node> {
+    let mut select = receiver(cx)?;
+    let name = super::args::name_at(cx, 1)?;
+    let window = arg(cx, 2);
+    let window = match node(cx, window) {
+        Some(Node::Window(window)) => window,
+        _ => return refuse(cx, "a named window is a Window"),
+    };
+    select.window(name, window);
     Ok(Node::Select(select))
 }

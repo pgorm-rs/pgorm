@@ -9,6 +9,7 @@
 
 import type { Interval, Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
+import type { Window, Windowed } from "./windows.d.ts";
 
 /** The SQL and the bound values a builder makes, exactly as running it would. */
 export interface Compiled {
@@ -61,6 +62,12 @@ export declare class Expr extends Builder {
   mod(other: Operand): Expr;
   /** `a || b`. */
   concat(other: Operand): Expr;
+  /** `@>`: a range, multirange or array containing the other. */
+  contains(other: Operand): Expr;
+  /** `<@`: contained by the other. */
+  containedBy(other: Operand): Expr;
+  /** `&&`: sharing a value with the other. */
+  overlaps(other: Operand): Expr;
   isDistinctFrom(other: Operand): Expr;
   isNotDistinctFrom(other: Operand): Expr;
   and(other: Expr): Expr;
@@ -93,6 +100,11 @@ export declare class Expr extends Builder {
   at(index: Operand): Expr;
   /** An array slice, `a[lower:upper]`; `null` leaves that end open. */
   slice(lower: Operand | null, upper: Operand | null): Expr;
+  /**
+   * This call over a window, inline or named by the statement; only a function
+   * call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   */
+  over(window: Window | string): Windowed;
   /** A projection naming its output column. */
   as(alias: string): Aliased;
   asc(options?: { readonly nulls?: Nulls }): OrderBy;

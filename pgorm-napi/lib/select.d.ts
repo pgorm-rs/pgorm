@@ -9,6 +9,7 @@
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
+import type { Window, Windowed } from "./windows.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 /** A table, schema-qualified and aliased when the options say. Its names are identifiers, quoted. */
@@ -31,7 +32,7 @@ export declare class FromItem extends Builder {
 /** A source a statement reads. */
 export type Source = Table | FromItem;
 
-export type Projection = Expr | Aliased;
+export type Projection = Expr | Aliased | Windowed;
 
 /** A `SELECT`; every method returns a new statement. */
 export declare class Select extends Builder {
@@ -72,6 +73,8 @@ export declare class Select extends Builder {
   ): Select;
   /** The statement's WITH clause, replacing any it had. */
   with(clause: With): Select;
+  /** The statement's named window, which `over(name)` reads; the last call wins. */
+  window(name: string, window: Window): Select;
   /** This query as a FROM item, `(SELECT ..) AS "alias"`. */
   as(alias: string): FromItem;
 }

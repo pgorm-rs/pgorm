@@ -3,8 +3,10 @@
 //! values `tests/parity/<family>.json` holds, which the JavaScript suite holds
 //! its own builders to in both runtimes. A case missing on either side fails.
 
+mod json;
 mod merge;
 mod select;
+mod windows;
 mod writes;
 
 use std::collections::BTreeMap;
@@ -53,9 +55,34 @@ fn text(value: &Value) -> String {
             let items: Vec<String> = items.iter().map(text).collect();
             format!("[{}]", items.join(","))
         }
+        Value::Range(_, Some(range)) => range_text(range),
+        Value::Multirange(_, Some(ranges)) => {
+            let ranges: Vec<String> = ranges.iter().map(range_text).collect();
+            format!("{{{}}}", ranges.join(","))
+        }
         other if crate::values::value_is_null(other) => "null".to_owned(),
         other => panic!("no canonical text for {other:?}"),
     }
+}
+
+/// A range as the module's `Range` writes itself: `[1,5)`, an unbounded side
+/// empty, or `empty`.
+fn range_text(range: &pgorm::pgorm_query::Range<Value>) -> String {
+    use std::ops::Bound;
+    let pgorm::pgorm_query::Range::Bounds { lower, upper } = range else {
+        return "empty".to_owned();
+    };
+    let (open, lower) = match lower {
+        Bound::Included(value) => ("[", text(value)),
+        Bound::Excluded(value) => ("(", text(value)),
+        Bound::Unbounded => ("(", String::new()),
+    };
+    let (close, upper) = match upper {
+        Bound::Included(value) => ("]", text(value)),
+        Bound::Excluded(value) => (")", text(value)),
+        Bound::Unbounded => (")", String::new()),
+    };
+    format!("{open}{lower},{upper}{close}")
 }
 
 fn golden(file: &str) -> BTreeMap<String, (String, Vec<[String; 2]>)> {
@@ -126,5 +153,24 @@ fn merge_family_matches_its_golden_file() {
     check(
         include_str!("../../../tests/parity/merge.json"),
         merge::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.sql-json/test]
+#[test]
+fn json_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/json.json"),
+        json::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.ranges/test]
+#[test]
+fn window_and_range_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/windows.json"),
+        windows::cases(),
     );
 }

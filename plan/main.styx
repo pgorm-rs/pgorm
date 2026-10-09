@@ -10890,6 +10890,8 @@ children (
                         [spec:pgorm:req:napi.writes]
                         [spec:pgorm:req:napi.merge]
                         [spec:pgorm:req:napi.sql-json]
+                        [spec:pgorm:req:napi.windows]
+                        [spec:pgorm:req:napi.ranges]
                     )
                 }
                 deps (napi-connections)

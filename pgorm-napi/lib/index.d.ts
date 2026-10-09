@@ -11,7 +11,9 @@ import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 export * from "./expressions.d.ts";
+export * from "./json.d.ts";
 export * from "./merge.d.ts";
+export * from "./windows.d.ts";
 export * from "./select.d.ts";
 export * from "./writes.d.ts";
 

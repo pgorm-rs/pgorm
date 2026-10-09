@@ -1,0 +1,58 @@
+{
+  "json-value": {
+    "sql": "SELECT JSON_VALUE(\"doc\", CAST($1::text AS jsonpath) RETURNING integer DEFAULT 0 ON EMPTY ERROR ON ERROR)",
+    "values": [["text","$.size"]]
+  },
+  "json-value-sized": {
+    "sql": "SELECT JSON_VALUE(\"doc\", CAST($1::text AS jsonpath) RETURNING decimal(10, 2) NULL ON EMPTY)",
+    "values": [["text","$.price"]]
+  },
+  "json-exists-passing": {
+    "sql": "SELECT JSON_EXISTS(\"doc\", CAST($1::text AS jsonpath) PASSING $2::text AS \"Tag\" FALSE ON ERROR)",
+    "values": [["text","$.tags[*] ? (@ == $Tag)"], ["text","blue"]]
+  },
+  "json-query": {
+    "sql": "SELECT JSON_QUERY(\"doc\", CAST($1::text AS jsonpath) RETURNING jsonb WITH UNCONDITIONAL WRAPPER EMPTY ARRAY ON EMPTY NULL ON ERROR)",
+    "values": [["text","$.tags[*]"]]
+  },
+  "json-query-omit": {
+    "sql": "SELECT JSON_QUERY(\"body\" FORMAT JSON, CAST($1::text AS jsonpath) RETURNING varchar(20) OMIT QUOTES)",
+    "values": [["text","$.name"]]
+  },
+  "json-object": {
+    "sql": "SELECT JSON_OBJECT($1::text : \"id\", $2::text : \"body\" FORMAT JSON ABSENT ON NULL RETURNING jsonb)",
+    "values": [["text","id"], ["text","body"]]
+  },
+  "json-object-pairs": {
+    "sql": "SELECT JSON_OBJECT(\"k\" : $1::int8, \"k\" : $2::int8 WITH UNIQUE KEYS)",
+    "values": [["i64","1"], ["i64","2"]]
+  },
+  "json-array": {
+    "sql": "SELECT JSON_ARRAY($1::int8, $2::text, \"three\" FORMAT JSON NULL ON NULL RETURNING json)",
+    "values": [["i64","1"], ["text","two"]]
+  },
+  "json-array-query": {
+    "sql": "SELECT JSON_ARRAY(SELECT \"id\" FROM \"t\" RETURNING jsonb)",
+    "values": []
+  },
+  "json-aggregates": {
+    "sql": "SELECT JSON_OBJECTAGG(\"k\" : \"v\" ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb) FILTER (WHERE \"v\" IS NOT NULL), JSON_ARRAYAGG(\"v\" ORDER BY \"k\" DESC NULL ON NULL RETURNING jsonb) FILTER (WHERE \"k\" > $1) FROM \"t\"",
+    "values": [["i64","0"]]
+  },
+  "json-parse-scalar-serialize": {
+    "sql": "SELECT JSON($1::text WITH UNIQUE KEYS), JSON_SCALAR($2::int8), JSON_SCALAR($3::int2), JSON_SERIALIZE(JSON(\"doc\") RETURNING text)",
+    "values": [["text","{\"a\": 1}"], ["i64","5"], ["i16","5"]]
+  },
+  "is-json": {
+    "sql": "SELECT (\"doc\" IS JSON), (\"doc\" IS JSON OBJECT WITH UNIQUE KEYS), (\"body\" IS NOT JSON ARRAY), ($1::text IS JSON SCALAR)",
+    "values": [["text","[1]"]]
+  },
+  "json-table": {
+    "sql": "SELECT \"d\".\"id\", \"jt\".\"n\", \"jt\".\"part\" FROM \"docs\" AS \"d\", JSON_TABLE(\"d\".\"doc\", '$.items[*] ? (@.n >= $Min)' AS \"root\" PASSING $1::int8 AS \"Min\" COLUMNS (\"i\" FOR ORDINALITY, \"n\" integer, \"label\" text PATH '$.name' DEFAULT 'none' ON EMPTY NULL ON ERROR, \"tags\" jsonb FORMAT JSON WITH CONDITIONAL WRAPPER EMPTY ARRAY ON EMPTY, \"flagged\" bool EXISTS PATH '$.flag' FALSE ON ERROR, NESTED PATH '$.parts[*]' AS \"parts\" COLUMNS (\"part\" text PATH '$')) EMPTY ON ERROR) AS \"jt\"",
+    "values": [["i64","1"]]
+  },
+  "json-table-left-join": {
+    "sql": "SELECT \"d\".\"id\", \"l\".* FROM \"docs\" AS \"d\" LEFT JOIN JSON_TABLE(\"d\".\"doc\", '$.items[*]' COLUMNS (\"label\" mood)) AS \"l\" ON $1",
+    "values": [["bool","true"]]
+  }
+}

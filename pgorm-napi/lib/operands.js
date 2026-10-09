@@ -78,6 +78,34 @@ export class Operand extends Builder {
     return binary(this, "concat", other);
   }
 
+  /**
+   * `@>`: a range, multirange or array that contains the other.
+   * [spec:pgorm:req:napi.ranges]
+   *
+   * @param {unknown} other
+   */
+  contains(other) {
+    return binary(this, "contains", other);
+  }
+
+  /**
+   * `<@`: contained by the other.
+   *
+   * @param {unknown} other
+   */
+  containedBy(other) {
+    return binary(this, "containedBy", other);
+  }
+
+  /**
+   * `&&`: shares a value with the other.
+   *
+   * @param {unknown} other
+   */
+  overlaps(other) {
+    return binary(this, "overlaps", other);
+  }
+
   /** @param {unknown} other */
   isDistinctFrom(other) {
     return binary(this, "isDistinctFrom", other);

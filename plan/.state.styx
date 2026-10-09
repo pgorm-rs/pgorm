@@ -1421,19 +1421,22 @@ impl_evidence (
     )}
     {id napi-statements, covered_rules (
         napi.expressions
+        napi.merge
+        napi.ranges
         napi.select
+        napi.sql-json
         napi.statements
+        napi.windows
         napi.writes
     ), covered_claims (
         {impl_name main, rule napi.expressions}
+        {impl_name main, rule napi.merge}
+        {impl_name main, rule napi.ranges}
         {impl_name main, rule napi.select}
+        {impl_name main, rule napi.sql-json}
         {impl_name main, rule napi.statements}
+        {impl_name main, rule napi.windows}
         {impl_name main, rule napi.writes}
-    ), rule_versions_seen (
-        {id napi.expressions, version 0}
-        {id napi.select, version 0}
-        {id napi.statements, version 0}
-        {id napi.writes, version 0}
     )}
     {id napi-values, covered_rules (
         napi.inference

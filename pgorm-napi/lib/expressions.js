@@ -8,6 +8,7 @@
 import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
 import { Predicate } from "./predicates.js";
+import { Windowed } from "./windows.js";
 
 /**
  * @param {Expr} expr
@@ -56,6 +57,16 @@ export class Expr extends Predicate {
    */
   slice(lower, upper) {
     return new Expr(native.exprSubscript(arg(this), arg(lower ?? null), arg(upper ?? null), true), TRUSTED);
+  }
+
+  /**
+   * This call over a `Window`, or over the window the statement names; only
+   * a function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   *
+   * @param {import("./windows.js").Window | string} window
+   */
+  over(window) {
+    return new Windowed(native.exprOver(arg(this), arg(window)), TRUSTED);
   }
 
   /** @param {string} alias */

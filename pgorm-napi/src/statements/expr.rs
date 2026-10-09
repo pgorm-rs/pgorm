@@ -154,7 +154,8 @@ fn subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Expr(expr))
 }
 
-const BINARY: [(&str, BinOper); 13] = [
+// [spec:pgorm:req:napi.ranges]
+const BINARY: [(&str, BinOper); 16] = [
     ("eq", BinOper::Equal),
     ("ne", BinOper::NotEqual),
     ("lt", BinOper::SmallerThan),
@@ -168,6 +169,9 @@ const BINARY: [(&str, BinOper); 13] = [
     ("mod", BinOper::Mod),
     ("concat", BinOper::Concatenate),
     ("isDistinctFrom", BinOper::IsDistinctFrom),
+    ("contains", BinOper::Contains),
+    ("containedBy", BinOper::Contained),
+    ("overlaps", BinOper::Overlap),
 ];
 
 /// `exprBinary(expr, operator, operand)`: a comparison or arithmetic, the
