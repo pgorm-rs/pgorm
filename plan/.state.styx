@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-10-09T15:41:10.180992Z
+last_sync_at 2026-10-09T16:24:47.136314Z
 
 rule_versions (
     {id codegen.entity, version 3}
@@ -154,9 +154,15 @@ rule_versions (
     {id migration.up, version 2}
     {id migration.up-only, version 0}
     {id napi.api, version 1}
+    {id napi.application, version 0}
     {id napi.cancellation, version 0}
     {id napi.connections, version 0}
     {id napi.cursors, version 0}
+    {id napi.entities, version 0}
+    {id napi.entity-graphs, version 0}
+    {id napi.entity-reads, version 0}
+    {id napi.entity-versions, version 0}
+    {id napi.entity-writes, version 0}
     {id napi.errors, version 1}
     {id napi.exit, version 0}
     {id napi.expressions, version 0}
@@ -170,6 +176,9 @@ rule_versions (
     {id napi.models, version 0}
     {id napi.optional, version 0}
     {id napi.pagination, version 0}
+    {id napi.pipeline, version 0}
+    {id napi.pipeline-binder, version 0}
+    {id napi.pipeline-expressions, version 0}
     {id napi.promises, version 0}
     {id napi.ranges, version 0}
     {id napi.relations, version 0}
@@ -177,6 +186,12 @@ rule_versions (
     {id napi.rows, version 0}
     {id napi.runtime, version 0}
     {id napi.runtimes, version 1}
+    {id napi.schema, version 0}
+    {id napi.schema-alter, version 0}
+    {id napi.schema-indexes, version 0}
+    {id napi.schema-sequences, version 0}
+    {id napi.schema-tables, version 0}
+    {id napi.schema-types, version 0}
     {id napi.select, version 0}
     {id napi.sql-json, version 0}
     {id napi.statements, version 0}
@@ -510,6 +525,7 @@ derived_priorities (
     {id napi-models, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-packaging, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-pipeline, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
+    {id napi-pipeline-sources, priority 3, derived_at 2026-10-09T16:24:47.136314Z}
     {id napi-proof, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-schema, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-statements, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
@@ -1048,7 +1064,6 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id napi-entities, kind @doing, author "brendan@necessary.nu", at 2026-10-09T16:09:42.135283Z}
 )
 
 impl_evidence (
@@ -1189,8 +1204,6 @@ impl_evidence (
         {impl_name main, rule generative.acceptance}
     ), rule_versions_seen (
         {id generative.acceptance, version 0}
-        {id generative.build-amortization, version 0}
-        {id generative.replay-parity, version 0}
     )}
     {id generative.ci, covered_rules (
         generative.ci
@@ -1385,7 +1398,6 @@ impl_evidence (
     ), rule_versions_seen (
         {id conn.tx.closure, version 2}
         {id conn.tx.retry, version 1}
-        {id entity.relation.linked, version 4}
     )}
     {id napi-connections, covered_rules (
         napi.cancellation
@@ -1405,6 +1417,21 @@ impl_evidence (
         {id napi.results, version 0}
         {id napi.streams, version 0}
         {id napi.transactions, version 0}
+    )}
+    {id napi-entities, covered_rules (
+        napi.application
+        napi.entities
+        napi.entity-graphs
+        napi.entity-reads
+        napi.entity-versions
+        napi.entity-writes
+    ), covered_claims (
+        {impl_name main, rule napi.application}
+        {impl_name main, rule napi.entities}
+        {impl_name main, rule napi.entity-graphs}
+        {impl_name main, rule napi.entity-reads}
+        {impl_name main, rule napi.entity-versions}
+        {impl_name main, rule napi.entity-writes}
     )}
     {id napi-models, covered_rules (
         napi.cursors
@@ -1433,6 +1460,10 @@ impl_evidence (
         {impl_name main, rule napi.pipeline}
         {impl_name main, rule napi.pipeline-binder}
         {impl_name main, rule napi.pipeline-expressions}
+    ), rule_versions_seen (
+        {id napi.pipeline, version 0}
+        {id napi.pipeline-binder, version 0}
+        {id napi.pipeline-expressions, version 0}
     )}
     {id napi-proof, covered_rules (
         napi.api
@@ -1479,6 +1510,13 @@ impl_evidence (
         {impl_name main, rule napi.schema-sequences}
         {impl_name main, rule napi.schema-tables}
         {impl_name main, rule napi.schema-types}
+    ), rule_versions_seen (
+        {id napi.schema, version 0}
+        {id napi.schema-alter, version 0}
+        {id napi.schema-indexes, version 0}
+        {id napi.schema-sequences, version 0}
+        {id napi.schema-tables, version 0}
+        {id napi.schema-types, version 0}
     )}
     {id napi-statements, covered_rules (
         napi.expressions
@@ -1797,9 +1835,7 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.results}
     ), rule_versions_seen (
-        {id python.cancellation, version 0}
         {id python.results, version 0}
-        {id python.value-tags, version 0}
     )}
     {id python.runtime, covered_rules (
         python.connections
@@ -1863,7 +1899,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.surface}
     ), rule_versions_seen (
-        {id macros.derive.enum-def, version 1}
         {id sql.surface, version 0}
     )}
     {id query-second-tier, covered_rules (
@@ -1871,18 +1906,7 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.scope}
     ), rule_versions_seen (
-        {id sql.ast.expr.operators, version 3}
-        {id sql.ast.insert, version 3}
-        {id sql.ast.select.union, version 1}
-        {id sql.ast.window-statement, version 4}
-        {id sql.ddl.foreign-key, version 5}
-        {id sql.render.insert, version 2}
-        {id sql.render.operators, version 5}
-        {id sql.render.parens, version 3}
-        {id sql.render.precedence, version 3}
-        {id sql.render.window, version 4}
         {id sql.scope, version 0}
-        {id sql.types.opers, version 4}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape
@@ -2094,19 +2118,10 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.matrix}
         {impl_name main, rule security.sqlmap.observability}
     ), rule_versions_seen (
-        {id security.sqlmap, version 0}
         {id security.sqlmap.adapter, version 0}
-        {id security.sqlmap.artifacts, version 0}
         {id security.sqlmap.controls, version 0}
-        {id security.sqlmap.execution, version 0}
-        {id security.sqlmap.fixtures, version 0}
-        {id security.sqlmap.isolation, version 0}
         {id security.sqlmap.matrix, version 0}
         {id security.sqlmap.observability, version 0}
-        {id security.sqlmap.outcomes, version 0}
-        {id security.sqlmap.pin, version 0}
-        {id security.sqlmap.profiles, version 0}
-        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.ci, covered_rules (
         security.sqlmap.ci
@@ -2125,18 +2140,8 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.isolation}
     ), rule_versions_seen (
         {id security.sqlmap, version 0}
-        {id security.sqlmap.adapter, version 0}
-        {id security.sqlmap.artifacts, version 0}
-        {id security.sqlmap.controls, version 0}
-        {id security.sqlmap.execution, version 0}
         {id security.sqlmap.fixtures, version 0}
         {id security.sqlmap.isolation, version 0}
-        {id security.sqlmap.matrix, version 0}
-        {id security.sqlmap.observability, version 0}
-        {id security.sqlmap.outcomes, version 0}
-        {id security.sqlmap.pin, version 0}
-        {id security.sqlmap.profiles, version 0}
-        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.runner, covered_rules (
         security.sqlmap.artifacts
@@ -2149,19 +2154,10 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.pin}
         {impl_name main, rule security.sqlmap.profiles}
     ), rule_versions_seen (
-        {id security.sqlmap, version 0}
-        {id security.sqlmap.adapter, version 0}
         {id security.sqlmap.artifacts, version 0}
-        {id security.sqlmap.controls, version 0}
         {id security.sqlmap.execution, version 0}
-        {id security.sqlmap.fixtures, version 0}
-        {id security.sqlmap.isolation, version 0}
-        {id security.sqlmap.matrix, version 0}
-        {id security.sqlmap.observability, version 0}
-        {id security.sqlmap.outcomes, version 0}
         {id security.sqlmap.pin, version 0}
         {id security.sqlmap.profiles, version 0}
-        {id security.sqlmap.verdict, version 0}
     )}
     {id sqlmap.verdict, covered_rules (
         security.sqlmap.outcomes

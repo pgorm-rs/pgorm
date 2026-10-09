@@ -1,0 +1,34 @@
+{
+  "find": {
+    "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\"",
+    "values": []
+  },
+  "find-filtered": {
+    "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\" WHERE \"accounts\".\"id\" >= $1 ORDER BY \"accounts\".\"display name\" DESC LIMIT $2",
+    "values": [["i32","10"], ["u64","20"]]
+  },
+  "find-enum": {
+    "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\" WHERE \"accounts\".\"mood\" = CAST($1::text AS napi_entities.mood)",
+    "values": [["text","busy"]]
+  },
+  "find-one": {
+    "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\" LIMIT $1",
+    "values": [["u64","1"]]
+  },
+  "find-composite": {
+    "sql": "SELECT \"memberships\".\"account_id\", \"memberships\".\"team\", \"memberships\".\"role\" FROM \"napi_entities\".\"memberships\" WHERE \"memberships\".\"account_id\" = $1 AND \"memberships\".\"team\" = $2",
+    "values": [["i32","1"], ["text","red"]]
+  },
+  "graph-notes": {
+    "sql": "SELECT \"accounts\".\"id\" AS \"s0_id\", \"accounts\".\"display name\" AS \"s0_display name\", \"accounts\".\"note\" AS \"s0_note\", \"accounts\".\"version\" AS \"s0_version\", CAST(\"accounts\".\"mood\" AS text) AS \"s0_mood\", \"n\".\"id\" AS \"s1_id\", \"n\".\"account_id\" AS \"s1_account_id\", \"n\".\"body\" AS \"s1_body\" FROM \"napi_entities\".\"accounts\" LEFT JOIN \"napi_entities\".\"notes\" AS \"n\" ON \"accounts\".\"id\" = \"n\".\"account_id\"",
+    "values": []
+  },
+  "graph-mixed-default-aliases": {
+    "sql": "SELECT \"accounts\".\"id\" AS \"s0_id\", \"accounts\".\"display name\" AS \"s0_display name\", \"accounts\".\"note\" AS \"s0_note\", \"accounts\".\"version\" AS \"s0_version\", CAST(\"accounts\".\"mood\" AS text) AS \"s0_mood\", \"g1\".\"id\" AS \"s1_id\", \"g1\".\"account_id\" AS \"s1_account_id\", \"g1\".\"body\" AS \"s1_body\", \"g2\".\"id\" AS \"s2_id\", \"g2\".\"account_id\" AS \"s2_account_id\", \"g2\".\"body\" AS \"s2_body\" FROM \"napi_entities\".\"accounts\" INNER JOIN \"napi_entities\".\"notes\" AS \"g1\" ON \"accounts\".\"id\" = \"g1\".\"account_id\" LEFT JOIN \"napi_entities\".\"notes\" AS \"g2\" ON \"accounts\".\"id\" = \"g2\".\"account_id\"",
+    "values": []
+  },
+  "graph-filtered": {
+    "sql": "SELECT \"accounts\".\"id\" AS \"s0_id\", \"accounts\".\"display name\" AS \"s0_display name\", \"accounts\".\"note\" AS \"s0_note\", \"accounts\".\"version\" AS \"s0_version\", CAST(\"accounts\".\"mood\" AS text) AS \"s0_mood\", \"n\".\"id\" AS \"s1_id\", \"n\".\"account_id\" AS \"s1_account_id\", \"n\".\"body\" AS \"s1_body\" FROM \"napi_entities\".\"accounts\" LEFT JOIN \"napi_entities\".\"notes\" AS \"n\" ON \"accounts\".\"id\" = \"n\".\"account_id\" WHERE \"n\".\"body\" = $1 ORDER BY \"accounts\".\"id\" ASC",
+    "values": [["text","x"]]
+  }
+}

@@ -4,6 +4,7 @@ Cargo.lock
 !security/sqlmap/adapter/Cargo.lock
 !pgorm-python/Cargo.lock
 !pgorm-napi/Cargo.lock
+!pgorm-napi/tests/*/Cargo.lock
 !security/generative/bridge/Cargo.lock
 !security/generative/replay/Cargo.lock
 !security/generative/compile/Cargo.lock

@@ -1,0 +1,30 @@
+[package]
+name = "pgorm-napi-application-fixture"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "An application crate that registers its own entities with pgorm-napi in one native module"
+
+# Its own workspace, as an application's crate is, apart from the binding's.
+[workspace]
+
+[lib]
+name = "application"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pgorm-napi = { path = "../..", default-features = false }
+pgorm = { path = "../../.." }
+neon = { version = "1.1.2", default-features = false, features = ["napi-6"] }
+async-trait = "0.1.92"
+serde_json = "1.0.151"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

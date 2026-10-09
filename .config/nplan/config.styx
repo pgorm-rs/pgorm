@@ -171,6 +171,19 @@ platforms (
         }
     }
     {
+        platform "napi-application"
+        files (pgorm-napi/**/*.rs pgorm-napi/Cargo.toml pgorm-napi/Cargo.lock pgorm-napi/tests/application-binding/Cargo.toml pgorm-napi/tests/application-binding/Cargo.lock)
+        checks {
+            format {
+                cmd "cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all -- --check"
+                fix "cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all"
+            }
+            clippy {
+                cmd "cargo clippy --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --locked --target-dir target --all-targets -- -D warnings"
+            }
+        }
+    }
+    {
         platform "napi-native"
         files (pgorm-napi/**/*.rs pgorm-napi/Cargo.toml pgorm-napi/Cargo.lock)
         checks {

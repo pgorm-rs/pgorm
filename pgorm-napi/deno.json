@@ -1,3 +1,8 @@
 {
-  "nodeModulesDir": "none"
+  "nodeModulesDir": "none",
+  "test": {
+    "exclude": [
+      "tests/application-binding/"
+    ]
+  }
 }

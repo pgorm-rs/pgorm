@@ -133,6 +133,15 @@ jobs:
       - name: Live suite under Deno
         working-directory: pgorm-napi
         run: deno test --allow-ffi --allow-read --allow-env --allow-run tests/
+      # An application's own module: the fixture crate registers its entities
+      # and graphs, builds one native library with the binding's API, and runs
+      # its suite against it in both runtimes.
+      # [spec:pgorm:req:napi.application]
+      - name: Application module with registered entities
+        run: |
+          cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all -- --check
+          cargo clippy --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --locked --target-dir target --all-targets -- -D warnings
+          node pgorm-napi/checks/entities.js
       - name: PostgreSQL log
         if: failure()
         run: cat "$RUNNER_TEMP/postgres.log"
