@@ -15,8 +15,8 @@
 // built here, its main package naming only those. `install` serves the
 // tarballs from a registry of its own on loopback, installs them into fresh
 // Node.js and Deno projects as an application would — `npm install
-// pgorm-napi`, and `npm:pgorm-napi` in a `nodeModulesDir: "auto"` Deno
-// project — runs tests/package/smoke.test.ts in each against the server
+// @necessary/pgorm`, and `npm:@necessary/pgorm` in a `nodeModulesDir: "auto"`
+// Deno project — runs tests/package/smoke.test.ts in each against the server
 // PGORM_TEST_DSN or DATABASE_URL names, and holds the loader to refusing a
 // missing, a mismatched and an unoffered platform package in both runtimes.
 //
@@ -229,13 +229,19 @@ function verifyNotices() {
 const LICENCES = ["LICENSE-APACHE", "LICENSE-MIT"];
 
 /**
+ * The packages are scoped, and npm publishes a scoped package as restricted
+ * unless its manifest says otherwise.
+ */
+const PUBLISH = { access: "public" };
+
+/**
  * The main package's manifest, from the checkout's: the module and its
  * declarations, and the platform packages as optional dependencies.
  *
  * @param {any} pkg
  * @param {any[]} platforms
  */
-// [spec:pgorm:req:napi.packages]
+// [spec:pgorm:req:napi.packages+1]
 function mainManifest(pkg, platforms) {
   return {
     name: pkg.name,
@@ -250,8 +256,9 @@ function mainManifest(pkg, platforms) {
     // Each platform package at this package's own version, exactly: the
     // module and the addon are one release, and a range here could pair a
     // module with an addon it was not built against. A project's own
-    // dependency on pgorm-napi takes a range as usual.
+    // dependency on the main package takes a range as usual.
     optionalDependencies: Object.fromEntries(platforms.map((entry) => [entry.package, pkg.version])),
+    publishConfig: PUBLISH,
   };
 }
 
@@ -275,6 +282,7 @@ function platformManifest(pkg, entry) {
     engines: pkg.engines,
     main: "pgorm_napi.node",
     files: ["pgorm_napi.node", "DEPENDENCIES.json", "THIRD_PARTY_NOTICES.txt", ...LICENCES],
+    publishConfig: PUBLISH,
   };
 }
 
@@ -481,10 +489,10 @@ async function install() {
     const dependencies = { [name]: `^${version}` };
     const others = listing.platforms.filter((/** @type {string} */ other) => other !== running).map((/** @type {string} */ other) => `${name}-${other}`);
 
-    // Node.js: `npm install pgorm-napi`, which picks the platform package.
+    // Node.js: `npm install @necessary/pgorm`, which picks the platform package.
     const nodeProject = join(projects, "node");
     project(nodeProject, {
-      "package.json": { name: "pgorm-napi-smoke", private: true, type: "module", dependencies },
+      "package.json": { name: "smoke", private: true, type: "module", dependencies },
       ".npmrc": npmrc,
     });
     await run("npm", ["install", "--ignore-scripts"], { cwd: nodeProject, env });
@@ -494,8 +502,9 @@ async function install() {
     ensure(!existsSync(join(modules, name, "lib", "pgorm_napi.node")), "the installed main package carries an addon");
     await run(process.execPath, ["--test", "smoke.test.ts"], { cwd: nodeProject, env });
 
-    // Deno: `npm:pgorm-napi` through the import map, into a node_modules Deno
-    // manages itself.
+    // Deno: `npm:@necessary/pgorm` through the import map, into a
+    // node_modules Deno manages itself, whose store folders spell a scoped
+    // name's `/` as `+`.
     const denoProject = join(projects, "deno");
     project(denoProject, {
       "deno.json": { nodeModulesDir: "auto", imports: { [name]: `npm:${name}@^${version}` } },
@@ -503,10 +512,11 @@ async function install() {
     });
     await run("deno", ["install"], { cwd: denoProject, env });
     const store = join(denoProject, "node_modules", ".deno");
-    ensure(existsSync(join(store, `${wanted}@${version}`, "node_modules", wanted, "pgorm_napi.node")), `deno did not install ${wanted}`);
-    for (const other of others) {
-      ensure(!existsSync(join(store, `${other}@${version}`, "node_modules", other, "pgorm_napi.node")), `deno installed ${other} on ${running}`);
-    }
+    /** @param {string} packageName */
+    const stored = (packageName) =>
+      join(store, `${packageName.replace("/", "+")}@${version}`, "node_modules", packageName, "pgorm_napi.node");
+    ensure(existsSync(stored(wanted)), `deno did not install ${wanted}`);
+    for (const other of others) ensure(!existsSync(stored(other)), `deno installed ${other} on ${running}`);
     await run("deno", ["test", "--allow-ffi", "--allow-read", "--allow-env", "--allow-run", "smoke.test.ts"], { cwd: denoProject, env });
 
     // The loader's refusals, in both runtimes: npm installs each project and
@@ -548,7 +558,7 @@ async function install() {
     for (const refusal of refusals) {
       const directory = join(projects, refusal.case);
       project(directory, {
-        "package.json": { name: `pgorm-napi-${refusal.case}`, private: true, type: "module", dependencies },
+        "package.json": { name: refusal.case, private: true, type: "module", dependencies },
         ".npmrc": npmrc,
         "deno.json": { nodeModulesDir: "manual" },
         "load.js": `import ${JSON.stringify(name)};\n`,

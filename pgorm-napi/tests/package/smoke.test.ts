@@ -1,9 +1,9 @@
 // The installed packages' smoke suite. checks/package.js copies it into fresh
-// Node.js and Deno projects that installed pgorm-napi from a registry serving
-// only the packed tarballs, and runs it there under `node --test` and
+// Node.js and Deno projects that installed @necessary/pgorm from a registry
+// serving only the packed tarballs, and runs it there under `node --test` and
 // `deno test` against the server PGORM_TEST_DSN names. It imports the package
 // by name, as an application does: Node.js resolves it from node_modules, and
-// Deno as `npm:pgorm-napi` through the project's import map.
+// Deno as `npm:@necessary/pgorm` through the project's import map.
 //
 // The check passes the package version and the platform package it expects
 // the addon to come from in PGORM_NAPI_VERSION and PGORM_NAPI_PLATFORM_PACKAGE.
@@ -19,7 +19,7 @@ import process from "node:process";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { col, column, connect, Decimal, insert, model, Pool, select, Table, version } from "pgorm-napi";
+import { col, column, connect, Decimal, insert, model, Pool, select, Table, version } from "@necessary/pgorm";
 
 const dsn = required("PGORM_TEST_DSN");
 const expectedVersion = required("PGORM_NAPI_VERSION");
@@ -55,7 +55,7 @@ after(async () => {
 });
 
 /** The installed main package's module, and the require that module loads its addon with. */
-const entry = fileURLToPath(import.meta.resolve("pgorm-napi"));
+const entry = fileURLToPath(import.meta.resolve("@necessary/pgorm"));
 const mainRequire = createRequire(entry);
 const mainDirectory = dirname(dirname(entry));
 const platformDirectory = dirname(mainRequire.resolve(`${platformPackage}/package.json`));
@@ -64,7 +64,7 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-// [spec:pgorm:req:napi.packages/test]
+// [spec:pgorm:req:napi.packages+1/test]
 // [spec:pgorm:req:napi.platform-loading/test]
 test("the installed module loads its addon from the platform package", () => {
   assert.equal(version, expectedVersion);
@@ -80,7 +80,7 @@ test("the installed addon is a release build of this version", () => {
   assert.equal(addon.probeDropQueue, undefined);
 });
 
-// [spec:pgorm:req:napi.packages/test]
+// [spec:pgorm:req:napi.packages+1/test]
 // [spec:pgorm:req:napi.support/test]
 test("the main package offers the release platforms' packages at its own version", () => {
   const main = readJson(join(mainDirectory, "package.json"));
@@ -97,6 +97,10 @@ test("the main package offers the release platforms' packages at its own version
   assert.ok(platformPackage in offered);
   const platform = readJson(join(platformDirectory, "package.json"));
   assert.equal(platform.version, expectedVersion);
+  assert.equal(main.name, "@necessary/pgorm");
+  assert.equal(platform.name, platformPackage);
+  assert.ok(platformPackage.startsWith("@necessary/pgorm-"), platformPackage);
+  for (const manifest of [main, platform]) assert.deepEqual(manifest.publishConfig, { access: "public" }, `${manifest.name}`);
 });
 
 // [spec:pgorm:req:napi.notices/test]
@@ -105,7 +109,7 @@ test("the platform package carries the dependency notices and the licences", () 
   const names = inventory.packages.map((entry) => entry.name);
   for (const name of ["pgorm", "pgorm-napi", "neon", "tokio-postgres", "rustls"]) assert.ok(names.includes(name), name);
   assert.ok(inventory.packages.every((entry) => entry.license), "a package without a licence");
-  assert.match(readFileSync(join(platformDirectory, "THIRD_PARTY_NOTICES.txt"), "utf8"), /^pgorm-napi npm packages/);
+  assert.match(readFileSync(join(platformDirectory, "THIRD_PARTY_NOTICES.txt"), "utf8"), /^@necessary\/pgorm npm packages/);
   for (const directory of [mainDirectory, platformDirectory]) {
     for (const licence of ["LICENSE-MIT", "LICENSE-APACHE"]) assert.ok(existsSync(join(directory, licence)), `${directory} lacks ${licence}`);
   }

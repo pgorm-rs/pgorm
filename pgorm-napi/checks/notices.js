@@ -190,7 +190,8 @@ export function generate() {
     packages,
     bundled_native_components: components,
   };
-  let text = "pgorm-napi npm packages — third-party notices\n\n";
+  const { name } = JSON.parse(readFileSync(join(napi, "package.json"), "utf8"));
+  let text = `${name} npm packages — third-party notices\n\n`;
   text += "The companion DEPENDENCIES.json maps packages and bundled native components to the notice hashes below.\n\n";
   for (const identity of [...notices.keys()].sort()) {
     text += `===== SHA-256 ${identity} =====\n${notices.get(identity)}\n\n`;

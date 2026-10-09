@@ -3,7 +3,7 @@
 
 import process from "node:process";
 
-import { Pool } from "pgorm-napi";
+import { Pool } from "@necessary/pgorm";
 
 const pool = new Pool(process.env.PGORM_TEST_DSN ?? "");
 const row = await pool.one("SELECT $1::int4 + 1 AS n", [41]);

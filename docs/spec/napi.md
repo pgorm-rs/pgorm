@@ -1045,28 +1045,30 @@ entities.
 ## Distribution
 
 pgorm-napi reaches applications as npm packages with prebuilt addons, the
-layout Node-API modules use: a main package of JavaScript, and a package per
-platform holding that platform's native code, which a package manager selects
-by the platform it runs on. [DISTRIBUTION.md](../../pgorm-napi/DISTRIBUTION.md)
+layout Node-API modules use: a main package of JavaScript, `@necessary/pgorm`,
+and a package per platform holding that platform's native code, which a
+package manager selects by the platform it runs on. [DISTRIBUTION.md](../../pgorm-napi/DISTRIBUTION.md)
 is the user-facing account of it.
 
-> [spec:pgorm:req:napi.packages]
+> [spec:pgorm:req:napi.packages+1]
 > pgorm-napi MUST be distributed as npm packages released together at one
-> version, the crate's: a main package holding the ES module, its
-> declarations, `DISTRIBUTION.md`, `support.json` and pgorm's licences, and no
-> native code; and one package per release platform holding that platform's
-> release addon as `pgorm_napi.node`, pgorm's licences and the Rust dependency
-> notices `napi.notices` requires. A platform package is named for
-> the main package and its platform, `<main>-<os>-<cpu>` with `-gnu` or
-> `-musl` added on Linux, in Node.js's `process.platform` and `process.arch`
-> vocabulary, and declares the `os`, `cpu` and, on Linux, `libc` a package
-> manager selects it by. The main package MUST list exactly the release
-> platforms' packages as optional dependencies, each at the main package's own
-> version exactly — the one exact requirement the packages carry, because a
-> module and the addon built with it are one release. The checkout's own
-> `package.json` stays private: the packages are made by the packaging check,
-> never by packing the checkout. Their names are provisional until the operator
-> chooses them, before anything is published.
+> version, the crate's, in the `@necessary` scope: a main package,
+> `@necessary/pgorm`, holding the ES module, its declarations,
+> `DISTRIBUTION.md`, `support.json` and pgorm's licences, and no native code;
+> and one package per release platform holding that platform's release addon
+> as `pgorm_napi.node`, pgorm's licences and the Rust dependency notices
+> `napi.notices` requires. A platform package is named for the main package
+> and its platform, `@necessary/pgorm-<os>-<cpu>` with `-gnu` or `-musl` added
+> on Linux, in Node.js's `process.platform` and `process.arch` vocabulary, and
+> declares the `os`, `cpu` and, on Linux, `libc` a package manager selects it
+> by. Every package's manifest MUST declare public access, which npm otherwise
+> withholds from a scoped package. The main package MUST list exactly the
+> release platforms' packages as optional dependencies, each at the main
+> package's own version exactly — the one exact requirement the packages
+> carry, because a module and the addon built with it are one release. The
+> checkout's own `package.json` carries the main package's name and stays
+> private: the packages are made by the packaging check, never by packing the
+> checkout.
 
 > [spec:pgorm:req:napi.platform-loading]
 > Without a library beside it, the module MUST load the addon from the

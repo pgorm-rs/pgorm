@@ -1,4 +1,4 @@
-pgorm-napi npm packages — third-party notices
+@necessary/pgorm npm packages — third-party notices
 
 The companion DEPENDENCIES.json maps packages and bundled native components to the notice hashes below.
 

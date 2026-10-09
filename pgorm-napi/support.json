@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "rust_crate": "pgorm-napi",
-  "npm_package": "pgorm-napi",
-  "package_names": "provisional: the operator decides the final npm names, and whether they take a scope, before anything is published",
+  "npm_package": "@necessary/pgorm",
+  "package_names": "chosen by the operator: the main package is @necessary/pgorm and each platform's is @necessary/pgorm-<platform>; the @necessary scope must be owned on npm before anything is published",
   "node_api_version": 6,
   "runtimes": {
     "node": ">=26",
@@ -11,7 +11,7 @@
   "platforms": [
     {
       "platform": "darwin-arm64",
-      "package": "pgorm-napi-darwin-arm64",
+      "package": "@necessary/pgorm-darwin-arm64",
       "os": "darwin",
       "cpu": "arm64",
       "rust_target": "aarch64-apple-darwin",
@@ -20,7 +20,7 @@
     },
     {
       "platform": "linux-x64-gnu",
-      "package": "pgorm-napi-linux-x64-gnu",
+      "package": "@necessary/pgorm-linux-x64-gnu",
       "os": "linux",
       "cpu": "x64",
       "libc": "glibc",
@@ -30,7 +30,7 @@
     },
     {
       "platform": "linux-arm64-gnu",
-      "package": "pgorm-napi-linux-arm64-gnu",
+      "package": "@necessary/pgorm-linux-arm64-gnu",
       "os": "linux",
       "cpu": "arm64",
       "libc": "glibc",
@@ -39,7 +39,7 @@
     },
     {
       "platform": "linux-x64-musl",
-      "package": "pgorm-napi-linux-x64-musl",
+      "package": "@necessary/pgorm-linux-x64-musl",
       "os": "linux",
       "cpu": "x64",
       "libc": "musl",
@@ -48,7 +48,7 @@
     },
     {
       "platform": "linux-arm64-musl",
-      "package": "pgorm-napi-linux-arm64-musl",
+      "package": "@necessary/pgorm-linux-arm64-musl",
       "os": "linux",
       "cpu": "arm64",
       "libc": "musl",
@@ -57,7 +57,7 @@
     },
     {
       "platform": "darwin-x64",
-      "package": "pgorm-napi-darwin-x64",
+      "package": "@necessary/pgorm-darwin-x64",
       "os": "darwin",
       "cpu": "x64",
       "rust_target": "x86_64-apple-darwin",
@@ -65,7 +65,7 @@
     },
     {
       "platform": "win32-x64",
-      "package": "pgorm-napi-win32-x64",
+      "package": "@necessary/pgorm-win32-x64",
       "os": "win32",
       "cpu": "x64",
       "rust_target": "x86_64-pc-windows-msvc",

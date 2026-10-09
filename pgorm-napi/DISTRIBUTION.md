@@ -3,26 +3,26 @@
 pgorm-napi is distributed as npm packages with prebuilt native addons, the
 usual layout for a Node-API module:
 
-- **`pgorm-napi`**, the main package: the ES module (`lib/*.js`), its
+- **`@necessary/pgorm`**, the main package: the ES module (`lib/*.js`), its
   TypeScript declarations (`lib/*.d.ts`), this file and `support.json`. It
   holds no native code.
-- **`pgorm-napi-<os>-<cpu>[-<libc>]`**, one per platform: that platform's
-  release build of the addon, `pgorm_napi.node`, and the notices of the Rust
-  dependencies compiled into it. The name uses Node.js's `process.platform` and
-  `process.arch`, plus the C library on Linux (`gnu` for glibc, `musl`), e.g.
-  `pgorm-napi-darwin-arm64` or `pgorm-napi-linux-x64-gnu`. Each declares the
-  `os`, `cpu` and, on Linux, `libc` it runs on.
+- **`@necessary/pgorm-<os>-<cpu>[-<libc>]`**, one per platform: that
+  platform's release build of the addon, `pgorm_napi.node`, and the notices of
+  the Rust dependencies compiled into it. The name uses Node.js's
+  `process.platform` and `process.arch`, plus the C library on Linux (`gnu`
+  for glibc, `musl`), e.g. `@necessary/pgorm-darwin-arm64` or
+  `@necessary/pgorm-linux-x64-gnu`. Each declares the `os`, `cpu` and, on
+  Linux, `libc` it runs on.
 
 The main package lists the platform packages a release builds as optional
 dependencies, so npm and Deno install only the one that matches the machine.
 Each one is pinned to the main package's own version. That is the one exact
 version requirement the packages carry: the module and the addon are released
 together, and a range could pair a module with an addon it was not built for.
-Your own project depends on `pgorm-napi` with a range as usual, and its
+Your own project depends on `@necessary/pgorm` with a range as usual, and its
 lockfile pins the exact versions.
 
-These names are provisional. The operator decides the final npm names,
-including whether they get a scope, before anything is published. Nothing has
+The Rust crate they are built from keeps its name, `pgorm-napi`. Nothing has
 been published yet ([Publishing](#publishing)).
 
 ## Installing
@@ -33,11 +33,11 @@ Deno 2.9.5 or later.
 **Node.js**
 
 ```sh
-npm install pgorm-napi
+npm install @necessary/pgorm
 ```
 
 ```js
-import { connect } from "pgorm-napi";
+import { connect } from "@necessary/pgorm";
 
 await using pool = await connect(process.env.DATABASE_URL);
 console.log(await pool.one("SELECT $1::int8 + 1 AS n", [41n])); // { n: 42n }
@@ -48,7 +48,7 @@ console.log(await pool.one("SELECT $1::int8 + 1 AS n", [41n])); // { n: 42n }
 ```json
 {
   "nodeModulesDir": "auto",
-  "imports": { "pgorm-napi": "npm:pgorm-napi@^0.2.0" }
+  "imports": { "@necessary/pgorm": "npm:@necessary/pgorm@^0.2.0" }
 }
 ```
 
@@ -57,9 +57,9 @@ deno install
 deno run --allow-ffi --allow-read app.ts
 ```
 
-`import { connect } from "pgorm-napi"` then resolves through the import map,
-and `import { connect } from "npm:pgorm-napi@^0.2.0"` works directly too. Deno
-installs the matching platform package as it installs any optional
+`import { connect } from "@necessary/pgorm"` then resolves through the import
+map, and `import { connect } from "npm:@necessary/pgorm@^0.2.0"` works directly
+too. Deno installs the matching platform package as it installs any optional
 dependency. `nodeModulesDir: "auto"` is the configuration the packaging check
 tests.
 
@@ -85,13 +85,13 @@ a release builds, and which have been tested:
 
 | Platform | Package | Release | Packaging check passed on |
 | --- | --- | --- | --- |
-| macOS arm64 | `pgorm-napi-darwin-arm64` | yes; CI builds it on `macos-15` | macOS 15 in CI and macOS 26.5.1 locally; Node.js 26.11.1; Deno 2.9.7 and 2.9.5 |
-| Linux x86-64, glibc | `pgorm-napi-linux-x64-gnu` | yes; CI builds it on `ubuntu-24.04` | Ubuntu 24.04 in CI; Node.js 26.11.1; Deno 2.9.7 |
-| Linux arm64, glibc | `pgorm-napi-linux-arm64-gnu` | no | untested |
-| Linux x86-64, musl | `pgorm-napi-linux-x64-musl` | no | untested |
-| Linux arm64, musl | `pgorm-napi-linux-arm64-musl` | no | untested |
-| macOS x86-64 | `pgorm-napi-darwin-x64` | no | untested |
-| Windows x86-64 | `pgorm-napi-win32-x64` | no | untested |
+| macOS arm64 | `@necessary/pgorm-darwin-arm64` | yes; CI builds it on `macos-15` | macOS 15 in CI and macOS 26.5.1 locally; Node.js 26.11.1; Deno 2.9.7 and 2.9.5 |
+| Linux x86-64, glibc | `@necessary/pgorm-linux-x64-gnu` | yes; CI builds it on `ubuntu-24.04` | Ubuntu 24.04 in CI; Node.js 26.11.1; Deno 2.9.7 |
+| Linux arm64, glibc | `@necessary/pgorm-linux-arm64-gnu` | no | untested |
+| Linux x86-64, musl | `@necessary/pgorm-linux-x64-musl` | no | untested |
+| Linux arm64, musl | `@necessary/pgorm-linux-arm64-musl` | no | untested |
+| macOS x86-64 | `@necessary/pgorm-darwin-x64` | no | untested |
+| Windows x86-64 | `@necessary/pgorm-win32-x64` | no | untested |
 
 Configuring a CI job does not establish a result. A combination moves into
 `support.json`'s `tested_combinations`, and into the last column here, only
@@ -146,9 +146,9 @@ It runs three steps, which CI runs on separate runners:
    on this machine, and the main package then names only those.
 3. **`install`**: serves the tarballs from an npm registry it runs on
    loopback, which returns 404 for every other name. Into fresh projects it
-   runs `npm install pgorm-napi` and, in a `nodeModulesDir: "auto"` Deno
-   project, installs `npm:pgorm-napi`, each with its own cache and no user
-   configuration. It checks that only the matching platform package was
+   runs `npm install @necessary/pgorm` and, in a `nodeModulesDir: "auto"` Deno
+   project, installs `npm:@necessary/pgorm`, each with its own cache and no
+   user configuration. It checks that only the matching platform package was
    installed, then runs `tests/package/smoke.test.ts` under `node --test` and
    `deno test`: connecting, a bound query, a built statement, a model, a
    transaction that commits and one that rolls back, `Temporal`, `bigint` and
@@ -199,9 +199,11 @@ authorities is bundled; the [README](README.md#connections) has the details.
 
 Nothing has been published, and no workflow publishes. A release would take:
 
-1. The operator choosing the final package names (and a scope, if any).
-   `support.json`'s `npm_package` and the checkout's `package.json` name are
-   the main package's, and each platform package's name is derived from it.
+1. The `@necessary` scope owned on npm by the account or organisation that
+   publishes. `support.json`'s `npm_package` and the checkout's `package.json`
+   name are the main package's, and each platform package's name is derived
+   from it. The packed manifests carry `publishConfig.access: public`, since
+   npm would otherwise publish a scoped package as restricted.
 2. Every release platform's package published before the main package, at the
    same version, from one run's `packages` artifact (`npm publish <tarball>`
    for each). Deno will not install the main package while any optional

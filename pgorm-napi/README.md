@@ -20,26 +20,26 @@ later.
 
 ## Installing
 
-pgorm-napi is packaged for npm: a main package, `pgorm-napi`, of JavaScript
-and declarations, and a package per platform holding its prebuilt addon,
-which npm and Deno install beside it — macOS arm64 and Linux x86-64 (glibc)
-today.
+pgorm-napi is packaged for npm: a main package, `@necessary/pgorm`, of
+JavaScript and declarations, and a package per platform holding its prebuilt
+addon, `@necessary/pgorm-<os>-<cpu>[-<libc>]`, which npm and Deno install
+beside it — macOS arm64 and Linux x86-64 (glibc) today.
 
 ```sh
-npm install pgorm-napi
+npm install @necessary/pgorm
 ```
 
 ```json
 {
   "nodeModulesDir": "auto",
-  "imports": { "pgorm-napi": "npm:pgorm-napi@^0.2.0" }
+  "imports": { "@necessary/pgorm": "npm:@necessary/pgorm@^0.2.0" }
 }
 ```
 
 The second is a Deno project's `deno.json`; `deno install` then fetches the
 packages. CI builds the packages, installs them in both runtimes and keeps the
-tarballs, but nothing is published to npm yet, and the package names are
-provisional until then; meanwhile, build from a checkout. [DISTRIBUTION.md](DISTRIBUTION.md)
+tarballs, but nothing is published to npm yet; meanwhile, build from a
+checkout. [DISTRIBUTION.md](DISTRIBUTION.md)
 covers the packages, the platforms, what Deno's `--allow-ffi` grants, the
 dependency notices and how the packages are built and checked.
 
@@ -59,11 +59,12 @@ looking for an installed platform package, so a checkout runs its own build.
 
 ## Loading
 
-Import the module, never the `.node` file — `pgorm-napi` once installed, as
-the examples here do, or `./pgorm-napi/lib/index.js` from a checkout:
+Import the module, never the `.node` file — `@necessary/pgorm` once
+installed, as the examples here do, or `./pgorm-napi/lib/index.js` from a
+checkout:
 
 ```js
-import { DatabaseError, Pool } from "pgorm-napi";
+import { DatabaseError, Pool } from "@necessary/pgorm";
 
 await using pool = new Pool("postgres://postgres@localhost/postgres?sslmode=disable");
 try {
@@ -88,7 +89,7 @@ try {
 ## Connections
 
 ```js
-import { connect } from "pgorm-napi";
+import { connect } from "@necessary/pgorm";
 
 await using pool = await connect(process.env.DATABASE_URL, { maxSize: 10 });
 
@@ -155,7 +156,7 @@ pgorm-query's statements and expressions are built from JavaScript as
 pgorm-python builds them, and run through the same terminals as SQL text:
 
 ```js
-import { Condition, call, col, select, Table, With } from "pgorm-napi";
+import { Condition, call, col, select, Table, With } from "@necessary/pgorm";
 
 const account = new Table("account", { schema: "app", alias: "a" });
 const event = new Table("event", { alias: "e" });
@@ -208,7 +209,7 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 ### Writes
 
 ```js
-import { col, Conflict, deleteFrom, insert, ReturningRow, Table, update } from "pgorm-napi";
+import { col, Conflict, deleteFrom, insert, ReturningRow, Table, update } from "@necessary/pgorm";
 
 const account = new Table("account", { schema: "app" });
 
@@ -246,7 +247,7 @@ await pool.query(deleteFrom(account).where(col("active").eq(false)).returning([R
 ### MERGE
 
 ```js
-import { merge, MergeAction, ReturningRow, Table } from "pgorm-napi";
+import { merge, MergeAction, ReturningRow, Table } from "@necessary/pgorm";
 
 const target = new Table("account", { alias: "t" });
 const source = new Table("staged", { alias: "s" });
@@ -281,7 +282,7 @@ source may be a `Table` or a `FromItem`, a subquery among them.
 import {
   call, col, FrameType, jsonDefault, jsonExists, jsonTable, JsonTableColumn as C, jsonValue,
   Range, select, Table, Value, Window, windowFunction,
-} from "pgorm-napi";
+} from "@necessary/pgorm";
 
 const docs = new Table("docs", { alias: "d" });
 const size = jsonValue(docs.col("doc"), "$.size", { returning: "integer", onEmpty: jsonDefault(0), onError: "error" });
@@ -333,7 +334,7 @@ and pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 `Paginator`, down to the SQL they write.
 
 ```ts
-import { column, Conflict, model, type RowOf, TypeName } from "pgorm-napi";
+import { column, Conflict, model, type RowOf, TypeName } from "@necessary/pgorm";
 
 const Account = model("account", {
   schema: "app",
@@ -426,7 +427,7 @@ builders, and runs through `execute`:
 import {
   alterTable, col, ColumnDef, createIndex, createSequence, createTable, createType, DataType,
   Table, TypeName, Value,
-} from "pgorm-napi";
+} from "@necessary/pgorm";
 
 const mood = new TypeName("mood", { schema: "app" });
 const booking = new Table("booking", { schema: "app" });
@@ -496,7 +497,7 @@ relation-to-relation stages over sources, compiled through prqlc to
 PostgreSQL SQL and run as any statement is.
 
 ```js
-import { pipeline as pl, Table } from "pgorm-napi";
+import { pipeline as pl, Table } from "@necessary/pgorm";
 
 const items = new Table("items", { schema: "app" });
 const category = pl.col("items", "category");
@@ -640,7 +641,7 @@ its items' one kind. For anything else, declare the kind with `Value`, using
 pgorm-python's kind names:
 
 ```js
-import { Range, TypeName, Value } from "pgorm-napi";
+import { Range, TypeName, Value } from "@necessary/pgorm";
 
 new Value(5, "i16");                                  // an int2
 Value.null("uuid");                                   // a typed NULL
@@ -697,7 +698,7 @@ Deno on its global npm cache, so type checking `node:` imports needs no
 `node_modules`.
 
 `tests/package/` is the installed packages' smoke suite. It imports
-`pgorm-napi` by name and runs only in the projects `checks/package.js`
+`@necessary/pgorm` by name and runs only in the projects `checks/package.js`
 installs the packed packages into ([DISTRIBUTION.md](DISTRIBUTION.md#build-and-verify)),
 so `deno test` leaves it out here, while `deno check` holds it to the
 declarations through the package's own name.
