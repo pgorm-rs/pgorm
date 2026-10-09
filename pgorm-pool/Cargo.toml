@@ -2,7 +2,7 @@
 name = "pgorm-pool"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
 description = "Connection pool for tokio-postgres, vendored from deadpool-postgres for pgorm"
 keywords = ["async", "database", "pool", "postgres"]

@@ -205,6 +205,27 @@ test("verify-full TLS connects through a configured CA, and checks the host name
   await assert.rejects(misnamed.ping(), ConnectionError);
 });
 
+// [spec:pgorm:req:napi.connections/test]
+test("verify-full TLS binds SCRAM authentication to the server's certificate", async (context) => {
+  const ca = tlsCa();
+  if (ca === undefined || new URL(dsn()).password === "") {
+    context.skip("needs a TLS server that authenticates with a password: PGORM_TEST_CA and SCRAM");
+    return;
+  }
+  // channel_binding=require refuses SCRAM unless it is bound to the TLS
+  // session, over the certificate's tls-server-end-point hash, so the TLS
+  // connector has to report that binding for this to connect. Plaintext has
+  // nothing to bind to, and the same setting refuses it.
+  const bound = new URL(withoutSslmode(dsn(), "localhost"));
+  bound.searchParams.set("channel_binding", "require");
+  await using verified = new Pool(bound.toString(), { ca });
+  assert.equal(await verified.ping(), true);
+  const plain = new URL(dsn());
+  plain.searchParams.set("channel_binding", "require");
+  await using refused = new Pool(plain.toString());
+  await assert.rejects(refused.ping(), ConnectionError);
+});
+
 // [spec:pgorm:req:napi.results/test]
 test("execute resolves with the number of rows a statement affected", async () => {
   await reset();

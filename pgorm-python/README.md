@@ -24,7 +24,7 @@ From the repository root, using CPython 3.14:
 
 ```sh
 uv venv target/python-dev
-uv pip install --python target/python-dev/bin/python 'maturin==1.15.0'
+uv pip install --python target/python-dev/bin/python 'maturin>=1.15,<2'
 CARGO_TARGET_DIR=target/python-codegen-seed \
   target/python-dev/bin/maturin build --manifest-path pgorm-python/Cargo.toml \
   --interpreter target/python-dev/bin/python --out target/python-dist --locked

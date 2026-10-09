@@ -2,7 +2,7 @@
 name = "pgorm-generative-replay"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 publish = false
 license = "MIT OR Apache-2.0"
 description = "Standalone replay harness for the pgorm generated-program campaign"
@@ -18,22 +18,25 @@ path = "src/lib.rs"
 
 [dependencies]
 pgorm = { path = "../../.." }
-tokio = { version = "=1.53.1", features = ["rt-multi-thread", "macros"] }
-serde = { version = "=1.0.229", features = ["derive"] }
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1.0.229", features = ["derive"] }
 # `raw_value` backs the decoder's numeric-fidelity check; `float_roundtrip`
 # keeps a JSON float's shortest representation across decode and re-render.
-serde_json = { version = "=1.0.151", features = ["raw_value", "float_roundtrip"] }
-tokio-postgres = "=0.7.18"
+serde_json = { version = "1.0.151", features = ["raw_value", "float_roundtrip"] }
+tokio-postgres = "0.7.18"
 # A streamed step observes a bounded prefix, so the harness has to drive
 # `RowStream` item by item rather than collect it.
-futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
-jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
-rust_decimal = "=1.43.0"
-uuid = "=1.26.0"
-bytes = "=1.12.1"
-fallible-iterator = "=0.2.0"
-postgres-protocol = "=0.6.12"
-async-trait = "=0.1.92"
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+rust_decimal = "1.43.0"
+uuid = "1.27.0"
+bytes = "1.12.1"
+# fallible-iterator stays on 0.2: postgres-protocol 0.6.12, the latest release,
+# hands its array and range iterators out through 0.2's `FallibleIterator`, and
+# 0.3's is a different trait those types do not implement.
+fallible-iterator = "0.2.0"
+postgres-protocol = "0.6.12"
+async-trait = "0.1.92"
 
 [lints.rust]
 unsafe_code = "forbid"

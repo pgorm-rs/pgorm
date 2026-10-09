@@ -2,7 +2,7 @@
 name = "pgorm-napi"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 description = "Asynchronous PostgreSQL access through pgorm from Node.js and Deno, over Node-API"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pgorm-rs/pgorm"
@@ -17,27 +17,30 @@ name = "pgorm_napi"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pgorm = { version = "=0.2.0", path = ".." }
-neon = { version = "=1.1.2", default-features = false, features = ["napi-6"] }
-tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
-tokio-postgres = "=0.7.18"
-# The value codecs, at the revisions pgorm itself resolves, so the addon
+pgorm = { version = "0.2.0", path = ".." }
+neon = { version = "1.1.2", default-features = false, features = ["napi-6"] }
+tokio = { version = "1.53.2", features = ["rt-multi-thread"] }
+tokio-postgres = "0.7.18"
+# The value codecs, the same crates pgorm itself resolves, so the addon
 # converts exactly what pgorm's own `Value` holds.
-bytes = "=1.12.1"
-fallible-iterator = "=0.2.0"
-jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
-postgres-protocol = "=0.6.12"
-rust_decimal = "=1.43.0"
-serde_json = { version = "=1.0.151", features = ["raw_value", "float_roundtrip"] }
-uuid = "=1.26.0"
+bytes = "1.12.1"
+# fallible-iterator stays on 0.2: postgres-protocol 0.6.12, the latest release,
+# hands its array and range iterators out through 0.2's `FallibleIterator`, and
+# 0.3's is a different trait those types do not implement.
+fallible-iterator = "0.2.0"
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+postgres-protocol = "0.6.12"
+rust_decimal = "1.43.0"
+serde_json = { version = "1.0.151", features = ["raw_value", "float_roundtrip"] }
+uuid = "1.27.0"
 # Connections: the cancellation pgorm-python's runtime uses, row streams, and
 # TLS through rustls verifying against the platform's trust store, or a CA the
 # caller supplies.
-futures-util = "=0.3.34"
-rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
-rustls-native-certs = "=0.8.4"
-tokio-postgres-rustls = "=0.13.0"
-tokio-util = "=0.7.19"
+futures-util = "0.3.34"
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8.4"
+tokio-postgres-rustls = "0.14.0"
+tokio-util = "0.7.20"
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -29,7 +29,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 The library target is named `_native` with `crate-type = ["cdylib", "rlib"]`.
 Depend on this checkout's `pgorm-python` with `default-features = false`, the
-same checkout's `pgorm`, your entity crate, and `pyo3 = "=0.29.2"`. Define an
+same checkout's `pgorm`, your entity crate, and the `pyo3` release
+`pgorm.capabilities()["binding"]["version"]` names. Define an
 `extension-module` feature enabling `pyo3/extension-module`. Registration
 requires `E: EntityTrait + Send + Sync + 'static`,
 `E::Model: IntoActiveModel<E::ActiveModel> + Sync + 'static`, and
@@ -41,7 +42,7 @@ Copy the matching `pgorm-python/python/pgorm` facade into the application's
 
 ```toml
 [build-system]
-requires = ["maturin==1.15.0"]
+requires = ["maturin>=1.15,<2"]
 build-backend = "maturin"
 
 [project]

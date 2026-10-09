@@ -20,7 +20,7 @@ OpenSSL, `uv` and the repository's `nplan` installation:
 
 ```sh
 uv venv target/python-dev
-uv pip install --python target/python-dev/bin/python 'maturin==1.15.0'
+uv pip install --python target/python-dev/bin/python 'maturin>=1.15,<2'
 PGORM_TEST_PG_BIN=/path/to/postgresql/bin \
   target/python-dev/bin/python pgorm-python/tests/with_local_postgres.py \
   target/python-dev/bin/python pgorm-python/checks/acceptance.py

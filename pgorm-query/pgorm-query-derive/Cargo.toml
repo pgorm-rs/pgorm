@@ -9,7 +9,7 @@ documentation = "https://docs.rs/pgorm-query"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = [ "database" ]
 keywords = ["database", "sql", "postgres"]
-rust-version = "1.88"
+rust-version = "1.89"
 
 [lib]
 proc-macro = true
@@ -22,7 +22,7 @@ proc-macro2 = { version = "1.0.107", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 
 [dev-dependencies]
-trybuild = "1.0.120"
+trybuild = "1.0.122"
 pgorm-query.workspace = true
 strum = { version = "0.28", features = ["derive"] }
 

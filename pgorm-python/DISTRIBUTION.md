@@ -13,8 +13,8 @@ recorded test evidence states the actual OS and Python version exercised.
 ## Build and verify
 
 The distribution checker requires Rust, a C compiler, libclang, CPython 3.14
-and `uv`. Maturin 1.15.0 is installed into temporary PEP 517 build environments
-from the package's build requirements. The checker uses the committed Cargo
+and `uv`. Maturin (`>=1.15,<2`) is installed into temporary PEP 517 build
+environments from the package's build requirements. The checker uses the committed Cargo
 lockfile and separate Cargo target directories for standalone and source
 archive builds. Cargo dependency caches may be reused.
 

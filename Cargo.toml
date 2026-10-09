@@ -12,7 +12,7 @@ documentation = "https://docs.rs/pgorm"
 repository = "https://github.com/pgorm-rs/pgorm"
 categories = ["database"]
 keywords = ["async", "orm", "postgres"]
-rust-version = "1.88"
+rust-version = "1.89"
 
 [package.metadata.docs.rs]
 features = ["default", "debug-print", "postgres-array", "pgorm-internal", "tests-cfg", "metrics-fingerprint", "pg-19"]
@@ -47,7 +47,7 @@ tokio-postgres.workspace = true
 # every configuration anyway — `pgorm-query` and tokio-postgres's
 # `with-jiff-0_2` both depend on it — so `with-jiff` gates the conversion
 # surface (`TryGetable`, `IntoActiveValue`, the prelude names), not the crate.
-jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 futures = { version = "0.3.34", default-features = false, features = ["std"] }
 log = { version = "0.4.34", default-features = false }
 # Required, not optional. `Value::Decimal` is an unconditional variant of
@@ -120,7 +120,7 @@ prqlc = { git = "https://github.com/necessary-nu/prql.git", rev = "2ce6a2428ee85
 pgorm-query.workspace = true
 strum = { version = "0.28", default-features = false }
 serde_json = { version = "1.0.151", default-features = false, optional = true }
-uuid = { version = "1.26", default-features = false, optional = true }
+uuid = { version = "1.27", default-features = false, optional = true }
 url = { version = "2.5", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 bytes = "1.12"
@@ -132,12 +132,12 @@ tokio = { version = "1.53", features = ["full"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 pgorm = { path = ".", features = ["debug-print", "tests-cfg", "postgres-array", "pgorm-internal", "metrics-fingerprint"] }
 pretty_assertions = { version = "1.4" }
-uuid = { version = "1.26", features = ["v4"] }
+uuid = { version = "1.27", features = ["v4"] }
 arraystring = "0.3"
 dotenvy = "0.15.7"
 ipnetwork = "0.21.1"
-mac_address = "1.1.8"
-pgvector = { version = "~0.4.2", default-features = false }
+mac_address = "1.2.0"
+pgvector = { version = "0.4.2", default-features = false }
 toml = "1.1"
 # The identifier render oracle registers the migration ledger's custom table
 # name, which only the migrator renders (tests/identifier_oracle/live_capture.rs).
