@@ -408,6 +408,25 @@ SQL text running a built statement.
 > takes a WITH clause, and one with a RETURNING list is a common table
 > expression's body.
 
+> [spec:pgorm:req:napi.merge]
+> `merge(target, source, on)` MUST follow pgorm-query's MERGE typestate. It
+> gives a `PendingMerge`, which has no `inspect()` and which every terminal
+> refuses with a `ConstructionError`, because PostgreSQL refuses a MERGE with
+> no WHEN arm; its first arm gives the `Merge` statement. `whenMatched` and
+> `whenNotMatchedBySource` take an action on a target row —
+> `MergeAction.update`, which takes its first assignment and so is never
+> empty, `MergeAction.delete()` or `MergeAction.doNothing()` — and
+> `whenNotMatched` one on a source row — `MergeAction.insert`, likewise never
+> empty, `MergeAction.insertDefaults()` or `MergeAction.doNothing()`; any
+> other pairing MUST be a `ConstructionError`. Each arm takes an optional
+> condition; within a kind of row the unconditional arm renders after the
+> conditional ones and a later one replaces it, as pgorm-query orders them.
+> `returning` reads a row's versions as a write's does, `returningAction()`
+> puts `merge_action()` first in the list, its only form, and `only()` writes
+> `ONLY` before the target. A `Merge` takes a plain WITH clause — a recursive
+> one is refused, as PostgreSQL refuses it — and with a RETURNING list is a
+> common table expression's body.
+
 ## Clean exit
 
 > [spec:pgorm:req:napi.exit]

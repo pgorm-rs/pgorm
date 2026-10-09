@@ -7,9 +7,11 @@
 // [spec:pgorm:req:napi.typing]
 
 import type { Select } from "./select.d.ts";
+import type { Delete, Insert, Update } from "./writes.d.ts";
 
 export * from "./expressions.d.ts";
 export * from "./select.d.ts";
+export * from "./writes.d.ts";
 
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
@@ -436,7 +438,7 @@ export interface TransactionOptions extends OperationOptions {
  * A statement a builder made, which a terminal runs as `inspect()` builds it,
  * its values bound.
  */
-export type Statement = Select;
+export type Statement = Select | Insert | Update | Delete;
 
 /**
  * What a pool, a connection and a transaction run bound SQL through: SQL text

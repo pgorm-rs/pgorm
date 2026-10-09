@@ -40,6 +40,8 @@ export { CaseOperand, caseOf, caseWhen, Condition, SearchedCase, SimpleCase } fr
 export { Aliased, bind, call, col, exists, Expr, OrderBy, scalar, tuple } from "./expressions.js";
 export { Builder } from "./builder.js";
 export { FromItem, Select, select, Table, With } from "./select.js";
+export { Delete, deleteFrom, Insert, insert, ReturningRow, Update, update } from "./writes.js";
+export { Conflict, ConflictTarget, ConflictUpdate } from "./conflicts.js";
 export {
   ConnectionError,
   ConstructionError,

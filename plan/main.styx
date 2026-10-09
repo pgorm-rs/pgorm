@@ -10888,6 +10888,7 @@ children (
                         [spec:pgorm:req:napi.expressions]
                         [spec:pgorm:req:napi.select]
                         [spec:pgorm:req:napi.writes]
+                        [spec:pgorm:req:napi.merge]
                     )
                 }
                 deps (napi-connections)

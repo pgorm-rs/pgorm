@@ -4,6 +4,7 @@
 //! its own builders to in both runtimes. A case missing on either side fails.
 
 mod select;
+mod writes;
 
 use std::collections::BTreeMap;
 
@@ -106,5 +107,14 @@ fn select_family_matches_its_golden_file() {
     check(
         include_str!("../../../tests/parity/select.json"),
         select::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.writes/test]
+#[test]
+fn writes_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/writes.json"),
+        writes::cases(),
     );
 }

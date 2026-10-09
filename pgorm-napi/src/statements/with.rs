@@ -31,6 +31,9 @@ fn expression<'cx>(
     let body = arg(cx, index + 1);
     let mut expression = match node(cx, body) {
         Some(Node::Select(select)) => CommonTableExpression::new(table, select),
+        Some(Node::Insert(insert)) => CommonTableExpression::new(table, insert.inner),
+        Some(Node::Update(update)) => CommonTableExpression::new(table, update.inner),
+        Some(Node::Delete(delete)) => CommonTableExpression::new(table, delete.inner),
         Some(other) => {
             let what = other.describe();
             return refuse(

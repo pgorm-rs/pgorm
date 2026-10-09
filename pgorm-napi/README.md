@@ -175,6 +175,44 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   be built never exists. A statement binding more than 65,535 values is refused
   before anything is sent.
 
+### Writes
+
+```js
+import { col, Conflict, deleteFrom, insert, ReturningRow, Table, update } from "./pgorm-napi/lib/index.js";
+
+const account = new Table("account", { schema: "app" });
+
+await pool.query(
+  insert(account).columns("id", "name").values(1, "Alice").values(2, "Bob")
+    .onConflict(Conflict.on("id").update("name"))
+    .returning([col("id"), ReturningRow.old.col("id").isNull().as("inserted")]),
+);
+await pool.execute(update(account).set("visits", col("visits").add(1)).where(col("id").eq(1)));
+await pool.query(deleteFrom(account).where(col("active").eq(false)).returning([ReturningRow.old.star()]));
+```
+
+- **INSERT** names its distinct columns once, then takes rows: `values(..)` per
+  row, checked against the columns' count, `select(query)`, or
+  `defaultValues()` with no columns. `overriding("systemValue" | "userValue")`
+  is for identity columns.
+- **Conflicts** are an arbiter and an action: `Conflict.doNothing()` for any
+  conflict, or `Conflict.on(column | expression, ..)` — with `.where(..)` for a
+  partial index — or `Conflict.onConstraint(name)`, followed by `.doNothing()`,
+  `.update(column, ..)` (from `EXCLUDED`) or `.set(column, value)`, an update
+  taking a `.where(..)` of its own. A target without its action is refused.
+- **UPDATE** assigns each column once with `set`; **DELETE** comes from
+  `deleteFrom`. Each needs `where(..)` or an explicit `allRows()` before it runs,
+  and `from(item)` / `using(item)` add the items it reads.
+- **RETURNING**: `returning(items, { oldAs, newAs })`, every column when
+  `items` is empty. `ReturningRow.old` and `ReturningRow.new` read the row
+  before and after the write; a renamed version answers only to its new name,
+  `col(name, { table: newName })`.
+- A write with a RETURNING list is a common table expression's body, and every
+  write takes `with(..)`.
+- An INSERT with no rows, an UPDATE with no assignment and an UPDATE or DELETE
+  with neither `where` nor `allRows()` are refused, by `inspect()` and the
+  terminals alike, before anything is sent.
+
 ## Values
 
 A parameter is bound, never interpolated, and each value has one JavaScript

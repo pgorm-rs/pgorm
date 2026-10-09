@@ -13,17 +13,20 @@
 //! through [`compile`].
 
 mod args;
+mod conflict;
 mod expr;
 #[cfg(test)]
 mod parity;
+mod returning;
 mod select;
 mod table;
 mod with;
+mod write;
 
 use neon::{prelude::*, types::Finalize};
 use pgorm::pgorm_query::{
-    AnyWithClause, Condition, FromItem, NamedTable, NullOrdering, Order, Query, SelectStatement,
-    SimpleExpr, Values,
+    AnyWithClause, Condition, ConflictUpdate, FromItem, NamedTable, NullOrdering, OnConflict,
+    Order, Query, SelectStatement, SimpleExpr, Values,
 };
 
 use crate::{codec::Codec, rows, values::Tagged};
@@ -59,6 +62,15 @@ pub(crate) enum Node {
     FromItem(FromItem),
     Select(SelectStatement),
     With(AnyWithClause),
+    Insert(write::Insert),
+    Update(write::Update),
+    Delete(write::Delete),
+    /// A conflict arbiter before its action.
+    Arbiter(conflict::Arbiter),
+    /// A conflict's `DO UPDATE`, which can take more assignments.
+    ConflictUpdate(ConflictUpdate),
+    /// A completed conflict action.
+    Conflict(OnConflict),
 }
 
 impl Finalize for Node {}
@@ -76,6 +88,11 @@ impl Node {
             Self::FromItem(_) => "a FROM item",
             Self::Select(_) => "a Select",
             Self::With(_) => "a WITH clause",
+            Self::Insert(_) => "an INSERT",
+            Self::Update(_) => "an UPDATE",
+            Self::Delete(_) => "a DELETE",
+            Self::Arbiter(_) => "a conflict target with no action",
+            Self::ConflictUpdate(_) | Self::Conflict(_) => "a conflict action",
         }
     }
 }
@@ -91,6 +108,9 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
         select::EXPORTS,
         table::EXPORTS,
         with::EXPORTS,
+        write::EXPORTS,
+        conflict::EXPORTS,
+        returning::EXPORTS,
     ] {
         for &(name, build) in exports {
             cx.export_function(name, move |mut cx| {
@@ -113,10 +133,14 @@ const MAX_PARAMETERS: usize = 65_535;
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
         Node::Select(select) => select.build(),
-        other => {
-            let what = other.describe();
-            return refuse(cx, format!("{what} is not a statement to run"));
-        }
+        other => match write::built(other) {
+            Some(Ok(built)) => built,
+            Some(Err(reason)) => return refuse(cx, reason),
+            None => {
+                let what = other.describe();
+                return refuse(cx, format!("{what} is not a statement to run"));
+            }
+        },
     };
     limited(cx, built)
 }

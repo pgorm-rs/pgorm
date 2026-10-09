@@ -228,7 +228,7 @@ let withOf;
 export class With extends Builder {
   /**
    * @param {string} name
-   * @param {Select} body
+   * @param {Select | import("./writes.js").Insert | import("./writes.js").Update | import("./writes.js").Delete} body
    * @param {CteOptions} [options]
    * @param {symbol} [token]
    */
@@ -249,7 +249,7 @@ export class With extends Builder {
    * One more common table expression, which may read the ones before it.
    *
    * @param {string} name
-   * @param {Select} body
+   * @param {Select | import("./writes.js").Insert | import("./writes.js").Update | import("./writes.js").Delete} body
    * @param {CteOptions} [options]
    */
   cte(name, body, { columns, materialized } = {}) {

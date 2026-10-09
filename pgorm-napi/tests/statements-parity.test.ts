@@ -9,8 +9,9 @@ import { test } from "node:test";
 
 import { built, type Built } from "./parity/canonical.ts";
 import { cases as select } from "./parity/select.ts";
+import { cases as writes } from "./parity/writes.ts";
 
-const families = { select };
+const families = { select, writes };
 
 for (const [family, cases] of Object.entries(families)) {
   const golden = JSON.parse(readFileSync(new URL(`./parity/${family}.json`, import.meta.url), "utf8")) as Record<

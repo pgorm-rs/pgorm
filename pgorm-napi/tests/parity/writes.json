@@ -1,0 +1,54 @@
+{
+  "insert-values-upsert": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"id\", \"name\") VALUES ($1, $2), ($3, $4) ON CONFLICT (\"id\") DO UPDATE SET \"name\" = \"excluded\".\"name\" RETURNING \"id\", (old.\"id\" IS NULL) AS \"inserted\"",
+    "values": [["i64","1"], ["text","Alice"], ["i64","2"], ["text","O'Brien"]]
+  },
+  "insert-select-do-nothing": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"id\") SELECT \"id\" FROM \"staged\" ON CONFLICT DO NOTHING",
+    "values": []
+  },
+  "insert-defaults": {
+    "sql": "INSERT INTO \"app\".\"account\" VALUES (DEFAULT) RETURNING *",
+    "values": []
+  },
+  "insert-constraint-set": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"id\", \"name\") VALUES ($1, $2) ON CONFLICT ON CONSTRAINT \"account_pkey\" DO UPDATE SET \"name\" = $3, \"note\" = \"excluded\".\"note\" WHERE \"name\" <> $4",
+    "values": [["i64","1"], ["text","x"], ["text","y"], ["text","z"]]
+  },
+  "insert-expression-target": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"id\") OVERRIDING SYSTEM VALUE VALUES ($1) ON CONFLICT (\"id\", LOWER(\"name\")) WHERE \"active\" = $2 DO NOTHING",
+    "values": [["i64","1"], ["bool","true"]]
+  },
+  "insert-typed-values": {
+    "sql": "INSERT INTO \"app\".\"account\" (\"small\", \"missing\", \"mood\") VALUES ($1, $2, CAST($3::text AS app.mood))",
+    "values": [["i16","5"], ["text","null"], ["text","calm"]]
+  },
+  "insert-with": {
+    "sql": "WITH \"src\" AS (SELECT \"id\" FROM \"staged\") INSERT INTO \"app\".\"account\" (\"id\") SELECT \"id\" FROM \"src\"",
+    "values": []
+  },
+  "update-versions-renamed": {
+    "sql": "UPDATE \"app\".\"account\" SET \"name\" = $1, \"visits\" = \"visits\" + $2 WHERE \"id\" = $3 RETURNING WITH (OLD AS \"before\", NEW AS \"after\") \"before\".\"name\" AS \"was\", \"after\".\"name\" AS \"now\"",
+    "values": [["text","Bob"], ["i64","1"], ["i64","2"]]
+  },
+  "update-from-all-rows": {
+    "sql": "UPDATE \"app\".\"account\" SET \"name\" = \"s\".\"other\" FROM \"staged\" AS \"s\"",
+    "values": []
+  },
+  "update-where-twice": {
+    "sql": "UPDATE \"app\".\"account\" SET \"a\" = $1 WHERE \"b\" = $2 AND \"c\" = $3 RETURNING new.*",
+    "values": [["i64","1"], ["i64","2"], ["i64","3"]]
+  },
+  "delete-using": {
+    "sql": "DELETE FROM \"app\".\"account\" USING \"gone\" WHERE \"gone\".\"id\" = \"app\".\"account\".\"id\" RETURNING old.*",
+    "values": []
+  },
+  "delete-all-rows": {
+    "sql": "DELETE FROM \"t\"",
+    "values": []
+  },
+  "delete-as-cte": {
+    "sql": "WITH \"moved\" AS (DELETE FROM \"app\".\"account\" WHERE \"id\" > $1 RETURNING \"id\") , \"kept\" AS (UPDATE \"log\" SET \"seen\" = $2 RETURNING \"id\") SELECT * FROM \"moved\"",
+    "values": [["i64","3"], ["bool","true"]]
+  }
+}
