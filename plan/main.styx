@@ -10776,4 +10776,101 @@ children (
             }
         )
     }
+
+    {
+        id napi
+        title "pgorm is usable from Deno and Node through pgorm-napi, a Node-API binding built with Neon, as it is from Python"
+        kind @feat
+        children (
+            {
+                id napi-proof
+                title "The pgorm-napi addon loads in Deno and Node, resolves an async query as a Promise from pgorm's runtime, and lets the process exit cleanly"
+                kind @feat
+                log (
+                    {
+                        at 2026-10-09T10:47:56.219684Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance:\n- The pgorm-napi crate (own workspace, cdylib, Neon 1.x) builds a .node that both `node` and `deno` load from a local path. Settle and document how each runtime loads it, e.g. Deno through node:module createRequire with --allow-ffi, or whatever works cleanly.\n- The addon owns a tokio runtime and runs pgorm's async work on it. One exported async function connects to the test server and runs a bound query, e.g. SELECT $1::int + 1, resolving a JS Promise with the result through Neon's Channel / promise API; a failure rejects with a typed JS error carrying the SQLSTATE.\n- Many concurrent calls resolve correctly in both runtimes.\n- A process that finished its work exits on its own in both runtimes, with no hang from the addon's threadsafe functions or tokio runtime, and no crash at shutdown. This is the known risk, so test it explicitly.\n- A test harness runs the same suite under `node --test` and `deno test` (the operator allowed deno test for this binding), and `deno check` covers the .d.ts and test files.\n- An `nplan check` platform for pgorm-napi (cargo check, clippy and fmt on its workspace, plus `deno check`) runs within the commit check budget. CI: add a job (Linux and macOS) running both runtimes' suites against a PostgreSQL 18 service, following the python.yml pattern (push to main with path filters, weekly, dispatch).\n- A docs/spec/napi.md rule set opens with the targeting and loading model.\n\nIf Deno's threadsafe-function support turns out broken for Neon, stop and report with a minimal reproduction instead of working around it silently; the operator decides whether to switch approach."
+                    }
+                )
+            }
+
+            {
+                id napi-values
+                title "Every pgorm value crosses into and out of JavaScript with a declared type, and query results decode to JS objects"
+                kind @feat
+                deps (napi-proof)
+            }
+
+            {
+                id napi-connections
+                title "JavaScript connects, pools, runs bound SQL, and scopes transactions and savepoints"
+                kind @feat
+                deps (napi-values)
+            }
+
+            {
+                id napi-statements
+                title "JavaScript builds pgorm-query's statements and expressions: SELECT, INSERT, UPDATE, DELETE, MERGE, ON CONFLICT, RETURNING row versions, SQL/JSON, windows, ranges"
+                kind @feat
+                deps (napi-connections)
+            }
+
+            {
+                id napi-schema
+                title "JavaScript builds DDL: tables, keys, constraints, types, sequences, indexes and their alterations"
+                kind @feat
+                deps (napi-statements)
+            }
+
+            {
+                id napi-models
+                title "JavaScript declares models and uses them: CRUD, relations, graphs, cursors and pagination"
+                kind @feat
+                deps (napi-statements)
+            }
+
+            {
+                id napi-entities
+                title "A Rust application registers its entities with the binding, and JavaScript uses them through it"
+                kind @feat
+                deps (napi-models)
+            }
+
+            {
+                id napi-pipeline
+                title "JavaScript composes pgorm's PRQL-shaped pipeline over sources"
+                kind @feat
+                deps (napi-statements)
+            }
+
+            {
+                id napi-codegen
+                title "Codegen produces TypeScript for a schema's entities, as it does Python"
+                kind @feat
+                deps (napi-entities)
+            }
+
+            {
+                id napi-packaging
+                title "pgorm-napi ships as an npm package with prebuilt per-platform binaries, importable from Deno as npm:"
+                kind @build
+                deps (
+                    napi-entities
+                    napi-schema
+                    napi-pipeline
+                    napi-codegen
+                )
+            }
+        )
+        log (
+            {
+                at 2026-10-09T10:47:56.15092Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-09: \"I want a `neon` crate so I can use this (just like the Python one) from Deno (yes, Deno supports the N-API)\", then, while the plan was being filed: \"it should be called pgorm-napi\". Decisions, the last two asked and answered:\n- The crate is pgorm-napi, its own cargo workspace and a cdylib, as pgorm-python is.\n- It is built with the Neon framework (neon-bindings, latest stable 1.x, napi-6 or lower) targeting Node-API; \"napi\" names the interface, Neon is the framework.\n- TypeScript declarations (.d.ts) are the .pyi stubs' counterpart.\n- The API mirrors pgorm-python's structure in JavaScript conventions: camelCase, Promises for anything async, typed errors.\n- Live tests run under BOTH runtimes, Node's test runner and `deno test` with the permissions a native addon needs (--allow-ffi, plus net/env/read as required). That is the operator's explicit exception to their global rule that only `deno check` is run in Deno; `deno check` remains the type check.\n- Local build first: build the .node and load it from a path. npm packaging with per-platform prebuilt binaries, importable from Deno as npm:, is napi-packaging, last.\n\nThe risk to retire first: Neon's async bridge (Channel, promises) and its drop_queue cleanup are built on napi_threadsafe_function. Deno reports Node-API version 10 and exports those functions, but others still treat their behaviour outside Node as unverified. napi-proof gates everything else on a live proof in both runtimes, including a clean process exit. Machine facts at filing: deno 2.9.5, node 22.15.0."
+            }
+        )
+    }
 )
