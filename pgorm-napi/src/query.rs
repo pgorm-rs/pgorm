@@ -1,5 +1,5 @@
-//! `queryInt`: the binding's first asynchronous operation, a bound statement
-//! run through pgorm's pool whose result settles a JavaScript promise.
+//! `query`: a bound statement run through pgorm's pool, whose decoded rows
+//! settle a JavaScript promise.
 
 use std::{
     collections::HashMap,
@@ -11,8 +11,12 @@ use neon::prelude::*;
 use pgorm::{ConnectionTrait, DatabasePool, types::ToSql};
 
 use crate::{
+    codec::Codec,
     errors::{Failure, Redactions, failure},
+    params::{self, Param},
+    rows::{self, Decoded},
     settle,
+    values::read,
 };
 
 /// Connections each data source's pool keeps open.
@@ -53,39 +57,7 @@ fn source(dsn: &str) -> Result<Source, Failure> {
     Ok(source)
 }
 
-/// Each parameter as an `int4`. A value with no exact `int4` — a fraction, a
-/// non-finite number, one outside the 32-bit range, anything but a number — is
-/// refused rather than rounded, wrapped or stringified.
-fn int4_params<'cx>(
-    cx: &mut FunctionContext<'cx>,
-    values: &[Handle<'cx, JsValue>],
-) -> Result<Vec<i32>, Failure> {
-    values
-        .iter()
-        .enumerate()
-        .map(|(index, value)| {
-            let position = index + 1;
-            let number = value
-                .downcast::<JsNumber, _>(cx)
-                .map_err(|_| {
-                    Failure::Construction(format!("parameter ${position} is not a number"))
-                })?
-                .value(cx);
-            let in_range = number.fract() == 0.0
-                && number >= f64::from(i32::MIN)
-                && number <= f64::from(i32::MAX);
-            if !in_range {
-                return Err(Failure::Construction(format!(
-                    "parameter ${position} ({number}) is not a 32-bit integer"
-                )));
-            }
-            #[allow(clippy::cast_possible_truncation)]
-            Ok(number as i32)
-        })
-        .collect()
-}
-
-async fn run(source: Source, sql: String, params: Vec<i32>) -> Result<i32, Failure> {
+async fn run(source: Source, sql: String, params: Vec<Param>) -> Result<Decoded, Failure> {
     let secrets = &source.secrets;
     let connection = source
         .pool
@@ -96,25 +68,26 @@ async fn run(source: Source, sql: String, params: Vec<i32>) -> Result<i32, Failu
         .iter()
         .map(|param| param as &(dyn ToSql + Sync))
         .collect();
-    let row = connection
-        .query_one(&sql, &bound)
+    let rows = connection
+        .query_all(&sql, &bound)
         .await
         .map_err(|error| failure(&error, secrets))?;
-    row.try_get::<_, i32>(0)
-        .map_err(|error| failure(&pgorm::Error::Postgres(error), secrets))
+    rows::decode(&rows)
 }
 
-/// `queryInt(dsn, sql, params)`: run `sql` with each of `params` bound as an
-/// `int4`, on the pool for `dsn`, and resolve with the `int4` in the first
-/// column of the one row it returns.
-pub(crate) fn query_int(mut cx: FunctionContext) -> JsResult<JsPromise> {
+/// `query(dsn, sql, params, tagged)`: run `sql` with `params` bound, on the
+/// pool for `dsn`, and resolve with `[names, rows]`.
+pub(crate) fn query(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let dsn = cx.argument::<JsString>(0)?.value(&mut cx);
-    let sql = cx.argument::<JsString>(1)?.value(&mut cx);
-    let values = cx.argument::<JsArray>(2)?.to_vec(&mut cx)?;
-    let prepared = int4_params(&mut cx, &values).and_then(|params| Ok((source(&dsn)?, params)));
-    match prepared {
-        Ok((source, params)) => settle::promise(&mut cx, run(source, sql, params), |cx, value| {
-            Ok(cx.number(value).upcast())
+    let sql = cx.argument::<JsValue>(1)?;
+    let sql = read::sql(&mut cx, sql)?;
+    let values = cx.argument::<JsArray>(2)?;
+    let tagged = cx.argument::<JsBoolean>(3)?.value(&mut cx);
+    let codec = Codec::get(&mut cx)?;
+    let params = params::read(&mut cx, codec, values)?;
+    match source(&dsn) {
+        Ok(source) => settle::promise(&mut cx, run(source, sql, params), move |cx, decoded| {
+            rows::to_js(cx, decoded, tagged)
         }),
         Err(failure) => settle::rejected(&mut cx, failure),
     }

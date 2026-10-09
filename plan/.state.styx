@@ -1929,6 +1929,19 @@ impl_evidence (
         {impl_name main, rule napi.runtimes}
         {impl_name main, rule napi.typing}
     )}
+    {id napi-values, covered_rules (
+        napi.inference
+        napi.rows
+        napi.temporal
+        napi.value-tags
+        napi.values
+    ), covered_claims (
+        {impl_name main, rule napi.inference}
+        {impl_name main, rule napi.rows}
+        {impl_name main, rule napi.temporal}
+        {impl_name main, rule napi.value-tags}
+        {impl_name main, rule napi.values}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

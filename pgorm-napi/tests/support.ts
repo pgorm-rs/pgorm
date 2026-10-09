@@ -1,8 +1,9 @@
 // Shared by the test files, which run unchanged under `node --test` and
 // `deno test`: both runners accept node:test's `test`, and every runtime
 // difference the suite meets is kept here.
-// [spec:pgorm:req:napi.runtimes/test]
+// [spec:pgorm:req:napi.runtimes+1/test]
 
+import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -70,7 +71,7 @@ export function runFixture(name: string, deadline: number, env: Record<string, s
   const script = join(here, "fixtures", `${name}.ts`);
   const args = deno
     ? ["run", "--allow-ffi", "--allow-read", "--allow-env", script]
-    : ["--experimental-strip-types", "--disable-warning=ExperimentalWarning", script];
+    : [script];
   const started = performance.now();
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
@@ -95,4 +96,58 @@ export function runFixture(name: string, deadline: number, env: Record<string, s
       resolve({ code, signal, stdout, stderr, elapsed: performance.now() - started, hung });
     });
   });
+}
+
+/**
+ * A database of its own for a test file, named for the runtime and process so
+ * the two runtimes' suites can run at once, made fresh on the server
+ * {@link dsn} names and dropped by `drop`.
+ */
+export async function scratchDatabase(prefix: string): Promise<{ dsn: string; drop(): Promise<void> }> {
+  const { query } = await import("../lib/index.js");
+  const name = `${prefix}_${deno ? "deno" : "node"}_${process.pid}`;
+  const server = dsn();
+  await query(server, `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+  await query(server, `CREATE DATABASE ${name}`);
+  const url = new URL(server);
+  url.pathname = `/${name}`;
+  return {
+    dsn: url.toString(),
+    async drop() {
+      await query(server, `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    },
+  };
+}
+
+/**
+ * Assert two plain values equal, comparing what `assert.deepStrictEqual`
+ * cannot see: a Temporal value has no own properties, so any two of a class
+ * would pass it, and the module's `Decimal` and `Uuid` keep their text in a
+ * private field. Each is compared by class and text, recursively through
+ * arrays, ranges and plain objects.
+ */
+export function same(actual: unknown, expected: unknown, path = "value"): void {
+  if (typeof expected !== "object" || expected === null) {
+    assert.deepStrictEqual(actual, expected, path);
+    return;
+  }
+  assert.equal(
+    Object.getPrototypeOf(actual),
+    Object.getPrototypeOf(expected),
+    `${path}: ${actual?.constructor?.name} is not ${expected.constructor?.name}`,
+  );
+  if (expected instanceof Uint8Array || expected instanceof Float32Array) {
+    assert.deepStrictEqual(actual, expected, path);
+  } else if (Array.isArray(expected)) {
+    assert.ok(Array.isArray(actual), path);
+    assert.equal(actual.length, expected.length, `${path}.length`);
+    expected.forEach((item, index) => same(actual[index], item, `${path}[${index}]`));
+  } else if (Object.getOwnPropertyNames(expected).length === 0) {
+    assert.equal(String(actual), String(expected), path);
+  } else {
+    assert.deepStrictEqual(Object.keys(actual as object), Object.keys(expected), `${path} keys`);
+    for (const [key, item] of Object.entries(expected)) {
+      same((actual as Record<string, unknown>)[key], item, `${path}.${key}`);
+    }
+  }
 }

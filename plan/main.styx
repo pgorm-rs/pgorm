@@ -10827,7 +10827,31 @@ children (
                 id napi-values
                 title "Every pgorm value crosses into and out of JavaScript with a declared type, and query results decode to JS objects"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:napi.values]
+                        [spec:pgorm:req:napi.temporal]
+                        [spec:pgorm:req:napi.value-tags]
+                        [spec:pgorm:req:napi.inference]
+                        [spec:pgorm:req:napi.rows]
+                    )
+                }
                 deps (napi-proof)
+                log (
+                    {
+                        at 2026-10-09T11:35:44.647247Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-09 pointed at MDN's Temporal reference and updated the machine's Node to 26 (v26.11.1, now the fnm default). Verified: Temporal is a global with no flag in Node 26.11.1 (Instant round-trips nanoseconds) and in Deno 2.9.5. It is absent in Node 22 and 24, so the binding targets Node >= 26 and a Temporal-carrying Deno. Date and time values use Temporal, not Date:\n- date → Temporal.PlainDate\n- time → Temporal.PlainTime\n- timestamp → Temporal.PlainDateTime\n- timestamptz → Temporal.Instant or Temporal.ZonedDateTime, decided with the session time zone semantics written down\n- interval → Temporal.Duration, provided PostgreSQL's months/days/microseconds split survives the round trip; else a typed object that keeps it\n- timetz decided explicitly\nPrecision is microseconds on the server and nanoseconds in Temporal: a write with sub-microsecond digits is refused or rounded by a stated rule, never silently truncated. napi.runtimes states the minimum versions, and CI moves to Node 26."
+                    }
+
+                    {
+                        at 2026-10-09T12:07:06.470716Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+                )
             }
 
             {

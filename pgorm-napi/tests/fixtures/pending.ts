@@ -3,9 +3,9 @@
 
 import process from "node:process";
 
-import { queryInt } from "../../lib/index.js";
+import { query } from "../../lib/index.js";
 
-queryInt(process.env.PGORM_TEST_DSN ?? "", "SELECT $1::int + 1 FROM pg_sleep(1)", [1]).then((value) =>
-  console.log(`settled ${value}`)
+query(process.env.PGORM_TEST_DSN ?? "", "SELECT $1::int + 1 AS n FROM pg_sleep(1)", [1]).then(([row]) =>
+  console.log(`settled ${row?.n}`)
 );
 console.log("script ended");

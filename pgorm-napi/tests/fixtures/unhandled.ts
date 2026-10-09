@@ -3,6 +3,6 @@
 
 import process from "node:process";
 
-import { queryInt } from "../../lib/index.js";
+import { query } from "../../lib/index.js";
 
-queryInt(process.env.PGORM_TEST_DSN ?? "", "SELECT $1::int + 1", [2147483647]);
+query(process.env.PGORM_TEST_DSN ?? "", "SELECT $1::int + 1 AS n", [2147483647]);

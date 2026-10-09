@@ -8,12 +8,12 @@
 import process from "node:process";
 import { Worker } from "node:worker_threads";
 
-import { queryInt } from "../../lib/index.js";
+import { query } from "../../lib/index.js";
 
 const dsn = process.env.PGORM_TEST_DSN ?? "";
 const mode = process.env.WORKER_MODE ?? "finish";
 
-console.log(`main ${await queryInt(dsn, "SELECT $1::int + 1", [1])}`);
+console.log(`main ${(await query(dsn, "SELECT $1::int + 1 AS n", [1]))[0]?.n}`);
 
 const worker = new Worker(new URL("./worker-body.ts", import.meta.url), { workerData: { dsn, mode } });
 worker.on("message", (message: string) => {
@@ -27,6 +27,6 @@ worker.on("error", (error) => {
 worker.on("exit", async () => {
   console.log("worker exited");
   if (mode === "terminate") {
-    console.log(`main ${await queryInt(dsn, "SELECT $1::int + 1 FROM pg_sleep(3)", [3])}`);
+    console.log(`main ${(await query(dsn, "SELECT $1::int + 1 AS n FROM pg_sleep(3)", [3]))[0]?.n}`);
   }
 });

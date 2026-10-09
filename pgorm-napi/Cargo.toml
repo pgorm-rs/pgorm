@@ -21,6 +21,15 @@ pgorm = { version = "=0.2.0", path = ".." }
 neon = { version = "=1.1.2", default-features = false, features = ["napi-6"] }
 tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
 tokio-postgres = "=0.7.18"
+# The value codecs, at the revisions pgorm itself resolves, so the addon
+# converts exactly what pgorm's own `Value` holds.
+bytes = "=1.12.1"
+fallible-iterator = "=0.2.0"
+jiff = { version = "=0.2.37", default-features = false, features = ["std"] }
+postgres-protocol = "=0.6.12"
+rust_decimal = "=1.43.0"
+serde_json = { version = "=1.0.151", features = ["raw_value", "float_roundtrip"] }
+uuid = "=1.26.0"
 
 [lints.rust]
 unsafe_code = "forbid"

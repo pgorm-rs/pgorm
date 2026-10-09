@@ -183,14 +183,28 @@ fn postgres_failure(error: &tokio_postgres::Error, secrets: &Redactions) -> Fail
         // failures, so the phase is read from its top-level message, never
         // from a nested cause a caller could have shaped.
         let phase = error.to_string();
+        // A codec's own refusal is the cause, and says what was wrong with
+        // the value.
+        let explained = match std::error::Error::source(error) {
+            Some(cause) => format!("{phase}: {cause}"),
+            None => phase.clone(),
+        };
         return if phase.starts_with("error deserializing column ")
             || phase.starts_with("invalid column `")
             || phase == "query returned an unexpected number of columns"
             || phase == "query returned an unexpected number of rows"
         {
-            Failure::Decode(secrets.apply(&phase))
-        } else if phase.starts_with("error serializing parameter ") {
-            Failure::Construction(secrets.apply(&phase))
+            Failure::Decode(secrets.apply(&explained))
+        } else if let Some(index) = phase
+            .strip_prefix("error serializing parameter ")
+            .and_then(|index| index.parse::<usize>().ok())
+        {
+            let cause = std::error::Error::source(error)
+                .map(|cause| format!(": {cause}"))
+                .unwrap_or_default();
+            Failure::Construction(
+                secrets.apply(&format!("parameter ${} cannot be bound{cause}", index + 1)),
+            )
         } else {
             Failure::Connection(format!(
                 "PostgreSQL connection or protocol failure: {}",

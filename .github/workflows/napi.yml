@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   runtimes:
-    name: ${{ matrix.name }} / Node.js 22 and Deno 2
+    name: ${{ matrix.name }} / Node.js 26 and Deno 2
     strategy:
       fail-fast: false
       matrix:
@@ -53,7 +53,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: '22.15.0'
+          # The binding's dates and times are Temporal's, a global from
+          # Node.js 26, which also strips TypeScript types without a flag.
+          node-version: '26.11.1'
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: '2.9.5'
@@ -108,7 +110,7 @@ jobs:
         run: deno check
       - name: Live suite under Node.js
         working-directory: pgorm-napi
-        run: node --test --experimental-strip-types --disable-warning=ExperimentalWarning "tests/*.test.ts"
+        run: node --test "tests/*.test.ts"
       - name: Live suite under Deno
         working-directory: pgorm-napi
         run: deno test --allow-ffi --allow-read --allow-env --allow-run tests/

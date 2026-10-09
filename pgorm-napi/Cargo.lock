@@ -1385,10 +1385,17 @@ dependencies = [
 name = "pgorm-napi"
 version = "0.2.0"
 dependencies = [
+ "bytes",
+ "fallible-iterator",
+ "jiff",
  "neon",
  "pgorm",
+ "postgres-protocol",
+ "rust_decimal",
+ "serde_json",
  "tokio",
  "tokio-postgres",
+ "uuid",
 ]
 
 [[package]]
@@ -2559,6 +2566,7 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "rustversion",
+ "serde",
  "wasm-bindgen-macro",
  "wasm-bindgen-shared",
 ]

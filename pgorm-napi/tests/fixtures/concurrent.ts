@@ -2,10 +2,10 @@
 
 import process from "node:process";
 
-import { queryInt } from "../../lib/index.js";
+import { query } from "../../lib/index.js";
 
 const dsn = process.env.PGORM_TEST_DSN ?? "";
 const results = await Promise.all(
-  Array.from({ length: 100 }, (_, index) => queryInt(dsn, "SELECT $1::int + 1", [index])),
+  Array.from({ length: 100 }, (_, index) => query(dsn, "SELECT $1::int + 1 AS n", [index])),
 );
-console.log(`settled ${results.reduce((sum, value) => sum + value, 0)}`);
+console.log(`settled ${results.reduce((sum, [row]) => sum + Number(row?.n), 0)}`);
