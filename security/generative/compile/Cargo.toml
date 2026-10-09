@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 publish = false
+license = "MIT OR Apache-2.0"
 description = "Runs pgorm-codegen over generated DDL so the compile suite can build its output"
 
 # A detached workspace, on the terms the replay harness is detached: the driver

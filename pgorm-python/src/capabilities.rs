@@ -163,7 +163,7 @@ fn manifest() -> Value {
             "unsupported_kinds": ["u64", "char"],
             "stream": false, "automatic_ddl": false
         },
-        "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM or WebPKI roots"},
+        "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM, or the platform's trust store"},
         "pipeline_policy": {
             "construction": "owned native Pipeline; runtime table/entity/named pipeline sources",
             "parameters": "synchronous *_with callback; each binding minted once inside its real Rust brand",

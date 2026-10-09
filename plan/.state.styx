@@ -924,6 +924,7 @@ assertions (
     {id python-select-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:54:27.016683Z}
     {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
     {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
+    {id supply-chain-detached-workspaces, kind @complete, author "brendan@necessary.nu", at 2026-10-09T13:39:40.322092Z}
 )
 
 impl_evidence (

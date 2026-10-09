@@ -26,8 +26,10 @@ class Pool:
 
     TLS verifies the certificate and hostname by default. Explicit
     ``sslmode=disable`` in the DSN or ``tls="disable"`` selects plaintext.
-    ``cafile`` supplies PEM trust anchors; otherwise the bundled WebPKI roots
-    are used. A pool keeps reusable connections and one shared Tokio runtime.
+    ``cafile`` supplies PEM trust anchors; otherwise the roots the platform's
+    certificate store trusts are used, and a store holding none raises
+    ``ConstructionError``. A pool keeps reusable connections and one shared
+    Tokio runtime.
     """
 
     def __init__(

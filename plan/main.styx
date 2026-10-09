@@ -10960,6 +10960,28 @@ children (
                 kind @decision
                 text "Operator 2026-10-09, asked whether pgorm-python should keep its bundled webpki-roots, with CDLA-Permissive-2.0 allowed in deny.toml, or take its trust roots from the platform as pgorm-napi does: \"b\". pgorm-python moves to the platform's roots through rustls-native-certs, as pgorm-napi does at 0f95d938, and webpki-roots leaves its dependency tree; deny.toml's licence list is unchanged. That changes pgorm-python's default trust: a wheel trusts what the host's certificate store trusts, not a list bundled at build time. Say so in pgorm-python's TLS docs and DISTRIBUTION.md, including what a host with no usable certificate store gets. A caller-supplied CA keeps working as it does today. The rest of the node stands: rustls to >= 0.23.45 (RUSTSEC-2026-0285); rustls-pemfile replaced by rustls-pki-types' PemObject (RUSTSEC-2025-0134); and the supply-chain workflow audits the root, pgorm-python and pgorm-napi workspaces, each against its committed lockfile."
             }
+
+            {
+                at 2026-10-09T13:22:22.007203Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-09T13:39:40.322092Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-09T13:39:50.048551Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Done 2026-10-09. pgorm-python: rustls 0.23.45, PEM through rustls::pki_types::PemObject, roots from rustls-native-certs 0.8.4 (the versions pgorm-napi resolves); rustls-pemfile and webpki-roots are out of its graph and of the application-binding and generative bridge lockfiles, which depend on it by path. A store yielding no usable root (empty or missing SSL_CERT_FILE, empty SSL_CERT_DIR, a host with no CA bundle) fails Pool construction with ConstructionError naming what the loader reported; it never builds a pool that trusts nothing. New installed tests: the run's own CA is refused under the platform store, accepted through cafile and through SSL_CERT_FILE, and an empty/missing store fails construction while cafile still connects. Documented in the README's Connections section and DISTRIBUTION.md's new \"TLS trust\" section. The audit was widened to every committed lockfile (13 detached + the generated root). Beyond the three pgorm-python failures it found one more class: every unpublished fixture crate (python test fixtures, generative bridge/compile/replay, the five findings reproducers, the sqlmap adapter) failed `licenses` as unlicensed because it declared no licence. Fixed mechanically by declaring the repository's `MIT OR Apache-2.0`, as pgorm-napi (publish = false) and the codegen scaffold already do; replay.py's reproducer template now declares it too. deny.toml is unchanged. The workflow discovers lockfiles with `git ls-files`, audits each with `--locked` against deny.toml from one advisory-db fetch, reports every failing workspace before failing, and now also runs on pushes to main that touch a manifest, lockfile or the policy. Sensitivity: pinning rustls 0.23.44 back into pgorm-napi failed the audit with RUSTSEC-2026-0285 and the loop named only pgorm-napi; restored byte-for-byte. No nplan check platform for it: a commit gate failing on an advisory published against an unrelated dependency would block every manifest commit with no bypass, so auditing stays in CI (weekly, PRs, pushes to main)."
+                after_done true
+            }
         )
     }
 
