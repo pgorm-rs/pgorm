@@ -202,19 +202,25 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+15]
+> [spec:pgorm:req:sql.scope+16]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
-> `SqlTemplate` in expression position, `FromItem`'s raw relation in relation
-> position, and `ConnectionTrait::execute` / `batch_execute` for a whole
-> statement — so what follows records a decision about the *typed* surface,
-> never about what a caller can send. Each entry MUST carry a verdict and the
-> reason for it; "deferred" MUST additionally say what closing it would take,
-> because a deferral whose cost is unrecorded is indistinguishable from an
-> oversight. An entry graduates by being implemented and deleted from this
-> list, and a construct absent from both this list and the builder is a defect
-> in this rule, not a silent no.
+> `SqlTemplate` in expression position, `FromItem::Template` in relation
+> position, and `ConnectionTrait::execute` / `batch_execute` /
+> `query_raw` for a whole statement — so what follows records a decision about
+> the *typed* surface, never about what a caller can send. The exceptions are
+> named here too: `COPY`'s data flow and `LISTEN`'s notifications travel
+> outside any statement result, so no route above reaches them. Each entry
+> MUST carry a verdict and the reason for it; "deferred" MUST additionally say
+> what closing it would take, because a deferral whose cost is unrecorded is
+> indistinguishable from an oversight. An entry graduates by being implemented
+> and deleted from this list, and a construct absent from both this list and
+> the builder is a defect in this rule, not a silent no. Some boundaries are
+> recorded beside the construct they bound rather than here: `CONCURRENTLY`
+> (`sql.ddl.index-create`), a range type's `CANONICAL` (`sql.ddl.type-range`),
+> a sequence's persistence, owner and schema (`sql.ddl.sequence`), and syntax
+> only PostgreSQL 19 parses (`sql.target`).
 >
 > Three tests decide which verdict an entry gets. *Does the ORM need it to do
 > its job?* — the builder exists to render the statements an entity layer
@@ -226,8 +232,46 @@ today, including panicking edges and deliberate failsafes.
 > new renderer and a new `SubQueryStatement` arm; a clause on an existing
 > statement costs a field.
 >
-> **Deferred** — worth building, not built: none at present. Composite
-> attribute alteration, the last entry, is built (`sql.ddl.type-composite`).
+> **Deferred** — worth building, not built:
+>
+> - **Views, materialized views and `CREATE TABLE AS`.** Each wraps a
+>   `SelectStatement` in a name, and hand-writing that name and its column
+>   names is the quoting the builders exist to remove; a view's body cannot
+>   take bind parameters, so it renders with its values inlined. Refreshing a
+>   materialized view is a statement an application issues on a schedule.
+>   Closing it takes the three create statements, `REFRESH MATERIALIZED VIEW`
+>   and the drops, with the grammar's refusals made unrepresentable, and a
+>   live test of an entity reading a view and writing through an updatable
+>   one (`sql-views`).
+> - **`FETCH FIRST … WITH TIES`, `GROUP BY DISTINCT`, `SIMILAR TO`, `WITH
+>   ORDINALITY` / `ROWS FROM`, and `TABLESAMPLE`.** Clauses on statements the
+>   builder already has, each with a value or an identifier to carry: a limit
+>   that keeps the rows tied with the last (and so needs an `ORDER BY`), the
+>   deduplication of grouping sets, `LIKE`'s regular-expression sibling and
+>   its `ESCAPE`, the ordinal column and the multi-function form of a
+>   set-returning function in `FROM`, and a sampled scan with its method,
+>   percentage and `REPEATABLE` seed. Closing it takes a field or a variant
+>   each, and the same from Python and JavaScript (`sql-select-extras`).
+> - **`CREATE DOMAIN`, its `ALTER` and `DROP`.** A named type with a base
+>   type, a default, `NOT NULL` and named `CHECK`s, which a schema uses where
+>   an entity has a column; codegen refuses a schema that uses one. Closing it
+>   takes the statements and codegen reading a domain column as its base type
+>   (`sql-domains`).
+> - **`CREATE SCHEMA` and `DROP SCHEMA`.** Tables, types and sequences can be
+>   schema-qualified, and the schema they name has no typed statement;
+>   unlike a database, a schema belongs to one database and is created inside
+>   a transaction. Closing it takes the two statements, with `IF [NOT] EXISTS`
+>   and `CASCADE` / `RESTRICT` (`sql-schemas`).
+> - **`COPY`.** `COPY … FROM STDIN` and `TO STDOUT` are a message flow the
+>   driver carries, not rows a statement returns, and pgorm exposes no route
+>   to it. Closing it takes `copy_in` and `copy_out` on a connection and a
+>   transaction, over a typed `COPY` statement whose table and column names
+>   are quoted and whose format is chosen from a closed set (`conn-copy`).
+> - **`LISTEN`.** `NOTIFY` is a statement `execute` already sends (or
+>   `pg_notify(..)` an expression), but a notification arrives on the
+>   connection that listened, which the pool keeps out of reach. Closing it
+>   takes a dedicated listening connection that yields notifications as a
+>   stream, with quoted channel names (`conn-listen`).
 >
 > **Out of scope** — not the builder's job:
 >
@@ -238,13 +282,9 @@ today, including panicking edges and deliberate failsafes.
 > - **`EXCLUDE` constraints.** An operator-class-per-column constraint whose
 >   typed form would be most of an index builder again, for a constraint an
 >   entity layer never generates.
-> - **Views and materialized views.** A view is a stored query, so `CREATE
->   VIEW` is one keyword wrapped around a `SelectStatement` a caller already
->   has; the refresh and storage options on matviews are schema-ownership
->   decisions like partitioning. What pgorm needs is to *read* views, which it
->   does — an entity maps to a view as readily as to a table.
-> - **Table and column storage options** (`WITH (fillfactor = …)`,
->   `TABLESPACE`, `SET STORAGE`). Physical tuning with no effect on any
+> - **Table and column storage and persistence options** (`WITH (fillfactor =
+>   …)`, `TABLESPACE`, `SET STORAGE`, `TEMPORARY`, `UNLOGGED`,
+>   `SET { LOGGED | UNLOGGED }`). Physical tuning with no effect on any
 >   statement the ORM issues, and no identifier or value that needs quoting.
 > - **`GRANT` / `REVOKE`, and roles.** Privileges are an operational concern,
 >   granted by whoever administers the database rather than by the process
@@ -256,15 +296,19 @@ today, including panicking edges and deliberate failsafes.
 >   with extra steps.
 > - **Row-level security policies.** Same shape as privileges, and a policy
 >   that the application can rewrite is not a security boundary.
-> - **`COPY`.** Protocol-level: `COPY ... FROM STDIN` is a distinct message
->   flow, not a statement a renderer emits, so it belongs to the driver
->   surface rather than to the query builder.
 > - **Procedural `DO` blocks.** A string of another language, as triggers are.
-> - **`CREATE DATABASE` / `CREATE SCHEMA` / `CREATE EXTENSION`'s neighbours.**
->   Cluster-level administration, run once by an operator and outside any
->   transaction. `CREATE EXTENSION` itself is the exception that proves the
->   rule and is built (`sql.ddl.extension`), because an extension is what makes
->   a *column type* available and so is reachable from an entity.
+> - **`CREATE DATABASE` and the other cluster-level statements.** Run once by
+>   an operator, outside any transaction and outside the database the
+>   application connects to. `CREATE EXTENSION` is built (`sql.ddl.extension`),
+>   because an extension is what makes a *column type* available and so is
+>   reachable from an entity.
+> - **`EXPLAIN`.** A diagnostic no ORM path issues, whose result is a plan
+>   rather than rows of the entity's shape; `query_raw` sends it with a built
+>   statement's text and parameters.
+> - **`LOCK TABLE`.** The ORM's locking is row-level, through `SELECT … FOR
+>   UPDATE` / `FOR SHARE`, which is built (`sql.render.locking`); a table lock
+>   is a statement with a table name and a mode, sent through `execute` inside
+>   the transaction it must belong to.
 
 ## Target release
 

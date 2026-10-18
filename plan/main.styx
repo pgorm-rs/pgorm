@@ -8605,6 +8605,14 @@ children (
                         text "Delivered again at sql.scope +15: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:47:45.938487Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-18, on the remaining sql.scope verdicts the lead proposed (build FETCH FIRST WITH TIES, GROUP BY DISTINCT, SIMILAR TO, WITH ORDINALITY / ROWS FROM, TABLESAMPLE, CREATE DOMAIN with codegen reading domain columns, CREATE/DROP SCHEMA, COPY as copy_in/copy_out on a connection, LISTEN as a dedicated listening connection with a notification stream; rule out EXPLAIN, reachable through query_raw, and LOCK TABLE, reachable through execute in a transaction): \"yes\". sql.scope +16 records them: each built construct is a deferred entry naming its node (sql-views, sql-select-extras, sql-domains, sql-schemas, conn-copy, conn-listen) and what closing it takes; EXPLAIN and LOCK TABLE join the out-of-scope list with their reasons; the preamble names COPY's data flow and LISTEN's notifications as the two things no route reaches and points at the boundaries recorded in other rules; FromItem::Template replaces \"raw relation\"; CREATE SCHEMA leaves the cluster-level entry, which keeps CREATE DATABASE; persistence options join the storage entry, which sql.ddl.sequence already cited; the history sentence is gone."
+                        after_done true
+                    }
                 )
             }
 
@@ -8824,6 +8832,51 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's decision on query-second-tier (2026-10-18). Builders: CREATE [OR REPLACE] [RECURSIVE] VIEW name [(columns)] AS <SelectStatement> [WITH [CASCADED | LOCAL] CHECK OPTION] with the security_barrier and security_invoker options, DROP VIEW [IF EXISTS] .. [CASCADE | RESTRICT]; CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY] name [WITH [NO] DATA], DROP MATERIALIZED VIEW; CREATE TABLE [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA. Names and column names are quoted identifiers; the body is the caller's SelectStatement rendered with its values inlined, because a view body cannot take bind parameters (check what PostgreSQL refuses and make invalid combinations unrepresentable where the grammar forbids them: e.g. RECURSIVE needs column names, CHECK OPTION needs an auto-updatable view and is refused on RECURSIVE, REFRESH CONCURRENTLY needs a unique index and is refused WITH NO DATA, OR REPLACE may only add columns at the end). Spec: move views and materialized views off sql.scope's out-of-scope list (bump; query-second-tier re-delivers with a feat commit), new rules for the statements in sql-ddl.md, register entries in sql.surface for new exports, oracle-checked renders (libpg_query 18 grammar) and live tests on 18.6, including an entity reading from a view and writing through a simple auto-updatable one, a CHECK OPTION refusal (44000), and a concurrent refresh. Python (pgorm-python schema builders, stubs, capability manifest, parity cases) and JavaScript (pgorm-napi schema builders, .d.ts, parity goldens, Node and Deno) get the same statements, as they mirror every other DDL builder."
+                    }
+                )
+            }
+
+            {
+                id sql-select-extras
+                title "pgorm builds FETCH FIRST WITH TIES, GROUP BY DISTINCT, SIMILAR TO, WITH ORDINALITY and ROWS FROM, and TABLESAMPLE, from Rust, Python and JavaScript"
+                kind @feat
+                deps (query-second-tier python-statement-typing)
+                log (
+                    {
+                        at 2026-10-18T15:48:25.999776Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope, per the operator's sql.scope verdict (2026-10-18, on query-second-tier) and sql.scope +16's deferred entry. FETCH FIRST n ROWS WITH TIES (requires ORDER BY: make a tie limit without an order unrepresentable or refused before rendering; check what PostgreSQL refuses, e.g. WITH TIES with OFFSET is fine, without ORDER BY is 42601/2201W); GROUP BY DISTINCT over the grouping sets sql.ast.select.grouping builds; SIMILAR TO and NOT SIMILAR TO with an optional ESCAPE, bound like LIKE's pattern; WITH ORDINALITY on a set-returning function in FROM and ROWS FROM (f(..), g(..)) WITH ORDINALITY with a column alias list; TABLESAMPLE BERNOULLI | SYSTEM (percentage) [REPEATABLE (seed)] on a table in FROM, the percentage and seed bound. Oracle-checked renders on the 18 grammar, live tests on 18.6, each construct's entry graduated from sql.scope's deferred list (bump; query-second-tier re-delivers with a feat commit), sql.surface register entries for new exports, and Python and JavaScript reach each with stubs / .d.ts, capability entries and parity cases. Waits on python-statement-typing, which changes the same Python statement stubs."
+                    }
+                )
+            }
+
+            {
+                id sql-domains
+                title "pgorm builds CREATE, ALTER and DROP DOMAIN from Rust, Python and JavaScript, and codegen reads a domain column as its base type"
+                kind @feat
+                deps (query-second-tier sql-views codegen-interval-columns)
+                log (
+                    {
+                        at 2026-10-18T15:48:26.114298Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. CREATE DOMAIN name AS base_type [COLLATE] [DEFAULT expr] [NOT NULL | NULL] [CONSTRAINT name CHECK (expr) [NOT VALID]]...; ALTER DOMAIN SET/DROP DEFAULT, SET/DROP NOT NULL, ADD CONSTRAINT [NOT VALID], DROP CONSTRAINT [IF EXISTS] [CASCADE|RESTRICT], RENAME CONSTRAINT, VALIDATE CONSTRAINT, RENAME TO, (SET SCHEMA and OWNER TO stay out with sequences'); DROP DOMAIN [IF EXISTS] [CASCADE|RESTRICT]; schema-qualifiable names, CHECK expressions over VALUE. A column whose type is a domain is ColumnType::Named or a dedicated variant: decide, keeping one spelling. Codegen (Rust and Python) reads a domain column as its base type (and its array), recording the domain's name where the entity needs it for casts, instead of refusing the schema. Oracle-checked renders, live tests on 18.6 (a CHECK refusal 23514, NOT VALID then VALIDATE), sql.scope entry graduated, register entries, Python and JavaScript schema builders. Waits on sql-views (same DDL files in three languages) and codegen-interval-columns (same codegen type tables)."
+                    }
+                )
+            }
+
+            {
+                id sql-schemas
+                title "pgorm builds CREATE SCHEMA and DROP SCHEMA from Rust, Python and JavaScript"
+                kind @feat
+                deps (query-second-tier sql-views)
+                log (
+                    {
+                        at 2026-10-18T15:48:26.265572Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. CREATE SCHEMA [IF NOT EXISTS] name (no AUTHORIZATION: roles stay out of scope; no schema elements list) and DROP SCHEMA [IF EXISTS] name [, ...] [CASCADE | RESTRICT]; ALTER SCHEMA RENAME TO if it is cheap (OWNER TO stays out). Quoted names, oracle-checked renders, live tests on 18.6 including creating a schema, a schema-qualified table and enum in it, and a RESTRICT refusal (2BP01). sql.scope entry graduated, register entries, Python and JavaScript schema builders, and pgorm-migration's docs mention it where they discuss schema-qualified entities. Waits on sql-views (same DDL files)."
                     }
                 )
             }
@@ -11431,6 +11484,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-10-18T15:47:46.057673Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-18, offered opt-level \"s\" for a further 2.6 MB (9.1 MB) at about 4% more cycles when decoding rows: \"speed\". The addon profile keeps opt-level 3."
+                        after_done true
+                    }
                 )
             }
         )
@@ -11577,6 +11638,36 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from statement-interval-value (f9db65b7). The generative replay accepts an interval value tag (named interval, carrying the SQL literal) the way it does a multirange, but the campaign never generates one: interval is not a portable kind in the program format, wire.py, the corpus, the reference codec or the emitters. Add it so programs bind and compare intervals across Rust and Python, with the reference semantics keeping months, days and microseconds apart (no 1 mon = 30 days equivalence), mixed signs and the two infinities among the generated values. Filed as a root node because the generative container is sealed."
+            }
+        )
+    }
+
+    {
+        id conn-copy
+        title "A connection or transaction runs COPY FROM STDIN and TO STDOUT through copy_in and copy_out over a typed COPY statement, from Rust, Python and JavaScript"
+        kind @feat
+        deps (query-second-tier)
+        log (
+            {
+                at 2026-10-18T15:48:26.408206Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. pgorm exposes no route to COPY's data flow: DatabaseConnection hides the client, and execute cannot carry COPY FROM STDIN. Build a typed COPY statement (table, optional column list, FROM STDIN or TO STDOUT, or TO STDOUT over a SelectStatement; FORMAT text | csv | binary from a closed set with that format's options: DELIMITER, NULL, HEADER [MATCH], QUOTE, ESCAPE, FORCE_QUOTE / FORCE_NOT_NULL / FORCE_NULL, ENCODING, FREEZE where valid) and copy_in / copy_out on DatabaseConnection and DatabaseTransaction over tokio-postgres's CopyInSink / CopyOutStream: copy_in takes bytes (a Sink or an async iterator of Bytes) and reports the row count; copy_out yields a byte stream. Decide whether a typed row writer for binary COPY belongs here (pgorm already has Value and its binary codecs) or is a follow-up; say which. Cancellation and errors follow the connection's existing rules (a dropped sink aborts the COPY; a server error is the usual typed error). Live tests on 18.6: text, csv and binary in both directions, a column subset, a constraint violation mid-copy (23505) leaving the transaction aborted, an aborted copy_in, large streams. Python (async iterator of bytes in, async iterator out) and JavaScript (async iterable / ReadableStream) get the same, with stubs, .d.ts and live tests. sql.scope's COPY entry graduates (bump; query-second-tier re-delivers). The metrics wrappers (InstrumentedConnection / InstrumentedTransaction) forward the new methods."
+            }
+        )
+    }
+
+    {
+        id conn-listen
+        title "A dedicated listening connection yields LISTEN notifications as a stream, from Rust, Python and JavaScript"
+        kind @feat
+        deps (query-second-tier conn-copy)
+        log (
+            {
+                at 2026-10-18T15:48:26.548871Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. A notification arrives on the connection that ran LISTEN, as an AsyncMessage on tokio-postgres's Connection future, which pgorm-pool's manager polls internally and pooled connections recycle, so LISTEN cannot work on a pooled connection. Build a dedicated listener: created from the pool's config (or from a tokio_postgres::Config plus a TLS connector, as connect_with is), owning its connection outright, with listen(channel) / unlisten(channel) / unlisten_all and a Stream of notifications (channel, payload, sender pid). Channel names are quoted identifiers; NOTIFY gets a typed helper too (NOTIFY channel, 'payload' or pg_notify with a bound payload). Decide and document what happens when the connection drops (the stream ends with an error; no silent reconnect that would miss notifications) and how backpressure works (bounded buffer, an overflow error rather than unbounded growth). Live tests on 18.6: a notification sent from a pooled connection inside a committed transaction arrives, one from a rolled-back transaction does not, unlisten stops delivery, a quoted channel name with odd characters works, payload limits. Python and JavaScript get the listener as an async iterator, with stubs, .d.ts and live tests. sql.scope's LISTEN entry graduates (bump; query-second-tier re-delivers). Waits on conn-copy, which changes the same connection surfaces in three languages."
             }
         )
     }
