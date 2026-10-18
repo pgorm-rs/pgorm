@@ -351,6 +351,22 @@ fn unsupported_statements_are_named() {
         "unsupported DDL: CREATE VIEW at statement 1",
     );
     assert_error(
+        "CREATE OR REPLACE RECURSIVE VIEW v (n) AS SELECT 1;",
+        "unsupported DDL: CREATE VIEW at statement 1",
+    );
+    assert_error(
+        "CREATE TABLE t (id int); CREATE MATERIALIZED VIEW m AS SELECT id FROM t;",
+        "unsupported DDL: CREATE MATERIALIZED VIEW at statement 2",
+    );
+    assert_error(
+        "REFRESH MATERIALIZED VIEW CONCURRENTLY m;",
+        "unsupported DDL: REFRESH MATERIALIZED VIEW at statement 1",
+    );
+    assert_error(
+        "CREATE TABLE t AS SELECT 1 AS id WITH NO DATA;",
+        "unsupported DDL: CREATE TABLE AS at statement 1",
+    );
+    assert_error(
         "CREATE TABLE t (id int); INSERT INTO t VALUES (1);",
         "unsupported DDL: INSERT at statement 2",
     );

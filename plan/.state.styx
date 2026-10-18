@@ -2171,6 +2171,19 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id sql-views, covered_rules (
+        napi.schema-views
+        python.schema-views
+        sql.ddl.create-table-as
+        sql.ddl.materialized-view
+        sql.ddl.view
+    ), covered_claims (
+        {impl_name main, rule napi.schema-views}
+        {impl_name main, rule python.schema-views}
+        {impl_name main, rule sql.ddl.create-table-as}
+        {impl_name main, rule sql.ddl.materialized-view}
+        {impl_name main, rule sql.ddl.view}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

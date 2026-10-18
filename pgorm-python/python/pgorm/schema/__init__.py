@@ -20,6 +20,10 @@ from .._native import (
     create_enum as create_enum, add_enum_value as add_enum_value,
     rename_enum as rename_enum, rename_enum_value as rename_enum_value,
     drop_enum as drop_enum,
+    create_view as create_view, create_recursive_view as create_recursive_view,
+    drop_view as drop_view, create_materialized_view as create_materialized_view,
+    refresh_materialized_view as refresh_materialized_view,
+    drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
 )
 
 create_table = CreateTable
@@ -35,4 +39,6 @@ __all__ = [
     "add_enum_value",
     "rename_enum",
     "rename_enum_value", "drop_enum",
+    "create_view", "create_recursive_view", "drop_view", "create_materialized_view",
+    "refresh_materialized_view", "drop_materialized_view", "create_table_as",
 ]

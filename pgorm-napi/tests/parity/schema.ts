@@ -1,5 +1,6 @@
 // The schema family's parity cases — tables, their columns, keys and
-// constraints and their alterations, indexes, types, sequences, extensions and
+// constraints and their alterations, indexes, types, sequences, views,
+// materialized views and tables created from a query, extensions and
 // comments — held to `schema.json` as `select.ts`'s are to theirs. A DDL
 // statement binds nothing, so every case's values are empty.
 // [spec:pgorm:req:napi.schema/test]
@@ -8,6 +9,7 @@
 // [spec:pgorm:req:napi.schema-indexes/test]
 // [spec:pgorm:req:napi.schema-types/test]
 // [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:napi.schema-views/test]
 
 import {
   alterSequence,
@@ -22,20 +24,28 @@ import {
   CreatedRange,
   createExtension,
   createIndex,
+  createMaterializedView,
+  createRecursiveView,
   createSequence,
   createTable,
+  createTableAs,
   createType,
+  createView,
   DataType,
   Decimal,
   dropExtension,
   dropIndex,
+  dropMaterializedView,
   dropSequence,
   dropTable,
   dropType,
+  dropView,
+  refreshMaterializedView,
   renameColumn,
   renameConstraint,
   renameSequence,
   renameTable,
+  select,
   Table,
   truncateTable,
   TypeName,
@@ -45,6 +55,17 @@ import {
 const booking = new Table("booking", { schema: "app" });
 const room = new Table("room", { schema: "app" });
 const mood = new TypeName("mood", { schema: "app" });
+
+/** Bookings of a room above 10 whose note is not `it's`, its values written as literals. */
+const largeRooms = () =>
+  select(col("id"), col("room")).from(booking).where(col("room").gt(10)).where(col("note").ne("it's"));
+
+const counting = () =>
+  select(col("id").as("n"))
+    .from(booking)
+    .unionAll(select(col("n").add(1)).from(new Table("counter")).where(col("n").lt(5)));
+
+const app = (name: string) => new Table(name, { schema: "app" });
 
 export const cases: Record<string, () => Builder> = {
   "create-table-columns": () =>
@@ -171,6 +192,25 @@ export const cases: Record<string, () => Builder> = {
   "create-extension": () =>
     createExtension("btree_gist", { ifNotExists: true, schema: "public", version: "1.7", cascade: true }),
   "drop-extension": () => dropExtension("btree_gist", { ifExists: true, behavior: "restrict" }),
+  "create-view": () => createView(app("large_room"), largeRooms()),
+  "create-view-options": () =>
+    createView(app("large_room"), largeRooms())
+      .orReplace()
+      .columns(["booking"])
+      .columns(["room_no"])
+      .checkOption("local")
+      .checkOption("cascaded")
+      .securityBarrier()
+      .securityInvoker(),
+  "create-recursive-view": () => createRecursiveView("counter", ["n"], counting()).orReplace().securityBarrier(),
+  "drop-views": () => dropView(["large_room", app("other")], { ifExists: true, behavior: "cascade" }),
+  "create-materialized-view": () =>
+    createMaterializedView(app("room_total"), largeRooms()).ifNotExists().columns(["booking", "room_no"]).withNoData(),
+  "refresh-materialized-view": () => refreshMaterializedView(app("room_total")),
+  "refresh-materialized-view-concurrently": () => refreshMaterializedView(app("room_total"), { concurrently: true }),
+  "refresh-materialized-view-no-data": () => refreshMaterializedView(app("room_total"), { withNoData: true }),
+  "drop-materialized-views": () => dropMaterializedView([app("room_total"), "other"], { behavior: "restrict" }),
+  "create-table-as": () => createTableAs("large_copy", largeRooms()).ifNotExists().columns(["booking"]).withNoData(),
   "comment-on-table": () => commentOnTable(booking, "Rooms booked, and when"),
   "comment-on-column": () => commentOnColumn(booking, "note", "it's a \\ note\nover two lines"),
 };

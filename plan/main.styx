@@ -8825,6 +8825,15 @@ children (
                 id sql-views
                 title "pgorm builds views, materialized views and CREATE TABLE AS, from Rust, Python and JavaScript, and an entity reads and writes through a view"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:sql.ddl.view]
+                        [spec:pgorm:req:sql.ddl.materialized-view]
+                        [spec:pgorm:req:sql.ddl.create-table-as]
+                        [spec:pgorm:req:python.schema-views]
+                        [spec:pgorm:req:napi.schema-views]
+                    )
+                }
                 deps (query-second-tier)
                 log (
                     {
@@ -8832,6 +8841,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's decision on query-second-tier (2026-10-18). Builders: CREATE [OR REPLACE] [RECURSIVE] VIEW name [(columns)] AS <SelectStatement> [WITH [CASCADED | LOCAL] CHECK OPTION] with the security_barrier and security_invoker options, DROP VIEW [IF EXISTS] .. [CASCADE | RESTRICT]; CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY] name [WITH [NO] DATA], DROP MATERIALIZED VIEW; CREATE TABLE [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA. Names and column names are quoted identifiers; the body is the caller's SelectStatement rendered with its values inlined, because a view body cannot take bind parameters (check what PostgreSQL refuses and make invalid combinations unrepresentable where the grammar forbids them: e.g. RECURSIVE needs column names, CHECK OPTION needs an auto-updatable view and is refused on RECURSIVE, REFRESH CONCURRENTLY needs a unique index and is refused WITH NO DATA, OR REPLACE may only add columns at the end). Spec: move views and materialized views off sql.scope's out-of-scope list (bump; query-second-tier re-delivers with a feat commit), new rules for the statements in sql-ddl.md, register entries in sql.surface for new exports, oracle-checked renders (libpg_query 18 grammar) and live tests on 18.6, including an entity reading from a view and writing through a simple auto-updatable one, a CHECK OPTION refusal (44000), and a concurrent refresh. Python (pgorm-python schema builders, stubs, capability manifest, parity cases) and JavaScript (pgorm-napi schema builders, .d.ts, parity goldens, Node and Deno) get the same statements, as they mirror every other DDL builder."
+                    }
+
+                    {
+                        at 2026-10-18T16:24:27.541262Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Shapes, checked against PostgreSQL 18.6 and libpg_query 18. Unrepresentable (the grammar refuses them): a recursive view without columns (42601) — View::create_recursive takes the first column; a check option on a recursive view (0A000, raised in gram.y so the oracle refuses it too) — RecursiveViewCreateStatement is its own type with no check_option; CREATE VIEW IF NOT EXISTS (42601) and CREATE OR REPLACE MATERIALIZED VIEW (42601 in 18) — no method; an empty column list — none written. REFRESH CONCURRENTLY beside WITH NO DATA is refused by the server at execution (42601) after the raw grammar accepts it, so the two are one last-wins slot. Left to the server and held by the live suite (tests/view_tests.rs): a check option on a view that is not automatically updatable (0A000), an OR REPLACE that moves, drops, renames or retypes a column (42P16; omitted options are reset), more column names than columns (42601), a concurrent refresh without a unique index (55000) or of an unpopulated view (0A000), a drop of the wrong kind (42809), RESTRICT with a dependent view (2BP01), check option violations (44000, LOCAL vs CASCADED over a view of a view). The body is the caller's SelectStatement rendered value-inlined. ALTER VIEW is not built: Table::rename, Table::rename_column and Table::alter(..).modify_column(default) reach a view (and the renames a materialized view), live-tested. Codegen already refused CREATE VIEW by name; it misnamed CREATE MATERIALIZED VIEW as CREATE TABLE AS and REFRESH as an unrecognised statement, both now named. Generating an entity from a view would need the body's column types, which DDL text without a catalog does not carry, so no codegen follow-up is filed."
                     }
                 )
             }

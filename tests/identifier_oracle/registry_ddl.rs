@@ -3,8 +3,8 @@
 
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, Comment, ConstraintChange, ConstraintDrop, Enforcement, Expr,
-    ForeignKey, Index, IndexColumn, IndexType, NotNullConstraint, Sequence, SequenceOption, Table,
-    TableForeignKey, TableKey, TypeName,
+    ForeignKey, Index, IndexColumn, IndexType, MaterializedView, NotNullConstraint, Query,
+    SelectStatement, Sequence, SequenceOption, Table, TableForeignKey, TableKey, TypeName, View,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -1284,6 +1284,161 @@ pub fn sites() -> Vec<Site> {
             policy: Quoted,
             render: |n| sql(&Sequence::rename(fixed("s"), n_(n))),
         },
+        // -- VIEW ----------------------------------------------------------
+        Site {
+            id: "ddl/create-view.name",
+            api: "View::create(Name, body)",
+            kinds: &["ViewStmt.view.relname"],
+            policy: Quoted,
+            render: |n| sql(&View::create(n_(n), body())),
+        },
+        Site {
+            id: "ddl/create-view.schema",
+            api: "View::create((Name, Name), body) — the schema part",
+            kinds: &["ViewStmt.view.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&View::create((n_(n), fixed("v")), body())),
+        },
+        Site {
+            id: "ddl/create-view.column",
+            api: "ViewCreateStatement::column(Name)",
+            kinds: &["ViewStmt.aliases[0]"],
+            policy: Quoted,
+            render: |n| sql(View::create(fixed("v"), body()).column(n_(n))),
+        },
+        Site {
+            id: "ddl/create-view.columns",
+            api: "ViewCreateStatement::columns([Name])",
+            kinds: &["ViewStmt.aliases[1]"],
+            policy: Quoted,
+            render: |n| sql(View::create(fixed("v"), body()).columns([fixed("a"), n_(n)])),
+        },
+        Site {
+            id: "ddl/create-recursive-view.name",
+            api: "View::create_recursive(Name, column, body)",
+            kinds: &[
+                "RangeVar.relname",
+                "CommonTableExpr.ctename",
+                "ViewStmt.view.relname",
+            ],
+            policy: Quoted,
+            render: |n| sql(&View::create_recursive(n_(n), fixed("c"), body())),
+        },
+        Site {
+            id: "ddl/create-recursive-view.first-column",
+            api: "View::create_recursive(name, Name, body)",
+            kinds: &[
+                "ViewStmt.aliases[0]",
+                "ColumnRef.fields[0]",
+                "CommonTableExpr.aliascolnames[0]",
+            ],
+            policy: Quoted,
+            render: |n| sql(&View::create_recursive(fixed("v"), n_(n), body())),
+        },
+        Site {
+            id: "ddl/create-recursive-view.column",
+            api: "RecursiveViewCreateStatement::column(Name)",
+            kinds: &[
+                "ViewStmt.aliases[1]",
+                "ColumnRef.fields[0]",
+                "CommonTableExpr.aliascolnames[1]",
+            ],
+            policy: Quoted,
+            render: |n| sql(View::create_recursive(fixed("v"), fixed("c"), body()).column(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-view.name",
+            api: "View::drop(Name)",
+            kinds: &["DropStmt.objects[0].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&View::drop(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-view.further-name",
+            api: "ViewDropStatement::name(Name)",
+            kinds: &["DropStmt.objects[1].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(View::drop(fixed("v")).name(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-view.schema",
+            api: "View::drop((Name, Name)) — the schema part",
+            kinds: &["DropStmt.objects[0].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&View::drop((n_(n), fixed("v")))),
+        },
+        // -- MATERIALIZED VIEW ---------------------------------------------
+        Site {
+            id: "ddl/create-materialized-view.name",
+            api: "MaterializedView::create(Name, body)",
+            kinds: &["CreateTableAsStmt.into.rel.relname"],
+            policy: Quoted,
+            render: |n| sql(&MaterializedView::create(n_(n), body())),
+        },
+        Site {
+            id: "ddl/create-materialized-view.schema",
+            api: "MaterializedView::create((Name, Name), body) — the schema part",
+            kinds: &["CreateTableAsStmt.into.rel.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&MaterializedView::create((n_(n), fixed("m")), body())),
+        },
+        Site {
+            id: "ddl/create-materialized-view.column",
+            api: "MaterializedViewCreateStatement::column(Name)",
+            kinds: &["CreateTableAsStmt.into.col_names[0]"],
+            policy: Quoted,
+            render: |n| sql(MaterializedView::create(fixed("m"), body()).column(n_(n))),
+        },
+        Site {
+            id: "ddl/refresh-materialized-view.name",
+            api: "MaterializedView::refresh(Name)",
+            kinds: &["RefreshMatViewStmt.relation.relname"],
+            policy: Quoted,
+            render: |n| sql(&MaterializedView::refresh(n_(n))),
+        },
+        Site {
+            id: "ddl/refresh-materialized-view.schema",
+            api: "MaterializedView::refresh((Name, Name)) — the schema part",
+            kinds: &["RefreshMatViewStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&MaterializedView::refresh((n_(n), fixed("m")))),
+        },
+        Site {
+            id: "ddl/drop-materialized-view.name",
+            api: "MaterializedView::drop(Name)",
+            kinds: &["DropStmt.objects[0].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&MaterializedView::drop(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-materialized-view.further-name",
+            api: "MaterializedViewDropStatement::name(Name)",
+            kinds: &["DropStmt.objects[1].List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(MaterializedView::drop(fixed("m")).name(n_(n))),
+        },
+        // -- CREATE TABLE AS -----------------------------------------------
+        Site {
+            id: "ddl/create-table-as.name",
+            api: "Table::create_as(Name, body)",
+            kinds: &["CreateTableAsStmt.into.rel.relname"],
+            policy: Quoted,
+            render: |n| sql(&Table::create_as(n_(n), body())),
+        },
+        Site {
+            id: "ddl/create-table-as.schema",
+            api: "Table::create_as((Name, Name), body) — the schema part",
+            kinds: &["CreateTableAsStmt.into.rel.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&Table::create_as((n_(n), fixed("t")), body())),
+        },
+        Site {
+            id: "ddl/create-table-as.column",
+            api: "TableCreateAsStatement::column(Name)",
+            kinds: &["CreateTableAsStmt.into.col_names[0]"],
+            policy: Quoted,
+            render: |n| sql(Table::create_as(fixed("t"), body()).column(n_(n))),
+        },
         // -- EXTENSION -----------------------------------------------------
         Site {
             id: "ddl/create-extension.name",
@@ -1307,4 +1462,10 @@ pub fn sites() -> Vec<Site> {
             render: |n| sql(&Extension::drop(n_(n))),
         },
     ]
+}
+
+/// The body a view, materialized view or `CREATE TABLE AS` site wraps, which
+/// names nothing under test: `SELECT 1`.
+fn body() -> SelectStatement {
+    Query::select().expr(1).take()
 }

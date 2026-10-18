@@ -1,0 +1,166 @@
+"""Views, materialized views and CREATE TABLE AS from the installed native wheel."""
+import os
+import unittest
+from uuid import uuid4
+
+import pgorm as p
+from pgorm import schema as s
+
+
+def accounts_query(table):
+    return p.Select(p.col("id"), p.col("name"), p.col("active")).from_(table).where_(p.col("active") == True)
+
+
+class ViewConstruction(unittest.TestCase):
+    # [spec:pgorm:req:python.schema-views/test]    the Select's values are written into the
+    # definition, and each option renders where the Rust builder writes it
+    def test_views_render_their_query_inlined(self):
+        manifest = p.capabilities()["operations"]
+        for operation in (
+            "create_view", "create_recursive_view", "drop_view", "create_materialized_view",
+            "refresh_materialized_view", "drop_materialized_view", "create_table_as",
+        ):
+            self.assertFalse(manifest["schema." + operation]["registration_required"])
+            p.require_capability("schema." + operation)
+        table = p.Table("account")
+        query = p.Select(p.col("id")).from_(table).where_(p.col("name") != "it's")
+        view = s.create_view(p.Table("v", schema="app"), query, columns=["key"], check_option="local")
+        compiled = view.inspect()
+        self.assertEqual(
+            compiled.sql,
+            'CREATE VIEW "app"."v" ("key") AS SELECT "id" FROM "account" '
+            "WHERE \"name\" <> E'it\\'s' WITH LOCAL CHECK OPTION",
+        )
+        self.assertEqual(compiled.params, [])
+        self.assertEqual(
+            s.refresh_materialized_view(p.Table("m"), concurrently=True).inspect().sql,
+            'REFRESH MATERIALIZED VIEW CONCURRENTLY "m"',
+        )
+
+    # [spec:pgorm:req:python.schema-views/test]    what PostgreSQL refuses and the Rust types
+    # cannot hold is refused as the statement is built
+    def test_invalid_view_options_are_refused(self):
+        table = p.Table("account")
+        query = p.Select(p.col("id")).from_(table)
+        for action in (
+            lambda: s.create_recursive_view(p.Table("r"), [], query),
+            lambda: s.refresh_materialized_view(p.Table("m"), concurrently=True, with_no_data=True),
+            lambda: s.create_view(p.Table("v"), query, check_option="both"),
+            lambda: s.create_view(p.Table("v", alias="w"), query),
+            lambda: s.create_materialized_view(p.Table("m", alias="w"), query),
+            lambda: s.create_table_as(p.Table("t"), query, columns=[""]),
+            lambda: s.drop_view(p.Table("v", alias="w")),
+        ):
+            with self.subTest(action=action), self.assertRaises(p.ConstructionError):
+                action()
+        for action in (
+            lambda: s.create_view(p.Table("v"), p.RawSQL("SELECT 1")),
+            lambda: s.create_table_as(p.Table("t"), query, columns="key"),
+        ):
+            with self.subTest(action=action), self.assertRaises(TypeError):
+                action()
+
+
+class ViewDatabase(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        self.namespace = 'views "雪 ' + uuid4().hex[:8]
+        self.quoted = '"' + self.namespace.replace('"', '""') + '"'
+        await self.pool.execute(p.RawSQL(f"CREATE SCHEMA {self.quoted}"))
+        self.table = p.Table("account", schema=self.namespace)
+        create = s.create_table(self.table).column(s.ColumnDef("id", "integer").auto_increment()).primary_key("id")
+        create = create.column(s.ColumnDef("name", "text").not_null())
+        await self.pool.execute(create.column(s.ColumnDef("active", "boolean").not_null().default(True)))
+        await self.pool.execute(p.RawSQL(
+            f"INSERT INTO {self.quoted}.account (name, active) VALUES ('ada', true), ('it''s', true), ('cy', false)"
+        ))
+
+    async def asyncTearDown(self):
+        await self.pool.execute(p.RawSQL(f"DROP SCHEMA {self.quoted} CASCADE"))
+        await self.pool.close()
+
+    def relation(self, name):
+        return p.Table(name, schema=self.namespace)
+
+    async def names(self, relation):
+        rows = await self.pool.fetch_all(p.Select(p.col("name")).from_(relation).order_by(p.col("id").asc()))
+        return [row["name"] for row in rows]
+
+    # [spec:pgorm:req:python.schema-views/test]    a view built from a Select reads the rows it
+    # shows, an insert through it reaches the table, and its check option refuses a hidden row
+    async def test_view_reads_writes_and_checks_rows(self):
+        view = self.relation('active "x"')
+        await self.pool.execute(s.create_view(view, accounts_query(self.table), check_option="cascaded"))
+        self.assertEqual(await self.names(view), ["ada", "it's"])
+        await self.pool.execute(p.insert(view).columns("name").values("dee"))
+        self.assertEqual(await self.names(self.table), ["ada", "it's", "cy", "dee"])
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.pool.execute(p.insert(view).columns("name", "active").values("hidden", False))
+        self.assertEqual(refused.exception.sqlstate, "44000")
+
+        await self.pool.execute(s.create_view(
+            view, accounts_query(self.table).select(p.col("id"), p.col("name"), p.col("active"), p.col("id").as_("again")),
+            or_replace=True, security_barrier=True,
+        ))
+        options = await self.pool.fetch_one(p.RawSQL(
+            "SELECT reloptions::text[] AS options FROM pg_class WHERE oid = $1::text::regclass",
+            [f'{self.quoted}."active ""x"""'],
+        ))
+        self.assertEqual(options["options"], ["security_barrier=true"])
+        recursive = self.relation("counter")
+        await self.pool.execute(s.create_recursive_view(recursive, ["n"], p.Select(p.literal(1))))
+        counted = await self.pool.fetch_all(p.Select(p.col("n")).from_(recursive))
+        self.assertEqual([row["n"] for row in counted], [1])
+        await self.pool.execute(s.drop_view(recursive))
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.pool.execute(s.drop_view(self.table))
+        self.assertEqual(refused.exception.sqlstate, "42809")
+        await self.pool.execute(s.drop_view(view, cascade=True))
+        await self.pool.execute(s.drop_view(view, if_exists=True))
+
+    # [spec:pgorm:req:python.schema-views/test]    a materialized view holds its rows until a
+    # refresh, and a concurrent refresh needs a unique index
+    async def test_materialized_view_refreshes_concurrently(self):
+        view = self.relation('snapshot "x"')
+        await self.pool.execute(s.create_materialized_view(view, accounts_query(self.table), with_no_data=True))
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.names(view)
+        self.assertEqual(refused.exception.sqlstate, "55000")
+        await self.pool.execute(s.refresh_materialized_view(view))
+        self.assertEqual(await self.names(view), ["ada", "it's"])
+        await self.pool.execute(p.insert(self.table).columns("name").values("dee"))
+        self.assertEqual(await self.names(view), ["ada", "it's"])
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.pool.execute(s.refresh_materialized_view(view, concurrently=True))
+        self.assertEqual(refused.exception.sqlstate, "55000")
+        await self.pool.execute(s.create_index(view, "id", name="snapshot_id").unique())
+        await self.pool.execute(s.refresh_materialized_view(view, concurrently=True))
+        self.assertEqual(await self.names(view), ["ada", "it's", "dee"])
+        await self.pool.execute(s.refresh_materialized_view(view, with_no_data=True))
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.names(view)
+        self.assertEqual(refused.exception.sqlstate, "55000")
+        await self.pool.execute(s.create_materialized_view(view, p.Select(p.literal(1)), if_not_exists=True))
+        await self.pool.execute(s.drop_materialized_view(view))
+        await self.pool.execute(s.drop_materialized_view(view, if_exists=True))
+
+    # [spec:pgorm:req:python.schema-views/test]    a table created from a Select with no data
+    # has its columns, renamed where names are given, and keeps the rows inserted later
+    async def test_table_created_from_query_without_data(self):
+        copy = self.relation('copy "x"')
+        await self.pool.execute(s.create_table_as(copy, accounts_query(self.table), columns=["account_id"], with_no_data=True))
+        empty = await self.pool.fetch_all(p.Select(p.col("account_id")).from_(copy))
+        self.assertEqual(empty, [])
+        await self.pool.execute(p.RawSQL(
+            f'INSERT INTO {self.quoted}."copy ""x""" SELECT id, name, active FROM {self.quoted}.account WHERE active'
+        ))
+        rows = await self.pool.fetch_all(p.Select(p.col("account_id"), p.col("name")).from_(copy).order_by(p.col("account_id").asc()))
+        self.assertEqual([dict(row) for row in rows], [{"account_id": 1, "name": "ada"}, {"account_id": 2, "name": "it's"}])
+        await self.pool.execute(s.create_table_as(copy, p.Select(p.literal(1)), if_not_exists=True))
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.pool.execute(s.create_table_as(self.relation("too_many"), p.Select(p.literal(1)), columns=["a", "b"]))
+        self.assertEqual(refused.exception.sqlstate, "42601")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -40,6 +40,8 @@ mod returning;
 mod sequence;
 #[path = "query_builder_subscript.rs"]
 mod subscript;
+#[path = "query_builder_view.rs"]
+mod view;
 #[path = "query_builder_window.rs"]
 mod window;
 

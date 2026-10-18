@@ -219,6 +219,35 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > a module MUST NOT execute DDL automatically. Capabilities MUST distinguish
 > runtime DDL construction from registered-entity schema generation.
 
+> [spec:pgorm:req:python.schema-views]
+> `pgorm.schema` MUST build views, materialized views and `CREATE TABLE AS`
+> through pgorm-query's builders (`sql.ddl.view`,
+> `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each a function
+> returning a `DDL` statement, under the contract of `python.schema`: a
+> relation named by a `Table` without an alias, quoted and schema-qualified as
+> it was given, and column names as identifiers. The query is a `Select`,
+> handed to the Rust statement as the `SelectStatement` it owns, so its values
+> reach the definition as the Rust renderer writes them, as literals, and
+> `inspect()` gives an empty parameter list. The functions are
+> `create_view(name, query, *, columns, or_replace, check_option,
+> security_barrier, security_invoker)`, `check_option` being `"local"` or
+> `"cascaded"`; `create_recursive_view(name, columns, query, *, or_replace,
+> security_barrier, security_invoker)`, which has no check option and refuses
+> an empty column list, as PostgreSQL's grammar refuses both;
+> `drop_view(name, *, if_exists, cascade)`; `create_materialized_view(name,
+> query, *, columns, if_not_exists, with_no_data)`;
+> `refresh_materialized_view(name, *, concurrently, with_no_data)`;
+> `drop_materialized_view(name, *, if_exists, cascade)`; and
+> `create_table_as(name, query, *, columns, if_not_exists, with_no_data)`.
+> What the Rust types cannot hold MUST be refused with `ConstructionError` as
+> the statement is built, never dropped: a check option other than the two,
+> a recursive view without columns, and a refresh both concurrent and with no
+> data, which PostgreSQL refuses together (`42601`). The capability manifest
+> lists each function as a `schema.` operation needing no registration.
+> `Select` has no set operation, so a recursive view built from Python has a
+> query that does not read the view: the `UNION` that joins a non-recursive
+> term to one reading the view has no Python spelling yet.
+
 > [spec:pgorm:req:python.runtime]
 > Database I/O MUST have an asyncio-compatible awaitable interface backed by
 > reusable Tokio runtime resources and pgorm pools. Native waiting MUST NOT

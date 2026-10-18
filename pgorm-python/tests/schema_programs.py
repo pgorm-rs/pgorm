@@ -65,4 +65,32 @@ def programs(p):
         "enum_rename_value": p.rename_enum_value(kind, "busy", "calm"),
         "enum_rename": p.rename_enum(kind, 'new "x"'),
         "enum_drop": p.drop_enum(kind, if_exists=True, cascade=True),
+        **views(p, table),
+    }
+
+
+def views(p, table):
+    query = p.Select(p.col('id "x"'), p.col("name")).from_(table).where_(p.col("name") != "O'Brien \\ 雪")
+    view = p.Table('view "雪"', schema='schema "雪"')
+    return {
+        "create_view": p.create_view(view, query),
+        "create_view_options": p.create_view(
+            view, query, columns=['key "x"', "label"], or_replace=True, check_option="local",
+            security_barrier=True, security_invoker=True,
+        ),
+        "create_view_cascaded": p.create_view(view, query, check_option="cascaded"),
+        "create_recursive_view": p.create_recursive_view(
+            view, ['key "x"', "label"], query, or_replace=True, security_barrier=True,
+        ),
+        "drop_view": p.drop_view(view, if_exists=True, cascade=True),
+        "create_materialized_view": p.create_materialized_view(
+            view, query, columns=['key "x"'], if_not_exists=True, with_no_data=True,
+        ),
+        "refresh_materialized_view": p.refresh_materialized_view(view),
+        "refresh_concurrently": p.refresh_materialized_view(view, concurrently=True),
+        "refresh_with_no_data": p.refresh_materialized_view(view, with_no_data=True),
+        "drop_materialized_view": p.drop_materialized_view(view, if_exists=True),
+        "create_table_as": p.create_table_as(
+            view, query, columns=['key "x"', "label"], if_not_exists=True, with_no_data=True,
+        ),
     }

@@ -1,6 +1,7 @@
 /**
  * DDL over pgorm-query's builders: tables, their columns, keys and
- * constraints and their alterations, indexes, types, sequences, extensions and
+ * constraints and their alterations, indexes, types, sequences, views,
+ * materialized views and tables created from a query, extensions and
  * comments.
  *
  * A DDL statement takes no parameters, so each renders with every value it
@@ -18,7 +19,7 @@
 import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
 import type { BuiltinType, DataType } from "./json.d.ts";
-import type { Table } from "./select.d.ts";
+import type { Select, Table } from "./select.d.ts";
 
 /**
  * A table or sequence a statement names: a name, or a {@link Table} without
@@ -391,3 +392,100 @@ export declare function dropExtension(
   name: string,
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): SchemaStatement;
+
+// [spec:pgorm:req:napi.schema-views]
+
+/**
+ * The options a view takes, plain or recursive: each written only when set,
+ * the method giving a new statement.
+ */
+export interface ViewOptions<S> {
+  /**
+   * `OR REPLACE`: the new query keeps the view's columns in place, with
+   * their names and types, and may add columns after them; the view's options
+   * and check option are replaced by this statement's.
+   */
+  orReplace(): S;
+  /** Names appended to the column list, renaming the query's leading columns. */
+  columns(names: readonly string[]): S;
+  /** The view's conditions run before any a query over it supplies. */
+  securityBarrier(): S;
+  /** The relations it reads are checked against the querying role. */
+  securityInvoker(): S;
+}
+
+/**
+ * `CREATE VIEW` over a {@link Select}, written with its values inlined: a
+ * view's definition is SQL text and binds nothing.
+ */
+export declare class CreateView extends SchemaStatement {
+  /**
+   * `WITH LOCAL CHECK OPTION` or `WITH CASCADED CHECK OPTION`: a row written
+   * through the view must be one it shows (`44000` otherwise). Only an
+   * automatically updatable view takes one.
+   */
+  checkOption(option: "local" | "cascaded"): CreateView;
+}
+export interface CreateView extends ViewOptions<CreateView> {}
+
+/**
+ * `CREATE RECURSIVE VIEW`, whose query reads the view by name. It has no
+ * check option, which PostgreSQL refuses on a recursive view.
+ */
+export declare class CreateRecursiveView extends SchemaStatement {}
+export interface CreateRecursiveView extends ViewOptions<CreateRecursiveView> {}
+
+/** The clauses a materialized view and `CREATE TABLE AS` share. */
+export interface RelationAsOptions<S> {
+  /** `IF NOT EXISTS`: an existing relation of the name is left alone, its rows with it. */
+  ifNotExists(): S;
+  /** Names appended to the column list, renaming the query's leading columns. */
+  columns(names: readonly string[]): S;
+  /** `WITH NO DATA`: the query's columns and none of its rows. */
+  withNoData(): S;
+}
+
+/**
+ * `CREATE MATERIALIZED VIEW`: the rows the query returned, held until a
+ * refresh. One created `withNoData` cannot be read until it is refreshed.
+ */
+export declare class CreateMaterializedView extends SchemaStatement {}
+export interface CreateMaterializedView extends RelationAsOptions<CreateMaterializedView> {}
+
+/** `CREATE TABLE AS`: a table of the query's columns and rows, tied to it no further. */
+export declare class CreateTableAs extends SchemaStatement {}
+export interface CreateTableAs extends RelationAsOptions<CreateTableAs> {}
+
+export declare function createView(name: TableRef, query: Select): CreateView;
+
+/** A recursive view names at least one column, which its query's rows are called. */
+export declare function createRecursiveView(
+  name: TableRef,
+  columns: string | readonly [string, ...string[]],
+  query: Select,
+): CreateRecursiveView;
+
+export declare function dropView(
+  names: TableRef | readonly [TableRef, ...TableRef[]],
+  options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
+): SchemaStatement;
+
+export declare function createMaterializedView(name: TableRef, query: Select): CreateMaterializedView;
+
+/**
+ * `REFRESH MATERIALIZED VIEW`: `concurrently` replaces the rows without
+ * blocking reads, which needs a unique index on the view and a populated
+ * view; `withNoData` empties it. PostgreSQL refuses the two together, and so
+ * does this function.
+ */
+export declare function refreshMaterializedView(
+  name: TableRef,
+  options?: { readonly concurrently?: boolean; readonly withNoData?: boolean },
+): SchemaStatement;
+
+export declare function dropMaterializedView(
+  names: TableRef | readonly [TableRef, ...TableRef[]],
+  options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
+): SchemaStatement;
+
+export declare function createTableAs(name: TableRef, query: Select): CreateTableAs;

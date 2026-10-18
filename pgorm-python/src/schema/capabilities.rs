@@ -1,4 +1,5 @@
 // [spec:pgorm:req:python.schema]
+// [spec:pgorm:req:python.schema-views]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
         ("schema.data_type", "pgorm_query::ColumnType"),
@@ -28,6 +29,13 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         ("schema.rename_enum_value", "pgorm_query::extension::PendingTypeAlter::rename_value"),
         ("schema.rename_enum", "pgorm_query::extension::PendingTypeAlter::rename_to"),
         ("schema.drop_enum", "pgorm_query::extension::TypeDropStatement"),
+        ("schema.create_view", "pgorm_query::ViewCreateStatement"),
+        ("schema.create_recursive_view", "pgorm_query::RecursiveViewCreateStatement"),
+        ("schema.drop_view", "pgorm_query::ViewDropStatement"),
+        ("schema.create_materialized_view", "pgorm_query::MaterializedViewCreateStatement"),
+        ("schema.refresh_materialized_view", "pgorm_query::MaterializedViewRefreshStatement"),
+        ("schema.drop_materialized_view", "pgorm_query::MaterializedViewDropStatement"),
+        ("schema.create_table_as", "pgorm_query::TableCreateAsStatement"),
         ("schema.from_entity", "Schema::{create_table_from_entity,create_enum_from_entity,create_index_from_entity,create_comments_from_entity}"),
     ].into_iter().map(|(name, api)| (name.to_owned(), serde_json::json!({
         "rust_api": format!("pgorm::{api}"), "features": [],

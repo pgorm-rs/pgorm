@@ -32,6 +32,7 @@ mod token;
 mod type_vocab;
 mod types;
 mod value;
+mod view;
 mod window;
 mod write_relations;
 
