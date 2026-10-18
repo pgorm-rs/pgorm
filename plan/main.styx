@@ -300,6 +300,14 @@ children (
                                 text "Delivered again at the current rule version (sql.ast.cast-shape +2), on the re-check recorded above; the earlier commit carried a non-delivery type, so it did not refresh the node's evidence."
                                 after_done true
                             }
+
+                            {
+                                at 2026-10-18T15:34:23.564669Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Delivered again at sql.ast.cast-shape +2: merging branches cut before the 2026-10-18 re-check (c745e19b, 1ecaad8f, f9db65b7) restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                                after_done true
+                            }
                         )
                     }
 
@@ -8572,6 +8580,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at the current rule version (sql.surface +27), on the re-check recorded above; the earlier commits carried a non-delivery type, so they did not refresh the node's evidence."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:34:23.67833Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at sql.surface +28, which adds Interval (sql.value.interval) to the register in f9db65b7; the merges of branches cut before the 2026-10-18 re-check had also restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
                 )
