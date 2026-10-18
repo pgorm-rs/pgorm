@@ -32,6 +32,7 @@ VARIANTS = {
     "ipnetwork": "IpNetwork",
     "mac_address": "MacAddress",
     "vector": "Vector",
+    "interval": "Interval",
 }
 # `wire.RANGES` names to the pgorm_query::RangeType each one is.
 RANGE_TYPES = {
@@ -212,6 +213,12 @@ class ValueEmitter:
         if kind == "vector":
             items = ", ".join(f"f32::from_bits(0x{item}u32)" for item in data)
             return f"Box::new({PRELUDE}::Vector::from(vec![{items}]))"
+        if kind == "interval":
+            months, days, microseconds = wire.interval_fields(data)
+            return (
+                f"Box::new({Q}::Interval::new("
+                f"{months}i32, {days}i32, {microseconds}i64))"
+            )
         raise UnsupportedInstruction("value kind has no Rust source: " + kind)
 
     def value_source(self, snapshot):

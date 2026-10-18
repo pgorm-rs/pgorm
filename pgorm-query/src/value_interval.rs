@@ -26,7 +26,7 @@ type CodecError = Box<dyn Error + Sync + Send>;
 /// Equality and hashing are field by field, so `1 mon` and `30 days` are
 /// different values here, where PostgreSQL's `=` on `interval` calls them
 /// equal.
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Interval {
     pub months: i32,
@@ -36,7 +36,7 @@ pub struct Interval {
 
 impl Interval {
     /// The interval of these three fields, taken as they are.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     pub const fn new(months: i32, days: i32, microseconds: i64) -> Self {
         Self {
             months,
@@ -46,20 +46,20 @@ impl Interval {
     }
 
     /// Whether this is PostgreSQL's `infinity`, every field at its maximum.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     pub const fn is_infinity(&self) -> bool {
         self.months == i32::MAX && self.days == i32::MAX && self.microseconds == i64::MAX
     }
 
     /// Whether this is PostgreSQL's `-infinity`, every field at its minimum.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     pub const fn is_neg_infinity(&self) -> bool {
         self.months == i32::MIN && self.days == i32::MIN && self.microseconds == i64::MIN
     }
 
     /// The binary form, `interval_send`'s: the microseconds, then the days,
     /// then the months, each big-endian. [`FromSql`] reads the same layout.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     pub fn to_binary(&self) -> [u8; 16] {
         let mut out = [0; 16];
         out[..8].copy_from_slice(&self.microseconds.to_be_bytes());
@@ -121,7 +121,7 @@ fn is_interval(ty: &Type) -> bool {
 }
 
 /// The binary form [`Interval::to_binary`] writes.
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 impl<'a> FromSql<'a> for Interval {
     fn from_sql(_: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
         let raw: &[u8; 16] = raw
@@ -141,21 +141,21 @@ impl<'a> FromSql<'a> for Interval {
     }
 }
 
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 impl From<Interval> for Value {
     fn from(x: Interval) -> Value {
         Value::Interval(Some(Box::new(x)))
     }
 }
 
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 impl Nullable for Interval {
     fn null() -> Value {
         Value::Interval(None)
     }
 }
 
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 impl ValueType for Interval {
     fn try_from(v: Value) -> Result<Self, ValueTypeError> {
         match v {
@@ -177,7 +177,7 @@ impl ValueType for Interval {
     }
 }
 
-// [spec:pgorm:def:sql.value.interval]
+// [spec:pgorm:def:sql.value.interval+1]
 impl NotU8 for Interval {}
 
 impl Value {
@@ -198,7 +198,7 @@ impl Value {
 mod tests {
     use super::*;
 
-    // [spec:pgorm:def:sql.value.interval/test]
+    // [spec:pgorm:def:sql.value.interval+1/test]
     #[test]
     fn binary_form_is_microseconds_days_months() -> Result<(), CodecError> {
         let interval = Interval::new(1, -2, 3_000_004);
@@ -211,7 +211,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:def:sql.value.interval/test]
+    // [spec:pgorm:def:sql.value.interval+1/test]
     #[test]
     fn binary_form_round_trips_every_extreme() -> Result<(), CodecError> {
         for interval in [
@@ -229,7 +229,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:def:sql.value.interval/test]
+    // [spec:pgorm:def:sql.value.interval+1/test]
     #[test]
     fn codec_refuses_other_types_and_widths() {
         assert!(!<Interval as FromSql>::accepts(&Type::INT8));
@@ -272,7 +272,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.interval/test]
+    // [spec:pgorm:def:sql.value.interval+1/test]
     #[test]
     fn converts_into_and_out_of_value() {
         let interval = Interval::new(1, -2, 3);
@@ -304,7 +304,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.interval/test]
+    // [spec:pgorm:def:sql.value.interval+1/test]
     #[test]
     fn equality_is_field_by_field() {
         assert_ne!(

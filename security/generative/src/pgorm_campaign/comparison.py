@@ -18,7 +18,17 @@ class Comparison:
     reason: str
 
 
+# [spec:pgorm:req:generative.comparison+1]
 def value_key(value):
+    """The identity two observed values must share to compare equal.
+
+    Identity, not SQL comparison: only alternate spellings of one temporal
+    value are normalised. An interval compares field by field, so `1 mon` and
+    `30 days` are different observations although PostgreSQL's `=`, and so its
+    DISTINCT, GROUP BY and ORDER BY, treat them as equal. The oracle never
+    evaluates that comparison itself; a program that asks for it gets the
+    server's answer on both sides.
+    """
     wire.validate(value)
     tag = value["type"]
     kind = tag["kind"]
@@ -75,7 +85,7 @@ def encoded(value):
     )
 
 
-# [spec:pgorm:req:generative.comparison]
+# [spec:pgorm:req:generative.comparison+1]
 def rows(actual, expected, *, ordered):
     if (
         type(ordered) is not bool

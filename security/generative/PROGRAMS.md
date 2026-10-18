@@ -52,6 +52,14 @@ rejected. The four temporal kinds are `date`, `time`, `datetime` (naive) and
 non-zero offset is rejected rather than converted. No kind carries an offset,
 so the campaign asserts nothing about non-UTC offsets — an accepted gap, since
 PostgreSQL preserves the instant and never stored the offset either.
+An `interval` carries `months`, `days` and `microseconds`, each exact decimal
+text within `i32`, `i32` and `i64` — the Python binding's own snapshot of one.
+No field is folded into another, so `1 mon` and `30 days` are two values and an
+observed interval compares field by field, although PostgreSQL's `=` (and so its
+DISTINCT, GROUP BY and ORDER BY) calls them equal; a comparison a program asks
+the server to make keeps the server's answer on both sides. PostgreSQL's
+`infinity` and `-infinity` are the triples with every field at its maximum or
+its minimum, and travel as those triples.
 Enum tags carry the schema and type name; array elements retain their full
 tags, including SQL NULL and JSON null as distinct values. A built-in range
 (`int4range`, `int8range`, `numrange`, `daterange`, `tsrange`, `tstzrange`) is

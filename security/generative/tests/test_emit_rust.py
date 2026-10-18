@@ -335,6 +335,46 @@ class EmitRustTests(unittest.TestCase):
         self.assertIn("pgorm::Upserted::Inserted(model)", upsert)
         self.assertIn("::observe::absent()", upsert)
 
+    def test_intervals_emit_and_read_back_exactly(self):
+        program = next(
+            program
+            for program in (
+                generate(20260913, index, family="types").program
+                for index in range(200)
+            )
+            if any(
+                node["op"] == "result.value"
+                and node["data"]["type"]["kind"] == "interval"
+                for node in program.data()["nodes"]
+            )
+        )
+        source = emit_rust.render(program)
+        self.assertIn("pgorm::pgorm_query::Value::Interval(Some(Box::new(", source)
+        self.assertIn("pgorm::pgorm_query::Interval::new(", source)
+        self.assertIn("try_get::<_, pgorm::entity::prelude::Interval>(", source)
+        self.assertIn("pgorm::pgorm_query::ArrayType::Interval", source)
+        author = Author(seed=17)
+        columns = [
+            projection(author, author.value("interval", data), "i" + str(index))
+            for index, data in enumerate(
+                (
+                    {"months": "1", "days": "-2", "microseconds": "3000004"},
+                    {
+                        "months": "-2147483648",
+                        "days": "-2147483648",
+                        "microseconds": "-9223372036854775808",
+                    },
+                )
+            )
+        ]
+        author.fetch(author.node("select", {"columns": columns}))
+        source = emit_rust.render(author.finish())
+        self.assertIn("Interval::new(1i32, -2i32, 3000004i64)", source)
+        self.assertIn(
+            "Interval::new(-2147483648i32, -2147483648i32, -9223372036854775808i64)",
+            source,
+        )
+
     def test_enum_values_carry_their_qualified_cast(self):
         source = emit_rust.render(hostile_program())
         name = emit_rust.literal('State" 雪')

@@ -8,7 +8,7 @@ def row(value, name="value"):
     return {"kind": "record", "fields": [{"name": name, "value": value}]}
 
 
-# [spec:pgorm:req:generative.comparison/test]
+# [spec:pgorm:req:generative.comparison+1/test]
 class ComparisonTests(unittest.TestCase):
     def test_unordered_rows_retain_duplicate_counts(self):
         a, b = [row(wire.scalar("i32", str(i))) for i in (1, 2)]

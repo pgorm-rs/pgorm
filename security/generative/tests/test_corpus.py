@@ -14,7 +14,7 @@ from pgorm_campaign.corpus_random import sample
 class CorpusTests(unittest.TestCase):
     def test_required_boundaries_preserve_tags_and_bytes(self):
         cases = builtin()
-        self.assertEqual(len(cases), 293)
+        self.assertEqual(len(cases), 319)
         self.assertEqual(len({case.data()["id"] for case in cases}), len(cases))
         self.assertTrue(set(STRINGS) <= {case.data()["family"] for case in cases})
         values = [wire.validate(case.value()) for case in cases]
@@ -46,6 +46,42 @@ class CorpusTests(unittest.TestCase):
         self.assertIn(wire.scalar(ENUM, "O'Brien 雪"), values)
         self.assertIn(wire.scalar("json", None), values)
         self.assertIn(wire.scalar("decimal", "-0.00"), values)
+
+    def test_intervals_reach_mixed_signs_limits_and_infinities(self):
+        intervals = {
+            tuple(wire.interval_fields(case.value()["data"]))
+            for case in builtin()
+            if case.value()["type"]["kind"] == "interval"
+            and not case.value()["sql_null"]
+        }
+        i32, i64 = 2**31, 2**63
+        for fields in (
+            (0, 0, 0),
+            (1, -2, 0),
+            (-1, 2, -3_000_004),
+            (0, 0, 1),
+            (0, 0, -1),
+            (1, 0, 0),
+            (0, 30, 0),
+            (i32 - 1, 0, 0),
+            (-i32, 0, 0),
+            (0, i32 - 1, 0),
+            (0, -i32, 0),
+            (0, 0, i64 - 1),
+            (0, 0, -i64),
+            (i32 - 1, i32 - 1, i64 - 1),
+            (-i32, -i32, -i64),
+        ):
+            self.assertIn(fields, intervals)
+        drawn = [
+            wire.interval_fields(item.value()["data"])
+            for item in (sample(123, index) for index in range(2000))
+            if item.value()["type"]["kind"] == "interval"
+        ]
+        self.assertGreater(len(drawn), 50)
+        self.assertTrue(any(min(fields) < 0 < max(fields) for fields in drawn))
+        self.assertTrue(any(abs(fields[2]) > 2**40 for fields in drawn))
+        self.assertTrue(any(abs(fields[0]) <= 1 for fields in drawn))
 
     def test_identifier_traits_do_not_invent_rejections(self):
         names = {
@@ -94,7 +130,7 @@ class CorpusTests(unittest.TestCase):
         values = [sample(123, index) for index in range(1000)]
         self.assertEqual(
             sha256(b"".join(encoded(item.data()) for item in values)).hexdigest(),
-            "04cb9a03a020329092e7924cc98dd26798cb18ca41d8984a10e39a3f1e22efa7",
+            "e2c29859c67736bd255d7e7e323e8b9a86df4a363384264cd4fba2468c32132b",
         )
         self.assertEqual(
             list(reversed(values)),

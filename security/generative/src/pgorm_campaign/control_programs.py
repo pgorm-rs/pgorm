@@ -144,5 +144,6 @@ def numeric(kind):
             wire.scalar("datetime", "2024-01-02 03:04:05.123456"),
             "timestamp",
         ),
+        "interval": (wire.scalar("interval", wire.interval(1, 0, 0)), "interval"),
     }[kind]
     return typed(sample["type"], sample["data"], postgres)

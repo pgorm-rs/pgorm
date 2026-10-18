@@ -110,6 +110,50 @@ class WireTests(unittest.TestCase):
             ):
                 wire.scalar(kind, data)
 
+    def test_intervals_keep_three_signed_fields_apart(self):
+        month = wire.scalar("interval", wire.interval(1, 0, 0))
+        days = wire.scalar("interval", wire.interval(0, 30, 0))
+        self.assertNotEqual(month, days)
+        for data in (
+            wire.interval(1, -2, 3_000_004),
+            wire.interval(0, 0, -1),
+            wire.INTERVAL_INFINITY,
+            wire.INTERVAL_NEGATIVE_INFINITY,
+        ):
+            value = wire.scalar("interval", data)
+            self.assertEqual(value, wire.validate(json.loads(json.dumps(value))))
+        self.assertEqual(
+            wire.INTERVAL_INFINITY,
+            {
+                "months": "2147483647",
+                "days": "2147483647",
+                "microseconds": "9223372036854775807",
+            },
+        )
+        self.assertEqual(wire.interval_fields(wire.interval(-1, 2, -3)), (-1, 2, -3))
+        array = wire.scalar(
+            {"kind": "array", "element": {"kind": "interval"}},
+            [days, wire.scalar("interval", None, sql_null=True)],
+        )
+        self.assertEqual(array["data"][0], days)
+        for data in (
+            {"months": "1", "days": "0"},
+            {"months": "1", "days": "0", "microseconds": "0", "hours": "0"},
+            {"months": "2147483648", "days": "0", "microseconds": "0"},
+            {"months": "0", "days": "-2147483649", "microseconds": "0"},
+            {"months": "0", "days": "0", "microseconds": "-9223372036854775809"},
+            {"months": "01", "days": "0", "microseconds": "0"},
+            {"months": 1, "days": 0, "microseconds": 0},
+            "'+1 months'::interval",
+        ):
+            with (
+                self.subTest(data=data),
+                self.assertRaises(wire.FormatError),
+            ):
+                wire.scalar("interval", data)
+        with self.assertRaises(wire.FormatError):
+            wire.scalar("multirange", None, sql_null=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6889,6 +6889,14 @@ children (
                         text "After checkpoint 5f171d10 was integrated, nplan derived generative.oracles Done from committed implementation/verification coverage despite the explicit chore checkpoint type. The earlier note's statement that the node remains Doing is therefore stale. The delivered kernel checks supported programs independently and fails closed on unsupported semantics, as these two rules require. This component status does not claim full matrix coverage, controls, generic native replay or campaign acceptance; those remain existing downstream WBS obligations. Known invalid-conversion and unsupported-policy paths continue to report incomplete."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T17:11:32.601887Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at generative.comparison +1 (generative-interval-kind): an observed interval compares by its months, days and microseconds, while a comparison a program asks PostgreSQL for keeps the server's answer, which calls 1 mon and 30 days equal."
+                        after_done true
+                    }
                 )
             }
 
@@ -11687,12 +11695,20 @@ children (
         title "The generative campaign generates, binds and compares interval values as a portable kind"
         kind @test
         deps (statement-interval-value)
+        sealed true
         log (
             {
                 at 2026-10-18T15:35:44.801871Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from statement-interval-value (f9db65b7). The generative replay accepts an interval value tag (named interval, carrying the SQL literal) the way it does a multirange, but the campaign never generates one: interval is not a portable kind in the program format, wire.py, the corpus, the reference codec or the emitters. Add it so programs bind and compare intervals across Rust and Python, with the reference semantics keeping months, days and microseconds apart (no 1 mon = 30 days equivalence), mixed signs and the two infinities among the generated values. Filed as a root node because the generative container is sealed."
+            }
+
+            {
+                at 2026-10-18T17:11:32.48455Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -661,7 +661,7 @@ def _type_tokens(value):
         tokens.add("json")
         if _json_null(value["data"]):
             tokens.add("json-null")
-    elif kind in ("decimal", "uuid", "enum"):
+    elif kind in ("decimal", "uuid", "enum", "interval"):
         tokens.add(kind)
     elif kind in TEMPORAL:
         tokens.add("temporal")

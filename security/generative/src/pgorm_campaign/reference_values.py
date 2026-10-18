@@ -59,6 +59,7 @@ TYPES = {
     # the search path. The pinned image does not install it, so any statement
     # naming it is refused by the server before a value is examined.
     "vector": "vector",
+    "interval": "interval",
 }
 
 
@@ -99,7 +100,25 @@ def argument(value):
         raise InvalidOracle("reference arrays require explicit element parameters")
     if kind in wire.RANGES:
         return range_text(kind, data)
+    if kind == "interval":
+        return interval_text(data)
     return data
+
+
+def interval_text(data):
+    """PostgreSQL's text input for an interval, each field signed and in its unit.
+
+    Every field carries its sign because `IntervalStyle` `sql_standard` reads a
+    leading `-` as applying to the unsigned fields after it, and the
+    microseconds stay an integer so no field passes through a rounded fraction.
+    The two infinite triples are spelled as the words the server writes.
+    """
+    if data == wire.INTERVAL_INFINITY:
+        return "infinity"
+    if data == wire.INTERVAL_NEGATIVE_INFINITY:
+        return "-infinity"
+    months, days, microseconds = wire.interval_fields(data)
+    return f"{months:+d} mon {days:+d} day {microseconds:+d} us"
 
 
 def range_text(kind, data):

@@ -49,6 +49,12 @@ def range_value(tag, data, p):
     return p.Range(lower, upper, data["bounds"])
 
 
+def interval_value(data, p):
+    """A public ``pgorm.Interval`` holding the payload's three fields as given."""
+    months, days, microseconds = wire.interval_fields(data)
+    return p.Interval(months=months, days=days, microseconds=microseconds)
+
+
 def equivalent_snapshot(expected, actual):
     """Only alternate spellings of the same temporal value may compare equal."""
     if expected == actual:
@@ -88,6 +94,8 @@ def materialize(snapshot, p):
         result = p.Value.json(snapshot["data"])
     elif tag["kind"] in wire.RANGES:
         result = p.Value(range_value(tag, snapshot["data"], p), tag["kind"])
+    elif tag["kind"] == "interval":
+        result = p.Value(interval_value(snapshot["data"], p), "interval")
     else:
         result = p.Value(data_value(tag, snapshot["data"]), kind(tag, p))
     if not equivalent_snapshot(snapshot, result.snapshot()):

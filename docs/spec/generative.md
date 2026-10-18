@@ -55,7 +55,7 @@ compile-time verification of derives, lifetimes and generic shapes.
 | Pipeline | Literal/binder paths, projections, grouping/HAVING, windows, joins, composed sources, select_sources and set operations |
 | Names | Schema/table/column/alias, ORDER/GROUP selection, function/type/qualified-enum names and enum DDL |
 | Substitution/patterns | Owned templates with comments/quotes/dollar strings/repeated slots, literal substring helpers and explicit LIKE |
-| Types | Numeric bounds, float edge cases, nullability, arrays, JSON, Decimal, UUID, temporal and enum variants |
+| Types | Numeric bounds, float edge cases, nullability, arrays, JSON, Decimal, UUID, temporal, interval and enum variants |
 | Sequences | Store/read/reuse as value or identifier, commit/rollback/savepoint, repeated execution and stream cancellation |
 
 > [spec:pgorm:req:generative.corpus]
@@ -117,14 +117,18 @@ compile-time verification of derives, lifetimes and generic shapes.
 > absence of an exception alone MUST NOT establish correctness. Unsupported
 > oracle semantics MUST be reported as uncovered/incomplete rather than passed.
 
-> [spec:pgorm:req:generative.comparison]
+> [spec:pgorm:req:generative.comparison+1]
 > Oracles MUST account for PostgreSQL NULL/three-valued logic, duplicate rows,
-> ordering only where specified, scalar/array/enum types, numeric and temporal
-> semantics, affected-row counts and final fixture state. Normalization MUST
-> be explicit and MUST NOT erase a defect such as a missing row, altered value,
-> lost type tag, wrong optional join or broadened tenant predicate. Expected
-> invalid-input or database errors MUST identify their expected category/cause;
-> arbitrary errors MUST NOT satisfy an expected rejection.
+> ordering only where specified, scalar/array/enum types, numeric, temporal
+> and interval semantics, affected-row counts and final fixture state. An
+> observed interval MUST compare by its months, days and microseconds, so
+> `1 mon` and `30 days` are different values, while a comparison a program
+> asks PostgreSQL to make keeps the server's answer, which calls them equal.
+> Normalization MUST be explicit and MUST NOT erase a defect such as a missing
+> row, altered value, lost type tag, wrong optional join or broadened tenant
+> predicate. Expected invalid-input or database errors MUST identify their
+> expected category/cause; arbitrary errors MUST NOT satisfy an expected
+> rejection.
 
 > [spec:pgorm:req:generative.controls]
 > Test-only vulnerable implementations and deliberately incorrect outcomes MUST

@@ -10,7 +10,7 @@
     {"id": "pipeline", "variations": ["literal", "bound", "projection", "derive", "group-having", "window", "join", "nested-source", "select-sources", "append", "intersect", "remove", "right-join", "full-join", "source-arity-1", "source-arity-2", "source-arity-3", "source-arity-4", "source-arity-5", "source-arity-6"]},
     {"id": "names", "variations": ["schema", "table", "column", "alias", "order", "group", "function", "type", "qualified-enum"]},
     {"id": "patterns", "variations": ["raw-template", "template-comment", "template-quote", "template-dollar-string", "repeated-slot", "contains", "starts-with", "ends-with", "explicit-like"]},
-    {"id": "types", "variations": ["integer-boundary", "float-special", "signed-zero", "sql-null", "json-null", "array-null", "array-empty", "array-element-null", "json", "decimal", "uuid", "temporal", "enum", "enum-array"]},
+    {"id": "types", "variations": ["integer-boundary", "float-special", "signed-zero", "sql-null", "json-null", "array-null", "array-empty", "array-element-null", "json", "decimal", "uuid", "temporal", "interval", "enum", "enum-array"]},
     {"id": "schema", "variations": ["create", "drop", "rename-table", "rename-column", "index", "enum-create", "enum-add", "enum-rename", "enum-drop", "quoted-names"]},
     {"id": "sequences", "variations": ["store-read-value", "store-read-identifier", "commit", "rollback", "savepoint", "read-only", "repeated-execution", "stream-complete", "stream-early-close", "stream-cancel"]}
   ],
@@ -37,6 +37,7 @@
     {"kind": "datetime_utc", "postgres": "pg_catalog.timestamptz", "result_kind": "datetime_utc", "policy": "live"},
     {"kind": "ipnetwork", "postgres": "pg_catalog.inet", "result_kind": "ipnetwork", "policy": "live"},
     {"kind": "mac_address", "postgres": "pg_catalog.macaddr", "result_kind": "mac_address", "policy": "live"},
+    {"kind": "interval", "postgres": "pg_catalog.interval", "result_kind": "interval", "policy": "live"},
     {"kind": "vector", "postgres": null, "result_kind": null, "policy": "construction-or-rejection", "reason": "Pinned PostgreSQL has no pgvector extension; verify tagged construction and explicit missing-type rejection."},
     {"kind": "enum", "postgres": "fixture.State\" 雪", "result_kind": "enum", "policy": "live"}
   ],

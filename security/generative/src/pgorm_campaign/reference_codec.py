@@ -31,6 +31,7 @@ KINDS = {
     "inet": "ipnetwork",
     "cidr": "ipnetwork",
     "macaddr": "mac_address",
+    "interval": "interval",
 }
 
 # Each built-in range type by its subtype's catalog name.
@@ -155,6 +156,13 @@ class Codec:
             return list(raw)
         if kind in ("text", "enum"):
             return raw.decode("utf-8")
+        if kind == "interval":
+            # interval_send: microseconds, days, then months. Psycopg's own
+            # loader would fold all three into one timedelta.
+            if len(raw) != 16:
+                raise InvalidOracle("wrong binary interval width")
+            microseconds, days, months = struct.unpack("!qii", raw)
+            return wire.interval(months, days, microseconds)
         if kind == "json":
             if self.types[oid][1] == "jsonb":
                 if raw[:1] != b"\x01":
@@ -178,7 +186,7 @@ class Codec:
             return text if "/" in text else text + ("/128" if ":" in text else "/32")
         return str(value)
 
-    # [spec:pgorm:req:generative.comparison]
+    # [spec:pgorm:req:generative.comparison+1]
     def value(self, oid, raw):
         tag = self.tag(oid)
         data = None

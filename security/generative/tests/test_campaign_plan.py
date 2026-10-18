@@ -26,7 +26,7 @@ class SchedulingTest(unittest.TestCase):
         self.assertEqual(counts["construction"], 150)
         self.assertEqual(counts["runtime"], 30)
         self.assertEqual(counts["invalid"], 6)
-        self.assertEqual(counts["control"], 22)
+        self.assertEqual(counts["control"], 23)
         self.assertNotIn("compile", counts)
         self.assertEqual(len(plan.items), sum(counts.values()))
 

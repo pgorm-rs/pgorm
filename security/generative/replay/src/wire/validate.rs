@@ -214,6 +214,7 @@ fn scalar(kind: &str, data: &Json) -> Result<(), FormatError> {
         }),
         "json" => json(data, 0),
         "vector" => vector(data),
+        "interval" => interval(data),
         "date" | "time" | "datetime" | "datetime_utc" => temporal(kind, data),
         _ => Err(FormatError::new("unknown portable value kind")),
     }
@@ -248,6 +249,16 @@ fn canonical_integer(text: &str) -> bool {
     matches!(characters.next(), Some(b'1'..=b'9'))
         && digits.len() <= 20
         && characters.all(|byte| byte.is_ascii_digit())
+}
+
+/// Months, days and microseconds, each canonical decimal text within its own
+/// width, and nothing else.
+fn interval(data: &Json) -> Result<(), FormatError> {
+    let object = fields(data, &["months", "days", "microseconds"], &[])?;
+    for (name, bits) in [("months", 32), ("days", 32), ("microseconds", 64)] {
+        integer(&object[name], bits, true)?;
+    }
+    Ok(())
 }
 
 fn bit_pattern(data: &Json, size: usize) -> Result<(), FormatError> {

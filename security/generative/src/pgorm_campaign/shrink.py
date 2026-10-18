@@ -20,6 +20,7 @@ FAILING = ("defect", "incomplete")
 # declared type identity. Kinds whose exact spelling carries the defect (floats
 # as IEEE bits, decimals, temporal precision, enum labels, UUIDs) are left
 # alone: a "simpler" spelling there would be a different test, not a smaller one.
+# An interval has no one simplest payload; `_toward_zero` steps each field.
 SIMPLER = {
     "bool": (False,),
     "text": ("",),
@@ -320,6 +321,25 @@ def _rewrite(inputs, source, target):
     return rewritten
 
 
+def _toward_zero(data):
+    """Interval payloads nearer zero, one field at a time.
+
+    All three fields at zero first, then each nonzero field zeroed alone, then
+    each field beyond one unit brought to one unit of its own sign. No field is
+    ever folded into another: a month spelled as days is a different value.
+    """
+    fields = wire.interval_fields(data)
+    smaller = [(0, 0, 0)]
+    for index, part in enumerate(fields):
+        if part:
+            smaller.append(fields[:index] + (0,) + fields[index + 1 :])
+    for index, part in enumerate(fields):
+        if abs(part) > 1:
+            unit = 1 if part > 0 else -1
+            smaller.append(fields[:index] + (unit,) + fields[index + 1 :])
+    return [wire.interval(*item) for item in dict.fromkeys(smaller) if item != fields]
+
+
 def _value_reductions(data):
     """Reduce payloads in place, keeping each declared type identity intact."""
     for node in data["nodes"]:
@@ -329,7 +349,10 @@ def _value_reductions(data):
         if value["sql_null"]:
             continue
         kind = value["type"]["kind"]
-        for payload in SIMPLER.get(kind, ()):
+        payloads = (
+            _toward_zero(value["data"]) if kind == "interval" else SIMPLER.get(kind, ())
+        )
+        for payload in payloads:
             if value["data"] == payload:
                 continue
             candidate = copy.deepcopy(data)

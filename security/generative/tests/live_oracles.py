@@ -29,7 +29,7 @@ KNOWN_DEFECTS = {
 
 
 # [spec:pgorm:req:generative.oracles/test]
-# [spec:pgorm:req:generative.comparison/test]
+# [spec:pgorm:req:generative.comparison+1/test]
 async def main():
     root = Path("target/generative-oracles")
     output = root / ("run-" + uuid.uuid4().hex[:12])

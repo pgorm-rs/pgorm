@@ -107,4 +107,8 @@ def literal(value, *, pipeline=False):
     if kind == "enum":
         # The public Value enum tag ascribes the constant's PostgreSQL type.
         return typed(value)
+    if kind == "interval":
+        # An interval literal carries its own cast (`sql.value.interval-text`):
+        # untyped, it would be text wherever no column types it.
+        return typed(value)
     return SQL((Parameter(wire.scalar("text", textual(value))),))

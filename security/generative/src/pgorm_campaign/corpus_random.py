@@ -6,7 +6,7 @@ from . import wire
 from .corpus import Input
 from .corpus_builtin import ENUM, STRINGS
 
-VERSION = 1
+VERSION = 2
 KINDS = tuple(sorted(wire.SCALARS)) + ("enum", "array")
 
 
@@ -47,6 +47,8 @@ def _value(kind, raw):
         return wire.scalar(kind, ("-" if raw[0] & 1 else "") + value)
     if kind.startswith("datetime") or kind in ("date", "time"):
         return wire.scalar(kind, _temporal(kind, raw))
+    if kind == "interval":
+        return wire.scalar(kind, _interval(raw))
     hostile = tuple(text for values in STRINGS.values() for text in values[:-1])
     data = {
         "bool": bool(raw[0] & 1),
@@ -74,6 +76,17 @@ def _temporal(kind, raw):
         return time
     value = day + " " + time
     return value + ("+00:00" if kind != "datetime" else "")
+
+
+def _interval(raw):
+    """Three independently signed fields, each shifted down by its own amount so
+    magnitudes range from a field's limit to a single unit and zero."""
+    months, days = (
+        int.from_bytes(raw[start : start + 4], "big", signed=True) >> (raw[16 + n] % 32)
+        for n, start in enumerate((0, 4))
+    )
+    microseconds = int.from_bytes(raw[8:16], "big", signed=True) >> (raw[18] % 64)
+    return wire.interval(months, days, microseconds)
 
 
 # [spec:pgorm:req:generative.corpus]

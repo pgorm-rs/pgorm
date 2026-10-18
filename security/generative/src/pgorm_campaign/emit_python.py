@@ -444,6 +444,9 @@ def scalar_source(tag, data):
     if name == "vector":
         items = ", ".join(f"_f32({literal(item)})" for item in data)
         return "[" + items + "]"
+    if name == "interval":
+        months, days, microseconds = wire.interval_fields(data)
+        return f"p.Interval(months={months}, days={days}, microseconds={microseconds})"
     return literal(data)
 
 
