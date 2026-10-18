@@ -9,11 +9,12 @@ sites (
         [spec:pgorm:req:napi.runtimes+1]
     )}
     {path .github/workflows/sqlmap-run.yml, spec (
-        [spec:pgorm:req:security.sqlmap.ci+1]
+        [spec:pgorm:req:security.sqlmap.ci+2]
+        [spec:pgorm:req:security.sqlmap.pin+1]
         [spec:pgorm:req:security.sqlmap.runner-tests]
     )}
     {path .github/workflows/sqlmap.yml, spec (
-        [spec:pgorm:req:security.sqlmap.ci+1]
+        [spec:pgorm:req:security.sqlmap.ci+2]
     )}
     {path security/sqlmap/acceptance/2026-09-14.md, spec (
         [spec:pgorm:req:security.sqlmap.acceptance+1]

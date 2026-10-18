@@ -11,19 +11,19 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 fn passing() -> Value {
-    json!({"profile": "full", "subset": [], "pass": true, "direct_regressions": {"pass": true},
+    json!({"profile": "full", "subset": [], "remeasure": false, "pass": true, "direct_regressions": {"pass": true},
            "inapplicable": {"select-Q": {"reason": "REPLACE-only and never reflected here."}},
            "falsified_exemptions": []})
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
 #[test]
 fn missing_report_is_explicitly_not_run() {
     let artifacts = scratch("missing");
     assert_eq!(verdict::profile_status("smoke", &artifacts).status, "not-run");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
 #[test]
 fn profile_status_requires_matching_complete_evidence() {
     let artifacts = scratch("evidence");
@@ -38,6 +38,9 @@ fn profile_status_requires_matching_complete_evidence() {
         (Some(("falsified_exemptions", json!(["select-Q"]))), "fail"),
         (Some(("inapplicable", Value::Null)), "incomplete"),
         (Some(("falsified_exemptions", Value::Null)), "incomplete"),
+        // A re-measurement of the declarations, however it ended, is not a profile run.
+        (Some(("remeasure", json!(true))), "incomplete"),
+        (Some(("remeasure", Value::Null)), "incomplete"),
     ];
     for (update, expected) in cases {
         let mut document = passing();
@@ -53,8 +56,8 @@ fn profile_status_requires_matching_complete_evidence() {
     }
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn exemptions_are_published_and_never_absorbed() {
     let artifacts = scratch("exemptions");
@@ -73,7 +76,7 @@ fn exemptions_are_published_and_never_absorbed() {
     assert_eq!(published["inapplicable"]["select-Q"], "REPLACE-only and never reflected here.");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
 #[test]
 fn a_failing_profile_still_publishes_its_exemptions() {
     let artifacts = scratch("failing");
@@ -86,13 +89,13 @@ fn a_failing_profile_still_publishes_its_exemptions() {
     assert!(summary.contains("- select-Q: "), "{summary}");
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
 #[test]
 fn publish_refuses_an_unknown_profile() {
     assert!(verdict::publish("nonsense", &scratch("unknown")).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1/test]
+// [spec:pgorm:req:security.sqlmap.ci+2/test]
 #[test]
 fn identifiers_status_needs_no_direct_regressions() {
     let artifacts = scratch("identifiers");

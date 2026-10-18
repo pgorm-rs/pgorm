@@ -6,9 +6,11 @@ pgorm API exercised by each protected route and its vulnerable control.
 
 ## Run locally
 
-Use Docker, Rust (CI uses the stable toolchain), a C compiler/libclang, and the exact Python
-version in `pins.json`. The runner verifies the upstream archive digest and
-uses the pinned PostgreSQL image. It accepts no external scan target.
+Use Docker, Rust (CI uses the stable toolchain), a C compiler/libclang, and
+any release of the Python series `pins.json` names (3.14). The runner refuses
+an interpreter outside that series and records the release it used in the
+report's `interpreter`. It verifies the upstream archive digest, uses the
+pinned PostgreSQL image, and accepts no external scan target.
 
 ```sh
 cargo test --locked --manifest-path security/sqlmap/adapter/Cargo.toml --tests
@@ -26,28 +28,36 @@ security/sqlmap/adapter/target/debug/sqlmap-harness \
   --profile full --direct-regressions --artifacts target/sqlmap/full-run
 ```
 
-Artifact directories must be new. `--python PATH` selects the pinned Python
-interpreter. `--case ID` runs a named subset; its result cannot stand for a
-complete profile. `--baseline-only` is a diagnostic and always exits nonzero.
+Artifact directories must be new. `--python PATH` selects the interpreter.
+`--case ID` runs a named subset; its result cannot stand for a complete
+profile. `--baseline-only` is a diagnostic and always exits nonzero.
 The runner also runs and records the direct regressions. Python is needed only
 to execute the pinned scanner itself; the harness around it is entirely Rust.
 `sqlmap-verdict <profile> <artifact directory>` turns a finished run's
 `run/report.json` into the `ci-status.json` and `ci-summary.txt` CI publishes.
 
 Every setting in `profiles.json` reaches the run. `dbms`, `level`, `risk`,
-`concurrency`, `retries`, `http_timeout_seconds` and `time_sec` become scanner
-options, `postgres_statement_timeout_seconds` is set on the disposable
-server, and `case_timeout_seconds` bounds each scan. Each case's `field` in
-`cases.json` is the parameter under test. The runner refuses a profile with
-a missing or unrecognised field, or with timeouts that do not strictly
-increase from the timed sleep to the scan deadline.
+`concurrency`, `retries`, `http_timeout_seconds`, `time_sec`,
+`union_columns`, `union_type_fuzzing` and `verbosity` become scanner
+options; `postgres_statement_timeout_seconds` and
+`postgres_lock_timeout_seconds` are set on the disposable server; and
+`case_timeout_seconds` bounds each scan. Each case's `field` in `cases.json`
+is the parameter under test: the scanner's `-p`, the only query parameter
+the adapter route reads, and the only injection point a finding may name.
+The runner refuses a profile with a missing or unrecognised field, or with
+timeouts that do not strictly increase from the timed sleep to the scan
+deadline. The other scanner options are the same for every profile: batch
+mode declining sqlmap's offer to test past the declared level and risk, a
+flushed session with fresh queries, no proxy, no colour, and per-case output
+paths.
 
 To reproduce a report, check out its recorded source revision, restore any
 recorded source changes and workspace lockfile, use the accompanying
-`pins.json`, `cases.json` and `profiles.json`, then run the recorded profile
-and subset into a fresh artifact directory. `command.json` files retain
-individual scanner invocations; their loopback addresses belong to the old
-fixture and must be replaced by a newly provisioned adapter.
+`pins.json`, `cases.json` and `profiles.json` and the Python release the
+report's `interpreter` records, then run the recorded profile and subset into
+a fresh artifact directory. `command.json` files retain individual scanner
+invocations; their loopback addresses belong to the old fixture and must be
+replaced by a newly provisioned adapter.
 
 ## CI and evidence
 
@@ -55,6 +65,10 @@ fixture and must be replaced by a newly provisioned adapter.
 and identifiers weekly or through **Run workflow**. All three call
 `sqlmap-run.yml`, which uses the same local runner and profiles, and each has
 its own check name. Fast runner tests do not need Docker or a live scanner.
+CI installs the latest patch of the Python series in `pins.json`. A new push
+to a pull request cancels its superseded smoke run, but every scheduled or
+dispatched run has its own concurrency group, so dispatching the workflow
+again never cancels a full or identifiers scan already under way.
 
 The identifiers profile joined the schedule on its measured cost. Its 28
 scheduled pairs took 13.5 minutes of scanning in each of two measurement runs,
@@ -136,11 +150,27 @@ declaration's evidence names the level-5 boundaries that were tried and cites
 Both runners refuse a declaration that omits a reason or any evidence field,
 carries a surplus field, cites a payload file that does not define the
 technique, gives a ceiling that is not a scanner level from 2 to 5, or names a
-technique the case does not declare. A declared pair the
-scanner nonetheless detects is recorded in `falsified_exemptions` and fails the
-run: if it fires, it was never inapplicable. Exempted pairs leave the scheduled
+technique the case does not declare. Exempted pairs leave the scheduled
 work, appear under `inapplicable` in the report and CI summary with their
 evidence, and are never counted as passes.
+
+A profile run never scans an exempted pair, so it cannot notice a declaration
+going stale. Re-measure them explicitly:
+
+```sh
+security/sqlmap/adapter/target/debug/sqlmap-harness \
+  --profile full --remeasure-exemptions --artifacts target/sqlmap/exemptions
+```
+
+This scans each declared pair's control, alone, with its exempted technique
+under the profile's settings; `--case ID` narrows it. A pair ends `held`
+(complete scan, no detection), `falsified` (the scanner detected the
+technique, so the pair was never inapplicable; it is listed in
+`falsified_exemptions`) or `incomplete`. The run passes only if every pair
+held. It is evidence about the declarations, never a profile pass:
+`sqlmap-verdict` reports such a report as incomplete. CI does not run it, as
+the full profile's 93 declarations would add a second long scan to the
+schedule.
 
 In the full profile, 93 of 210 pairs are declared inapplicable (Q 35, U 17,
 E 12, T 12, B 11, S 6), leaving 117 scheduled. Twenty of those 93 carry

@@ -22,7 +22,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Read runtime pin
+      # pins.json names a Python series, not a release; setup-python resolves it to the
+      # series' latest patch and the runner records the release it ran under.
+      - name: Read the Python series
         id: pins
         run: |
           mkdir -p target/sqlmap-ci
@@ -30,6 +32,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ steps.pins.outputs.python }}
+          check-latest: true
       - name: Prepare Rust and native dependencies
         run: |
           sudo apt-get update

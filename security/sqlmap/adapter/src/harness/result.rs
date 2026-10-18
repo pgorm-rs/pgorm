@@ -43,6 +43,8 @@ pub struct Inventory {
 pub struct ScanResult {
     pub complete: bool,
     pub reason: String,
+    /// The case's declared test parameter: the only injection point a finding may name.
+    pub parameter: String,
     pub findings: Vec<Value>,
     pub errors: Vec<Value>,
     pub requests: u64,
@@ -51,8 +53,13 @@ pub struct ScanResult {
     pub seconds: Option<f64>,
 }
 
-fn valid_finding(finding: &Value) -> bool {
-    finding["parameter"] == "input"
+impl ScanResult {
+    /// Whether a well-formed finding at the declared parameter shows `technique`.
+    pub fn detects(&self, technique: &str) -> bool { findings_show_technique(&self.findings, technique, &self.parameter) }
+}
+
+fn valid_finding(finding: &Value, parameter: &str) -> bool {
+    finding["parameter"] == parameter
         && finding["place"] == "GET"
         && finding["data"].as_array().is_some_and(|data| {
             !data.is_empty()
@@ -62,12 +69,16 @@ fn valid_finding(finding: &Value) -> bool {
         })
 }
 
+/// Findings count only at `parameter`, the case's declared test parameter, and only its own
+/// "does not seem to be injectable" line is evidence the scanner tested it.
 // [spec:pgorm:req:security.sqlmap.execution]
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn interpret(
     report: &Value,
     log: &str,
     returncode: Option<i32>,
     target: &str,
+    parameter: &str,
     requests: u64,
 ) -> ScanResult {
     let mut findings = Vec::new();
@@ -118,7 +129,7 @@ pub fn interpret(
     if requests == 0 {
         failures.push("inactive route: no accounted requests".into());
     }
-    let valid = findings.iter().filter(|f| valid_finding(f)).count();
+    let valid = findings.iter().filter(|f| valid_finding(f, parameter)).count();
     if valid != findings.len() {
         failures.push("unexpected injection parameter or malformed finding".into());
     }
@@ -127,20 +138,20 @@ pub fn interpret(
     if ["connection timed out", "unable to connect", "connection reset", "user aborted", "skipping parameter"].iter().any(|s| lower.contains(s)) {
         failures.push("transport failure or skipped parameter".into());
     }
-    let tested = log.contains("parameter 'input' does not seem to be injectable") || valid > 0;
+    let tested = log.contains(&format!("parameter '{parameter}' does not seem to be injectable")) || valid > 0;
     if !tested || !log.contains("[*] ending @") {
         failures.push("missing completion evidence".into());
     }
     ScanResult {
         complete: failures.is_empty(),
         reason: if failures.is_empty() { "completed".into() } else { failures.join("; ") },
-        findings, errors, requests, returncode, seconds: None,
+        parameter: parameter.into(), findings, errors, requests, returncode, seconds: None,
     }
 }
 
-pub fn findings_show_technique(findings: &[Value], technique: &str) -> bool {
+pub fn findings_show_technique(findings: &[Value], technique: &str, parameter: &str) -> bool {
     TECHNIQUES.iter().find(|(id, _)| *id == technique).is_some_and(|(_, name)| {
-        findings.iter().any(|f| valid_finding(f) && f["data"].as_array()
+        findings.iter().any(|f| valid_finding(f, parameter) && f["data"].as_array()
             .is_some_and(|data| data.iter().any(|d| d["technique"] == *name)))
     })
 }
@@ -149,33 +160,58 @@ pub fn findings_show_technique(findings: &[Value], technique: &str) -> bool {
 pub fn verdict(control: &ScanResult, protected: &ScanResult, technique: &str, baseline: bool, invariant: bool) -> &'static str {
     if !protected.findings.is_empty() || !invariant { return "vulnerable"; }
     if !baseline || !control.complete { return "incomplete"; }
-    if !findings_show_technique(&control.findings, technique) { return "invalid-control"; }
+    if !control.detects(technique) { return "invalid-control"; }
     if !protected.complete { return "incomplete"; }
     "pass"
 }
 
+/// A re-measured declaration. Any detection of the exempted technique falsifies it, even from
+/// a scan that did not otherwise complete, just as a protected finding is never excused; it
+/// held only when the control answered its baseline and its scan completed without one.
+// [spec:pgorm:req:security.sqlmap.profiles+4]
+pub fn exemption_outcome(control: &ScanResult, technique: &str, baseline: bool) -> &'static str {
+    if control.detects(technique) { return "falsified"; }
+    if !baseline || !control.complete { return "incomplete"; }
+    "held"
+}
+
 fn case_of(key: &str) -> Option<&str> { key.rsplit_once('-').map(|(case, _)| case) }
 
-/// A technique any retained control detected was never inapplicable for that case.
-// [spec:pgorm:req:security.sqlmap.profiles+3]
+/// A technique any retained control scan of the case detected was never inapplicable for it.
+/// A profile run scans each control with one scheduled technique only, so this fires on a
+/// re-measurement run, whose results are the declared pairs' own control scans.
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn falsified(results: &BTreeMap<String, Value>, inapplicable: &BTreeMap<String, Value>) -> Vec<String> {
     let mut hits = Vec::new();
     for key in inapplicable.keys() {
         let Some((case, technique)) = key.rsplit_once('-') else { continue };
         if results.iter().any(|(scheduled, result)| case_of(scheduled) == Some(case)
-            && findings_show_technique(result["control"]["findings"].as_array().map_or(&[][..], Vec::as_slice), technique)) {
+            && result["control"]["parameter"].as_str().is_some_and(|parameter|
+                findings_show_technique(result["control"]["findings"].as_array().map_or(&[][..], Vec::as_slice), technique, parameter))) {
             hits.push(key.clone());
         }
     }
     hits
 }
 
-// [spec:pgorm:req:security.sqlmap.verdict]
-pub fn aggregate(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String], falsified: &[String]) -> bool {
+/// Every expected key accounted for exactly once, each ending `required`, with clean
+/// fixture teardown and no falsified declaration.
+fn accounted(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String], falsified: &[String], required: &str) -> bool {
     let unique: BTreeSet<_> = expected.iter().collect();
     !expected.is_empty() && expected.len() == unique.len()
         && unique == results.keys().collect()
-        && results.values().all(|r| r["outcome"] == "pass") && cleanup.is_empty() && falsified.is_empty()
+        && results.values().all(|r| r["outcome"] == required) && cleanup.is_empty() && falsified.is_empty()
+}
+
+// [spec:pgorm:req:security.sqlmap.verdict]
+pub fn aggregate(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String], falsified: &[String]) -> bool {
+    accounted(expected, results, cleanup, falsified, "pass")
+}
+
+/// A re-measurement passes only when every declared pair it scanned held.
+// [spec:pgorm:req:security.sqlmap.profiles+4]
+pub fn remeasured(expected: &[String], results: &BTreeMap<String, Value>, cleanup: &[String], falsified: &[String]) -> bool {
+    accounted(expected, results, cleanup, falsified, "held")
 }
 
 /// A CONTEXTS.md section anchor: a decimal number with an optional subsection letter.
@@ -193,7 +229,7 @@ fn strings(value: &Value) -> Result<Vec<String>, String> {
 }
 
 /// Declared inapplicability, refused unless it cites checkable scanner evidence.
-// [spec:pgorm:req:security.sqlmap.profiles+3]
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     let id = case["id"].as_str().ok_or("missing case id")?;
     let declared = match &case["inapplicable"] {
@@ -245,7 +281,7 @@ pub fn exemptions(case: &Value) -> Result<BTreeMap<String, Value>, String> {
     Ok(out)
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3]
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn inventory(manifest: &Value, profile: &Value, subset: &[String]) -> Result<Inventory, String> {
     let cases = manifest["cases"].as_array().ok_or("missing manifest cases")?;
     let mut by_id = BTreeMap::new();

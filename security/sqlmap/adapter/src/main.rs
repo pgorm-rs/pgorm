@@ -2,7 +2,7 @@
 use axum::{extract::{Path, Query as HttpQuery, State}, http::StatusCode, routing::get, Router};
 use pgorm::{entity::prelude::*, DecodeRaw};
 use pgorm::pgorm_query::{self as q, Expr, Func, Query, Values};
-use serde::Deserialize;
+use pgorm_sqlmap_adapter::harness::{declared_input, fields};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, io::Write, sync::{Arc, Mutex}};
 use tokio_postgres::SimpleQueryMessage;
@@ -32,10 +32,9 @@ struct App {
     serial: Arc<tokio::sync::Mutex<()>>,
     evidence: Arc<Mutex<std::fs::File>>,
     counts: Arc<Mutex<BTreeMap<String, u64>>>,
+    /// Each case's declared test parameter, from the manifest the runner inventoried.
+    fields: Arc<BTreeMap<String, String>>,
 }
-
-#[derive(Deserialize)]
-struct Input { input: String }
 
 fn names(rows: Vec<item::Model>) -> Vec<String> {
     rows.into_iter().map(|r| format!("{}:{}:{}:{}", r.id, r.tenant, r.name, r.note)).collect()
@@ -206,13 +205,17 @@ async fn control(app: &App, case: &str, input: &str) -> Result<Value> {
 
 // [spec:pgorm:req:security.sqlmap.fixtures]
 // [spec:pgorm:req:security.sqlmap.observability]
-async fn route(State(app):State<App>, Path((mode,case)):Path<(String,String)>, HttpQuery(input):HttpQuery<Input>) -> (StatusCode,String) {
+// [spec:pgorm:req:security.sqlmap.profiles+4]
+async fn route(State(app):State<App>, Path((mode,case)):Path<(String,String)>, HttpQuery(query):HttpQuery<Vec<(String,String)>>) -> (StatusCode,String) {
+    // Only the case's declared parameter is read, so the scanner's -p and the route agree.
+    let Some(field) = app.fields.get(&case) else { return (StatusCode::NOT_FOUND,format!("unknown case: {case}")); };
+    let input = match declared_input(field,&query) { Ok(input) => input, Err(e) => return (StatusCode::BAD_REQUEST,e.to_string()) };
     let _serial = app.serial.lock().await;
     let mut invoked = false;
     let result: Result<Value> = async {
         app.raw.batch_execute(include_str!("../../fixtures.sql")).await?;
         invoked = true;
-        match mode.as_str() { "protected"=>protected(&app,&case,&input.input).await,"control"=>control(&app,&case,&input.input).await,_=>Err("unknown mode".into()) }
+        match mode.as_str() { "protected"=>protected(&app,&case,input).await,"control"=>control(&app,&case,input).await,_=>Err("unknown mode".into()) }
     }.await;
     let (status,body) = match result {
         Ok(v) if v.get("rejected").is_some() => (StatusCode::UNPROCESSABLE_ENTITY,v),
@@ -225,7 +228,7 @@ async fn route(State(app):State<App>, Path((mode,case)):Path<(String,String)>, H
     };
     let key=format!("{mode}/{case}");
     if invoked { *app.counts.lock().expect("counts mutex").entry(key.clone()).or_default()+=1; }
-    let event=json!({"route":key,"input":input.input,"invoked":invoked,"status":status.as_u16(),"response":body});
+    let event=json!({"route":key,"parameter":field,"input":input,"invoked":invoked,"status":status.as_u16(),"response":body});
     if let Err(e) = writeln!(app.evidence.lock().expect("evidence mutex"),"{event}") {
         return (StatusCode::INTERNAL_SERVER_ERROR,format!("evidence write failed: {e}"));
     }
@@ -241,7 +244,8 @@ async fn main() -> Result<()> {
     tokio::spawn(async move { if let Err(e)=connection.await {eprintln!("fixture connection ended: {e}");} });
     let privileged:bool=raw.query_one("SELECT rolsuper OR rolcreatedb OR rolcreaterole OR pg_has_role(current_user,'pg_execute_server_program','member') OR pg_has_role(current_user,'pg_read_server_files','member') OR pg_has_role(current_user,'pg_write_server_files','member') FROM pg_roles WHERE rolname=current_user",&[]).await?.get(0);
     if privileged {return Err("adapter refuses a privileged database role".into());}
-    let app=App {db:pgorm::connect(config),raw:Arc::new(raw),serial:Arc::new(tokio::sync::Mutex::new(())),evidence:Arc::new(Mutex::new(std::fs::OpenOptions::new().append(true).create_new(true).open(std::env::var("SQLMAP_EVIDENCE")?)?)),counts:Default::default()};
+    let fields=Arc::new(fields(&serde_json::from_slice(&std::fs::read(std::env::var("SQLMAP_MANIFEST")?)?)?)?);
+    let app=App {db:pgorm::connect(config),raw:Arc::new(raw),serial:Arc::new(tokio::sync::Mutex::new(())),evidence:Arc::new(Mutex::new(std::fs::OpenOptions::new().append(true).create_new(true).open(std::env::var("SQLMAP_EVIDENCE")?)?)),counts:Default::default(),fields};
     let listener=tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     println!("{}",json!({"port":listener.local_addr()?.port()}));
     std::io::stdout().flush()?;
