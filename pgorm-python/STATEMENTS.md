@@ -171,11 +171,15 @@ WITH clause precedes the whole statement, so every arm reads its
 expressions, while its WHERE, GROUP BY, HAVING, DISTINCT and WINDOW belong to
 the first arm alone.
 
-Arms are written in call order, each parenthesised, so PostgreSQL's
-precedence groups them: `INTERSECT` binds tighter than `UNION` and `EXCEPT`,
-which group from the left. `a.union(b).intersect(c)` is
-`a UNION (b INTERSECT c)`; to intersect the union, make it the arm, as in
-`c.intersect(a.union(b))`. A recursive view's query is a set operation whose
+Arms are written in call order, each parenthesised, and a chain combines in
+the order it reads: each operation takes everything before it as its left
+operand, so `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`.
+PostgreSQL's own precedence differs in one place — `INTERSECT` binds tighter
+than `UNION` and `EXCEPT` — so an `INTERSECT` that follows a `UNION` or
+`EXCEPT` parenthesises what came before it, rendering
+`(SELECT … UNION (SELECT …)) INTERSECT (SELECT …)`; every other chain renders
+flat. To combine with a combination, make it the arm, as in
+`a.union(b.intersect(c))`. A recursive view's query is a set operation whose
 arm reads the view; see
 [SCHEMA.md](SCHEMA.md#views-materialized-views-and-tables-from-a-query).
 

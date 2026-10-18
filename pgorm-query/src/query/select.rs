@@ -1788,6 +1788,11 @@ impl SelectStatement {
 
     /// Union with another SelectStatement that must have the same selected fields.
     ///
+    /// A chain of set operations groups in call order: each arm combines
+    /// everything appended before it with its own query. Where PostgreSQL's
+    /// precedence would read the flat chain otherwise — `INTERSECT` binds
+    /// tighter than `UNION` and `EXCEPT` — the arms before are parenthesised.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1809,8 +1814,25 @@ impl SelectStatement {
     ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4)"#
     /// );
+    ///
+    /// let font = |id: i32| {
+    ///     Query::select()
+    ///         .column(Char::Character)
+    ///         .from(Char::Table)
+    ///         .and_where(Expr::col(Char::FontId).eq(id))
+    ///         .to_owned()
+    /// };
+    /// let query = font(1)
+    ///     .union(UnionType::Distinct, font(2))
+    ///     .union(UnionType::Intersect, font(3))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"(SELECT "character" FROM "character" WHERE "font_id" = 1 UNION (SELECT "character" FROM "character" WHERE "font_id" = 2)) INTERSECT (SELECT "character" FROM "character" WHERE "font_id" = 3)"#
+    /// );
     /// ```
-    // [spec:pgorm:sem:sql.ast.select.union+1]
+    // [spec:pgorm:sem:sql.ast.select.union+2]
     pub fn union(&mut self, union_type: UnionType, query: SelectStatement) -> &mut Self {
         self.unions.push((union_type, query));
         self

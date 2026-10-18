@@ -14,7 +14,7 @@ fn base() -> SelectStatement {
 }
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    the select clause vocabulary
-// [spec:pgorm:req:sql.render.select-order+6/test]
+// [spec:pgorm:req:sql.render.select-order+7/test]
 #[test]
 fn sweep_select_clause_shapes() {
     sweep([

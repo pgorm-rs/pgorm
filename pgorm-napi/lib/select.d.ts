@@ -91,11 +91,23 @@ export declare class Select extends Builder {
   limitWithTies(count: number | bigint): Select;
   offset(count: number | bigint | null): Select;
   distinct(): Select;
+  /**
+   * `UNION`, with `other` as a parenthesised arm. A chain of set operations
+   * combines in call order: each takes everything before it as its left
+   * operand, so `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`, the
+   * union parenthesised because PostgreSQL binds `INTERSECT` tighter. The
+   * receiver's ORDER BY and limits order and bound the combined rows.
+   */
   union(other: Select): Select;
+  /** `UNION ALL`, combining in call order as {@link Select.union} does. */
   unionAll(other: Select): Select;
+  /** `INTERSECT`, combining in call order as {@link Select.union} does. */
   intersect(other: Select): Select;
+  /** `INTERSECT ALL`, combining in call order as {@link Select.union} does. */
   intersectAll(other: Select): Select;
+  /** `EXCEPT`, combining in call order as {@link Select.union} does. */
   except(other: Select): Select;
+  /** `EXCEPT ALL`, combining in call order as {@link Select.union} does. */
   exceptAll(other: Select): Select;
   /** Lock the rows read: `FOR UPDATE` and the weaker strengths, `OF` some items, without waiting. */
   lock(

@@ -46,6 +46,8 @@ mod returning;
 mod schema;
 #[path = "query_builder_sequence.rs"]
 mod sequence;
+#[path = "query_builder_set_operation.rs"]
+mod set_operation;
 #[path = "query_builder_subscript.rs"]
 mod subscript;
 #[path = "query_builder_view.rs"]
@@ -90,7 +92,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+6] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+7] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -207,26 +209,8 @@ impl QueryBuilder {
         self.prepare_returning(insert.returning.as_ref(), None, sql);
     }
 
-    fn prepare_union_statement(
-        &self,
-        union_type: UnionType,
-        select_statement: &SelectStatement,
-        sql: &mut dyn SqlWriter,
-    ) {
-        match union_type {
-            UnionType::Distinct => write!(sql, " UNION (").unwrap(),
-            UnionType::All => write!(sql, " UNION ALL (").unwrap(),
-            UnionType::Intersect => write!(sql, " INTERSECT (").unwrap(),
-            UnionType::IntersectAll => write!(sql, " INTERSECT ALL (").unwrap(),
-            UnionType::Except => write!(sql, " EXCEPT (").unwrap(),
-            UnionType::ExceptAll => write!(sql, " EXCEPT ALL (").unwrap(),
-        }
-        self.prepare_select_statement(select_statement, sql);
-        write!(sql, ")").unwrap();
-    }
-
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+6]
+    // [spec:pgorm:req:sql.render.select-order+7]
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_select_statement(
         &self,
@@ -236,6 +220,8 @@ impl QueryBuilder {
         if let Some(with_clause) = &select.with {
             self.prepare_with_clause(with_clause, sql);
         }
+
+        self.open_set_operation_groups(&select.unions, sql);
 
         write!(sql, "SELECT ").unwrap();
 
@@ -284,11 +270,7 @@ impl QueryBuilder {
 
         self.prepare_window_clause(&select.windows, sql);
 
-        if !select.unions.is_empty() {
-            select.unions.iter().for_each(|(union_type, query)| {
-                self.prepare_union_statement(*union_type, query, sql);
-            });
-        }
+        self.prepare_set_operations(&select.unions, sql);
 
         if !select.orders.is_empty() {
             write!(sql, " ORDER BY ").unwrap();

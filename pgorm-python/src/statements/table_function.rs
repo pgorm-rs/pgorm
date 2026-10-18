@@ -18,7 +18,7 @@ fn function_call(value: &Bound<'_, PyAny>) -> PyResult<FunctionCall> {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+8]
 /// A function in FROM: one call, or several read side by side under
 /// `ROWS FROM (..)`, the shorter padded with NULLs; `with_ordinality` adds a
 /// final `bigint` column numbering the rows from 1, and `columns` names the

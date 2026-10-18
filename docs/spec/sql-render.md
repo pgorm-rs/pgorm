@@ -406,11 +406,12 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+6]
+> [spec:pgorm:req:sql.render.select-order+7]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
 > through the same `prepare_with_clause` the three write statements use and
-> therefore already ending in a separating space;
+> therefore already ending in a separating space; one `(` for each set
+> operation arm that regroups the chain before it (`sql.ast.select.union`);
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
@@ -431,7 +432,15 @@ an ideal Postgres renderer would emit.
 > ordering instead renders a `CASE WHEN expr=v0 THEN 0 WHEN expr=v1 THEN 1 …
 > ELSE n END` expression with the values inlined, emulating MySQL
 > `FIELD()`-style ordering. Unions render as ` UNION (…)`, ` UNION ALL (…)`,
-> ` INTERSECT (…)`, or ` EXCEPT (…)` with the sub-select parenthesized.
+> ` INTERSECT (…)`, ` INTERSECT ALL (…)`, ` EXCEPT (…)` or ` EXCEPT ALL (…)`
+> with the sub-select parenthesized. An `INTERSECT` or `INTERSECT ALL` arm
+> that follows a `UNION` or `EXCEPT` arm of either form is preceded by a `)`
+> closing one of the parentheses opened before `SELECT`, so
+> `a.union(b).intersect(c)` renders `(SELECT … UNION (…)) INTERSECT (…)`:
+> PostgreSQL's grammar takes a parenthesised set operation as an operand, and
+> the WITH clause stays outside it, ahead of the whole statement. The ORDER
+> BY, row limit, OFFSET and locking tail follow the last arm, outside every
+> parenthesis, and so apply to the combined result as before.
 
 > [spec:pgorm:req:sql.render.joins+2]
 > Join types MUST render as `JOIN`, `CROSS JOIN`, `INNER JOIN`, `LEFT JOIN`,

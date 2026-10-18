@@ -281,8 +281,10 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
   (`null` removes), `limitWithTies` (`FETCH FIRST n ROWS WITH TIES`, in
-  LIMIT's slot), `distinct`, `union` .. `exceptAll`, `lock("update", { of,
-  wait })`, `with`, and `as(alias)` to read a query as a FROM item.
+  LIMIT's slot), `distinct`, `union` .. `exceptAll` (a chain combines in
+  call order: `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`),
+  `lock("update", { of, wait })`, `with`, and `as(alias)` to read a query as
+  a FROM item.
   `tableFunction(calls, { alias, ordinality, columns, rowsFrom })` reads
   set-returning calls as one — `ROWS FROM` over several — and
   `table.tablesample("bernoulli" | "system", percentage, { repeatable })`

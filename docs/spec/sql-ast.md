@@ -627,7 +627,7 @@ today, including panicking edges and deliberate failsafes.
 > nothing to read under `GROUP BY ()` — is PostgreSQL's check (`42803`), not
 > the builder's.
 
-> [spec:pgorm:sem:sql.ast.select.union+1]
+> [spec:pgorm:sem:sql.ast.select.union+2]
 > `union(UnionType, query)` appends one compound-query arm and `unions(iter)`
 > extends with many; arms accumulate in call order and are never merged or
 > deduplicated. `UnionType` names all six of PostgreSQL's set operations —
@@ -637,6 +637,17 @@ today, including panicking edges and deliberate failsafes.
 > and `Except`/`ExceptAll` render `EXCEPT`/`EXCEPT ALL`. Each appended arm is
 > rendered as a parenthesised SELECT after the operator. The AST does not
 > verify that the arms project the same columns — that is left to PostgreSQL.
+>
+> A chain MUST mean what it reads in call order: each arm combines everything
+> appended before it, the receiver's own query first, with its own query, so
+> `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`. PostgreSQL's
+> precedence would read the same arms written flat otherwise — `INTERSECT`
+> binds tighter than `UNION` and `EXCEPT`, which share one level and
+> associate left — so an `INTERSECT` or `INTERSECT ALL` arm appended right
+> after a `UNION` or `EXCEPT` arm (either form) MUST parenthesise everything
+> written before it, and nothing else is regrouped: a chain whose flat
+> reading is already its call-order reading renders flat. To combine with a
+> combination, the combination is the arm: `c.intersect(a.union(b))`.
 >
 > The two UNION spellings are the inherited ones and MUST be documented on the
 > enum itself, because `All` beside `IntersectAll` reads as a modifier and is

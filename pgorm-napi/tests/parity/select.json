@@ -52,7 +52,7 @@
     "values": [["text","x"]]
   },
   "set-operations": {
-    "sql": "SELECT \"id\" FROM \"t\" UNION (SELECT \"id\" FROM \"u\") UNION ALL (SELECT \"id\" FROM \"v\") INTERSECT (SELECT \"id\" FROM \"w\") INTERSECT ALL (SELECT \"id\" FROM \"x\") EXCEPT (SELECT \"id\" FROM \"y\") EXCEPT ALL (SELECT \"id\" FROM \"z\")",
+    "sql": "(SELECT \"id\" FROM \"t\" UNION (SELECT \"id\" FROM \"u\") UNION ALL (SELECT \"id\" FROM \"v\")) INTERSECT (SELECT \"id\" FROM \"w\") INTERSECT ALL (SELECT \"id\" FROM \"x\") EXCEPT (SELECT \"id\" FROM \"y\") EXCEPT ALL (SELECT \"id\" FROM \"z\")",
     "values": []
   },
   "locks": {

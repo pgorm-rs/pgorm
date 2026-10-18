@@ -37,6 +37,38 @@ function pool(): Pool {
   return shared;
 }
 
+/** Three bags of values for chained set operations, so that every chain whose
+ * flat reading PostgreSQL's precedence would regroup reads differently. */
+const BAGS = { bag_left: [1, 1, 1, 2, 2, 3], bag_right: [1, 1, 2], bag_third: [1, 2, 2, 4] };
+
+const SET_OPERATIONS = ["union", "unionAll", "intersect", "intersectAll", "except", "exceptAll"] as const;
+type SetOperation = (typeof SET_OPERATIONS)[number];
+
+/** `op` over two bags as PostgreSQL computes it: the plain forms yield each
+ * qualifying value once, the `ALL` forms by multiplicity. */
+function combine(op: SetOperation, left: number[], right: number[]): number[] {
+  const count = (bag: number[]) => bag.reduce((counts, v) => counts.set(v, (counts.get(v) ?? 0) + 1), new Map<number, number>());
+  const [l, r] = [count(left), count(right)];
+  const times = (v: number): number => {
+    const [a, b] = [l.get(v) ?? 0, r.get(v) ?? 0];
+    switch (op) {
+      case "union":
+        return Number(a + b > 0);
+      case "unionAll":
+        return a + b;
+      case "intersect":
+        return Number(a > 0 && b > 0);
+      case "intersectAll":
+        return Math.min(a, b);
+      case "except":
+        return Number(a > 0 && b === 0);
+      case "exceptAll":
+        return Math.max(a - b, 0);
+    }
+  };
+  return [...new Set([...left, ...right])].sort((x, y) => x - y).flatMap((v) => Array<number>(times(v)).fill(v));
+}
+
 const account = new Table("account", { schema: "app", alias: "a" });
 const event = new Table("event", { alias: "e" });
 const mood = new TypeName("mood", { schema: "app" });
@@ -63,6 +95,10 @@ before(async () => {
          (5, 2, 'view'), (6, 2, 'view'), (7, 4, 'click')`,
       `CREATE TABLE "we""ird" ("Mixed Case" int4, "select" text)`,
       `INSERT INTO "we""ird" VALUES (1, 'kept')`,
+      ...Object.entries(BAGS).flatMap(([name, bag]) => [
+        `CREATE TABLE ${name} (v int4 NOT NULL)`,
+        `INSERT INTO ${name} VALUES ${bag.map((v) => `(${v})`).join(", ")}`,
+      ]),
     ]
   ) {
     await pool().execute(sql);
@@ -274,6 +310,36 @@ test("set operations combine rows with and without duplicates", async () => {
   assert.equal(await count(kinds.except(select(bind("click")))), 1);
   assert.equal(await count(kinds.exceptAll(select(bind("click")))), 6);
   assert.equal(await count(kinds.intersectAll(kinds)), 7);
+});
+
+// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:sem:sql.ast.select.union+2/test]
+test("a chain of set operations combines in call order, for every pair of operators", async () => {
+  const bag = (name: keyof typeof BAGS) => select(col("v")).from(new Table(name));
+  const intersects = (op: SetOperation) => op === "intersect" || op === "intersectAll";
+  for (const first of SET_OPERATIONS) {
+    for (const second of SET_OPERATIONS) {
+      const chained = bag("bag_left")[first](bag("bag_right"))[second](bag("bag_third")).orderBy(col("v").asc());
+      const inCallOrder = combine(second, combine(first, BAGS.bag_left, BAGS.bag_right), BAGS.bag_third);
+      const rows = (await pool().query(chained)).map((row) => row.v);
+      assert.deepStrictEqual(rows, inCallOrder, `${first} then ${second}`);
+      if (intersects(second) && !intersects(first)) {
+        const flat = combine(first, BAGS.bag_left, combine(second, BAGS.bag_right, BAGS.bag_third));
+        assert.notDeepStrictEqual(flat, inCallOrder, `${first} then ${second} tells the readings apart`);
+      }
+    }
+  }
+
+  const one = select(bind(1).as("v"));
+  const two = select(bind(2).as("v"));
+  assert.equal(
+    one.union(two).intersect(one).inspect().sql,
+    '(SELECT $1 AS "v" UNION (SELECT $2 AS "v")) INTERSECT (SELECT $3 AS "v")',
+  );
+  assert.equal(
+    one.intersect(two).union(one).inspect().sql,
+    'SELECT $1 AS "v" INTERSECT (SELECT $2 AS "v") UNION (SELECT $3 AS "v")',
+  );
 });
 
 // [spec:pgorm:req:napi.select+1/test]

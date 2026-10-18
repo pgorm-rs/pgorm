@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+7]
+> [spec:pgorm:req:python.statements+8]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -168,10 +168,12 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > statement is read into this one as a parenthesised arm, its tie limit
 > checked as it is read, and anything but a `Select` is a `TypeError`. The
 > arms are written in call order after the receiver's HAVING and WINDOW
-> clauses, so PostgreSQL's precedence groups them, `INTERSECT` binding
-> tighter than `UNION` and `EXCEPT`; the receiver's ORDER BY, row limit and
-> OFFSET, whenever they were set, order and bound the combined rows, and its
-> WITH clause precedes every arm.
+> clauses and combine in call order, as Rust's do: `a.union(b).intersect(c)`
+> is `(a UNION b) INTERSECT c`, everything before an `INTERSECT` that follows
+> a `UNION` or `EXCEPT` parenthesised so PostgreSQL's precedence cannot
+> regroup it; the receiver's ORDER BY, row limit and OFFSET, whenever they
+> were set, order and bound the combined rows, and its WITH clause precedes
+> every arm.
 > A SELECT's FROM list and joins MUST take a FROM item that is not a named
 > table: `JSON_TABLE`, lowered into `Func::json_table` with each column kind's
 > own clauses and behaviours as the Rust builder types them, its first column

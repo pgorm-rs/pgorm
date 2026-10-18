@@ -632,7 +632,7 @@ fn window_7() {
     assert_ne!(taken, WindowStatement::new());
 }
 
-// [spec:pgorm:req:sql.render.select-order+6/test]    WINDOW sits with HAVING, ahead of the tail
+// [spec:pgorm:req:sql.render.select-order+7/test]    WINDOW sits with HAVING, ahead of the tail
 // clauses that apply to the whole result
 // [spec:pgorm:req:sql.render.window+6/test]
 #[test]
@@ -678,7 +678,7 @@ fn window_clause_precedes_order_limit_lock() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+6/test]    a named window belongs to its own query level,
+// [spec:pgorm:req:sql.render.select-order+7/test]    a named window belongs to its own query level,
 // so it is written before the set operation
 #[test]
 fn window_clause_precedes_union() {
