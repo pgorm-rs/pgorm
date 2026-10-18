@@ -277,7 +277,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `ConstructionError` on Python truth testing, as a query expression does,
 > and so MUST `Compiled`, which every inspection returns.
 
-> [spec:pgorm:req:python.schema-views+1]
+> [spec:pgorm:req:python.schema-views+2]
 > `pgorm.schema` MUST build views, materialized views and `CREATE TABLE AS`
 > through pgorm-query's builders (`sql.ddl.view`,
 > `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each a function
@@ -286,7 +286,13 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > it was given, and column names as identifiers. The query is a `Select`,
 > handed to the Rust statement as the `SelectStatement` it owns, so its values
 > reach the definition as the Rust renderer writes them, as literals, and
-> `inspect()` gives an empty parameter list. The functions are
+> `inspect()` gives an empty parameter list. The query is read as a method
+> reads a statement into another (`python.statements`): nothing can order it
+> or declare its windows once it is a definition, so a tie limit Rust's
+> `check_tie_limit` refuses, as one without ORDER BY, and a WINDOW clause or a
+> reference to one that its `check_windows` refuses MUST be refused with
+> `ConstructionError` as the function is called, never sent to the server.
+> The functions are
 > `create_view(name, query, *, columns, or_replace, check_option,
 > security_barrier, security_invoker)`, `check_option` being `"local"` or
 > `"cascaded"`; `create_recursive_view(name, columns, query, *, or_replace,

@@ -12,7 +12,7 @@ def accounts_query(table):
 
 
 class ViewConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.schema-views+1/test]    the Select's values are written into the
+    # [spec:pgorm:req:python.schema-views+2/test]    the Select's values are written into the
     # definition, and each option renders where the Rust builder writes it
     def test_views_render_their_query_inlined(self):
         manifest = p.capabilities()["operations"]
@@ -47,7 +47,7 @@ class ViewConstruction(unittest.TestCase):
         )
         self.assertEqual(recursive.params, [])
 
-    # [spec:pgorm:req:python.schema-views+1/test]    what PostgreSQL refuses and the Rust types
+    # [spec:pgorm:req:python.schema-views+2/test]    what PostgreSQL refuses and the Rust types
     # cannot hold is refused as the statement is built
     def test_invalid_view_options_are_refused(self):
         table = p.Table("account")
@@ -69,6 +69,30 @@ class ViewConstruction(unittest.TestCase):
         ):
             with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
+
+    # [spec:pgorm:req:python.schema-views+2/test]    each builder reads its query as an embedded
+    # statement, refusing a tie limit without ORDER BY and an undeclared window as it is called
+    def test_view_bodies_check_tie_limit_and_windows(self):
+        table = p.Table("account")
+        step = p.Select(p.col("n") + 1).from_(p.Table("r")).where_(p.col("n") < 4)
+        builders = {
+            "create_view": lambda q: s.create_view(p.Table("v"), q),
+            "create_recursive_view": lambda q: s.create_recursive_view(p.Table("r"), ["n"], q.union_all(step)),
+            "create_materialized_view": lambda q: s.create_materialized_view(p.Table("m"), q),
+            "create_table_as": lambda q: s.create_table_as(p.Table("t"), q),
+        }
+        unordered = p.Select(p.col("id").as_("n")).from_(table).limit_with_ties(2)
+        undeclared = p.Select(p.call("count", p.col("id")).over("w").as_("n")).from_(table)
+        ordered = unordered.order_by(p.col("id").asc())
+        for name, build in builders.items():
+            with self.subTest(builder=name):
+                with self.assertRaisesRegex(p.ConstructionError, "ORDER BY"):
+                    build(unordered)
+                with self.assertRaisesRegex(p.ConstructionError, 'no window "w"'):
+                    build(undeclared)
+                compiled = build(ordered).inspect()
+                self.assertIn('ORDER BY "id" ASC FETCH FIRST 2 ROWS WITH TIES', compiled.sql)
+                self.assertEqual(compiled.params, [])
 
 
 class ViewDatabase(unittest.IsolatedAsyncioTestCase):
@@ -96,7 +120,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         rows = await self.pool.fetch_all(p.Select(p.col("name")).from_(relation).order_by(p.col("id").asc()))
         return [row["name"] for row in rows]
 
-    # [spec:pgorm:req:python.schema-views+1/test]    a view built from a Select reads the rows it
+    # [spec:pgorm:req:python.schema-views+2/test]    a view built from a Select reads the rows it
     # shows, an insert through it reaches the table, and its check option refuses a hidden row
     async def test_view_reads_writes_and_checks_rows(self):
         view = self.relation('active "x"')
@@ -123,7 +147,17 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(s.drop_view(view, cascade=True))
         await self.pool.execute(s.drop_view(view, if_exists=True))
 
-    # [spec:pgorm:req:python.schema-views+1/test]    a recursive view's query reads the view
+    # [spec:pgorm:req:python.schema-views+2/test]    an ordered tie limit the check admits is
+    # stored in the definition, and the relation holds every row tied with the last
+    async def test_ordered_tie_limit_view_keeps_ties(self):
+        tied = p.Select(p.col("id"), p.col("name")).from_(self.table).order_by(p.col("active").desc()).limit_with_ties(1)
+        view, copy = self.relation("first active"), self.relation("first active copy")
+        await self.pool.execute(s.create_view(view, tied))
+        await self.pool.execute(s.create_table_as(copy, tied))
+        for relation in (view, copy):
+            self.assertEqual(await self.names(relation), ["ada", "it's"])
+
+    # [spec:pgorm:req:python.schema-views+2/test]    a recursive view's query reads the view
     # through its UNION ALL arm, by the bare name its WITH RECURSIVE form gives it
     async def test_recursive_view_reads_itself(self):
         counter = self.relation("counter")
@@ -140,7 +174,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row["n"] for row in counted], [1, 2, 3, 4])
         await self.pool.execute(s.drop_view(counter))
 
-    # [spec:pgorm:req:python.schema-views+1/test]    a materialized view holds its rows until a
+    # [spec:pgorm:req:python.schema-views+2/test]    a materialized view holds its rows until a
     # refresh, and a concurrent refresh needs a unique index
     async def test_materialized_view_refreshes_concurrently(self):
         view = self.relation('snapshot "x"')
@@ -166,7 +200,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(s.drop_materialized_view(view))
         await self.pool.execute(s.drop_materialized_view(view, if_exists=True))
 
-    # [spec:pgorm:req:python.schema-views+1/test]    a table created from a Select with no data
+    # [spec:pgorm:req:python.schema-views+2/test]    a table created from a Select with no data
     # has its columns, renamed where names are given, and keeps the rows inserted later
     async def test_table_created_from_query_without_data(self):
         copy = self.relation('copy "x"')

@@ -1,6 +1,11 @@
 //! Views, materialized views and `CREATE TABLE AS`: a named relation over a
 //! `Select`, whose values the Rust renderer writes into the definition as
 //! literals, a definition being stored as SQL text that binds nothing.
+//!
+//! Each query is read as an embedded statement is, through
+//! `PySelect::embedded`: nothing can order it or declare its windows once it
+//! is a definition, so a tie limit or a WINDOW clause PostgreSQL would
+//! refuse is refused here, before any statement exists.
 
 use super::{
     statement::{PyDDL, Statement},
@@ -35,7 +40,7 @@ fn check_option(option: &str) -> PyResult<ViewCheckOption> {
 
 /// `CREATE [OR REPLACE] VIEW`: the check option exists only here, the
 /// recursive form having none, as PostgreSQL's grammar refuses one there.
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), or_replace=false, check_option=None, security_barrier=false, security_invoker=false))]
 #[allow(clippy::too_many_arguments)]
@@ -49,7 +54,7 @@ pub(super) fn create_view(
     security_invoker: bool,
 ) -> PyResult<PyDDL> {
     let option = check_option.map(self::check_option).transpose()?;
-    let mut inner = View::create(table_name(name)?, query.inner.clone());
+    let mut inner = View::create(table_name(name)?, query.embedded()?);
     inner.columns(column_names(&columns)?);
     if or_replace {
         inner.or_replace();
@@ -71,7 +76,7 @@ pub(super) fn create_view(
 /// `CREATE [OR REPLACE] RECURSIVE VIEW`: its column list names the rows of
 /// the `WITH RECURSIVE` query PostgreSQL defines it as, and the grammar
 /// refuses one without, so an empty list is refused here.
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, columns, query, *, or_replace=false, security_barrier=false, security_invoker=false))]
 pub(super) fn create_recursive_view(
@@ -88,7 +93,7 @@ pub(super) fn create_recursive_view(
             "a recursive view names at least one column",
         ));
     };
-    let mut inner = View::create_recursive(table_name(name)?, first, query.inner.clone());
+    let mut inner = View::create_recursive(table_name(name)?, first, query.embedded()?);
     inner.columns(columns);
     if or_replace {
         inner.or_replace();
@@ -104,7 +109,7 @@ pub(super) fn create_recursive_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_view(name: &PyTable, if_exists: bool, cascade: bool) -> PyResult<PyDDL> {
@@ -120,7 +125,7 @@ pub(super) fn drop_view(name: &PyTable, if_exists: bool, cascade: bool) -> PyRes
     })
 }
 
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
 pub(super) fn create_materialized_view(
@@ -130,7 +135,7 @@ pub(super) fn create_materialized_view(
     if_not_exists: bool,
     with_no_data: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = MaterializedView::create(table_name(name)?, query.inner.clone());
+    let mut inner = MaterializedView::create(table_name(name)?, query.embedded()?);
     inner.columns(column_names(&columns)?);
     if if_not_exists {
         inner.if_not_exists();
@@ -146,7 +151,7 @@ pub(super) fn create_materialized_view(
 /// `REFRESH MATERIALIZED VIEW`. PostgreSQL refuses `CONCURRENTLY` beside
 /// `WITH NO DATA`, and the Rust statement holds the two in one slot, so both
 /// together are refused here rather than one silently kept.
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, *, concurrently=false, with_no_data=false))]
 pub(super) fn refresh_materialized_view(
@@ -171,7 +176,7 @@ pub(super) fn refresh_materialized_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_materialized_view(
@@ -191,7 +196,7 @@ pub(super) fn drop_materialized_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
 pub(super) fn create_table_as(
@@ -201,7 +206,7 @@ pub(super) fn create_table_as(
     if_not_exists: bool,
     with_no_data: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = Table::create_as(table_name(name)?, query.inner.clone());
+    let mut inner = Table::create_as(table_name(name)?, query.embedded()?);
     inner.columns(column_names(&columns)?);
     if if_not_exists {
         inner.if_not_exists();

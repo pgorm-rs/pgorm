@@ -1,5 +1,5 @@
 // [spec:pgorm:req:python.schema+1]
-// [spec:pgorm:req:python.schema-views+1]
+// [spec:pgorm:req:python.schema-views+2]
 // [spec:pgorm:req:python.schema-schemas]
 // [spec:pgorm:req:python.schema-domains]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {

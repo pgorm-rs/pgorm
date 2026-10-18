@@ -225,7 +225,10 @@ A view, a materialized view and `CREATE TABLE AS` wrap a `Select` in a name.
 PostgreSQL stores a view's definition as SQL text, so the query's values are
 written into it as literals by Rust's renderer, and `inspect().params` is
 empty. The name is a `p.Table` without an alias; `columns=` names the leading
-columns the query returns.
+columns the query returns. The query is read as a CTE body or a subquery is:
+nothing can order it once it is a definition, so a `limit_with_ties` without
+`order_by`, or a WINDOW clause PostgreSQL would refuse, raises
+`ConstructionError` as the function is called.
 
 ```python
 account = p.Table("account", schema="app")

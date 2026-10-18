@@ -12432,12 +12432,20 @@ children (
         title "Python's view and CREATE TABLE AS builders check their query as JavaScript's do, refusing a tie limit without ORDER BY"
         kind @fix
         deps (sql-views sql-select-extras sql-domains)
+        sealed true
         log (
             {
                 at 2026-10-18T19:21:23.848757Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-select-set-operations (e4152e18). pgorm-python's create_view, create_recursive_view, create_materialized_view and create_table_as (src/schema/view.rs) take query.inner.clone() instead of query.embedded()?, so a view body with a tie limit and no ORDER BY reaches the server, while pgorm-napi's view builders refuse it as they read the query. Use embedded() so the check runs, and add a test per builder."
+            }
+
+            {
+                at 2026-10-18T23:10:55.150159Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
