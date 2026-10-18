@@ -169,7 +169,7 @@ fn a_created_range_declares_its_multirange() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    one newtype per range type,
+// [spec:pgorm:sem:codegen.entity.types+9/test]    one newtype per range type,
 // named in UpperCamelCase and deriving `DeriveCreatedRange` under its name and
 // schema, `Eq` but for a float subtype; the entity's fields name the newtypes
 // [spec:pgorm:req:codegen.entity.files+1/test]    `pgorm_range_types.rs` is
@@ -226,7 +226,7 @@ fn a_created_range_generates_a_compiling_newtype() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells
+// [spec:pgorm:sem:codegen.entity.types+9/test]    the expanded writer spells
 // a created range column's type as the derive does
 #[test]
 fn the_expanded_writer_names_the_created_range() {

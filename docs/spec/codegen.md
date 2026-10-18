@@ -329,7 +329,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expands the Entity/Column/PrimaryKey machinery that the expanded format
 > spells out.
 
-> [spec:pgorm:def:codegen.entity.expanded+3]
+> [spec:pgorm:def:codegen.entity.expanded+4]
 > The expanded format (`expanded_format == true`) emits per entity, in
 > order: the same imports; `#[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 > pub struct Entity;`; `impl EntityName for Entity` containing
@@ -352,7 +352,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > identity column + `.default(<expr>)` for a column with a `DEFAULT` and
 > `.generated(<expr>, pgorm::pgorm_query::GeneratedKind::Stored | Virtual)`
 > for a generated one, `<expr>` the Rust `codegen.entity.expressions` prints,
-> and `<EnumName>::db_type()` for enum columns);
+> and `<EnumName>::db_type()` for enum columns, an enum inside an array or a
+> domain spelled as `codegen.entity.types` spells it);
 > `impl RelationTrait for Relation` whose `def()` matches every variant to a
 > `RelationDef` expression — or has the body `panic!("No RelationDef")` when
 > there are no relations; the `Related` impls; and
@@ -484,7 +485,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+8]
+> [spec:pgorm:sem:codegen.entity.types+9]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -560,16 +561,29 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > writes is held to the domain's default, `NOT NULL` and checks. Both writers
 > spell `ColumnType::Domain { name: Name::runtime("<name>"), schema:
 > <Some(Name::runtime("<schema>")) or None>, base: Arc::new(<base>) }` out,
-> the base spelled as a column's type is, but for an enum base, which is
-> `<Enum>::db_type().get_column_type().clone()`: the `Arc` holds a
-> `ColumnType`, where a field's own definition takes the `ColumnDef` that
-> `db_type()` returns. A domain over an enum or a created range imports and
-> generates that type as a column of it does. The live round trip of a
-> generated entity whose columns are domains over an integer, another
-> domain, a sized string, an enum, an array and a created range, a
-> schema-qualified one and arrays of two of them, is held at the workspace
-> root (`tests/codegen_domain_tests.rs`), over the files
-> `pgorm-codegen/tests/sql/domain/` compares the writer's output with.
+> the base spelled as a type inside another is, an enum base included. A
+> domain over an enum or a created range imports and generates that type as a
+> column of it does. The live round trip of a generated entity whose columns
+> are domains over an integer, another domain, a sized string, an enum, an
+> array and a created range, a schema-qualified one and arrays of two of
+> them, is held at the workspace root (`tests/codegen_domain_tests.rs`), over
+> the files `pgorm-codegen/tests/sql/domain/` compares the writer's output
+> with.
+>
+> An enum column's definition is its `ActiveEnum`'s `<Enum>::db_type()`, the
+> `ColumnDef` that `.def()` passes through. An enum inside another type — an
+> array's element, a domain's base — is
+> `<Enum>::db_type().get_column_type().clone()` instead, since the `Arc`
+> holding it holds a `ColumnType`: the expanded writer spells an enum array
+> `ColumnType::Array(Arc::new(<Enum>::db_type().get_column_type().clone()))`,
+> its schema, when it has one, carried by the `ActiveEnum`. The compact writer
+> states no `column_type` for an enum array, the derive inferring the array of
+> the enum's type from the `Vec` of its `ActiveEnum`; a domain over one it
+> spells as the expanded writer does. The live round trip of a generated
+> entity whose columns are arrays of an enum and of a schema-qualified one,
+> nullable and not, and a domain over an enum array is held at the workspace
+> root (`tests/codegen_enum_array_tests.rs`), over the files
+> `pgorm-codegen/tests/sql/enum_array/` compares both writers' output with.
 >
 > The `Eq` derive is added to the Model derive list only when no column's
 > type is `Float` or `Double`, checked recursively through `Array` element

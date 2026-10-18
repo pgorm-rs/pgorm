@@ -229,7 +229,7 @@ fn compact_model_pk_membership_uses_raw_column_name() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    the expanded format spells
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    the expanded format spells
 // out Entity, EntityName, Model, Column, PrimaryKey, PrimaryKeyTrait, Relation,
 // ColumnTrait, RelationTrait, the Related impls and ActiveModelBehavior
 #[test]
@@ -288,7 +288,7 @@ fn expanded_format_emits_every_block_in_order() {
     assert!(!blocks[3].contains("pgorm"), "{}", blocks[3]);
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    `EntityName::schema_name` is
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    `EntityName::schema_name` is
 // emitted only when a schema name is configured
 #[test]
 fn expanded_entity_name_carries_schema_name_when_configured() {
@@ -315,7 +315,7 @@ fn expanded_entity_name_carries_schema_name_when_configured() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    `ColumnTrait::def` matches
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    `ColumnTrait::def` matches
 // each column to a ColumnType chain, with `.null()`, `.unique()` and
 // `<Enum>::db_type()` where they apply
 #[test]
@@ -350,7 +350,7 @@ fn expanded_column_def_chains_null_unique_enum_type() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    `RelationTrait::def` matches
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    `RelationTrait::def` matches
 // the variants, or panics when the entity has no relations
 #[test]
 fn expanded_relation_trait_def_matches_variants_or_panics() {
@@ -379,7 +379,7 @@ fn expanded_relation_trait_def_matches_variants_or_panics() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    `Column` variants of
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    `Column` variants of
 // non-snake-case columns carry `#[pgorm(column_name = "..")]`
 #[test]
 fn expanded_column_enum_preserves_non_snake_case_names() {

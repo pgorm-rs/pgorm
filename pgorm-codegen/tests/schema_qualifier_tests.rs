@@ -46,7 +46,7 @@ fn compact_entity_carries_the_source_schema() {
     );
 }
 
-// [spec:pgorm:def:codegen.entity.expanded+3/test]    and the expanded
+// [spec:pgorm:def:codegen.entity.expanded+4/test]    and the expanded
 // `EntityName::schema_name`, which is what qualifies every generated statement
 #[test]
 fn expanded_entity_name_carries_the_source_schema() {

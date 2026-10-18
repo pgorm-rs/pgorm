@@ -1574,12 +1574,20 @@ children (
                 title "The expanded codegen writer's enum-array column compiles"
                 kind @fix
                 deps (sql-domains)
+                sealed true
                 log (
                     {
                         at 2026-10-18T21:52:40.128816Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-domains (2fa97891). pgorm-codegen's expanded writer emits ColumnType::Array(Arc::new(Mood::db_type())) for an enum-array column; db_type() returns a ColumnDef, so that is an Arc<ColumnDef> where Arc<ColumnType> is needed and the generated code does not compile (confirmed on the output). The domain path avoids it with .get_column_type().clone(). Emit the column type for an enum array the same way, add a golden fixture with an enum-array column for the expanded writer, and compile it in the test."
+                    }
+
+                    {
+                        at 2026-10-18T22:08:35.73852Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
