@@ -7,10 +7,12 @@ from pgorm import schema as s
 
 
 class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
-    # [spec:pgorm:req:python.schema/test]
+    # [spec:pgorm:req:python.schema+1/test]
     async def test_registered_entity_schema_executes_explicitly(self):
         account = p.entity("app.Account")
         generated = s.from_entity(account)
+        with self.assertRaises(p.ConstructionError):
+            bool(generated)
         self.assertEqual((len(generated.enums), len(generated.indexes), len(generated.comments)), (1, 1, 2))
         detached = generated.enums
         detached.clear()

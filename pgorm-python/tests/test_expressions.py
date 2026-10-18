@@ -61,7 +61,7 @@ class ExpressionTests(unittest.TestCase):
         expression = col("x") > 1
         ranked = window_function("rank")
         for value in [expression, Condition.all(expression), expression.as_("result"), expression.asc(),
-                      format_json(col("doc")), ranked, ranked.over(Window())]:
+                      format_json(col("doc")), ranked, ranked.over(Window()), expression.inspect()]:
             with self.assertRaises(ConstructionError):
                 bool(value)
         with self.assertRaises(ConstructionError):

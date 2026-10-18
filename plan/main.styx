@@ -6557,6 +6557,14 @@ children (
                         kind @note
                         text "Implemented owned native DataType/ColumnDef/CreateTable/CreateIndex/DDL and registered EntitySchema from actual Rust Schema methods. Verified 19 independent Rust DDL parity cases; all 97 installed standalone Python tests pass, including live quoted table/index/enum alterations, shadowed qualified enum arrays, and declaration/import without DDL. Fresh downstream checker passed 8 Rust tests, 9 entity, 7 graph, 5 pipeline-source and 1 registered-schema live test plus 8 independent cursor parity cases. The runnable SCHEMA.md example passed. Final format/typing/clippy checks in progress."
                     }
+
+                    {
+                        at 2026-10-18T17:23:04.449971Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at python.schema +1 (python-schema-truth-testing, 1c883ab5, which added truth testing to the rule): DataType, ColumnDef, CreateTable, CreateIndex, DDL, EntitySchema and Compiled raise ConstructionError on bool(); test_schema_objects_refuse_truth_testing samples every class the native schema module defines or pgorm.schema exports, and registered_schema.py truth-tests a registered entity's EntitySchema (checks/entities.py passed); the rest of the rule's text is unchanged and its 37 sites were re-read and re-pinned."
+                        after_done true
+                    }
                 )
             }
 
@@ -11827,6 +11835,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-statement-typing (6b3c7eed). Every query-expression and statement object in pgorm-python refuses truth testing (__bool__ raises), but the schema module's statements (CreateTable, CreateIndex, the DDL wrapper and the rest of src/schema) and Compiled still evaluate as true. Add the refusal to each, including whatever builders sql-views adds, extend test_boolean_conversion_fails_at_the_boundary / test_statement_truth_testing_is_rejected to cover them, and say so in SCHEMA.md. Waits on sql-views, which is editing src/schema."
+            }
+
+            {
+                at 2026-10-18T17:14:57.542945Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

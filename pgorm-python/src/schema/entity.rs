@@ -1,5 +1,5 @@
 use super::{PyCreateIndex, PyCreateTable, PyDDL};
-use crate::{UnsupportedCapabilityError, entities::PyEntity};
+use crate::{UnsupportedCapabilityError, entities::PyEntity, errors::ConstructionError};
 use pyo3::prelude::*;
 
 /// A detached result of Rust's Schema methods for a compiled entity.
@@ -16,7 +16,16 @@ pub struct PyEntitySchema {
     pub(crate) comments: Vec<PyDDL>,
 }
 
-// [spec:pgorm:req:python.schema]
+#[pymethods]
+impl PyEntitySchema {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "entity schemas cannot be tested as Python booleans",
+        ))
+    }
+}
+
+// [spec:pgorm:req:python.schema+1]
 #[pyfunction]
 pub(super) fn schema_from_entity(entity: &Bound<'_, PyAny>) -> PyResult<PyEntitySchema> {
     let entity = entity.extract::<PyRef<'_, PyEntity>>().map_err(|_| {

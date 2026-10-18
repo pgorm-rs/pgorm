@@ -960,6 +960,7 @@ assertions (
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
+    {id python-schema-truth-testing, kind @complete, author "brendan@necessary.nu", at 2026-10-18T17:14:57.542945Z}
     {id python-select-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:54:27.016683Z}
     {id python-sql-json, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:02:37.335682Z}
     {id python-statement-typing, kind @complete, author "brendan@necessary.nu", at 2026-10-18T16:09:55.445604Z}
@@ -1275,6 +1276,9 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule generative.comparison}
         {impl_name main, rule generative.oracles}
+    ), rule_versions_seen (
+        {id generative.comparison, version 0}
+        {id generative.oracles, version 0}
     )}
     {id generative.program, covered_rules (
         generative.format

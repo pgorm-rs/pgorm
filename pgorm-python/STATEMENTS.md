@@ -281,6 +281,8 @@ target and an empty update assignment set cannot reach the Rust INSERT builder.
 Rust `build()` method. It returns `Compiled.sql` and independently owned
 `Compiled.params`. More than 65,535 bound parameters raises `ConstructionError`
 before execution preparation. SQL and parameters are not combined implicitly.
+A statement, `RawSQL` and the `Compiled` that `inspect()` returns raise
+`ConstructionError` on Python truth testing, as SQL expressions do.
 
 The extension's Rust `statements::compile` entry point uses exactly these same
 validated builders for execution preparation. It accepts native statements,

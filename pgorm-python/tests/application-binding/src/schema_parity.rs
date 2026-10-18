@@ -3,7 +3,7 @@ use pgorm::Schema;
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.schema/test]
+// [spec:pgorm:req:python.schema+1/test]
 #[test]
 fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
     Python::initialize();

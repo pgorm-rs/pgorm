@@ -136,6 +136,12 @@ query placeholders. Python does not concatenate identifiers or values into
 DDL. Arbitrary column options, partial/expression/concurrent indexes and runtime
 foreign-key construction are not exposed. `schema_policy` records these limits.
 
+Like SQL expressions and statements, every `pgorm.schema` object — `DataType`,
+`ColumnDef`, `CreateTable`, `CreateIndex`, `DDL` and `EntitySchema` — and the
+`Compiled` an inspection returns raise `ConstructionError` on Python truth
+testing, so `if statement:` or `statement or fallback` fails where it is written
+rather than reading every statement as true.
+
 ## Views, materialized views and tables from a query
 
 A view, a materialized view and `CREATE TABLE AS` wrap a `Select` in a name.

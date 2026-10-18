@@ -1,4 +1,4 @@
-use crate::expressions::Compiled;
+use crate::{errors::ConstructionError, expressions::Compiled};
 use pgorm::pgorm_query::{
     ColumnRenameStatement, CommentStatement, ConstraintRenameStatement, IndexDropStatement,
     MaterializedViewCreateStatement, MaterializedViewDropStatement,
@@ -40,7 +40,7 @@ pub struct PyDDL {
 
 #[pymethods]
 impl PyDDL {
-    // [spec:pgorm:req:python.schema]
+    // [spec:pgorm:req:python.schema+1]
     pub fn inspect(&self) -> Compiled {
         let sql = match &self.inner {
             Statement::AlterTable(s) => s.to_string(),
@@ -66,5 +66,11 @@ impl PyDDL {
             sql,
             values: Values(Vec::new()),
         }
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL statements cannot be tested as Python booleans",
+        ))
     }
 }

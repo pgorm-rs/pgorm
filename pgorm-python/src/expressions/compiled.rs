@@ -1,7 +1,7 @@
 use pgorm::pgorm_query::Values;
 use pyo3::prelude::*;
 
-use crate::values::PyValue;
+use crate::{errors::ConstructionError, values::PyValue};
 
 /// A Rust-built SQL statement and its independently owned, ordered parameters.
 #[pyclass(name = "Compiled", module = "pgorm", frozen, from_py_object)]
@@ -24,6 +24,12 @@ impl Compiled {
             .collect()
     }
 
+    // [spec:pgorm:req:python.schema+1]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "compiled SQL cannot be tested as Python booleans",
+        ))
+    }
     fn __repr__(&self) -> String {
         format!("Compiled(parameters={})", self.values.0.len())
     }

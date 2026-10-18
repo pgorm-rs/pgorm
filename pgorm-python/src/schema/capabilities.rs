@@ -1,4 +1,4 @@
-// [spec:pgorm:req:python.schema]
+// [spec:pgorm:req:python.schema+1]
 // [spec:pgorm:req:python.schema-views]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
