@@ -4,10 +4,12 @@ use pyo3::prelude::*;
 use super::table::PyTable;
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:python.statements+4]
-/// A FROM item that is not a named table, owned by Rust's `FromItem`. It is
-/// always aliased, as PostgreSQL requires of every such item, so its columns
-/// are qualified by a name the caller chose. `json_table` builds one.
+// [spec:pgorm:req:python.statements+5]
+/// A FROM item that is not a plain named table, owned by Rust's `FromItem`.
+/// A value-producing item is always aliased, as PostgreSQL requires, so its
+/// columns are qualified by a name the caller chose; a sampled table is
+/// qualified by its alias, or by its unqualified name when it has none.
+/// `json_table`, `TableFunction.alias` and `Table.tablesample` build one.
 #[pyclass(name = "FromItem", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyFromItem {

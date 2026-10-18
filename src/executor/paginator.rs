@@ -17,7 +17,10 @@ use std::{
 };
 use tokio_postgres::types::ToSql;
 
-use super::{QueryResult, ValueHolder, select::ensure_select_list};
+use super::{
+    QueryResult, ValueHolder,
+    select::{ensure_select_list, refuse_tie_limit},
+};
 
 /// Pin a Model so that stream operations can be performed on the model
 pub type PinBoxStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + 'db>>;
@@ -53,8 +56,10 @@ const COUNT_SUBQUERY_ALIAS: &str = "sub_query";
 /// The statement for one page and the values to bind to it.
 // [spec:pgorm:sem:exec.paginator.fetch+3]
 // [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
+// [spec:pgorm:req:exec.tie-limit]
 fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
+    refuse_tie_limit(query, "paginator")?;
     let mut query = query.clone();
     query.limit(limit).offset(offset);
     Ok(query.build())
@@ -64,8 +69,10 @@ fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, 
 /// bind to it.
 // [spec:pgorm:sem:exec.paginator.count]
 // [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
+// [spec:pgorm:req:exec.tie-limit]
 fn count_of(query: &SelectStatement) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
+    refuse_tie_limit(query, "paginator")?;
     let mut counted = query.clone();
     counted.reset_limit().reset_offset().clear_order_by();
     Ok(SelectStatement::new()

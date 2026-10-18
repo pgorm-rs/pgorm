@@ -1,7 +1,7 @@
 // @ts-check
 
 // SELECT, the tables and other items it reads, and common table expressions.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";
@@ -48,16 +48,35 @@ export class Table extends Builder {
   star() {
     return new Expr(native.tableStar(arg(this)), TRUSTED);
   }
+
+  /**
+   * The table read through `TABLESAMPLE`: each row (`"bernoulli"`) or page
+   * (`"system"`) drawn with probability `percentage` out of 100, and the same
+   * sample drawn again for the same `repeatable` seed over unchanged data.
+   * Both numbers are bound; one PostgreSQL refuses is its error, not this
+   * method's.
+   *
+   * @param {"bernoulli" | "system"} method
+   * @param {number} percentage
+   * @param {{ repeatable?: number }} [options]
+   */
+  tablesample(method, percentage, { repeatable } = {}) {
+    return new FromItem(native.tableSample(arg(this), method, percentage, repeatable), TRUSTED);
+  }
 }
 
-/** A FROM item that is not a named table, always aliased: a subquery, `JSON_TABLE`. */
+/**
+ * A FROM item that is not a named table, always aliased: a subquery,
+ * `JSON_TABLE`, a table function, or a sampled table, which answers to its
+ * table's alias or name.
+ */
 export class FromItem extends Builder {
   /**
    * @param {unknown} handle
    * @param {symbol} [token]
    */
   constructor(handle, token) {
-    trusted(token, "FromItem", "select.as(alias) or jsonTable()");
+    trusted(token, "FromItem", "select.as(alias), jsonTable(), tableFunction() or table.tablesample()");
     super(handle);
   }
 
@@ -124,9 +143,22 @@ export class Select extends Builder {
     return new Select(native.selectWhere(arg(this), arg(predicate)), TRUSTED);
   }
 
-  /** @param {...Expr} expressions */
-  groupBy(...expressions) {
-    return new Select(native.selectGroupBy(arg(this), args(expressions)), TRUSTED);
+  /**
+   * Items added to the GROUP BY list in order: expressions, and the grouping
+   * elements `groupingSet`, `rollup`, `cube` and `groupingSets` make.
+   *
+   * @param {...(Expr | import("./grouping.js").GroupingElement)} items
+   */
+  groupBy(...items) {
+    return new Select(native.selectGroupBy(arg(this), args(items)), TRUSTED);
+  }
+
+  /**
+   * `GROUP BY DISTINCT`: a grouping set the list reaches more than once —
+   * `rollup(a, b)` beside `rollup(a)` reaches `(a)` three ways — grouped once.
+   */
+  groupByDistinct() {
+    return new Select(native.selectGroupByDistinct(arg(this)), TRUSTED);
   }
 
   /** @param {Expr | import("./conditions.js").Condition} predicate */
@@ -139,9 +171,26 @@ export class Select extends Builder {
     return new Select(native.selectOrderBy(arg(this), args(orderings)), TRUSTED);
   }
 
-  /** @param {number | bigint | null} count */
+  /**
+   * LIMIT, or none with `null`, which removes a tie limit too.
+   *
+   * @param {number | bigint | null} count
+   */
   limit(count) {
     return new Select(native.selectLimit(arg(this), "limit", count), TRUSTED);
+  }
+
+  /**
+   * `FETCH FIRST count ROWS WITH TIES`: the first `count` rows and every row
+   * tied with the last of them on the ORDER BY, in LIMIT's place. The ties
+   * need an ORDER BY and PostgreSQL refuses them beside SKIP LOCKED; both
+   * are checked when the statement is inspected or run, since the order may
+   * be given after the limit.
+   *
+   * @param {number | bigint} count
+   */
+  limitWithTies(count) {
+    return new Select(native.selectLimit(arg(this), "withTies", count), TRUSTED);
   }
 
   /** @param {number | bigint | null} count */

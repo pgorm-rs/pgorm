@@ -23,6 +23,7 @@ mod range;
 mod render;
 mod returning;
 mod schema;
+mod select_extras;
 mod sequence;
 mod sql_json;
 mod subscript;

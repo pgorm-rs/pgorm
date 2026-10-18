@@ -69,7 +69,7 @@ pub(crate) fn items<'cx>(
 
 /// An identifier: a JavaScript string of 1–63 UTF-8 bytes without NUL,
 /// minted into a `Name`, which renders quoted — never SQL.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 pub(crate) fn name<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Name> {
     if !value.is_a::<JsString, _>(cx) {
         return refuse(cx, "an identifier is a string");
@@ -126,7 +126,7 @@ pub(crate) fn rust_type(named: &values::TypeName) -> TypeName {
 /// `Value`, written as its kind needs — an enum's label cast to the enum, a
 /// created range's text cast to its range type through `Expr::as_range`.
 /// Nothing here interpolates: the value is a placeholder's.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -264,12 +264,27 @@ pub(crate) fn select<'cx>(
     value: Handle<'cx, JsValue>,
 ) -> NeonResult<SelectStatement> {
     match node(cx, value) {
-        Some(Node::Select(select)) => Ok(select),
+        Some(Node::Select(select)) => embedded(cx, select),
         Some(other) => {
             let what = other.describe();
             refuse(cx, format!("expected a Select, got {what}"))
         }
         None => refuse(cx, "expected a Select"),
+    }
+}
+
+/// `select`, read into another statement: final from here on, so a tie
+/// limit PostgreSQL's grammar refuses — with no ORDER BY, or beside SKIP
+/// LOCKED — is refused here, as `compile` refuses one in a statement run on
+/// its own, rather than by the server once the outer statement is sent.
+// [spec:pgorm:req:napi.select+1]
+pub(crate) fn embedded<'cx>(
+    cx: &mut Cx<'cx>,
+    select: SelectStatement,
+) -> NeonResult<SelectStatement> {
+    match select.check_tie_limit() {
+        Ok(()) => Ok(select),
+        Err(error) => refuse(cx, error.to_string()),
     }
 }
 

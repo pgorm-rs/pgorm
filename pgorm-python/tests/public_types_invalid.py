@@ -19,6 +19,10 @@ async def invalid(connection: p.Connection) -> None:
     s.DataType("not_a_type")  # expected-error: arg-type
     s.create_table(p.Table("t")).column("raw SQL")  # expected-error: arg-type
     p.select(p.literal(1)).limit("3")  # expected-error: arg-type
+    p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
+    p.GroupingElement.sets()  # expected-error: call-arg
+    p.Table("t").tablesample("bernoulli", 10)  # expected-error: arg-type
+    p.TableFunction(p.Table("t"))  # expected-error: arg-type
     pl.from_(p.Table("t")).filter_with(42)  # expected-error: arg-type
     optional: p.Record | None = await connection.fetch_all(  # expected-error: assignment
         p.select(p.literal(1))

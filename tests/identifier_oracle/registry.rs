@@ -31,8 +31,8 @@
 use pgorm::pgorm_query::{
     Asterisk, ColumnType, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable,
     JoinType, JsonTable, JsonTableColumn, LockType, MatchedAction, MergeInsert, MergeUpdate, Name,
-    OnConflict, Order, Query, Range, RecursiveWithClause, ReturningRow, Search, SearchOrder,
-    SqlTemplate, TypeName, WindowStatement, WithClause,
+    OnConflict, Order, Query, Range, RecursiveWithClause, ReturningRow, SampleMethod, Search,
+    SearchOrder, SqlTemplate, TableFunction, TableSample, TypeName, WindowStatement, WithClause,
 };
 
 use super::oracle::{
@@ -225,6 +225,58 @@ fn query_sites() -> Vec<Site> {
                     .column(Asterisk)
                     .from(FromItem::Template(template, n_(n)))),
                 Err(err) => Rendered::Refused(format!("{err:?}")),
+            },
+        },
+        Site {
+            id: "query/select.table-function.alias",
+            api: "TableFunction::alias(Name)",
+            kinds: &["RangeFunction.alias.aliasname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(
+                    TableFunction::new(Func::named(fixed("f")).arg(1))
+                        .with_ordinality()
+                        .alias(n_(n)),
+                ))
+            },
+        },
+        Site {
+            id: "query/select.table-function.column",
+            api: "TableFunction::columns([Name])",
+            kinds: &["RangeFunction.alias.colnames[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(
+                    TableFunction::new(Func::named(fixed("f")).arg(1))
+                        .columns([n_(n)])
+                        .alias(fixed("t")),
+                ))
+            },
+        },
+        Site {
+            id: "query/select.table-sample.table",
+            api: "TableSample::new(Name, method, percentage)",
+            kinds: &["RangeVar.relname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(TableSample::new(
+                    n_(n),
+                    SampleMethod::Bernoulli,
+                    10,
+                )))
+            },
+        },
+        Site {
+            id: "query/select.table-sample.alias",
+            api: "TableSample::new(NamedTable::alias(Name), method, percentage)",
+            kinds: &["RangeVar.alias.aliasname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select().column(Asterisk).from(TableSample::new(
+                    fixed("t").into_named_table().alias(n_(n)),
+                    SampleMethod::System,
+                    10,
+                )))
             },
         },
         // -- joins ---------------------------------------------------------

@@ -7,6 +7,7 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 use super::{merge::PyMerge, select::PySelect};
 use crate::{expressions::PyExpr, identifiers::PyIdentifier};
 
+// [spec:pgorm:req:python.statements+5]
 /// One common table expression. Its body is a SELECT, or a MERGE, whose rows
 /// are those its RETURNING list yields.
 fn expression(
@@ -15,7 +16,7 @@ fn expression(
 ) -> PyResult<CommonTableExpression> {
     let name = PyIdentifier::new(name)?.name();
     if let Ok(select) = query.extract::<PyRef<'_, PySelect>>() {
-        Ok(CommonTableExpression::new(name, select.inner.clone()))
+        Ok(CommonTableExpression::new(name, select.embedded()?))
     } else if let Ok(merge) = query.extract::<PyRef<'_, PyMerge>>() {
         Ok(CommonTableExpression::new(name, merge.inner.clone()))
     } else {

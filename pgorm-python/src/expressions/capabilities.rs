@@ -58,6 +58,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("expr.not_like", "pgorm_query::SimpleExpr::not_like"),
         ("expr.ilike", "pgorm_query::Expr::ilike"),
         ("expr.not_ilike", "pgorm_query::Expr::not_ilike"),
+        ("expr.similar_to", "pgorm_query::SimpleExpr::similar_to"),
+        (
+            "expr.not_similar_to",
+            "pgorm_query::SimpleExpr::not_similar_to",
+        ),
         (
             "expr.inspect",
             "pgorm_query::SelectStatement::expr, SelectStatement::build",

@@ -2173,6 +2173,27 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id sql-select-extras, covered_rules (
+        exec.tie-limit
+        sql.ast.expr.similar-to
+        sql.ast.select.group-distinct
+        sql.ast.select.table-function
+        sql.ast.select.table-sample
+        sql.ast.select.tie-limit
+        sql.render.table-function
+        sql.render.table-sample
+        sql.render.tie-limit
+    ), covered_claims (
+        {impl_name main, rule exec.tie-limit}
+        {impl_name main, rule sql.ast.expr.similar-to}
+        {impl_name main, rule sql.ast.select.group-distinct}
+        {impl_name main, rule sql.ast.select.table-function}
+        {impl_name main, rule sql.ast.select.table-sample}
+        {impl_name main, rule sql.ast.select.tie-limit}
+        {impl_name main, rule sql.render.table-function}
+        {impl_name main, rule sql.render.table-sample}
+        {impl_name main, rule sql.render.tie-limit}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

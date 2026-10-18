@@ -8871,6 +8871,19 @@ children (
                 id sql-select-extras
                 title "pgorm builds FETCH FIRST WITH TIES, GROUP BY DISTINCT, SIMILAR TO, WITH ORDINALITY and ROWS FROM, and TABLESAMPLE, from Rust, Python and JavaScript"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:sql.ast.select.tie-limit]
+                        [spec:pgorm:req:sql.ast.select.group-distinct]
+                        [spec:pgorm:req:sql.ast.expr.similar-to]
+                        [spec:pgorm:req:sql.ast.select.table-function]
+                        [spec:pgorm:req:sql.ast.select.table-sample]
+                        [spec:pgorm:req:sql.render.tie-limit]
+                        [spec:pgorm:req:sql.render.table-function]
+                        [spec:pgorm:req:sql.render.table-sample]
+                        [spec:pgorm:req:exec.tie-limit]
+                    )
+                }
                 deps (query-second-tier python-statement-typing)
                 log (
                     {

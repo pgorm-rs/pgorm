@@ -1,6 +1,6 @@
 use super::QueryResult;
 use super::graph::GraphRow;
-use super::select::ensure_select_list;
+use super::select::{ensure_select_list, refuse_tie_limit};
 use crate::query::graph::qualified_pk_tiebreaks;
 use crate::{
     ColumnTrait, ConnectionTrait, EntityTrait, Error, FromQueryResult, IntoBoundary, IntoKey, Key,
@@ -329,7 +329,9 @@ impl<S, K> Cursor<S, K> {
     /// re-executed with a moved boundary or a flipped direction without the
     /// previous execution's clauses still on it.
     // [spec:pgorm:sem:exec.cursor.order+4]
+    // [spec:pgorm:req:exec.tie-limit]
     fn compose(&mut self) -> Result<SelectStatement, Error> {
+        refuse_tie_limit(&self.query, "cursor")?;
         let mut query = self.query.clone();
         self.apply_limit(&mut query);
         self.apply_order_by(&mut query);

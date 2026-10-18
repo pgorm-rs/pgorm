@@ -4,7 +4,7 @@ use crate::{
     backend::QueryBuilder,
     expr::*,
     prepare::*,
-    query::{OrderedStatement, condition::*, select_expr::*},
+    query::{OrderedStatement, RowLimit, condition::*, select_expr::*},
     types::*,
     value::*,
 };
@@ -31,7 +31,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select+3]
+// [spec:pgorm:def:sql.ast.select+4]
 // [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
@@ -42,10 +42,11 @@ pub struct SelectStatement {
     pub(crate) join: Vec<JoinExpr>,
     pub(crate) r#where: ConditionHolder,
     pub(crate) groups: Vec<GroupingElement>,
+    pub(crate) group_distinct: bool,
     pub(crate) having: ConditionHolder,
     pub(crate) unions: Vec<(UnionType, SelectStatement)>,
     pub(crate) orders: Vec<OrderExpr>,
-    pub(crate) limit: Option<Value>,
+    pub(crate) limit: Option<RowLimit>,
     pub(crate) offset: Option<Value>,
     pub(crate) lock: Option<LockClause>,
     pub(crate) window: Option<(Name, WindowStatement)>,
@@ -86,7 +87,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select+3]
+// [spec:pgorm:def:sql.ast.select+4]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LockClause {
     pub(crate) r#type: LockType,
@@ -134,6 +135,7 @@ impl SelectStatement {
             join: std::mem::take(&mut self.join),
             r#where: std::mem::replace(&mut self.r#where, ConditionHolder::new()),
             groups: std::mem::take(&mut self.groups),
+            group_distinct: std::mem::take(&mut self.group_distinct),
             having: std::mem::replace(&mut self.having, ConditionHolder::new()),
             unions: std::mem::take(&mut self.unions),
             orders: std::mem::take(&mut self.orders),
@@ -741,7 +743,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM "character", "font" WHERE "font"."id" = "character"."font_id""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from+3]
+    // [spec:pgorm:req:sql.ast.select.from+4]
     pub fn from<R>(&mut self, tbl_ref: R) -> &mut Self
     where
         R: IntoFromItem,
@@ -765,7 +767,7 @@ impl SelectStatement {
     ///     r#"SELECT * FROM (VALUES (1, 'hello'), (2, 'world')) AS "x""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.from+3]
+    // [spec:pgorm:req:sql.ast.select.from+4]
     pub fn from_values<I, V, A>(&mut self, value_tuples: I, alias: A) -> &mut Self
     where
         I: IntoIterator<Item = V>,
@@ -1553,7 +1555,8 @@ impl SelectStatement {
         self.cond_having(other)
     }
 
-    /// Limit the number of returned rows.
+    /// Limit the number of returned rows, replacing any row limit already set
+    /// — a tie limit of [`limit_with_ties`](Self::limit_with_ties) included.
     ///
     /// # Examples
     ///
@@ -1572,11 +1575,11 @@ impl SelectStatement {
     /// );
     /// ```
     pub fn limit(&mut self, limit: u64) -> &mut Self {
-        self.limit = Some(limit.into());
+        self.limit = Some(RowLimit::Count(limit.into()));
         self
     }
 
-    /// Reset limit
+    /// Remove the row limit, whether a plain `LIMIT` or a tie limit.
     pub fn reset_limit(&mut self) -> &mut Self {
         self.limit = None;
         self

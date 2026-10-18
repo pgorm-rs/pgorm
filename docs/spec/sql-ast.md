@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+29]
+> [spec:pgorm:req:sql.surface+30]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -162,8 +162,12 @@ today, including panicking edges and deliberate failsafes.
 > `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`); and
 > `JsonTable`, `JsonTableBehavior`, `JsonTableColumn`, `JsonValueColumn`,
 > `JsonQueryColumn`, `JsonExistsColumn` and `JsonNestedColumns`: `JSON_TABLE`,
-> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`); and
-> `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
+> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`);
+> `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`);
+> `TableFunction`, a set-returning function in `FROM` with its ordinal column,
+> column names and `ROWS FROM` (`sql.ast.select.table-function`); and
+> `TableSample`, a table read through `TABLESAMPLE`, and `SampleMethod`, the
+> method that draws it (`sql.ast.select.table-sample`). An
 > item leaves the list with the state it described: `Frame` went when a
 > frame's bounds stopped being one enum, the frame builder replacing it
 > (`sql.ast.window-statement`), `StandaloneIndexKind` when the primary-key
@@ -210,7 +214,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+16]
+> [spec:pgorm:req:sql.scope+17]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -251,15 +255,6 @@ today, including panicking edges and deliberate failsafes.
 >   and the drops, with the grammar's refusals made unrepresentable, and a
 >   live test of an entity reading a view and writing through an updatable
 >   one (`sql-views`).
-> - **`FETCH FIRST … WITH TIES`, `GROUP BY DISTINCT`, `SIMILAR TO`, `WITH
->   ORDINALITY` / `ROWS FROM`, and `TABLESAMPLE`.** Clauses on statements the
->   builder already has, each with a value or an identifier to carry: a limit
->   that keeps the rows tied with the last (and so needs an `ORDER BY`), the
->   deduplication of grouping sets, `LIKE`'s regular-expression sibling and
->   its `ESCAPE`, the ordinal column and the multi-function form of a
->   set-returning function in `FROM`, and a sampled scan with its method,
->   percentage and `REPEATABLE` seed. Closing it takes a field or a variant
->   each, and the same from Python and JavaScript (`sql-select-extras`).
 > - **`CREATE DOMAIN`, its `ALTER` and `DROP`.** A named type with a base
 >   type, a default, `NOT NULL` and named `CHECK`s, which a schema uses where
 >   an entity has a column; codegen refuses a schema that uses one. Closing it
@@ -372,7 +367,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+3]
+> [spec:pgorm:def:sql.ast.select+4]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
 > WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
 > pays one pointer — `query.build.with` records why the clause lives on the
@@ -384,10 +379,14 @@ today, including panicking edges and deliberate failsafes.
 > optional window), `from` table references, `JoinExpr` joins, a WHERE
 > `ConditionHolder`, a GROUP BY list of `GroupingElement`s
 > (`sql.ast.select.grouping`), a HAVING `ConditionHolder`, a list of
-> `(UnionType, SelectStatement)` unions, ORDER BY expressions, optional LIMIT
-> and OFFSET values (set from `u64` via `limit`/`offset`, cleared via
+> `(UnionType, SelectStatement)` unions, ORDER BY expressions, an optional row
+> limit — a `LIMIT` or the tie limit of `sql.ast.select.tie-limit`, one slot
+> for both — and an optional OFFSET (each set from `u64` via
+> `limit`/`limit_with_ties`/`offset`, cleared via
 > `reset_limit`/`reset_offset`), an optional `LockClause`, and at most one named
-> WINDOW definition.
+> WINDOW definition. The GROUP BY list carries its set quantifier,
+> `DISTINCT` once `group_by_distinct` is called
+> (`sql.ast.select.group-distinct`).
 >
 > A `LockClause` pairs a `LockType` (`Update`, `NoKeyUpdate`, `Share`,
 > `KeyShare`) with an optional table list and optional `LockBehavior` (`Nowait`,
@@ -419,7 +418,7 @@ today, including panicking edges and deliberate failsafes.
 > `cond_having`); both feed the HAVING `ConditionHolder` with the semantics of
 > `sql.ast.condition.holder`.
 
-> [spec:pgorm:req:sql.ast.select.from+3]
+> [spec:pgorm:req:sql.ast.select.from+4]
 > FROM clauses MUST accumulate: calling `from` repeatedly produces multiple
 > comma-separated FROM items (the "old-school join" form), and `from_clear`
 > MUST remove all of them. The FROM item variants are: plain tables (with
@@ -429,9 +428,13 @@ today, including panicking edges and deliberate failsafes.
 > (`FromItem::ValuesList` rendering `(VALUES (..), (..)) AS "alias"`).
 > `FromItem::JsonTable` (`sql.ast.json-table`) is made by `JsonTable::alias`
 > and handed to the generic `from`, or to a join: the alias is the one thing
-> a shorthand would take, and the builder already holds it.
+> a shorthand would take, and the builder already holds it. So is
+> `FromItem::TableFunction`, made by `TableFunction::alias`
+> (`sql.ast.select.table-function`), and `FromItem::TableSample` converts from
+> a `TableSample` (`sql.ast.select.table-sample`), which `from` takes as it
+> is.
 >
-> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+5]`) gets no
+> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+6]`) gets no
 > shorthand of its own. Its constructor returns `Result`, and a shorthand
 > would have to either return `Result` — breaking the `&mut Self` chain every
 > other builder method keeps — or swallow the failure; instead it is built
@@ -460,6 +463,108 @@ today, including panicking edges and deliberate failsafes.
 > `Condition` tree) and MUST be stored as `JoinOn::Condition` wrapping a
 > `ConditionHolder`, so multi-part conditions built with `Condition::all`/`any`
 > render as chained `AND`/`OR` in the ON clause.
+
+> [spec:pgorm:req:sql.ast.select.table-function]
+> A set-returning function in FROM is a `TableFunction`, PostgreSQL's
+> `func_table`: one call, built by `TableFunction::new(call)`, or
+> `ROWS FROM (..)`, built by `TableFunction::rows_from(call)`, to which
+> `and(call)` adds a call read beside the others. A second call makes it
+> `ROWS FROM` whichever constructor began it, since the grammar has no other
+> spelling for several; over one call `ROWS FROM` differs from the plain call
+> only for a function returning a composite, whose columns it expands.
+> `ROWS FROM` reads its calls side by side, row *n* of each forming row *n* of
+> the relation, and pads the calls that run out first with NULLs.
+> `with_ordinality()` adds `WITH ORDINALITY`, a final `bigint` column
+> numbering the rows from 1, and `columns(names)` names the relation's columns
+> in its alias, `AS "t"("a", "b")`, the ordinal column last, replacing any
+> names given before. Fewer names leave the remaining columns their own; more
+> than the relation has is the server's refusal (`42P10`). A record-returning
+> call that needs a column definition list (`AS (a int)`) is not built:
+> `FromItem::Template` reaches it.
+>
+> `alias(name)` finishes it as `FromItem::TableFunction`, which `from`, the
+> joins and every other FROM position take, as `JsonTable::alias` does. A
+> single call with neither an ordinal nor column names is returned as the
+> `FromItem::FunctionCall` that `from_function` builds, so `f(..) AS "t"` has
+> one representation however it was spelled.
+>
+> The call is any `FunctionCall`. `Func::generate_series(start, stop)`,
+> `Func::generate_series_step(start, stop, step)` and `Func::unnest(array)`
+> are the set-returning constructors, `Function::GenerateSeries` and
+> `Function::Unnest`, and the two the Python and JavaScript call vocabularies
+> reach; `Func::named` calls any other by name. Both are overloaded on their
+> argument types, so a bound argument, a placeholder the call gives no type,
+> is ambiguous to the server (`42725`) until it is cast to its type, as
+> anywhere a placeholder has no context
+> (`[spec:pgorm:sem:sql.render.placeholder-typing+1]`); the constructors add
+> no cast of their own. A zero step is the server's refusal (`22023`).
+
+> [spec:pgorm:req:sql.ast.select.table-sample]
+> A table read through `TABLESAMPLE` is a `TableSample`:
+> `TableSample::new(table, method, percentage)` over any `IntoNamedTable` — a
+> table name, optionally schema-qualified and aliased — with `repeatable(seed)`
+> setting the `REPEATABLE` seed, a second call replacing the first.
+> `SampleMethod` is PostgreSQL's two built-in methods: `Bernoulli` draws each
+> row on its own, `System` each page, reading less of the table and clustering
+> the sample by page. The extension methods (`SYSTEM_ROWS`, `SYSTEM_TIME`) are
+> not built.
+>
+> The percentage, the probability out of 100 that a row or page is drawn, and
+> the seed are any `Into<f64>` and are bound as parameters, which the server
+> types `real` and `double precision`; binding narrows the `real` one as it
+> narrows any double bound there. A percentage outside 0 to 100, which an
+> `f64` can hold, is the server's refusal (`2202H`), as is a NULL (`2202H`, and
+> `2202G` for the seed). The same seed over unchanged data draws the same
+> sample.
+>
+> A sample converts into `FromItem::TableSample`, so `from`, the joins, an
+> UPDATE's FROM list, a DELETE's USING list and a MERGE's source all take it;
+> its `table_name` is the sampled table's, its `qualifier` the alias or else
+> the table name, and `FromItem::alias` re-aliases the table it samples. Only
+> a table can be sampled, and the type holds nothing but a table name, so a
+> sampled subquery, values list or function — which the grammar refuses
+> (`42601`) — has no construction; a common table expression's name is a name
+> the type cannot tell from a table's, and sampling one is the server's
+> refusal (`0A000`).
+
+> [spec:pgorm:req:sql.ast.select.tie-limit]
+> `limit_with_ties(count)` sets a tie limit, `FETCH FIRST count ROWS WITH
+> TIES`: the first `count` rows in the statement's ORDER BY and every further
+> row equal to the last of them on all its keys. It shares one slot with
+> `limit` — PostgreSQL's grammar takes a `LIMIT` or a `FETCH FIRST`, never both
+> — so either replaces the other and `reset_limit` removes either;
+> `has_tie_limit` says which is set. OFFSET composes with it as with `LIMIT`.
+> The count is bound, which the server types `bigint`.
+>
+> The grammar refuses a tie limit in two places (`42601`): on a statement with
+> no ORDER BY, since the ties are measured on the order, and beside
+> `SKIP LOCKED`, since the tied set would then depend on which rows other
+> transactions hold. `FOR UPDATE` and the weaker strengths, `NOWAIT`
+> included, combine with it. Neither refused state is designed out
+> (`[dec:pgorm:invalid-states-unrepresentable]`): the ORDER BY and the lock
+> are set by other methods in any order, and `clear_order_by` can remove the
+> order after the limit was set. So `check_tie_limit` refuses both before
+> anything renders —
+> `Error::TiesWithoutOrder` and `Error::TiesWithSkipLocked` — and every
+> pgorm executor and the Python and JavaScript builders call it before they
+> render (`[dec:pgorm:no-panic]`, `exec.tie-limit`). Rendering is infallible
+> and writes what the statement holds (`sql.render.tie-limit`), so a caller of
+> pgorm-query alone who skips the check sends SQL the server refuses with
+> that `42601`. The check reads the statement's own clauses: a SELECT nested
+> in it — a subquery, a CTE body, a set operation's arm — carrying a refused
+> shape is the server's refusal.
+
+> [spec:pgorm:req:sql.ast.select.group-distinct]
+> `group_by_distinct()` sets the GROUP BY list's set quantifier to
+> `DISTINCT`: each grouping set the list stands for is grouped by once,
+> however many combinations of its items reach it. `ROLLUP (a, b), ROLLUP
+> (a)` stands for `(a, b)` twice, `(a)` three times and `()` once, and so
+> yields the `(a)` groups three times over; with `DISTINCT` each set yields
+> its groups once. The quantifier applies to the whole list, whichever call
+> adds to it and in whichever order, and changes nothing over a list with no
+> repeated set. With no GROUP BY at all there is no list to quantify, and
+> nothing renders. The default quantifier, `ALL`, is never spelled, and a set
+> quantifier cannot be unset, as `distinct` cannot.
 
 > [spec:pgorm:def:sql.ast.select.grouping]
 > A SELECT's GROUP BY list is a list of `GroupingElement`s — PostgreSQL's
@@ -630,7 +735,7 @@ today, including panicking edges and deliberate failsafes.
 > `SimpleExpr`, which is what allows plain Rust values wherever
 > `Into<SimpleExpr>` is accepted.
 
-> [spec:pgorm:req:sql.ast.expr.operators+4]
+> [spec:pgorm:req:sql.ast.expr.operators+5]
 > `Expr` and `SimpleExpr` MUST provide combinators that produce `Binary`/`Unary`
 > nodes: comparisons `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, plus
 > `equals`/`not_equals` for column-to-column comparison; arithmetic `add`,
@@ -640,7 +745,8 @@ today, including panicking edges and deliberate failsafes.
 > `is_not`, and the null-safe `is_distinct_from`/`is_not_distinct_from`;
 > logical
 > `and`, `or`, and `not` (prefix `NOT`); string/pattern operators `like`,
-> `not_like`, `ilike`, `not_ilike` — a `LikeExpr` with an escape character MUST
+> `not_like`, `ilike`, `not_ilike`, `similar_to` and `not_similar_to`
+> (`sql.ast.expr.similar-to`) — a `LikeExpr` with an escape character MUST
 > render an `ESCAPE` clause whose character is an inline constant — and
 > `concat` (`||`).
 >
@@ -681,6 +787,22 @@ today, including panicking edges and deliberate failsafes.
 > `sum`, `count`, `count_distinct`, and `if_null` wrap the expression in the
 > corresponding function call. JSON field, path and key-existence access is
 > `sql.ast.expr.json`.
+
+> [spec:pgorm:req:sql.ast.expr.similar-to]
+> `similar_to(pattern)` and `not_similar_to(pattern)`, on `Expr` and on
+> `SimpleExpr`, build `SIMILAR TO` and `NOT SIMILAR TO`
+> (`BinOper::SimilarTo`, `BinOper::NotSimilarTo`): whether the whole string
+> matches a pattern in SQL's regular-expression dialect, which is LIKE's `%`
+> and `_` with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes
+> added. The pattern is any `IntoLikeExpr`, the operand LIKE takes, held as
+> `SimpleExpr::LikePattern`: it is bound, which the server types `text`, and a
+> `LikeExpr` carries the one-character `ESCAPE` the grammar admits only as a
+> pattern's tail, written as an inline constant. The default escape is a
+> backslash. An escape of more than one character, the server's refusal
+> (`22025`), has no construction, `LikeExpr::escape` taking a `char`, and
+> `ESCAPE ''`, which turns escaping off, is not built for SIMILAR TO, as it is
+> not for LIKE. Both operators are of the LIKE family the renderer ranks by
+> (`sql.render.precedence`), where the grammar ranks `SIMILAR`.
 
 > [spec:pgorm:req:sql.ast.expr.in+1]
 > `is_in`/`is_not_in` MUST build an `IN`/`NOT IN` over a `Tuple` of the given
@@ -886,7 +1008,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+3]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -1094,7 +1216,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a FROM relation list, a WHERE
 > `ConditionHolder` (per `sql.ast.condition.holder`), an optional
@@ -1128,7 +1250,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+4]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+5]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a USING relation list, a WHERE `ConditionHolder` shared with the
 > condition rules, and an optional `ReturningClause`. Like the other three
@@ -1152,7 +1274,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:req:sql.ast.merge+1]
 > `MergeStatement` is the MERGE AST node. It holds a target `NamedTable`
-> (`[spec:pgorm:def:sql.types.table-ref+5]`: a name, bare or
+> (`[spec:pgorm:def:sql.types.table-ref+6]`: a name, bare or
 > schema-qualified, with an optional alias), an `only` flag, a source
 > `FromItem`, the join condition, an optional plain `WithClause`, its
 > `WHEN` arms, and an optional RETURNING list. `Query::merge(target, source,
@@ -1462,7 +1584,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+9]
+> [spec:pgorm:def:sql.ast.func+10]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. `get_func()` and `get_args()`
@@ -1478,8 +1600,9 @@ today, including panicking edges and deliberate failsafes.
 > PostgreSQL full-text family `to_tsquery`, `to_tsvector`,
 > `phraseto_tsquery`, `plainto_tsquery`, `websearch_to_tsquery` (each with an
 > optional `regconfig` OID prepended as first argument), `ts_rank`,
-> `ts_rank_cd`; array/subquery comparators `any`, `some`, `all`; and
-> PostgreSQL 18's UUID family, below.
+> `ts_rank_cd`; array/subquery comparators `any`, `some`, `all`; the
+> set-returning `generate_series`, `generate_series_step` and `unnest`
+> (`sql.ast.select.table-function`); and PostgreSQL 18's UUID family, below.
 >
 > The UUID family is `uuidv4()`, `uuidv7()`, `uuidv7_shifted(shift)`,
 > `uuid_extract_timestamp(u)` and `uuid_extract_version(u)` (`func_uuid.rs`),
@@ -1573,7 +1696,7 @@ today, including panicking edges and deliberate failsafes.
 > `Func::named(name)` calls an arbitrary function by identifier
 > (`Function::Named`). A `FunctionCall` converts into
 > `SimpleExpr::FunctionCall`, and can serve as a FROM item through
-> `SelectStatement::from_function`.
+> `SelectStatement::from_function` or a `TableFunction`.
 
 ## SQL/JSON
 
@@ -1588,7 +1711,7 @@ today, including panicking edges and deliberate failsafes.
 > `ON ERROR`, `ON NULL`, `WITH UNIQUE KEYS`, `FORMAT JSON`) are grammar between
 > the parentheses, which `Func::named`'s argument list cannot spell. Each form
 > is built by a `Func` constructor returning its own builder, as `Func::grouping`
-> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+9]`): `json_exists`,
+> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+10]`): `json_exists`,
 > `json_value` and `json_query` take a context item and a path; `json_object()`
 > and `json_array()` start empty; `json_array_query(select)`,
 > `json_objectagg(key, value)`, `json_arrayagg(value)`, `json(input)` and

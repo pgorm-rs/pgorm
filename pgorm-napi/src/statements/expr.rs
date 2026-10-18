@@ -51,7 +51,7 @@ fn receiver<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<Simp
 
 /// `exprCol(name, table, schema)`: a column, qualified by a table and its
 /// schema when they are given.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn col(cx: &mut FunctionContext) -> NeonResult<Node> {
     let column = name_at(cx, 0)?;
     let table = arg(cx, 1);
@@ -68,7 +68,7 @@ fn col(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `exprBind(value)`: a bound value.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn bind(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let expr = args::bound(cx, value)?;
@@ -101,6 +101,11 @@ fn function(name: &str, args: &[SimpleExpr]) -> Option<FunctionCall> {
         ("uuidv7", [shift]) => Func::uuidv7_shifted(shift.clone()),
         ("uuid_extract_timestamp", [value]) => Func::uuid_extract_timestamp(value.clone()),
         ("uuid_extract_version", [value]) => Func::uuid_extract_version(value.clone()),
+        ("generate_series", [start, stop]) => Func::generate_series(start.clone(), stop.clone()),
+        ("generate_series", [start, stop, step]) => {
+            Func::generate_series_step(start.clone(), stop.clone(), step.clone())
+        }
+        ("unnest", [array]) => Func::unnest(array.clone()),
         _ => return None,
     })
 }
@@ -108,7 +113,7 @@ fn function(name: &str, args: &[SimpleExpr]) -> Option<FunctionCall> {
 /// `exprCall(name, args)`: a call to one of the functions pgorm-query has a
 /// constructor for. Another name or argument count is refused: the name
 /// selects a constructor and never reaches SQL.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn call(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let name = if value.is_a::<JsString, _>(cx) {
@@ -124,8 +129,8 @@ fn call(cx: &mut FunctionContext) -> NeonResult<Node> {
             format!(
                 "call() has no {name:?} taking {} argument(s); it reaches lower, upper, abs, \
                  char_length, count, count_distinct, sum, avg, min, max, round, coalesce, random, \
-                 gen_random_uuid, uuidv4, uuidv7, uuid_extract_timestamp and \
-                 uuid_extract_version",
+                 gen_random_uuid, uuidv4, uuidv7, uuid_extract_timestamp, \
+                 uuid_extract_version, generate_series and unnest",
                 args.len()
             ),
         ),
@@ -143,7 +148,7 @@ fn tuple(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `exprSubquery(kind, select)`: a scalar subquery, `(SELECT ..)`, or
 /// `EXISTS (SELECT ..)`.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 fn subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
     let kind = choice(cx, 0, "a subquery's kind", &["scalar", "exists"])?;
     let select = select_at(cx, 1)?;
@@ -177,7 +182,7 @@ const BINARY: [(&str, BinOper); 16] = [
 /// `exprBinary(expr, operator, operand)`: a comparison or arithmetic, the
 /// operand bound unless it is an expression. `isNotDistinctFrom` is the one
 /// operator outside the table, as pgorm-query spells it.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn binary(cx: &mut FunctionContext) -> NeonResult<Node> {
     let left = receiver(cx, 0)?;
     let operator = arg(cx, 1);
@@ -220,7 +225,7 @@ fn unary(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `exprIn(expr, negated, values | select)`: membership in a list — empty
 /// included, which pgorm-query renders as a comparison that is always false
 /// for `IN` and always true for `NOT IN` — or in a subquery's rows.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn membership(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expr = Expr::expr(receiver(cx, 0)?);
     let negated = args::flag(cx, 1)?;
@@ -259,21 +264,28 @@ fn between(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Expr(built))
 }
 
-/// `exprLike(expr, operator, pattern, escape)`: a pattern match. The pattern
-/// is bound; the escape, one character, is written by pgorm-query's literal
-/// renderer, the one place the grammar admits it.
-// [spec:pgorm:req:napi.expressions+1]
+/// `exprLike(expr, operator, pattern, escape)`: a pattern match, LIKE's or
+/// SIMILAR TO's. The pattern is bound; the escape, one character, is written
+/// by pgorm-query's literal renderer, the one place the grammar admits it.
+// [spec:pgorm:req:napi.expressions+2]
 fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expr = Expr::expr(receiver(cx, 0)?);
     let operator = choice(
         cx,
         1,
         "a pattern operator",
-        &["like", "notLike", "ilike", "notIlike"],
+        &[
+            "like",
+            "notLike",
+            "ilike",
+            "notIlike",
+            "similarTo",
+            "notSimilarTo",
+        ],
     )?;
     let pattern = arg(cx, 2);
     if !pattern.is_a::<JsString, _>(cx) {
-        return refuse(cx, "a LIKE pattern is a string");
+        return refuse(cx, "a LIKE or SIMILAR TO pattern is a string");
     }
     let mut pattern = pgorm::pgorm_query::LikeExpr::new(crate::values::read::string(cx, pattern)?);
     let escape = arg(cx, 3);
@@ -286,14 +298,16 @@ fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
         let mut chars = escape.chars();
         match (chars.next(), chars.next()) {
             (Some(character), None) if character != '\0' => pattern = pattern.escape(character),
-            _ => return refuse(cx, "a LIKE escape is one character, not NUL"),
+            _ => return refuse(cx, "a pattern's escape is one character, not NUL"),
         }
     }
     let built = match operator {
         "like" => expr.like(pattern),
         "notLike" => expr.not_like(pattern),
         "ilike" => expr.ilike(pattern),
-        _ => expr.not_ilike(pattern),
+        "notIlike" => expr.not_ilike(pattern),
+        "similarTo" => expr.similar_to(pattern),
+        _ => expr.not_similar_to(pattern),
     };
     Ok(Node::Expr(built))
 }
@@ -301,7 +315,7 @@ fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `exprText(expr, helper, text)`: a test that reads its argument as text,
 /// `%`, `_` and backslashes included, through PostgreSQL's own functions —
 /// `starts_with`, `strpos` and `right` — so there is no escaping to get wrong.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn text(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expr = receiver(cx, 0)?;
     let helper = choice(
@@ -328,7 +342,7 @@ fn text(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `exprCast(expr, type, array)`: `CAST(expr AS type)`, the type named by
 /// identifier and quoted.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn cast(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expr = receiver(cx, 0)?;
     let named = arg(cx, 1);
@@ -412,7 +426,7 @@ fn order(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `conditionNew("all" | "any", items)`: pgorm-query's `Condition::all` or
 /// `any` over the items, an empty one being true or false as Rust has it.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn condition_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let kind = choice(cx, 0, "a condition's kind", &["all", "any"])?;
     let mut condition = if kind == "all" {
@@ -452,7 +466,7 @@ fn condition_not(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `caseWhen(case, condition, result)`: the searched `CASE` with one more
 /// arm, `case` `null` for the first.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 fn case_when(cx: &mut FunctionContext) -> NeonResult<Node> {
     let case = arg(cx, 0);
     let case = if args::absent(cx, case) {

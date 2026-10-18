@@ -22,7 +22,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 /// The common table expression at `index`: its name, its body — whose rows
 /// are a `Select`'s, or a write's RETURNING rows — its column names and its
 /// materialization.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 fn expression<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -30,7 +30,9 @@ fn expression<'cx>(
     let table = name_at(cx, index)?;
     let body = arg(cx, index + 1);
     let mut expression = match node(cx, body) {
-        Some(Node::Select(select)) => CommonTableExpression::new(table, select),
+        Some(Node::Select(select)) => {
+            CommonTableExpression::new(table, super::args::embedded(cx, select)?)
+        }
         Some(Node::Insert(insert)) => CommonTableExpression::new(table, insert.inner),
         Some(Node::Update(update)) => CommonTableExpression::new(table, update.inner),
         Some(Node::Delete(delete)) => CommonTableExpression::new(table, delete.inner),
@@ -83,7 +85,7 @@ fn with_cte(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `withRecursive(name, body, columns, materialized, search, cycle)`:
 /// `WITH RECURSIVE`, with `SEARCH BREADTH | DEPTH FIRST BY expr SET name`
 /// and `CYCLE expr SET name USING name` when they are given.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 fn with_recursive(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expression = expression(cx, 0)?;
     let mut clause = RecursiveWithClause::new(expression);

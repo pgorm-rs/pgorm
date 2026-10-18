@@ -36,7 +36,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE "character" && $1"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+4]
+    // [spec:pgorm:req:sql.ast.expr.operators+5]
     pub fn overlaps<T>(self, expr: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,

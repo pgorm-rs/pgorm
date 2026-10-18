@@ -52,7 +52,7 @@ fn entries<'py>(
         .collect()
 }
 
-// [spec:pgorm:req:python.expressions+1]
+// [spec:pgorm:req:python.expressions+2]
 #[pyfunction]
 #[pyo3(signature = (entries=None, /, *, absent_on_null=false, unique_keys=false, returning=None))]
 pub(crate) fn json_object(
@@ -103,7 +103,7 @@ pub(crate) fn json_array_query(
     query: PyRef<'_, PySelect>,
     returning: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyExpr> {
-    let mut json = Func::json_array_query(query.inner.clone());
+    let mut json = Func::json_array_query(query.embedded()?);
     if let Some(ty) = column_type(returning)? {
         json = json.returning(ty);
     }

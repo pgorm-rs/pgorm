@@ -343,7 +343,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+1]
+> [spec:pgorm:req:napi.expressions+2]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -362,29 +362,48 @@ SQL text running a built statement.
 > `IS [NOT] NULL`, `[NOT] BETWEEN [SYMMETRIC]` and `[NOT] IN` a list — an
 > empty one included, which no value is in — or a subquery MUST each be the
 > pgorm-query method of that meaning, and `Condition.all` and `Condition.any`
-> pgorm-query's `Condition`, empty ones true and false. `like`, `ilike` and
-> their negations take a pattern string, bound, and an optional one-character
-> escape; `startsWith`, `endsWith` and `containsText` read their argument as
+> pgorm-query's `Condition`, empty ones true and false. `like`, `ilike`,
+> `similarTo` and their negations take a pattern string, bound, and an
+> optional one-character escape (`sql.ast.expr.similar-to`); `startsWith`,
+> `endsWith` and `containsText` read their argument as
 > text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
 > `_` match themselves. `call` reaches only the functions pgorm-query has a
 > constructor for, at the argument counts each takes — `uuidv7` with or
 > without its shift among them — and another name or count is a
-> `ConstructionError`: the name selects a constructor and never reaches SQL.
+> `ConstructionError`: the name selects a constructor and never reaches SQL;
+> `generate_series`, with or without its step, and `unnest` are the
+> set-returning ones a `tableFunction` reads.
 > A cast names its type by identifier or `TypeName`; `collate` names a
 > collation, schema-qualifiable; `at` and `slice` subscript an array; a
 > searched or simple `CASE` exists only once it has an arm; `exists` and
 > `scalar` take a `Select`.
 
-> [spec:pgorm:req:napi.select]
+> [spec:pgorm:req:napi.select+1]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of
 > expressions and aliased expressions, `*` until one is given; FROM items —
 > a `Table`, schema-qualified and aliased, or a `FromItem`, which is always
-> aliased, a subquery among them —; inner, left, right and full joins on a
+> aliased, a subquery among them, a `tableFunction` over calls — `ROWS FROM`
+> over several, `WITH ORDINALITY`, column names — and a table's
+> `tablesample` by `"bernoulli"` or `"system"` with a bound percentage and
+> optional seed (`sql.ast.select.table-function`,
+> `sql.ast.select.table-sample`) —; inner, left, right and full joins on a
 > predicate, a lateral subquery among them, and cross joins; WHERE and HAVING,
-> each call ANDed to what is there; GROUP BY; ORDER BY with a direction and
+> each call ANDed to what is there; GROUP BY over expressions and the grouping
+> elements `groupingSet`, `rollup`, `cube` and `groupingSets` — the last
+> taking its first element, an expression among its elements the set of
+> itself — with `groupByDistinct` (`sql.ast.select.grouping`,
+> `sql.ast.select.group-distinct`); ORDER BY with a direction and
 > NULLS FIRST or LAST; LIMIT and OFFSET, a non-negative integer number or
 > `bigint` within PostgreSQL's `bigint`, or `null` to remove one, anything
-> else a `ConstructionError`; DISTINCT; UNION, INTERSECT and EXCEPT, each with
+> else a `ConstructionError`, and `limitWithTies`, the same count in LIMIT's
+> slot, which `inspect()` and every run refuse with a `ConstructionError`
+> when the statement has no ORDER BY or locks SKIP LOCKED, by pgorm-query's
+> `check_tie_limit` (`sql.ast.select.tie-limit`) — the order may come after
+> the limit, so the method cannot refuse it — and which a method reading the
+> statement into another — a subquery, a set operation's operand, an
+> INSERT's rows or a common table expression's body — refuses as it is
+> called, nothing being able to order it after; DISTINCT; UNION, INTERSECT
+> and EXCEPT, each with
 > its ALL form; a row lock of one of the four strengths, OF the items named,
 > each by the name it answers to in the statement, and with NOWAIT or SKIP
 > LOCKED; and a WITH clause of common table expressions with column lists and

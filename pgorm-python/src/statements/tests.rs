@@ -2,9 +2,10 @@ use std::ffi::CString;
 
 use pgorm::pgorm_query::{
     Asterisk, BinOper, ColumnType, CommonTableExpression, Condition, Expr, FrameExclusion,
-    FrameType, Func, IntoNamedTable, JoinType, MatchedAction, MergeInsert, MergeUpdate, Name,
-    NotMatchedAction, NullOrdering, OnConflict, Order, OverStatement, Overriding, Query,
-    ReturningRow, SimpleExpr, Values, WindowStatement, WithClause,
+    FrameType, FromItem, Func, GroupingElement, IntoNamedTable, JoinType, MatchedAction,
+    MergeInsert, MergeUpdate, Name, NotMatchedAction, NullOrdering, OnConflict, Order,
+    OverStatement, Overriding, Query, ReturningRow, SampleMethod, SimpleExpr, TableFunction,
+    TableSample, Values, WindowStatement, WithClause,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -39,7 +40,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -89,7 +90,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -126,7 +127,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -159,7 +160,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -217,7 +218,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -286,7 +287,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -331,7 +332,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -385,7 +386,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -421,7 +422,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn windows_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -490,7 +491,7 @@ w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
     })
 }
 
-// [spec:pgorm:req:python.statements+4/test]
+// [spec:pgorm:req:python.statements+5/test]
 #[test]
 fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     Python::initialize();
@@ -546,6 +547,371 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
                 "{source}: {error}"
             );
         }
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tie limit shares `limit`'s slot, either
+// replacing the other and `None` clearing both
+#[test]
+fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        py.run(
+            c"s = p.Select(p.col('image')).from_(p.Table('glyph')).order_by(p.col('aspect').desc())",
+            Some(&globals),
+            None,
+        )?;
+        let ordered = || {
+            Query::select()
+                .column(n("image"))
+                .from(n("glyph"))
+                .order_by_expr(Expr::col(n("aspect")).into(), Order::Desc)
+                .take()
+        };
+        parity(
+            py,
+            &globals,
+            "s.limit_with_ties(3).offset(1)",
+            ordered().limit_with_ties(3).offset(1).build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "s.limit_with_ties(3).limit(2)",
+            ordered().limit(2).build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "s.limit(2).limit_with_ties(3)",
+            ordered().limit_with_ties(3).build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "s.limit_with_ties(3).limit(None)",
+            ordered().build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select(p.col('image')).from_(p.Table('glyph')).limit_with_ties(3).order_by(p.col('aspect').desc())",
+            ordered().limit_with_ties(3).build(),
+        )
+    })
+}
+
+// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit/test]    a tie limit with no ORDER BY is refused at
+// inspection, at execution's compile and as a CTE body or subquery reads it, and its count is
+// checked as `limit`'s is
+#[test]
+fn tie_limits_without_order_are_refused() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let unordered = py.eval(
+            c"p.Select(p.col('image')).from_(p.Table('glyph')).limit_with_ties(3)",
+            Some(&globals),
+            None,
+        )?;
+        let error = unordered
+            .call_method0("inspect")
+            .expect_err("no ORDER BY to measure ties on");
+        assert!(error.is_instance_of::<crate::errors::ConstructionError>(py));
+        assert!(error.to_string().contains("needs an ORDER BY"), "{error}");
+        let error = super::compile(&unordered).expect_err("execution renders through inspect");
+        assert!(error.is_instance_of::<crate::errors::ConstructionError>(py));
+        globals.set_item("unordered", unordered)?;
+        py.run(
+            c"ordered = unordered.order_by(p.col('aspect').desc())",
+            Some(&globals),
+            None,
+        )?;
+        for source in [
+            "p.With('w', unordered)",
+            "p.With('w', ordered).cte('v', unordered)",
+            "p.json_array_query(unordered)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(p.Table('w')).with_(p.With('w', ordered))",
+            Query::select()
+                .column(Asterisk)
+                .from(Name::runtime("w"))
+                .with(WithClause::new(CommonTableExpression::new(
+                    Name::runtime("w"),
+                    Query::select()
+                        .column(Name::runtime("image"))
+                        .from(Name::runtime("glyph"))
+                        .order_by_expr(Expr::col(Name::runtime("aspect")).into(), Order::Desc)
+                        .limit_with_ties(3)
+                        .take(),
+                )))
+                .build(),
+        )?;
+        for source in [
+            "p.Select().limit_with_ties(-1)",
+            "p.Select().limit_with_ties(True)",
+            "p.Select().limit_with_ties(1.5)",
+            "p.Select().limit_with_ties(None)",
+            "p.Select().limit_with_ties(2 ** 63)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:sql.ast.select.group-distinct/test]    grouping elements interleave with
+// expressions in call order, and DISTINCT quantifies the whole list
+#[test]
+fn grouping_elements_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        let a = || -> SimpleExpr { Expr::col(n("a")).into() };
+        let b = || -> SimpleExpr { Expr::col(n("b")).into() };
+        py.run(
+            c"G = p.GroupingElement\na = p.col('a')\nb = p.col('b')",
+            Some(&globals),
+            None,
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select(a).from_(p.Table('t')).group_by(a, G.rollup(a, b), b, G.sets(G.set(a, b), G.empty(), b, G.cube(a, b), G.set())).group_by(G.rollup()).group_by_distinct()",
+            Query::select()
+                .expr(a())
+                .from(n("t"))
+                .add_group_by([a()])
+                .group_by_element(GroupingElement::rollup([a(), b()]))
+                .add_group_by([b()])
+                .group_by_element(
+                    GroupingElement::sets(GroupingElement::set([a(), b()]))
+                        .add(GroupingElement::empty())
+                        .add(GroupingElement::set([b()]))
+                        .add(GroupingElement::cube([a(), b()]))
+                        .add(GroupingElement::set(Vec::<SimpleExpr>::new())),
+                )
+                .group_by_element(GroupingElement::rollup(Vec::<SimpleExpr>::new()))
+                .group_by_distinct()
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select(a).from_(p.Table('t')).group_by_distinct()",
+            Query::select()
+                .expr(a())
+                .from(n("t"))
+                .group_by_distinct()
+                .build(),
+        )?;
+        for source in [
+            "p.Select().group_by(1)",
+            "p.Select().group_by(a.asc())",
+            "G.rollup(1)",
+            "G.set(a, 'b')",
+            "G.sets(1)",
+            "G.sets(a, None)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        let error = py
+            .eval(c"G.sets()", Some(&globals), None)
+            .expect_err("GROUPING SETS takes its first element");
+        assert!(error.is_instance_of::<pyo3::exceptions::PyTypeError>(py));
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:sql.ast.select.table-function/test]    one call, ROWS FROM, ordinality and
+// column names, the lone plain call as Rust's FunctionCall item, and anything but a call refused
+#[test]
+fn table_functions_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        let one = || SimpleExpr::Constant(1i64.into());
+        let three = || SimpleExpr::Constant(3i64.into());
+        py.run(
+            c"T = p.TableFunction\nseries = p.call('generate_series', p.literal(1), p.literal(3))\ntags = p.call('unnest', p.col('tags'))",
+            Some(&globals),
+            None,
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(T(series).with_ordinality().columns('v', p.Identifier('N')).alias('t'))",
+            Query::select()
+                .column(Asterisk)
+                .from(
+                    TableFunction::new(Func::generate_series(one(), three()))
+                        .with_ordinality()
+                        .columns([n("v"), n("N")])
+                        .alias(n("t")),
+                )
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(T(series).and_(tags).columns('x', 'y').alias('t'))",
+            Query::select()
+                .column(Asterisk)
+                .from(
+                    TableFunction::new(Func::generate_series(one(), three()))
+                        .and(Func::unnest(Expr::col(n("tags"))))
+                        .columns([n("x"), n("y")])
+                        .alias(n("t")),
+                )
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(p.Table('a')).cross_join(T.rows_from(tags).alias('u'))",
+            Query::select()
+                .column(Asterisk)
+                .from(n("a"))
+                .cross_join(
+                    TableFunction::rows_from(Func::unnest(Expr::col(n("tags")))).alias(n("u")),
+                )
+                .build(),
+        )?;
+        let plain = py.eval(c"T(tags).alias('u')", Some(&globals), None)?;
+        let plain = plain.extract::<PyRef<'_, super::PyFromItem>>()?;
+        assert_eq!(
+            plain.inner,
+            FromItem::FunctionCall(Func::unnest(Expr::col(n("tags"))), n("u"))
+        );
+        let alias = py.eval(
+            c"T(series).with_ordinality().alias('t').alias",
+            Some(&globals),
+            None,
+        )?;
+        assert_eq!(alias.extract::<String>()?, "t");
+        for source in [
+            "T(p.col('x'))",
+            "T(p.col('x') + 1)",
+            "T(1)",
+            "T(p.Table('t'))",
+            "T.rows_from(p.literal(1))",
+            "T(series).and_(p.col('y'))",
+            "T(series).columns('')",
+            "T(series).alias('')",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:sql.ast.select.table-sample/test]    both methods, the percentage and seed
+// bound as doubles, and numbers a double cannot hold exactly refused
+#[test]
+fn table_samples_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        parity(
+            py,
+            &globals,
+            "p.Select(p.col('image', table='g')).from_(p.Table('glyph', schema='public', alias='g').tablesample(p.SampleMethod.System, 12.5, repeatable=42))",
+            Query::select()
+                .column((n("g"), n("image")))
+                .from(
+                    TableSample::new(
+                        (n("public"), n("glyph")).into_named_table().alias(n("g")),
+                        SampleMethod::System,
+                        12.5,
+                    )
+                    .repeatable(42),
+                )
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select(p.col('image')).from_(p.Table('glyph').tablesample(p.SampleMethod.Bernoulli, 50)).join(p.Table('font'), p.col('id', table='glyph') == p.col('id', table='font'))",
+            Query::select()
+                .column(n("image"))
+                .from(TableSample::new(n("glyph"), SampleMethod::Bernoulli, 50))
+                .join(
+                    JoinType::InnerJoin,
+                    n("font"),
+                    Expr::col((n("glyph"), n("id"))).equals((n("font"), n("id"))),
+                )
+                .build(),
+        )?;
+        let star = py.eval(
+            c"p.Table('glyph', schema='public').tablesample(p.SampleMethod.Bernoulli, 1).col('id').inspect().sql",
+            Some(&globals),
+            None,
+        )?;
+        assert_eq!(star.extract::<String>()?, r#"SELECT "glyph"."id""#);
+        for source in [
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, True)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, '10')",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, None)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 2 ** 53 + 1)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 10, repeatable=False)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 10, repeatable=10 ** 400)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        let error = py
+            .eval(
+                c"p.Table('t').tablesample('bernoulli', 10)",
+                Some(&globals),
+                None,
+            )
+            .expect_err("the method is a SampleMethod");
+        assert!(error.is_instance_of::<pyo3::exceptions::PyTypeError>(py));
         Ok(())
     })
 }

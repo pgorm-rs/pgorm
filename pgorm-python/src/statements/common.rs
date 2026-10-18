@@ -1,6 +1,6 @@
 use pgorm::pgorm_query::{
     BinOper, Condition, Expr, IntoCondition, OrderedStatement, Query, ReturningClause,
-    SelectStatement, SimpleExpr, Values,
+    SelectStatement, Values,
 };
 use pyo3::{
     prelude::*,
@@ -80,13 +80,6 @@ pub(super) fn compiled((sql, values): (String, Values)) -> PyResult<Compiled> {
         ));
     }
     Ok(Compiled { sql, values })
-}
-
-pub(super) fn expressions(items: &Bound<'_, PyTuple>) -> PyResult<Vec<SimpleExpr>> {
-    items
-        .iter()
-        .map(|item| require_expr(&item).map(|expr| expr.inner))
-        .collect()
 }
 
 /// A RETURNING list, `*` when empty, with the written row's versions renamed

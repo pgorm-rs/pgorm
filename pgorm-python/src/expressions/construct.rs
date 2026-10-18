@@ -160,7 +160,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         .map_err(|_| ConstructionError::new_err("expected a query expression"))
 }
 
-// [spec:pgorm:req:python.expressions+1]
+// [spec:pgorm:req:python.expressions+2]
 #[pyfunction]
 #[pyo3(signature = (name, *arguments))]
 pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExpr> {
@@ -188,6 +188,11 @@ pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExp
         ("uuidv7", [shift]) => Func::uuidv7_shifted(shift.clone()),
         ("uuid_extract_timestamp", [value]) => Func::uuid_extract_timestamp(value.clone()),
         ("uuid_extract_version", [value]) => Func::uuid_extract_version(value.clone()),
+        ("generate_series", [start, stop]) => Func::generate_series(start.clone(), stop.clone()),
+        ("generate_series", [start, stop, step]) => {
+            Func::generate_series_step(start.clone(), stop.clone(), step.clone())
+        }
+        ("unnest", [array]) => Func::unnest(array.clone()),
         _ => {
             return Err(crate::UnsupportedCapabilityError::new_err(
                 "unsupported function or argument count",

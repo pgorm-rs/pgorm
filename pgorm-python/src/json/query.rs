@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{errors::ConstructionError, expressions::PyExpr};
 
-// [spec:pgorm:req:python.expressions+1]
+// [spec:pgorm:req:python.expressions+2]
 #[pyfunction]
 #[pyo3(signature = (context, path, *, passing=None, on_error=None))]
 pub(crate) fn json_exists(

@@ -109,7 +109,8 @@ fn manifest() -> Value {
             "count": [1], "count_distinct": [1], "sum": [1], "avg": [1],
             "min": [1], "max": [1], "round": [1, 2], "coalesce": {"min_args": 1},
             "random": [0], "gen_random_uuid": [0], "uuidv4": [0], "uuidv7": [0, 1],
-            "uuid_extract_timestamp": [1], "uuid_extract_version": [1]
+            "uuid_extract_timestamp": [1], "uuid_extract_version": [1],
+            "generate_series": [2, 3], "unnest": [1]
         },
         "result_forms": ["pool", "connection", "bool", "expression", "json_input", "pending_merge", "merge", "with", "condition", "compiled", "projection", "ordering", "record", "optional_record", "records", "affected_count", "async_stream", "entity", "entity_query", "entity_model", "active_model", "active_value", "graph", "graph_query", "graph_cursor", "graph_tuple", "model_descriptor", "model_column", "model_query", "model_write", "model_records", "pipeline", "pipeline_expression", "pipeline_binder", "pipeline_source", "pipeline_grouped", "pipeline_window", "source_selection", "selected_sources", "ddl", "create_table", "create_index", "entity_schema", "ddl_column", "ddl_type", "transaction"],
         "result_policy": {

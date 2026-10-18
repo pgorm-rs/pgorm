@@ -1,15 +1,15 @@
 //! The infix operators PostgreSQL spells as a phrase rather than as a symbol:
 //! null-safe comparison (`IS [NOT] DISTINCT FROM`), the bound-sorting range
-//! test (`BETWEEN [NOT] SYMMETRIC`), and time-zone conversion
-//! (`AT TIME ZONE`).
+//! test (`BETWEEN [NOT] SYMMETRIC`), time-zone conversion (`AT TIME ZONE`),
+//! and the regular-expression match `[NOT] SIMILAR TO`.
 //!
 //! They sit in a child module of `expr` rather than in [`Expr`]'s main block,
-//! as the JSON and membership families do. What they share is that each exists
-//! for an edge its symbolic neighbour gets wrong: `<>` answers NULL where
+//! as the JSON and membership families do. The first three each exist for an
+//! edge its symbolic neighbour gets wrong: `<>` answers NULL where
 //! `IS DISTINCT FROM` answers, and `BETWEEN` silently matches nothing where
-//! `BETWEEN SYMMETRIC` sorts the pair. Two of the three also depend on
+//! `BETWEEN SYMMETRIC` sorts the pair. All but `AT TIME ZONE` depend on
 //! [`crate::BinOper`] family membership to render correctly — see
-//! `[spec:pgorm:def:sql.types.opers+4]`.
+//! `[spec:pgorm:def:sql.types.opers+5]`.
 
 use super::*;
 
@@ -155,5 +155,70 @@ impl Expr {
         V: Into<SimpleExpr>,
     {
         self.binary(BinOper::AtTimeZone, zone)
+    }
+
+    /// Express a `SIMILAR TO` expression: whether the whole string matches a
+    /// pattern in SQL's regular-expression dialect, which is LIKE's `%` and
+    /// `_` with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes
+    /// added. The pattern is bound like [`like`](Self::like)'s, and a
+    /// [`LikeExpr`] carries an `ESCAPE` character the same way; the default
+    /// escape is a backslash, and an escape longer than one character is
+    /// PostgreSQL's refusal (`22025`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let (sql, values) = Query::select()
+    ///     .column(Char::Character)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::Character).similar_to("(A|B)%"))
+    ///     .and_where(Expr::col(Char::Character).not_similar_to(LikeExpr::new("!%%").escape('!')))
+    ///     .build();
+    ///
+    /// assert_eq!(
+    ///     sql,
+    ///     r#"SELECT "character" FROM "character" WHERE "character" SIMILAR TO $1 AND "character" NOT SIMILAR TO $2 ESCAPE '!'"#
+    /// );
+    /// assert_eq!(values.0, vec!["(A|B)%".into(), "!%%".into()]);
+    /// ```
+    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    pub fn similar_to<L>(self, pattern: L) -> SimpleExpr
+    where
+        L: IntoLikeExpr,
+    {
+        self.like_like(BinOper::SimilarTo, pattern.into_like_expr())
+    }
+
+    /// Express a `NOT SIMILAR TO` expression, the complement of
+    /// [`Expr::similar_to`].
+    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    pub fn not_similar_to<L>(self, pattern: L) -> SimpleExpr
+    where
+        L: IntoLikeExpr,
+    {
+        self.like_like(BinOper::NotSimilarTo, pattern.into_like_expr())
+    }
+}
+
+impl SimpleExpr {
+    /// Express a `SIMILAR TO` expression, as [`Expr::similar_to`] does.
+    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    pub fn similar_to<L>(self, pattern: L) -> Self
+    where
+        L: IntoLikeExpr,
+    {
+        self.like_like(BinOper::SimilarTo, pattern.into_like_expr())
+    }
+
+    /// Express a `NOT SIMILAR TO` expression, as [`Expr::not_similar_to`]
+    /// does.
+    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    pub fn not_similar_to<L>(self, pattern: L) -> Self
+    where
+        L: IntoLikeExpr,
+    {
+        self.like_like(BinOper::NotSimilarTo, pattern.into_like_expr())
     }
 }

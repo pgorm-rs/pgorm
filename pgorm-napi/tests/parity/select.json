@@ -90,5 +90,41 @@
   "condition-inspect": {
     "sql": "SELECT TRUE WHERE \"a\" = $1 OR \"b\" IS NULL",
     "values": [["i64","1"]]
+  },
+  "tie-limit": {
+    "sql": "SELECT \"id\" FROM \"t\" ORDER BY \"score\" DESC FETCH FIRST $1 ROWS WITH TIES OFFSET $2",
+    "values": [["u64","2"], ["u64","1"]]
+  },
+  "tie-limit-replaced": {
+    "sql": "SELECT \"id\" FROM \"t\" ORDER BY \"score\" DESC LIMIT $1",
+    "values": [["u64","4"]]
+  },
+  "grouping-elements": {
+    "sql": "SELECT \"a\", \"b\", COUNT(\"id\") FROM \"t\" GROUP BY DISTINCT \"a\", ROLLUP (\"a\", \"b\"), CUBE (\"b\", (\"a\", \"b\")), GROUPING SETS ((\"a\", \"b\"), \"b\", (), ROLLUP (\"a\")), (), ()",
+    "values": []
+  },
+  "group-by-distinct-ungrouped": {
+    "sql": "SELECT \"a\" FROM \"t\"",
+    "values": []
+  },
+  "similar-to": {
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" SIMILAR TO $1 AND \"b\" NOT SIMILAR TO $2 ESCAPE '!' AND \"c\" SIMILAR TO $3 ESCAPE E'\\\\' AND (NOT \"d\" SIMILAR TO $4)",
+    "values": [["text","(x|y)%"], ["text","!%%"], ["text","a\\_b"], ["text","%z"]]
+  },
+  "table-function": {
+    "sql": "SELECT * FROM GENERATE_SERIES($1, $2) AS \"n\"",
+    "values": [["i64","1"], ["i64","3"]]
+  },
+  "table-function-ordinality": {
+    "sql": "SELECT \"a\".\"id\", \"t\".\"tag\", \"t\".\"position\" FROM \"app\".\"account\" AS \"a\" CROSS JOIN UNNEST(\"a\".\"tags\") WITH ORDINALITY AS \"t\"(\"tag\", \"position\")",
+    "values": []
+  },
+  "rows-from": {
+    "sql": "SELECT \"r\".*, \"s\".\"s\" FROM ROWS FROM (GENERATE_SERIES($1, $2, $3), UNNEST($4)) WITH ORDINALITY AS \"r\"(\"x\", \"y\", \"n\") CROSS JOIN ROWS FROM (GENERATE_SERIES($5, $6)) AS \"s\"",
+    "values": [["i64","10"], ["i64","1"], ["i64","-3"], ["array","[a,b,c]"], ["i64","1"], ["i64","2"]]
+  },
+  "tablesample": {
+    "sql": "SELECT \"a\".\"id\", \"event\".\"kind\" FROM \"app\".\"account\" AS \"a\" TABLESAMPLE SYSTEM ($1) REPEATABLE ($2) LEFT JOIN \"event\" TABLESAMPLE BERNOULLI ($3) ON \"a\".\"id\" = \"event\".\"account_id\" FOR SHARE OF \"a\"",
+    "values": [["f64","12.5"], ["f64","42"], ["f64","50"]]
   }
 }

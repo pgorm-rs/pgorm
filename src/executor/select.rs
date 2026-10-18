@@ -19,17 +19,34 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 
 /// The guard every ORM path that sends a `SELECT` passes through: a statement
 /// whose projection list is empty renders as `SELECT  FROM "tbl"`, which the
-/// server rejects with an opaque syntax error, so it is refused here instead.
+/// server rejects with an opaque syntax error, so it is refused here instead,
+/// and so is a tie limit PostgreSQL's grammar refuses (`check_tie_limit`).
 ///
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
 // [spec:pgorm:sem:query.build.modifiers+9]
+// [spec:pgorm:req:exec.tie-limit]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(
             "select list is empty; add at least one column or expression".to_owned(),
         )));
+    }
+    query.check_tie_limit()?;
+    Ok(())
+}
+
+/// Refuse a tie limit where the ORM writes a row limit of its own: a
+/// paginator's pages and a cursor's window are counted in rows, so replacing
+/// a `FETCH FIRST .. WITH TIES` with them would drop its ties without a word.
+// [spec:pgorm:req:exec.tie-limit]
+pub(crate) fn refuse_tie_limit(query: &SelectStatement, reader: &str) -> Result<(), Error> {
+    if query.has_tie_limit() {
+        return Err(Error::Query(RuntimeError::Internal(format!(
+            "a {reader} counts its own rows and cannot keep a FETCH FIRST .. WITH TIES; \
+             read the tie-limited query with `all` or wrap it as a subquery"
+        ))));
     }
     Ok(())
 }

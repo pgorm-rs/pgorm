@@ -1080,7 +1080,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE "size_w" < 10 AND "size_w" > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+4]
+    // [spec:pgorm:req:sql.ast.expr.operators+5]
     pub fn binary<O, T>(self, op: O, right: T) -> SimpleExpr
     where
         O: Into<BinOper>,
@@ -1949,7 +1949,7 @@ impl SimpleExpr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 10 < "size_w" AND 20 > "size_h""#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.operators+4]
+    // [spec:pgorm:req:sql.ast.expr.operators+5]
     pub fn binary<O, T>(self, op: O, right: T) -> Self
     where
         O: Into<BinOper>,

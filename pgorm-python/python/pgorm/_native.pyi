@@ -143,7 +143,11 @@ from ._expressions import (
     Expr as Expr, Condition as Condition, col as col, bind as bind,
     literal as literal, call as call, tuple_expr as tuple_expr,
 )
-from ._statements import Table as Table, FromItem as FromItem, Select as Select, Join as Join
+from ._statements import (
+    Table as Table, FromItem as FromItem, Select as Select, Join as Join,
+    SampleMethod as SampleMethod, TableFunction as TableFunction,
+    GroupingElement as GroupingElement,
+)
 from ._windows import (
     FrameType as FrameType, FrameExclusion as FrameExclusion, Frame as Frame,
     FramePrecedingStart as FramePrecedingStart, FrameCurrentRowStart as FrameCurrentRowStart,

@@ -10,6 +10,19 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("table.star", "pgorm_query::ColumnRef::TableAsterisk"),
         ("table.as_", "pgorm_query::NamedTable::alias"),
         (
+            "table.tablesample",
+            "pgorm_query::TableSample::{new, repeatable}, SampleMethod, FromItem::TableSample",
+        ),
+        (
+            "table_function",
+            "pgorm_query::TableFunction::{new, rows_from, and, with_ordinality, columns}",
+        ),
+        ("table_function.alias", "pgorm_query::TableFunction::alias"),
+        (
+            "grouping_element",
+            "pgorm_query::GroupingElement::{set, empty, rollup, cube, sets}, GroupingSets::add",
+        ),
+        (
             "from_item.col",
             "pgorm_query::FromItem::qualifier, ColumnRef::TableColumn",
         ),
@@ -34,7 +47,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         (
             "select.group_by",
-            "pgorm_query::SelectStatement::add_group_by",
+            "pgorm_query::SelectStatement::{add_group_by, group_by_element}",
+        ),
+        (
+            "select.group_by_distinct",
+            "pgorm_query::SelectStatement::group_by_distinct",
         ),
         ("select.having", "pgorm_query::SelectStatement::cond_having"),
         (
@@ -44,6 +61,10 @@ pub(crate) fn operations() -> Map<String, Value> {
         (
             "select.limit",
             "pgorm_query::SelectStatement::limit, reset_limit",
+        ),
+        (
+            "select.limit_with_ties",
+            "pgorm_query::SelectStatement::{limit_with_ties, check_tie_limit}",
         ),
         (
             "select.offset",
@@ -63,7 +84,10 @@ pub(crate) fn operations() -> Map<String, Value> {
             "window_function",
             "pgorm_query::Func::named, FunctionCall::args",
         ),
-        ("select.inspect", "pgorm_query::SelectStatement::build"),
+        (
+            "select.inspect",
+            "pgorm_query::SelectStatement::{check_tie_limit, build}",
+        ),
         (
             "insert",
             "pgorm_query::Query::insert, InsertStatement::into_table",

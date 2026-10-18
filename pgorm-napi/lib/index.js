@@ -32,6 +32,8 @@ export { CaseOperand, caseOf, caseWhen, Condition, SearchedCase, SimpleCase } fr
 export { Aliased, bind, call, col, exists, Expr, OrderBy, scalar, tuple } from "./expressions.js";
 export { Builder } from "./builder.js";
 export { FromItem, Select, select, Table, With } from "./select.js";
+export { cube, GroupingElement, groupingSet, groupingSets, rollup } from "./grouping.js";
+export { tableFunction } from "./table-function.js";
 export { Delete, deleteFrom, Insert, insert, ReturningRow, Update, update } from "./writes.js";
 export { Conflict, ConflictTarget, ConflictUpdate } from "./conflicts.js";
 export { Merge, merge, MergeAction, MergeInsert, MergeUpdate, PendingMerge } from "./merge.js";

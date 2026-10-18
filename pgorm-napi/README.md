@@ -183,7 +183,8 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 - **Builders never change.** Each method returns a new builder from a copy of
   its receiver's pgorm-query state, so a base query can be extended in two
   directions. Builders come from the module's functions (`select`, `col`,
-  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `tuple`) and the
+  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `tuple`,
+  `groupingSet`, `rollup`, `cube`, `groupingSets`, `tableFunction`) and the
   `Table` and `With` constructors.
 - **Values are bound, identifiers quoted.** An operand that is not an
   expression is a parameter, inferred as one is or declared with `Value` — an
@@ -193,22 +194,33 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   is 1–63 bytes, always an identifier, its dots included.
 - **Expressions**: comparisons and arithmetic (`eq` .. `gte`, `add` .. `mod`,
   `concat`), `and`/`or`/`not` and `Condition.all`/`any`, `isNull`, `isIn` a list
-  or a `Select`, `between` (`{ symmetric }`), `like`/`ilike` with an `escape`,
-  `startsWith`/`endsWith`/`containsText` (text, not patterns), `cast`,
-  `collate`, `at`/`slice`, `caseWhen(..).when(..).else(..)`,
+  or a `Select`, `between` (`{ symmetric }`), `like`/`ilike`/`similarTo` with
+  an `escape`, `startsWith`/`endsWith`/`containsText` (text, not patterns),
+  `cast`, `collate`, `at`/`slice`, `caseWhen(..).when(..).else(..)`,
   `caseOf(x).when(..)`, `call` for the functions pgorm-query constructs
-  (`uuidv7` and its shift among them), `exists` and `scalar`.
+  (`uuidv7` and its shift among them, and the set-returning `generate_series`
+  and `unnest`, whose overloads need a bound argument typed:
+  `bind(1).cast("int8")`), `exists` and `scalar`.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
-  `where`, `groupBy`, `having`, `orderBy`, `limit`/`offset` (`null` removes),
-  `distinct`, `union` .. `exceptAll`, `lock("update", { of, wait })`, `with`, and
-  `as(alias)` to read a query as a FROM item. `new With(name, query, { columns,
-  materialized }).cte(..)` and `With.recursive(name, query, { search, cycle })`
-  are its common table expressions.
+  `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
+  `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
+  (`null` removes), `limitWithTies` (`FETCH FIRST n ROWS WITH TIES`, in
+  LIMIT's slot), `distinct`, `union` .. `exceptAll`, `lock("update", { of,
+  wait })`, `with`, and `as(alias)` to read a query as a FROM item.
+  `tableFunction(calls, { alias, ordinality, columns, rowsFrom })` reads
+  set-returning calls as one — `ROWS FROM` over several — and
+  `table.tablesample("bernoulli" | "system", percentage, { repeatable })`
+  samples a table. `new With(name, query, { columns, materialized }).cte(..)`
+  and `With.recursive(name, query, { search, cycle })` are its common table
+  expressions.
 - **Refusals happen as a builder is called**: an argument that cannot be built
   — an unknown function, a negative limit, a LIKE escape of two characters, an
   empty tuple — throws a `ConstructionError` there, so a statement that cannot
   be built never exists. A statement binding more than 65,535 values is refused
-  before anything is sent.
+  before anything is sent, and so is a tie limit with no ORDER BY or beside
+  SKIP LOCKED — by `inspect()` and every terminal, since the order may come
+  after the limit, and as soon as such a query is read into another
+  statement.
 
 ### Writes
 

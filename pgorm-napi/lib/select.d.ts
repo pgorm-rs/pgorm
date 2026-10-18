@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
@@ -20,9 +20,23 @@ export declare class Table extends Builder {
   col(name: string): Expr;
   /** Every column, `"table".*`. */
   star(): Expr;
+  /**
+   * The table read through `TABLESAMPLE`: each row (`"bernoulli"`) or page
+   * (`"system"`) drawn with probability `percentage` out of 100, and the same
+   * sample drawn again for the same `repeatable` seed over unchanged data.
+   * Both are bound; a percentage outside 0 to 100 is PostgreSQL's refusal
+   * (`2202H`). The item answers to the table's alias, or its name.
+   */
+  tablesample(method: SampleMethod, percentage: number, options?: { readonly repeatable?: number }): FromItem;
 }
 
-/** A FROM item that is not a named table, always aliased: a subquery, `JSON_TABLE`. */
+/** PostgreSQL's two built-in `TABLESAMPLE` methods: by row, or by page. */
+export type SampleMethod = "bernoulli" | "system";
+
+/**
+ * A FROM item that is not a named table, always aliased: a subquery,
+ * `JSON_TABLE`, a table function, or a sampled table.
+ */
 export declare class FromItem extends Builder {
   private constructor();
   col(name: string): Expr;
@@ -53,11 +67,28 @@ export declare class Select extends Builder {
   crossJoin(item: Source): Select;
   /** A predicate ANDed to the WHERE clause. */
   where(predicate: Predicate): Select;
-  groupBy(...expressions: Expr[]): Select;
+  /** Items added to the GROUP BY list in order: expressions and grouping elements. */
+  groupBy(...items: (Expr | GroupingElement)[]): Select;
+  /**
+   * `GROUP BY DISTINCT`: a grouping set the list reaches more than once —
+   * `rollup(a, b)` beside `rollup(a)` reaches `(a)` three ways — grouped once.
+   */
+  groupByDistinct(): Select;
   having(predicate: Predicate): Select;
   orderBy(...orderings: OrderBy[]): Select;
-  /** LIMIT, or none with `null`: a non-negative integer within PostgreSQL's `bigint`. */
+  /**
+   * LIMIT, or none with `null`: a non-negative integer within PostgreSQL's
+   * `bigint`. It replaces a tie limit, and `null` removes either.
+   */
   limit(count: number | bigint | null): Select;
+  /**
+   * `FETCH FIRST count ROWS WITH TIES` in LIMIT's place: the first `count`
+   * rows and every row tied with the last on the ORDER BY. Inspecting or
+   * running the statement throws a {@link ConstructionError} when it has no
+   * ORDER BY or locks SKIP LOCKED, which PostgreSQL's grammar refuses; the
+   * order may be given after the limit.
+   */
+  limitWithTies(count: number | bigint): Select;
   offset(count: number | bigint | null): Select;
   distinct(): Select;
   union(other: Select): Select;
@@ -81,6 +112,49 @@ export declare class Select extends Builder {
 
 /** `SELECT items`, or `SELECT *` when there are none. */
 export declare function select(...items: Projection[]): Select;
+
+/**
+ * An item of a GROUP BY list beyond a bare expression. Each stands for a list
+ * of grouping sets, and the list groups by every combination of its items'.
+ */
+export declare class GroupingElement {
+  private constructor();
+}
+
+/** One grouping set, `(a, b)`; with no expressions `()`, the whole input as one group. */
+export declare function groupingSet(...expressions: Expr[]): GroupingElement;
+/** `ROLLUP (a, b)`: the sets `(a, b)`, `(a)` and `()`. A `tuple` item is one unit. */
+export declare function rollup(...expressions: Expr[]): GroupingElement;
+/** `CUBE (a, b)`: every subset of the list, `()` included. */
+export declare function cube(...expressions: Expr[]): GroupingElement;
+/** `GROUPING SETS (..)`: exactly its items' sets, an expression the set of itself; never empty. */
+export declare function groupingSets(
+  first: Expr | GroupingElement,
+  ...rest: (Expr | GroupingElement)[]
+): GroupingElement;
+
+/** How a {@link tableFunction} is read. */
+export interface TableFunctionOptions {
+  /** The item's alias, which every FROM item that is not a table has. */
+  readonly alias: string;
+  /** `WITH ORDINALITY`: a final `bigint` column numbering the rows from 1. */
+  readonly ordinality?: boolean;
+  /** The columns' names in the alias, `AS "t"("a", "b")`, the ordinal last. */
+  readonly columns?: readonly string[];
+  /** `ROWS FROM (..)` over a single call; several calls are always read so. */
+  readonly rowsFrom?: boolean;
+}
+
+/**
+ * Set-returning calls as a FROM item: `f(..) AS alias`, or `ROWS FROM (f(..),
+ * g(..))` over several, which reads them side by side and pads the shorter
+ * ones with NULLs. Each call is one {@link call} made, `generate_series` and
+ * `unnest` among them; any other expression is a {@link ConstructionError}.
+ */
+export declare function tableFunction(
+  calls: Expr | readonly [Expr, ...Expr[]],
+  options: TableFunctionOptions,
+): FromItem;
 
 /** A common table expression's column names and materialization. */
 export interface CteOptions {

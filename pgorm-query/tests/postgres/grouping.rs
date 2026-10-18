@@ -42,7 +42,7 @@ fn grouping_sets(sql: &str) -> Vec<(i64, usize)> {
 }
 
 // [spec:pgorm:def:sql.ast.select.grouping/test]    `rollup` and `cube` take their expressions
-// [spec:pgorm:req:sql.render.grouping/test]    `ROLLUP (…)` and `CUBE (…)`
+// [spec:pgorm:req:sql.render.grouping+1/test]    `ROLLUP (…)` and `CUBE (…)`
 #[test]
 fn rollup_and_cube_render_their_keyword() {
     let sql = grouped(GroupingElement::rollup([aspect(), image()]));
@@ -62,7 +62,7 @@ fn rollup_and_cube_render_their_keyword() {
 
 // [spec:pgorm:def:sql.ast.select.grouping/test]    `set` and `empty`, and `sets` taking its first
 // element up front
-// [spec:pgorm:req:sql.render.grouping/test]    `GROUPING SETS (…)` holding a bare expression, a
+// [spec:pgorm:req:sql.render.grouping+1/test]    `GROUPING SETS (…)` holding a bare expression, a
 // parenthesised set, `()` and a nested element
 #[test]
 fn grouping_sets_hold_every_element_kind() {
@@ -89,7 +89,7 @@ fn grouping_sets_hold_every_element_kind() {
     assert_eq!(parsed_nodes(&sql, "RowExpr").len(), 1);
 }
 
-// [spec:pgorm:req:sql.render.grouping/test]    a plain group-by list renders exactly as before,
+// [spec:pgorm:req:sql.render.grouping+1/test]    a plain group-by list renders exactly as before,
 // with no grouping-set node
 #[test]
 fn plain_group_by_is_unchanged() {
@@ -134,7 +134,7 @@ fn elements_and_expressions_share_one_list() {
 }
 
 // [spec:pgorm:def:sql.ast.select.grouping/test]    a tuple item is one unit of a ROLLUP or CUBE
-// [spec:pgorm:req:sql.render.grouping/test]    an empty ROLLUP or CUBE renders `()`
+// [spec:pgorm:req:sql.render.grouping+1/test]    an empty ROLLUP or CUBE renders `()`
 #[test]
 fn units_and_empty_lists() {
     let pair: SimpleExpr = Expr::tuple([aspect().into(), image().into()]).into();
@@ -157,7 +157,7 @@ fn units_and_empty_lists() {
     }
 }
 
-// [spec:pgorm:def:sql.ast.func+9/test]    `Func::grouping` renders the GROUPING keyword, which the
+// [spec:pgorm:def:sql.ast.func+10/test]    `Func::grouping` renders the GROUPING keyword, which the
 // parser reads as its own node rather than as a call
 #[test]
 fn grouping_function_is_the_grouping_node() {

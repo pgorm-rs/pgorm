@@ -22,6 +22,9 @@ mod ordered;
 mod returning;
 mod select;
 mod select_expr;
+mod table_function;
+mod table_sample;
+mod tie_limit;
 mod traits;
 mod update;
 mod window;
@@ -39,12 +42,15 @@ pub use ordered::*;
 pub use returning::*;
 pub use select::*;
 pub use select_expr::*;
+pub use table_function::TableFunction;
+pub use table_sample::{SampleMethod, TableSample};
 pub use traits::*;
 pub use update::*;
 pub use window::*;
 
 pub(crate) use frame::FrameBound;
 pub(crate) use grouping::GroupingKind;
+pub(crate) use tie_limit::RowLimit;
 pub use with::*;
 
 /// Shorthand for constructing any table query
