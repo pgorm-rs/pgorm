@@ -12478,12 +12478,27 @@ children (
         title "Predicates and keyset cursors on a column whose domain is over an enum cast to the enum, so the server has an operator for them"
         kind @fix
         deps (sql-domains)
+        sealed true
         log (
             {
                 at 2026-10-18T21:52:40.355509Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-domains (2fa97891). PostgreSQL has no operator at all on a domain over an enum, not even d = d (42883), so every predicate and keyset cursor comparison on such a column fails at the server unless the column is cast to the enum; this is recorded in entity.traits.column.enum-cast but not handled. Make the ORM's value predicates (eq and friends, membership, between) and cursor bounds cast a domain-over-enum column to its enum, as save_as casts work for enums today, with live tests."
+            }
+
+            {
+                at 2026-10-18T22:35:25.352851Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-18T22:44:09.79938Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

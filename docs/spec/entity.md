@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+8]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -180,19 +180,31 @@ explicit limitations.
 > through `Expr::as_range` to the domain and its multirange read as `text`.
 > Every other domain needs no cast at all: its values travel as its base
 > type's (`exec.cursor.binding-accepts`), and a comparison with one resolves
-> its base type's operator. PostgreSQL resolves no enum operator for a domain
-> over an enum, though, not even between two values of the domain (`42883`,
-> *operator does not exist: d = d*), so a predicate on such a column is the
-> server's refusal; the column compares once cast to the enum, `Expr::col(c)
-> .cast_as(enum)` against a value cast the same way.
+> its base type's operator.
+>
+> A column whose domain is over an enum, directly or through further
+> domains, is the exception in comparisons: PostgreSQL resolves no operator
+> for it, not even between two values of the domain (`42883`, *operator does
+> not exist: d = d*), so every comparison `ColumnTrait` builds casts the
+> column to the enum by its structured `TypeName`, and casts each value
+> operand to the enum in place of `save_as` — an array operand (`eq_any`,
+> `ne_all`) to the enum's array in place of `save_array_as`. The value is
+> compared, not written, so it is not cast to the domain and the domain's
+> constraints do not apply to it, as they apply to no comparison with any
+> other domain's column, whose value travels as its base type's. The
+> column-taking forms (`eq_col` and its siblings) cast each column so typed,
+> either side, and `eq_expr` casts its own. A domain over an array of an enum
+> compares as the domain, PostgreSQL's array comparisons resolving for it, and
+> an array of such a domain compares as that array, its value cast to it.
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
-> `save_as`: the scalar comparators, `between` / `not_between`, `if_null`, and
-> `is_in` / `is_not_in` per element. A value predicate that binds an operand bare
-> is a defect — the column-taking (`eq_col`) and expression-taking (`eq_expr`)
-> forms are the deliberate exceptions, since their operands are not values. The
-> keyset cursor's boundary values follow the same discipline
-> (`exec.cursor.keyset`).
+> `save_as`, but under a column whose domain is over an enum, where it is cast
+> to the enum: the scalar comparators, `between` / `not_between`, `if_null`,
+> and `is_in` / `is_not_in` per element. A value predicate that binds an
+> operand bare is a defect — the column-taking (`eq_col`) and expression-taking
+> (`eq_expr`) forms are the deliberate exceptions, since their operands are not
+> values. The keyset cursor's boundary values and order columns follow the
+> same discipline (`exec.cursor.keyset`).
 >
 > `save_array_as` / `save_enum_array_as` are the array counterpart of `save_as` /
 > `save_enum_as`, for the operands that are one array value rather than one value

@@ -110,7 +110,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads/test]
+// [spec:pgorm:req:napi.entity-reads+1/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());

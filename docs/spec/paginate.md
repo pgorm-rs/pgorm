@@ -36,7 +36,7 @@ bound parameter is held to.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+5]
+> [spec:pgorm:sem:exec.cursor.keyset+6]
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
@@ -57,9 +57,14 @@ bound parameter is held to.
 > Each boundary value binds under its order column's `save_as` cast
 > (`entity.traits.column.enum-cast`), captured from the typed column set at
 > `cursor_by` time — the keyset itself is type-erased identifiers, so the
-> cast cannot be recovered later. An identifier no column of the capture
-> set claims, and every secondary tiebreak (another table's primary key),
-> binds bare, as a plain column's value always did.
+> cast cannot be recovered later. An order column whose domain is over an
+> enum compares as every predicate on it does: the column is cast to the
+> enum in each of the boundary's comparisons, and its value to the enum in
+> place of `save_as`, PostgreSQL resolving no operator for the domain.
+> `ORDER BY` keeps the bare column, which sorts as its enum does, so the row
+> order and the boundary agree. An identifier no column of the capture set
+> claims, and every secondary tiebreak (another table's primary key), binds
+> bare, as a plain column's value always did.
 >
 > A boundary may be given at either of two arities, and its arity selects
 > how much of the keyset it compares. At the arity of the order columns it
