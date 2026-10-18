@@ -163,7 +163,7 @@ class StatementTests(unittest.TestCase):
         pending = merge(table, source, table.col("id") == source.col("id"))
         merged = pending.when_matched(MatchedAction.Delete)
         for query in [select(), insert(table), update(table), delete(table), RawSQL("SELECT 1"),
-                      pending, merged]:
+                      pending, merged, merged.inspect(), RawSQL("SELECT $1", [1]).inspect()]:
             with self.assertRaises(ConstructionError):
                 bool(query)
 

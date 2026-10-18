@@ -227,13 +227,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Execution and lifecycle
 
-> [spec:pgorm:req:python.schema]
+> [spec:pgorm:req:python.schema+1]
 > Explicit schema APIs MUST expose supported table, index and enum DDL through
 > the Rust DDL builders, retaining schema qualification, quoted identifiers
 > and type identity. Schema generation for a registered entity MUST invoke the
 > corresponding Rust entity schema path. Declaring a Python model or importing
 > a module MUST NOT execute DDL automatically. Capabilities MUST distinguish
 > runtime DDL construction from registered-entity schema generation.
+> Every class `pgorm.schema` defines — its statements, its column and type
+> definitions and an entity's generated schema — MUST raise
+> `ConstructionError` on Python truth testing, as a query expression does,
+> and so MUST `Compiled`, which every inspection returns.
 
 > [spec:pgorm:req:python.schema-views]
 > `pgorm.schema` MUST build views, materialized views and `CREATE TABLE AS`

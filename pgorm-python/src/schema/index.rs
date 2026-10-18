@@ -3,8 +3,8 @@ use super::{
     table::table_name,
 };
 use crate::{
-    UnsupportedCapabilityError, expressions::Compiled, identifiers::PyIdentifier,
-    statements::PyTable,
+    UnsupportedCapabilityError, errors::ConstructionError, expressions::Compiled,
+    identifiers::PyIdentifier, statements::PyTable,
 };
 use pgorm::pgorm_query::{Index, IndexCreateStatement, IndexOrder, IndexType, Name, Values};
 use pyo3::prelude::*;
@@ -17,7 +17,7 @@ pub struct PyCreateIndex {
 
 #[pymethods]
 impl PyCreateIndex {
-    // [spec:pgorm:req:python.schema]
+    // [spec:pgorm:req:python.schema+1]
     #[new]
     #[pyo3(signature=(table, first, *, name=None))]
     fn new(
@@ -89,6 +89,12 @@ impl PyCreateIndex {
             sql: self.inner.to_string(),
             values: Values(Vec::new()),
         }
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL statements cannot be tested as Python booleans",
+        ))
     }
 }
 

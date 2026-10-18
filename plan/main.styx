@@ -11778,12 +11778,20 @@ children (
         title "Python's schema statements and Compiled refuse truth testing, as every query object does"
         kind @fix
         deps (python-statement-typing sql-views)
+        sealed true
         log (
             {
                 at 2026-10-18T16:22:56.216054Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-statement-typing (6b3c7eed). Every query-expression and statement object in pgorm-python refuses truth testing (__bool__ raises), but the schema module's statements (CreateTable, CreateIndex, the DDL wrapper and the rest of src/schema) and Compiled still evaluate as true. Add the refusal to each, including whatever builders sql-views adds, extend test_boolean_conversion_fails_at_the_boundary / test_statement_truth_testing_is_rejected to cover them, and say so in SCHEMA.md. Waits on sql-views, which is editing src/schema."
+            }
+
+            {
+                at 2026-10-18T17:14:57.542945Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

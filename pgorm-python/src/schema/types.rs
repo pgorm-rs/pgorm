@@ -37,7 +37,7 @@ impl PyDataType {
 
 #[pymethods]
 impl PyDataType {
-    // [spec:pgorm:req:python.schema]
+    // [spec:pgorm:req:python.schema+1]
     #[new]
     #[pyo3(signature=(kind, *, length=None, precision=None, scale=None))]
     fn new(
@@ -143,6 +143,11 @@ impl PyDataType {
         }
     }
 
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "data types cannot be tested as Python booleans",
+        ))
+    }
     fn __repr__(&self) -> String {
         format!("DataType({:?})", self.inner)
     }
