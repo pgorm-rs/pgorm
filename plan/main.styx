@@ -9056,7 +9056,7 @@ children (
                 id select-named-windows
                 title "A SELECT's WINDOW clause holds every named window, from Rust, Python and JavaScript"
                 kind @fix
-                deps (sql-select-extras)
+                deps (sql-select-extras python-select-set-operations)
                 log (
                     {
                         at 2026-10-18T16:22:56.441121Z
@@ -12021,7 +12021,7 @@ children (
         id python-truth-testing-rest
         title "Every remaining pgorm-python query object refuses truth testing: entity write terminals, windows, WITH, FROM items, joins, tables, conflicts, frames and MERGE actions"
         kind @fix
-        deps (python-schema-truth-testing sql-select-extras)
+        deps (python-schema-truth-testing sql-select-extras select-named-windows)
         log (
             {
                 at 2026-10-18T17:34:04.304813Z
