@@ -9204,6 +9204,14 @@ children (
                         kind @note
                         text "Scope, per the operator's sql.scope verdict (2026-10-18, on query-second-tier) and sql.scope +16's deferred entry. FETCH FIRST n ROWS WITH TIES (requires ORDER BY: make a tie limit without an order unrepresentable or refused before rendering; check what PostgreSQL refuses, e.g. WITH TIES with OFFSET is fine, without ORDER BY is 42601/2201W); GROUP BY DISTINCT over the grouping sets sql.ast.select.grouping builds; SIMILAR TO and NOT SIMILAR TO with an optional ESCAPE, bound like LIKE's pattern; WITH ORDINALITY on a set-returning function in FROM and ROWS FROM (f(..), g(..)) WITH ORDINALITY with a column alias list; TABLESAMPLE BERNOULLI | SYSTEM (percentage) [REPEATABLE (seed)] on a table in FROM, the percentage and seed bound. Oracle-checked renders on the 18 grammar, live tests on 18.6, each construct's entry graduated from sql.scope's deferred list (bump; query-second-tier re-delivers with a feat commit), sql.surface register entries for new exports, and Python and JavaScript reach each with stubs / .d.ts, capability entries and parity cases. Waits on python-statement-typing, which changes the same Python statement stubs."
                     }
+
+                    {
+                        at 2026-10-18T23:10:22.577411Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.select.tie-limit +1 and exec.tie-limit +1 (select-one-zero-limit, cfadc574): narrow_limit_to_one narrows a tie limit to a plain LIMIT of at most one row, a tie limit of zero to LIMIT 0; every site re-read and re-pinned."
+                        after_done true
+                    }
                 )
             }
 
@@ -11895,6 +11903,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T23:10:22.672935Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at napi.entity-reads +1 (select-one-zero-limit, cfadc574): one and oneOpt narrow the row limit to one row as Rust does, a limit of zero staying zero; inspect and a live test in both runtimes hold it."
+                        after_done true
                     }
                 )
             }
