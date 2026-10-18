@@ -281,9 +281,9 @@ test("closing the pool closes its listeners, ending a pull in flight", async () 
   const closing = new Pool(scratch(), { maxSize: 1 });
   const listener = await closing.listener();
   await listener.listen("napi_pool_closed");
-  const pending = listener.next();
+  const pending = assert.rejects(listener.next(), LifecycleError);
   await closing.close();
-  await assert.rejects(pending, LifecycleError);
+  await pending;
   assert.equal(listener.closed, true);
   await assert.rejects(listener.listen("napi_pool_closed"), LifecycleError);
   await sessionEnds('LISTEN "napi_pool_closed"');
@@ -294,9 +294,9 @@ test("closing the pool closes its listeners, ending a pull in flight", async () 
 test("closing a listener ends its session and its pull; leaving a for await loop closes it", async () => {
   const closed = await pool().listener();
   await closed.listen("napi_closed");
-  const pending = closed.next();
+  const pending = assert.rejects(closed.next(), LifecycleError);
   await closed.close();
-  await assert.rejects(pending, LifecycleError);
+  await pending;
   assert.deepEqual(await closed.next(), { done: true, value: undefined });
   await assert.rejects(closed.unlistenAll(), LifecycleError);
   await sessionEnds('LISTEN "napi_closed"');
