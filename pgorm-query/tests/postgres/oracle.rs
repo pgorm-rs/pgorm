@@ -12,7 +12,7 @@
 /// Statement keywords the [`assert_eq`] shim uses to tell a whole rendered
 /// statement from a rendered fragment (a bare column reference, a value literal,
 /// an expression) that no grammar could parse on its own.
-const STATEMENT_KEYWORDS: [&str; 12] = [
+const STATEMENT_KEYWORDS: [&str; 13] = [
     "SELECT ",
     "INSERT ",
     "UPDATE ",
@@ -25,6 +25,7 @@ const STATEMENT_KEYWORDS: [&str; 12] = [
     "TRUNCATE ",
     "COMMENT ",
     "REPLACE ",
+    "COPY ",
 ];
 
 /// Whether `sql` opens with a statement keyword, and so is a candidate for the

@@ -21,6 +21,7 @@
 )]
 
 mod config;
+mod copy;
 mod generic_client;
 mod transaction;
 
@@ -37,12 +38,15 @@ use std::{
     },
 };
 
+use bytes::Buf;
 use config::Tag;
 use deadpool::managed;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::spawn;
 use tokio::task::JoinHandle;
-use tokio_postgres::{Client as PgClient, Config as PgConfig, Error, Statement, types::Type};
+use tokio_postgres::{
+    Client as PgClient, Config as PgConfig, CopyInSink, Error, Statement, ToStatement, types::Type,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio_postgres::{
@@ -527,6 +531,7 @@ impl ClientWrapper {
         Ok(Transaction {
             txn: PgClient::transaction(&mut self.client).await?,
             statement_cache: self.statement_cache.clone(),
+            connection: self.conn_task.abort_handle(),
         })
     }
 
@@ -536,7 +541,26 @@ impl ClientWrapper {
         TransactionBuilder {
             builder: self.client.build_transaction(),
             statement_cache: self.statement_cache.clone(),
+            connection: self.conn_task.abort_handle(),
         }
+    }
+
+    /// Like [`tokio_postgres::Client::copy_in()`], but a COPY the server
+    /// refuses before its data flow starts closes the connection, because
+    /// tokio-postgres leaves an answer behind that the next request would read
+    /// as its own. Pass a prepared [`Statement`]: preparing is a request of its
+    /// own, and a statement refused there leaves the connection intact.
+    // [spec:pgorm:req:conn.copy]
+    pub async fn copy_in<T, U>(&self, statement: &T) -> Result<CopyInSink<U>, Error>
+    where
+        T: ?Sized + ToStatement,
+        U: Buf + 'static + Send,
+    {
+        copy::guarded(
+            &self.conn_task.abort_handle(),
+            self.client.copy_in(statement),
+        )
+        .await
     }
 }
 

@@ -1,5 +1,5 @@
-//! Pools, connections, transactions and row streams, which JavaScript holds as
-//! boxed handles and releases explicitly.
+//! Pools, connections, transactions, row streams and COPY, which JavaScript
+//! holds as boxed handles and releases explicitly.
 //!
 //! A pool's connections live on the runtime; a JavaScript `Connection` owns
 //! one checked out of it until `close`, and every operation takes it out of
@@ -12,6 +12,7 @@
 //! what it holds only as a backstop.
 
 mod config;
+mod copy;
 pub(crate) mod job;
 mod stream;
 mod transaction;
@@ -54,6 +55,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("connectionClosed", connection_closed)?;
     transaction::export(cx)?;
     stream::export(cx)?;
+    copy::export(cx)?;
     job::export(cx)?;
     Ok(())
 }

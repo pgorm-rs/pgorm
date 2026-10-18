@@ -228,7 +228,12 @@ fn manifest() -> Value {
         operations.extend(crate::pipeline::capabilities());
         operations.extend(crate::schema::capabilities());
         operations.extend(crate::transactions::capabilities());
+        operations.extend(crate::copy::capabilities());
     }
+    if let Some(forms) = manifest["result_forms"].as_array_mut() {
+        forms.extend(["copy_from", "copy_to", "copy_count", "copy_stream"].map(Value::from));
+    }
+    manifest["copy_policy"] = crate::copy::policy();
     manifest
 }
 

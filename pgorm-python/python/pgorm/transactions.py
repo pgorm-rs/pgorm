@@ -4,9 +4,10 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from types import TracebackType
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from . import _native
+from .copy import CopyOutStream, CopySource, copy_in
 from .results import Query, Record
 
 if TYPE_CHECKING:
@@ -54,6 +55,18 @@ class Transaction:
 
     async def fetch_optional(self, query: Query) -> Record | None:
         return await self._native.fetch(query, "optional")
+
+    async def copy_in(self, statement: _native.CopyFrom[Any], source: CopySource) -> int:
+        """Run a COPY FROM inside this transaction; see ``Connection.copy_in``.
+
+        A source that raises aborts the COPY and with it the transaction,
+        which then refuses statements until it is rolled back.
+        """
+        return await copy_in(self._native, statement, source)
+
+    async def copy_out(self, statement: _native.CopyTo[Any]) -> CopyOutStream:
+        """Open a COPY TO; closing it before its end discards the transaction."""
+        return CopyOutStream(await _native._copy_out(self._native, statement), None)
 
     async def commit(self) -> None:
         await self._native.finish(True)

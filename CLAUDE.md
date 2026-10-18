@@ -70,6 +70,8 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 ### Connections
 `pgorm::connect(config: tokio_postgres::Config) -> DatabasePool` is infallible in its signature: pool construction failure panics rather than returning an `Error`. `connect_with_builder` takes a closure over the `PoolBuilder` for sizing and timeouts, and returns `Result` — the closure is caller input, so an unbuildable pool is an `Error`, not a panic.
 
+COPY's data flow is `CopyTrait::copy_in` / `copy_out` (on `DatabaseConnection`, `DatabaseTransaction` and the metrics wrappers) over pgorm-query's typed `CopyFromStatement<F>` / `CopyToStatement<F>`, whose format type parameter (`CopyText`, `CopyCsv`, `CopyBinary`) decides which options exist. Both borrow the connection exclusively. A COPY FROM the server refuses at its start closes its connection: tokio-postgres sends a `Sync` with the COPY and another when the sink ends, and a refused start answers both, which would leave every later response on the connection one request out of step.
+
 `connect_with(config, tls, manager: ManagerConfig, build)` is the general entry point the other three delegate to, and the only route to TLS (any `MakeTlsConnect<Socket>` connector — `tokio-postgres-rustls`, `tokio-postgres-openssl`), to a `RecyclingMethod` other than `Fast`, or to a non-default `StatementCacheSize`. `ManagerConfig`, `RecyclingMethod`, `StatementCacheSize`, `PoolBuilder`, `NoTls`, `Socket`, `MakeTlsConnect` and `TlsConnect` are all re-exported from `pgorm`, so calling it needs no direct dependency on `pgorm-pool` or `tokio-postgres`. `DatabasePool` still has no public constructor beside it.
 
 ### Testing Setup

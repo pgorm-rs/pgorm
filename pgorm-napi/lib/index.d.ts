@@ -11,6 +11,7 @@ import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 import type { SchemaStatement } from "./schema.d.ts";
 import type { Pipeline } from "./pipeline.d.ts";
+import type { CopyFrom, CopyOutStream, CopySource, CopyTo } from "./copy.d.ts";
 
 export * from "./expressions.d.ts";
 export * from "./json.d.ts";
@@ -23,6 +24,7 @@ export * from "./writes.d.ts";
 export * from "./models.d.ts";
 export * from "./graphs.d.ts";
 export * from "./entities.d.ts";
+export * from "./copy.d.ts";
 
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
@@ -475,6 +477,26 @@ export declare abstract class Queryable {
     params?: readonly Param[],
     options?: O,
   ): Promise<RowFor<O> | null>;
+  // [spec:pgorm:req:napi.copy]
+  /**
+   * Run a `COPY … FROM STDIN`, writing the bytes `source` yields, and resolve
+   * with the rows it wrote. The source is pulled only as the COPY takes its
+   * data, so a large one streams. A source that throws, or yields anything
+   * but a `Uint8Array`, abandons the COPY — nothing is written, and inside a
+   * transaction the transaction is aborted — and the promise rejects with
+   * its error. A row the server refuses rejects with a {@link DatabaseError}
+   * once the data is sent. The connection or transaction is held until the
+   * COPY ends, refusing other work with a {@link LifecycleError}; a pool's
+   * COPY takes a connection of its own.
+   */
+  copyIn(statement: CopyFrom, source: CopySource, options?: OperationOptions): Promise<number>;
+  /**
+   * Run a `COPY … TO STDOUT` and resolve, once the server accepts it, with
+   * its data as a {@link CopyOutStream}, which holds the connection or
+   * transaction until it ends or closes; a pool's holds a connection of its
+   * own.
+   */
+  copyOut(statement: CopyTo, options?: OperationOptions): Promise<CopyOutStream>;
 }
 
 /**

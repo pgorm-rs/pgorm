@@ -39,7 +39,7 @@ bytes = "1.12.1"
 # hands its array and range iterators out through 0.2's `FallibleIterator`, and
 # 0.3's is a different trait those types do not implement.
 fallible-iterator = "0.2.0"
-futures-util = "0.3.34"
+futures-util = { version = "0.3.34", features = ["sink"] }
 postgres-protocol = "0.6.12"
 tokio-util = { version = "0.7.20", features = ["rt"] }
 # TLS through rustls, verifying against the platform's trust store or a CA the

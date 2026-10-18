@@ -20,6 +20,7 @@ mod collate;
 mod composite;
 #[path = "query_builder_constraint.rs"]
 mod constraint;
+mod copy;
 #[path = "query_builder_cte.rs"]
 mod cte;
 #[path = "query_builder_generated.rs"]

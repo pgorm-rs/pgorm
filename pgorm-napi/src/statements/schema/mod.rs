@@ -21,7 +21,7 @@ mod sequence;
 mod table;
 mod types;
 
-pub(super) use options::integer;
+pub(super) use options::{get, integer, names, object, pick, relation, text};
 
 use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,

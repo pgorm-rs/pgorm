@@ -645,7 +645,7 @@ pub async fn sql_text_answers_with_the_statement_text() {
     assert_statement_bound::<String>();
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    the hooks see the statement they report on
+// [spec:pgorm:req:metric.fingerprint+3/test]    the hooks see the statement they report on
 #[pgorm_macros::test]
 pub async fn query_context_carries_statement_text() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_context_metricctx").await;
@@ -693,7 +693,7 @@ pub async fn query_context_carries_statement_text() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    libpg_query's canonical hex rendering
+// [spec:pgorm:req:metric.fingerprint+3/test]    libpg_query's canonical hex rendering
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn fingerprint_renders_libpg_query_hex() {
@@ -723,7 +723,7 @@ pub async fn fingerprint_renders_libpg_query_hex() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    constants are normalized away
+// [spec:pgorm:req:metric.fingerprint+3/test]    constants are normalized away
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn fingerprint_ignores_literal_values() {
@@ -744,7 +744,7 @@ pub async fn fingerprint_ignores_literal_values() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    different shapes stay apart
+// [spec:pgorm:req:metric.fingerprint+3/test]    different shapes stay apart
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn distinct_shapes_get_distinct_fingerprints() {
@@ -769,7 +769,7 @@ pub async fn distinct_shapes_get_distinct_fingerprints() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    a fingerprint groups statements
+// [spec:pgorm:req:metric.fingerprint+3/test]    a fingerprint groups statements
 // by PostgreSQL 18's query-ID rules: a schema qualifier is not part of the
 // identity, and an alias stands for the relation it names
 #[cfg(feature = "metrics-fingerprint")]
@@ -808,7 +808,7 @@ pub async fn fingerprint_follows_postgres_18_query_ids() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    unidentifiable is not an error
+// [spec:pgorm:req:metric.fingerprint+3/test]    unidentifiable is not an error
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn unparseable_sql_has_no_fingerprint() {
@@ -837,7 +837,7 @@ pub async fn unparseable_sql_has_no_fingerprint() {
     );
 }
 
-// [spec:pgorm:req:metric.fingerprint+2/test]    fingerprints reach the collector through the wrappers
+// [spec:pgorm:req:metric.fingerprint+3/test]    fingerprints reach the collector through the wrappers
 #[cfg(feature = "metrics-fingerprint")]
 #[pgorm_macros::test]
 pub async fn instrumented_wrapper_reports_fingerprints() -> Result<(), Error> {

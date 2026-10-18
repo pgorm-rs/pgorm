@@ -1,0 +1,30 @@
+{
+  "from-binary-freeze": {
+    "sql": "COPY \"ticket\" (\"id\") FROM STDIN WITH (FORMAT binary, FREEZE true)",
+    "values": []
+  },
+  "from-csv-forced": {
+    "sql": "COPY \"ticket\" (\"id\", \"note\", \"label\") FROM STDIN WITH (FORMAT csv, HEADER match, QUOTE E'\\'', ESCAPE E'\\\\', FORCE_NOT_NULL (\"note\"), FORCE_NULL *, ON_ERROR ignore, LOG_VERBOSITY silent)",
+    "values": []
+  },
+  "from-text-options": {
+    "sql": "COPY \"app\".\"account\" (\"id\", \"name\", \"note\") FROM STDIN WITH (FORMAT text, DELIMITER '|', NULL 'NULL', DEFAULT '@default', HEADER true, ON_ERROR ignore, REJECT_LIMIT 10, ENCODING 'UTF8', LOG_VERBOSITY verbose) WHERE \"id\" > 3 AND \"name\" <> E'O\\'Brien'",
+    "values": []
+  },
+  "to-delete-returning": {
+    "sql": "COPY (DELETE FROM \"app\".\"account\" WHERE \"id\" > 3 RETURNING *) TO STDOUT WITH (FORMAT csv, FORCE_QUOTE *)",
+    "values": []
+  },
+  "to-insert-returning": {
+    "sql": "COPY (INSERT INTO \"ticket\" (\"note\") VALUES ('x') RETURNING \"id\") TO STDOUT WITH (FORMAT binary)",
+    "values": []
+  },
+  "to-select-csv": {
+    "sql": "COPY (SELECT \"id\", \"name\" FROM \"app\".\"account\" WHERE \"name\" = E'O\\'Brien') TO STDOUT WITH (FORMAT csv, DELIMITER ';', NULL '-', HEADER true, QUOTE '\"', ESCAPE '\"', FORCE_QUOTE (\"name\"))",
+    "values": []
+  },
+  "to-table-text": {
+    "sql": "COPY \"app\".\"account\" TO STDOUT WITH (FORMAT text, NULL '', ENCODING 'LATIN1')",
+    "values": []
+  }
+}

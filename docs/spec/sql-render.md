@@ -770,6 +770,36 @@ an ideal Postgres renderer would emit.
 > list and its row are written from the same pairs. On the `build()` path
 > every value is a `$N` placeholder, numbered in text order.
 
+## COPY
+
+> [spec:pgorm:req:sql.render.copy]
+> A COPY statement (`sql.ast.copy`) MUST render as `COPY `, its table or
+> `(`its query`)`, for COPY FROM its column list in parentheses when it has
+> one, then ` FROM STDIN` or ` TO STDOUT`, then ` WITH (FORMAT <format>` and
+> its options, each `, <OPTION> <value>`, and `)`. COPY FROM's `WHERE` comes
+> last. `FORMAT` is always written, so the statement names its format rather
+> than leaving it to the server's default, and every option is written with
+> its value: `FREEZE true`, `HEADER true` or `HEADER match`, `ON_ERROR
+> ignore`, `REJECT_LIMIT <n>`, `LOG_VERBOSITY verbose` or `silent`, a forced
+> column list as `("a", "b")` or `*`. The options follow the order of
+> PostgreSQL's own documentation, `FORMAT`, `FREEZE`, `DELIMITER`, `NULL`,
+> `DEFAULT`, `HEADER`, `QUOTE`, `ESCAPE`, `FORCE_QUOTE`, `FORCE_NOT_NULL`,
+> `FORCE_NULL`, `ON_ERROR`, `REJECT_LIMIT`, `ENCODING`, `LOG_VERBOSITY`.
+>
+> Every name is a quoted identifier (`sql.render.ident-quoting`). The
+> grammar takes an option's string argument only as a string constant, so
+> `DELIMITER`, `NULL`, `DEFAULT`, `QUOTE`, `ESCAPE` and `ENCODING` are written
+> as an inlined string value is (`sql.render.string-escape`), an `E'..'`
+> string when the escaping writes a backslash.
+>
+> COPY takes no bind parameters. PostgreSQL prepares it without analysing
+> the query inside, so the statement declares none, and a value bound for a
+> `$1` in that query is refused (`08P01`, *bind message supplies 1
+> parameters, but prepared statement "" requires 0*). `Display` is therefore
+> the only rendering. A query source and a `WHERE` are written with
+> their values inlined, by the `String` sink (`sql.render.writer`), and there
+> is no `build()` whose placeholders nothing could bind.
+
 ## CASE
 
 > [spec:pgorm:req:sql.render.case]

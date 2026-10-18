@@ -23,7 +23,7 @@ use crate::{
 
 /// The options object at `index`, its keys checked against `known`; `None`
 /// when it is left out.
-pub(super) fn object<'cx>(
+pub(in crate::statements) fn object<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
     known: &[&str],
@@ -49,7 +49,7 @@ pub(super) fn object<'cx>(
 }
 
 /// The option `key`, `None` when it is absent or `undefined`.
-pub(super) fn get<'cx>(
+pub(in crate::statements) fn get<'cx>(
     cx: &mut Cx<'cx>,
     options: Option<Handle<'cx, JsObject>>,
     key: &str,
@@ -101,7 +101,7 @@ pub(super) fn choice<'cx, T: Clone>(
 }
 
 /// `value`, a string that is one of `choices`.
-pub(super) fn pick<'cx, T: Clone>(
+pub(in crate::statements) fn pick<'cx, T: Clone>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
     what: &str,
@@ -155,7 +155,7 @@ pub(super) const ACTIONS: &[(&str, ForeignKeyAction)] = &[
 ];
 
 /// The identifiers of an array, which may be empty.
-pub(super) fn names<'cx>(
+pub(in crate::statements) fn names<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
     what: &str,
@@ -190,7 +190,7 @@ pub(super) fn columns<'cx>(
 /// The relation a statement names: a name, or a `Table` with no alias, its
 /// schema kept. A sequence is a relation too.
 // [spec:pgorm:req:napi.schema]
-pub(super) fn relation<'cx>(
+pub(in crate::statements) fn relation<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
 ) -> NeonResult<TableName> {
@@ -362,7 +362,7 @@ pub(super) fn sequence_options<'cx>(
 
 /// Text a statement writes as a literal — a comment, an extension's version —
 /// which cannot hold NUL.
-pub(super) fn text<'cx>(
+pub(in crate::statements) fn text<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
     what: &str,

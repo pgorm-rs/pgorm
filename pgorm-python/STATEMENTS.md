@@ -272,6 +272,102 @@ target/action states:
 `insert.on_conflict` accepts a completed ignore or update action. An incomplete
 target and an empty update assignment set cannot reach the Rust INSERT builder.
 
+## COPY
+
+```python
+from pgorm import CopyFrom, CopyTo, Table, col, select
+
+items = Table("items", schema="app")
+load = CopyFrom(items, "csv").columns("id", "name").header()
+assert load.inspect().sql == (
+    'COPY "app"."items" ("id", "name") FROM STDIN WITH (FORMAT csv, HEADER true)'
+)
+
+async def rows():
+    yield b"id,name\n"
+    for n in range(1_000_000):
+        yield f"{n},item {n}\n".encode()
+
+inserted = await pool.copy_in(load, rows())
+
+query = select(col("id"), col("name")).from_(items).where_(col("id") > 10)
+async with await pool.copy_out(CopyTo(query, "binary")) as chunks:
+    async for chunk in chunks:
+        output.write(chunk)
+```
+
+`CopyFrom(table, format)` and `CopyTo(source, format)` build `pgorm_query`'s
+`CopyFromStatement` and `CopyToStatement`. The format, `"text"`, `"csv"` or
+`"binary"`, is chosen at construction and is the stubs' type parameter, so a
+type checker rejects an option the format lacks; at run time, setting an
+option the format or the direction does not take raises `ConstructionError`
+naming why.
+
+| Option | COPY FROM | COPY TO |
+| --- | --- | --- |
+| `columns(*names)`, `where_(predicate)`, `freeze()` | every format | none |
+| `delimiter`, `null_string`, `header()`, `encoding` | text, csv | text, csv |
+| `default_string`, `header_match()`, `on_error_ignore(reject_limit, log_verbosity)` | text, csv | none |
+| `quote`, `escape` | csv | csv |
+| `force_not_null`, `force_null` and their `_all` forms | csv | none |
+| `force_quote`, `force_quote_all()` | none | csv |
+
+The builders are immutable, like the other statements, and take a table
+without an alias. `delimiter`, `quote` and `escape` take a one-character
+string. A COPY TO reads a `Table`, or a built `Select`, `Insert`, `Update`,
+`Delete` or `Merge`: a column subset is a `Select`, and a write is a source
+only with a RETURNING list, which the server checks (`0A000`). COPY takes no
+bind parameters, so `inspect()` returns the Rust rendering with every value
+written inline and empty `params`. A COPY statement is not a query, and
+`execute` and the `fetch_*` terminals refuse it.
+
+### Running a COPY
+
+`copy_in(statement, source)` and `copy_out(statement)` exist on `Pool`,
+`Connection` and `Transaction`, over `pgorm::CopyTrait`.
+
+`copy_in` returns the number of rows inserted. `source` is bytes-like data
+(`bytes`, `bytearray`, `memoryview` or another contiguous buffer), or a sync
+or async iterable of it, already in the statement's format. A `str`, or an
+item that is not bytes, raises `ConstructionError`: encode text first. The
+source is pulled only as the COPY takes data. Small chunks are gathered to
+64 KiB, large ones sliced at 256 KiB, and at most four wait for the
+connection, so a large generator streams rather than accumulates. Chunks need
+not end at a row boundary.
+
+- If the source raises, or yields an item that is not bytes, the COPY is
+  aborted with `CopyFail` and that exception propagates unchanged. Outside a
+  transaction nothing is written and the connection stays usable; inside one
+  the transaction is aborted and refuses statements (`25P02`) until it is
+  rolled back.
+- A row the server refuses raises `DatabaseError` with its SQLSTATE (`23505`
+  for a duplicate key) when the COPY finishes, after the rest of the source
+  has been sent: the protocol reports nothing while data is still flowing.
+- A COPY FROM the server refuses before any data moves (a missing table or
+  column, an option it rejects) raises `DatabaseError` and closes the
+  connection, and with it any transaction on it; the pool lends a fresh
+  connection next time.
+
+`copy_out` returns a `CopyOutStream`, an async iterator of `bytes`. A chunk
+joins the `CopyData` messages already received, up to 64 KiB; no row boundary
+is promised, and binary data is one byte stream. At most four messages wait
+unread, so a stream nobody reads holds the server back. Reading to the end
+releases the connection or transaction; closing early (`aclose()`, leaving
+`async with`, an exception inside `async for`) discards the connection, and
+with it any transaction, since the server would otherwise keep sending. A
+pool's `copy_out` acquires a connection the stream owns until its end or
+close, as `Pool.stream` does.
+
+While a copy runs, its connection or transaction refuses other work with
+`LifecycleError`: a COPY FROM until it finishes or aborts, a COPY TO until its
+end is read or it is closed.
+
+Cancelling the task running `copy_in` before the data is complete aborts the
+COPY, as a raising source does. Cancelling it while the COPY finishes leaves
+the outcome unknown (outside a transaction the rows may already be
+committed), so the connection, or the whole transaction, is discarded rather
+than reused.
+
 ## Inspection and execution preparation
 
 `inspect()` validates the public builder state and invokes that statement's

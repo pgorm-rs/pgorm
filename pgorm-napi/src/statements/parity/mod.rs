@@ -3,6 +3,7 @@
 //! values `tests/parity/<family>.json` holds, which the JavaScript suite holds
 //! its own builders to in both runtimes. A case missing on either side fails.
 
+mod copy;
 mod json;
 mod merge;
 mod pipeline;
@@ -199,5 +200,14 @@ fn pipeline_family_matches_its_golden_file() {
     check(
         include_str!("../../../tests/parity/pipeline.json"),
         pipeline::cases(),
+    );
+}
+
+// [spec:pgorm:req:napi.copy/test]
+#[test]
+fn copy_family_matches_its_golden_file() {
+    check(
+        include_str!("../../../tests/parity/copy.json"),
+        copy::cases(),
     );
 }

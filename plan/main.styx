@@ -11646,6 +11646,16 @@ children (
         id conn-copy
         title "A connection or transaction runs COPY FROM STDIN and TO STDOUT through copy_in and copy_out over a typed COPY statement, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main (
+                [spec:pgorm:def:sql.ast.copy]
+                [spec:pgorm:req:sql.render.copy]
+                [spec:pgorm:req:conn.copy]
+                [spec:pgorm:req:metric.layer.copy]
+                [spec:pgorm:req:python.copy]
+                [spec:pgorm:req:napi.copy]
+            )
+        }
         deps (query-second-tier)
         log (
             {

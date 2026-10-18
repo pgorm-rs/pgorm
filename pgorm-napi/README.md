@@ -9,7 +9,7 @@ are [docs/spec/napi.md](../docs/spec/napi.md).
 The addon loads in both runtimes, runs pgorm's asynchronous work on a tokio
 runtime of its own, settles a Promise with the outcome, and lets the process
 exit when its work is done. JavaScript connects through pools, runs bound SQL,
-scopes transactions and savepoints and streams rows
+scopes transactions and savepoints, streams rows and runs COPY
 ([Connections](#connections)), builds pgorm-query's statements
 ([Statements](#statements)), DDL ([Schema](#schema)) and pipelines
 ([Pipelines](#pipelines)), declares models and reads and writes them, their
@@ -153,6 +153,44 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
 
 `TimeoutError` is a pool's `acquireTimeout` running out; an `AbortSignal`
 timeout rejects with the signal's own `TimeoutError` `DOMException`.
+
+### COPY
+
+```js
+import { col, copyFrom, copyTo, select, Table } from "@necessary/pgorm";
+
+const load = copyFrom("accounts", "csv").columns(["id", "name"]).header();
+await pool.copyIn(load, fs.createReadStream("accounts.csv"));        // rows written
+
+const dump = copyTo(select(col("id"), col("name")).from(new Table("accounts")).where(col("active").eq(true)), "binary");
+for await (const chunk of await pool.copyOut(dump)) output.write(chunk);   // Uint8Array chunks
+```
+
+- **`copyFrom(table, format)`** and **`copyTo(source, format)`** build
+  `COPY … FROM STDIN` and `COPY … TO STDOUT` in `"text"`, `"csv"` or
+  `"binary"`; a COPY TO reads a table, or a `select`, or a write with a
+  `returning` list. The format is the builder's type: an option it does not
+  take — `quote` on text, `header` on binary, `freeze` on a COPY TO — is no
+  method of its type, and called anyway is a `ConstructionError`. COPY takes
+  no parameters, so a value in its `where` or query is written into the SQL as
+  a literal, and `inspect()` gives no values; `execute` and the other
+  terminals refuse a COPY.
+- **`copyIn(statement, source)`** on a pool, connection or transaction writes
+  a `Uint8Array`, or an iterable or async iterable of them — a generator, a
+  web `ReadableStream`, a Node.js stream of buffers — pulling the next chunk
+  only as the COPY takes the last, and resolves with the rows written. A
+  source that throws, or yields anything but a `Uint8Array`, abandons the
+  COPY — nothing is written; inside a transaction it is aborted until rolled
+  back — and the promise rejects with that error. A row the server refuses
+  rejects with its `DatabaseError` once the data is sent.
+- **`copyOut(statement)`** resolves, once the server accepts the statement,
+  with a `CopyOutStream` of `Uint8Array` chunks, one per `next()`; a chunk is
+  a piece of the format's byte stream, not a row.
+- A COPY holds what it runs on — a pool's takes a connection of its own; a
+  connection or transaction refuses other work with a `LifecycleError` until
+  the COPY ends — and, unlike `stream`, it runs in a transaction. Leaving a
+  `CopyOutStream` early, or aborting a COPY with its `signal`, discards the
+  connection; an aborted COPY in a transaction ends it.
 
 ## Statements
 

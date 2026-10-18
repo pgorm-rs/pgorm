@@ -182,6 +182,8 @@ Because `get()` clones the collector for every connection, keep collectors cheap
 
 On failure the same context goes to `record_query_error`, and the `Error` is propagated unchanged.
 
+Both wrappers also implement `CopyTrait`. `copy_in` and `copy_out` are reported under `"copy_in"` and `"copy_out"`, with the COPY statement's rendered text as `sql()` and `rows` as `None`: the hook times the start of the COPY, as `query_raw`'s times the start of a stream, and the sink or stream comes back unwrapped. The row count `CopyInSink::finish` returns, and a row the server refuses there, reach the caller rather than the collector.
+
 ### Transactions
 
 `TransactionTrait::begin` on `InstrumentedConnection` times the `BEGIN` and reports `record_transaction_begin` on success. A *failed* begin is reported through `record_query_error`, with a context whose `operation()` is `"begin"` and whose `sql()` is `None` — not through a dedicated hook.
@@ -263,7 +265,7 @@ impl MetricsCollector for PrometheusMetrics {
 let instrumented = InstrumentedPool::new(pool, PrometheusMetrics::new());
 ```
 
-`query.operation()` is the natural label dimension: it partitions the seven `ConnectionTrait` methods (plus `"begin"`, `"commit"` and `"rollback"` on a failed transaction round trip) without any extra plumbing. Label by `query.fingerprint()` only where the backend tolerates the cardinality — one series per query shape is far more than one per method, and a statement with no fingerprint has to fall into a bucket of its own.
+`query.operation()` is the natural label dimension: it partitions the seven `ConnectionTrait` methods (plus `"copy_in"` and `"copy_out"`, and `"begin"`, `"commit"` and `"rollback"` on a failed transaction round trip) without any extra plumbing. Label by `query.fingerprint()` only where the backend tolerates the cardinality — one series per query shape is far more than one per method, and a statement with no fingerprint has to fall into a bucket of its own.
 
 ### Cost
 

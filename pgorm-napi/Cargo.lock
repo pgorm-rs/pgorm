@@ -1477,6 +1477,7 @@ name = "pgorm-pool"
 version = "0.2.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "deadpool",
  "serde",
  "tokio",

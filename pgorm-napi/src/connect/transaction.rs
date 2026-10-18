@@ -17,11 +17,15 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     Abort, ConnectionHandle, ConnectionState, Operation, Outcome, Statement, abort_argument,
+    copy::{
+        self, CopyInHandle, CopyOutHandle, InLink, InState, OutLink, OutState, Release, Settle,
+    },
     job::{Database, Job, Output, taken},
 };
 use crate::{
     errors::{Failure, failure},
     settle,
+    statements::{CopyFrom, CopyTo, copy_from_at, copy_to_at},
 };
 
 pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -33,6 +37,8 @@ pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("transactionWaitClosed", transaction_wait_closed)?;
     cx.export_function("transactionClosed", transaction_closed)?;
     cx.export_function("transactionJob", transaction_job)?;
+    cx.export_function("transactionCopyIn", transaction_copy_in)?;
+    cx.export_function("transactionCopyOut", transaction_copy_out)?;
     Ok(())
 }
 
@@ -56,6 +62,23 @@ enum Command {
         receiver: mpsc::UnboundedReceiver<Command>,
         opened: Finish,
         parent_lock: OwnedMutexGuard<()>,
+    },
+    /// A COPY, which holds the frame's lock until it ends.
+    CopyIn {
+        copy: Box<CopyFrom>,
+        link: InLink,
+        opened: Finish,
+        abort: Abort,
+        release: Release,
+        lock: OwnedMutexGuard<()>,
+    },
+    CopyOut {
+        copy: Box<CopyTo>,
+        link: OutLink,
+        opened: Finish,
+        abort: Abort,
+        release: Release,
+        lock: OwnedMutexGuard<()>,
     },
 }
 
@@ -273,6 +296,30 @@ impl State {
         Ok(())
     }
 
+    /// What ends a COPY in this frame from outside it.
+    fn copy_stop(&self, abort: Abort) -> copy::Stop {
+        copy::Stop::frame(abort, &self.connection, &self.abandoned, &self.root.aborted)
+    }
+
+    /// Free the frame once a COPY in it has ended: its lock first, so that a
+    /// statement JavaScript runs as the COPY settles finds it free. A COPY
+    /// whose connection is discarded ends the whole transaction, nothing in
+    /// it committed, as an aborted statement does.
+    // [spec:pgorm:req:napi.copy]
+    fn after_copy(
+        &self,
+        settle: Settle,
+        lock: OwnedMutexGuard<()>,
+        release: Release,
+    ) -> Option<Completion> {
+        drop(lock);
+        if settle == Settle::Discard {
+            self.root.aborted.cancel();
+        }
+        drop(release);
+        (settle == Settle::Discard).then(Completion::discarded)
+    }
+
     /// A savepoint, which holds this frame's lock until it finishes.
     async fn begin(
         self: &Arc<Self>,
@@ -356,6 +403,35 @@ fn serve<'a>(
                         reply: Some(reply),
                         result: outcome.map_err(|error| failure(&error, &secrets)),
                     };
+                }
+                Command::CopyIn {
+                    copy,
+                    link,
+                    opened,
+                    abort,
+                    release,
+                    lock,
+                } => {
+                    let stop = state.copy_stop(abort);
+                    let settle = copy::copy_in(&mut tx, &copy, link, opened, &stop, &secrets).await;
+                    if let Some(completion) = state.after_copy(settle, lock, release) {
+                        return completion;
+                    }
+                }
+                Command::CopyOut {
+                    copy,
+                    link,
+                    opened,
+                    abort,
+                    release,
+                    lock,
+                } => {
+                    let stop = state.copy_stop(abort);
+                    let settle =
+                        copy::copy_out(&mut tx, &copy, link, opened, &stop, &secrets).await;
+                    if let Some(completion) = state.after_copy(settle, lock, release) {
+                        return completion;
+                    }
                 }
                 Command::Begin {
                     child,
@@ -613,4 +689,52 @@ fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
     };
     let work = async move { state.run_job(lock, job, &abort).await };
     settle::promise(&mut cx, work, |cx, output| output.into_js(cx))
+}
+
+/// `transactionCopyIn(transaction, copy, abort)`: a COPY FROM in the
+/// transaction, holding its lock as a statement does until the COPY ends.
+// [spec:pgorm:req:napi.copy]
+fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let state = state(&mut cx)?;
+    let copy = Box::new(copy_from_at(&mut cx, 1)?);
+    let abort = abort_argument(&mut cx, 2)?;
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let (shared, link, release) = InState::channel();
+    let (opened, receive) = oneshot::channel();
+    let command = Command::CopyIn {
+        copy,
+        link,
+        opened,
+        abort,
+        release,
+        lock,
+    };
+    copy::opened(&mut cx, shared, state.send(command), receive, CopyInHandle)
+}
+
+/// `transactionCopyOut(transaction, copy, abort)`: a COPY TO in the
+/// transaction, which refuses other work until the stream ends or closes.
+// [spec:pgorm:req:napi.copy]
+fn transaction_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
+    let state = state(&mut cx)?;
+    let copy = Box::new(copy_to_at(&mut cx, 1)?);
+    let abort = abort_argument(&mut cx, 2)?;
+    let lock = match state.lock() {
+        Ok(lock) => lock,
+        Err(failure) => return settle::rejected(&mut cx, failure),
+    };
+    let (shared, link, release) = OutState::channel();
+    let (opened, receive) = oneshot::channel();
+    let command = Command::CopyOut {
+        copy,
+        link,
+        opened,
+        abort,
+        release,
+        lock,
+    };
+    copy::opened(&mut cx, shared, state.send(command), receive, CopyOutHandle)
 }

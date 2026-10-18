@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from . import _native
+from .copy import CopyOutStream, CopySource, copy_in
 from .results import Query, Record, ResultStream
 from .transactions import Transaction, TransactionMode, IsolationLevel
 
@@ -122,6 +123,21 @@ class Pool:
             raise
         return ResultStream(native, connection, release_connection=True)
 
+    async def copy_in(self, statement: "_native.CopyFrom[Any]", source: CopySource) -> int:
+        """Run a COPY FROM on a connection of its own; see ``Connection.copy_in``."""
+        async with self.connection() as connection:
+            return await connection.copy_in(statement, source)
+
+    async def copy_out(self, statement: "_native.CopyTo[Any]") -> CopyOutStream:
+        """Open a COPY TO whose stream owns the connection it acquired."""
+        connection = await self.acquire()
+        try:
+            native = await _native._copy_out(connection._native, statement)
+        except BaseException:
+            await connection.close()
+            raise
+        return CopyOutStream(native, connection)
+
     async def close(self) -> None:
         """Reject waiters, cancel active operations and release connections."""
         await self._native.close()
@@ -189,6 +205,22 @@ class Connection:
     async def stream(self, query: Query) -> ResultStream:
         native = await self._native.stream(query)
         return ResultStream(native, self, release_connection=False)
+
+    async def copy_in(self, statement: "_native.CopyFrom[Any]", source: CopySource) -> int:
+        """Run a COPY FROM over ``source`` and return the rows it inserted.
+
+        ``source`` is bytes-like data, or a sync or async iterable of it, in the
+        statement's format; it is pulled only as the COPY takes data. If the
+        source raises, the COPY is aborted, nothing is written and the
+        exception propagates. A COPY the server refuses before any data
+        moves closes this connection. The connection is reserved until the
+        COPY ends.
+        """
+        return await copy_in(self._native, statement, source)
+
+    async def copy_out(self, statement: "_native.CopyTo[Any]") -> CopyOutStream:
+        """Open a COPY TO; the stream reserves this connection until it ends."""
+        return CopyOutStream(await _native._copy_out(self._native, statement), None)
 
     async def close(self) -> None:
         await self._native.close()
