@@ -8495,6 +8495,14 @@ children (
                         text "Delivered again at the current rule version (sql.scope +15), on the re-check recorded above: every construct the rule lists holds in the code, and the rule's own completeness clause makes the unlisted constructs a defect in the rule rather than in this node's code; they wait on the operator's verdicts. The earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T14:40:03.476245Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Operator 2026-10-18, asked why sql.scope rules views out (its reason: CREATE VIEW is one keyword around a SelectStatement the caller has, matview refresh and storage are schema-ownership decisions, and pgorm only needs to read views) after the lead argued the reason inverts: hand-writing CREATE VIEW means the caller quotes the view and column names, the body cannot take bind parameters so the query must be rendered with values inlined, REFRESH MATERIALIZED VIEW is a statement applications issue on a schedule, pgorm already builds sequences, composite and range types and extensions, and no test shows an entity reading a view. Asked \"Do you want views and materialized views built?\": \"yes.\" So views and materialized views leave sql.scope's out-of-scope list and are built: CREATE [OR REPLACE] [RECURSIVE] VIEW with column names, WITH CASCADED/LOCAL CHECK OPTION and the security_barrier / security_invoker options, DROP VIEW; CREATE MATERIALIZED VIEW .. WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY], DROP MATERIALIZED VIEW; live tests of an entity reading a view and writing through a simple updatable one. CREATE TABLE AS, which the lead had proposed ruling out only by analogy with views, is built with them. Filed as sql-views. The rest of the sql.scope verdicts are still the operator's to give."
+                        after_done true
+                    }
                 )
             }
 
@@ -8691,6 +8699,21 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found re-checking query-reexports-curated and single-cast-node on 2026-10-18 (notes on both). (1) sql.surface is held only by two compile_fail,E0603 doctests in pgorm-query/src/lib.rs, which nextest never runs. Add tests that run under nextest and hold: exactly three public modules (error, extension, value); the doc-hidden residue named in the rule; that pgorm_query::Write and the pub(crate) clause shapes cannot be named (a trybuild compile-fail case; the repo already uses trybuild); and that the rule's register and lib.rs's root exports agree both ways, so an export added without a register entry fails. Also decide value::with_vector, a public module holding only impls that is a reachable path not among the rule's spellings. (2) every_cast_spelling_builds_one_node_shape (pgorm-query/tests/postgres/query.rs) and entity_layer_casts_build_the_one_cast_node (tests/enum_tests.rs) were not extended when sql.ast.cast-shape +1 added as_range and the entity layer's created-range casts; add as_range, CreatedRange::into_expr, and the read and write casts on created range and created multirange columns, plus SimpleExpr::cast_as / cast_as_type, so each is held structurally rather than only by CAST( render goldens. Waits on statement-interval-value, which adds a value and may add exports to the same register."
+                    }
+                )
+            }
+
+            {
+                id sql-views
+                title "pgorm builds views, materialized views and CREATE TABLE AS, from Rust, Python and JavaScript, and an entity reads and writes through a view"
+                kind @feat
+                deps (query-second-tier)
+                log (
+                    {
+                        at 2026-10-18T14:40:13.425659Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Scope, per the operator's decision on query-second-tier (2026-10-18). Builders: CREATE [OR REPLACE] [RECURSIVE] VIEW name [(columns)] AS <SelectStatement> [WITH [CASCADED | LOCAL] CHECK OPTION] with the security_barrier and security_invoker options, DROP VIEW [IF EXISTS] .. [CASCADE | RESTRICT]; CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY] name [WITH [NO] DATA], DROP MATERIALIZED VIEW; CREATE TABLE [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA. Names and column names are quoted identifiers; the body is the caller's SelectStatement rendered with its values inlined, because a view body cannot take bind parameters (check what PostgreSQL refuses and make invalid combinations unrepresentable where the grammar forbids them: e.g. RECURSIVE needs column names, CHECK OPTION needs an auto-updatable view and is refused on RECURSIVE, REFRESH CONCURRENTLY needs a unique index and is refused WITH NO DATA, OR REPLACE may only add columns at the end). Spec: move views and materialized views off sql.scope's out-of-scope list (bump; query-second-tier re-delivers with a feat commit), new rules for the statements in sql-ddl.md, register entries in sql.surface for new exports, oracle-checked renders (libpg_query 18 grammar) and live tests on 18.6, including an entity reading from a view and writing through a simple auto-updatable one, a CHECK OPTION refusal (44000), and a concurrent refresh. Python (pgorm-python schema builders, stubs, capability manifest, parity cases) and JavaScript (pgorm-napi schema builders, .d.ts, parity goldens, Node and Deno) get the same statements, as they mirror every other DDL builder."
                     }
                 )
             }
