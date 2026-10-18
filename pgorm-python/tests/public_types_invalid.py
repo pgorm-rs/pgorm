@@ -6,6 +6,8 @@ from pgorm import pipeline as pl, schema as s
 
 async def invalid(connection: p.Connection) -> None:
     await connection.execute("SELECT 1")  # expected-error: arg-type
+    pending = p.merge(p.Table("t"), p.Table("s"), p.col("id") == 1)
+    await connection.fetch_all(pending)  # expected-error: arg-type
     scalar: int = await connection.fetch_one(  # expected-error: assignment
         p.select(p.literal(1))
     )

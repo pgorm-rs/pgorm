@@ -3,12 +3,12 @@
 import unittest
 
 from pgorm import (
-    Condition, Conflict, ConflictTarget, ConstructionError, Join, Nulls,
-    RawSQL, Table, Value, bind, call, col, delete, insert, literal, select, update,
+    Condition, Conflict, ConflictTarget, ConstructionError, Join, MatchedAction, Nulls,
+    RawSQL, Table, Value, bind, call, col, delete, insert, literal, merge, select, update,
 )
 
 
-# [spec:pgorm:req:python.statements+3/test]
+# [spec:pgorm:req:python.statements+4/test]
 # [spec:pgorm:req:python.raw/test]
 class StatementTests(unittest.TestCase):
     def test_runtime_tables_and_aliases_preserve_identity(self):
@@ -159,8 +159,11 @@ class StatementTests(unittest.TestCase):
             RawSQL("SELECT $1", "not a parameter sequence")
 
     def test_statement_truth_testing_is_rejected(self):
-        table = Table("account")
-        for query in [select(), insert(table), update(table), delete(table), RawSQL("SELECT 1")]:
+        table, source = Table("account"), Table("staged")
+        pending = merge(table, source, table.col("id") == source.col("id"))
+        merged = pending.when_matched(MatchedAction.Delete)
+        for query in [select(), insert(table), update(table), delete(table), RawSQL("SELECT 1"),
+                      pending, merged]:
             with self.assertRaises(ConstructionError):
                 bool(query)
 

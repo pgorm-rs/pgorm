@@ -39,7 +39,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -89,7 +89,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -126,7 +126,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -159,7 +159,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -217,7 +217,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -286,7 +286,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -331,7 +331,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -385,7 +385,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -421,7 +421,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn windows_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -490,7 +490,7 @@ w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
     })
 }
 
-// [spec:pgorm:req:python.statements+3/test]
+// [spec:pgorm:req:python.statements+4/test]
 #[test]
 fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     Python::initialize();

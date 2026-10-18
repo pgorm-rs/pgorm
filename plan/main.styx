@@ -5813,6 +5813,14 @@ children (
                         text "Delivered again at the current rule version (python.values +2), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:14:47.507374Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at python.values +4 (python-statement-typing, 73a0ada5, which dropped the leftover feature condition and stated the created-range limits): the six built-in range types and their multiranges convert with no feature gate; a created range converts both ways, its result column decoding through the subtype's codec to its own kind; a created multirange converts as a value, its result column raising DecodeError (results/ranges.rs, the driver reporting no subtype) so it is read cast to text; arrays of a created range or multirange are refused both ways (values/mod.rs, results/ranges.rs)."
+                        after_done true
+                    }
                 )
             }
 
@@ -5930,6 +5938,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at python.statements +3: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T16:14:47.405754Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at python.statements +4 (python-statement-typing, 73a0ada5, which rewrote the frame and WINDOW-clause text): the frame typestate builds no end on an earlier side of the current row, no UNBOUNDED FOLLOWING start or UNBOUNDED PRECEDING end and no lone following start, and builds same-side offsets (Rows.preceding(1).and_preceding(3)) as a frame holding no rows; a second Select.window replaces the first, an item over the dropped name failing 42704. Both are tested live in test_windows.py; Merge is in the Query alias the execution methods take and runs through the typed example."
                         after_done true
                     }
                 )
@@ -6157,6 +6173,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at python.entities +2: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T16:14:47.597086Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at python.entities +3 (python-statement-typing, 73a0ada5): describe()'s relations now report condition_type (\"all\"/\"any\") and on_condition (present/absent) beside columns and the PERIOD pair, with enforcement and deferrability described as what the server holds the key's rows to; covered by a native unit test (entities/relations.rs), graph_parity.rs and registered_temporal.py, and the terminals list is asserted against reachable methods in registered_entities.py. The application check (checks/entities.py) passed."
                         after_done true
                     }
                 )
@@ -11617,12 +11641,28 @@ children (
             python.entities
             statement-interval-value
         )
+        sealed true
         log (
             {
                 at 2026-10-18T14:28:24.899368Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found re-checking python.statements, python.expressions, python.values and python.entities on 2026-10-18 (notes on each). Code: (1) the Query alias in pgorm-python/python/pgorm/results.py, which execute / fetch_* / stream take in runtime.py and transactions.py, omits _native.Merge, so await pool.fetch_all(merge) fails mypy --strict although it runs; add it, and put a MERGE through a type-checked path (examples/application.py or the typing checks) so the check sees it. (2) test_statement_truth_testing_is_rejected omits Merge and PendingMerge, whose __bool__ refusals exist. (3) JsonInput (from format_json) and WindowFunction have no __bool__ refusal. (4) No test asserts a registered entity's describe()[\"terminals\"] list. Rule text: python.statements says \"a frame whose end comes before its start cannot be built\", but the typestate stops only an end on an earlier side of the current row (Rows.preceding(1).and_preceding(5) builds in Rust and Python), and should say the WINDOW clause holds one named window, a second call replacing the first; python.values' \"where the corresponding Rust feature exists\" is leftover (ranges have no feature gate) and its \"MUST cover ... the range and multirange types a schema created\" reads broader than the documented limits (created multirange result columns read through text, no arrays of created ranges); python.entities says enforcement and deferrability \"change what a join means\" (they don't) while describe() omits condition_type and on_condition, which do: decide whether describe() reports them or the rule stops implying it. Rule bumps stale the owning nodes (all kind feat): re-deliver them with a feat-typed commit naming them, separate from this node's fix commit. Waits on statement-interval-value, which changes the same Python values code."
+            }
+
+            {
+                at 2026-10-18T16:09:55.445604Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-18T16:10:07.520311Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "describe() now reports each relation's condition_type (\"all\"/\"any\") and on_condition (present/absent bool), rather than the rule stopping implying it: both decide what a join by the relation reads, condition_type is a two-value enum and on_condition a Rust closure over the join's aliases with no rendering of its own, so a bool is the honest report. python.entities +3 says enforcement and deferrability change what the server holds the key's rows to, not the join. The WINDOW clause's one named window is a pgorm-query capability gap, not wording: PostgreSQL's WINDOW clause takes a list, SelectStatement::window holds Option<(Name, WindowStatement)>, and a second call silently drops the first name, so an item over it fails at the server (42704) instead of at construction; python.statements +4 states the behaviour, Rust is unchanged here. Truth testing: JsonInput and WindowFunction now refuse; the schema module's CreateTable, CreateIndex and DDL (and Compiled) still evaluate truthy and were left alone because sql-views is editing src/schema in parallel."
+                after_done true
             }
         )
     }

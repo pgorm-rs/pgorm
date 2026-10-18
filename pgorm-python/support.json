@@ -19,8 +19,8 @@
     }
   ],
   "ci_candidates": [
-    {"platform": "macos-arm64", "runner": "macos-15", "python": "3.14.4"},
-    {"platform": "linux-x86_64", "runner": "ubuntu-24.04", "python": "3.14.4"}
+    {"platform": "macos-arm64", "runner": "macos-15", "python": "3.14"},
+    {"platform": "linux-x86_64", "runner": "ubuntu-24.04", "python": "3.14"}
   ],
   "free_threading": false,
   "subinterpreters": false,

@@ -73,15 +73,21 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > explicitly before execution. Runtime-generated compositions within those
 > capabilities MUST NOT invoke rustc, Cargo, Maturin or a code-generation build.
 
-> [spec:pgorm:req:python.values+3]
+> [spec:pgorm:req:python.values+4]
 > Conversions MUST preserve supported Rust value variants and nullability in
 > both directions. The conversion table MUST cover booleans, signed and
 > unsigned integer bounds, floating-point values including signed zero and
 > non-finite values, strings, bytes, Decimal, UUID, JSON, date/time values,
-> intervals, arrays, qualified enums, the built-in ranges and multiranges
-> where the corresponding Rust feature exists, and the range and multirange
-> types a schema created. A created range's kind MUST carry the type's name,
-> quoted and schema-qualifiable, and its subtype, which converts each bound.
+> intervals, arrays, qualified enums, PostgreSQL's six built-in range types
+> and their multiranges, and the range and multirange types a schema created.
+> A created range's kind MUST carry the type's name, quoted and
+> schema-qualifiable, and its subtype, which converts each bound. A created
+> range converts both ways, a result column of one decoding through its
+> subtype's codec to its own kind. A created multirange converts as a value,
+> but the driver reports its column's type with no subtype, so reading a
+> result column of one MUST raise a decode error, leaving it to be read cast
+> to text; an array of a created range or multirange MUST be refused both
+> ways.
 > An interval is `pgorm.Interval(months, days, microseconds)`, immutable and
 > hashable, each field an exact `int` within its width and with its own
 > sign, inferred as the `interval` kind, decoded from an `interval` column
@@ -134,7 +140,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+3]
+> [spec:pgorm:req:python.statements+4]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -144,11 +150,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > and its alias required so an empty column list or an unnamed item cannot be
 > built. A SELECT item MUST be able to call a function over a window, inline or
 > named in the statement's WINDOW clause, lowered into `WindowStatement` and
-> the `expr_window` family. `OVER` MUST attach only to what Rust's
-> `WindowFunction` admits — a function call or a JSON aggregate — and a frame
-> MUST follow the Rust frame typestate, so a frame whose end comes before its
-> start cannot be built; a function PostgreSQL computes only over a window MUST
-> NOT be usable without one.
+> the `expr_window` family. The WINDOW clause holds one named window, as
+> Rust's `SelectStatement::window` does, so a second call replaces the first.
+> `OVER` MUST attach only to what Rust's `WindowFunction` admits — a function
+> call or a JSON aggregate — and a frame MUST follow the Rust frame typestate,
+> which types a start by the side of the current row it lies on, so that no
+> frame can be built whose end lies on an earlier side than its start, that
+> starts at `UNBOUNDED FOLLOWING` or ends at `UNBOUNDED PRECEDING`, or whose
+> following start stands alone. Two offsets on one side are not compared, as
+> PostgreSQL's grammar does not compare them: `ROWS BETWEEN 1 PRECEDING AND 3
+> PRECEDING` builds, and holds no rows. A function PostgreSQL computes only
+> over a window MUST NOT be usable without one.
 > A RETURNING list MUST be able to read a written row's old and new versions
 > and rename them. MERGE MUST follow the Rust typestate: a pending MERGE with no
 > WHEN arm MUST NOT be inspectable or executable, each arm's action MUST be
@@ -170,14 +182,18 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > MUST be explicit errors. Dynamic descriptors MUST NOT claim to instantiate
 > Rust derives, EntityTrait implementations or ActiveModelBehavior hooks.
 
-> [spec:pgorm:req:python.entities+2]
+> [spec:pgorm:req:python.entities+3]
 > Concrete compiled entity registrations MUST expose their actual Rust entity,
 > model, column and ActiveModel operations, including write-state and hook
-> semantics. Registration MUST declare its types and supported terminals, and
-> the declared attributes that change what a key or a join means: a key ending
-> `WITHOUT OVERLAPS`, and each relation's columns, `PERIOD` pair, enforcement
-> and deferrability. The write terminals that read a row's two versions —
-> `UpdateOne::exec_returning_change`, `UpdateMany::exec_returning_changes` and
+> semantics. Registration MUST declare its types and supported terminals, the
+> declared attributes that change what a key or a join by a relation means —
+> a key ending `WITHOUT OVERLAPS`, and each relation's columns, `PERIOD` pair,
+> condition type and whether an `on_condition` adds its own condition, a Rust
+> closure declared only as present or absent — and each relation's foreign
+> key enforcement and deferrability, which change what the server holds the
+> key's rows to and not what a join reads. The write terminals that read a
+> row's two versions — `UpdateOne::exec_returning_change`,
+> `UpdateMany::exec_returning_changes` and
 > `Insert::exec_returning_upsert(s)` — MUST be reachable as the statement
 > terminals they are in Rust, without ActiveModel hooks, answering a `Change`
 > of two models and an `Upserted` that is either the inserted model or the

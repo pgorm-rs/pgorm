@@ -1,7 +1,10 @@
 //! Windows over the Rust `WindowStatement` and its frame builder. The frame
 //! classes follow the Rust typestate: a start knows which side of the current
 //! row it lies on and offers only the ends PostgreSQL's grammar lets follow
-//! it, so no frame whose end comes before its start can be built.
+//! it, so no end on an earlier side of the current row than its start can be
+//! built. Two offsets on the same side are not compared, as the grammar does
+//! not compare them: `Rows.preceding(1).and_preceding(5)` builds a frame that
+//! holds no rows.
 
 use pgorm::pgorm_query::{
     FrameClause, FrameCurrentRow, FrameExclusion, FrameFollowing, FramePreceding, FrameStart,
@@ -208,7 +211,7 @@ impl PyFrameFollowing {
     }
 }
 
-// [spec:pgorm:req:python.statements+3]
+// [spec:pgorm:req:python.statements+4]
 /// An `OVER` window: PARTITION BY, ORDER BY and a frame, owned by Rust's
 /// `WindowStatement`.
 #[pyclass(name = "Window", module = "pgorm", frozen, from_py_object)]
@@ -320,7 +323,7 @@ enum Over {
     Named(Name),
 }
 
-// [spec:pgorm:req:python.statements+3]
+// [spec:pgorm:req:python.statements+4]
 /// A function call under `OVER`, a SELECT item built by `over`.
 #[pyclass(name = "WindowedExpr", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -375,7 +378,7 @@ impl PyWindowedExpr {
     }
 }
 
-// [spec:pgorm:req:python.statements+3]
+// [spec:pgorm:req:python.statements+4]
 /// A function PostgreSQL computes only over a window, built by
 /// `window_function`. Its one method is `over`, so it cannot stand in a query
 /// without its window (`42809`).
@@ -390,6 +393,12 @@ impl PyWindowFunction {
     fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowedExpr> {
         let call = WindowCall::Function(self.inner.clone());
         call.over(window)
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL expressions cannot be tested as Python booleans",
+        ))
     }
 
     fn __repr__(&self) -> &'static str {

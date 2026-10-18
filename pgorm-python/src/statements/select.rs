@@ -25,7 +25,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+3]
+// [spec:pgorm:req:python.statements+4]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]

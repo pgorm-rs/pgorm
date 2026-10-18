@@ -65,7 +65,9 @@ module targets, so a 19 build is tested against a PostgreSQL 19 server through
 ## CI and supported combinations
 
 The [Python workflow](../.github/workflows/python.yml) runs the checker for
-macOS arm64 and Linux x86-64 with CPython 3.14.4. Its macOS job uses the
+macOS arm64 and Linux x86-64 with the latest CPython 3.14 patch release, which
+`actions/setup-python` resolves from `'3.14'`; a run's evidence records the
+interpreter it used. Its macOS job uses the
 [`macos-15` arm64 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners);
 the Linux job uses Ubuntu 24.04. Each job checks its actual architecture,
 provisions an owned PostgreSQL 18 cluster (`postgresql@18` from Homebrew on
