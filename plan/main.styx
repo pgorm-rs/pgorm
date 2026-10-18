@@ -1492,6 +1492,14 @@ children (
                         text "Re-checked 2026-10-18 at codegen.entity.types +8, codegen.entity.compact.attrs +8 and codegen.entity.types.unsupported +8 (sql-domains, d5d22226): a domain column is a field of its base's Rust type with the domain spelled in its column definition by both writers; an array of a domain over an array is refused by name."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:16:50.306876Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at codegen.entity.types +9 and codegen.entity.expanded +4 (codegen-enum-array-expanded, 9a8a6c61): an enum inside an array or a domain is spelled <Enum>::db_type().get_column_type().clone() by both writers, an enum column itself <Enum>::db_type(); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -1559,12 +1567,27 @@ children (
                 title "Codegen reads a schema dump that creates its schemas, instead of refusing CREATE SCHEMA"
                 kind @fix
                 deps (sql-schemas sql-domains)
+                sealed true
                 log (
                     {
                         at 2026-10-18T19:21:23.94957Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-schemas (f767aea9). pgorm-codegen refuses CREATE SCHEMA in its input (\"unsupported DDL: CREATE SCHEMA at statement 1\"), so a schema dump that creates its own schemas cannot be fed to it, though codegen already emits schema_name for schema-qualified tables. Accept CREATE SCHEMA [IF NOT EXISTS] (and ignore it, or record the schema so a table in an undeclared schema can be reported), update codegen.ddl.unsupported, and add a fixture with a schema, a table and an enum in it."
+                    }
+
+                    {
+                        at 2026-10-18T22:17:32.448173Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T22:26:07.721992Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -1574,12 +1597,20 @@ children (
                 title "The expanded codegen writer's enum-array column compiles"
                 kind @fix
                 deps (sql-domains)
+                sealed true
                 log (
                     {
                         at 2026-10-18T21:52:40.128816Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-domains (2fa97891). pgorm-codegen's expanded writer emits ColumnType::Array(Arc::new(Mood::db_type())) for an enum-array column; db_type() returns a ColumnDef, so that is an Arc<ColumnDef> where Arc<ColumnType> is needed and the generated code does not compile (confirmed on the output). The domain path avoids it with .get_column_type().clone(). Emit the column type for an enum array the same way, add a golden fixture with an enum-array column for the expanded writer, and compile it in the test."
+                    }
+
+                    {
+                        at 2026-10-18T22:08:35.73852Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

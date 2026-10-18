@@ -164,7 +164,7 @@ fn the_bridge_reads_each_interval_qualifier() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    a qualifier no
+// [spec:pgorm:req:codegen.ddl.unsupported+17/test]    a qualifier no
 // `IntervalSpec` holds is named, as is a precision the server would quietly
 // reduce
 // [spec:pgorm:sem:codegen.ddl.types+9/test]
@@ -200,7 +200,7 @@ fn an_interval_modifier_beyond_the_spec_is_named() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    an interval column is an
+// [spec:pgorm:sem:codegen.entity.types+9/test]    an interval column is an
 // `Interval` field, an array of them a `Vec<Interval>`, whatever the qualifier
 // [spec:pgorm:sem:codegen.entity.compact.attrs+8/test]    the compact writer
 // names the column type exactly where the field's `Interval` does not: a
@@ -227,7 +227,7 @@ fn interval_columns_generate_a_compiling_entity() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells
+// [spec:pgorm:sem:codegen.entity.types+9/test]    the expanded writer spells
 // each qualifier out through the prelude, and defines every column as the
 // compact derive does
 #[test]

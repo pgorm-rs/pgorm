@@ -1076,6 +1076,8 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id codegen-enum-array-expanded, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:08:35.73852Z}
+    {id codegen-accepts-create-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:26:07.721992Z}
 )
 
 impl_evidence (

@@ -329,7 +329,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > expands the Entity/Column/PrimaryKey machinery that the expanded format
 > spells out.
 
-> [spec:pgorm:def:codegen.entity.expanded+3]
+> [spec:pgorm:def:codegen.entity.expanded+4]
 > The expanded format (`expanded_format == true`) emits per entity, in
 > order: the same imports; `#[derive(Copy, Clone, Default, Debug, DeriveEntity)]
 > pub struct Entity;`; `impl EntityName for Entity` containing
@@ -352,7 +352,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > identity column + `.default(<expr>)` for a column with a `DEFAULT` and
 > `.generated(<expr>, pgorm::pgorm_query::GeneratedKind::Stored | Virtual)`
 > for a generated one, `<expr>` the Rust `codegen.entity.expressions` prints,
-> and `<EnumName>::db_type()` for enum columns);
+> and `<EnumName>::db_type()` for enum columns, an enum inside an array or a
+> domain spelled as `codegen.entity.types` spells it);
 > `impl RelationTrait for Relation` whose `def()` matches every variant to a
 > `RelationDef` expression — or has the body `panic!("No RelationDef")` when
 > there are no relations; the `Related` impls; and
@@ -484,7 +485,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+8]
+> [spec:pgorm:sem:codegen.entity.types+9]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -560,16 +561,29 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > writes is held to the domain's default, `NOT NULL` and checks. Both writers
 > spell `ColumnType::Domain { name: Name::runtime("<name>"), schema:
 > <Some(Name::runtime("<schema>")) or None>, base: Arc::new(<base>) }` out,
-> the base spelled as a column's type is, but for an enum base, which is
-> `<Enum>::db_type().get_column_type().clone()`: the `Arc` holds a
-> `ColumnType`, where a field's own definition takes the `ColumnDef` that
-> `db_type()` returns. A domain over an enum or a created range imports and
-> generates that type as a column of it does. The live round trip of a
-> generated entity whose columns are domains over an integer, another
-> domain, a sized string, an enum, an array and a created range, a
-> schema-qualified one and arrays of two of them, is held at the workspace
-> root (`tests/codegen_domain_tests.rs`), over the files
-> `pgorm-codegen/tests/sql/domain/` compares the writer's output with.
+> the base spelled as a type inside another is, an enum base included. A
+> domain over an enum or a created range imports and generates that type as a
+> column of it does. The live round trip of a generated entity whose columns
+> are domains over an integer, another domain, a sized string, an enum, an
+> array and a created range, a schema-qualified one and arrays of two of
+> them, is held at the workspace root (`tests/codegen_domain_tests.rs`), over
+> the files `pgorm-codegen/tests/sql/domain/` compares the writer's output
+> with.
+>
+> An enum column's definition is its `ActiveEnum`'s `<Enum>::db_type()`, the
+> `ColumnDef` that `.def()` passes through. An enum inside another type — an
+> array's element, a domain's base — is
+> `<Enum>::db_type().get_column_type().clone()` instead, since the `Arc`
+> holding it holds a `ColumnType`: the expanded writer spells an enum array
+> `ColumnType::Array(Arc::new(<Enum>::db_type().get_column_type().clone()))`,
+> its schema, when it has one, carried by the `ActiveEnum`. The compact writer
+> states no `column_type` for an enum array, the derive inferring the array of
+> the enum's type from the `Vec` of its `ActiveEnum`; a domain over one it
+> spells as the expanded writer does. The live round trip of a generated
+> entity whose columns are arrays of an enum and of a schema-qualified one,
+> nullable and not, and a domain over an enum array is held at the workspace
+> root (`tests/codegen_enum_array_tests.rs`), over the files
+> `pgorm-codegen/tests/sql/enum_array/` compares both writers' output with.
 >
 > The `Eq` derive is added to the Model derive list only when no column's
 > type is `Float` or `Double`, checked recursively through `Array` element
@@ -998,12 +1012,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+16]
+> [spec:pgorm:req:codegen.ddl.unsupported+17]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints, and its `DEFAULT`s and generation expressions within the subset
 > `codegen.entity.expressions` reads; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
-> and `CREATE DOMAIN` (`codegen.ddl.objects`); `CREATE INDEX`; and `COMMENT ON TABLE`
+> and `CREATE DOMAIN` (`codegen.ddl.objects`); `CREATE INDEX`; `CREATE SCHEMA`,
+> `IF NOT EXISTS` or not (`codegen.ddl.objects`); and `COMMENT ON TABLE`
 > / `COMMENT ON COLUMN` — with a column's `COLLATE` clause and a `NOT NULL`
 > constraint's name and `NO INHERIT`, which the bridged statement carries and
 > the entity, like a comment, does not (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
@@ -1017,8 +1032,9 @@ compiling the C parser falls on people generating entities and on nobody else.
 > ``a CHECK constraint on column `t`.`c` `` — with `an unrecognised statement` as
 > the fallback for a statement kind the namer does not know.
 >
-> Named rejections MUST cover at least: every statement other than the six
-> above; a range type option PostgreSQL does not have, a `SUBTYPE` that is not
+> Named rejections MUST cover at least: every statement other than the seven
+> above; a statement written inside a `CREATE SCHEMA` as one of its elements,
+> named by its kind (``CREATE TABLE inside CREATE SCHEMA `s` ``); a range type option PostgreSQL does not have, a `SUBTYPE` that is not
 > a type name or is a `serial` spelling, and a range type with no `SUBTYPE`
 > (unresolved, as PostgreSQL refuses it with `42601`); on a domain, a base
 > that is a `serial` spelling or names no type the file declared or the
@@ -1098,7 +1114,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not
 > have, and a table or a type declared twice — each is keyed by name
-> downstream, so a duplicate would otherwise overwrite in silence. So is a table
+> downstream, so a duplicate would otherwise overwrite in silence. So is a
+> schema created a second time without `IF NOT EXISTS`, which PostgreSQL
+> refuses (`42P06`, *schema already exists*), as ``TransformError("statement
+> <n>: schema `<s>` is declared twice")``. So is a table
 > declaring more than one primary key, in each spelling PostgreSQL refuses
 > (`42P16`, *multiple primary keys for table are not allowed*): `PRIMARY KEY` on
 > two columns, on a column beside a table-level `PRIMARY KEY (...)`, as two table
@@ -1349,7 +1368,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > a foreign key whose last pair is its period (`period(p, q)`), the grammar
 > putting `PERIOD` on the last column of each list and nowhere else.
 
-> [spec:pgorm:sem:codegen.ddl.objects+9]
+> [spec:pgorm:sem:codegen.ddl.objects+10]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -1389,6 +1408,25 @@ compiling the C parser falls on people generating entities and on nobody else.
 > of it a non-null field: the column reads as `NULL` wherever an outer join
 > or an absent row makes it one, and an insert leaving it out takes the
 > domain's default, so the field's nullability is the column's own.
+>
+> A `CREATE SCHEMA` contributes no statement and no type: a table or a type in
+> the schema carries the schema as its qualifier, which is what the entity
+> generated for it names (`codegen.entity.context`). Its `AUTHORIZATION` role
+> is read and set aside, ownership being a privilege rather than a fact about
+> any value an entity reads or writes. The schema's name is read for one check
+> alone: a second `CREATE SCHEMA` of a name, unless it says `IF NOT EXISTS`, is
+> refused, as the server refuses it (`codegen.ddl.unsupported`). `CREATE SCHEMA
+> AUTHORIZATION <role>`, naming no schema, creates the one named for its role,
+> and a role keyword — `CURRENT_USER`, `CURRENT_ROLE`, `SESSION_USER` — is
+> answered by the session the file runs in, so such a schema is read with no
+> name and takes no part in the check. A qualified name elsewhere in the
+> file is not held to the schemas it creates, so a dump that creates its
+> schemas and one that does not are read alike: `public` exists without being
+> created, and a dump of some schemas names types and tables in others. A
+> schema element — `CREATE SCHEMA s CREATE TABLE t (..)` — is named, not read
+> (`codegen.ddl.unsupported`): the server qualifies an element's unqualified
+> names with the schema as it runs it, which the parse tree does not record,
+> so the element read as written would be a table outside its schema.
 >
 > A unique `CREATE INDEX` is folded into its table as the unique key that
 > enforces the same uniqueness — a `TableKey<Unique>`

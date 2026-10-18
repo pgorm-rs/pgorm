@@ -133,7 +133,7 @@ fn error(sql: &str) -> String {
 // reads as `ColumnType::Domain`, carrying the domain's identity and its base read as a
 // column's type is — another domain, an enum, an array and a range type among them —
 // through an array as on its own
-// [spec:pgorm:sem:codegen.ddl.objects+9/test]
+// [spec:pgorm:sem:codegen.ddl.objects+10/test]
 #[test]
 fn the_bridge_reads_a_domain_column() {
     let statements = parse_schema(SCHEMA).expect("the schema parses");
@@ -149,7 +149,7 @@ fn the_bridge_reads_a_domain_column() {
     assert_eq!(columns, expected);
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9/test]    a domain's COLLATE, DEFAULT, NOT NULL, NULL
+// [spec:pgorm:sem:codegen.ddl.objects+10/test]    a domain's COLLATE, DEFAULT, NOT NULL, NULL
 // and CHECKs are read and set aside: the entity a domain generates is the one its bare
 // declaration does
 #[test]
@@ -165,7 +165,7 @@ fn domain_constraints_are_set_aside() {
     assert_eq!(generate(nullable), generate(bare));
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    a constraint PostgreSQL refuses on a
+// [spec:pgorm:req:codegen.ddl.unsupported+17/test]    a constraint PostgreSQL refuses on a
 // domain is named, as are a serial base, a base the file does not declare and a domain
 // column under a qualification the domain was not declared with
 #[test]
@@ -261,7 +261,7 @@ fn unholdable_domain_arrays_are_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    a domain column is a field of its base's
+// [spec:pgorm:sem:codegen.entity.types+9/test]    a domain column is a field of its base's
 // Rust type, an array of one a `Vec` of it, an enum or a created range's newtype included
 // [spec:pgorm:sem:codegen.entity.compact.attrs+8/test]    the compact writer names every
 // domain column's type, the domain and its base spelled in full
@@ -293,7 +293,7 @@ fn domain_columns_generate_a_compiling_entity() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells each domain in
+// [spec:pgorm:sem:codegen.entity.types+9/test]    the expanded writer spells each domain in
 // full, and defines every column as the compact derive does
 #[test]
 fn the_expanded_writer_spells_each_domain() {

@@ -62,7 +62,7 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+8]
+    // [spec:pgorm:sem:codegen.entity.types+9]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
     // [spec:pgorm:req:codegen.entity.types.unsupported+8]
     pub fn get_rs_type(&self) -> TokenStream {
@@ -254,11 +254,27 @@ impl Column {
     }
 }
 
-/// The Rust that builds a column's `ColumnType`, which `get_def` follows with
-/// `.def()`. An enum's is its `ActiveEnum`'s `db_type()`, a `ColumnDef`
-/// that `.def()` passes through.
-// [spec:pgorm:req:codegen.entity.types.unsupported+8]
+/// The Rust that builds a column's definition, which `get_def` follows with
+/// `.def()`: an enum column's is its `ActiveEnum`'s `db_type()`, a `ColumnDef`
+/// that `.def()` passes through, and any other column's is its `ColumnType`.
 fn write_col_def(col_type: &ColumnType) -> TokenStream {
+    match col_type {
+        ColumnType::Enum { name, .. } => {
+            let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
+            quote! { #enum_ident::db_type() }
+        }
+        col_type => write_col_type(col_type),
+    }
+}
+
+/// The Rust that builds a `ColumnType`. An enum reaches it only inside
+/// another type — an array's element, a domain's base — and is its
+/// `ActiveEnum`'s column type itself, `db_type().get_column_type().clone()`,
+/// since the `Arc` holding it holds a `ColumnType` where `db_type()` returns
+/// a `ColumnDef`.
+// [spec:pgorm:req:codegen.entity.types.unsupported+8]
+// [spec:pgorm:sem:codegen.entity.types+9]
+fn write_col_type(col_type: &ColumnType) -> TokenStream {
     match col_type {
         ColumnType::Char(s) => match s {
             Some(s) => quote! { ColumnType::Char(Some(#s)) },
@@ -301,10 +317,10 @@ fn write_col_def(col_type: &ColumnType) -> TokenStream {
         }
         ColumnType::Enum { name, .. } => {
             let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
-            quote! { #enum_ident::db_type() }
+            quote! { #enum_ident::db_type().get_column_type().clone() }
         }
         ColumnType::Array(column_type) => {
-            let column_type = write_col_def(column_type);
+            let column_type = write_col_type(column_type);
             quote! { ColumnType::Array(Arc::new(#column_type)) }
         }
         ColumnType::Range(range) => {
@@ -337,7 +353,7 @@ fn write_col_def(col_type: &ColumnType) -> TokenStream {
                 }
                 None => quote! { None },
             };
-            let subtype = write_col_def(subtype);
+            let subtype = write_col_type(subtype);
             quote! {
                 ColumnType::#variant {
                     name: Name::runtime(#name),
@@ -356,10 +372,8 @@ fn write_col_def(col_type: &ColumnType) -> TokenStream {
 }
 
 /// A domain column's `ColumnType::Domain`, its name and schema as runtime
-/// names and its base built as a column's type is. An enum base is its
-/// `ActiveEnum`'s column type itself, the `Arc` holding a `ColumnType` where
-/// a field's own definition takes the `ColumnDef` `db_type()` returns.
-// [spec:pgorm:sem:codegen.entity.types+8]
+/// names and its base built as a `ColumnType`.
+// [spec:pgorm:sem:codegen.entity.types+9]
 fn domain_tokens(name: &Name, schema: &Option<Name>, base: &ColumnType) -> TokenStream {
     let name = name.to_string();
     let schema = match schema {
@@ -369,13 +383,7 @@ fn domain_tokens(name: &Name, schema: &Option<Name>, base: &ColumnType) -> Token
         }
         None => quote! { None },
     };
-    let base = match base {
-        ColumnType::Enum { name, .. } => {
-            let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
-            quote! { #enum_ident::db_type().get_column_type().clone() }
-        }
-        base => write_col_def(base),
-    };
+    let base = write_col_type(base);
     quote! {
         ColumnType::Domain {
             name: Name::runtime(#name),
@@ -395,7 +403,7 @@ pub(crate) fn under_domains(col_type: &ColumnType) -> &ColumnType {
 }
 
 /// The Rust type a built-in range ranges over, as the prelude names it.
-// [spec:pgorm:sem:codegen.entity.types+8]
+// [spec:pgorm:sem:codegen.entity.types+9]
 fn range_element(range: RangeType) -> &'static str {
     match range {
         RangeType::Int4 => "i32",
@@ -465,7 +473,7 @@ fn col_type_attr(col_type: &ColumnType) -> Option<String> {
 /// The `IntervalSpec` an interval column carries, as generated source spells
 /// it: the qualifier vocabulary resolves through the prelude, as `RangeType`
 /// does.
-// [spec:pgorm:sem:codegen.entity.types+8]
+// [spec:pgorm:sem:codegen.entity.types+9]
 fn interval_spec_tokens(spec: &IntervalSpec) -> TokenStream {
     let precision = |precision: &Option<IntervalPrecision>| match precision {
         Some(precision) => {

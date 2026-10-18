@@ -37,7 +37,7 @@ use pgorm_range_types::Floatrange;
 const SCHEMA: &str = include_str!("../pgorm-codegen/tests/sql/domain/schema.sql");
 
 /// The schema the file's one qualified domain lives in, which the file
-/// itself does not create: pgorm-codegen does not read `CREATE SCHEMA`.
+/// itself does not create.
 async fn schema(db: &impl ConnectionTrait) -> Result<(), Error> {
     db.batch_execute(&pgorm::pgorm_query::Schema::create(Name::runtime("billing")).to_string())
         .await?;
@@ -99,7 +99,7 @@ fn line(id: i32) -> stock_line::Model {
 /// The schema, run as written, and the table its generated entity creates
 /// have the same columns, each typed with its domain, so the entity carries
 /// the domain's name that its field's Rust type does not.
-// [spec:pgorm:sem:codegen.entity.types+8/test]    against a live server: the entity generated
+// [spec:pgorm:sem:codegen.entity.types+9/test]    against a live server: the entity generated
 // from a table of domain columns creates that table, domain for domain
 // [spec:pgorm:sem:codegen.entity.compact.attrs+8/test]
 #[pgorm_macros::test]
@@ -147,7 +147,7 @@ async fn generated_domain_columns_keep_their_domains() -> Result<(), Error> {
 /// every kind of domain the file declares; a domain's default fills the field
 /// a write leaves out; and each domain refuses, by its own `NOT NULL` or
 /// check, a value it does not hold.
-// [spec:pgorm:sem:codegen.entity.types+8/test]    against a live server: each domain field of
+// [spec:pgorm:sem:codegen.entity.types+9/test]    against a live server: each domain field of
 // the generated entity writes and reads back, its domain's default and constraints applied
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]

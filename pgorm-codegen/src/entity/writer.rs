@@ -365,7 +365,7 @@ impl EntityWriter {
         lines.push("".to_owned());
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+3]
+    // [spec:pgorm:def:codegen.entity.expanded+4]
     // [spec:pgorm:sem:codegen.entity.expanded.blocks+1]
     #[allow(clippy::too_many_arguments)]
     pub fn gen_expanded_code_blocks(
@@ -474,7 +474,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:def:codegen.entity.expanded+3]
+    // [spec:pgorm:def:codegen.entity.expanded+4]
     pub fn gen_impl_entity_name(entity: &Entity, schema_name: &Option<String>) -> TokenStream {
         let schema_name = match Self::gen_schema_name(entity, schema_name) {
             Some(schema_name) => quote! {

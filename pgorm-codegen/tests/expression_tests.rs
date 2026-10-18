@@ -169,7 +169,7 @@ fn a_generated_key_is_the_databases() {
     }
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    a construct outside the subset codegen
+// [spec:pgorm:req:codegen.ddl.unsupported+17/test]    a construct outside the subset codegen
 // reads is named with the expression it sits in, never approximated
 #[test]
 fn expressions_outside_the_subset_are_named() {

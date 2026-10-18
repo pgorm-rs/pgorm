@@ -8,9 +8,10 @@
 //!
 //! The bridge understands the DDL the entity model has a place for — tables,
 //! columns, primary keys, unique constraints, foreign keys, enum and range
-//! types, domains, indexes and comments. Anything else in the file is a named error rather
-//! than a silent omission: a schema that generates entities is a schema the
-//! bridge understood in full.
+//! types, domains, indexes and comments, and the schemas they are created in.
+//! Anything else in the file is a named error rather than a silent omission:
+//! a schema that generates entities is a schema the bridge understood in
+//! full.
 //!
 //! ```
 //! use pgorm_codegen::{EntityWriterOptions, sql_schema};
@@ -42,7 +43,7 @@ use crate::{
 use pg_query::NodeEnum;
 use pg_query::protobuf::{CommentStmt, CreateStmt, IndexStmt};
 use pgorm_query::{ColumnType, TableCreateStatement};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 
 /// A declared type's full identity: `(schema, name)`, `None` for an
@@ -72,7 +73,7 @@ type Declared = BTreeMap<TypeIdentity, DeclaredType>;
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
 // [spec:pgorm:def:codegen.ddl+3]
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
         .map_err(|err| Error::TransformError(format!("schema SQL did not parse: {err}")))?;
@@ -92,13 +93,13 @@ pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<Writ
 }
 
 /// A construct the bridge does not carry into the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 fn unsupported(what: impl Display, at: usize) -> Error {
     Error::TransformError(format!("unsupported DDL: {what} at statement {at}"))
 }
 
 /// A construct the bridge understands but cannot resolve in this schema.
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 fn unresolved(problem: impl Display, at: usize) -> Error {
     Error::TransformError(format!("statement {at}: {problem}"))
 }
@@ -113,17 +114,32 @@ struct Collected<'a> {
     comments: Vec<(usize, &'a CommentStmt)>,
 }
 
-/// Sort every statement in the file into the four the bridge reads, refusing
+/// Sort every statement in the file by what the bridge reads it as, refusing
 /// anything else by name.
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+///
+/// A `CREATE SCHEMA` is read for its name alone, to refuse a second creation
+/// of one schema as the server does (`42P06`) unless it says `IF NOT EXISTS`.
+/// A qualified name is not held to the schemas the file creates: `public`
+/// exists unasked, and a dump of some schemas names others it never creates.
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Error> {
     let mut collected = Collected::default();
+    let mut schemas = BTreeSet::new();
     for (index, raw) in parsed.stmts.iter().enumerate() {
         let at = index + 1;
         let Some(node) = raw.stmt.as_ref().and_then(|stmt| stmt.node.as_ref()) else {
             return Err(unsupported("an empty statement", at));
         };
         match node {
+            NodeEnum::CreateSchemaStmt(stmt) => {
+                if let Some(name) = objects::schema(stmt, at)?
+                    && !schemas.insert(name.clone())
+                    && !stmt.if_not_exists
+                {
+                    return Err(unresolved(format!("schema `{name}` is declared twice"), at));
+                }
+            }
             NodeEnum::CreateStmt(stmt) => collected.tables.push((at, stmt)),
             NodeEnum::IndexStmt(stmt) => collected.indexes.push((at, stmt.as_ref())),
             NodeEnum::CommentStmt(stmt) => collected.comments.push((at, stmt.as_ref())),
@@ -164,7 +180,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Record a type the file declares, refusing a second declaration of one
 /// identity — whichever kinds the two are.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn declare(
     declared: &mut Declared,
     identity: TypeIdentity,
@@ -183,7 +199,7 @@ fn declare(
 
 /// Resolve the collected statements against each other: declared types into
 /// the columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         declared: types,
@@ -263,7 +279,7 @@ fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
 
 /// The SQL a statement the bridge does not read was written as, named the way
 /// its author wrote it.
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 fn statement_kind(node: &NodeEnum) -> &'static str {
     match node {
         NodeEnum::AlterTableStmt(_) => "ALTER TABLE",
@@ -272,7 +288,6 @@ fn statement_kind(node: &NodeEnum) -> &'static str {
         NodeEnum::AlterOwnerStmt(_) => "ALTER ... OWNER TO",
         NodeEnum::AlterObjectSchemaStmt(_) => "ALTER ... SET SCHEMA",
         NodeEnum::RenameStmt(_) => "ALTER ... RENAME",
-        NodeEnum::CreateSchemaStmt(_) => "CREATE SCHEMA",
         NodeEnum::CreateSeqStmt(_) => "CREATE SEQUENCE",
         NodeEnum::CreateTrigStmt(_) => "CREATE TRIGGER",
         NodeEnum::CreateFunctionStmt(_) => "CREATE FUNCTION",

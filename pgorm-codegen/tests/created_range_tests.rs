@@ -56,7 +56,7 @@ fn created(name: &str, schema: Option<&str>, subtype: ColumnType) -> ColumnType 
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9/test]    a range type the file creates
+// [spec:pgorm:sem:codegen.ddl.objects+10/test]    a range type the file creates
 // types the columns naming it, by its full identity and with its subtype read
 // as a column's type is
 // [spec:pgorm:sem:codegen.ddl.types+9/test]
@@ -85,7 +85,7 @@ fn a_created_range_types_its_columns() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9/test]    a range type declares its
+// [spec:pgorm:sem:codegen.ddl.objects+10/test]    a range type declares its
 // multirange too: under the name PostgreSQL derives, in the range's schema, or
 // under MULTIRANGE_TYPE_NAME as written
 #[test]
@@ -169,7 +169,7 @@ fn a_created_range_declares_its_multirange() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    one newtype per range type,
+// [spec:pgorm:sem:codegen.entity.types+9/test]    one newtype per range type,
 // named in UpperCamelCase and deriving `DeriveCreatedRange` under its name and
 // schema, `Eq` but for a float subtype; the entity's fields name the newtypes
 // [spec:pgorm:req:codegen.entity.files+1/test]    `pgorm_range_types.rs` is
@@ -226,7 +226,7 @@ fn a_created_range_generates_a_compiling_newtype() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells
+// [spec:pgorm:sem:codegen.entity.types+9/test]    the expanded writer spells
 // a created range column's type as the derive does
 #[test]
 fn the_expanded_writer_names_the_created_range() {
@@ -257,7 +257,7 @@ fn the_expanded_writer_names_the_created_range() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    what the bridge cannot
+// [spec:pgorm:req:codegen.ddl.unsupported+17/test]    what the bridge cannot
 // carry out of a range type is named: a subtype no newtype can hold, an array
 // of a created range, an option PostgreSQL does not have, a range with no
 // subtype, a serial subtype, and a type declared twice
@@ -310,7 +310,7 @@ fn what_a_created_range_cannot_carry_is_named() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9/test]    the options that do not change
+// [spec:pgorm:sem:codegen.ddl.objects+10/test]    the options that do not change
 // a row's value are read and set aside, and a range over an enum the file
 // declared reads its subtype as that enum, which no newtype holds
 #[test]

@@ -13,7 +13,7 @@ use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use std::sync::Arc;
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    `Column::get_rs_type` follows
+// [spec:pgorm:sem:codegen.entity.types+9/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
@@ -92,7 +92,7 @@ fn column_rust_types_follow_the_mapping_table() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    `Float` and `Double` also map
+// [spec:pgorm:sem:codegen.entity.types+9/test]    `Float` and `Double` also map
 // to `f32` / `f64`, and either one suppresses the Model's `Eq` derive —
 // recursively through `Array`
 #[test]
@@ -334,7 +334,7 @@ fn derived_entity_names_the_hostile_type_exactly() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells the
+// [spec:pgorm:sem:codegen.entity.types+9/test]    the expanded writer spells the
 // same name the same way, so the two emission paths agree on a hostile name as
 // they do on a benign one
 #[test]
@@ -546,7 +546,7 @@ fn compact_primary_key_facts_surface_as_field_attributes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+8/test]    a range column is the `Range` of its
+// [spec:pgorm:sem:codegen.entity.types+9/test]    a range column is the `Range` of its
 // subtype's Rust type, and the expanded writer names its `RangeType`
 // [spec:pgorm:req:codegen.entity.types.unsupported+8/test]    an array of ranges is supported
 #[test]
