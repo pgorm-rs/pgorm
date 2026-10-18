@@ -1864,8 +1864,6 @@ impl_evidence (
         python.schema
     ), covered_claims (
         {impl_name main, rule python.schema}
-    ), rule_versions_seen (
-        {id python.schema, version 0}
     )}
     {id python.statements, covered_rules (
         python.raw

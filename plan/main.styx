@@ -6542,6 +6542,14 @@ children (
                         kind @note
                         text "Implemented owned native DataType/ColumnDef/CreateTable/CreateIndex/DDL and registered EntitySchema from actual Rust Schema methods. Verified 19 independent Rust DDL parity cases; all 97 installed standalone Python tests pass, including live quoted table/index/enum alterations, shadowed qualified enum arrays, and declaration/import without DDL. Fresh downstream checker passed 8 Rust tests, 9 entity, 7 graph, 5 pipeline-source and 1 registered-schema live test plus 8 independent cursor parity cases. The runnable SCHEMA.md example passed. Final format/typing/clippy checks in progress."
                     }
+
+                    {
+                        at 2026-10-18T17:23:04.449971Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at python.schema +1 (python-schema-truth-testing, 1c883ab5, which added truth testing to the rule): DataType, ColumnDef, CreateTable, CreateIndex, DDL, EntitySchema and Compiled raise ConstructionError on bool(); test_schema_objects_refuse_truth_testing samples every class the native schema module defines or pgorm.schema exports, and registered_schema.py truth-tests a registered entity's EntitySchema (checks/entities.py passed); the rest of the rule's text is unchanged and its 37 sites were re-read and re-pinned."
+                        after_done true
+                    }
                 )
             }
 
