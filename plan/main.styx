@@ -223,6 +223,15 @@ children (
                         [spec:pgorm:sem:sql.render.ddl.extension]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T17:59:57.749467Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql-select-extras (2e2d393a) bumped sql.render.select-order+5 (tie limit in LIMIT's place, GROUP BY DISTINCT), sql.render.subquery+4 (table function and sample FROM items), sql.render.operators+6 (SIMILAR TO, its ESCAPE tail) and sql.render.precedence+9 (SIMILAR TO in the LIKE family); sites re-pinned and the renderer matches."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -351,6 +360,14 @@ children (
                         text "Stale-epoch review: the drift is the campaign's own doing — every rule this node implements was re-verified through the unrep/ergo waves (select.projection under the typestate work, the with/on-conflict/window/order families rewritten with oracle-checked coverage), and nplan_spec_status holds 100% covered/tested with zero stale annotations. Re-acknowledging to open a new Done epoch; no code change belongs to this node itself."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T17:59:57.656965Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql-select-extras (2e2d393a) bumped sql.ast.select+4 (tie limit slot, GROUP BY DISTINCT quantifier), sql.ast.select.from+4 (FromItem::TableFunction/TableSample), sql.ast.func+10 (generate_series, generate_series_step, unnest) and sql.ast.expr.operators+5 (similar_to); every site re-read and re-pinned, the code still says what the rules say."
+                        after_done true
+                    }
                 )
             }
 
@@ -374,6 +391,15 @@ children (
                         [spec:pgorm:def:sql.types.column-type]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T17:59:57.847907Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql-select-extras (2e2d393a) bumped sql.types.opers+5 (BinOper::SimilarTo/NotSimilarTo) and sql.types.table-ref+6 (FromItem::TableFunction and TableSample, table_name and qualifier for a sample); sites re-pinned and the types match."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -8691,6 +8717,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at sql.surface +28, which adds Interval (sql.value.interval) to the register in f9db65b7; the merges of branches cut before the 2026-10-18 re-check had also restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T17:59:57.943548Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql-select-extras (2e2d393a) bumped sql.surface+30, recording TableFunction (sql.ast.select.table-function) and TableSample with SampleMethod (sql.ast.select.table-sample) in the register; test-surface passes 5/5 with them."
                         after_done true
                     }
                 )
