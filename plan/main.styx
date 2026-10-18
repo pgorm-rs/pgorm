@@ -8878,6 +8878,14 @@ children (
                         text "sql.surface +31: Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement are re-exported by name from lib.rs and recorded in the register with sql.ddl.schema."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:45:14.596715Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.surface +34 (sql-domains, d5d22226): the register records Domain, DomainCreateStatement, PendingDomainAlter, DomainAlterStatement, DomainDropStatement, DomainCheck and IntoDomainCheck, lib.rs exports them in its schema-statement group, and test-surface passes."
+                        after_done true
+                    }
                 )
             }
 
