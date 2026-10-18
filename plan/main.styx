@@ -8727,6 +8727,14 @@ children (
                         text "sql-select-extras (2e2d393a) bumped sql.surface+30, recording TableFunction (sql.ast.select.table-function) and TableSample with SampleMethod (sql.ast.select.table-sample) in the register; test-surface passes 5/5 with them."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T18:00:23.95579Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-delivered at sql.surface+30: the register and pgorm-query's exports agree both ways, the three new names each with their rule."
+                        after_done true
+                    }
                 )
             }
 
