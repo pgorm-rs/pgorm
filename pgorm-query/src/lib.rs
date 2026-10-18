@@ -646,10 +646,11 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+28]
-// [spec:pgorm:req:sql.surface+28/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+29]
+// [spec:pgorm:req:sql.surface+29/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
-// crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
+// crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
+// runs the rest of the rule's tests, in `tests/surface`.
 //
 // What this list does NOT name is a decision as much as what it does, and the
 // constructs outside it are enumerated with their reasons rather than left to
@@ -690,11 +691,18 @@ pub mod tests_cfg;
 
 // The internal shapes the rest of the crate reaches for as `crate::Thing`,
 // and which stop at the crate boundary. Everything else a module names that
-// way arrives through the public re-exports below.
+// way arrives through the public re-exports below. One to a line: the
+// compile-fail snapshot in `tests/surface` quotes each item's own line, so
+// adding a shape leaves the others' quotations as they are.
 pub(crate) use backend::Oper;
 pub(crate) use prepare::Write;
-pub(crate) use query::{ConditionHolder, InsertValueSource, JoinExpr, LockClause, ReturningItems};
-pub(crate) use types::{JoinKind, JoinOn};
+pub(crate) use query::ConditionHolder;
+pub(crate) use query::InsertValueSource;
+pub(crate) use query::JoinExpr;
+pub(crate) use query::LockClause;
+pub(crate) use query::ReturningItems;
+pub(crate) use types::JoinKind;
+pub(crate) use types::JoinOn;
 
 // Names: what an identifier position holds, and the conversions into it —
 // names themselves, then the table references and the join shape that reads

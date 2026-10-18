@@ -8811,12 +8811,20 @@ children (
                 title "nextest holds pgorm-query's public surface and every cast spelling's node shape"
                 kind @test
                 deps (query-reexports-curated single-cast-node statement-interval-value)
+                sealed true
                 log (
                     {
                         at 2026-10-18T14:28:24.802325Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found re-checking query-reexports-curated and single-cast-node on 2026-10-18 (notes on both). (1) sql.surface is held only by two compile_fail,E0603 doctests in pgorm-query/src/lib.rs, which nextest never runs. Add tests that run under nextest and hold: exactly three public modules (error, extension, value); the doc-hidden residue named in the rule; that pgorm_query::Write and the pub(crate) clause shapes cannot be named (a trybuild compile-fail case; the repo already uses trybuild); and that the rule's register and lib.rs's root exports agree both ways, so an export added without a register entry fails. Also decide value::with_vector, a public module holding only impls that is a reachable path not among the rule's spellings. (2) every_cast_spelling_builds_one_node_shape (pgorm-query/tests/postgres/query.rs) and entity_layer_casts_build_the_one_cast_node (tests/enum_tests.rs) were not extended when sql.ast.cast-shape +1 added as_range and the entity layer's created-range casts; add as_range, CreatedRange::into_expr, and the read and write casts on created range and created multirange columns, plus SimpleExpr::cast_as / cast_as_type, so each is held structurally rather than only by CAST( render goldens. Waits on statement-interval-value, which adds a value and may add exports to the same register."
+                    }
+
+                    {
+                        at 2026-10-18T16:20:09.811186Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

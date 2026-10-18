@@ -739,7 +739,7 @@ pub mod with_array {
     }
 }
 
-pub mod with_vector {
+mod with_vector {
     use super::*;
 
     impl From<pgvector::Vector> for Value {

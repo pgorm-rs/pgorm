@@ -323,10 +323,40 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
     );
 }
 
+/// A range type a schema created and the multirange created beside it, the
+/// two column types whose casts the created-range rule adds.
+mod bookings {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveCreatedRange)]
+    #[pgorm(range_name = "slot", schema_name = "booking")]
+    pub struct Slot(pub Range<i32>);
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveCreatedRange)]
+    #[pgorm(multirange_name = "slot_set", schema_name = "booking")]
+    pub struct Slots(pub Multirange<i32>);
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(table_name = "bookings")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub slot: Slot,
+        pub slots: Slots,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
 // [spec:pgorm:req:sql.ast.cast-shape+2/test]    the entity layer's casts — the
-// enum defaults on read and write, `ActiveEnum::as_enum`, and a derived
-// `select_as` / `save_as` override — are each the one `AsEnum` node, with the
-// quoted-or-verbatim choice carried in its `TypeName`
+// enum defaults on read and write, `ActiveEnum::as_enum`, a derived
+// `select_as` / `save_as` override, and the created-range casts:
+// `CreatedRange::into_expr`, the write cast of a created range or multirange
+// column and the read cast of a created multirange one — are each the one
+// `AsEnum` node, with the quoted-or-verbatim choice carried in its `TypeName`
 #[test]
 fn entity_layer_casts_build_the_one_cast_node() {
     let tea = || SimpleExpr::from(Expr::col(casts::Column::Tea));
@@ -334,6 +364,9 @@ fn entity_layer_casts_build_the_one_cast_node() {
     let name = || SimpleExpr::from(Expr::col(collection::Column::Name));
     let value = || SimpleExpr::from(Expr::val("EverydayTea"));
     let array = || SimpleExpr::from(Expr::val(Value::array(["EverydayTea".to_owned()])));
+    let slot = || SimpleExpr::from(Expr::col(bookings::Column::Slot));
+    let slots = || SimpleExpr::from(Expr::col(bookings::Column::Slots));
+    let text = |text: &'static str| SimpleExpr::from(Expr::val(text));
 
     // (spelling, the expression it built, the operand it was handed, the
     // type's text, whether that text is the caller's verbatim SQL)
@@ -394,6 +427,37 @@ fn entity_layer_casts_build_the_one_cast_node() {
             "citext[]",
             true,
         ),
+        (
+            "CreatedRange::into_expr",
+            bookings::Slot(Range::from(1..5)).into_expr(),
+            text("[1,5)"),
+            "booking.slot",
+            false,
+        ),
+        (
+            "save_enum_as on a created range, a built-in range value written as its text",
+            bookings::Column::Slot.save_enum_as(Expr::val(Range::from(1..5))),
+            text("[1,5)"),
+            "booking.slot",
+            false,
+        ),
+        (
+            "save_enum_as on a created multirange",
+            bookings::Column::Slots.save_enum_as(Expr::val(Multirange::from(vec![
+                Range::from(1..5),
+                Range::from(7..9),
+            ]))),
+            text("{[1,5),[7,9)}"),
+            "booking.slot_set",
+            false,
+        ),
+        (
+            "select_enum_as on a created multirange",
+            bookings::Column::Slots.select_enum_as(Expr::expr(slots())),
+            slots(),
+            "text",
+            false,
+        ),
     ];
 
     for (spelling, cast, operand, type_text, verbatim) in spellings {
@@ -412,6 +476,12 @@ fn entity_layer_casts_build_the_one_cast_node() {
             other => panic!("{spelling} built a cast that is not an `AsEnum`: {other:?}"),
         }
     }
+
+    // A created range is read from its binary form, so its read is no cast.
+    assert_eq!(
+        bookings::Column::Slot.select_enum_as(Expr::expr(slot())),
+        slot()
+    );
 }
 
 // [spec:pgorm:sem:entity.traits.column.enum-cast+6/test]    the special case:
