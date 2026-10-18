@@ -1486,7 +1486,7 @@ today, including panicking edges and deliberate failsafes.
 > `DEFAULT` the way it takes any expression, `ColumnDef::default(Func::uuidv7())`
 > (`[spec:pgorm:req:sql.ddl.column-def+12]`), and an entity as
 > `#[pgorm(default_expr = "Func::uuidv7()")]`, `Func` being a prelude member for
-> that reason (`[spec:pgorm:def:entity.prelude+7]`). `uuidv7_shifted` is
+> that reason (`[spec:pgorm:def:entity.prelude+8]`). `uuidv7_shifted` is
 > `uuidv7`'s one-argument overload, which moves the embedded time by an
 > `interval` and binds it as any argument is bound; PostgreSQL has no other
 > `uuidv7` arity (`uuidv7(1)` is `42883`). The two readers are immutable, so

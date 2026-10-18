@@ -36,7 +36,7 @@ async fn _paged<C: ConnectionTrait>(db: &C) -> Result<u64, Error> {
         .await
 }
 
-// [spec:pgorm:def:entity.prelude+7/test]    a query built, an active model set, a
+// [spec:pgorm:def:entity.prelude+8/test]    a query built, an active model set, a
 // statement decoded and a column enumerated, with the prelude as the only import
 #[test]
 fn prelude_carries_what_a_query_needs() {
@@ -102,7 +102,7 @@ fn prelude_carries_what_a_query_needs() {
     );
 }
 
-// [spec:pgorm:def:entity.prelude+7/test]    `Func`, the vocabulary an entity's
+// [spec:pgorm:def:entity.prelude+8/test]    `Func`, the vocabulary an entity's
 // `default_expr` names a function default in, with the prelude as the only import
 #[test]
 fn prelude_carries_the_function_vocabulary() {
@@ -112,4 +112,41 @@ fn prelude_carries_the_function_vocabulary() {
         .as_query()
         .to_string();
     assert_eq!(sql, r#"SELECT UUIDV7() FROM "cake""#);
+}
+
+/// An entity whose interval columns carry a qualifier, written as pgorm-codegen
+/// writes one, with the prelude as the only import.
+mod interval_columns {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "interval_columns")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(column_type = "Interval(IntervalSpec::Fields(PgInterval::YearToMonth))")]
+        pub months: Interval,
+        #[pgorm(column_type = "Interval(IntervalSpec::Any(Some(IntervalPrecision::P3)))")]
+        pub precise: Interval,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:def:entity.prelude+8/test]    the interval vocabulary: a field's
+// `Interval` and the `IntervalSpec`, `PgInterval` and `IntervalPrecision` its
+// `column_type` names resolve through the glob
+#[test]
+fn prelude_carries_the_interval_vocabulary() {
+    assert_eq!(
+        interval_columns::Column::Months.def().get_column_type(),
+        &ColumnType::Interval(IntervalSpec::Fields(PgInterval::YearToMonth))
+    );
+    assert_eq!(
+        interval_columns::Column::Precise.def().get_column_type(),
+        &ColumnType::Interval(IntervalSpec::Any(IntervalPrecision::new(3)))
+    );
 }

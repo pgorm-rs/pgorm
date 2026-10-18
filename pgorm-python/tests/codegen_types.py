@@ -1,13 +1,16 @@
 """Type-check this consumer against the installed generated application stubs."""
 
 from typing import assert_type
-from pgorm import Connection
+from pgorm import Connection, Interval
 from pgorm.app import (
     Account,
     AccountActive,
     AccountModel,
     AccountNotes,
     AccountOnly,
+    IntervalSpan,
+    IntervalSpanActive,
+    IntervalSpanModel,
     NoteModel,
     RequiredNotes,
 )
@@ -38,3 +41,13 @@ async def consumer(connection: Connection) -> None:
         await RequiredNotes.find().all(connection), list[tuple[AccountModel, NoteModel]]
     )
     assert_type(await AccountOnly.find().one_opt(connection), AccountModel | None)
+    span = await IntervalSpan.find().one(connection)
+    assert_type(span, IntervalSpanModel)
+    assert_type(span.months, Interval)
+    assert_type(span.maybe, Interval | None)
+    assert_type(span.history, list[Interval])
+    assert_type(span.budgets, list[Interval] | None)
+    assert_type(
+        IntervalSpan.active().set_months(Interval(1)).set_budgets(None),
+        IntervalSpanActive,
+    )

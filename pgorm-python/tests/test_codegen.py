@@ -25,7 +25,7 @@ class CodegenTests(unittest.TestCase):
             ],
         }
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_registration_collisions_are_rejected(self):
         for update in (
             {"name": "different"},
@@ -53,7 +53,7 @@ class CodegenTests(unittest.TestCase):
         with self.assertRaises(CodegenError):
             validate(data, self.base)
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_build_input_does_not_accept_code(self):
         for path in (
             "crate::Entity",
@@ -76,7 +76,7 @@ class CodegenTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(CodegenError):
                 validate({**self.config, key: value}, self.base)
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_reflection_preserves_standard_value_tags(self):
         cases = [
             ("i8", "int", "i8"),
@@ -87,6 +87,8 @@ class CodegenTests(unittest.TestCase):
             ("jiff::Timestamp", "datetime", "datetime_utc"),
             ("Option<DateTime>", "datetime | None", "datetime"),
             ("rust_decimal::Decimal", "Decimal", "decimal"),
+            ("Interval", "p.Interval", "interval"),
+            ("Option<pgorm::pgorm_query::Interval>", "p.Interval | None", "interval"),
         ]
         for rust, annotation, kind in cases:
             mapped = field_type(
@@ -118,6 +120,17 @@ class CodegenTests(unittest.TestCase):
         )
         self.assertEqual(array.annotation, "list[int | None] | None")
         self.assertIn("Value.array('i32'", array.binding())
+        intervals = field_type(
+            {
+                "rust_decode_type": "Option < Vec < Interval > >",
+                "input_hint": {
+                    "kind": "array",
+                    "element": {"kind": "scalar", "tag": "interval"},
+                },
+            }
+        )
+        self.assertEqual(intervals.annotation, "list[p.Interval] | None")
+        self.assertIn("Value.array('interval'", intervals.binding())
         enum = field_type(
             {
                 "rust_decode_type": "Mood",
@@ -127,7 +140,7 @@ class CodegenTests(unittest.TestCase):
         self.assertEqual(enum.annotation, "str")
         self.assertIn("schema='a\"b'", enum.binding())
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_field_aliases_resolve_real_column_names(self):
         columns = [
             {

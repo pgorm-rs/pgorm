@@ -266,7 +266,7 @@ impl Entity {
             .collect()
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+6]
+    // [spec:pgorm:sem:codegen.entity.types+7]
     pub fn get_eq_needed(&self) -> TokenStream {
         fn is_floats(col_type: &ColumnType) -> bool {
             match col_type {

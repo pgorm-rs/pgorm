@@ -67,6 +67,10 @@ SCALARS = {
     "mac_address::MacAddress": ("bytes", "mac_address"),
     "Vector": ("list[float]", "vector"),
     "pgvector::Vector": ("list[float]", "vector"),
+    # The generated module imports pgorm as `p`, so the class is named through it.
+    "Interval": ("p.Interval", "interval"),
+    "pgorm_query::Interval": ("p.Interval", "interval"),
+    "pgorm::pgorm_query::Interval": ("p.Interval", "interval"),
 }
 
 

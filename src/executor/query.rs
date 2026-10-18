@@ -435,7 +435,7 @@ impl TryGetable for MacAddress {
     }
 }
 
-// [spec:pgorm:req:exec.decode.interval]
+// [spec:pgorm:req:exec.decode.interval+1]
 try_getable_all!(Interval);
 
 // [spec:pgorm:def:exec.decode.types+3]
@@ -528,7 +528,7 @@ mod postgres_array {
 
     try_getable_postgres_array!(rust_decimal::Decimal);
 
-    // [spec:pgorm:req:exec.decode.interval]
+    // [spec:pgorm:req:exec.decode.interval+1]
     try_getable_postgres_array!(Interval);
 
     #[allow(unused_macros)]

@@ -24,7 +24,7 @@
 //! entity's own module, and a key filled by `Func::uuidv7()` is the default a
 //! new table most often wants.
 
-// [spec:pgorm:def:entity.prelude+7]
+// [spec:pgorm:def:entity.prelude+8]
 // [spec:pgorm:sem:query.build.alias+2]
 pub use crate::{
     ActiveEnum, ActiveModelBehavior, ActiveModelTrait, ActiveValue,
@@ -75,8 +75,14 @@ pub use uuid::Uuid;
 // [spec:pgorm:def:exec.decode.types+3]
 pub use crate::pgorm_query::{IpNetwork, MacAddress, Vector};
 
-// [spec:pgorm:req:exec.decode.interval]
+// [spec:pgorm:req:exec.decode.interval+1]
 pub use crate::pgorm_query::Interval;
+
+/// The qualifier vocabulary of an interval column, so that
+/// `column_type = "Interval(IntervalSpec::Fields(PgInterval::YearToMonth))"`
+/// resolves in the module the entity is written in.
+// [spec:pgorm:def:entity.prelude+8]
+pub use crate::pgorm_query::{IntervalPrecision, IntervalSpec, PgInterval};
 
 // [spec:pgorm:def:exec.decode.range+3]
 pub use crate::pgorm_query::{Multirange, Range, RangeType};

@@ -36,4 +36,6 @@ rust_decimal = { version = "1.43", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = { version = "1.4" }
-pgorm = { path = "../", default-features = false, features = ["macros"] }
+# `postgres-array` lets a generated entity's `Vec<T>` field compile here, as
+# a fixture holding an array column has to.
+pgorm = { path = "../", default-features = false, features = ["macros", "postgres-array"] }

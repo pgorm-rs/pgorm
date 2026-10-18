@@ -1397,12 +1397,20 @@ children (
                 title "Codegen maps an interval column to Interval, in Rust and in Python's generated types"
                 kind @feat
                 deps (statement-interval-value)
+                sealed true
                 log (
                     {
                         at 2026-10-18T15:35:37.346517Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed from statement-interval-value (f9db65b7). pgorm_query::Interval now exists, entities take Interval / Option<Interval> / Vec<Interval> fields and Schema creates an interval column, but pgorm-codegen still refuses interval columns, and pgorm-python's codegen type table has no interval entry. Map interval (and interval[]) to Interval in generated Rust entities and to pgorm.Interval in Python codegen, decide what an interval column carrying a field qualifier (INTERVAL YEAR TO MONTH, a precision) generates, and cover it in codegen's tests and the live schema round trip."
+                    }
+
+                    {
+                        at 2026-10-18T16:51:55.197502Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

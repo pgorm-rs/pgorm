@@ -618,7 +618,7 @@ impl_into_active_value!(crate::prelude::DateTimeWithTimeZone);
 
 impl_into_active_value!(crate::prelude::Decimal);
 
-// [spec:pgorm:req:exec.decode.interval]
+// [spec:pgorm:req:exec.decode.interval+1]
 impl_into_active_value!(crate::prelude::Interval);
 
 #[cfg(feature = "with-uuid")]

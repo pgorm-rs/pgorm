@@ -290,11 +290,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Downstream development and release
 
-> [spec:pgorm:req:python.codegen]
+> [spec:pgorm:req:python.codegen+1]
 > A documented code-generation/build workflow MUST create concrete Python
 > wrappers and matching type information for downstream Rust entities and
 > selected graph shapes. It MUST preserve qualified names, column mappings,
 > enum types and optional decode shapes and detect registration/name collisions.
+> A field's Python type follows its reflected Rust type: each Rust value type
+> `pgorm.Value` carries maps to the Python type its values decode as — an
+> `Interval` field to `pgorm.Interval` whatever the column's field
+> qualifier, bound under the `interval` kind, and an array of them to
+> `list[pgorm.Interval]` — and a type outside them to `Any`.
 > Compilation occurs when those definitions or enabled shapes change, not
 > when a user constructs another query over the installed types. Generated
 > modules MUST declare compatibility with the binding registry and pgorm build.

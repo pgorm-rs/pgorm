@@ -2,7 +2,9 @@ use super::{Declared, DeclaredType, unresolved, unsupported};
 use crate::Error;
 use pg_query::NodeEnum;
 use pg_query::protobuf::TypeName;
-use pgorm_query::{ColumnType, IntervalSpec, Name, RangeType, StringLen};
+use pgorm_query::{
+    ColumnType, IntervalPrecision, IntervalSpec, Name, PgInterval, RangeType, StringLen,
+};
 use std::sync::Arc;
 
 /// A column's type together with the auto-increment fact the `serial` family
@@ -16,7 +18,7 @@ pub(super) struct ColumnKind {
 ///
 /// `context` names the column for the error message; `at` is the 1-based
 /// statement number.
-// [spec:pgorm:sem:codegen.ddl.types+7]
+// [spec:pgorm:sem:codegen.ddl.types+8]
 pub(super) fn column_kind(
     type_name: &TypeName,
     declared: &Declared,
@@ -79,7 +81,7 @@ fn modifiers(type_name: &TypeName, context: &str, at: usize) -> Result<Vec<u32>,
 /// The reverse of the `ColumnType` → Postgres spelling contract, read over the
 /// names the grammar produces: keyword spellings arrive qualified as
 /// `pg_catalog.<name>`, everything else bare.
-// [spec:pgorm:sem:codegen.ddl.types+7]
+// [spec:pgorm:sem:codegen.ddl.types+8]
 fn named_type(
     names: &[String],
     modifiers: &[u32],
@@ -124,7 +126,7 @@ fn named_type(
         ("timestamptz", []) => ColumnType::TimestampWithTimeZone,
         ("time", []) => ColumnType::Time,
         ("date", []) => ColumnType::Date,
-        ("interval", []) => ColumnType::Interval(IntervalSpec::Any(None)),
+        ("interval", modifiers) => ColumnType::Interval(interval_spec(modifiers, context, at)?),
         ("bool" | "boolean", []) => ColumnType::Boolean,
         ("money", []) => ColumnType::Money,
         ("bytea", []) => ColumnType::Bytea,
@@ -157,12 +159,88 @@ fn named_type(
     Ok(plain(col_type))
 }
 
+/// An interval's qualifier, from the modifiers the grammar writes for it: a
+/// field mask — `INTERVAL_MASK` bits over the fields the qualifier spans, or
+/// every bit (`0x7FFF`) for an unqualified `interval(p)` — then the
+/// fractional-seconds precision when one was given.
+///
+/// The mask is read as `intervaltypmodin` reads it, so a generic spelling
+/// such as `pg_catalog.interval(6)` means what the server takes it to mean,
+/// `YEAR TO MONTH`. A precision on a field other than `SECOND` reaches here
+/// only through that generic spelling and has no `IntervalSpec`; a precision
+/// past 6 the server would quietly reduce to 6, which is the file saying
+/// something other than what the column would be.
+// [spec:pgorm:sem:codegen.ddl.types+8]
+fn interval_spec(modifiers: &[u32], context: &str, at: usize) -> Result<IntervalSpec, Error> {
+    const MONTH: u32 = 1 << 1;
+    const YEAR: u32 = 1 << 2;
+    const DAY: u32 = 1 << 3;
+    const HOUR: u32 = 1 << 10;
+    const MINUTE: u32 = 1 << 11;
+    const SECOND: u32 = 1 << 12;
+    const FULL_RANGE: u32 = 0x7FFF;
+
+    let (mask, precision) = match modifiers {
+        [] => return Ok(IntervalSpec::Any(None)),
+        [mask] => (*mask, None),
+        [mask, precision] => {
+            let digits = u8::try_from(*precision)
+                .ok()
+                .and_then(IntervalPrecision::new)
+                .ok_or_else(|| {
+                    unsupported(
+                        format!(
+                            "an `interval` precision of {precision}, above the 6 PostgreSQL keeps, on {context}"
+                        ),
+                        at,
+                    )
+                })?;
+            (*mask, Some(digits))
+        }
+        _ => {
+            return Err(unsupported(
+                format!("`interval` with a type modifier on {context}"),
+                at,
+            ));
+        }
+    };
+    let spec = match (mask, precision) {
+        (FULL_RANGE, precision) => IntervalSpec::Any(precision),
+        (YEAR, None) => IntervalSpec::Fields(PgInterval::Year),
+        (MONTH, None) => IntervalSpec::Fields(PgInterval::Month),
+        (DAY, None) => IntervalSpec::Fields(PgInterval::Day),
+        (HOUR, None) => IntervalSpec::Fields(PgInterval::Hour),
+        (MINUTE, None) => IntervalSpec::Fields(PgInterval::Minute),
+        (SECOND, precision) => IntervalSpec::Fields(PgInterval::Second(precision)),
+        (m, None) if m == YEAR | MONTH => IntervalSpec::Fields(PgInterval::YearToMonth),
+        (m, None) if m == DAY | HOUR => IntervalSpec::Fields(PgInterval::DayToHour),
+        (m, None) if m == DAY | HOUR | MINUTE => IntervalSpec::Fields(PgInterval::DayToMinute),
+        (m, precision) if m == DAY | HOUR | MINUTE | SECOND => {
+            IntervalSpec::Fields(PgInterval::DayToSecond(precision))
+        }
+        (m, None) if m == HOUR | MINUTE => IntervalSpec::Fields(PgInterval::HourToMinute),
+        (m, precision) if m == HOUR | MINUTE | SECOND => {
+            IntervalSpec::Fields(PgInterval::HourToSecond(precision))
+        }
+        (m, precision) if m == MINUTE | SECOND => {
+            IntervalSpec::Fields(PgInterval::MinuteToSecond(precision))
+        }
+        _ => {
+            return Err(unsupported(
+                format!("`interval` with a type modifier on {context}"),
+                at,
+            ));
+        }
+    };
+    Ok(spec)
+}
+
 /// A name the file declared as a type — an enum or a range type — resolved by
 /// its exact identity, `None` when it names none and is to be read as a
 /// built-in. A reference to a declared type's bare name under another
 /// qualification MUST NOT resolve to that schema's type, and a schema-qualified
 /// name the file did not declare is no built-in either.
-// [spec:pgorm:sem:codegen.ddl.types+7]
+// [spec:pgorm:sem:codegen.ddl.types+8]
 fn declared_type(
     schema: Option<&str>,
     name: &str,
@@ -227,7 +305,7 @@ fn declared_type(
 
 /// A built-in range or multirange type by its catalogue name. None takes a
 /// type modifier, so a modified one falls through to the refusal below.
-// [spec:pgorm:sem:codegen.ddl.types+7]
+// [spec:pgorm:sem:codegen.ddl.types+8]
 fn builtin_range(name: &str) -> Option<ColumnType> {
     [
         RangeType::Int4,
