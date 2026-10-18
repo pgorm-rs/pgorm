@@ -11900,12 +11900,20 @@ children (
         title "The generative campaign's live wire check constructs every value kind the extension advertises"
         kind @test
         deps (generative-interval-kind)
+        sealed true
         log (
             {
                 at 2026-10-18T17:34:04.080474Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by generative-interval-kind (12959726). security/generative/tests/live_wire.py asserts that the value kinds it saw equal the extension's advertised value_types, which include the range, multirange and created-range kinds, but the script never constructs those, so it fails before and after interval was added (interval's own cases validate and round-trip). Construct every advertised kind (built-in ranges and multiranges of each subtype, a created range and multirange over a schema-qualified type the fixture creates) so the check passes and stays exhaustive: a newly advertised kind without a case should fail it by name. Filed as a root node because the generative container is sealed."
+            }
+
+            {
+                at 2026-10-18T18:33:19.713463Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
