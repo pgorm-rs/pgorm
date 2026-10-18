@@ -1183,7 +1183,7 @@ impl QueryBuilder {
             // Cast, unlike the temporal literals: an untyped string is `text`
             // wherever no column types it, and an array of them is a `text[]`
             // no `interval[]` column takes.
-            // [spec:pgorm:sem:sql.value.interval-text]
+            // [spec:pgorm:sem:sql.value.interval-text+1]
             Value::Interval(Some(v)) => {
                 self.write_string_quoted(&v.to_string(), &mut s);
                 write!(s, "::interval").unwrap()

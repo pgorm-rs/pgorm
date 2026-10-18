@@ -469,7 +469,7 @@ including panic semantics and quirks inherited from sea-query.
 > its programs bind, inline and decode intervals through both bindings and
 > compare them field by field, and its replay encodes the same triple.
 
-> [spec:pgorm:sem:sql.value.interval-text]
+> [spec:pgorm:sem:sql.value.interval-text+1]
 > `Display` for `Interval` writes the text PostgreSQL's interval input reads
 > back as the same triple: `infinity` and `-infinity` for the two infinite
 > triples, `+0 days` when every field is zero, and otherwise each nonzero
@@ -479,9 +479,10 @@ including panic semantics and quirks inherited from sea-query.
 > applies a leading `-` to every field after it unless another field is
 > signed too, so `-1 days 2 hours` would be read as `-1 days -2 hours`. The
 > microseconds are an integer, so no field passes through a fraction the
-> server would round, and the infinities are words because the server's
-> input refuses to compute an infinity from finite fields (`interval out of
-> range`).
+> server would round, and the infinities are the words PostgreSQL's own
+> output uses for them. On 18 the all-maximum and all-minimum triples spelled
+> as fields also read back as the infinities, but the words do not depend on
+> that.
 >
 > The literal rendering (`[spec:pgorm:sem:sql.value.render+2]`) writes that
 > text single-quoted through `write_string_quoted` and cast,
