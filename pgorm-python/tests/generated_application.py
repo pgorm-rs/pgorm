@@ -2,6 +2,7 @@
 
 import copy
 import inspect
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -17,7 +18,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
     asyncSetUp = fixture.RegisteredEntities.asyncSetUp
     asyncTearDown = fixture.RegisteredEntities.asyncTearDown
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     async def test_generated_models_keep_native_states(self):
         original = (
             app.Account.active()
@@ -62,7 +63,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await updated.into_active().delete(connection), 1)
                 self.assertIsNone(await query.one_opt(connection))
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     # [spec:pgorm:req:python.entities+3/test]
     async def test_generated_views_return_typed_versions(self):
         def active(identity, name):
@@ -99,7 +100,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 case other:
                     self.fail(f"expected an update then an insert, got {other!r}")
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     async def test_graph_views_keep_optional_models(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2):
@@ -132,7 +133,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
             required = await app.RequiredNotes.find().all(connection)
             self.assertEqual([(a.id, n.id) for a, n in required], [(1, 10)])
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     async def test_views_reject_foreign_entities(self):
         with self.assertRaises(p.LifecycleError):
             app.AccountActive(p.entity("app.Note").active())
@@ -152,8 +153,73 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 app.AccountModel(model.native)
 
 
+HOUR = 3_600_000_000
+
+
+class GeneratedIntervals(unittest.IsolatedAsyncioTestCase):
+    """The wrappers over the entity pgorm-codegen generates from its interval
+    schema, against the table that schema creates."""
+
+    async def asyncSetUp(self):
+        schema = Path(__file__).resolve().parents[2] / (
+            "pgorm-codegen/tests/sql/interval/schema.sql"
+        )
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        await self.pool.execute(p.RawSQL("DROP TABLE IF EXISTS interval_span"))
+        await self.pool.execute(p.RawSQL(schema.read_text()))
+
+    async def asyncTearDown(self):
+        await self.pool.execute(p.RawSQL("DROP TABLE IF EXISTS interval_span"))
+        await self.pool.close()
+
+    # [spec:pgorm:req:python.codegen+1/test]
+    async def test_interval_fields_are_pgorm_intervals(self):
+        behind = p.Interval(14, -3, -(4 * HOUR + 1_234_567))
+        ahead = p.Interval(-1, 2, HOUR + 3_000_004)
+        active = (
+            app.IntervalSpan.active()
+            .set_id(1)
+            .set_plain(behind)
+            .set_maybe(None)
+            .set_precise(behind)
+            .set_months(behind)
+            .set_days(behind)
+            .set_clock(ahead)
+            .set_minutes(behind)
+            .set_seconds(ahead)
+            .set_history([behind, ahead])
+            .set_budgets([behind, ahead])
+        )
+        self.assertEqual(active.get("months").value.kind, "interval")
+        async with self.pool.connection() as connection:
+            model = await active.insert(connection)
+            self.assertIsInstance(model, app.IntervalSpanModel)
+            # Each column stores the value as its qualifier makes it: the
+            # fields it leaves out dropped, seconds rounded to its precision.
+            self.assertEqual(
+                (model.plain, model.maybe, model.history),
+                (behind, None, [behind, ahead]),
+            )
+            self.assertEqual(model.precise, p.Interval(14, -3, -(4 * HOUR + 1_235_000)))
+            self.assertEqual(model.months, p.Interval(14, 0, 0))
+            self.assertEqual(model.days, p.Interval(14, -3, 0))
+            self.assertEqual(model.clock, p.Interval(-1, 2, HOUR + 3_000_000))
+            self.assertEqual(model.minutes, p.Interval(14, -3, -4 * HOUR))
+            self.assertEqual(model.seconds, p.Interval(-1, 2, HOUR + 3_000_000))
+            self.assertEqual(model.budgets, [p.Interval(14, 0, 0), p.Interval(-1, 0, 0)])
+            cleared = await model.into_active().set_budgets(None).update(connection)
+            self.assertIsNone(cleared.budgets)
+            found = await app.IntervalSpan.find().filter(
+                app.IntervalSpan.col("id") == 1
+            ).one(connection)
+            self.assertIsInstance(found, app.IntervalSpanModel)
+            self.assertEqual(found.months, p.Interval(14, 0, 0))
+        with self.assertRaises(p.ConstructionError):
+            app.IntervalSpan.active().set_plain(p.Value(1, "i64"))
+
+
 class GeneratedContract(unittest.TestCase):
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_compatibility_fails_before_queries(self):
         for key in ("package_version", "pgorm_version", "registry_abi", "features"):
             expected = copy.deepcopy(app._COMPATIBILITY)
@@ -178,7 +244,7 @@ class GeneratedContract(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             exec(compile(code, "incompatible.py", "exec"), {})
 
-    # [spec:pgorm:req:python.codegen/test]
+    # [spec:pgorm:req:python.codegen+1/test]
     def test_generated_types_follow_compiled_metadata(self):
         stub = Path(app.__file__).with_suffix(".pyi").read_text()
         self.assertIn("def id(self) -> int:", stub)
@@ -191,6 +257,13 @@ class GeneratedContract(unittest.TestCase):
             "RequiredNotesRow: TypeAlias = tuple[AccountModel, NoteModel]", stub
         )
         self.assertIn("AccountOnlyRow: TypeAlias = AccountModel", stub)
+        self.assertIn("def months(self) -> p.Interval:", stub)
+        self.assertIn("def maybe(self) -> p.Interval | None:", stub)
+        self.assertIn("def budgets(self) -> list[p.Interval] | None:", stub)
+        self.assertIn(
+            "def set_history(self, value: list[p.Interval] | p.Value) -> IntervalSpanActive:",
+            stub,
+        )
         self.assertEqual(app.Account.col("id").describe()["rust_decode_type"], "i32")
         self.assertEqual(
             app.Account.col("display name").describe()["json_key"], "displayName"

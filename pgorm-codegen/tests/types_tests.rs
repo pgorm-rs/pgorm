@@ -6,13 +6,14 @@ mod common;
 use common::*;
 use pgorm_codegen::{Column, EntityTransformer, Error};
 use pgorm_query::{
-    ColumnDef, ColumnType, IdentityGeneration, Name, SequenceOption, StringLen, TypeName,
+    ColumnDef, ColumnType, IdentityGeneration, IntervalSpec, Name, PgInterval, SequenceOption,
+    StringLen, TypeName,
 };
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 use std::sync::Arc;
 
-// [spec:pgorm:sem:codegen.entity.types+6/test]    `Column::get_rs_type` follows
+// [spec:pgorm:sem:codegen.entity.types+7/test]    `Column::get_rs_type` follows
 // the mapping table, wrapping nullable columns in `Option`
 #[test]
 fn column_rust_types_follow_the_mapping_table() {
@@ -36,6 +37,11 @@ fn column_rust_types_follow_the_mapping_table() {
                 typed("c_uuid", ColumnType::Uuid),
                 typed("c_bytea", ColumnType::Bytea),
                 typed("c_bool", ColumnType::Boolean),
+                typed("c_interval", ColumnType::Interval(IntervalSpec::Any(None))),
+                typed(
+                    "c_months",
+                    ColumnType::Interval(IntervalSpec::Fields(PgInterval::YearToMonth)),
+                ),
                 enum_col("c_enum", "tea_kind", &["black", "green"]),
                 ColumnDef::new(Name::runtime("c_array"))
                     .array(ColumnType::Integer)
@@ -48,6 +54,10 @@ fn column_rust_types_follow_the_mapping_table() {
                 // nullable: the same mapping, wrapped in `Option`
                 typed_null("c_null_int", ColumnType::Integer),
                 typed_null("c_null_uuid", ColumnType::Uuid),
+                typed_null(
+                    "c_null_intervals",
+                    ColumnType::Array(Arc::new(ColumnType::Interval(IntervalSpec::Any(None)))),
+                ),
             ],
         )],
         Opts::default(),
@@ -69,17 +79,20 @@ fn column_rust_types_follow_the_mapping_table() {
         ("c_uuid", "Uuid"),
         ("c_bytea", "Vec<u8>"),
         ("c_bool", "bool"),
+        ("c_interval", "Interval"),
+        ("c_months", "Interval"),
         ("c_enum", "TeaKind"),
         ("c_array", "Vec<i32>"),
         ("c_nested_array", "Vec<Vec<i32>>"),
         ("c_null_int", "Option<i32>"),
         ("c_null_uuid", "Option<Uuid>"),
+        ("c_null_intervals", "Option<Vec<Interval> >"),
     ] {
         assert_contains(sample, &format!("pub {field}: {rust_type}"));
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+6/test]    `Float` and `Double` also map
+// [spec:pgorm:sem:codegen.entity.types+7/test]    `Float` and `Double` also map
 // to `f32` / `f64`, and either one suppresses the Model's `Eq` derive —
 // recursively through `Array`
 #[test]
@@ -242,7 +255,7 @@ fn attribute_string_value(attr: &str) -> String {
         .value()
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+6/test]    the compact attribute
+// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    the compact attribute
 // carries a named type's name as a rendered string literal, so a name holding a
 // quote arrives at the derive as the name that was described rather than as
 // tokens that escaped the literal
@@ -308,7 +321,7 @@ fn hostile_named_type_survives_the_compact_attribute() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.compact.attrs+6/test]    and the entity the
+// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    and the entity the
 // derive builds from it names the type that was described, character for
 // character
 #[test]
@@ -321,7 +334,7 @@ fn derived_entity_names_the_hostile_type_exactly() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+6/test]    the expanded writer spells the
+// [spec:pgorm:sem:codegen.entity.types+7/test]    the expanded writer spells the
 // same name the same way, so the two emission paths agree on a hostile name as
 // they do on a benign one
 #[test]
@@ -341,7 +354,7 @@ fn hostile_named_type_survives_the_expanded_column_def() {
     );
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]    a named type the
+// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    a named type the
 // generated `ColumnType::named("..")` could not rebuild — schema-qualified, an
 // array, or a type expression — is refused by name rather than respelled as a
 // different type
@@ -375,7 +388,7 @@ fn column_conversion_rejects_an_unrespellable_named_type() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]    a type outside the
+// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    a type outside the
 // mapping fails the whole run with a `TransformError` naming table, column and
 // type — no placeholder code, and no panic
 #[test]
@@ -395,7 +408,7 @@ fn transform_rejects_column_type_outside_mapping() {
     }
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]    the check sits at
+// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    the check sits at
 // `Column` construction, so the writer never meets an unmapped type; `Array`
 // element types are checked through
 #[test]
@@ -533,9 +546,9 @@ fn compact_primary_key_facts_surface_as_field_attributes() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.types+6/test]    a range column is the `Range` of its
+// [spec:pgorm:sem:codegen.entity.types+7/test]    a range column is the `Range` of its
 // subtype's Rust type, and the expanded writer names its `RangeType`
-// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]    an array of ranges is supported
+// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    an array of ranges is supported
 #[test]
 fn range_columns_name_their_range_type() {
     use pgorm_query::RangeType;
@@ -574,4 +587,101 @@ fn range_columns_name_their_range_type() {
         assert_eq!(column.get_rs_type().to_string(), rust_type);
         assert_eq!(column.get_def().to_string(), def);
     }
+}
+
+// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    an array needs a
+// `column_type` exactly when its element does, since the derive infers an
+// array as an array of what the element's Rust type infers: `text[]` would be
+// created as `varchar[]`, and `citext[]` as `varchar[]` too
+#[test]
+fn arrays_name_the_element_type_they_cannot_infer() {
+    let array = |name: &str, element: ColumnType| {
+        ColumnDef::new(Name::runtime(name))
+            .array(element)
+            .not_null()
+            .to_owned()
+    };
+    let generated = generate(
+        vec![keyed_with(
+            "sample",
+            &["id"],
+            vec![
+                serial("id"),
+                array("tags", ColumnType::Text),
+                array("prices", ColumnType::Decimal(Some((10, 2)))),
+                array("names", ColumnType::named("citext")),
+                array("grid", ColumnType::Array(Arc::new(ColumnType::Text))),
+                array("counts", ColumnType::Integer),
+                array("labels", ColumnType::String(StringLen::None)),
+                ColumnDef::new(Name::runtime("kinds"))
+                    .array(ColumnType::Enum {
+                        schema: None,
+                        name: Name::runtime("tea_kind"),
+                        variants: vec![Name::runtime("black")],
+                    })
+                    .to_owned(),
+            ],
+        )],
+        Opts::default(),
+    );
+    let sample = generated.file("sample.rs");
+    for field in [
+        r#"#[pgorm(column_type = "Array(Arc::new(ColumnType::Text))")] pub tags: Vec<String>,"#,
+        r#"#[pgorm(column_type = "Array(Arc::new(ColumnType::Decimal(Some((10, 2)))))")]
+           pub prices: Vec<Decimal>,"#,
+        r#"#[pgorm(column_type = "Array(Arc::new(ColumnType::named(\"citext\")))")]
+           pub names: Vec<String>,"#,
+        // One run of fields with nothing between them: the arrays whose
+        // element the derive infers carry no attribute.
+        r#"#[pgorm(column_type = "Array(Arc::new(ColumnType::Array(Arc::new(ColumnType::Text))))")]
+           pub grid: Vec<Vec<String> >,
+           pub counts: Vec<i32>,
+           pub labels: Vec<String>,
+           pub kinds: Option<Vec<TeaKind> >,"#,
+    ] {
+        assert_contains(sample, field);
+    }
+}
+
+/// The attribute [`arrays_name_the_element_type_they_cannot_infer`] pins for
+/// `text[]`, carried through the real derive.
+mod text_array_entity {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[pgorm(table_name = "sample")]
+    pub struct Model {
+        #[pgorm(primary_key)]
+        pub id: i32,
+        #[pgorm(column_type = "Array(Arc::new(ColumnType::Text))")]
+        pub tags: Vec<String>,
+        #[pgorm(
+            column_type = "Array(Arc::new(ColumnType::named(\"citext\")))",
+            nullable
+        )]
+        pub names: Option<Vec<String>>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    and the derive builds
+// the array of the element type named, not of the one `String` infers
+#[test]
+fn derived_array_columns_keep_their_element_type() {
+    use pgorm::entity::prelude::{ColumnTrait, ColumnTypeTrait};
+
+    assert_eq!(
+        text_array_entity::Column::Tags.def(),
+        ColumnType::Array(Arc::new(ColumnType::Text)).def()
+    );
+    assert_eq!(
+        text_array_entity::Column::Names.def(),
+        ColumnType::Array(Arc::new(ColumnType::named("citext")))
+            .def()
+            .null()
+    );
 }

@@ -695,7 +695,7 @@ explicit limitations.
 
 ## Prelude
 
-> [spec:pgorm:def:entity.prelude+7]
+> [spec:pgorm:def:entity.prelude+8]
 > `pgorm::entity::prelude` (`src/entity/prelude.rs`) is the glob a file that
 > talks to the database imports instead of naming what it needs one item at a
 > time. Membership is chosen from what code actually writes, and is public API:
@@ -721,7 +721,14 @@ explicit limitations.
 > the glob, and `CreatedRange` with its derive `DeriveCreatedRange`
 > (`[spec:pgorm:def:sql.value.created-range]`), so a generated
 > `pgorm_range_types.rs` resolves through it too. A file that also imports `std::ops::Range` by name keeps its
-> own: an explicit import shadows a glob.
+> own: an explicit import shadows a glob. The interval value `Interval`
+> (`[spec:pgorm:def:sql.value.interval]`) is a member, with the qualifier
+> vocabulary an interval column's type is written in — `IntervalSpec`,
+> `PgInterval` and `IntervalPrecision` (`[spec:pgorm:def:sql.types.column-type+10]`)
+> — so a generated entity's
+> `column_type = "Interval(IntervalSpec::Fields(PgInterval::YearToMonth))"`
+> and `ColumnType::Interval(IntervalSpec::Any(None))` resolve through the
+> glob as a range column's do.
 >
 > `Order` — `pgorm_query`'s `ASC`/`DESC` enum — is deliberately NOT a member.
 > `order` is an ordinary table name, so an entity aliased `Order` is ordinary

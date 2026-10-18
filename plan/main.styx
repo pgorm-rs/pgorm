@@ -1368,6 +1368,14 @@ children (
                         text "codegen.entity.transform v0 overclaimed since adoption: (1) it said repeated FKs to one target get num_suffix \"in declaration order\", but the rev/map/rev pipeline in transformer.rs hands suffixes out in reverse — first-declared gets the highest; behavior deliberately kept so regenerated entities keep their relation variant names. (2) It said `unique` comes from the matching ColumnSpec, but the transform path unconditionally overwrites it from single-column unique indexes, discarding ColumnSpec::UniqueKey (which is live only in the public From<&ColumnDef> conversion). Found by verify.codegen; rule corrected at +1 with operator approval, all 13 refs re-pinned."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:52:16.110426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "codegen.entity.types +7, codegen.entity.types.unsupported +7 and codegen.entity.compact.attrs +7 (30f11b85, codegen-interval-columns): interval columns map to Interval with the qualifier carried in the column definition, and a compact array names an element type the derive cannot infer."
+                        after_done true
+                    }
                 )
             }
 
@@ -1419,6 +1427,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Filed from statement-interval-value (f9db65b7). pgorm_query::Interval now exists, entities take Interval / Option<Interval> / Vec<Interval> fields and Schema creates an interval column, but pgorm-codegen still refuses interval columns, and pgorm-python's codegen type table has no interval entry. Map interval (and interval[]) to Interval in generated Rust entities and to pgorm.Interval in Python codegen, decide what an interval column carrying a field qualifier (INTERVAL YEAR TO MONTH, a precision) generates, and cover it in codegen's tests and the live schema round trip."
+                    }
+
+                    {
+                        at 2026-10-18T16:51:55.197502Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -8926,7 +8941,12 @@ children (
                 id sql-domains
                 title "pgorm builds CREATE, ALTER and DROP DOMAIN from Rust, Python and JavaScript, and codegen reads a domain column as its base type"
                 kind @feat
-                deps (query-second-tier sql-views codegen-interval-columns)
+                deps (
+                    query-second-tier
+                    sql-views
+                    codegen-interval-columns
+                    python-schema-truth-testing
+                )
                 log (
                     {
                         at 2026-10-18T15:48:26.114298Z
@@ -8941,7 +8961,7 @@ children (
                 id sql-schemas
                 title "pgorm builds CREATE SCHEMA and DROP SCHEMA from Rust, Python and JavaScript"
                 kind @feat
-                deps (query-second-tier sql-views)
+                deps (query-second-tier sql-views python-schema-truth-testing)
                 log (
                     {
                         at 2026-10-18T15:48:26.265572Z

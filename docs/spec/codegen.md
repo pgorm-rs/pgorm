@@ -358,7 +358,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+6]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+7]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
@@ -374,8 +374,18 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > generated, its string the Rust that builds the expression
 > (`codegen.entity.expressions`); `column_type = "..."` for exactly the types whose default
 > mapping is ambiguous — `Float`, `Double`, `Decimal(Some((p, s)))`,
-> `Money`, `Text`, `JsonBinary`, `named("...")`, `Bytea` — with
-> `nullable` appended (only
+> `Money`, `Text`, `JsonBinary`, `named("...")`, `Bytea`, and an interval
+> carrying a field qualifier or a precision, spelled as the expanded writer
+> spells its `IntervalSpec` (`codegen.entity.types`):
+> `Interval(IntervalSpec::Fields(PgInterval::YearToMonth))`,
+> `Interval(IntervalSpec::Any(Some(IntervalPrecision::P3)))`. An unqualified
+> `interval` is what an `Interval` field infers, and states none. An array
+> carries `Array(Arc::new(ColumnType::<element>))` when its element is one of
+> these other than `Float`, `Double` and `Bytea`, which `f32`, `f64` and
+> `Vec<u8>` infer as they are: the derive infers an array as the array of
+> what its element's Rust type infers, so without it `text[]` would be
+> created as `varchar[]`, and `interval YEAR TO MONTH[]` as an `interval[]`
+> keeping the days and seconds the column discards. `nullable` is appended (only
 > alongside a `column_type`) when the column is nullable; and `unique` when
 > the column is unique. Fields needing none of these carry no `#[pgorm]`
 > attribute.
@@ -383,8 +393,12 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > The `column_type` part's string is re-parsed as tokens by
 > `DeriveEntityModel` and spliced after `ColumnType::`
 > (`macros.derive.entity-model.column-def`), so it is generated *program
-> text*. Every part of it but the named type's name is fixed by this rule —
-> `Decimal`'s precision and scale are integers — and the name, which comes
+> text*, and the names it uses — `Arc`, `ColumnType`, `IntervalSpec`,
+> `PgInterval`, `IntervalPrecision` — resolve through the prelude glob the
+> entity file imports (`[spec:pgorm:def:entity.prelude+8]`). Every part of it
+> but the named type's name is fixed by this rule —
+> `Decimal`'s precision and scale are integers, and an interval's qualifier
+> is one of a closed set of variants — and the name, which comes
 > from the described schema, MUST be written by rendering it as a string
 > literal rather than by placing it between two quote characters. A type name
 > is data: Postgres accepts names that Rust source does not, and a name
@@ -465,7 +479,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+6]
+> [spec:pgorm:sem:codegen.entity.types+7]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -479,6 +493,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > | `Uuid` | `Uuid` |
 > | `Bytea` | `Vec<u8>` |
 > | `Boolean` | `bool` |
+> | `Interval(_)` | `Interval`, whatever the `IntervalSpec` |
 > | `Enum { name, .. }` | UpperCamelCase of `name` |
 > | `Array(inner)` | `Vec<T(inner)>` (recursive) |
 > | `Range(t)` / `Multirange(t)` | `Range<E>` / `Multirange<E>`, `E` being `i32`, `i64`, `Decimal`, `Date`, `DateTime` or `DateTimeWithTimeZone` for `Int4` through `TimestampTz` |
@@ -492,6 +507,25 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > writer names a range column's type `ColumnType::Range(RangeType::Int4)`,
 > which resolves the same way; the compact writer states no `column_type` for
 > one, the derive taking it from the field's own `ValueType`.
+>
+> An interval column is an `Interval` field whatever its field qualifier and
+> precision: the qualifier constrains what the column stores, not the type a
+> row decodes as (`[spec:pgorm:def:sql.value.interval]`). The qualifier is
+> carried in the column's definition instead, so that the table the entity
+> creates (`Schema::create_table_from_entity`) is the table described,
+> qualifier for qualifier, and a value written through the entity is stored
+> as that column stores it — the fields the qualifier leaves out dropped, the
+> seconds rounded to its precision. The expanded writer spells the
+> `IntervalSpec` out in every case, through the prelude as `RangeType` is:
+> `ColumnType::Interval(IntervalSpec::Any(None))`,
+> `ColumnType::Interval(IntervalSpec::Any(Some(IntervalPrecision::P3)))`,
+> `ColumnType::Interval(IntervalSpec::Fields(PgInterval::DayToSecond(Some(IntervalPrecision::P3))))`;
+> the compact writer states it in `column_type` where the field's
+> `Interval` would infer an unqualified `interval`
+> (`codegen.entity.compact.attrs`). The live round trip of a generated
+> entity with a column of each kind of qualifier is held at the workspace
+> root (`tests/codegen_interval_tests.rs`), over the files
+> `pgorm-codegen/tests/sql/interval/` compares the writer's output with.
 >
 > A range type a schema created generates one newtype, as an enum type
 > generates one `ActiveEnum`: `pub struct <RangeName>(pub Range<E>);`
@@ -545,7 +579,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+6]
+> [spec:pgorm:req:codegen.entity.types.unsupported+7]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -557,7 +591,9 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > element type is itself unsupported. An array of ranges or multiranges is
 > supported as its element is — `int4range[]` is `Vec<Range<i32>>`
 > (`[spec:pgorm:def:sql.value.array+6]`) — the compact writer stating no
-> `column_type` for it, as for a range. A range type a schema created, and
+> `column_type` for it, as for a range. So is an array of intervals, its
+> element's qualifier with it: `interval YEAR TO MONTH[]` is `Vec<Interval>`,
+> and no `IntervalSpec` is refused. A range type a schema created, and
 > the multirange beside it, is supported over the subtypes
 > `codegen.entity.types` maps for it, and refused
 > over any other with ``TransformError("... range type `<name>` over <subtype>
@@ -1071,7 +1107,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so there is no constraint a non-unique index could
 > be carried as. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+7]
+> [spec:pgorm:sem:codegen.ddl.types+8]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
@@ -1084,7 +1120,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `SmallInteger`/`Integer`/`BigInteger`, `float4`/`float8` → `Float`/`Double`,
 > `numeric` → `Decimal`, `timestamp` → `Timestamp`,
 > `timestamptz` → `TimestampWithTimeZone`,
-> `time` → `Time`, `date` → `Date`, `interval` → `Interval(Any(None))`,
+> `time` → `Time`, `date` → `Date`, `interval` → `Interval` (below),
 > `bool` → `Boolean`, `money` → `Money`, `bytea` → `Bytea`, `bit` → `Bit`,
 > `varbit` → `VarBit`, `json` → `Json`, `jsonb` → `JsonBinary`, `uuid` → `Uuid`,
 > `inet`/`cidr`/`macaddr`/`ltree` → `Inet`/`Cidr`/`MacAddr`/`LTree`,
@@ -1106,6 +1142,23 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`varchar(255)`, `numeric(10, 2)`, `bit(8)`, `vector(3)`), a single-argument
 > `numeric(p)` reading as `Decimal(Some((p, 0)))` — its own meaning. An array
 > bound wraps the element type in `Array`; only one unsized `[]` is accepted.
+>
+> An `interval` keeps its field qualifier and precision, which the grammar
+> writes as the type's modifiers — a field mask, the `INTERVAL_MASK` bits of
+> the fields the qualifier spans or every bit (`0x7FFF`) for none, then the
+> precision when one was given — as the `IntervalSpec` that renders them:
+> `interval` → `Any(None)`, `interval(3)` → `Any(Some(P3))`,
+> `interval YEAR TO MONTH` → `Fields(YearToMonth)`,
+> `interval DAY TO SECOND(3)` → `Fields(DayToSecond(Some(P3)))`, through an
+> array as on its own. The mask is read as the server's `intervaltypmodin`
+> reads it, so the generic spelling `pg_catalog.interval(6)` is
+> `YEAR TO MONTH`, as the server takes it to be. A precision past 6, which
+> the server would quietly reduce to 6, is named
+> (``an `interval` precision of <p>, above the 6 PostgreSQL keeps, on
+> column `<t>`.`<c>` ``), and so is a modifier no `IntervalSpec` holds — a
+> precision on a field other than `SECOND`, which only the generic spelling
+> reaches, or a mask naming no qualifier — as `` `interval` with a type
+> modifier``.
 >
 > The map is close to a bijection because the forward contract
 > (`[spec:pgorm:req:sql.ddl.column-types+5]`) no longer spells one Postgres

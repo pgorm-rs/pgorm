@@ -133,7 +133,7 @@ fn schema_sql_generates_one_file_per_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+7/test]    the type spellings map onto the
+// [spec:pgorm:sem:codegen.ddl.types+8/test]    the type spellings map onto the
 // ColumnType vocabulary, serial included
 #[test]
 fn column_types_map_through_the_vocabulary() {
@@ -608,7 +608,7 @@ fn conflicting_not_null_constraints_are_refused() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+7/test]    a type spelling outside the
+// [spec:pgorm:sem:codegen.ddl.types+8/test]    a type spelling outside the
 // vocabulary is named, and so is a modifier the vocabulary cannot hold
 #[test]
 fn unsupported_types_are_named() {
@@ -846,7 +846,7 @@ fn rendered_ddl_round_trips_through_the_bridge() {
     assert_eq!(round_tripped.files, direct.files);
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+7/test]    the types that once shared a
+// [spec:pgorm:sem:codegen.ddl.types+8/test]    the types that once shared a
 // spelling with another variant now each recover themselves
 #[test]
 fn one_spelling_one_variant_round_trips() {
@@ -909,7 +909,7 @@ fn enum_and_unique_index_round_trip() {
     );
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+7/test]    each built-in range and multirange type
+// [spec:pgorm:sem:codegen.ddl.types+8/test]    each built-in range and multirange type
 // reads back as the `Range` or `Multirange` of its subtype
 #[test]
 fn range_types_map_through_the_vocabulary() {
@@ -944,10 +944,10 @@ fn range_types_map_through_the_vocabulary() {
     assert_not_contains(span, "column_type");
 }
 
-// [spec:pgorm:req:codegen.entity.types.unsupported+6/test]    an array of ranges or
+// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    an array of ranges or
 // multiranges is a `Vec` of them, the derive taking its column type from the
 // field's own `ValueType` as it does for a range
-// [spec:pgorm:sem:codegen.ddl.types+7/test]    and a range type takes no modifier
+// [spec:pgorm:sem:codegen.ddl.types+8/test]    and a range type takes no modifier
 #[test]
 fn array_of_ranges_generates_a_vec() {
     let generated = from_sql(
@@ -974,7 +974,7 @@ fn array_of_ranges_generates_a_vec() {
 // [spec:pgorm:sem:codegen.ddl.tables+11/test]    an identity inside a composite
 // key is carried, not refused, and the generated entity declares it on its
 // column and compiles: the key is not generated whole, the column is
-// [spec:pgorm:sem:codegen.entity.compact.attrs+6/test]    `identity` follows
+// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    `identity` follows
 // `primary_key`, and the identity column carries no `auto_increment = false`
 #[test]
 fn composite_key_identity_generates_a_compiling_entity() {

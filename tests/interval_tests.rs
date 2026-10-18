@@ -70,7 +70,7 @@ async fn inlined(db: &DatabaseConnection, interval: Interval) -> Result<Interval
 }
 
 // [spec:pgorm:req:exec.cursor.binding-interval/test]
-// [spec:pgorm:req:exec.decode.interval/test]
+// [spec:pgorm:req:exec.decode.interval+1/test]
 #[pgorm_macros::test]
 async fn bound_intervals_round_trip_exactly() -> Result<(), Error> {
     let ctx = TestContext::new("interval_tests_bound").await;
@@ -218,7 +218,7 @@ async fn interval_bound_to_another_type_is_refused() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:exec.decode.interval/test]
+// [spec:pgorm:req:exec.decode.interval+1/test]
 #[pgorm_macros::test]
 async fn entity_interval_fields_write_and_read() -> Result<(), Error> {
     let ctx = TestContext::new("interval_tests_entity").await;

@@ -1,5 +1,9 @@
 #[path = "../../application-binding/src/account.rs"]
 pub mod account;
+/// The entity pgorm-codegen generates from a table of interval columns, so
+/// the Python wrappers are generated over Rust codegen's own output.
+#[path = "../../../../pgorm-codegen/tests/sql/interval/interval_span.rs"]
+pub mod interval_span;
 #[path = "../../application-binding/src/note.rs"]
 pub mod note;
 
