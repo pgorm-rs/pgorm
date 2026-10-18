@@ -231,6 +231,14 @@ children (
                         text "sql-select-extras (2e2d393a) bumped sql.render.select-order+5 (tie limit in LIMIT's place, GROUP BY DISTINCT), sql.render.subquery+4 (table function and sample FROM items), sql.render.operators+6 (SIMILAR TO, its ESCAPE tail) and sql.render.precedence+9 (SIMILAR TO in the LIKE family); sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:43:24.996157Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "select-named-windows (d4f6c3e3) bumped sql.render.window+6 (prepare_window_clause writes every entry in order, an extended window's ( \"base\" ORDER BY .. frame ), all in query_builder_window.rs) and sql.render.select-order+6 (the WINDOW clause with each further entry after a comma); sites re-pinned and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -366,6 +374,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sql-select-extras (2e2d393a) bumped sql.ast.select+4 (tie limit slot, GROUP BY DISTINCT quantifier), sql.ast.select.from+4 (FromItem::TableFunction/TableSample), sql.ast.func+10 (generate_series, generate_series_step, unnest) and sql.ast.expr.operators+5 (similar_to); every site re-read and re-pinned, the code still says what the rules say."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:43:24.836452Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "select-named-windows (d4f6c3e3) bumped sql.ast.window-statement+7 (the WINDOW clause a list, ExtendedWindow and WindowDefinition, check_windows and its five refusals) and sql.ast.select+5 (the WINDOW clause a list of named windows); every site re-read and re-pinned, the code still says what the rules say."
                         after_done true
                     }
                 )
