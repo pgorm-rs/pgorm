@@ -21,7 +21,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+6/test]
+# [spec:pgorm:req:python.statements+7/test]
 class WindowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -116,23 +116,68 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('WINDOW "Running W" AS', query.inspect().sql)
         rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
         self.assertEqual(rows, [(1, 1, 1), (2, 2, 1), (3, 5, 2), (4, 10, 2)])
+        # Window names are case-exact identifiers, so this one is undeclared.
         unknown = p.Select(p.call("sum", self.r("weight")).over("running w")).from_(self.reading).window(
             "Running W", window)
-        with self.assertRaises(p.DatabaseError) as caught:
+        with self.assertRaises(p.ConstructionError):
             await self.connection.fetch_all(unknown)
-        self.assertEqual(caught.exception.sqlstate, "42704")
 
-    async def test_second_named_window_replaces_the_first(self):
-        def counted(name):
-            return (p.Select(p.call("count", self.r("id")).over(name))
-                    .from_(self.reading).window("by kind", p.Window().partition_by(self.r("kind")))
-                    .window("all", p.Window()).order_by(self.r("id").asc()))
-        self.assertNotIn('"by kind"', counted("all").inspect().sql)
-        rows = await self.connection.fetch_all(counted("all"))
-        self.assertEqual([next(iter(row.values())) for row in rows], [4, 4, 4, 4])
-        with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(counted("by kind"))
-        self.assertEqual(caught.exception.sqlstate, "42704")
+    async def test_window_clause_holds_every_named_window(self):
+        query = (p.Select(p.call("count", self.r("id")).over("by kind").as_("of kind"),
+                          p.call("count", self.r("id")).over("all").as_("all"))
+                 .from_(self.reading).window("by kind", p.Window().partition_by(self.r("kind")))
+                 .window("all", p.Window()).order_by(self.r("id").asc()))
+        self.assertIn('WINDOW "by kind" AS ( PARTITION BY "r"."kind" ), "all" AS (  )', query.inspect().sql)
+        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        self.assertEqual(rows, [(2, 4)] * 4)
+
+    async def test_extended_window_runs_over_its_base(self):
+        query = (p.Select(self.r("id"), p.call("sum", self.r("weight")).over("running").as_("running"),
+                          p.call("sum", self.r("weight")).over("pair").as_("pair"),
+                          p.window_function("row_number").over("running").as_("n"))
+                 .from_(self.reading)
+                 .window("kinds", p.Window().partition_by(self.r("kind")))
+                 .window("running", p.ExtendedWindow("kinds").order_by(self.r("id").asc()))
+                 .window("ordered", p.Window().order_by(self.r("id").asc()))
+                 .window("pair", p.ExtendedWindow("ordered").frame(F.Rows.preceding(1).and_current_row()))
+                 .order_by(self.r("id").asc()))
+        sql = query.inspect().sql
+        self.assertIn('"running" AS ( "kinds" ORDER BY "r"."id" ASC )', sql)
+        self.assertIn('"pair" AS ( "ordered" ROWS BETWEEN $1 PRECEDING AND CURRENT ROW )', sql)
+        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        self.assertEqual(rows, [(1, 1, 1, 1), (2, 2, 3, 1), (3, 5, 6, 2), (4, 10, 12, 2)])
+
+    async def test_refused_window_clause_raises_construction_error(self):
+        def over(name):
+            return p.Select(p.call("count", self.r("id")).over(name)).from_(self.reading)
+        ordered = p.Window().order_by(self.r("id").asc())
+        refused = [
+            over("w").window("w", p.Window()).window("w", ordered),
+            over("w").window("v", p.Window()),
+            over("w").window("w", p.ExtendedWindow("v")).window("v", p.Window()),
+            over("w").window("v", p.Window().frame(F.Rows.current_row())).window("w", p.ExtendedWindow("v")),
+            over("w").window("v", ordered).window("w", p.ExtendedWindow("v").order_by(self.r("id").desc())),
+        ]
+        for query in refused:
+            with self.assertRaises(p.ConstructionError):
+                query.inspect()
+            with self.assertRaises(p.ConstructionError):
+                await self.connection.fetch_all(query)
+            with self.assertRaises(p.ConstructionError):
+                over("x").window("x", p.Window()).union(query)
+        accepted = over("w").window("v", ordered).window("w", p.ExtendedWindow("v").frame(F.Rows.current_row()))
+        self.assertEqual(len(await self.connection.fetch_all(accepted)), 4)
+
+    def test_extended_window_refuses_partition_and_truth(self):
+        extended = p.ExtendedWindow("w")
+        with self.assertRaises(AttributeError):
+            getattr(extended, "partition_by")
+        with self.assertRaises(p.ConstructionError):
+            bool(extended)
+        with self.assertRaises(p.ConstructionError):
+            p.ExtendedWindow("")
+        with self.assertRaises(TypeError):
+            p.Select(p.col("id")).window("w", p.col("id"))
 
     async def test_json_aggregates_run_as_window_functions(self):
         by_id = p.Window().order_by(self.r("id").asc())

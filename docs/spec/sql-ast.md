@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+33]
+> [spec:pgorm:req:sql.surface+34]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -102,7 +102,9 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.grouping`); `FrameStart`, its three side markers
 > `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
 > `FrameExclusion`, the frame builder and its `EXCLUDE` clause
-> (`sql.ast.window-statement`); `TableKey`,
+> (`sql.ast.window-statement`); `ExtendedWindow` and `WindowDefinition`, a
+> window built on an earlier entry of a WINDOW clause and what an entry of
+> one defines (`sql.ast.window-statement`); `TableKey`,
 > `IntoTableKey`, `Primary` and `Unique`, a table's key — one type for the
 > primary key and the unique keys, a tuple of one or more columns that one
 > column or a tuple converts into, and its two kinds — and the one table-level
@@ -375,7 +377,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+4]
+> [spec:pgorm:def:sql.ast.select+5]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
 > WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
 > pays one pointer — `query.build.with` records why the clause lives on the
@@ -391,8 +393,9 @@ today, including panicking edges and deliberate failsafes.
 > limit — a `LIMIT` or the tie limit of `sql.ast.select.tie-limit`, one slot
 > for both — and an optional OFFSET (each set from `u64` via
 > `limit`/`limit_with_ties`/`offset`, cleared via
-> `reset_limit`/`reset_offset`), an optional `LockClause`, and at most one named
-> WINDOW definition. The GROUP BY list carries its set quantifier,
+> `reset_limit`/`reset_offset`), an optional `LockClause`, and the WINDOW
+> clause, a list of named windows (`sql.ast.window-statement`). The GROUP BY
+> list carries its set quantifier,
 > `DISTINCT` once `group_by_distinct` is called
 > (`sql.ast.select.group-distinct`).
 >
@@ -1512,7 +1515,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+6]
+> [spec:pgorm:def:sql.ast.window-statement+7]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, and the `OverStatement` trait's
 > `partition_by_columns`), ORDER BY expressions (shared
@@ -1574,10 +1577,39 @@ today, including panicking edges and deliberate failsafes.
 > A select projection references a window in one of two ways
 > (`WindowSelectType`): `Query` embeds the window inline (`expr_window`,
 > `expr_window_as` render `OVER ( ... )`), while `Name` references a named
-> window (`expr_window_name`, `expr_window_name_as` render `OVER "w"`) that is
-> declared at statement level with `SelectStatement::window(name, window)`,
-> rendering a `WINDOW "w" AS ( ... )` clause. The statement holds at most one
-> named window; a second `window()` call replaces the first.
+> window (`expr_window_name`, `expr_window_name_as` render `OVER "w"`) that
+> the statement's WINDOW clause declares. The clause is a list, as
+> PostgreSQL's is: `SelectStatement::window(name, window)` appends an entry,
+> `"w" AS ( ... )`, the entries render in call order, and a statement reads as
+> many named windows as it declares. An entry's window is a
+> `WindowDefinition`, which a `WindowStatement` and an `ExtendedWindow` both
+> convert into. `ExtendedWindow::new(base)` is a window built on an earlier
+> entry, `"w2" AS ( "w1" ORDER BY ... )`, which PostgreSQL makes copy the
+> base's PARTITION BY and any ORDER BY it has: it carries an ORDER BY (the
+> shared `OrderedStatement` trait) and a frame (`frame(f)`, a second call
+> replacing the first), and no PARTITION BY, because PostgreSQL refuses one
+> there (`42P20`), so none has a construction.
+>
+> What PostgreSQL refuses of a clause turns on its other entries and on the
+> projection, which separate calls build in any order, so it is not designed
+> out (`[dec:pgorm:invalid-states-unrepresentable]`): two entries of one name
+> (`42P20`); an extended window whose base is no earlier entry, a later one
+> included (`42704`), whose base has a frame (`42P20`), or which adds an
+> ORDER BY to a base that orders its rows, by its own ORDER BY or one copied
+> down a chain of extended windows (`42P20`); and a projection over a name no
+> entry declares (`42704`). `check_windows` refuses each before anything
+> renders — `Error::WindowRedefined`, `Error::WindowBaseUndefined`,
+> `Error::WindowFrameCopied`, `Error::WindowOrderOverridden` and
+> `Error::WindowUndefined` — and every pgorm executor and the Python and
+> JavaScript builders call it where they call `check_tie_limit`
+> (`sql.ast.select.tie-limit`, `[dec:pgorm:no-panic]`). Names are compared as
+> PostgreSQL compares the quoted identifiers pgorm writes: by their text,
+> case-exactly, whatever type minted them. Rendering is infallible and writes
+> what the statement holds (`sql.render.window`), so a caller of pgorm-query
+> alone who skips the check sends SQL the server refuses with those codes.
+> The check reads the statement's own clauses: a SELECT nested in it names
+> its windows for itself, and one carrying a refused clause is the server's
+> refusal.
 >
 > PostgreSQL accepts `OVER` only after a function call, so all four
 > `expr_window*` constructors MUST take the windowed expression as a

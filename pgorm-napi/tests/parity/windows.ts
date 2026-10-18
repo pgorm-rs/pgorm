@@ -1,7 +1,7 @@
 // The window family's parity cases — calls over inline and named windows,
 // frames and the window functions — and the range operators', held to
 // `windows.json` as `select.ts`'s are to theirs.
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 // [spec:pgorm:req:napi.ranges/test]
 
 import {
@@ -10,6 +10,7 @@ import {
   call,
   col,
   CreatedRange,
+  ExtendedWindow,
   FrameType,
   jsonArrayAgg,
   jsonObjectAgg,
@@ -34,6 +35,14 @@ export const cases: Record<string, () => Builder> = {
       call("avg", reading.col("weight")).over(new Window()),
     ).from(reading).window("by_kind", new Window().partitionBy(reading.col("kind")));
   },
+  "window-clause-entries": () =>
+    select(
+      call("sum", reading.col("weight")).over("running"),
+      windowFunction("rank").over("ordered").as("rank"),
+    ).from(reading)
+      .window("by_kind", new Window().partitionBy(reading.col("kind")))
+      .window("ordered", new ExtendedWindow("by_kind").orderBy(reading.col("at").asc()))
+      .window("running", new ExtendedWindow("ordered").frame(FrameType.rows.preceding(1).andCurrentRow())),
   "window-frames": () => {
     const ordered = new Window().orderBy(reading.col("id").asc());
     return select(

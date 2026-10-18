@@ -163,7 +163,8 @@ from ._statements import (
 from ._windows import (
     FrameType as FrameType, FrameExclusion as FrameExclusion, Frame as Frame,
     FramePrecedingStart as FramePrecedingStart, FrameCurrentRowStart as FrameCurrentRowStart,
-    FrameFollowingStart as FrameFollowingStart, Window as Window, WindowedExpr as WindowedExpr,
+    FrameFollowingStart as FrameFollowingStart, Window as Window,
+    ExtendedWindow as ExtendedWindow, WindowedExpr as WindowedExpr,
     WindowFunction as WindowFunction, window_function as window_function,
 )
 from ._json import (

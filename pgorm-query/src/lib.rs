@@ -647,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+33]
-// [spec:pgorm:req:sql.surface+33/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+34]
+// [spec:pgorm:req:sql.surface+34/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.
@@ -744,14 +744,14 @@ pub use value_range_text::RangeSubtype;
 // traits that let a caller write against any of them.
 pub use query::{
     AnyWithClause, CaseOperand, CaseStatement, CommonTableExpression, Condition,
-    ConditionExpression, ConditionType, ConditionalStatement, Cycle, DeleteStatement, FrameClause,
-    FrameCurrentRow, FrameExclusion, FrameFollowing, FramePreceding, FrameStart, FrameType,
-    Grouping, GroupingElement, GroupingSets, InsertStatement, IntoCondition, IntoSubQueryStatement,
-    LockBehavior, LockType, OrderedStatement, OverStatement, Overriding, Query,
-    QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, ReturningRow,
+    ConditionExpression, ConditionType, ConditionalStatement, Cycle, DeleteStatement,
+    ExtendedWindow, FrameClause, FrameCurrentRow, FrameExclusion, FrameFollowing, FramePreceding,
+    FrameStart, FrameType, Grouping, GroupingElement, GroupingSets, InsertStatement, IntoCondition,
+    IntoSubQueryStatement, LockBehavior, LockType, OrderedStatement, OverStatement, Overriding,
+    Query, QueryStatementBuilder, RecursiveWithClause, Returning, ReturningClause, ReturningRow,
     SampleMethod, Search, SearchOrder, SelectExpr, SelectStatement, SimpleCaseStatement,
-    SubQueryStatement, TableFunction, TableSample, UnionType, UpdateStatement, WindowFunction,
-    WindowSelectType, WindowStatement, WithClause,
+    SubQueryStatement, TableFunction, TableSample, UnionType, UpdateStatement, WindowDefinition,
+    WindowFunction, WindowSelectType, WindowStatement, WithClause,
 };
 pub use query::{
     ConflictAction, ConflictArbiter, ConflictAssignment, ConflictAssignments, ConflictConstraint,

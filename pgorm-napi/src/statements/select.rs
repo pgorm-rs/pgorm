@@ -306,18 +306,15 @@ fn select_with(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Select(select))
 }
 
-/// `selectWindow(select, name, window)`: the statement's named window,
-/// `WINDOW "name" AS (..)`, which `over(name)` reads. pgorm-query's builder
-/// holds one, so the last call wins.
-// [spec:pgorm:req:napi.windows]
+/// `selectWindow(select, name, window)`: an entry appended to the WINDOW
+/// clause, `"name" AS (..)`, which `over(name)` reads. A clause PostgreSQL
+/// refuses is refused where the tie limit is: when the statement is compiled
+/// or read into another.
+// [spec:pgorm:req:napi.windows+1]
 fn select_window(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let name = super::args::name_at(cx, 1)?;
-    let window = arg(cx, 2);
-    let window = match node(cx, window) {
-        Some(Node::Window(window)) => window,
-        _ => return refuse(cx, "a named window is a Window"),
-    };
+    let window = super::window::definition_at(cx, 2)?;
     select.window(name, window);
     Ok(Node::Select(select))
 }

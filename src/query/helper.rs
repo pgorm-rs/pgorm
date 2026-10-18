@@ -5,7 +5,7 @@ use crate::{
 use pgorm_query::{
     AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, GroupingElement, IntoCondition,
     IntoName, LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SimpleExpr,
-    UnionType, WindowStatement,
+    UnionType, WindowDefinition,
 };
 pub use pgorm_query::{Condition, ConditionalStatement, JoinType, Name, Order, OrderedStatement};
 
@@ -758,11 +758,17 @@ pub trait QuerySelect: Sized {
         self.join_lateral(join, sub, alias, SimpleExpr::Constant(true.into()))
     }
 
-    /// Declare a named window the projection can refer to with `OVER "name"`.
+    /// Append a named window to the WINDOW clause, which the projection can
+    /// refer to with `OVER "name"`: a `WindowStatement`, or an
+    /// `ExtendedWindow` built on an entry appended before it. A clause
+    /// PostgreSQL refuses — two entries of one name, an extended window over
+    /// a base it cannot copy — is refused by every terminal before it sends
+    /// anything (`SelectStatement::check_windows`).
     // [spec:pgorm:sem:query.build.window]
-    fn window<A>(mut self, name: A, window: WindowStatement) -> Self
+    fn window<A, W>(mut self, name: A, window: W) -> Self
     where
         A: IntoName,
+        W: Into<WindowDefinition>,
     {
         QuerySelect::query(&mut self).window(name, window);
         self

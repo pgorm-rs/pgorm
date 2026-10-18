@@ -203,11 +203,41 @@ query = select(
 ).from_(reading).window("by_kind", Window().partition_by(reading.col("kind")))
 ```
 
-`over` takes a `Window`, written inline as `OVER (..)`, or the name of the
+`over` takes a `Window`, written inline as `OVER (..)`, or the name of a
 window the statement declares with `.window(name, window)`, written
-`OVER "name"` beside a `WINDOW "name" AS (..)` clause. Rust's builder holds one
-named window, so a second `.window` call replaces the first. Window names are
+`OVER "name"` beside a `WINDOW "name" AS (..)` clause. Each `.window` call
+appends an entry to the clause, which renders them in call order, so a
+statement reads as many named windows as it declares. Window names are
 identifiers, quoted case-exactly like every other.
+
+An entry may build on an earlier one: `ExtendedWindow(base)` is
+`"name" AS ("base" ..)`, which copies the base's PARTITION BY and any ORDER BY
+it has and adds `.order_by(*orderings)` and `.frame(frame)`. It has no
+`partition_by`, because PostgreSQL refuses one there.
+
+```python
+from pgorm import ExtendedWindow, FrameType, Table, Window, call, select
+
+reading = Table("reading", alias="r")
+query = select(
+    call("sum", reading.col("weight")).over("running").as_("running"),
+    call("sum", reading.col("weight")).over("recent").as_("recent"),
+).from_(reading).window(
+    "by_kind", Window().partition_by(reading.col("kind"))
+).window(
+    "running", ExtendedWindow("by_kind").order_by(reading.col("at").asc())
+).window(
+    "recent", ExtendedWindow("running").frame(FrameType.Rows.preceding(2).and_current_row())
+)
+```
+
+What PostgreSQL refuses of a clause depends on its other entries, so
+`inspect()`, execution and reading the statement into another (a set
+operation's arm, a CTE body) raise `ConstructionError` for it, through Rust's
+`check_windows`: a name declared twice, an extended window whose base is no
+earlier entry, has a frame, or already orders its rows when it adds an ORDER
+BY, and an `over(name)` no entry declares. `.window` takes a `Window` or an
+`ExtendedWindow`; anything else raises `TypeError`.
 
 PostgreSQL writes `OVER` only after a function call, and Rust's
 `expr_window` takes only a `WindowFunction`: a `FunctionCall` or one of the

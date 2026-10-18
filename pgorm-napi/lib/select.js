@@ -248,11 +248,13 @@ export class Select extends Builder {
   }
 
   /**
-   * The statement's named window, `WINDOW "name" AS (..)`, which `over(name)`
-   * reads; the last call wins.
+   * An entry appended to the WINDOW clause, `"name" AS (..)`, which
+   * `over(name)` reads: a `Window`, or an `ExtendedWindow` built on an entry
+   * appended before it. A clause PostgreSQL refuses is refused when the
+   * statement is inspected, run or read into another.
    *
    * @param {string} name
-   * @param {import("./windows.js").Window} window
+   * @param {import("./windows.js").Window | import("./windows.js").ExtendedWindow} window
    */
   window(name, window) {
     return new Select(native.selectWindow(arg(this), name, arg(window)), TRUSTED);

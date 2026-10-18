@@ -71,7 +71,14 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::SelectStatement::offset, reset_offset",
         ),
         ("select.distinct", "pgorm_query::SelectStatement::distinct"),
-        ("select.window", "pgorm_query::SelectStatement::window"),
+        (
+            "select.window",
+            "pgorm_query::SelectStatement::{window, check_windows}",
+        ),
+        (
+            "window.extended",
+            "pgorm_query::ExtendedWindow::{new, frame}, OrderedStatement::{order_by_expr, order_by_expr_with_nulls}",
+        ),
         (
             "window",
             "pgorm_query::WindowStatement::new, OverStatement::add_partition_by, OrderedStatement::{order_by_expr, order_by_expr_with_nulls}, WindowStatement::frame",
@@ -86,7 +93,7 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         (
             "select.inspect",
-            "pgorm_query::SelectStatement::{check_tie_limit, build}",
+            "pgorm_query::SelectStatement::{check_tie_limit, check_windows, build}",
         ),
         (
             "insert",

@@ -203,7 +203,7 @@ async fn at_time_zone_shifts_the_clock(db: &DatabaseConnection) -> Result<(), Er
 /// `ROWS` counts rows, `RANGE` counts values within a distance, and `GROUPS`
 /// counts peer groups — three different answers from one offset, which is what
 /// makes `GROUPS` a mode rather than a spelling of one of the other two.
-// [spec:pgorm:def:sql.ast.window-statement+6/test]
+// [spec:pgorm:def:sql.ast.window-statement+7/test]
 // [spec:pgorm:req:sql.scope+21/test]
 async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Result<(), Error> {
     let framed = |r#type: FrameType| {

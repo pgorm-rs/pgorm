@@ -275,17 +275,27 @@ pub(crate) fn select<'cx>(
 
 /// `select`, read into another statement: final from here on, so a tie
 /// limit PostgreSQL's grammar refuses — with no ORDER BY, or beside SKIP
-/// LOCKED — is refused here, as `compile` refuses one in a statement run on
-/// its own, rather than by the server once the outer statement is sent.
+/// LOCKED — and a WINDOW clause it refuses are refused here, as `compile`
+/// refuses them in a statement run on its own, rather than by the server
+/// once the outer statement is sent.
 // [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.windows+1]
 pub(crate) fn embedded<'cx>(
     cx: &mut Cx<'cx>,
     select: SelectStatement,
 ) -> NeonResult<SelectStatement> {
-    match select.check_tie_limit() {
+    match checked(&select) {
         Ok(()) => Ok(select),
         Err(error) => refuse(cx, error.to_string()),
     }
+}
+
+/// pgorm-query's two checks of a SELECT that rendering leaves to its caller:
+/// its tie limit and its WINDOW clause.
+// [spec:pgorm:req:napi.windows+1]
+pub(crate) fn checked(select: &SelectStatement) -> pgorm::pgorm_query::error::Result<()> {
+    select.check_tie_limit()?;
+    select.check_windows()
 }
 
 /// The `Select` at `index`.

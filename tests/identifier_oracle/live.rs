@@ -10,10 +10,10 @@
 use pgorm::{
     ConnectionTrait, DatabaseConnection, DecodeRaw,
     pgorm_query::{
-        Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Expr, ForeignKey, Func,
-        Index, IntoNamedTable, MergeInsert, MergeUpdate, Multirange, Name, OnConflict, Order,
-        Query, Range, Schema, Sequence, SequenceOption, Table, TypeName, Values, WindowStatement,
-        WithClause,
+        Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Expr, ExtendedWindow,
+        ForeignKey, Func, Index, IntoNamedTable, MergeInsert, MergeUpdate, Multirange, Name,
+        OnConflict, Order, Query, Range, Schema, Sequence, SequenceOption, Table, TypeName, Values,
+        WindowStatement, WithClause,
         extension::{RangeDefinition, Type},
     },
 };
@@ -255,8 +255,8 @@ async fn live_function_and_type_names() {
     close(ctx, db).await;
 }
 
-/// `WindowDef.name` / `FuncCall.over`: a window defined and referenced under
-/// the hostile name.
+/// `WindowDef.name` / `WindowDef.refname` / `FuncCall.over`: a window
+/// defined, extended and referenced under the hostile name.
 // [spec:pgorm:req:security.ident-oracle+14/test]
 #[tokio::test]
 async fn live_window_names() {
@@ -266,18 +266,26 @@ async fn live_window_names() {
         .expect("the fixture table is created");
     for name in NASTY {
         let n = || Name::runtime(name);
+        let c = || Name::runtime("c");
         let sql = Query::select()
-            .expr_window_name(Func::count(Expr::col(Name::runtime("c"))), n())
+            .expr_window_name(Func::count(Expr::col(c())), n())
+            .expr_window_name(Func::count(Expr::col(c())), Name::runtime("ordered"))
             .from(Name::runtime("t"))
-            .window(n(), WindowStatement::partition_by(Name::runtime("c")))
+            .window(n(), WindowStatement::partition_by(c()))
+            .window(
+                Name::runtime("ordered"),
+                ExtendedWindow::new(n())
+                    .order_by(c(), Order::Asc)
+                    .to_owned(),
+            )
             .limit(1)
             .to_string();
-        let count: i64 = db
+        let row = db
             .query_one(&sql, &[])
             .await
-            .unwrap_or_else(|err| panic!("{err}\n    {sql:?}"))
-            .get(0);
-        assert_eq!(count, 2, "{sql:?}");
+            .unwrap_or_else(|err| panic!("{err}\n    {sql:?}"));
+        let counts: (i64, i64) = (row.get(0), row.get(1));
+        assert_eq!(counts, (2, 2), "{sql:?}");
     }
     close(ctx, db).await;
 }

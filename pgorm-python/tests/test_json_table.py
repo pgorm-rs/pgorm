@@ -18,7 +18,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+6/test]
+# [spec:pgorm:req:python.statements+7/test]
 class JsonTableTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

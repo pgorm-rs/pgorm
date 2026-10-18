@@ -3,6 +3,10 @@
     "sql": "SELECT \"r\".\"id\", SUM(\"r\".\"weight\") OVER ( PARTITION BY \"r\".\"kind\" ORDER BY \"r\".\"at\" ASC ) AS \"running\", row_number() OVER \"by_kind\" AS \"n\", AVG(\"r\".\"weight\") OVER (  ) FROM \"reading\" AS \"r\" WINDOW \"by_kind\" AS ( PARTITION BY \"r\".\"kind\" )",
     "values": []
   },
+  "window-clause-entries": {
+    "sql": "SELECT SUM(\"r\".\"weight\") OVER \"running\", rank() OVER \"ordered\" AS \"rank\" FROM \"reading\" AS \"r\" WINDOW \"by_kind\" AS ( PARTITION BY \"r\".\"kind\" ), \"ordered\" AS ( \"by_kind\" ORDER BY \"r\".\"at\" ASC ), \"running\" AS ( \"ordered\" ROWS BETWEEN $1 PRECEDING AND CURRENT ROW )",
+    "values": [["i64","1"]]
+  },
   "window-frames": {
     "sql": "SELECT SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC ROWS BETWEEN $1 PRECEDING AND $2 FOLLOWING EXCLUDE CURRENT ROW ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC ROWS UNBOUNDED PRECEDING ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC GROUPS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC RANGE BETWEEN CAST($3::text AS interval) PRECEDING AND CURRENT ROW ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC ROWS BETWEEN $4 FOLLOWING AND $5 FOLLOWING ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC ROWS BETWEEN $6 PRECEDING AND $7 PRECEDING ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC ROWS CURRENT ROW EXCLUDE TIES ), SUM(\"w\") OVER (  ORDER BY \"r\".\"id\" ASC GROUPS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE NO OTHERS ) FROM \"reading\" AS \"r\"",
     "values": [["i64","1"], ["i64","1"], ["text","1 day"], ["i64","1"], ["i64","3"], ["i64","3"], ["i64","1"]]

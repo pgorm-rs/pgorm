@@ -13,6 +13,7 @@ import {
   ConstructionError,
   CreatedRange,
   DatabaseError,
+  ExtendedWindow,
   FrameType,
   jsonArrayAgg,
   jsonValue,
@@ -77,7 +78,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 
 const byId = reading.col("id").asc();
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("a call runs over an inline window and over one the statement names", async () => {
   const running = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const rows = await pool().query(
@@ -97,7 +98,60 @@ test("a call runs over an inline window and over one the statement names", async
   ]);
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
+test("the WINDOW clause holds every window it declares, an extended one among them", async () => {
+  const rows = await pool().query(
+    select(
+      reading.col("id"),
+      call("sum", reading.col("weight")).over("running").as("running"),
+      call("sum", reading.col("weight")).over("pair").as("pair"),
+      call("count", reading.col("id")).over("kinds").as("kinds"),
+      windowFunction("row_number").over("running").as("n"),
+    ).from(reading)
+      .window("kinds", new Window().partitionBy(reading.col("kind")))
+      .window("running", new ExtendedWindow("kinds").orderBy(byId))
+      .window("pair", new ExtendedWindow("running").frame(FrameType.rows.preceding(1).andCurrentRow()))
+      .orderBy(byId),
+  );
+  assert.deepStrictEqual(rows.map((row) => [row.id, row.running, row.pair, row.kinds, row.n]), [
+    [1n, 10n, 10n, 3n, 1n],
+    [2n, 30n, 30n, 3n, 2n],
+    [3n, 60n, 50n, 3n, 3n],
+    [4n, 1n, 1n, 2n, 1n],
+    [5n, 3n, 3n, 2n, 2n],
+  ]);
+});
+
+// [spec:pgorm:req:napi.windows+1/test]
+test("a WINDOW clause PostgreSQL refuses is refused before anything is sent", async () => {
+  const over = (name: string) => select(call("count", reading.col("id")).over(name)).from(reading);
+  const ordered = new Window().orderBy(byId);
+  const cases: [ReturnType<typeof over>, RegExp][] = [
+    [over("w").window("w", new Window()).window("w", ordered), /names two windows "w"/],
+    [over("w").window("v", new Window()), /no window "w" is declared/],
+    [over("w").window("w", new ExtendedWindow("v")).window("v", new Window()), /no earlier entry/],
+    [
+      over("w").window("v", new Window().frame(FrameType.rows.currentRow())).window("w", new ExtendedWindow("v")),
+      /which has a frame/,
+    ],
+    [
+      over("w").window("v", ordered).window("w", new ExtendedWindow("v").orderBy(reading.col("id").desc())),
+      /already orders its rows/,
+    ],
+  ];
+  for (const [query, pattern] of cases) {
+    assert.throws(() => query.inspect(), refused(pattern));
+    await assert.rejects(pool().query(query), refused(pattern));
+    assert.throws(() => over("x").window("x", new Window()).union(query), refused(pattern));
+  }
+  const accepted = over("w").window("v", ordered).window("w", new ExtendedWindow("v").frame(FrameType.rows.currentRow()));
+  assert.equal((await pool().query(accepted)).length, 5);
+  assert.throws(() => new ExtendedWindow(""), refused(/identifier/));
+  assert.equal((new ExtendedWindow("w") as unknown as { partitionBy?: unknown }).partitionBy, undefined);
+  assert.throws(() => new ExtendedWindow("w").frame(FrameType.rows.following(1) as never), refused(/following start needs an end/));
+});
+
+// [spec:pgorm:req:napi.windows+1/test]
 test("a frame's mode, start, end and exclusion decide which rows a call reads", async () => {
   const ordered = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const sum = (frame: Parameters<Window["frame"]>[0]) => call("sum", reading.col("weight")).over(ordered.frame(frame));
@@ -123,7 +177,7 @@ test("a frame's mode, start, end and exclusion decide which rows a call reads", 
   ]);
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("the window-only functions and the JSON aggregates run over a window", async () => {
   const ordered = new Window().orderBy(reading.col("weight").desc());
   const rows = await pool().query(
@@ -150,7 +204,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
   );
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("OVER follows only a call, a frame only ends after its start, and a window-only function needs its window", () => {
   const ordered = new Window().orderBy(byId);
   assert.throws(() => col("x").over(ordered), refused(/OVER follows only a function call/));

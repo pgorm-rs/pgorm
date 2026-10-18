@@ -29,10 +29,11 @@
 //! the migration ledger, the cursor's qualifiers).
 
 use pgorm::pgorm_query::{
-    Asterisk, ColumnType, CommonTableExpression, Cycle, Expr, FromItem, Func, IntoNamedTable,
-    JoinType, JsonTable, JsonTableColumn, LockType, MatchedAction, MergeInsert, MergeUpdate, Name,
-    OnConflict, Order, Query, Range, RecursiveWithClause, ReturningRow, SampleMethod, Search,
-    SearchOrder, SqlTemplate, TableFunction, TableSample, TypeName, WindowStatement, WithClause,
+    Asterisk, ColumnType, CommonTableExpression, Cycle, Expr, ExtendedWindow, FromItem, Func,
+    IntoNamedTable, JoinType, JsonTable, JsonTableColumn, LockType, MatchedAction, MergeInsert,
+    MergeUpdate, Name, OnConflict, Order, Query, Range, RecursiveWithClause, ReturningRow,
+    SampleMethod, Search, SearchOrder, SqlTemplate, TableFunction, TableSample, TypeName,
+    WindowStatement, WithClause,
 };
 
 use super::oracle::{
@@ -375,6 +376,18 @@ fn query_sites() -> Vec<Site> {
                     .column(fixed("c"))
                     .from(fixed("t"))
                     .window(n_(n), WindowStatement::partition_by(fixed("c"))))
+            },
+        },
+        Site {
+            id: "query/select.window.extends",
+            api: "ExtendedWindow::new(Name)",
+            kinds: &["WindowDef.refname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Query::select()
+                    .column(fixed("c"))
+                    .from(fixed("t"))
+                    .window(fixed("w"), ExtendedWindow::new(n_(n))))
             },
         },
         Site {

@@ -4,7 +4,7 @@
 // start offers only the ends that may follow it, so no frame whose end comes
 // before its start can be built, and a function PostgreSQL computes only over
 // a window has no form but `over`.
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -36,6 +36,36 @@ export class Window extends Handle {
    */
   frame(frame) {
     return new Window(native.windowFrame(arg(this), arg(frame)), TRUSTED);
+  }
+}
+
+/**
+ * A window built on an earlier entry of a SELECT's WINDOW clause, named
+ * `base`: it copies the base's PARTITION BY and any ORDER BY, and adds an
+ * ORDER BY and a frame. It has no `partitionBy`, which PostgreSQL refuses
+ * there. Every method returns a new window.
+ */
+export class ExtendedWindow extends Handle {
+  /**
+   * @param {string} base
+   * @param {symbol} [token]
+   */
+  constructor(base, token) {
+    super(token === TRUSTED ? base : native.extendedWindowNew(base));
+  }
+
+  /** @param {...import("./expressions.js").OrderBy} orderings */
+  orderBy(...orderings) {
+    return new ExtendedWindow(native.extendedWindowOrderBy(arg(this), args(orderings)), TRUSTED);
+  }
+
+  /**
+   * The frame, replacing any: a `Frame`, or a preceding or current-row start standing alone.
+   *
+   * @param {Frame | FramePrecedingStart | FrameCurrentRowStart} frame
+   */
+  frame(frame) {
+    return new ExtendedWindow(native.extendedWindowFrame(arg(this), arg(frame)), TRUSTED);
   }
 }
 

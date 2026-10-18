@@ -30,6 +30,43 @@ pub enum Error {
         /// The write's keyword: `INSERT`, `UPDATE`, `DELETE` or `MERGE`.
         write: &'static str,
     },
+    /// A WINDOW clause naming two windows alike, which PostgreSQL refuses
+    /// (`42P20`).
+    WindowRedefined {
+        /// The name the entries share.
+        name: String,
+    },
+    /// A projection over a window name the statement's WINDOW clause does
+    /// not declare (`42704`).
+    WindowUndefined {
+        /// The name the projection reads.
+        name: String,
+    },
+    /// A window extending a base that is no earlier entry of its WINDOW
+    /// clause, which PostgreSQL reads as no window at all (`42704`).
+    WindowBaseUndefined {
+        /// The extending window.
+        window: String,
+        /// The base it names.
+        base: String,
+    },
+    /// A window extending a base that has a frame, which PostgreSQL refuses
+    /// to copy (`42P20`).
+    WindowFrameCopied {
+        /// The extending window.
+        window: String,
+        /// The base it names.
+        base: String,
+    },
+    /// A window adding an ORDER BY to a base that already orders its rows,
+    /// by its own ORDER BY or one it copied, which PostgreSQL refuses to
+    /// override (`42P20`).
+    WindowOrderOverridden {
+        /// The extending window.
+        window: String,
+        /// The base it names.
+        base: String,
+    },
 }
 
 /// Why a placeholder template and its substitutions do not pair up.
@@ -84,6 +121,26 @@ impl std::fmt::Display for Error {
             Self::CopyWithoutReturning { write } => write!(
                 f,
                 "COPY TO copies the rows a write returns, and this {write} has no RETURNING list"
+            ),
+            Self::WindowRedefined { name } => {
+                write!(f, "the WINDOW clause names two windows \"{name}\"")
+            }
+            Self::WindowUndefined { name } => {
+                write!(f, "no window \"{name}\" is declared in the WINDOW clause")
+            }
+            Self::WindowBaseUndefined { window, base } => write!(
+                f,
+                "window \"{window}\" extends \"{base}\", which no earlier entry of the \
+                 WINDOW clause declares"
+            ),
+            Self::WindowFrameCopied { window, base } => write!(
+                f,
+                "window \"{window}\" cannot extend \"{base}\", which has a frame"
+            ),
+            Self::WindowOrderOverridden { window, base } => write!(
+                f,
+                "window \"{window}\" cannot add an ORDER BY to \"{base}\", which already \
+                 orders its rows"
             ),
         }
     }

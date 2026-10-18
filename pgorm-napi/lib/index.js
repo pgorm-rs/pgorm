@@ -61,6 +61,7 @@ export {
 } from "./json.js";
 export { jsonTable, JsonTableColumn } from "./json-table.js";
 export {
+  ExtendedWindow,
   Frame,
   FrameCurrentRowStart,
   FrameFollowingStart,

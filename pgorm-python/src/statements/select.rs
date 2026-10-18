@@ -5,7 +5,7 @@ use super::{
     common,
     from_item::from_item,
     grouping::{self, Grouped},
-    window::PyWindow,
+    window::window_definition,
 };
 use crate::{errors::ConstructionError, expressions::Compiled, identifiers::PyIdentifier};
 
@@ -30,7 +30,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+6]
+// [spec:pgorm:req:python.statements+7]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -39,24 +39,27 @@ pub struct PySelect {
 }
 
 impl PySelect {
-    /// Refuse a tie limit PostgreSQL's grammar would refuse, with Rust's
-    /// `check_tie_limit`, which rendering leaves to its caller.
-    fn check_tie_limit(&self) -> PyResult<()> {
+    // [spec:pgorm:req:python.statements+7]
+    /// Refuse a tie limit, and a WINDOW clause or a reference to one, that
+    /// PostgreSQL would refuse, with Rust's `check_tie_limit` and
+    /// `check_windows`, which rendering leaves to its caller.
+    fn check(&self) -> PyResult<()> {
         self.inner
             .check_tie_limit()
+            .and_then(|()| self.inner.check_windows())
             .map_err(|error| ConstructionError::new_err(error.to_string()))
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// The statement as another builder reads it — a CTE body, a subquery.
-    /// Nothing can order it once it is embedded, so its tie limit is checked
-    /// as it is read rather than left to the server.
+    /// Nothing can order it or declare its windows once it is embedded, so
+    /// both are checked as it is read rather than left to the server.
     pub(crate) fn embedded(&self) -> PyResult<SelectStatement> {
-        self.check_tie_limit()?;
+        self.check()?;
         Ok(self.inner.clone())
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// Append `other` as a parenthesised set-operation arm, as Rust's `union`
     /// does for every operator. The receiver's ORDER BY, row limit and OFFSET
     /// render after the last arm, so they order and bound the combined rows
@@ -126,7 +129,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// Append to the GROUP BY list, in call order: an expression is a set of
     /// one, and a `GroupingElement` is `()`, a parenthesised set, `ROLLUP`,
     /// `CUBE` or `GROUPING SETS`.
@@ -142,7 +145,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// `GROUP BY DISTINCT`: each grouping set the list names more than once
     /// is grouped once. It quantifies the whole list, and renders nothing
     /// while there is no GROUP BY.
@@ -176,7 +179,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// `FETCH FIRST n ROWS WITH TIES`: the first `count` rows and every row
     /// tied with the last of them on the ORDER BY, in `limit`'s slot. It
     /// needs an ORDER BY, which may come later in the chain, so the check is
@@ -203,12 +206,15 @@ impl PySelect {
         next
     }
 
-    /// Declare the statement's named window, `WINDOW name AS (..)`, which an
-    /// item's `over(name)` reads. Rust's builder holds one; the last call wins.
-    fn window(&self, name: &Bound<'_, PyAny>, window: PyRef<'_, PyWindow>) -> PyResult<Self> {
+    // [spec:pgorm:req:python.statements+7]
+    /// Append a named window to the WINDOW clause, `name AS (..)`, which an
+    /// item's `over(name)` reads: a `Window`, or an `ExtendedWindow` built on
+    /// an entry appended before it. A clause PostgreSQL refuses is refused
+    /// when the statement is inspected, executed or read into another.
+    fn window(&self, name: &Bound<'_, PyAny>, window: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.inner
-            .window(PyIdentifier::new(name)?.name(), window.inner.clone());
+            .window(PyIdentifier::new(name)?.name(), window_definition(window)?);
         Ok(next)
     }
 
@@ -253,11 +259,12 @@ impl PySelect {
         self.combined(UnionType::ExceptAll, &other)
     }
 
-    // [spec:pgorm:req:python.statements+6]
+    // [spec:pgorm:req:python.statements+7]
     /// Every execution path renders through this method, so the tie-limit
-    /// check Rust leaves to the caller is made here, before any SQL exists.
+    /// and window checks Rust leaves to the caller are made here, before any
+    /// SQL exists.
     pub fn inspect(&self) -> PyResult<Compiled> {
-        self.check_tie_limit()?;
+        self.check()?;
         common::compiled(self.inner.build())
     }
 

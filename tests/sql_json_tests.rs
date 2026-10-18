@@ -617,7 +617,7 @@ async fn json_value_returning_jsonb_sticks_at_null() -> Result<(), Error> {
 /// The aggregates order, filter and treat `NULL` as specified, answer `NULL`
 /// over no rows, and run as window functions.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2/test]    JSON_ARRAYAGG and JSON_OBJECTAGG, live
-// [spec:pgorm:def:sql.ast.window-statement+6/test]    a JSON aggregate under OVER
+// [spec:pgorm:def:sql.ast.window-statement+7/test]    a JSON aggregate under OVER
 #[pgorm_macros::test]
 async fn aggregates_order_filter_and_drop_nulls() -> Result<(), Error> {
     let ctx = TestContext::new("sql_json_aggregates").await;

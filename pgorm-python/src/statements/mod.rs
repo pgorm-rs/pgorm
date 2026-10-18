@@ -38,8 +38,8 @@ pub use table_function::PyTableFunction;
 pub use table_sample::PySampleMethod;
 pub(crate) use window::WindowCall;
 pub use window::{
-    PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing, PyFramePreceding, PyFrameType,
-    PyWindow, PyWindowFunction, PyWindowedExpr,
+    PyExtendedWindow, PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing,
+    PyFramePreceding, PyFrameType, PyWindow, PyWindowFunction, PyWindowedExpr,
 };
 pub use with::{PyReturningRow, PyWith};
 pub use write::{PyDelete, PyUpdate};
@@ -92,6 +92,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFrameCurrentRow>()?;
     module.add_class::<PyFrameFollowing>()?;
     module.add_class::<PyWindow>()?;
+    module.add_class::<PyExtendedWindow>()?;
     module.add_class::<PyWindowedExpr>()?;
     module.add_class::<PyWindowFunction>()?;
     module.add_function(wrap_pyfunction!(window::window_function, module)?)?;

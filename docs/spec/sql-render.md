@@ -406,7 +406,7 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+5]
+> [spec:pgorm:req:sql.render.select-order+6]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
 > through the same `prepare_with_clause` the three write statements use and
@@ -416,11 +416,12 @@ an ideal Postgres renderer would emit.
 > references (omitted entirely when no from-table); one space-separated join
 > expression per join; the WHERE condition; ` GROUP BY `, its `DISTINCT`
 > when set, and its grouping elements (`sql.render.grouping`); the
-> HAVING condition; the optional named window declaration
-> ` WINDOW "name" AS ( … )`; any union clauses; ` ORDER BY ` expressions;
+> HAVING condition; the WINDOW clause when the statement declares a window,
+> ` WINDOW "name" AS ( … )` with each further entry after a comma
+> (`sql.render.window`); any union clauses; ` ORDER BY ` expressions;
 > the row limit, ` LIMIT $N` or a tie limit in its place
-> (`sql.render.tie-limit`); ` OFFSET $N`; and the row-locking clause. The window
-> declaration belongs to the same query level as HAVING, so it MUST precede
+> (`sql.render.tie-limit`); ` OFFSET $N`; and the row-locking clause. The WINDOW
+> clause belongs to the same query level as HAVING, so it MUST precede
 > the set operations and the ORDER BY/LIMIT/OFFSET/locking tail that apply to
 > the combined result — that is the position PostgreSQL's grammar requires,
 > and emitting it later makes a named window unusable with any of them.
@@ -474,15 +475,21 @@ an ideal Postgres renderer would emit.
 > ` TABLESAMPLE SYSTEM (`, the percentage as a parameter, and `)`; then, when
 > seeded, ` REPEATABLE (`, the seed as a parameter, and `)`.
 
-> [spec:pgorm:req:sql.render.window+5]
-> A window specification is never emitted bare: `prepare_window_spec` wraps it
-> in `( ` … ` )` (note the spaces inside the parentheses), and it is the only
-> way a specification reaches the sink. Both spelling sites therefore agree —
-> an inline windowed projection renders ` OVER ( … )` and a statement-level
-> declaration renders ` WINDOW "name" AS ( … )` — and an empty specification
-> renders as the legal `(  )`. A projection that references a declared window
-> by name instead renders ` OVER "name"`, with any projection alias following
-> the window in either form (` OVER … AS "alias"`).
+> [spec:pgorm:req:sql.render.window+6]
+> A window specification is never emitted bare: `prepare_window_spec` wraps a
+> `WindowStatement` in `( ` … ` )` (note the spaces inside the parentheses),
+> `prepare_extended_window` wraps an `ExtendedWindow` the same way, and they
+> are the only ways a specification reaches the sink. Both spelling sites
+> therefore agree — an inline windowed projection renders ` OVER ( … )` and a
+> WINDOW clause entry renders `"name" AS ( … )` — and an empty specification
+> renders as the legal `(  )`. `prepare_window_clause` writes the clause:
+> ` WINDOW ` and its entries in the order the statement holds them, separated
+> by `, `, or nothing when it declares no window. An extended window writes
+> its base's quoted name where a window of its own writes its PARTITION BY,
+> then the same ORDER BY and frame: `( "base" ORDER BY … ROWS … )`, or
+> `( "base" )` alone. A projection that references a declared window by name
+> instead renders ` OVER "name"`, with any projection alias following the
+> window in either form (` OVER … AS "alias"`).
 >
 > `OVER` reaches the sink only after a projection whose expression is a
 > `SimpleExpr::FunctionCall`, because that is the only production PostgreSQL's
@@ -506,11 +513,12 @@ an ideal Postgres renderer would emit.
 > the keyword after it ends the expression, as `WHEN` and `THEN` do in
 > `sql.render.case`.
 >
-> The frame renders in a child module of the query builder,
-> `query_builder_window.rs`. A frame whose bound, `BETWEEN` or exclusion went
-> missing still parses — as a different frame — so each rendering is held to
-> libpg_query's `frame_options` bitmask and its offset nodes, not only to the
-> grammar.
+> The WINDOW clause, both specifications and the frame render in a child
+> module of the query builder, `query_builder_window.rs`. A frame whose bound,
+> `BETWEEN` or exclusion went missing still parses — as a different frame —
+> so each rendering is held to libpg_query's `frame_options` bitmask and its
+> offset nodes, not only to the grammar, and a WINDOW clause to the entries,
+> names and bases libpg_query reads from it.
 
 > [spec:pgorm:req:sql.render.func-mods]
 > `prepare_function_arguments` MUST render a call's parenthesized argument

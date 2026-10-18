@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+6]
+> [spec:pgorm:req:python.statements+7]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -178,8 +178,18 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > and its alias required so an empty column list or an unnamed item cannot be
 > built. A SELECT item MUST be able to call a function over a window, inline or
 > named in the statement's WINDOW clause, lowered into `WindowStatement` and
-> the `expr_window` family. The WINDOW clause holds one named window, as
-> Rust's `SelectStatement::window` does, so a second call replaces the first.
+> the `expr_window` family. The WINDOW clause MUST hold every window
+> `window(name, window)` declares, in call order, as Rust's
+> `SelectStatement::window` appends them: a `Window`, or an
+> `ExtendedWindow(base)`, lowered into Rust's `ExtendedWindow`, which builds
+> on an earlier entry with an ORDER BY and a frame and has no `partition_by`
+> (`sql.ast.window-statement`); anything else declared is a `TypeError`. A
+> clause PostgreSQL refuses — a name declared twice, an extended window whose
+> base is no earlier entry, has a frame, or already orders its rows when it
+> adds an ORDER BY — and an item over a name the clause does not declare are
+> refused by Rust's `check_windows`, as a `ConstructionError`, where the tie
+> limit is checked: when the statement is inspected or executed, and as a
+> method reads it into another statement.
 > `OVER` MUST attach only to what Rust's `WindowFunction` admits — a function
 > call or a JSON aggregate — and a frame MUST follow the Rust frame typestate,
 > which types a start by the side of the current row it lies on, so that no
