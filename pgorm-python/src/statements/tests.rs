@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{
     FrameType, FromItem, Func, GroupingElement, IntoNamedTable, JoinType, MatchedAction,
     MergeInsert, MergeUpdate, Name, NotMatchedAction, NullOrdering, OnConflict, Order,
     OverStatement, Overriding, Query, ReturningRow, SampleMethod, SimpleExpr, TableFunction,
-    TableSample, Values, WindowStatement, WithClause,
+    TableSample, UnionType, Values, WindowStatement, WithClause,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -40,7 +40,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -90,7 +90,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -127,7 +127,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -160,7 +160,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -218,7 +218,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -287,7 +287,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -332,7 +332,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -386,7 +386,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -422,7 +422,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn windows_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -491,7 +491,7 @@ w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 #[test]
 fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     Python::initialize();
@@ -551,7 +551,7 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tie limit shares `limit`'s slot, either
 // replacing the other and `None` clearing both
 #[test]
@@ -605,7 +605,7 @@ fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]    a tie limit with no ORDER BY is refused at
 // inspection, at execution's compile and as a CTE body or subquery reads it, and its count is
 // checked as `limit`'s is
@@ -682,7 +682,7 @@ fn tie_limits_without_order_are_refused() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 // [spec:pgorm:req:sql.ast.select.group-distinct/test]    grouping elements interleave with
 // expressions in call order, and DISTINCT quantifies the whole list
 #[test]
@@ -753,7 +753,7 @@ fn grouping_elements_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 // [spec:pgorm:req:sql.ast.select.table-function/test]    one call, ROWS FROM, ordinality and
 // column names, the lone plain call as Rust's FunctionCall item, and anything but a call refused
 #[test]
@@ -843,7 +843,7 @@ fn table_functions_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+5/test]
+// [spec:pgorm:req:python.statements+6/test]
 // [spec:pgorm:req:sql.ast.select.table-sample/test]    both methods, the percentage and seed
 // bound as doubles, and numbers a double cannot hold exactly refused
 #[test]
@@ -912,6 +912,127 @@ fn table_samples_match_rust_builders() -> PyResult<()> {
             )
             .expect_err("the method is a SampleMethod");
         assert!(error.is_instance_of::<pyo3::exceptions::PyTypeError>(py));
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.statements+6/test]    each operator appends one parenthesised arm in
+// call order, and the receiver's ORDER BY, limits and WITH clause cover the combined rows
+#[test]
+fn set_operations_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let n = Name::runtime;
+        let ids = |name: &'static str| Query::select().column(n("id")).from(n(name)).take();
+        py.run(
+            c"ids = lambda name: p.Select(p.col('id')).from_(p.Table(name))",
+            Some(&globals),
+            None,
+        )?;
+        parity(
+            py,
+            &globals,
+            "ids('t').union(ids('u')).union_all(ids('v')).intersect(ids('w')).intersect_all(ids('x')).except_(ids('y')).except_all(ids('z'))",
+            ids("t")
+                .union(UnionType::Distinct, ids("u"))
+                .union(UnionType::All, ids("v"))
+                .union(UnionType::Intersect, ids("w"))
+                .union(UnionType::IntersectAll, ids("x"))
+                .union(UnionType::Except, ids("y"))
+                .union(UnionType::ExceptAll, ids("z"))
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "ids('t').where_(p.col('id') > 1).order_by(p.col('id').desc()).union_all(ids('u').where_(p.col('id') < 9).order_by(p.col('id').asc()).limit(2)).limit(3).offset(1)",
+            ids("t")
+                .and_where(Expr::col(n("id")).gt(1i64))
+                .order_by(n("id"), Order::Desc)
+                .union(
+                    UnionType::All,
+                    ids("u")
+                        .and_where(Expr::col(n("id")).lt(9i64))
+                        .order_by(n("id"), Order::Asc)
+                        .limit(2)
+                        .take(),
+                )
+                .limit(3)
+                .offset(1)
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(p.Table('w')).except_(p.Select().from_(p.Table('w')).where_(p.col('id') == 2)).with_(p.With('w', ids('t'))).order_by(p.col('id').desc()).limit_with_ties(1)",
+            Query::select()
+                .column(Asterisk)
+                .from(n("w"))
+                .union(
+                    UnionType::Except,
+                    Query::select()
+                        .column(Asterisk)
+                        .from(n("w"))
+                        .and_where(Expr::col(n("id")).eq(2i64))
+                        .take(),
+                )
+                .with(WithClause::new(CommonTableExpression::new(
+                    n("w"),
+                    ids("t"),
+                )))
+                .order_by(n("id"), Order::Desc)
+                .limit_with_ties(1)
+                .build(),
+        )
+    })
+}
+
+// [spec:pgorm:req:python.statements+6/test]    an arm is read into the statement, so its tie
+// limit is checked as it is read; anything but a Select is a TypeError
+#[test]
+fn set_operation_arms_are_checked_when_read() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        py.run(
+            c"s = p.Select(p.col('id')).from_(p.Table('t'))\nunordered = s.limit_with_ties(1)",
+            Some(&globals),
+            None,
+        )?;
+        for method in [
+            "union",
+            "union_all",
+            "intersect",
+            "intersect_all",
+            "except_",
+            "except_all",
+        ] {
+            let source = format!("s.{method}(unordered)");
+            let error = py
+                .eval(&CString::new(source.as_str())?, Some(&globals), None)
+                .expect_err(&source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+            assert!(error.to_string().contains("needs an ORDER BY"), "{error}");
+            for other in ["p.Table('t')", "p.RawSQL('SELECT 1')", "'SELECT 1'", "None"] {
+                let source = format!("s.{method}({other})");
+                let error = py
+                    .eval(&CString::new(source.as_str())?, Some(&globals), None)
+                    .expect_err(&source);
+                assert!(
+                    error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
+                    "{source}: {error}"
+                );
+            }
+        }
+        let receiver = py.eval(c"unordered.union(s)", Some(&globals), None)?;
+        let error = receiver
+            .call_method0("inspect")
+            .expect_err("the combined rows have no ORDER BY to measure ties on");
+        assert!(error.is_instance_of::<crate::errors::ConstructionError>(py));
         Ok(())
     })
 }

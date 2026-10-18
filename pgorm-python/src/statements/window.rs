@@ -211,7 +211,7 @@ impl PyFrameFollowing {
     }
 }
 
-// [spec:pgorm:req:python.statements+5]
+// [spec:pgorm:req:python.statements+6]
 /// An `OVER` window: PARTITION BY, ORDER BY and a frame, owned by Rust's
 /// `WindowStatement`.
 #[pyclass(name = "Window", module = "pgorm", frozen, from_py_object)]
@@ -323,7 +323,7 @@ enum Over {
     Named(Name),
 }
 
-// [spec:pgorm:req:python.statements+5]
+// [spec:pgorm:req:python.statements+6]
 /// A function call under `OVER`, a SELECT item built by `over`.
 #[pyclass(name = "WindowedExpr", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -378,7 +378,7 @@ impl PyWindowedExpr {
     }
 }
 
-// [spec:pgorm:req:python.statements+5]
+// [spec:pgorm:req:python.statements+6]
 /// A function PostgreSQL computes only over a window, built by
 /// `window_function`. Its one method is `over`, so it cannot stand in a query
 /// without its window (`42809`).

@@ -12,7 +12,7 @@ def accounts_query(table):
 
 
 class ViewConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.schema-views/test]    the Select's values are written into the
+    # [spec:pgorm:req:python.schema-views+1/test]    the Select's values are written into the
     # definition, and each option renders where the Rust builder writes it
     def test_views_render_their_query_inlined(self):
         manifest = p.capabilities()["operations"]
@@ -36,8 +36,18 @@ class ViewConstruction(unittest.TestCase):
             s.refresh_materialized_view(p.Table("m"), concurrently=True).inspect().sql,
             'REFRESH MATERIALIZED VIEW CONCURRENTLY "m"',
         )
+        counting = p.Select(p.literal(1).as_("n")).union_all(
+            p.Select(p.col("n") + 1).from_(p.Table("counter")).where_(p.col("n") < 4)
+        )
+        recursive = s.create_recursive_view(p.Table("counter", schema="app"), ["n"], counting).inspect()
+        self.assertEqual(
+            recursive.sql,
+            'CREATE RECURSIVE VIEW "app"."counter" ("n") AS SELECT 1 AS "n" '
+            'UNION ALL (SELECT "n" + 1 FROM "counter" WHERE "n" < 4)',
+        )
+        self.assertEqual(recursive.params, [])
 
-    # [spec:pgorm:req:python.schema-views/test]    what PostgreSQL refuses and the Rust types
+    # [spec:pgorm:req:python.schema-views+1/test]    what PostgreSQL refuses and the Rust types
     # cannot hold is refused as the statement is built
     def test_invalid_view_options_are_refused(self):
         table = p.Table("account")
@@ -86,7 +96,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         rows = await self.pool.fetch_all(p.Select(p.col("name")).from_(relation).order_by(p.col("id").asc()))
         return [row["name"] for row in rows]
 
-    # [spec:pgorm:req:python.schema-views/test]    a view built from a Select reads the rows it
+    # [spec:pgorm:req:python.schema-views+1/test]    a view built from a Select reads the rows it
     # shows, an insert through it reaches the table, and its check option refuses a hidden row
     async def test_view_reads_writes_and_checks_rows(self):
         view = self.relation('active "x"')
@@ -107,18 +117,30 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
             [f'{self.quoted}."active ""x"""'],
         ))
         self.assertEqual(options["options"], ["security_barrier=true"])
-        recursive = self.relation("counter")
-        await self.pool.execute(s.create_recursive_view(recursive, ["n"], p.Select(p.literal(1))))
-        counted = await self.pool.fetch_all(p.Select(p.col("n")).from_(recursive))
-        self.assertEqual([row["n"] for row in counted], [1])
-        await self.pool.execute(s.drop_view(recursive))
         with self.assertRaises(p.DatabaseError) as refused:
             await self.pool.execute(s.drop_view(self.table))
         self.assertEqual(refused.exception.sqlstate, "42809")
         await self.pool.execute(s.drop_view(view, cascade=True))
         await self.pool.execute(s.drop_view(view, if_exists=True))
 
-    # [spec:pgorm:req:python.schema-views/test]    a materialized view holds its rows until a
+    # [spec:pgorm:req:python.schema-views+1/test]    a recursive view's query reads the view
+    # through its UNION ALL arm, by the bare name its WITH RECURSIVE form gives it
+    async def test_recursive_view_reads_itself(self):
+        counter = self.relation("counter")
+
+        def counting(source):
+            step = p.Select(p.col("n") + 1).from_(source).where_(p.col("n") < 4)
+            return p.Select(p.literal(1).as_("n")).union_all(step)
+
+        with self.assertRaises(p.DatabaseError) as refused:
+            await self.pool.execute(s.create_recursive_view(counter, ["n"], counting(counter)))
+        self.assertEqual(refused.exception.sqlstate, "42P01")
+        await self.pool.execute(s.create_recursive_view(counter, ["n"], counting(p.Table("counter"))))
+        counted = await self.pool.fetch_all(p.Select(p.col("n")).from_(counter).order_by(p.col("n").asc()))
+        self.assertEqual([row["n"] for row in counted], [1, 2, 3, 4])
+        await self.pool.execute(s.drop_view(counter))
+
+    # [spec:pgorm:req:python.schema-views+1/test]    a materialized view holds its rows until a
     # refresh, and a concurrent refresh needs a unique index
     async def test_materialized_view_refreshes_concurrently(self):
         view = self.relation('snapshot "x"')
@@ -144,7 +166,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(s.drop_materialized_view(view))
         await self.pool.execute(s.drop_materialized_view(view, if_exists=True))
 
-    # [spec:pgorm:req:python.schema-views/test]    a table created from a Select with no data
+    # [spec:pgorm:req:python.schema-views+1/test]    a table created from a Select with no data
     # has its columns, renamed where names are given, and keeps the rows inserted later
     async def test_table_created_from_query_without_data(self):
         copy = self.relation('copy "x"')

@@ -87,6 +87,16 @@ async def exercise(
         {"id": 2, "name": "雪", "kind": None},
     ]
 
+    without_events = (
+        p.select(a.col("id"))
+        .from_(a)
+        .except_(p.select(e.col("account_id")).from_(e))
+        .order_by(p.col("id").asc())
+    )
+    assert_type(without_events, p.Select)
+    quiet = [record["id"] for record in await pool.fetch_all(without_events)]
+    assert quiet == [2]
+
     visit = (
         p.merge(a, e, a.col("id") == e.col("account_id"))
         .when_matched(p.MergeUpdate("visits", a.col("visits") + p.literal(1)))
@@ -131,6 +141,7 @@ async def exercise(
     assert missing is None
     return {
         "joined": joined,
+        "without_events": quiet,
         "merged": merged,
         "streamed": streamed,
         "deleted": removed,

@@ -65,9 +65,9 @@ either replaces the other and `limit(None)` clears both. The ties are
 measured on the ORDER BY, which may be added later in the chain, so the
 statement is checked — by Rust's `check_tie_limit` — when it is inspected or
 executed: one with no ORDER BY raises `ConstructionError` before any SQL is
-sent. A SELECT read into another statement, a `With` body or
-`json_array_query`'s subquery, can no longer be ordered, so it is checked as
-it is read.
+sent. A SELECT read into another statement, a `With` body, a set operation's
+arm or `json_array_query`'s subquery, can no longer be ordered, so it is
+checked as it is read.
 
 ## Grouping
 
@@ -132,6 +132,52 @@ of 100, and `repeatable` seeds the draw so the same seed over unchanged data
 draws the same sample. Both numbers are `int` or `float` and are bound; an
 `int` a double cannot hold exactly raises `ConstructionError`, and a
 percentage outside 0 to 100 is PostgreSQL's refusal (`2202H`).
+
+## Set operations
+
+`.union(other)`, `.union_all(other)`, `.intersect(other)`,
+`.intersect_all(other)`, `.except_(other)` and `.except_all(other)` combine
+the rows of two queries, Rust's `union` with each of the six `UnionType`s.
+The forms without `ALL` return each distinct row once. `union_all` keeps
+every row of both; `intersect_all` returns a row as many times as the query
+returning it less often does; `except_all` returns a row as many times as
+this query returns it beyond the times `other` does. `except` is a Python
+keyword, hence `except_`, as with `from_`, `where_` and `with_`; the others
+are JavaScript's `unionAll`, `intersectAll` and `exceptAll` in snake case.
+
+```python
+from pgorm import Table, col, select
+
+account, archived = Table("account"), Table("archived_account")
+names = (
+    select(col("name")).from_(account)
+    .union(select(col("name")).from_(archived))
+    .order_by(col("name").asc())
+    .limit(10)
+)
+```
+
+`other` is a `Select`, read into the statement as a parenthesised arm. It may
+carry its own ORDER BY and limit, which bound only its rows, and its tie limit
+is checked as it is read, as a `With` body's is; anything else raises
+`TypeError`. The receiver's ORDER BY, LIMIT, OFFSET and tie limit are written
+after the last arm, so they order and bound the combined rows whether they
+were set before the set operation or after: a SELECT ordered and limited on
+its own orders and limits the whole combination once it is combined. An
+ordering of the combined rows names a result column, `col(name)` by the first
+arm's output name; PostgreSQL refuses a column qualified by one of the first
+arm's tables (`42P01`) and any other expression (`0A000`). The receiver's
+WITH clause precedes the whole statement, so every arm reads its
+expressions, while its WHERE, GROUP BY, HAVING, DISTINCT and WINDOW belong to
+the first arm alone.
+
+Arms are written in call order, each parenthesised, so PostgreSQL's
+precedence groups them: `INTERSECT` binds tighter than `UNION` and `EXCEPT`,
+which group from the left. `a.union(b).intersect(c)` is
+`a UNION (b INTERSECT c)`; to intersect the union, make it the arm, as in
+`c.intersect(a.union(b))`. A recursive view's query is a set operation whose
+arm reads the view; see
+[SCHEMA.md](SCHEMA.md#views-materialized-views-and-tables-from-a-query).
 
 ## Window functions
 

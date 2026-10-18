@@ -174,9 +174,20 @@ refused (`44000`), `"cascaded"` consulting the views beneath it too.
 options. `security_barrier` evaluates the view's conditions before a caller's,
 and `security_invoker` reads the underlying tables with the querying role's
 privileges. `create_recursive_view(name, columns, query, ...)` names at least
-one column and takes no check option; since `Select` has no `UNION`, its query
-cannot yet read the view. `drop_view(name, if_exists=False, cascade=False)`
-drops a view.
+one column and takes no check option. Its query is a non-recursive term joined
+by `union` or `union_all` to an arm that reads the view (see
+[STATEMENTS.md](STATEMENTS.md#set-operations)). PostgreSQL defines the view as
+a `WITH RECURSIVE` query named by the view's bare name, so the arm reads it
+unqualified; a schema-qualified name looks for a relation that does not exist
+yet (`42P01`):
+
+```python
+counter = p.Table("counter", schema="app")
+step = p.Select(p.col("n") + 1).from_(p.Table("counter")).where_(p.col("n") < 4)
+counting = s.create_recursive_view(counter, ["n"], p.Select(p.literal(1).as_("n")).union_all(step))
+```
+
+`drop_view(name, if_exists=False, cascade=False)` drops a view.
 
 `create_materialized_view(name, query, columns=(), if_not_exists=False,
 with_no_data=False)` stores the query's rows, or none until a refresh;

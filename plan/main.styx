@@ -11970,12 +11970,28 @@ children (
         title "Python's Select combines with UNION, INTERSECT and EXCEPT, with and without ALL, as JavaScript's and Rust's do"
         kind @feat
         deps (sql-views sql-select-extras)
+        sealed true
         log (
             {
                 at 2026-10-18T16:42:47.882511Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-views (19a670c7). pgorm-python's statement Select has no set operation: Rust's SelectStatement has union/intersect/except with ALL (sql.ast.select.union) and pgorm-napi's Select has union, unionAll, intersect, intersectAll and the rest, but Python reaches set operations only through the pipeline API. So create_recursive_view exists in Python but cannot build a body that reads the view (a recursive view's body is a UNION), and any statement-level UNION needs RawSQL. Give Python's Select the same set operations as Rust and JavaScript, with ORDER BY / LIMIT on the combined result as Rust allows, stubs, capability entries, parity cases against Rust, live tests including a recursive view built end to end, and python.statements' text; drop the caveat sql-views wrote into python.schema-views and SCHEMA.md. Waits on sql-select-extras, which changes the same Python Select."
+            }
+
+            {
+                at 2026-10-18T19:03:35.403663Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-18T19:03:45.587933Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Python's Select gains union, union_all, intersect, intersect_all, except_ and except_all, each Rust's SelectStatement::union with one of the six UnionTypes and the arm read through PySelect::embedded (its tie limit checked as it is read; a non-Select arm is a TypeError). Naming follows pgorm-napi's union/unionAll/intersect/intersectAll/except/exceptAll in snake case; except is a Python keyword, so except_, as from_/where_/with_. Semantics are Rust's, unchanged: the receiver's ORDER BY/LIMIT/OFFSET/tie limit render after the last arm whenever set, its WITH precedes every arm, arms render flat in call order so PostgreSQL's precedence regroups an INTERSECT after a UNION/EXCEPT (documented and tested live, not changed: parity with Rust and JavaScript). A recursive view's step arm must read the view by its bare name (the WITH RECURSIVE name); a qualified name is 42P01. python.statements +6, python.schema-views +1 (caveat replaced by the recursive-view requirement)."
+                after_done true
             }
         )
     }

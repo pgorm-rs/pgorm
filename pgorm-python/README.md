@@ -93,8 +93,8 @@ semantics.
 `Table`, `select`, `insert`, `update` and `delete` compose the Rust statement
 builders over application names supplied at runtime. `inspect()` returns the
 SQL and parameters produced by that builder state. See [runtime statement
-examples](STATEMENTS.md) for joins, grouping, write guards, conflict actions,
-RETURNING and the explicit `RawSQL` template API.
+examples](STATEMENTS.md) for joins, grouping, set operations, write guards,
+conflict actions, RETURNING and the explicit `RawSQL` template API.
 
 `await pool.execute(query)` returns affected rows. `fetch_all`, `fetch_one`
 and `fetch_optional` return detached records; `stream` opens an async iterator.
