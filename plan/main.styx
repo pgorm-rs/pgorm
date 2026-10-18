@@ -5237,6 +5237,14 @@ children (
                         text "Delivered again at the current rule versions (security.sqlmap.profiles +3), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:08:15.141328Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at security.sqlmap.pin+1 and security.sqlmap.profiles+4 (sqlmap-harness-fixes): Python series check with recorded release, declared field through adapter and interpreter, lock timeout/UNION columns/UNION fuzzing/verbosity declared by profiles, --remeasure-exemptions guard; runner tests (26) and verdict tests (6) pass."
+                        after_done true
+                    }
                 )
             }
 
@@ -5315,6 +5323,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at the current rule version (security.sqlmap.ci +1), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:08:15.271305Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at security.sqlmap.ci+2 (sqlmap-harness-fixes): per-run concurrency groups for scheduled/dispatched runs with PR smoke still cancelling superseded runs, setup-python takes 3.14's latest patch, sqlmap-verdict refuses re-measurement reports; verdict tests pass and actionlint is clean."
                         after_done true
                     }
                 )
