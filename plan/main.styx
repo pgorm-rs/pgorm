@@ -437,6 +437,14 @@ children (
                         text "Delivered at sql.ddl +9 in a docs commit of its own, the node's kind; the re-check note above rode the refactor commit that delivered query-reexports-curated."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T18:41:35.689952Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.ddl +10: Schema (create/drop/rename) joins the entry-point helpers and schema statements the no-placeholder list; every_ddl_entry_point_is_reachable reaches all three."
+                        after_done true
+                    }
                 )
             }
 
