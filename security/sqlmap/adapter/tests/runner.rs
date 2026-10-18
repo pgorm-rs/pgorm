@@ -6,14 +6,14 @@ const TARGET: &str = "http://127.0.0.1:56392/case/protected/select?input=alice";
 const LOG: &str = "GET parameter 'input' does not seem to be injectable\n[*] ending @ 12:00:00";
 
 fn clean_report() -> Value { json!({"success":true,"meta":{"url":TARGET.split('?').next()},"data":[],"error":[result::CLEAN_MESSAGE]}) }
-fn clean() -> ScanResult { result::interpret(&clean_report(), LOG, Some(0), TARGET, 25) }
+fn clean() -> ScanResult { result::interpret(&clean_report(), LOG, Some(0), TARGET, "input", 25) }
 fn finding(technique: &str, parameter: &str, place: &str) -> Value {
     json!({"parameter":parameter,"place":place,"data":[{"technique":technique,"payload":"input=alice' AND 1=1 --"}]})
 }
 fn detection() -> ScanResult {
     let mut report = clean_report();
     report["data"] = json!([{"type_name":"TECHNIQUES","value":[finding("boolean-based blind", "input", "GET")]}]);
-    result::interpret(&report, LOG, Some(0), TARGET, 25)
+    result::interpret(&report, LOG, Some(0), TARGET, "input", 25)
 }
 
 // [spec:pgorm:req:security.sqlmap.runner-tests]
@@ -24,19 +24,19 @@ fn sqlmap_urls_omit_query_but_match_endpoints() {
     for (raw, log) in [(include_str!("fixtures/control.json"), include_str!("fixtures/control.log")), (include_str!("fixtures/protected.json"), include_str!("fixtures/protected.log"))] {
         let report: Value = serde_json::from_str(raw).unwrap();
         let target = format!("{}?input=alice", report["meta"]["url"].as_str().unwrap());
-        let complete = result::interpret(&report, log, Some(0), &target, 25);
+        let complete = result::interpret(&report, log, Some(0), &target, "input", 25);
         assert!(complete.complete, "{}", complete.reason);
         for (field, stale) in [("scheme", target.replace("http:","https:")), ("hostname", target.replace("127.0.0.1","localhost")), ("port", target.replace(":56392",":56393")), ("path", target.replace("/select","/delete"))] {
-            let failed = result::interpret(&report, log, Some(0), &stale, 25);
+            let failed = result::interpret(&report, log, Some(0), &stale, "input", 25);
             assert!(!failed.complete);
             assert!(failed.reason.contains(field), "{}", failed.reason);
             assert_eq!(failed.findings, complete.findings);
         }
-        let inactive = result::interpret(&report, log, Some(0), &target, 0);
+        let inactive = result::interpret(&report, log, Some(0), &target, "input", 0);
         assert!(!inactive.complete);
         assert!(inactive.reason.contains("inactive route"));
         assert_eq!(inactive.findings, complete.findings);
-        let crashed = result::interpret(&report, log, Some(1), &target, 25);
+        let crashed = result::interpret(&report, log, Some(1), &target, "input", 25);
         assert!(crashed.reason.contains("exited 1"));
         assert_eq!(crashed.findings, complete.findings);
     }
@@ -45,7 +45,7 @@ fn sqlmap_urls_omit_query_but_match_endpoints() {
 #[test]
 fn zero_exit_without_valid_output_is_incomplete() {
     for report in [Value::Null, json!({}), json!([]), json!({"success":false}), json!({"success":true}), json!({"success":true,"data":{},"error":[]})] {
-        assert!(!result::interpret(&report, LOG, Some(0), TARGET, 25).complete);
+        assert!(!result::interpret(&report, LOG, Some(0), TARGET, "input", 25).complete);
     }
 }
 
@@ -54,7 +54,7 @@ fn malformed_findings_and_wrong_injection_points_are_retained() {
     for finding in [Value::Null, json!("bad"), finding("boolean-based blind", "other", "GET"), finding("boolean-based blind", "input", "Cookie"), finding("unknown", "input", "GET")] {
         let mut report = clean_report();
         report["data"] = json!([{"type_name":"TECHNIQUES","value":[finding.clone()]}]);
-        let result = result::interpret(&report, LOG, Some(0), TARGET, 25);
+        let result = result::interpret(&report, LOG, Some(0), TARGET, "input", 25);
         assert!(!result.complete);
         assert!(result.reason.contains("injection parameter"));
         assert_eq!(result.findings, vec![finding]);
@@ -65,7 +65,7 @@ fn malformed_findings_and_wrong_injection_points_are_retained() {
 fn malformed_metadata_never_panics_or_completes() {
     for meta in [Value::Null, json!([]), json!(5), json!({"url":[]}), json!({"url":"http://127.0.0.1:invalid/"}), json!({"url":"not a url"})] {
         let mut report = clean_report(); report["meta"] = meta;
-        let result = result::interpret(&report, LOG, Some(0), TARGET, 25);
+        let result = result::interpret(&report, LOG, Some(0), TARGET, "input", 25);
         assert!(!result.complete); assert!(result.reason.contains("URL"));
     }
 }
@@ -73,21 +73,21 @@ fn malformed_metadata_never_panics_or_completes() {
 #[test]
 fn crashes_cancel_and_timeouts_are_incomplete() {
     for code in [Some(1), Some(-9), Some(-15), None] {
-        assert!(!result::interpret(&clean_report(), LOG, code, TARGET, 25).complete);
+        assert!(!result::interpret(&clean_report(), LOG, code, TARGET, "input", 25).complete);
     }
 }
 
 #[test]
 fn missing_terminal_evidence_is_incomplete() {
     for log in ["", "[*] ending @", "parameter 'input' does not seem to be injectable"] {
-        assert!(!result::interpret(&clean_report(), log, Some(0), TARGET, 25).complete);
+        assert!(!result::interpret(&clean_report(), log, Some(0), TARGET, "input", 25).complete);
     }
 }
 
 #[test]
 fn transport_failures_and_skipped_parameters_are_incomplete() {
     for message in ["connection timed out", "unable to connect", "connection reset", "user aborted", "skipping parameter"] {
-        let result = result::interpret(&clean_report(), &format!("{LOG}{message}"), Some(0), TARGET, 25);
+        let result = result::interpret(&clean_report(), &format!("{LOG}{message}"), Some(0), TARGET, "input", 25);
         assert!(!result.complete); assert!(result.reason.contains("transport"));
     }
 }
@@ -95,7 +95,7 @@ fn transport_failures_and_skipped_parameters_are_incomplete() {
 #[test]
 fn scanner_errors_are_not_clean_negatives() {
     let mut report = clean_report(); report["error"] = json!(["unexpected internal exception"]);
-    let result = result::interpret(&report, LOG, Some(0), TARGET, 25);
+    let result = result::interpret(&report, LOG, Some(0), TARGET, "input", 25);
     assert!(!result.complete); assert_eq!(result.errors, vec![json!("unexpected internal exception")]);
 }
 
@@ -138,7 +138,7 @@ fn empty_extra_skipped_or_failed_cleanup_cannot_pass() {
     }
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 // [spec:pgorm:req:security.sqlmap.matrix/test]
 #[test]
 fn profiles_keep_234_full_and_six_smoke() {
@@ -160,7 +160,7 @@ fn profiles_keep_234_full_and_six_smoke() {
     assert!(result::inventory(&manifest, &profile, &[]).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn identifiers_profile_schedules_what_level_five_reaches() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
@@ -193,7 +193,7 @@ fn identifiers_profile_schedules_what_level_five_reaches() {
     assert_eq!(gated, 20);
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn ceilings_exempt_below_and_schedule_at_their_level() {
     let mut gated = evidence(); gated["ceiling"] = json!(5);
@@ -228,7 +228,7 @@ fn exempt_entry(evidence: Value) -> Value {
     json!({"reason":"REPLACE-only tests cannot escape the app's quoting at this injection point.","evidence":evidence})
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(evidence())}))).is_ok());
@@ -251,7 +251,7 @@ fn exemptions_without_reason_or_evidence_are_refused() {
     assert!(result::exemptions(&exempt_case(json!({"Q": exempt_entry(wide)}))).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn exemptions_naming_undeclared_techniques_are_refused() {
     for technique in ["U", "Z", "q"] {
@@ -263,7 +263,7 @@ fn exemptions_naming_undeclared_techniques_are_refused() {
     assert!(result::exemptions(&json!({"id":"a","techniques":["Q"],"inapplicable":[]})).is_err());
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn exempted_pairs_leave_scheduled_work_and_never_pass() {
@@ -281,19 +281,51 @@ fn exempted_pairs_leave_scheduled_work_and_never_pass() {
     assert!(!result::aggregate(&expected, &inflated, &[], &[]));
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+/// A re-measured control scan of `technique`, detecting it or not.
+fn remeasured_scan(technique: &str, detected: bool) -> ScanResult {
+    let mut report = clean_report();
+    if detected {
+        let name = result::TECHNIQUES.iter().find(|(id, _)| *id == technique).unwrap().1;
+        report["data"] = json!([{"type_name":"TECHNIQUES","value":[finding(name, "input", "GET")]}]);
+    }
+    result::interpret(&report, LOG, Some(0), TARGET, "input", 25)
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 // [spec:pgorm:req:security.sqlmap.verdict/test]
 #[test]
 fn a_detected_but_exempted_pair_fails_the_run() {
+    // The guard is real only on a re-measurement, whose results are the declared pairs' own
+    // control scans: a profile run scans each control with one scheduled technique.
     let inapplicable = BTreeMap::from([("a-Q".to_owned(), exempt_entry(evidence()))]);
-    let quiet = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("boolean-based blind","input","GET")]}}))]);
+    let held = remeasured_scan("Q", false);
+    assert_eq!(result::exemption_outcome(&held, "Q", true), "held");
+    let quiet = BTreeMap::from([("a-Q".to_owned(), json!({"outcome":"held","control":held}))]);
     assert!(result::falsified(&quiet, &inapplicable).is_empty());
-    let fired = BTreeMap::from([("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","input","GET")]}}))]);
-    assert_eq!(result::falsified(&fired, &inapplicable), ["a-Q"]);
-    assert!(!result::aggregate(&["a-B".into()], &fired, &[], &result::falsified(&fired, &inapplicable)));
-    // A finding on another case, or at another injection point, falsifies nothing.
-    let elsewhere = BTreeMap::from([("b-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","input","GET")]}})),
-                                    ("a-B".to_owned(), json!({"outcome":"pass","control":{"findings":[finding("inline query","other","GET")]}}))]);
+    assert!(result::remeasured(&["a-Q".into()], &quiet, &[], &[]));
+    let fired = remeasured_scan("Q", true);
+    assert_eq!(result::exemption_outcome(&fired, "Q", true), "falsified");
+    let falsified = BTreeMap::from([("a-Q".to_owned(), json!({"outcome":"falsified","control":fired.clone()}))]);
+    assert_eq!(result::falsified(&falsified, &inapplicable), ["a-Q"]);
+    assert!(!result::remeasured(&["a-Q".into()], &falsified, &[], &result::falsified(&falsified, &inapplicable)));
+    // A detection falsifies even a scan that did not complete, or followed a failed baseline.
+    let mut partial = fired.clone(); partial.complete = false;
+    assert_eq!(result::exemption_outcome(&partial, "Q", false), "falsified");
+    // An undetected pair held only if its baseline answered and its scan completed.
+    let mut unfinished = held.clone(); unfinished.complete = false;
+    assert_eq!(result::exemption_outcome(&unfinished, "Q", true), "incomplete");
+    assert_eq!(result::exemption_outcome(&held, "Q", false), "incomplete");
+    for outcome in ["incomplete", "pass", "falsified"] {
+        let results = BTreeMap::from([("a-Q".to_owned(), json!({"outcome":outcome,"control":held}))]);
+        assert!(!result::remeasured(&["a-Q".into()], &results, &[], &[]), "{outcome}");
+    }
+    assert!(!result::remeasured(&[], &BTreeMap::new(), &[], &[]));
+    assert!(!result::remeasured(&["a-Q".into()], &quiet, &["container removal failed".into()], &[]));
+    // A detection on another case, of another technique, or at another injection point falsifies nothing.
+    let mut other_parameter = remeasured_scan("Q", true); other_parameter.parameter = "probe".into();
+    let elsewhere = BTreeMap::from([("b-Q".to_owned(), json!({"control":remeasured_scan("Q", true)})),
+                                    ("a-U".to_owned(), json!({"control":remeasured_scan("U", true)})),
+                                    ("a-Q".to_owned(), json!({"control":other_parameter}))]);
     assert!(result::falsified(&elsewhere, &inapplicable).is_empty());
 }
 
@@ -308,17 +340,18 @@ fn command_options_and_encoding_match_python() {
     assert_eq!(args, ["python3", "scanner.py", "--url", TARGET, "-p", "input", "--dbms", "PostgreSQL", "--batch", "--flush-session", "--fresh-queries", "--ignore-proxy", "--disable-coloring", "--technique", "B", "--level", "3", "--risk", "2", "--threads", "1", "--retries", "0", "--timeout", "15", "--time-sec", "3", "--union-cols", "1-4", "--output-dir", "output/session", "--report-json", "output/scanner.json", "--answers", "extending=N,include=N,fuzzy=N", "-v", "2"]);
 }
 
-// [spec:pgorm:req:security.sqlmap.profiles+3/test]
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
 #[test]
 fn declared_settings_reach_scanner_and_fixture() {
     let manifest: Value = serde_json::from_str(include_str!("../../cases.json")).unwrap();
     let profiles: Value = serde_json::from_str(include_str!("../../profiles.json")).unwrap();
-    for name in ["smoke", "full"] { Settings::from_profile(&profiles[name]).unwrap(); }
+    for name in ["smoke", "full", "identifiers"] { Settings::from_profile(&profiles[name]).unwrap(); }
     // Values no hardcoded default shares, so a setting that stops arriving cannot pass by coincidence.
     let mut profile = profiles["full"].clone();
-    for (field, value) in [("level", 4), ("risk", 1), ("concurrency", 7), ("retries", 5), ("time_sec", 6),
-        ("postgres_statement_timeout_seconds", 17), ("http_timeout_seconds", 23), ("case_timeout_seconds", 301)] {
-        profile[field] = json!(value);
+    for (field, value) in [("level", json!(4)), ("risk", json!(1)), ("concurrency", json!(7)), ("retries", json!(5)), ("time_sec", json!(6)),
+        ("postgres_statement_timeout_seconds", json!(17)), ("postgres_lock_timeout_seconds", json!(3)), ("http_timeout_seconds", json!(23)),
+        ("case_timeout_seconds", json!(301)), ("union_columns", json!([2, 9])), ("union_type_fuzzing", json!(true)), ("verbosity", json!(3))] {
+        profile[field] = value;
     }
     let settings = Settings::from_profile(&profile).unwrap();
     assert_eq!(settings.case_timeout_seconds, 301);
@@ -326,22 +359,56 @@ fn declared_settings_reach_scanner_and_fixture() {
     let args = harness::scanner_args("python3", Path::new("scanner.py"), TARGET, "B", &settings, &case, Path::new("output")).unwrap();
     let value = |flag: &str| args[args.iter().position(|a| a == flag).unwrap_or_else(|| panic!("{flag} missing")) + 1].as_str();
     for (flag, expected) in [("-p", "probe"), ("--dbms", "PostgreSQL"), ("--level", "4"), ("--risk", "1"), ("--threads", "7"),
-        ("--retries", "5"), ("--time-sec", "6"), ("--timeout", "23")] {
+        ("--retries", "5"), ("--time-sec", "6"), ("--timeout", "23"), ("--union-cols", "2-9"), ("-v", "3"),
+        ("--answers", "extending=N,include=N,fuzzy=Y")] {
         assert_eq!(value(flag), expected, "{flag}");
     }
-    assert!(harness::target("http://127.0.0.1:12", &case, "control").unwrap().ends_with("?probe=alice"));
-    assert!(harness::container_args("fixture", "postgres", &settings).contains(&"statement_timeout=17s".to_owned()));
-    assert!(harness::role_session("fixture", settings.postgres_statement_timeout_seconds).contains("statement_timeout = '17s'"));
+    let target = harness::target("http://127.0.0.1:12", &case, "control").unwrap();
+    assert!(target.ends_with("?probe=alice"));
+    let container = harness::container_args("fixture", "postgres", &settings);
+    for setting in ["statement_timeout=17s", "lock_timeout=3s"] { assert!(container.contains(&setting.to_owned()), "{setting}"); }
+    let session = harness::role_session("fixture", &settings);
+    for setting in ["statement_timeout = '17s'", "lock_timeout = '3s'"] { assert!(session.contains(setting), "{setting}"); }
+    // The adapter routes by the same declared parameter, and reads no other.
+    let mut renamed = manifest.clone(); renamed["cases"][0]["field"] = json!("probe");
+    let fields = harness::fields(&renamed).unwrap();
+    assert_eq!(fields["select"], "probe");
+    assert_eq!(fields.len(), manifest["cases"].as_array().unwrap().len());
+    let query = |pairs: &[(&str, &str)]| pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<Vec<_>>();
+    assert_eq!(harness::declared_input(&fields["select"], &query(&[("probe", "alice"), ("input", "bob")])).unwrap(), "alice");
+    assert!(harness::declared_input(&fields["select"], &query(&[("input", "alice")])).is_err());
+    assert!(harness::declared_input(&fields["select"], &query(&[("probe", "alice"), ("probe", "bob")])).is_err());
+    let mut unnamed = manifest.clone(); unnamed["cases"][0].as_object_mut().unwrap().remove("field");
+    assert!(harness::fields(&unnamed).is_err());
+    // The interpreter accepts findings, and completion evidence, only at that parameter.
+    let mut report = clean_report();
+    report["meta"]["url"] = json!(target.split('?').next());
+    report["data"] = json!([{"type_name":"TECHNIQUES","value":[finding("boolean-based blind", "probe", "GET")]}]);
+    let probe_log = "GET parameter 'probe' does not seem to be injectable\n[*] ending @ 12:00:00";
+    let detected = result::interpret(&report, probe_log, Some(0), &target, harness::fields(&renamed).unwrap()["select"].as_str(), 25);
+    assert!(detected.complete, "{}", detected.reason);
+    assert!(detected.detects("B"));
+    let misread = result::interpret(&report, probe_log, Some(0), &target, "input", 25);
+    assert!(!misread.complete && misread.reason.contains("injection parameter"), "{}", misread.reason);
+    assert!(!misread.detects("B"));
+    report["data"] = json!([]);
+    let untested = result::interpret(&report, LOG, Some(0), &target, "probe", 25);
+    assert!(!untested.complete && untested.reason.contains("completion evidence"), "{}", untested.reason);
     // A setting the harness would not apply is refused, as is a missing one.
     let mut unknown = profiles["full"].clone(); unknown["parallel_cases"] = json!(2);
     assert!(Settings::from_profile(&unknown).is_err());
     for field in ["dbms", "level", "risk", "concurrency", "retries", "time_sec", "postgres_statement_timeout_seconds",
-        "http_timeout_seconds", "case_timeout_seconds", "timeout_margin"] {
+        "postgres_lock_timeout_seconds", "http_timeout_seconds", "case_timeout_seconds", "union_columns", "union_type_fuzzing",
+        "verbosity", "timeout_margin"] {
         let mut missing = profiles["full"].clone(); missing.as_object_mut().unwrap().remove(field);
         assert!(Settings::from_profile(&missing).is_err(), "{field}");
     }
-    let mut other = profiles["full"].clone(); other["dbms"] = json!("MySQL");
-    assert!(Settings::from_profile(&other).is_err());
+    for (field, bad) in [("dbms", json!("MySQL")), ("postgres_lock_timeout_seconds", json!(0)), ("union_columns", json!([4, 1])),
+        ("union_columns", json!([0, 4])), ("union_columns", json!([1, 4, 5])), ("union_columns", json!("1-4")),
+        ("union_type_fuzzing", json!("no")), ("verbosity", json!(0)), ("verbosity", json!(7))] {
+        let mut other = profiles["full"].clone(); other[field] = bad.clone();
+        assert!(Settings::from_profile(&other).is_err(), "{field}={bad}");
+    }
     // Timeouts that cannot hold the timed sleep, or that do not nest, are refused.
     for (field, value) in [("time_sec", 10), ("postgres_statement_timeout_seconds", 15), ("http_timeout_seconds", 240)] {
         let mut tight = profiles["full"].clone(); tight[field] = json!(value);
@@ -377,8 +444,51 @@ fn setup_failure_retains_inventory_and_status() {
     assert_eq!(report["inapplicable"].as_object().unwrap().len(), 93);
     assert_eq!(report["pass"], false);
     assert!(report["error"].is_string());
+    assert_eq!(report["remeasure"], false);
     assert!(artifacts.join("summary.txt").is_file());
     std::fs::remove_dir_all(artifacts).unwrap();
+}
+
+// [spec:pgorm:req:security.sqlmap.profiles+4/test]
+// [spec:pgorm:req:security.sqlmap.artifacts/test]
+#[test]
+fn remeasurement_schedules_exactly_the_declared_pairs() {
+    let artifacts = std::env::temp_dir().join(format!("sqlmap-remeasure-test-{}", std::process::id()));
+    let status = std::process::Command::new(env!("CARGO_BIN_EXE_sqlmap-harness"))
+        .args(["--profile", "full", "--remeasure-exemptions", "--python", "/nonexistent/sqlmap-python", "--artifacts"])
+        .arg(&artifacts).output().unwrap();
+    assert!(!status.status.success());
+    let report = harness::read_json(&artifacts.join("report.json")).unwrap();
+    assert_eq!(report["remeasure"], true);
+    // Each of the 93 declarations is measured on its control alone, and stays recorded as the claim.
+    let inapplicable: Vec<_> = report["inapplicable"].as_object().unwrap().keys().cloned().collect();
+    assert_eq!(inapplicable.len(), 93);
+    let mut expected: Vec<_> = report["expected"].as_array().unwrap().iter().map(|k| k.as_str().unwrap().to_owned()).collect();
+    expected.sort();
+    assert_eq!(expected, inapplicable);
+    let scans = report["expected_scans"].as_array().unwrap();
+    assert_eq!(scans.len(), 93);
+    assert!(scans.iter().all(|s| s.as_str().unwrap().ends_with("-control")));
+    assert_eq!(report["pass"], false);
+    assert!(std::fs::read_to_string(artifacts.join("summary.txt")).unwrap().starts_with("full exemption re-measurement: FAIL"));
+    std::fs::remove_dir_all(artifacts).unwrap();
+}
+
+// [spec:pgorm:req:security.sqlmap.pin+1/test]
+#[test]
+fn python_takes_any_patch_of_the_pinned_series() {
+    let pins: Value = serde_json::from_str(include_str!("../../pins.json")).unwrap();
+    assert_eq!(pins["python"], "3.14");
+    for (reported, release) in [("Python 3.14.0", "3.14.0"), ("Python 3.14.4\n", "3.14.4"), ("Python 3.14.12", "3.14.12"), ("Python 3.14.1rc1", "3.14.1rc1")] {
+        assert_eq!(harness::python_release(reported, "3.14").unwrap(), release, "{reported}");
+    }
+    for reported in ["Python 3.13.9", "Python 3.15.0", "Python 3.140.1", "Python 3.1.4", "Python 3.14", "Python 3.14.", "PyPy 3.14.4", "3.14.4"] {
+        assert!(harness::python_release(reported, "3.14").is_err(), "{reported}");
+    }
+    // The pin names a series, never a patch release or a range.
+    for series in ["3.14.4", "3", ">=3.14", "3.x", ""] {
+        assert!(harness::python_release("Python 3.14.4", series).is_err(), "{series}");
+    }
 }
 
 #[test]
@@ -390,6 +500,12 @@ fn cli_preserves_profile_subset_and_diagnostic_options() {
     let identifiers = Options::parse(["--profile", "identifiers"].into_iter().map(str::to_owned), Path::new("/tmp")).unwrap();
     assert_eq!(identifiers.profile, "identifiers");
     assert!(Options::parse(["--profile", "nonsense"].into_iter().map(str::to_owned), Path::new("/tmp")).is_err());
+    assert!(!identifiers.remeasure);
+    let remeasure = Options::parse(["--profile", "full", "--case", "select", "--remeasure-exemptions"].into_iter().map(str::to_owned), Path::new("/tmp")).unwrap();
+    assert!(remeasure.remeasure); assert_eq!(remeasure.subset, vec!["select"]);
+    for other in ["--baseline-only", "--direct-regressions"] {
+        assert!(Options::parse(["--remeasure-exemptions", other].into_iter().map(str::to_owned), Path::new("/tmp")).is_err(), "{other}");
+    }
 }
 
 /// Optional corpus check: reinterprets every retained Python scan, including failures.
@@ -408,7 +524,8 @@ fn parity_against_python_campaign() {
             let args = harness::read_json(&output.join("command.json")).unwrap();
             let args = args.as_array().unwrap();
             let target = args[args.iter().position(|a| a == "--url").unwrap() + 1].as_str().unwrap();
-            let actual = result::interpret(&scanner, &log, expected["returncode"].as_i64().map(|c| c as i32), target, expected["requests"].as_u64().unwrap());
+            let parameter = args[args.iter().position(|a| a == "-p").unwrap() + 1].as_str().unwrap();
+            let actual = result::interpret(&scanner, &log, expected["returncode"].as_i64().map(|c| c as i32), target, parameter, expected["requests"].as_u64().unwrap());
             assert_eq!(actual.complete, expected["complete"].as_bool().unwrap(), "{}", output.display());
             assert_eq!(json!(actual.findings), expected["findings"], "{}", output.display());
             assert_eq!(json!(actual.errors), expected["errors"], "{}", output.display());

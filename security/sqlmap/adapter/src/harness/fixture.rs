@@ -16,7 +16,8 @@ pub struct Fixture {
     pub url: String,
     pub settings: Value,
     admin_url: String,
-    statement_timeout_seconds: u64,
+    /// The profile the server was started under, whose session settings every role shares.
+    profile: Option<Settings>,
     adapter: Option<Process>,
     container_attempted: bool,
     artifacts: PathBuf,
@@ -26,15 +27,17 @@ impl Fixture {
     pub fn new(artifacts: &Path) -> Result<Self> {
         Ok(Self {
             name: format!("pgorm-sqlmap-{}", secret(6)?), url: String::new(), settings: Value::Null,
-            admin_url: String::new(), statement_timeout_seconds: 0, adapter: None, container_attempted: false, artifacts: artifacts.into(),
+            admin_url: String::new(), profile: None, adapter: None, container_attempted: false, artifacts: artifacts.into(),
         })
     }
 
-    pub async fn start(&mut self, pins: &Value, adapter: &Path, settings: &Settings) -> Result<()> {
+    /// `manifest` is the case manifest the run inventoried, from which the adapter takes each
+    /// case's declared test parameter.
+    pub async fn start(&mut self, pins: &Value, adapter: &Path, settings: &Settings, manifest: &Path) -> Result<()> {
         let password = secret(24)?;
         let admin_password = secret(24)?;
         let image = pins["postgres"].as_str().ok_or("missing PostgreSQL image pin")?;
-        self.statement_timeout_seconds = settings.postgres_statement_timeout_seconds;
+        self.profile = Some(settings.clone());
         let args = container_args(&self.name, image, settings);
         let mut docker = process::command("docker", &args.iter().map(String::as_str).collect::<Vec<_>>());
         docker.env("POSTGRES_PASSWORD", &admin_password);
@@ -51,7 +54,7 @@ impl Fixture {
         let port: u16 = mapping.strip_prefix("127.0.0.1:").ok_or("unexpected PostgreSQL port binding")?.parse()?;
         self.admin_url = format!("postgresql://postgres:{admin_password}@127.0.0.1:{port}");
         let sql = format!("CREATE ROLE fixture LOGIN PASSWORD '{password}' NOSUPERUSER NOCREATEDB NOCREATEROLE;\nCREATE DATABASE harness OWNER fixture;\n{}",
-            role_session("fixture", self.statement_timeout_seconds));
+            role_session("fixture", settings));
         process::output(&mut process::command("docker", &["exec", "-i", &self.name, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1"]), Some(&sql), 120).await?;
         // Read settings as the role the adapter actually uses.
         let settings = process::run("docker", &["exec", &self.name, "psql", "-U", "fixture", "-d", "harness", "-Atc",
@@ -62,6 +65,7 @@ impl Fixture {
         let mut command = process::command(adapter.to_str().ok_or("non-UTF8 adapter path")?, &[]);
         command.env("SQLMAP_FIXTURE_URL", format!("postgresql://fixture:{password}@127.0.0.1:{port}/harness"))
             .env("SQLMAP_EVIDENCE", self.artifacts.join("requests.jsonl"))
+            .env("SQLMAP_MANIFEST", manifest)
             .stdout(Stdio::piped()).stderr(stderr);
         self.adapter = Some(Process::spawn(&mut command)?);
         let stdout = self.adapter.as_mut().and_then(|p| p.child.stdout.take()).ok_or("missing adapter stdout")?;
@@ -77,7 +81,8 @@ impl Fixture {
     pub async fn direct_regressions(&self, root: &Path) -> Result<Value> {
         // TestContext creates its own databases on this same disposable server.
         // Give its role the same session settings as the scanner fixture.
-        process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-Atc", &role_session("postgres", self.statement_timeout_seconds)]).await?;
+        let settings = self.profile.as_ref().ok_or("fixture was never started")?;
+        process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-Atc", &role_session("postgres", settings)]).await?;
         process::run("docker", &["exec", &self.name, "psql", "-U", "postgres", "-d", "template1", "-v", "ON_ERROR_STOP=1", "-c", "CREATE SCHEMA fixture"] ).await?;
         let file = File::create(self.artifacts.join("direct-regressions.log"))?;
         let args = ["test", "--locked", "--test", "sql_security_tests", "--", "--test-threads=1"];
@@ -107,29 +112,32 @@ impl Fixture {
     }
 }
 
-/// The disposable server's `docker run` arguments, its default statement timeout the profile's.
+/// The disposable server's `docker run` arguments, its default statement and lock timeouts
+/// the profile's.
 ///
 /// The data volume mounts at `/var/lib/postgresql`: the 18 image keeps its
 /// data under `/var/lib/postgresql/18/docker` and refuses to start with
 /// anything mounted at the `.../data` path older images used.
-// [spec:pgorm:req:security.sqlmap.profiles+3]
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn container_args(name: &str, image: &str, settings: &Settings) -> Vec<String> {
     let mut args: Vec<String> = ["run", "--detach", "--name", name,
         "--label", "pgorm.sqlmap=disposable", "--network", "bridge", "--publish", "127.0.0.1::5432",
         "--env", "POSTGRES_PASSWORD", "--mount", "type=volume,destination=/var/lib/postgresql", "--memory", "512m", "--cpus", "2", image]
         .map(str::to_owned).into();
-    args.extend(["-c".into(), format!("statement_timeout={}s", settings.postgres_statement_timeout_seconds), "-c".into(), "lock_timeout=2s".into()]);
+    args.extend(["-c".into(), format!("statement_timeout={}s", settings.postgres_statement_timeout_seconds),
+        "-c".into(), format!("lock_timeout={}s", settings.postgres_lock_timeout_seconds)]);
     args
 }
 
-/// The session settings a fixture role runs under, the profile's statement timeout among them.
-// [spec:pgorm:req:security.sqlmap.profiles+3]
-pub fn role_session(role: &str, statement_timeout_seconds: u64) -> String {
+/// The session settings a fixture role runs under, the profile's statement and lock timeouts
+/// among them.
+// [spec:pgorm:req:security.sqlmap.profiles+4]
+pub fn role_session(role: &str, settings: &Settings) -> String {
     [
         format!("ALTER ROLE {role} SET search_path = fixture, pg_catalog;"),
         format!("ALTER ROLE {role} SET standard_conforming_strings = on;"),
-        format!("ALTER ROLE {role} SET statement_timeout = '{statement_timeout_seconds}s';"),
-        format!("ALTER ROLE {role} SET lock_timeout = '2s';"),
+        format!("ALTER ROLE {role} SET statement_timeout = '{}s';", settings.postgres_statement_timeout_seconds),
+        format!("ALTER ROLE {role} SET lock_timeout = '{}s';", settings.postgres_lock_timeout_seconds),
     ].join("\n") + "\n"
 }
 

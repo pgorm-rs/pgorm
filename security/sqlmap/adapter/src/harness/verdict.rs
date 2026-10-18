@@ -13,8 +13,8 @@ pub struct Status {
     pub inapplicable: Map<String, Value>,
 }
 
-// [spec:pgorm:req:security.sqlmap.ci+1]
-// [spec:pgorm:req:security.sqlmap.profiles+3]
+// [spec:pgorm:req:security.sqlmap.ci+2]
+// [spec:pgorm:req:security.sqlmap.profiles+4]
 pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
     let bare = |status: &'static str, reason: &str| Status { status, reason: reason.into(), inapplicable: Map::new() };
     let bytes = match fs::read(artifacts.join("run/report.json")) {
@@ -32,6 +32,11 @@ pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
     };
     if report.get("profile") != Some(&json!(profile)) || report.get("subset") != Some(&json!([])) {
         return bare("incomplete", "report does not cover the requested complete profile");
+    }
+    // A re-measurement scans the declared-inapplicable pairs instead of the scheduled work,
+    // so even a passing one says nothing about the profile.
+    if report.get("remeasure") != Some(&json!(false)) {
+        return bare("incomplete", "report is not a profile run: it re-measures declared inapplicability or does not say");
     }
     // A report that does not account for its own exemptions cannot be audited against
     // the work it claims to have scheduled, so it is evidence of nothing.
@@ -60,7 +65,7 @@ pub fn profile_status(profile: &str, artifacts: &Path) -> Status {
 /// Writes `ci-status.json` and `ci-summary.txt`, and reports whether the profile
 /// passed alongside the rendered summary. Echoing that summary anywhere else is
 /// the caller's business, so publishing stays free of ambient environment.
-// [spec:pgorm:req:security.sqlmap.ci+1]
+// [spec:pgorm:req:security.sqlmap.ci+2]
 pub fn publish(profile: &str, artifacts: &Path) -> Result<(bool, String)> {
     if !["smoke", "full", "identifiers"].contains(&profile) {
         return Err("profile must be smoke, full or identifiers".into());

@@ -17,6 +17,13 @@
     "time_sec": 1,
     "http_timeout_seconds": 15,
     "postgres_statement_timeout_seconds": 10,
+    "postgres_lock_timeout_seconds": 2,
+    "union_columns": [
+      1,
+      4
+    ],
+    "union_type_fuzzing": false,
+    "verbosity": 2,
     "timeout_margin": "10s database and 15s HTTP allow 1s control delays; 240s outer scan deadline"
   },
   "full": {
@@ -74,6 +81,13 @@
     "time_sec": 3,
     "http_timeout_seconds": 15,
     "postgres_statement_timeout_seconds": 10,
+    "postgres_lock_timeout_seconds": 2,
+    "union_columns": [
+      1,
+      4
+    ],
+    "union_type_fuzzing": false,
+    "verbosity": 2,
     "timeout_margin": "10s database and 15s HTTP allow 3s control delays; 240s outer scan deadline"
   },
   "identifiers": {
@@ -107,6 +121,13 @@
     "time_sec": 3,
     "http_timeout_seconds": 15,
     "postgres_statement_timeout_seconds": 10,
+    "postgres_lock_timeout_seconds": 2,
+    "union_columns": [
+      1,
+      4
+    ],
+    "union_type_fuzzing": false,
+    "verbosity": 2,
     "timeout_margin": "10s database and 15s HTTP allow 3s control delays; 300s outer scan deadline for the heavier level-5/risk-3 boundary catalogue"
   }
 }

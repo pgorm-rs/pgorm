@@ -1020,6 +1020,7 @@ assertions (
     {id spec, kind @complete, author "brendan@necessary.nu", at 2026-09-06T14:24:08.822493Z}
     {id sql-value-json, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:29.060218Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
+    {id sqlmap-harness-fixes, kind @complete, author "brendan@necessary.nu", at 2026-10-18T15:01:48.418142Z}
     {id sqlmap-identifier-profile, kind @complete, author "brendan@necessary.nu", at 2026-10-05T03:49:29.250867Z}
     {id sqlmap-profile-args-honoured, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:21:20.93194Z}
     {id sqlmap-smoke-unrunnable, kind @complete, author "brendan@necessary.nu", at 2026-09-24T16:21:33.966967Z}

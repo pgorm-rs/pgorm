@@ -119,39 +119,58 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 
 ## Scanner execution
 
-> [spec:pgorm:req:security.sqlmap.pin]
+> [spec:pgorm:req:security.sqlmap.pin+1]
 > The runner MUST invoke upstream sqlmap as an external program at an exact
-> recorded commit, with a content-verified installation or immutable image.
-> A moving branch or tag alone is not a pin. Python/runtime dependencies and
-> the PostgreSQL fixture image are pinned through a lock or immutable image
-> identity. The repository records the upstream URL, revision, content
-> identity and applicable license notices. Changing the scanner or payload
-> revision requires a reviewed pin update and a fresh control/full-suite
-> run; an earlier report cannot stand for the new revision.
+> recorded commit, fetched as that commit's archive and verified against its
+> recorded sha256 before use. A moving branch or tag alone is not a pin. The
+> PostgreSQL fixture image is pinned by immutable digest, and the harness's
+> Rust dependencies by the committed lockfile it builds with. Python is not
+> pinned to a release: the repository names the minor series the scanner runs
+> on, the runner MUST refuse an interpreter outside that series, and every run
+> MUST record the interpreter release it used, so CI takes the series' latest
+> patch and a report still names the one it ran. The repository records the
+> upstream URL, revision, content identity and applicable license notices.
+> Changing the scanner or payload revision requires a reviewed pin update and
+> a fresh control/full-suite run; an earlier report cannot stand for the new
+> revision.
 
-> [spec:pgorm:req:security.sqlmap.profiles+3]
-> Version-controlled smoke, full and identifiers profiles MUST declare their exact case
-> ids, PostgreSQL DBMS selection, techniques, level/risk, request
-> concurrency, retry policy and time budgets, and the manifest MUST declare
-> each case's test parameter. The runner MUST apply every declared setting
-> to the scanner invocation or the fixture it governs. It MUST refuse a
+> [spec:pgorm:req:security.sqlmap.profiles+4]
+> Version-controlled smoke, full and identifiers profiles MUST declare their
+> exact case ids, PostgreSQL DBMS selection, techniques, level/risk, request
+> concurrency, retry policy, time budgets, the fixture's lock timeout, the
+> UNION column range and whether UNION column types may be fuzzed, and the
+> scanner's verbosity, and the manifest MUST declare each case's test
+> parameter. The runner MUST apply every declared setting to the scanner
+> invocation or the fixture it governs. The test parameter is the one name
+> the scanner tests, the adapter route reads and result interpretation
+> accepts findings and completion evidence for. The runner MUST refuse a
 > profile that omits a setting, or declares one the runner does not apply,
-> rather than scan under a value the profile does not record. Both run
-> noninteractively with fresh sqlmap session/output state for every case;
-> cached findings from another case or run MUST NOT satisfy a control or
-> protected result. The full profile includes every manifest case and
-> exercises boolean, error, UNION, stacked, time and inline-query techniques
-> where the context supports them. A technique a case cannot exercise MUST be
-> declared inapplicable in the manifest, per case and per technique, carrying
-> a human reason and machine-checkable evidence: the scanner payload
-> definition the claim concerns, its qualifying clause and where values, and
-> the boundary the context would require. A reviewer MUST be able to retrace
-> the claim through the pinned scanner's own data rather than accept it. A
-> declaration missing a reason or that evidence, or naming a technique the
-> case does not declare, MUST fail the run, as MUST a declared-inapplicable
-> pair the scanner detects. Declared-inapplicable pairs are excluded from
-> scheduled work, reported separately with their evidence, and MUST NOT be
-> counted as passes. Smoke is an explicitly smaller claim.
+> rather than scan under a value the profile does not record. The remaining
+> invocation options are harness constants, because every profile needs them
+> identically: batch mode, answering no to the scanner's offer to run tests
+> past the declared level and risk; a flushed session and fresh queries; no
+> proxy; no colour in the log the runner parses; and per-case output paths.
+> Every profile runs noninteractively with fresh sqlmap session/output state
+> for every case; cached findings from another case or run MUST NOT satisfy a
+> control or protected result. The full profile includes every manifest case
+> and exercises boolean, error, UNION, stacked, time and inline-query
+> techniques where the context supports them. A technique a case cannot
+> exercise MUST be declared inapplicable in the manifest, per case and per
+> technique, carrying a human reason and machine-checkable evidence: the
+> scanner payload definition the claim concerns, its qualifying clause and
+> where values, and the boundary the context would require. A reviewer MUST
+> be able to retrace the claim through the pinned scanner's own data rather
+> than accept it. A declaration missing a reason or that evidence, or naming
+> a technique the case does not declare, MUST fail the run. Declared-inapplicable pairs are
+> excluded from scheduled work, reported separately with their evidence, and
+> MUST NOT be counted as passes. Because a profile run never scans them, the
+> runner MUST also offer an exemption re-measurement over any profile and
+> case subset. It scans each declared-inapplicable pair's control, alone,
+> with the exempted technique under that profile's settings. Each pair ends
+> `held`, `falsified` or `incomplete`. A pair the scanner detects there
+> falsifies its declaration and MUST fail the run, and the run passes only if
+> every pair held. A re-measurement is evidence about the declarations and
+> MUST NOT stand for a profile pass. Smoke is an explicitly smaller claim.
 > The identifiers profile scans the identifier-position cases at sqlmap's
 > highest level and risk, 5 and 3, with every technique. Some contexts are
 > unreachable at the full profile's level but reached by a higher-level
@@ -225,17 +244,20 @@ The Python package and generated campaign do not depend on an HTTP scan passing.
 
 ## Integration and acceptance
 
-> [spec:pgorm:req:security.sqlmap.ci+1]
+> [spec:pgorm:req:security.sqlmap.ci+2]
 > CI MUST provide a bounded smoke job for relevant pull requests, a scheduled
 > full job and a manually invocable full job. The identifiers profile runs
 > alongside the full profile on the same schedule and manual trigger, as its
 > own job with its own deadline and status. All use the same local runner,
 > profiles and verdict logic, retain artifacts on failure, and expose the
-> profile's status separately. Scanner work MUST stay out of the existing
-> pre-commit check budget. The job's permissions and services MUST be limited
-> to the disposable harness. Where external-source pull requests cannot
-> provision the harness, the status is explicitly not-run; the integration
-> policy must obtain a trusted run rather than treating the skip as a pass.
+> profile's status separately. A new push MAY cancel a pull request's
+> superseded smoke run, but a later trigger MUST NOT cancel or displace a
+> full or identifiers run. CI installs the latest patch of the pinned Python
+> series. Scanner work MUST stay out of the existing pre-commit check budget.
+> The job's permissions and services MUST be limited to the disposable
+> harness. Where external-source pull requests cannot provision the harness,
+> the status is explicitly not-run; the integration policy must obtain a
+> trusted run rather than treating the skip as a pass.
 
 > [spec:pgorm:req:security.sqlmap.acceptance+1]
 > Initial acceptance requires a passing full-profile report against the

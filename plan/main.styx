@@ -5237,6 +5237,14 @@ children (
                         text "Delivered again at the current rule versions (security.sqlmap.profiles +3), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:08:15.141328Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at security.sqlmap.pin+1 and security.sqlmap.profiles+4 (sqlmap-harness-fixes): Python series check with recorded release, declared field through adapter and interpreter, lock timeout/UNION columns/UNION fuzzing/verbosity declared by profiles, --remeasure-exemptions guard; runner tests (26) and verdict tests (6) pass."
+                        after_done true
+                    }
                 )
             }
 
@@ -5315,6 +5323,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at the current rule version (security.sqlmap.ci +1), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:08:15.271305Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at security.sqlmap.ci+2 (sqlmap-harness-fixes): per-run concurrency groups for scheduled/dispatched runs with PR smoke still cancelling superseded runs, setup-python takes 3.14's latest patch, sqlmap-verdict refuses re-measurement reports; verdict tests pass and actionlint is clean."
                         after_done true
                     }
                 )
@@ -5611,6 +5627,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found re-checking sqlmap.runner and sqlmap.ci on 2026-10-18 (notes on both). (1) Python is pinned exactly to 3.14.4: pins.json, the runner's equality check (security/sqlmap harness mod.rs), sqlmap-run.yml's setup-python and the README's \"exact Python version\". That breaks the operator's 2026-10-09 rule that no tool version is exact-pinned except git forks by rev; the sweep that day moved generative CI to '3.14' and missed this. Take 3.14's latest patch (a floor, not an equality), record the interpreter version actually used in the run's evidence as was done for maturin, and reword security.sqlmap.pin, whose \"Python/runtime dependencies ... pinned through a lock or immutable image identity\" a bare version string satisfies neither way. (2) The HTTP adapter (main.rs) and the result interpreter (result.rs) hard-code the test parameter as input instead of reading the case's declared field, which reaches only -p and the target URL; every case uses input today, so make the field reach both and extend declared_settings_reach_scanner_and_fixture to prove it. (3) lock_timeout 2s (fixture.rs), --union-cols 1-4 and -v 2 (mod.rs) are fixed in code rather than declared by the profile, which security.sqlmap.profiles says declares every setting; declare them, or name them in the rule as harness constants with the reason (lock_timeout sits below full's 3 s time_sec; harmless because pg_sleep takes no locks). (4) The detected-exempt-pair failure cannot fire in a normal run because exempt pairs are never scanned; exemptions were re-measured only by hand-editing the manifest. Either give the harness a way to re-measure exemptions (a profile that scans exempt pairs and expects no detection) or reword the rule so it does not promise a guard that is empty. (5) security.sqlmap.profiles still says \"both run noninteractively\" though there are three profiles. (6) sqlmap.yml's cancel-in-progress would kill a running five-hour full scan on a second dispatch; key concurrency so a scheduled or dispatched full run is not cancelled by another. Bumping security.sqlmap.profiles or .pin stales sqlmap.runner (kind test) and .ci stales sqlmap.ci (kind test): re-deliver them with a test-typed commit naming them."
+                    }
+
+                    {
+                        at 2026-10-18T15:01:48.418142Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
