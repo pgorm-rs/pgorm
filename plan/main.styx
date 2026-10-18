@@ -9066,6 +9066,51 @@ children (
                     }
                 )
             }
+
+            {
+                id select-one-zero-limit
+                title "Select::one() keeps a smaller limit, so a limit of zero returns no row"
+                kind @fix
+                deps (sql-select-extras)
+                log (
+                    {
+                        at 2026-10-18T18:24:02.755892Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-select-extras (a0e8e0aa); predates it. Select::one() / one_opt() narrow any row limit to LIMIT 1, so a statement built with limit(0), or a tie limit of 0, still returns a row through one(). Keep the smaller of the caller's limit and 1 (a limit of 0 returns no row; one() then reports no row as it does for an empty result), decide what one() does over a tie limit (it currently narrows to LIMIT 1; check that is still right), and cover it with live tests in Rust and the bindings that expose one()."
+                    }
+                )
+            }
+
+            {
+                id lock-of-table-names
+                title "FOR UPDATE OF names only the tables and aliases PostgreSQL accepts there"
+                kind @fix
+                deps (sql-select-extras)
+                log (
+                    {
+                        at 2026-10-18T18:24:02.897376Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-select-extras (a0e8e0aa); predates it. A locking clause's OF list (FOR UPDATE OF ..) renders any FromItem, so an aliased table written as its source, a subquery, a table function or a TABLESAMPLE there produces SQL the server refuses: OF takes table names or aliases only. Narrow what OF accepts to a table name or alias reference so the refused shapes cannot be built, check the server's refusals on 18.6 (42P01 for a name not in FROM, 0A000 for locking a function or VALUES), and give the bindings the same."
+                    }
+                )
+            }
+
+            {
+                id like-escape-off
+                title "LIKE and SIMILAR TO can turn escaping off with ESCAPE ''"
+                kind @fix
+                deps (sql-select-extras)
+                log (
+                    {
+                        at 2026-10-18T18:24:03.027325Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-select-extras (a0e8e0aa). LikeExpr::escape takes a char, so ESCAPE '' (escaping turned off, which PostgreSQL accepts for LIKE and SIMILAR TO) has no spelling, while a multi-character escape stays unrepresentable as it should. Add a way to say \"no escape character\", render ESCAPE '', hold it to the oracle, test it live, and give Python and JavaScript the same."
+                    }
+                )
+            }
         )
     }
 
@@ -11976,6 +12021,51 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-schema-truth-testing (9248d83a). After it, every schema object, Compiled, expression and statement refuses truth testing, but other native classes still evaluate as true: EntityUpdate, EntityUpdateMany, EntityInsert, EntityInsertMany (src/entities/versions.rs), Window, With, FromItem, Join, Table, Conflict, ConflictTarget, ConflictUpdate, the frame classes and the MERGE action classes. Add the refusal to each, and make one test enumerate every class pgorm._native defines (with an explicit, reasoned allow-list for value types where truthiness is meaningful, if any) so a new class without the refusal fails; extend python.statements / python.expressions text as needed (bump, re-deliver the feat owners in a separate feat commit). Waits on sql-select-extras, which adds Python classes in the same modules."
+            }
+        )
+    }
+
+    {
+        id copy-binary-rows
+        title "Binary COPY reads and writes rows of pgorm Values, from Rust, Python and JavaScript"
+        kind @feat
+        deps (conn-copy)
+        log (
+            {
+                at 2026-10-18T18:24:03.168377Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed from conn-copy (211a6b9b), which built COPY at the byte level only. Binary COPY's format is a header, then per row a field count and each field as length plus the type's binary send form, then a trailer; pgorm already writes and reads every Value's binary form for bind and decode. Add a typed row writer over a CopyInSink<CopyBinary> (rows of Values, each column's type checked against the statement's columns) and a typed reader over a CopyOutStream<CopyBinary> decoding into Values or a model, with the bindings' equivalents (Python rows of values, JavaScript arrays), live round trips over every value kind, and refusals for a row of the wrong width or type."
+            }
+        )
+    }
+
+    {
+        id copy-to-source-returning
+        title "A COPY TO over a write without RETURNING is refused when it is built"
+        kind @fix
+        deps (conn-copy)
+        log (
+            {
+                at 2026-10-18T18:24:03.318242Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed from conn-copy (211a6b9b). COPY TO's source can be any of the five statements (IntoCopySource), but PostgreSQL refuses an INSERT, UPDATE, DELETE or MERGE without RETURNING there (0A000, \"COPY query must have a RETURNING clause\"). Refuse it when the statement is built (or make it unrepresentable by accepting only a write that carries RETURNING), with tests and the bindings' equivalent."
+            }
+        )
+    }
+
+    {
+        id python-copy-typing-cases
+        title "Python's invalid-typing and direct-builder parity checks cover COPY"
+        kind @test
+        deps (conn-copy)
+        log (
+            {
+                at 2026-10-18T18:24:03.450531Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Filed from conn-copy (211a6b9b), whose Python half skipped these to avoid colliding with the typing work then in flight. Add COPY cases to pgorm-python/tests/public_types_invalid.py (a wrong-format option, e.g. quote on text or header on binary, a COPY TO option on COPY FROM, a str passed to copy_in) so mypy --strict holds the per-format stubs, and COPY statements to the direct-builder parity suite against the Rust builders."
             }
         )
     }
