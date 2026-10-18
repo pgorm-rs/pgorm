@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+26]
+> [spec:pgorm:req:sql.surface+27]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -83,7 +83,13 @@ today, including panicking edges and deliberate failsafes.
 > a later pass can work through rather than a category.
 >
 > The list grows only by a named item that a rule specifies, and each addition
-> is recorded here with that rule: `CaseOperand` and `SimpleCaseStatement`,
+> is recorded here with that rule: `Deferrability`, when a constraint's check
+> runs (`sql.ddl.deferrability`); `Overriding`, the `OVERRIDING SYSTEM VALUE`
+> or `OVERRIDING USER VALUE` an insert carries (`sql.ast.insert`);
+> `IdentityGeneration`, whether an identity column is generated `ALWAYS` or
+> `BY DEFAULT` (`sql.ddl.column-def`); `IndexColumnTarget`, whether an index
+> entry indexes a column or an expression (`sql.ddl.index-create`);
+> `CaseOperand` and `SimpleCaseStatement`,
 > the simple form of `CASE` (`sql.ast.case`); `Subscript`, what an array
 > subscript holds between its brackets (`sql.ast.expr.subscript`);
 > `GroupingElement`, `GroupingSets` and `Grouping`, the GROUP BY items beyond
