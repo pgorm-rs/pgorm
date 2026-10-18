@@ -6190,6 +6190,14 @@ children (
                         text "python.statements+8 evidence: test_chains_combine_in_call_order and test_intersect_after_union_groups_the_union (pgorm-python/tests/test_set_operations.py) pass against PostgreSQL 18.6, with the full suite and checks/typing.py."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T23:06:59.129114Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped python.statements+9: over() takes an ExtendedWindow inline, built on any entry of the WINDOW clause and refused by check_windows as an extended entry is; sites re-pinned, test_inline_window_builds_on_a_named_one and window_clause_matches_rust_builders pass."
+                        after_done true
+                    }
                 )
             }
 
@@ -11858,6 +11866,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "select-named-windows (d4f6c3e3) bumped napi.windows+1: select.window appends to the WINDOW clause, new ExtendedWindow(base) builds pgorm-query's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError in compile and embedded; the sites written before the bump re-read and pinned at +1, the binding matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:59.238316Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped napi.windows+2: over() takes an ExtendedWindow inline, refused by check_windows as an extended entry is; sites re-pinned, windows.test.ts and the window-inline-extended parity case pass in Node and Deno."
                         after_done true
                     }
                 )
