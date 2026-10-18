@@ -110,7 +110,10 @@ does: after a preceding start `and_preceding`, `and_current_row`,
 `and_following` and `and_unbounded_following`; after `current_row()` all but
 `and_preceding`; after a following start only `and_following` and
 `and_unbounded_following`. The missing methods do not exist, so `ROWS BETWEEN
-CURRENT ROW AND 1 PRECEDING` cannot be written. A preceding or current-row
+CURRENT ROW AND 1 PRECEDING` cannot be written. Two offsets on the same side
+are not compared, by the builder or by PostgreSQL's grammar:
+`FrameType.Rows.preceding(1).and_preceding(3)` builds, and the server reads it
+as a frame holding no rows. A preceding or current-row
 start stands alone as a whole frame; a following start does not, because
 PostgreSQL reads a lone start as running to the current row behind it, and
 `Window.frame` refuses one with `ConstructionError`. `exclude(FrameExclusion)`

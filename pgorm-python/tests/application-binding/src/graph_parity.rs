@@ -72,7 +72,7 @@ fn graphs_require_sources_and_unique_names() -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.graph/test]
-// [spec:pgorm:req:python.entities+2/test]
+// [spec:pgorm:req:python.entities+3/test]
 #[test]
 fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
     use crate::{room, stay};
@@ -154,6 +154,7 @@ fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
                     "from": {"schema": "python_entities", "table": "stays"},
                     "to": {"schema": "python_entities", "table": "rooms"},
                     "columns": [["room_id", "id"]], "period": ["during", "valid_at"],
+                    "condition_type": "all", "on_condition": false,
                     "enforcement": null, "deferrability": "deferrable_initially_deferred",
                 },
                 {
@@ -161,6 +162,7 @@ fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
                     "from": {"schema": "python_entities", "table": "stays"},
                     "to": {"schema": "python_entities", "table": "accounts"},
                     "columns": [["guest_id", "id"]], "period": null,
+                    "condition_type": "all", "on_condition": false,
                     "enforcement": "not_enforced", "deferrability": null,
                 },
             ])

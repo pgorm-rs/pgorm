@@ -1,8 +1,12 @@
 # Executing builders and reading results
 
 `Pool` and `Connection` execute the same native statement state returned by
-`inspect()`. Accepted queries are `Select`, `Insert`, `Update`, `Delete`,
-`Compiled`, and explicit `RawSQL`. Ordinary strings are not queries. No HTTP
+`inspect()`. Accepted queries, the `pgorm.Query` alias the execution methods
+are typed with, are `Select`, `Insert`, `Update`, `Delete`, `Merge`, a
+`Pipeline`, the schema module's `CreateTable`, `CreateIndex` and `DDL`,
+`Compiled`, and explicit `RawSQL`. A `PendingMerge`, a MERGE with no WHEN arm,
+is not one: execution refuses it with `ConstructionError`. Ordinary strings
+are not queries. No HTTP
 service, query dispatcher, compiler or extension build runs per query.
 
 ```python

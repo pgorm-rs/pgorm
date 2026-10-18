@@ -3,8 +3,9 @@
 Python applications import `pgorm`, compose native Rust builders and execute
 them against PostgreSQL in the same process. No HTTP server, adapter or query
 dispatcher is required. The [ordinary application](examples/application.py)
-creates its own schema, performs CRUD and a join, uses transactions and a
-savepoint, executes a pipeline and streams records using the public package.
+creates its own schema, performs CRUD, a join and a MERGE, uses transactions
+and a savepoint, executes a pipeline and streams records using the public
+package.
 
 The `python` WBS subtree implements the [Python specification](../docs/spec/python.md).
 Its acceptance checker verifies the installed standalone package and application

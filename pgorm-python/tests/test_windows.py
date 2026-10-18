@@ -21,7 +21,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+3/test]
+# [spec:pgorm:req:python.statements+4/test]
 class WindowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -89,6 +89,12 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.sums("id", F.Rows.following(1).and_unbounded_following()),
                          [14, 12, 8, None])
 
+    async def test_same_side_offsets_build_an_empty_frame(self):
+        # The typestate orders the sides of the current row, not two offsets
+        # on one side, and PostgreSQL accepts such a frame as holding no rows.
+        self.assertEqual(await self.sums("id", F.Rows.preceding(1).and_preceding(3)), [None] * 4)
+        self.assertEqual(await self.sums("id", F.Rows.following(3).and_following(1)), [None] * 4)
+
     async def test_each_exclusion_removes_its_own_rows(self):
         whole = F.Rows.unbounded_preceding().and_unbounded_following()
         X = p.FrameExclusion
@@ -114,6 +120,18 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
             "Running W", window)
         with self.assertRaises(p.DatabaseError) as caught:
             await self.connection.fetch_all(unknown)
+        self.assertEqual(caught.exception.sqlstate, "42704")
+
+    async def test_second_named_window_replaces_the_first(self):
+        def counted(name):
+            return (p.Select(p.call("count", self.r("id")).over(name))
+                    .from_(self.reading).window("by kind", p.Window().partition_by(self.r("kind")))
+                    .window("all", p.Window()).order_by(self.r("id").asc()))
+        self.assertNotIn('"by kind"', counted("all").inspect().sql)
+        rows = await self.connection.fetch_all(counted("all"))
+        self.assertEqual([next(iter(row.values())) for row in rows], [4, 4, 4, 4])
+        with self.assertRaises(p.DatabaseError) as caught:
+            await self.connection.fetch_all(counted("by kind"))
         self.assertEqual(caught.exception.sqlstate, "42704")
 
     async def test_json_aggregates_run_as_window_functions(self):

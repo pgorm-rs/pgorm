@@ -87,6 +87,18 @@ async def exercise(
         {"id": 2, "name": "雪", "kind": None},
     ]
 
+    visit = (
+        p.merge(a, e, a.col("id") == e.col("account_id"))
+        .when_matched(p.MergeUpdate("visits", a.col("visits") + p.literal(1)))
+        .returning_action()
+        .returning(a.col("id"), a.col("visits"))
+    )
+    assert_type(visit, p.Merge)
+    visited = await pool.fetch_all(visit)
+    assert_type(visited, list[p.Record])
+    merged = [dict(record) for record in visited]
+    assert merged == [{"merge_action": "UPDATE", "id": 1, "visits": 2}]
+
     pipeline = (
         pl.from_(accounts)
         .filter_with(
@@ -119,6 +131,7 @@ async def exercise(
     assert missing is None
     return {
         "joined": joined,
+        "merged": merged,
         "streamed": streamed,
         "deleted": removed,
         "transaction": "committed; child rolled back",

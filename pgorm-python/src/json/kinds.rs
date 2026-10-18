@@ -24,6 +24,12 @@ pub struct PyJsonInput {
 
 #[pymethods]
 impl PyJsonInput {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON operands cannot be tested as Python booleans",
+        ))
+    }
+
     fn __repr__(&self) -> &'static str {
         "JsonInput(...)"
     }

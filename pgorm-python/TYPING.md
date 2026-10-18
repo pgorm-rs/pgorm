@@ -7,8 +7,9 @@ the latest mypy release in strict mode against an installed wheel.
 [The ordinary application](examples/application.py) uses only `import pgorm`
 and its `schema` and `pipeline` modules. It creates two uniquely named tables,
 inserts and updates records, joins them, commits a transaction while rolling
-back a nested savepoint, selects through a pipeline, streams results and
-deletes a record. Its `finally` blocks remove its own tables. It needs a
+back a nested savepoint, merges one table into the other and reads the rows
+the MERGE returned, selects through a pipeline, streams results and deletes a
+record. Its `finally` blocks remove its own tables. It needs a
 PostgreSQL database on which the supplied account can create and drop tables.
 
 With the wheel installed in your current Python environment, run it from the
@@ -21,8 +22,9 @@ uv tool run --from mypy@latest mypy --strict \
   --python-executable "$(command -v python)" pgorm-python/examples/application.py
 ```
 
-The output includes the two joined rows, streamed IDs `[1, 2]`, one deleted
-record and transport `in-process`. The example needs no HTTP service or
+The output includes the two joined rows, the merged row with its
+`merge_action` of `UPDATE`, streamed IDs `[1, 2]`, one deleted record and
+transport `in-process`. The example needs no HTTP service or
 security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 [transactions](TRANSACTIONS.md), [pipelines](PIPELINE.md) and
 [stream ownership](RESULTS.md) for the corresponding API details.

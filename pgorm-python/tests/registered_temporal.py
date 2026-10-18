@@ -13,7 +13,7 @@ def days(start, end):
     return p.Range(date(2026, *start), date(2026, *end))
 
 
-# [spec:pgorm:req:python.entities+2/test]
+# [spec:pgorm:req:python.entities+3/test]
 # [spec:pgorm:req:python.graph/test]
 class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -60,6 +60,7 @@ class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
             "from": {"schema": "python_entities", "table": "stays"},
             "to": {"schema": "python_entities", "table": "rooms"},
             "columns": [["room_id", "id"]], "period": ["during", "valid_at"],
+            "condition_type": "all", "on_condition": False,
             "enforcement": None, "deferrability": "deferrable_initially_deferred",
         })
         self.assertEqual(relations["Guest"]["period"], None)

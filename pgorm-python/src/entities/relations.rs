@@ -1,12 +1,14 @@
 //! What `describe()` reports of a registered entity's relations: the parts of
-//! a compiled declaration that change what a join means, though no Python
-//! call names them.
+//! a compiled declaration no Python call names. The columns, the `PERIOD`
+//! pair, the condition type and an attached `on_condition` decide what a join
+//! by the relation reads; enforcement and deferrability decide what the
+//! server holds the foreign key's rows to, and leave the join as it is.
 
-use pgorm::pgorm_query::{Deferrability, Enforcement, FromItem};
+use pgorm::pgorm_query::{ConditionType, Deferrability, Enforcement, FromItem};
 use pgorm::{EntityTrait, Iterable, RelationDef, RelationTrait, RelationType};
 use serde_json::{Value as Json, json};
 
-// [spec:pgorm:req:python.entities+2]
+// [spec:pgorm:req:python.entities+3]
 /// Every relation the entity's `Relation` enum declares, in declaration order.
 pub(super) fn describe<E: EntityTrait>() -> Vec<Json> {
     E::Relation::iter()
@@ -14,6 +16,9 @@ pub(super) fn describe<E: EntityTrait>() -> Vec<Json> {
         .collect()
 }
 
+/// `on_condition` is reported as present or absent only: it is a Rust
+/// closure over the two tables' aliases, which has no rendering of its own
+/// until a join supplies them.
 fn relation_json(name: &str, def: &RelationDef) -> Json {
     json!({
         "name": name,
@@ -32,6 +37,11 @@ fn relation_json(name: &str, def: &RelationDef) -> Json {
             .columns
             .period()
             .map(|(from, to)| [from.to_string(), to.to_string()]),
+        "condition_type": match def.condition_type {
+            ConditionType::All => "all",
+            ConditionType::Any => "any",
+        },
+        "on_condition": def.on_condition.is_some(),
         "enforcement": def.enforcement.map(|enforcement| match enforcement {
             Enforcement::Enforced => "enforced",
             Enforcement::NotEnforced => "not_enforced",
@@ -53,5 +63,44 @@ fn table(item: &FromItem) -> Json {
             "table": table.name.table().to_string(),
         }),
         other => json!({"schema": null, "table": other.qualifier().to_string()}),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::relation_json;
+    use pgorm::pgorm_query::{Condition, ConditionType, FromItem, IntoName, TableName};
+    use pgorm::{ColumnPairs, RelationDef, RelationType, alias};
+
+    fn relation() -> RelationDef {
+        RelationDef {
+            rel_type: RelationType::HasOne,
+            from_tbl: FromItem::from(TableName::Table(alias("note").into_name())),
+            to_tbl: FromItem::from(TableName::Table(alias("account").into_name())),
+            columns: ColumnPairs::new(alias("account_id"), alias("id")),
+            is_owner: true,
+            on_delete: None,
+            on_update: None,
+            on_condition: None,
+            fk_name: None,
+            enforcement: None,
+            deferrability: None,
+            condition_type: ConditionType::All,
+        }
+    }
+
+    // [spec:pgorm:req:python.entities+3/test]
+    #[test]
+    fn join_condition_shape_is_reported() {
+        let plain = relation_json("Account", &relation());
+        assert_eq!(plain["condition_type"], "all");
+        assert_eq!(plain["on_condition"], false);
+        let mut either = relation();
+        either.condition_type = ConditionType::Any;
+        either.on_condition = Some(Box::new(|_, _| Condition::all()));
+        let either = relation_json("Account", &either);
+        assert_eq!(either["condition_type"], "any");
+        assert_eq!(either["on_condition"], true);
+        assert_eq!(either["columns"], plain["columns"]);
     }
 }

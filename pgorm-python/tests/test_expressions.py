@@ -5,8 +5,8 @@ import unittest
 
 from pgorm import (
     Condition, ConstructionError, Direction, Expr, Identifier, LikePattern,
-    Nulls, OrderBy, TypeName, UnsupportedCapabilityError, Value,
-    bind, call, col, literal, require_capability, tuple_expr,
+    Nulls, OrderBy, TypeName, UnsupportedCapabilityError, Value, Window,
+    bind, call, col, format_json, literal, require_capability, tuple_expr, window_function,
 )
 
 
@@ -59,7 +59,9 @@ class ExpressionTests(unittest.TestCase):
 
     def test_boolean_conversion_fails_at_the_boundary(self):
         expression = col("x") > 1
-        for value in [expression, Condition.all(expression), expression.as_("result"), expression.asc()]:
+        ranked = window_function("rank")
+        for value in [expression, Condition.all(expression), expression.as_("result"), expression.asc(),
+                      format_json(col("doc")), ranked, ranked.over(Window())]:
             with self.assertRaises(ConstructionError):
                 bool(value)
         with self.assertRaises(ConstructionError):
