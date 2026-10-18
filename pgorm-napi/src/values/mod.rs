@@ -1,19 +1,26 @@
 //! pgorm's values as the binding holds them: a `pgorm_query::Value` with the
 //! identity plain JavaScript cannot carry — an enum's type, a created range's
-//! type and subtype, an array's element kind — and the one kind PostgreSQL has
-//! that pgorm's `Value` does not, the interval.
+//! type and subtype, an array's element kind.
 
 pub(crate) mod created;
-pub(crate) mod interval;
 pub(crate) mod json;
 pub(crate) mod read;
 mod value;
 pub(crate) mod write;
 
 use pgorm::pgorm_query::{ArrayType, RangeType, Value};
+use tokio_postgres::types::{Kind, Type};
 
-pub(crate) use interval::Interval;
 pub(crate) use value::export;
+
+/// The type a value is written in: a domain is transparent on the wire.
+pub(crate) fn wire_type(ty: &Type) -> &Type {
+    let mut ty = ty;
+    while let Kind::Domain(base) = ty.kind() {
+        ty = base;
+    }
+    ty
+}
 
 /// A PostgreSQL type named by identifier: an enum, or a range type a schema
 /// created.
@@ -32,34 +39,21 @@ pub(crate) struct CreatedKind {
     pub(crate) multirange: bool,
 }
 
-/// A kind with no type name: one of pgorm's `Value` variants, or an interval.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum Scalar {
-    Value(ArrayType),
-    Interval,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Tag {
-    Scalar(Scalar),
+    /// A kind with no type name: one of pgorm's `Value` variants.
+    Scalar(ArrayType),
     Enum(TypeName),
     Created(CreatedKind),
     Array(Box<Tag>),
 }
 
-/// What a value holds. An enum label and a created range's text form are
+/// A value and its kind. An enum label and a created range's text form are
 /// `Value::String`, as pgorm's own `DeriveActiveEnum` and
 /// `DeriveCreatedRange` types convert into.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Datum {
-    Value(Value),
-    Interval(Option<Interval>),
-    Intervals(Option<Vec<Option<Interval>>>),
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Tagged {
-    pub(crate) datum: Datum,
+    pub(crate) datum: Value,
     pub(crate) tag: Tag,
 }
 
@@ -114,15 +108,14 @@ macro_rules! scalar_kinds {
             }
         }
 
-        pub(crate) fn parse_scalar(name: &str) -> Option<Scalar> {
+        pub(crate) fn parse_scalar(name: &str) -> Option<ArrayType> {
             match name {
-                $($name => Some(Scalar::Value(ArrayType::$variant)),)+
-                "interval" => Some(Scalar::Interval),
+                $($name => Some(ArrayType::$variant),)+
                 _ => RANGE_TYPES.into_iter().find_map(|range| {
                     if name == range.range_type_name() {
-                        Some(Scalar::Value(ArrayType::Range(range)))
+                        Some(ArrayType::Range(range))
                     } else if name == range.multirange_type_name() {
-                        Some(Scalar::Value(ArrayType::Multirange(range)))
+                        Some(ArrayType::Multirange(range))
                     } else {
                         None
                     }
@@ -141,14 +134,10 @@ macro_rules! scalar_kinds {
         /// The kind a pgorm value declares itself.
         pub(crate) fn value_tag(value: &Value) -> Tag {
             match value {
-                $(Value::$variant(_) => Tag::Scalar(Scalar::Value(ArrayType::$variant)),)+
-                Value::Array(kind, _) => {
-                    Tag::Array(Box::new(Tag::Scalar(Scalar::Value(kind.clone()))))
-                }
-                Value::Range(ty, _) => Tag::Scalar(Scalar::Value(ArrayType::Range(*ty))),
-                Value::Multirange(ty, _) => {
-                    Tag::Scalar(Scalar::Value(ArrayType::Multirange(*ty)))
-                }
+                $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
+                Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
+                Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
+                Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
             }
         }
 
@@ -170,16 +159,7 @@ scalar_kinds! {
     Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
     Date => "date", Time => "time", DateTime => "datetime",
     DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
-    MacAddress => "mac_address", Vector => "vector",
-}
-
-impl Scalar {
-    pub(crate) fn name(&self) -> &'static str {
-        match self {
-            Self::Value(kind) => scalar_name(kind),
-            Self::Interval => "interval",
-        }
-    }
+    MacAddress => "mac_address", Vector => "vector", Interval => "interval",
 }
 
 impl Tag {
@@ -187,7 +167,7 @@ impl Tag {
     /// `created_multirange` or `array`.
     pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::Scalar(scalar) => scalar.name(),
+            Self::Scalar(kind) => scalar_name(kind),
             Self::Enum(_) => "enum",
             Self::Created(kind) if kind.multirange => "created_multirange",
             Self::Created(_) => "created_range",
@@ -200,13 +180,11 @@ impl Tagged {
     /// SQL NULL of a scalar kind.
     pub(crate) fn null(tag: Tag) -> Self {
         let datum = match &tag {
-            Tag::Scalar(Scalar::Value(kind)) => Datum::Value(scalar_null(kind)),
-            Tag::Scalar(Scalar::Interval) => Datum::Interval(None),
-            Tag::Enum(_) | Tag::Created(_) => Datum::Value(Value::String(None)),
+            Tag::Scalar(kind) => scalar_null(kind),
+            Tag::Enum(_) | Tag::Created(_) => Value::String(None),
             Tag::Array(element) => match element.as_ref() {
-                Tag::Scalar(Scalar::Interval) => Datum::Intervals(None),
-                Tag::Scalar(Scalar::Value(kind)) => Datum::Value(Value::Array(kind.clone(), None)),
-                _ => Datum::Value(Value::Array(ArrayType::String, None)),
+                Tag::Scalar(kind) => Value::Array(kind.clone(), None),
+                _ => Value::Array(ArrayType::String, None),
             },
         };
         Self { datum, tag }
@@ -216,15 +194,11 @@ impl Tagged {
     pub(crate) fn value(value: Value) -> Self {
         Self {
             tag: value_tag(&value),
-            datum: Datum::Value(value),
+            datum: value,
         }
     }
 
     pub(crate) fn is_null(&self) -> bool {
-        match &self.datum {
-            Datum::Value(value) => value_is_null(value),
-            Datum::Interval(interval) => interval.is_none(),
-            Datum::Intervals(intervals) => intervals.is_none(),
-        }
+        value_is_null(&self.datum)
     }
 }

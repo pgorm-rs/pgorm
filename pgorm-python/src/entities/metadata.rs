@@ -46,6 +46,7 @@ impl InputKind {
             ColumnType::Vector(_) => "vector",
             ColumnType::Inet | ColumnType::Cidr => "ipnetwork",
             ColumnType::MacAddr => "mac_address",
+            ColumnType::Interval(_) => "interval",
             ColumnType::Enum { name, schema, .. } => {
                 return Self::Enum(PyTypeName {
                     name: name.to_string(),

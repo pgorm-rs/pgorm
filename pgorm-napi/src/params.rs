@@ -14,7 +14,7 @@ use pgorm::{
 
 use crate::{
     codec::Codec,
-    values::{Datum, Interval, interval::wire_type, read},
+    values::{read, wire_type},
 };
 
 type BindError = Box<dyn Error + Sync + Send>;
@@ -26,8 +26,6 @@ pub(crate) enum Param {
     /// placeholder has.
     Null,
     Value(ValueHolder),
-    Interval(Option<Interval>),
-    Intervals(Option<Vec<Option<Interval>>>),
 }
 
 /// `params`, a JavaScript array, as parameters: each a `Value`, or a plain
@@ -43,11 +41,7 @@ pub(crate) fn read<'cx>(
     for item in items {
         params.push(match read::infer(cx, codec, item)? {
             None => Param::Null,
-            Some(value) => match value.datum {
-                Datum::Value(value) => Param::Value(ValueHolder(value)),
-                Datum::Interval(interval) => Param::Interval(interval),
-                Datum::Intervals(intervals) => Param::Intervals(intervals),
-            },
+            Some(value) => Param::Value(ValueHolder(value.datum)),
         });
     }
     Ok(params)
@@ -113,19 +107,6 @@ impl ToSql for Param {
             Self::Value(holder) => {
                 check_temporal(&holder.0, ty)?;
                 holder.to_sql(ty, out)
-            }
-            Self::Interval(None) | Self::Intervals(None) => Ok(IsNull::Yes),
-            Self::Interval(Some(interval)) => interval.to_sql(ty, out),
-            Self::Intervals(Some(intervals)) => {
-                // `Vec`'s own impl panics on a type that is not an array, so
-                // the shape is established first.
-                let target = wire_type(ty);
-                match target.kind() {
-                    Kind::Array(_) => intervals.to_sql(target, out),
-                    _ => Err(
-                        format!("cannot bind an `interval[]` value to Postgres type `{ty}`").into(),
-                    ),
-                }
             }
         }
     }

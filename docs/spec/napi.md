@@ -103,9 +103,8 @@ process's clean exit in both runtimes.
 ## Values
 
 Every kind of value pgorm's `Value` holds crosses into and out of JavaScript
-with one declared JavaScript type, and the one PostgreSQL type pgorm has no
-variant for, `interval`, crosses as well. Precision is the first rule: a value
-reaches JavaScript exactly or not at all.
+with one declared JavaScript type, `interval` among them. Precision is the
+first rule: a value reaches JavaScript exactly or not at all.
 
 | Kind | PostgreSQL | JavaScript |
 | --- | --- | --- |
@@ -344,16 +343,17 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions]
+> [spec:pgorm:req:napi.expressions+1]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
 > a parameter is, or declared with `Value`, an enum's label written cast to its
 > type and a created range's text cast to its range through
-> `Expr::as_range` — and `bind` makes one an expression. A value pgorm's
-> statement values cannot hold MUST be a `ConstructionError` naming the
-> explicit form: `null`, which has no kind, and an interval, which pgorm's
-> `Value` has no variant for. Every identifier — of a column, table, schema,
+> `Expr::as_range` — and `bind` makes one an expression. An `Interval`, or a
+> `Temporal.Duration` converted as `Interval.from` converts it, binds as
+> pgorm's interval value (`[spec:pgorm:def:sql.value.interval]`), its fields
+> kept apart. `null`, which has no kind to bind, MUST be a
+> `ConstructionError` naming the explicit form. Every identifier — of a column, table, schema,
 > alias, collation, common table expression or type — MUST be a string of
 > 1–63 UTF-8 bytes without NUL, minted with `Name::runtime`, so that it is
 > quoted wherever pgorm-query writes it, a dot in it part of the name.
@@ -802,7 +802,7 @@ placeholders belong to the stage that minted them.
 > `ConstructionError` from `inspect()` or the terminal, before anything is
 > sent.
 
-> [spec:pgorm:req:napi.pipeline-expressions]
+> [spec:pgorm:req:napi.pipeline-expressions+1]
 > Pipeline expressions MUST be their own objects, lowered into
 > `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
 > statement builders' `Expr`: `col(table, column)`, qualified as prqlc
@@ -820,12 +820,12 @@ placeholders belong to the stage that minted them.
 > `bigint` within `bigint`, a finite number, a string — is written into the
 > SQL as pgorm's pipeline writes a literal. Any other value an operand is
 > given MUST be bound: inferred or declared with `Value` as a parameter is,
-> and minted as a placeholder by the binder of the stage that takes it, never
-> written as a literal; a value with no kind (`null`), an interval, and a
-> value whose kind needs a cast pgorm's pipeline cannot write (an enum's or a
-> created range's) are refused with a `ConstructionError` naming the explicit
-> form. A window's partition and ordering take no value, bound or not, as
-> pgorm's `Over` takes none.
+> an interval included, and minted as a placeholder by the binder of the
+> stage that takes it, never written as a literal; a value with no kind
+> (`null`) and a value whose kind needs a cast pgorm's pipeline cannot write
+> (an enum's or a created range's) are refused with a `ConstructionError`
+> naming the explicit form. A window's partition and ordering take no value,
+> bound or not, as pgorm's `Over` takes none.
 
 > [spec:pgorm:req:napi.pipeline-binder]
 > Each expression-taking stage MUST have a `With` form — `filterWith`,

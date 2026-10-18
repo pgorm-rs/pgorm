@@ -184,9 +184,9 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 - **Values are bound, identifiers quoted.** An operand that is not an
   expression is a parameter, inferred as one is or declared with `Value` — an
   enum's label is cast to its type. `null` is refused (test with `isNull()`, or
-  bind `Value.null(kind)`), as is an interval, which pgorm's statement values do
-  not hold: `bind(interval.toString()).cast("interval")`. A name is 1–63 bytes,
-  always an identifier, its dots included.
+  bind `Value.null(kind)`). An `Interval`, or a `Temporal.Duration`, binds as
+  pgorm's interval value, its months, days and microseconds kept apart. A name
+  is 1–63 bytes, always an identifier, its dots included.
 - **Expressions**: comparisons and arithmetic (`eq` .. `gte`, `add` .. `mod`,
   `concat`), `and`/`or`/`not` and `Condition.all`/`any`, `isNull`, `isIn` a list
   or a `Select`, `between` (`{ symmetric }`), `like`/`ilike` with an `escape`,

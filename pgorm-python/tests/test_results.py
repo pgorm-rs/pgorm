@@ -78,7 +78,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
 
     # [spec:pgorm:req:python.results/test]
     async def test_duplicate_names_and_unsupported_types_fail(self):
-        for query in ("SELECT 1 AS n, 2 AS n", "SELECT interval '1 day' AS n", "SELECT NULL::interval AS n"):
+        for query in ("SELECT 1 AS n, 2 AS n", "SELECT timetz '12:00+02' AS n", "SELECT NULL::timetz AS n"):
             with self.subTest(query=query), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_optional(p.RawSQL(query))
         self.assertTrue(await self.pool.ping())
@@ -96,6 +96,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             ("'12345678-1234-5678-1234-567812345678'::uuid", "uuid", UUID("12345678-1234-5678-1234-567812345678")),
             ("'10.0.0.1/24'::inet", "ipnetwork", "10.0.0.1/24"),
             ("'00:11:22:33:44:55'::macaddr", "mac_address", bytes.fromhex("001122334455")),
+            ("'1 mon -2 days 00:00:03.000004'::interval", "interval", p.Interval(1, -2, 3_000_004)),
         ]
         for sql, kind, expected in cases:
             with self.subTest(kind=kind):
@@ -111,6 +112,50 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(row["json_null"])
         self.assertTrue(row.tagged("sql_null").is_null)
         self.assertFalse(row.tagged("json_null").is_null)
+
+    # [spec:pgorm:req:python.values+3/test]
+    async def test_intervals_round_trip_through_statements(self):
+        cases = [
+            p.Interval(1, -2, 3_000_004), p.Interval(-1, 2, -3_000_004), p.Interval(),
+            p.Interval(2**31 - 1, 0, 0), p.Interval(-(2**31), 0, 0),
+            p.Interval(0, 2**31 - 1, 0), p.Interval(0, -(2**31), 0),
+            p.Interval(0, 0, 2**63 - 1), p.Interval(0, 0, -(2**63)),
+            p.Interval(2**31 - 1, 2**31 - 1, 2**63 - 1), p.Interval(-(2**31), -(2**31), -(2**63)),
+        ]
+        name = "python_interval_" + uuid4().hex
+        table = p.Table(name)
+        async with self.pool.connection() as connection:
+            await connection.execute(p.RawSQL(
+                f'CREATE TEMP TABLE "{name}" (id integer PRIMARY KEY, span interval, spans interval[])'
+            ))
+            insert = p.Insert(table).columns("id", "span", "spans")
+            for index, interval in enumerate(cases):
+                insert = insert.values(index, interval, p.Value.array("interval", [interval, None]))
+            self.assertEqual(await connection.execute(insert), len(cases))
+            rows = await connection.fetch_all(
+                p.Select(p.col("span"), p.col("spans")).from_(table).order_by(p.col("id").asc()))
+            self.assertEqual([row["span"] for row in rows], cases)
+            self.assertEqual([row["spans"] for row in rows], [[case, None] for case in cases])
+            self.assertEqual(rows[0].tagged("span").kind, "interval")
+            self.assertEqual(rows[0].tagged("spans").element_type, "interval")
+
+            # The server reads the three fields it was sent, and the infinities as such.
+            texts = await connection.fetch_one(p.Select(
+                p.bind(cases[0]).cast(p.TypeName("text")).as_("mixed"),
+                p.bind(cases[-2]).cast(p.TypeName("text")).as_("infinite"),
+                p.bind(cases[-1]).cast(p.TypeName("text")).as_("negative"),
+            ))
+            self.assertEqual(texts.values(), ("1 mon -2 days +00:00:03.000004", "infinity", "-infinity"))
+
+            # A predicate binds the interval it compares with; PostgreSQL's `=`
+            # holds 1 mon equal to 30 days, and no other row spells this one.
+            found = await connection.fetch_all(
+                p.Select(p.col("id")).from_(table).where_(p.col("span") == p.Interval(-1, 2, -3_000_004)))
+            self.assertEqual([row["id"] for row in found], [1])
+            null = await connection.fetch_one(p.Select(
+                p.bind(p.Value.null("interval")).cast(p.TypeName("interval")).as_("n")))
+            self.assertIsNone(null["n"])
+            self.assertEqual(null.tagged("n").kind, "interval")
 
     # [spec:pgorm:req:python.results/test]
     async def test_floating_special_values_survive(self):

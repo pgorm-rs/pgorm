@@ -13,7 +13,7 @@ use serde_json::{Value as Json, json};
 use crate::{
     errors::Failure,
     models::kind_key,
-    values::{CREATED_SUBTYPES, CreatedKind, Scalar, Tag, TypeName},
+    values::{CREATED_SUBTYPES, CreatedKind, Tag, TypeName},
 };
 
 /// The scalar kind a column type's values are, where it has one.
@@ -38,6 +38,7 @@ fn scalar(ty: &ColumnType) -> Option<ArrayType> {
         ColumnType::Vector(_) => ArrayType::Vector,
         ColumnType::Inet | ColumnType::Cidr => ArrayType::IpNetwork,
         ColumnType::MacAddr => ArrayType::MacAddress,
+        ColumnType::Interval(_) => ArrayType::Interval,
         ColumnType::Range(range) => ArrayType::Range(*range),
         ColumnType::Multirange(range) => ArrayType::Multirange(*range),
         _ => return None,
@@ -75,7 +76,7 @@ pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
             }))
         }
         ColumnType::Array(member) => column_tag(member).map(|tag| Tag::Array(Box::new(tag))),
-        other => scalar(other).map(|kind| Tag::Scalar(Scalar::Value(kind))),
+        other => scalar(other).map(Tag::Scalar),
     }
 }
 
@@ -320,6 +321,9 @@ mod tests {
             Some("range \"floatrange\" of f64")
         );
         assert_eq!(key(&ColumnType::Money), None);
-        assert_eq!(key(&ColumnType::Interval(IntervalSpec::Any(None))), None);
+        assert_eq!(
+            key(&ColumnType::Interval(IntervalSpec::Any(None))).as_deref(),
+            Some("interval")
+        );
     }
 }

@@ -15,7 +15,7 @@ use crate::{
     connect::job::Settled,
     errors::{Failure, Redactions, failure},
     rows,
-    values::{Datum, Tag, Tagged, read, value_tag},
+    values::{Tag, Tagged, read, value_tag},
 };
 
 /// A model as JavaScript holds it: the real `E::Model` behind a record.
@@ -50,13 +50,7 @@ pub(crate) fn column_value<'cx>(
             }
         },
     };
-    match tagged.datum {
-        Datum::Value(value) => Ok(value),
-        Datum::Interval(_) | Datum::Intervals(_) => read::refuse(
-            cx,
-            "an interval has no value in pgorm's entities, whose values are pgorm's own",
-        ),
-    }
+    Ok(tagged.datum)
 }
 
 /// A column's value with the kind it reads as: the column's own where it
@@ -74,7 +68,7 @@ pub(crate) fn tagged(column: &ColumnInfo, value: Value) -> Tagged {
     };
     Tagged {
         tag: named.unwrap_or_else(|| value_tag(&value)),
-        datum: Datum::Value(value),
+        datum: value,
     }
 }
 

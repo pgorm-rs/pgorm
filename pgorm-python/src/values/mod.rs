@@ -3,6 +3,7 @@
 mod classes;
 mod convert;
 mod created;
+mod interval;
 mod json;
 mod ranges;
 mod snapshot;
@@ -16,12 +17,13 @@ use crate::errors::ConstructionError;
 pub use classes::{PyMultirange, PyRange};
 pub(crate) use created::{CreatedKind, extract as created_kind};
 pub use created::{PyCreatedMultirange, PyCreatedRange};
+pub use interval::PyInterval;
 pub(crate) use ranges::{column_type as range_column_type, kind_names as range_kind_names};
 pub use types::PyTypeName;
 use types::Tag;
 pub(crate) use types::{SCALAR_NAMES, scalar_name};
 
-// [spec:pgorm:req:python.values+2]
+// [spec:pgorm:req:python.values+3]
 // [spec:pgorm:req:python.value-tags]
 /// Immutable owned Rust value plus qualified enum/array identity.
 #[pyclass(name = "Value", module = "pgorm", frozen, eq, from_py_object)]
@@ -284,6 +286,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyTypeName>()?;
     module.add_class::<PyRange>()?;
     module.add_class::<PyMultirange>()?;
+    module.add_class::<PyInterval>()?;
     module.add_class::<PyCreatedRange>()?;
     module.add_class::<PyCreatedMultirange>()?;
     Ok(())

@@ -4,7 +4,7 @@
 use neon::prelude::*;
 
 use super::{
-    Datum, Scalar, Tag, Tagged,
+    Tag, Tagged,
     read::{self, parse_decimal, parse_uuid, refuse, string},
     write,
 };
@@ -129,7 +129,7 @@ fn type_name<'cx>(
 
 fn kind_object<'cx>(cx: &mut Cx<'cx>, codec: Codec<'cx>, tag: &Tag) -> JsResult<'cx, JsValue> {
     match tag {
-        Tag::Scalar(scalar) => Ok(cx.string(scalar.name()).upcast()),
+        Tag::Scalar(kind) => Ok(cx.string(super::scalar_name(kind)).upcast()),
         Tag::Enum(name) => type_name(cx, codec, name),
         Tag::Created(kind) => {
             let schema: Handle<JsValue> = match &kind.name.schema {
@@ -208,21 +208,12 @@ fn value_items(mut cx: FunctionContext) -> JsResult<JsValue> {
     };
     let element = element.as_ref().clone();
     let items: Option<Vec<Tagged>> = match &value.datum {
-        Datum::Value(pgorm::pgorm_query::Value::Array(_, items)) => items.as_ref().map(|items| {
+        pgorm::pgorm_query::Value::Array(_, items) => items.as_ref().map(|items| {
             items
                 .iter()
                 .map(|item| Tagged {
-                    datum: Datum::Value(item.clone()),
+                    datum: item.clone(),
                     tag: element.clone(),
-                })
-                .collect()
-        }),
-        Datum::Intervals(items) => items.as_ref().map(|items| {
-            items
-                .iter()
-                .map(|item| Tagged {
-                    datum: Datum::Interval(*item),
-                    tag: Tag::Scalar(Scalar::Interval),
                 })
                 .collect()
         }),

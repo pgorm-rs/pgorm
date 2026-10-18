@@ -168,7 +168,7 @@ impl Recipe {
 
     /// The pgorm expression, or `None` where a value or placeholder needs a
     /// binder the lowering does not have.
-    // [spec:pgorm:req:napi.pipeline-expressions]
+    // [spec:pgorm:req:napi.pipeline-expressions+1]
     pub(super) fn lower<'brand>(
         &self,
         with: &mut Lowering<'_, 'brand>,

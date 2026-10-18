@@ -618,6 +618,9 @@ impl_into_active_value!(crate::prelude::DateTimeWithTimeZone);
 
 impl_into_active_value!(crate::prelude::Decimal);
 
+// [spec:pgorm:req:exec.decode.interval]
+impl_into_active_value!(crate::prelude::Interval);
+
 #[cfg(feature = "with-uuid")]
 #[cfg_attr(docsrs, doc(cfg(feature = "with-uuid")))]
 impl_into_active_value!(crate::prelude::Uuid);

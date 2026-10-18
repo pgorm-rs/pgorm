@@ -26,6 +26,7 @@ fn manifest() -> Value {
         "ipnetwork",
         "mac_address",
         "vector",
+        "interval",
     ]
     .into_iter()
     .chain(crate::values::range_kind_names())
@@ -97,6 +98,7 @@ fn manifest() -> Value {
             "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
             "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",
             "temporal_precision": "microseconds; finer precision and subsecond offsets rejected",
+            "interval": "pgorm.Interval: months, days and microseconds, each signed, never normalised into one another",
             "aware_datetime": "explicit UTC tag requiring a zero offset",
             "enum_storage": "Rust String value with qualified TypeName metadata",
             "created_range_storage": "Rust String of the text form with the qualified type name and subtype; written as CAST(text AS name)",
@@ -119,7 +121,7 @@ fn manifest() -> Value {
             "json": "serde_json i64/u64/f64; numeric value loss and nesting beyond 64 rejected",
             "arrays": "one dimension, lower bound 1, nullable elements; other shapes rejected",
             "ranges": "the six built-in range types and their multiranges; a range type a schema created over any RangeSubtype as its own created_range kind, named by the column's type, held as its text form; created multiranges, which the driver reports as simple types, and arrays of a created range rejected",
-            "unsupported": ["domain", "composite", "interval", "timetz", "bit", "money"],
+            "unsupported": ["domain", "composite", "timetz", "bit", "money"],
             "stream": "one pull at a time over bounded driver buffers; owns connection until EOF or close"
         },
         "entity_policy": {

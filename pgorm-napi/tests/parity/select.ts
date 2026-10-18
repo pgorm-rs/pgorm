@@ -3,7 +3,7 @@
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
 // [spec:pgorm:req:napi.select/test]
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 
 import {
   bind,

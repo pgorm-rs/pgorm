@@ -5,9 +5,9 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions]
+// [spec:pgorm:req:napi.expressions+1]
 
-import type { Interval, Param, TypeName, Value } from "./index.d.ts";
+import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
 import type { Window, Windowed } from "./windows.d.ts";
 
@@ -32,11 +32,10 @@ export declare abstract class Builder {
 
 /**
  * A value a built statement binds: a parameter, inferred or declared with
- * {@link Value}, but neither `null` — test with `isNull()`, or bind
- * `Value.null(kind)` — nor an interval, which pgorm's statement values do not
- * hold: bind its text cast, `bind(interval.toString()).cast("interval")`.
+ * {@link Value}, but not `null`, which has no kind — test with `isNull()`, or
+ * bind `Value.null(kind)`.
  */
-export type BindValue = Exclude<Param, null | Interval | Temporal.Duration>;
+export type BindValue = Exclude<Param, null>;
 
 /** What an operand may be: an expression, or a value to bind. */
 export type Operand = Expr | BindValue;

@@ -183,8 +183,7 @@ export type FieldInput<C> = C extends Column<infer K, infer O>
 /**
  * What a column is compared with: a value of its kind that a statement can
  * bind, a {@link Value} of its own kind, or an expression. A range is
- * compared as a `Value` naming its kind, and an interval not at all, as
- * built statements bind them.
+ * compared as a `Value` naming its kind, as built statements bind it.
  */
 export type FieldOperand<C> = C extends Column<infer K, infer O>
   ? Extract<Arrayed<KindInput<K, O>, O>, Operand> | Value | Expr

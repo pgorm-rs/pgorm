@@ -22,7 +22,7 @@ pub use mac_address::MacAddress;
 
 pub use pgvector::Vector;
 
-use crate::{ColumnType, Multirange, QueryBuilder, Range, RangeType, StringLen};
+use crate::{ColumnType, Interval, Multirange, QueryBuilder, Range, RangeType, StringLen};
 
 /// [`Value`] types variant for Postgres array
 // [spec:pgorm:def:sql.value.array+6]
@@ -60,6 +60,10 @@ pub enum ArrayType {
     MacAddress,
 
     Vector,
+
+    /// `interval[]`.
+    // [spec:pgorm:def:sql.value.interval]
+    Interval,
 
     /// A range over one of the built-in range types, `int4range[]`.
     // [spec:pgorm:def:sql.value.range+4]
@@ -119,6 +123,12 @@ pub enum Value {
     IpNetwork(Option<Box<IpNetwork>>),
 
     MacAddress(Option<Box<MacAddress>>),
+
+    /// An `interval`, its three fields kept apart. Boxed though it holds no
+    /// pointer: inline, its sixteen bytes and the `Option` around them would
+    /// widen every `Value` from 24 bytes to 32.
+    // [spec:pgorm:def:sql.value.interval]
+    Interval(Option<Box<Interval>>),
 
     /// A range, tagged with the built-in range type it is so that a NULL and
     /// an empty range still name one. Its bounds are values of the variant
@@ -290,6 +300,7 @@ impl Value {
             Self::Decimal(_) => Some(Cow::Borrowed("numeric")),
             Self::IpNetwork(_) => Some(Cow::Borrowed("inet")),
             Self::MacAddress(_) => Some(Cow::Borrowed("macaddr")),
+            Self::Interval(_) => Some(Cow::Borrowed("interval")),
             Self::Range(ty, _) => Some(Cow::Borrowed(ty.range_type_name())),
             Self::Multirange(ty, _) => Some(Cow::Borrowed(ty.multirange_type_name())),
         }
@@ -323,6 +334,7 @@ impl ArrayType {
             Self::Decimal => Some("numeric"),
             Self::IpNetwork => Some("inet"),
             Self::MacAddress => Some("macaddr"),
+            Self::Interval => Some("interval"),
             Self::Range(ty) => Some(ty.range_type_name()),
             Self::Multirange(ty) => Some(ty.multirange_type_name()),
         }

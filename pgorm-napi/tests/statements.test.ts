@@ -16,6 +16,7 @@ import {
   ConstructionError,
   DatabaseError,
   exists,
+  insert,
   Interval,
   Pool,
   scalar,
@@ -155,7 +156,7 @@ test("a builder never changes: extending one in two directions leaves it and eac
   assert.deepStrictEqual(ids(await pool().query(base.orderBy(account.col("id").asc()))), [1n, 2n, 3n, 4n]);
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("values are bound and identifiers quoted: neither text becomes SQL", async () => {
   const hostile = "x' OR '1'='1";
   const query = select(account.col("id")).from(account).where(account.col("name").eq(hostile));
@@ -172,7 +173,7 @@ test("values are bound and identifiers quoted: neither text becomes SQL", async 
   assert.deepStrictEqual(row, { "Mixed Case": 1, select: "kept" });
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("membership in an empty list matches no row, and its negation every row", async () => {
   const base = select(account.col("id")).from(account).orderBy(account.col("id").asc());
   assert.deepStrictEqual(await pool().query(base.where(account.col("id").isIn([]))), []);
@@ -182,7 +183,7 @@ test("membership in an empty list matches no row, and its negation every row", a
   assert.deepStrictEqual(ids(await pool().query(pairs)), [1n]);
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("text tests read their argument as text, and LIKE reads it as a pattern with its escape", async () => {
   const names = async (predicate: ReturnType<typeof col>) =>
     ids(await pool().query(select(account.col("name")).from(account).where(predicate).orderBy(account.col("id").asc())), "name");
@@ -196,7 +197,7 @@ test("text tests read their argument as text, and LIKE reads it as a pattern wit
   assert.deepStrictEqual(await names(account.col("name").notLike("%o%")), ["Alice", "O'Brien"]);
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("an enum value binds through its type's cast, scalar and array alike", async () => {
   const calm = new Value("calm", mood);
   const rows = await pool().query(select(account.col("id")).from(account).where(account.col("mood").eq(calm)));
@@ -205,7 +206,7 @@ test("an enum value binds through its type's cast, scalar and array alike", asyn
   assert.deepStrictEqual(listed, { moods: ["glad", "sad"] });
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("CASE, casts, collations and subscripts compute on the server", async () => {
   const row = await pool().one(
     select(
@@ -333,17 +334,64 @@ test("a failing built statement rejects with the server's error", async () => {
   );
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("a value with no statement form is refused as it is bound", () => {
   assert.throws(() => col("x").eq(null as never), refused(/null has no kind.*isNull\(\)/));
   assert.throws(() => bind(undefined as never), refused(/undefined/));
-  assert.throws(() => bind(new Interval({ days: 1 }) as never), refused(/interval/));
-  assert.throws(() => bind(Temporal.Duration.from({ days: 1 }) as never), refused(/interval/));
-  assert.throws(() => bind(new Value(new Interval({ days: 1 }), "interval")), refused(/interval/));
   assert.throws(() => col("x").eq(new Table("t") as never), refused(/expected an expression or a value, got a Table/));
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
+test("an interval binds in a built statement, each field and sign kept", async () => {
+  const intervals = [
+    new Interval({ months: 1, days: -2, microseconds: 3_000_004n }),
+    new Interval({ months: -1, days: 2, microseconds: -3_000_004n }),
+    new Interval({}),
+    new Interval({ months: 2 ** 31 - 1 }),
+    new Interval({ months: -(2 ** 31) }),
+    new Interval({ days: 2 ** 31 - 1 }),
+    new Interval({ days: -(2 ** 31) }),
+    new Interval({ microseconds: 2n ** 63n - 1n }),
+    new Interval({ microseconds: -(2n ** 63n) }),
+    new Interval({ months: 2 ** 31 - 1, days: 2 ** 31 - 1, microseconds: 2n ** 63n - 1n }),
+    new Interval({ months: -(2 ** 31), days: -(2 ** 31), microseconds: -(2n ** 63n) }),
+  ];
+  await pool().execute("CREATE TABLE app.span (id int8 PRIMARY KEY, span interval, spans interval[])");
+  let written = insert(new Table("span", { schema: "app" })).columns("id", "span", "spans");
+  intervals.forEach((interval, id) => {
+    written = written.values(id, interval, Value.array("interval", [interval, null]));
+  });
+  assert.equal(await pool().execute(written), intervals.length);
+  const spans = new Table("span", { schema: "app" });
+  const rows = await pool().query(select(spans.col("span"), spans.col("spans")).from(spans).orderBy(spans.col("id").asc()));
+  assert.deepStrictEqual(rows.map((row) => row.span), intervals);
+  assert.deepStrictEqual(rows.map((row) => row.spans), intervals.map((interval) => [interval, null]));
+
+  // The server reads the fields it was sent, the two all-limit triples as its
+  // infinities, and a Duration as the interval Interval.from makes of it.
+  const read = await pool().one(select(
+    bind(intervals[0]).cast("text").as("mixed"),
+    bind(intervals[9]).cast("text").as("infinite"),
+    bind(intervals[10]).cast("text").as("negative"),
+    bind(Temporal.Duration.from({ days: 1, hours: 2 })).cast("text").as("duration"),
+  ));
+  assert.deepStrictEqual(read, {
+    mixed: "1 mon -2 days +00:00:03.000004",
+    infinite: "infinity",
+    negative: "-infinity",
+    duration: "1 day 02:00:00",
+  });
+  const found = await pool().query(
+    select(spans.col("id")).from(spans).where(spans.col("span").eq(new Value(intervals[1], "interval"))),
+  );
+  assert.deepStrictEqual(found, [{ id: 1n }]);
+  await assert.rejects(
+    pool().query(select(spans.col("id")).from(spans).where(spans.col("id").eq(intervals[0]))),
+    refused(/cannot bind a `Interval` value to Postgres type `int8`/),
+  );
+});
+
+// [spec:pgorm:req:napi.expressions+1/test]
 test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(""), refused(/identifier/));
   assert.throws(() => col("x".repeat(64)), refused(/identifier/));
@@ -354,7 +402,7 @@ test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(1 as never), refused(/identifier is a string/));
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("call() reaches only the functions pgorm-query constructs, at their argument counts", () => {
   assert.throws(() => call("pg_sleep" as never, 1), refused(/no "pg_sleep"/));
   assert.throws(() => call("lower", col("a"), col("b")), refused(/taking 2 argument/));
@@ -373,7 +421,7 @@ test("limits and offsets are non-negative integers within PostgreSQL's bigint", 
   assert.deepStrictEqual(base.limit(2n ** 63n - 1n).inspect().values.map((value) => value.value), [2n ** 63n - 1n]);
 });
 
-// [spec:pgorm:req:napi.expressions/test]
+// [spec:pgorm:req:napi.expressions+1/test]
 test("shapes PostgreSQL has no SQL for are refused as they are built", () => {
   assert.throws(() => (select().select as () => unknown).call(select()), refused(/at least one item/));
   assert.throws(() => (tuple as () => unknown)(), refused(/at least one item/));

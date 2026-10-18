@@ -8,7 +8,7 @@
 use std::error::Error;
 
 use jiff::{Timestamp, civil::DateTime, tz::TimeZone};
-use pgorm::pgorm_query::{ArrayType, MacAddress, Value, Vector};
+use pgorm::pgorm_query::{ArrayType, Interval, MacAddress, Value, Vector};
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, json};
 
@@ -671,4 +671,21 @@ fn temporal_graphs_join_by_period_and_key() {
     let (sql, _) = entities::graphs::stay_guests(&aliases).build();
     assert!(sql.contains(r#""guest_id" = "r"" 雪"."id""#), "{sql}");
     assert!(!sql.contains("&&"), "{sql}");
+}
+
+/// An interval has no portable kind: its tag is named so the encoder is total,
+/// its data describes the value as its literal, and validation refuses it.
+// [spec:pgorm:def:sql.value.interval/test]
+#[test]
+fn interval_has_no_portable_kind() {
+    let tagged = Tagged::from_value(Value::from(Interval::new(1, -2, 3)));
+    let encoded = tagged.encode();
+    assert_eq!(encoded["type"], json!({"kind": "interval"}));
+    assert_eq!(
+        encoded["data"],
+        json!("'+1 months -2 days +3 microseconds'::interval")
+    );
+    assert!(validate(&encoded).is_err());
+    assert!(tagged.encode_checked().is_err());
+    assert!(Tagged::from_value(Value::Interval(None)).is_sql_null());
 }

@@ -5,7 +5,7 @@
 // They are not the statement builders' expressions, and the two do not mix.
 // A value an operand is given is bound by the stage that takes it; only
 // `literal()` writes one into the SQL.
-// [spec:pgorm:req:napi.pipeline-expressions]
+// [spec:pgorm:req:napi.pipeline-expressions+1]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

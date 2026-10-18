@@ -680,6 +680,7 @@ mod token;
 mod types;
 pub mod value;
 mod value_identity;
+mod value_interval;
 mod value_range;
 mod value_range_text;
 
@@ -724,6 +725,7 @@ pub use value::{
     ArrayType, IntoValueTuple, IpNetwork, MacAddress, Nullable, TryFromValueTuple, Value,
     ValueTuple, ValueTupleError, ValueType, ValueTypeError, Values, Vector,
 };
+pub use value_interval::Interval;
 pub use value_range::{Multirange, Range, RangeElement, RangeType};
 pub use value_range_text::RangeSubtype;
 

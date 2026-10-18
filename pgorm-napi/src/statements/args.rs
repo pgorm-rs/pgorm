@@ -14,7 +14,7 @@ use super::{Node, Ordering};
 pub(crate) use crate::values::read::refuse;
 use crate::{
     codec::Codec,
-    values::{self, Datum, Tag, read},
+    values::{self, Tag, read},
 };
 
 /// A copy of the node `value` boxes, if it is a builder object's native
@@ -69,7 +69,7 @@ pub(crate) fn items<'cx>(
 
 /// An identifier: a JavaScript string of 1–63 UTF-8 bytes without NUL,
 /// minted into a `Name`, which renders quoted — never SQL.
-// [spec:pgorm:req:napi.expressions]
+// [spec:pgorm:req:napi.expressions+1]
 pub(crate) fn name<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Name> {
     if !value.is_a::<JsString, _>(cx) {
         return refuse(cx, "an identifier is a string");
@@ -126,7 +126,7 @@ pub(crate) fn rust_type(named: &values::TypeName) -> TypeName {
 /// `Value`, written as its kind needs — an enum's label cast to the enum, a
 /// created range's text cast to its range type through `Expr::as_range`.
 /// Nothing here interpolates: the value is a placeholder's.
-// [spec:pgorm:req:napi.expressions]
+// [spec:pgorm:req:napi.expressions+1]
 pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -136,14 +136,7 @@ pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonRe
              Value.null(kind) for a typed NULL",
         );
     };
-    let Datum::Value(value) = tagged.datum else {
-        return refuse(
-            cx,
-            "an interval has no value in pgorm's statements, whose values are pgorm's own: \
-             bind its text cast to interval, bind(interval.toString()).cast(\"interval\")",
-        );
-    };
-    let expr = Expr::value(value);
+    let expr = Expr::value(tagged.datum);
     Ok(match tagged.tag {
         Tag::Enum(named) => expr.cast_as_type(rust_type(&named)),
         Tag::Array(element) => match *element {

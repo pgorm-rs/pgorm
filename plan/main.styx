@@ -11188,6 +11188,14 @@ children (
         id statement-interval-value
         title "A built statement binds an interval value, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main (
+                [spec:pgorm:def:sql.value.interval]
+                [spec:pgorm:sem:sql.value.interval-text]
+                [spec:pgorm:req:exec.cursor.binding-interval]
+                [spec:pgorm:req:exec.decode.interval]
+            )
+        }
         log (
             {
                 at 2026-10-09T14:58:04.236735Z

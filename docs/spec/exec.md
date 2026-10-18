@@ -190,6 +190,20 @@ These rules capture what the code does today, including known gaps.
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
 
+> [spec:pgorm:req:exec.decode.interval]
+> `Interval` implements `TryGetable` through its own `FromSql`
+> (`[spec:pgorm:def:sql.value.interval]`), and `Vec<Interval>` does under
+> `postgres-array`, as the arrays of `[spec:pgorm:def:exec.decode.array+1]`
+> do, each reading a column's months, days and microseconds as the server
+> sent them. The prelude names `Interval`, and it implements
+> `IntoActiveValue`, so an entity field can be an `Interval`, an
+> `Option<Interval>` or a `Vec<Interval>`: `Schema::create_table_from_entity`
+> writes its column as `interval` (`ValueType::column_type`), an
+> `ActiveValue::Set` writes it bound in binary, a predicate on it binds the
+> interval it compares with, and a row decodes back field for field. Codegen
+> does not map an `interval` column to the type, and refuses one as every
+> type outside its table (`[spec:pgorm:req:codegen.entity.types.unsupported+6]`).
+
 > [spec:pgorm:def:exec.decode.range+3]
 > `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+4]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
