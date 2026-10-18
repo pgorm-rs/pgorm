@@ -658,7 +658,7 @@ including panic semantics and quirks inherited from sea-query.
 > Asterisk)` to `TableAsterisk`, `(ReturningRow, name)` to `RowColumn`, and
 > `(ReturningRow, Asterisk)` to `RowAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+5]
+> [spec:pgorm:def:sql.types.table-ref+6]
 > Table references are split by position, so that a reference which names no
 > table cannot reach a statement that needs one. There are three positions,
 > and each takes the widest type its position admits: DDL targets a name,
@@ -684,19 +684,24 @@ including panic semantics and quirks inherited from sea-query.
 > qualified by — the bound alias when there is one, otherwise the table name.
 >
 > `FromItem` is the query-position reference: `Table(NamedTable)` — the DML
-> reference reused, so aliasing is expressed in one place — plus the five
+> reference reused, so aliasing is expressed in one place — plus the six
 > value-producing forms `SubQuery(SelectStatement, alias)`,
 > `ValuesList(Vec<ValueTuple>, alias)`, `FunctionCall(FunctionCall, alias)`,
-> `Template(SqlTemplate, alias)` and `JsonTable(Box<JsonTable>, alias)`
-> (`sql.ast.json-table`), each carrying a mandatory alias.
+> `Template(SqlTemplate, alias)`, `JsonTable(Box<JsonTable>, alias)`
+> (`sql.ast.json-table`) and `TableFunction(Box<TableFunction>, alias)`
+> (`sql.ast.select.table-function`), each carrying a mandatory alias, and
+> `TableSample(Box<TableSample>)` (`sql.ast.select.table-sample`), a named
+> table read through `TABLESAMPLE`, which carries its alias, when it has one,
+> on the table it samples.
 > `IntoFromItem` accepts a `FromItem` unchanged and widens anything
 > `IntoNamedTable` accepts; `From<NamedTable> for FromItem` and
 > `From<TableName> for FromItem` are the same widening as value conversions.
 > `FromItem::alias(a)` binds or replaces the alias on any form.
-> `FromItem::table_name()` returns the name for the named form and `None`
-> for the value-producing forms; `FromItem::qualifier()` returns the
-> identifier a column of the item is qualified by, delegating to
-> `NamedTable::qualifier()` for the named form.
+> `FromItem::table_name()` returns the name for the named form and the
+> sampled table's for a sample, and `None` for the value-producing forms;
+> `FromItem::qualifier()` returns the identifier a column of the item is
+> qualified by, delegating to `NamedTable::qualifier()` for the named form and
+> a sample.
 >
 > `Template` is how SQL this crate did not build stands where a relation
 > stands, and it is template-class rather than raw: its payload is a
@@ -719,10 +724,11 @@ including panic semantics and quirks inherited from sea-query.
 > position is a type error for the same reason
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
-> [spec:pgorm:def:sql.types.opers+4]
+> [spec:pgorm:def:sql.types.opers+5]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
 > operator vocabulary: logical `And`/`Or`; pattern `Like`/`NotLike` plus
-> Postgres `ILike`/`NotILike`; the IS family `Is`/`IsNot` and the null-safe
+> Postgres `ILike`/`NotILike` and the regular-expression `SimilarTo`/
+> `NotSimilarTo` (`sql.ast.expr.similar-to`); the IS family `Is`/`IsNot` and the null-safe
 > `IsDistinctFrom`/`IsNotDistinctFrom`; `In`/`NotIn`;
 > `Between`/`NotBetween` and their bound-sorting
 > `BetweenSymmetric`/`NotBetweenSymmetric`; comparisons `Equal`, `NotEqual`,
@@ -739,7 +745,8 @@ including panic semantics and quirks inherited from sea-query.
 > `EuclideanDistance`,
 > `NegativeInnerProduct`, `CosineDistance`; and an escape hatch
 > `Raw(&'static str)`. There is no `Escape` operator: `ESCAPE` is
-> grammatical only as the tail of a `LIKE` pattern, so it belongs to
+> grammatical only as the tail of a `LIKE` or `SIMILAR TO` pattern, so it
+> belongs to
 > `SimpleExpr::LikePattern` and cannot be applied to two arbitrary operands
 > (`[dec:pgorm:invalid-states-unrepresentable]`).
 >

@@ -17,6 +17,7 @@ mod conflict;
 mod copy;
 mod data_type;
 mod expr;
+mod grouping;
 mod json;
 mod json_table;
 mod merge;
@@ -34,8 +35,9 @@ mod write;
 use neon::{prelude::*, types::Finalize};
 use pgorm::pgorm_query::{
     AnyWithClause, ColumnType, Condition, ConflictUpdate, FrameClause, FromItem, FunctionCall,
-    JsonInput, JsonTableColumn, MergeStatement, NamedTable, NullOrdering, OnConflict, Order,
-    PendingMerge, Query, SelectStatement, SimpleExpr, Value, Values, WindowStatement,
+    GroupingElement, JsonInput, JsonTableColumn, MergeStatement, NamedTable, NullOrdering,
+    OnConflict, Order, PendingMerge, Query, SelectStatement, SimpleExpr, Value, Values,
+    WindowStatement,
 };
 
 use crate::{codec::Codec, rows, values::Tagged};
@@ -70,6 +72,9 @@ pub(crate) enum Node {
     CaseOperand(SimpleExpr),
     Table(NamedTable),
     FromItem(FromItem),
+    /// An item of a `GROUP BY` list beyond a bare expression: a set,
+    /// `ROLLUP`, `CUBE` or `GROUPING SETS`.
+    GroupingElement(GroupingElement),
     Select(SelectStatement),
     With(AnyWithClause),
     Insert(write::Insert),
@@ -121,6 +126,7 @@ impl Node {
             Self::CaseOperand(_) => "a CASE with no WHEN arm",
             Self::Table(_) => "a Table",
             Self::FromItem(_) => "a FROM item",
+            Self::GroupingElement(_) => "a grouping element",
             Self::Select(_) => "a Select",
             Self::With(_) => "a WITH clause",
             Self::Insert(_) => "an INSERT",
@@ -156,6 +162,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     for exports in [
         expr::EXPORTS,
         select::EXPORTS,
+        grouping::EXPORTS,
         table::EXPORTS,
         with::EXPORTS,
         write::EXPORTS,
@@ -191,11 +198,17 @@ const MAX_PARAMETERS: usize = 65_535;
 
 /// The SQL and values a statement node builds, through the same validated
 /// state whether it is inspected or run. A node that is no complete
-/// statement is refused.
+/// statement is refused, and so is a SELECT whose tie limit PostgreSQL's
+/// grammar would refuse: rendering writes it regardless, and the ORDER BY it
+/// needs may arrive after the limit, so this is the first point it is final.
 // [spec:pgorm:req:napi.statements]
+// [spec:pgorm:req:napi.select+1]
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
-        Node::Select(select) => select.build(),
+        Node::Select(select) => match select.check_tie_limit() {
+            Ok(()) => select.build(),
+            Err(error) => return refuse(cx, error.to_string()),
+        },
         Node::Merge(merge) => merge.build(),
         Node::Pipeline(part) => pipeline::compile(cx, part)?,
         Node::Schema(part) => match part.statement() {

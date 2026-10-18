@@ -15,6 +15,14 @@ pub enum Error {
         /// What about the pairing was rejected.
         reason: TemplateError,
     },
+    /// A `FETCH FIRST .. WITH TIES` on a statement with no ORDER BY: its ties
+    /// are measured on the order, and PostgreSQL's grammar refuses one
+    /// without it (`42601`).
+    TiesWithoutOrder,
+    /// A `FETCH FIRST .. WITH TIES` beside `SKIP LOCKED`, which PostgreSQL's
+    /// grammar refuses (`42601`): skipping locked rows would make the tied
+    /// set depend on what other transactions hold.
+    TiesWithSkipLocked,
 }
 
 /// Why a placeholder template and its substitutions do not pair up.
@@ -59,6 +67,12 @@ impl std::fmt::Display for Error {
             ),
             Self::Template { template, reason } => {
                 write!(f, "Invalid placeholder template \"{template}\": {reason}")
+            }
+            Self::TiesWithoutOrder => {
+                f.write_str("FETCH FIRST .. WITH TIES needs an ORDER BY to measure its ties on")
+            }
+            Self::TiesWithSkipLocked => {
+                f.write_str("FETCH FIRST .. WITH TIES cannot be combined with SKIP LOCKED")
             }
         }
     }

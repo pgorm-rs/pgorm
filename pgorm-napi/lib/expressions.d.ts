@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -87,6 +87,15 @@ export declare class Expr extends Builder {
   notLike(pattern: string, options?: { readonly escape?: string }): Expr;
   ilike(pattern: string, options?: { readonly escape?: string }): Expr;
   notIlike(pattern: string, options?: { readonly escape?: string }): Expr;
+  /**
+   * `SIMILAR TO`: whether the whole string matches a pattern in SQL's
+   * regular-expression dialect — LIKE's `%` and `_` with `|`, `*`, `+`, `?`,
+   * repetition, grouping and bracket classes. Bound as LIKE's pattern is, with
+   * the same one-character `escape`. A bound left operand needs its type, as
+   * the server cannot infer both sides from the operator alone.
+   */
+  similarTo(pattern: string, options?: { readonly escape?: string }): Expr;
+  notSimilarTo(pattern: string, options?: { readonly escape?: string }): Expr;
   /** Whether the text begins with `text`, read as text: `%` and `_` match themselves. */
   startsWith(text: Operand): Expr;
   endsWith(text: Operand): Expr;
@@ -175,12 +184,20 @@ export type FunctionName =
   | "uuidv4"
   | "uuidv7"
   | "uuid_extract_timestamp"
-  | "uuid_extract_version";
+  | "uuid_extract_version"
+  | "generate_series"
+  | "unnest";
 
 /**
  * A call to one of the functions pgorm-query has a constructor for; another
  * name or argument count is a {@link ConstructionError}. `uuidv7` takes no
  * argument, or the interval its time is shifted by.
+ *
+ * `generate_series` (start, stop and an optional step) and `unnest` (one
+ * array) are set-returning, read as a relation by `tableFunction`. Their
+ * overloads are chosen by argument type and a parameter has none, so a bound
+ * argument needs its type: `bind(1).cast("int4")`, or an array cast with
+ * `{ array: true }`; a column or a typed expression already has one.
  */
 export declare function call(name: FunctionName, ...operands: Operand[]): Expr;
 /** `(a, b, ..)`, at least one item. */

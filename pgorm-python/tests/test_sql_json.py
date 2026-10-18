@@ -14,7 +14,7 @@ def one(*items):
     return p.Select(*(item.as_(f"c{index}") for index, item in enumerate(items)))
 
 
-# [spec:pgorm:req:python.expressions+1/test]
+# [spec:pgorm:req:python.expressions+2/test]
 class SqlJsonTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

@@ -2,7 +2,7 @@
 
 // The predicates over an expression: NULL tests, membership, ranges of
 // values, patterns and text tests.
-// [spec:pgorm:req:napi.expressions+1]
+// [spec:pgorm:req:napi.expressions+2]
 
 import { arg, args, made } from "./builder.js";
 import { native } from "./operations.js";
@@ -107,6 +107,26 @@ export class Predicate extends Operand {
    */
   notIlike(pattern, options) {
     return like(this, "notIlike", pattern, options);
+  }
+
+  /**
+   * `SIMILAR TO`: whether the whole string matches a pattern in SQL's
+   * regular-expression dialect, LIKE's `%` and `_` with `|`, `*`, `+`, `?`,
+   * repetition, grouping and bracket classes; bound, with LIKE's escape.
+   *
+   * @param {string} pattern
+   * @param {{ escape?: string }} [options]
+   */
+  similarTo(pattern, options) {
+    return like(this, "similarTo", pattern, options);
+  }
+
+  /**
+   * @param {string} pattern
+   * @param {{ escape?: string }} [options]
+   */
+  notSimilarTo(pattern, options) {
+    return like(this, "notSimilarTo", pattern, options);
   }
 
   /** @param {unknown} text */

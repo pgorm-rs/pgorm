@@ -340,7 +340,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > backwards and once stood for a render no release before 18 parsed
 > (`[dec:pgorm:invalid-states-unrepresentable]`); that flag MUST NOT return.
 > pgorm targets PostgreSQL 18, the release the oracle parses with and the
-> live server runs (`[spec:pgorm:req:sql.render.oracle+1]`), so a virtual
+> live server runs (`[spec:pgorm:req:sql.render.oracle+2]`), so a virtual
 > column is no longer a render the builder has to keep from 17.
 >
 > What the server refuses around a generated column is the server's
@@ -708,7 +708,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Comment::on_column(table, column, text)` are the only constructors and both
 > take target and text up front, so every `CommentStatement` denotes a
 > complete statement and no build path can fail or panic. The target table is
-> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+5]`) — the same type
+> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+6]`) — the same type
 > every other DDL statement targets, reached through `IntoTableName` from an
 > iden or a `(schema, table)` tuple — so a comment can only name a table the
 > DDL beside it could also name, and there is no conversion to fail.
@@ -1604,7 +1604,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > Table reference shape was the third, and MUST NOT come back
 > either. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
 > and foreign-key targets and comment targets take a `TableName`
-> (`[spec:pgorm:def:sql.types.table-ref+5]`), which has no form the renderer
+> (`[spec:pgorm:def:sql.types.table-ref+6]`), which has no form the renderer
 > could refuse. The five `Not supported` panics and the `TableRef with values
 > is not support` panic that guarded these positions are gone, and a caller
 > cannot reintroduce them: binding an alias makes a reference a `NamedTable`,

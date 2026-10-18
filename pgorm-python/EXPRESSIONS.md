@@ -105,15 +105,25 @@ use PostgreSQL string functions and ordinary Rust value expressions.
 For pattern semantics, use `expr.like(LikePattern(...))`, `not_like`, `ilike`
 or `not_ilike`. The pattern and optional single-character ESCAPE clause
 are handled by Rust's `LikeExpr`; a plain string is rejected at this boundary.
+`similar_to` and `not_similar_to` take the same `LikePattern` for `SIMILAR TO`,
+a whole-string match in SQL's regular-expression dialect (LIKE's `%` and `_`
+with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes); its default
+escape is a backslash.
 
 `call(name, *arguments)` invokes the named Rust `Func` constructor for:
 `lower`, `upper`, `abs`, `char_length`, `count`, `count_distinct`, `sum`, `avg`,
 `min`, `max`, `round`, `coalesce`, `random`, `gen_random_uuid`, and PostgreSQL
-18's `uuidv4`, `uuidv7`, `uuid_extract_timestamp` and `uuid_extract_version`.
+18's `uuidv4`, `uuidv7`, `uuid_extract_timestamp` and `uuid_extract_version`,
+and the set-returning `generate_series` and `unnest` a `TableFunction` reads
+(see [STATEMENTS.md](STATEMENTS.md#table-functions-and-samples)).
 `round` accepts one or two arguments, `coalesce` one or more, `random`,
 `gen_random_uuid` and `uuidv4` none, `uuidv7` none or one (the `interval` its
-embedded time is shifted by, Rust's `Func::uuidv7_shifted`), and the others
-one. A call is an expression wherever one is taken, so
+embedded time is shifted by, Rust's `Func::uuidv7_shifted`), `generate_series`
+two or three (`Func::generate_series`, and `generate_series_step` with its
+step), and the others one. PostgreSQL overloads `generate_series` and `unnest`
+by argument type, and a bound argument carries none, so it is refused as
+ambiguous (`42725`): pass a column, a `literal`, or a bound value with its
+type cast, `bind(1).cast(TypeName("int4"))`. A call is an expression wherever one is taken, so
 `ColumnDef("id", "uuid").default(call("uuidv7"))` gives a table a time-ordered
 key. Unsupported names or argument
 counts raise `UnsupportedCapabilityError`. The capability manifest records

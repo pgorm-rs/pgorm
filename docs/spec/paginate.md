@@ -491,7 +491,7 @@ bound parameter is held to.
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` revision, on PostgreSQL 18's grammar, that the render
-> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+1]`,
+> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+2]`,
 > `[spec:pgorm:def:macros.sql+4]`) — and MUST NOT decide it by inspecting
 > the statement's text. The
 > statement is accepted only when it parses, holds exactly one statement,
@@ -514,14 +514,14 @@ bound parameter is held to.
 > (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
 > and placed in relation position as
 > `FromItem::Template(fragment, "sub_statement")`
-> (`[spec:pgorm:def:sql.types.table-ref+5]`). What the paginator holds is
+> (`[spec:pgorm:def:sql.types.table-ref+6]`). What the paginator holds is
 > then ONE shape — an ordinary `SelectStatement` — for a built source and
 > a raw one alike: the page clauses of `exec.paginator.fetch` and the
 > count wrapper of `exec.paginator.count` are the builder's, and the
 > paginator MUST NOT format SQL text of its own. The rendering, including
 > the newline before the closing parenthesis that keeps a trailing `--`
 > comment from swallowing it, belongs to
-> `[spec:pgorm:req:sql.render.subquery+3]`. Wrapping rather than splicing
+> `[spec:pgorm:req:sql.render.subquery+4]`. Wrapping rather than splicing
 > means `LIMIT` and `OFFSET` land outside the caller's own clauses instead
 > of colliding with them, so a raw statement that already carries
 > `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will not reorder

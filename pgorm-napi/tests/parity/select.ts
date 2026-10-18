@@ -2,8 +2,8 @@
 // with the JavaScript API, and `select.json` holds the SQL and values it must
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
-// [spec:pgorm:req:napi.select/test]
-// [spec:pgorm:req:napi.expressions+1/test]
+// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.expressions+2/test]
 
 import {
   bind,
@@ -13,11 +13,16 @@ import {
   caseWhen,
   col,
   Condition,
+  cube,
   Decimal,
   exists,
+  groupingSet,
+  groupingSets,
+  rollup,
   scalar,
   select,
   Table,
+  tableFunction,
   tuple,
   TypeName,
   Uuid,
@@ -201,6 +206,57 @@ export const cases: Record<string, () => Builder> = {
   "conditions": () =>
     select().from(t).where(Condition.all()).where(Condition.any()).having(Condition.all(col("a").eq(1)).not())
       .where(Condition.any(col("b").eq(2)).add(col("c").eq(3)).add(Condition.all(col("d").eq(4), col("e").eq(5)))),
+  "tie-limit": () =>
+    select(col("id")).from(t).orderBy(col("score").desc()).limitWithTies(5).limit(null).limit(3).limitWithTies(2)
+      .offset(1),
+  "tie-limit-replaced": () => select(col("id")).from(t).orderBy(col("score").desc()).limitWithTies(2).limit(4),
+  "grouping-elements": () =>
+    select(col("a"), col("b"), call("count", col("id")))
+      .from(t)
+      .groupBy(
+        col("a"),
+        rollup(col("a"), col("b")),
+        cube(col("b"), tuple(col("a"), col("b"))),
+        groupingSets(groupingSet(col("a"), col("b")), col("b"), groupingSet(), rollup(col("a"))),
+      )
+      .groupBy(groupingSet(), rollup())
+      .groupByDistinct(),
+  "group-by-distinct-ungrouped": () => select(col("a")).from(t).groupByDistinct(),
+  "similar-to": () =>
+    select().from(t).where(
+      Condition.all(
+        col("a").similarTo("(x|y)%"),
+        col("b").notSimilarTo("!%%", { escape: "!" }),
+        col("c").similarTo("a\\_b", { escape: "\\" }),
+        col("d").similarTo("%z").not(),
+      ),
+    ),
+  "table-function": () => select().from(tableFunction(call("generate_series", 1, 3), { alias: "n" })),
+  "table-function-ordinality": () => {
+    const tags = tableFunction([call("unnest", account.col("tags"))], {
+      alias: "t",
+      ordinality: true,
+      columns: ["tag", "position"],
+    });
+    return select(account.col("id"), tags.col("tag"), tags.col("position")).from(account).crossJoin(tags);
+  },
+  "rows-from": () => {
+    const zipped = tableFunction([call("generate_series", 10, 1, -3), call("unnest", bind(["a", "b", "c"]))], {
+      alias: "r",
+      ordinality: true,
+      columns: ["x", "y", "n"],
+    });
+    const single = tableFunction(call("generate_series", 1, 2), { alias: "s", rowsFrom: true });
+    return select(zipped.star(), single.col("s")).from(zipped).crossJoin(single);
+  },
+  "tablesample": () => {
+    const sampled = account.tablesample("system", 12.5, { repeatable: 42 });
+    const events = new Table("event").tablesample("bernoulli", 50);
+    return select(sampled.col("id"), events.col("kind"))
+      .from(sampled)
+      .join(events, sampled.col("id").eq(events.col("account_id")), { kind: "left" })
+      .lock("share", { of: [sampled] });
+  },
   "expression-inspect": () => col("x").add(bind(new Value(7, "i16"))),
   "condition-inspect": () => Condition.any(col("a").eq(1), col("b").isNull()),
 };

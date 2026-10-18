@@ -1,4 +1,5 @@
 use crate::keywords::Position;
+use crate::query::RowLimit;
 use crate::{
     extension::{
         ExtensionCreateStatement, ExtensionDropOpt, ExtensionDropStatement, TypeAlterAddOpt,
@@ -23,6 +24,8 @@ mod constraint;
 mod copy;
 #[path = "query_builder_cte.rs"]
 mod cte;
+#[path = "query_builder_from_item.rs"]
+mod from_item;
 #[path = "query_builder_generated.rs"]
 mod generated;
 #[path = "query_builder_grouping.rs"]
@@ -59,7 +62,7 @@ macro_rules! truncate_to_microsecond {
 }
 
 // [spec:pgorm:def:sql.render+1]
-// [spec:pgorm:req:sql.render.oracle+1] (the renderer whose every output the oracle in
+// [spec:pgorm:req:sql.render.oracle+2] (the renderer whose every output the oracle in
 // pgorm-query/tests/postgres/oracle.rs holds to the libpg_query grammar)
 #[derive(Debug, Clone, Copy)]
 pub struct QueryBuilder;
@@ -83,7 +86,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+4] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+5] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -219,7 +222,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+4]
+    // [spec:pgorm:req:sql.render.select-order+5]
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_select_statement(
         &self,
@@ -267,6 +270,9 @@ impl QueryBuilder {
 
         if !select.groups.is_empty() {
             write!(sql, " GROUP BY ").unwrap();
+            if select.group_distinct {
+                write!(sql, "DISTINCT ").unwrap();
+            }
             self.prepare_grouping_list(&select.groups, sql);
         }
 
@@ -304,15 +310,26 @@ impl QueryBuilder {
         }
     }
 
-    // Translate the LIMIT and OFFSET expression in [`SelectStatement`]
+    /// Translate the row limit and OFFSET of a [`SelectStatement`]. A tie
+    /// limit takes the place `LIMIT` would, before `OFFSET`, which the
+    /// grammar admits on either side of a `FETCH FIRST`.
+    // [spec:pgorm:req:sql.render.tie-limit]
     pub(crate) fn prepare_select_limit_offset(
         &self,
         select: &SelectStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        if let Some(limit) = &select.limit {
-            write!(sql, " LIMIT ").unwrap();
-            sql.push_param(limit.clone());
+        match &select.limit {
+            Some(RowLimit::Count(limit)) => {
+                write!(sql, " LIMIT ").unwrap();
+                sql.push_param(limit.clone());
+            }
+            Some(RowLimit::WithTies(count)) => {
+                write!(sql, " FETCH FIRST ").unwrap();
+                sql.push_param(count.clone());
+                write!(sql, " ROWS WITH TIES").unwrap();
+            }
+            None => {}
         }
 
         if let Some(offset) = &select.offset {
@@ -404,7 +421,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
-    // [spec:pgorm:req:sql.render.subquery+3] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.subquery+4] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr+3]
     fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
@@ -510,7 +527,7 @@ impl QueryBuilder {
             SimpleExpr::Collate(operand, collation) => {
                 self.prepare_collate(operand, collation, sql);
             }
-            // [spec:pgorm:req:sql.render.grouping]
+            // [spec:pgorm:req:sql.render.grouping+1]
             SimpleExpr::Grouping(grouping) => {
                 write!(sql, "GROUPING").unwrap();
                 self.prepare_tuple(&grouping.args, sql);
@@ -529,7 +546,7 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+5]
+    // [spec:pgorm:def:sql.render.operators+6]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
         if let Some(escape) = like.escape {
@@ -614,7 +631,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`FromItem`] into SQL statement.
-    // [spec:pgorm:req:sql.render.subquery+3] (value-bearing from items carry mandatory aliases)
+    // [spec:pgorm:req:sql.render.subquery+4] (value-bearing from items carry mandatory aliases)
     fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
         match from_item {
             FromItem::Table(table) => self.prepare_named_table(table, sql),
@@ -643,7 +660,7 @@ impl QueryBuilder {
             // otherwise swallow the closing parenthesis. Each resolved value
             // re-enters through `prepare_simple_expr`, so the fragment's own
             // `$N` are renumbered into this statement's parameter space.
-            // [spec:pgorm:req:sql.render.subquery+3]
+            // [spec:pgorm:req:sql.render.subquery+4]
             FromItem::Template(template, alias) => {
                 write!(sql, "(").unwrap();
                 for segment in template.segments() {
@@ -656,6 +673,10 @@ impl QueryBuilder {
                 alias.prepare(sql.as_writer());
             }
             FromItem::JsonTable(table, alias) => self.prepare_json_table(table, alias, sql),
+            FromItem::TableFunction(function, alias) => {
+                self.prepare_table_function(function, alias, sql)
+            }
+            FromItem::TableSample(sample) => self.prepare_table_sample(sample, sql),
         }
     }
 
@@ -691,7 +712,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+5] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+6] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -703,7 +724,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+5]
+    // [spec:pgorm:def:sql.render.operators+6]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -713,6 +734,8 @@ impl QueryBuilder {
                 BinOper::Or => "OR",
                 BinOper::Like => "LIKE",
                 BinOper::NotLike => "NOT LIKE",
+                BinOper::SimilarTo => "SIMILAR TO",
+                BinOper::NotSimilarTo => "NOT SIMILAR TO",
                 BinOper::Is => "IS",
                 BinOper::IsNot => "IS NOT",
                 BinOper::IsDistinctFrom => "IS DISTINCT FROM",
@@ -827,6 +850,8 @@ impl QueryBuilder {
                     Function::UuidV7 => "UUIDV7",
                     Function::UuidExtractTimestamp => "UUID_EXTRACT_TIMESTAMP",
                     Function::UuidExtractVersion => "UUID_EXTRACT_VERSION",
+                    Function::GenerateSeries => "GENERATE_SERIES",
+                    Function::Unnest => "UNNEST",
                     Function::Any => "ANY",
                     Function::Some => "SOME",
                     Function::All => "ALL",
@@ -2333,7 +2358,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`NamedTable`] into SQL statement.
-    // [spec:pgorm:def:sql.types.table-ref+5]
+    // [spec:pgorm:def:sql.types.table-ref+6]
     fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {
@@ -2546,7 +2571,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+8]
+    // [spec:pgorm:def:sql.render.precedence+9]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2613,7 +2638,7 @@ impl QueryBuilder {
 /// "returns boolean", which is why the JSON *existence* tests are here and the
 /// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
 /// not.
-// [spec:pgorm:def:sql.render.precedence+8]
+// [spec:pgorm:def:sql.render.precedence+9]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,

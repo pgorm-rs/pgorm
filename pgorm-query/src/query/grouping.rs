@@ -234,6 +234,43 @@ impl SelectStatement {
         self.groups.push(element.into());
         self
     }
+
+    /// Group by each distinct grouping set once: `GROUP BY DISTINCT`.
+    ///
+    /// A `GROUP BY` list stands for every combination of its items' sets,
+    /// and two combinations can name the same set — `ROLLUP (a, b), ROLLUP
+    /// (a)` reaches `(a)` three ways — so each such set yields its groups
+    /// that many times. `DISTINCT` removes the repeats before grouping. It
+    /// applies to the whole list, whichever call adds to it, and over a list
+    /// with no repeated set it changes nothing; with no `GROUP BY` at all it
+    /// renders nothing, as there is no list to deduplicate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .column(Glyph::Aspect)
+    ///     .from(Glyph::Table)
+    ///     .group_by_element(GroupingElement::rollup([
+    ///         Expr::col(Glyph::Aspect),
+    ///         Expr::col(Glyph::Image),
+    ///     ]))
+    ///     .group_by_element(GroupingElement::rollup([Expr::col(Glyph::Aspect)]))
+    ///     .group_by_distinct()
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "aspect" FROM "glyph" GROUP BY DISTINCT ROLLUP ("aspect", "image"), ROLLUP ("aspect")"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ast.select.group-distinct]
+    pub fn group_by_distinct(&mut self) -> &mut Self {
+        self.group_distinct = true;
+        self
+    }
 }
 
 /// `GROUPING(a, b, …)`: which of its arguments the current row's grouping set

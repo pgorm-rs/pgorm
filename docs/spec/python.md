@@ -115,10 +115,11 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions+1]
+> [spec:pgorm:req:python.expressions+2]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
-> LIKE patterns, function calls and qualified casts through Rust builders.
+> LIKE and SIMILAR TO patterns, function calls and qualified casts through
+> Rust builders.
 > SQL/JSON's query functions, constructors, `FORMAT JSON` and `IS JSON` MUST
 > lower into the corresponding `pgorm_query` builders, each clause applied
 > through the builder's own method. Their behaviours MUST be typed per
@@ -140,10 +141,27 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+4]
+> [spec:pgorm:req:python.statements+5]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
+> A SELECT MUST reach `sql.ast.select`'s clauses beyond those through the
+> Rust builder's own methods: `GroupingElement`'s `set`, `empty`, `rollup`,
+> `cube` and `sets` — `sets` taking its first element, so an empty
+> `GROUPING SETS` cannot be built — beside the expressions `group_by` takes,
+> and `group_by_distinct` (`sql.ast.select.grouping`,
+> `sql.ast.select.group-distinct`); `limit_with_ties`, sharing `limit`'s
+> slot, and refused with no ORDER BY or beside SKIP LOCKED by Rust's
+> `check_tie_limit`, as a `ConstructionError`, when the statement is
+> inspected or executed, since the order may be added after the limit, and
+> as a method reads it into another statement — a CTE body, a subquery —
+> since nothing can order it after (`sql.ast.select.tie-limit`); a
+> `TableFunction` FROM item over function calls, `ROWS FROM` over several,
+> `WITH ORDINALITY` and its column names, the calls built by `call`, whose
+> vocabulary reaches `generate_series` and `unnest`, and any other expression
+> refused (`sql.ast.select.table-function`); and a table's `tablesample`, a
+> `SampleMethod`, a percentage and an optional seed, both bound
+> (`sql.ast.select.table-sample`).
 > A SELECT's FROM list and joins MUST take a FROM item that is not a named
 > table: `JSON_TABLE`, lowered into `Func::json_table` with each column kind's
 > own clauses and behaviours as the Rust builder types them, its first column

@@ -64,7 +64,7 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoTableName` maps iden / 2-tuple
+// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
@@ -77,7 +77,7 @@ fn into_table_name_maps_the_two_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoNamedTable` maps the same spellings to an
+// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoNamedTable` maps the same spellings to an
 // unaliased named table, and a `TableName` or `NamedTable` passes through
 #[test]
 fn into_named_table_maps_the_named_forms() {
@@ -111,7 +111,7 @@ fn into_named_table_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    `IntoFromItem` widens every named spelling, and
+// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoFromItem` widens every named spelling, and
 // a `TableName` or `NamedTable` converts infallibly
 #[test]
 fn into_from_item_maps_the_named_forms() {
@@ -139,7 +139,7 @@ fn into_from_item_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    `alias` binds an alias and replaces an existing
+// [spec:pgorm:def:sql.types.table-ref+6/test]    `alias` binds an alias and replaces an existing
 // one, on the named form and on the value-producing forms alike
 #[test]
 fn from_item_alias_adds_or_replaces() {
@@ -182,7 +182,7 @@ fn from_item_alias_adds_or_replaces() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    a column of a from item is qualified by its
+// [spec:pgorm:def:sql.types.table-ref+6/test]    a column of a from item is qualified by its
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
@@ -217,7 +217,7 @@ fn from_item_qualifier_prefers_the_alias() {
     assert_eq!(template.table_name(), None);
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    the named form renders as dotted, quoted parts
+// [spec:pgorm:def:sql.types.table-ref+6/test]    the named form renders as dotted, quoted parts
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
@@ -246,7 +246,7 @@ fn named_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    the write statements take the same named table,
+// [spec:pgorm:def:sql.types.table-ref+6/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+3/test]
 // [spec:pgorm:req:sql.ast.update+5/test]
@@ -284,7 +284,7 @@ fn aliased_dml_targets_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+6/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
 fn value_producing_from_item_forms_render() {
@@ -334,10 +334,10 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+5/test]    a fragment in relation position keeps its
+// [spec:pgorm:def:sql.types.table-ref+6/test]    a fragment in relation position keeps its
 // non-marker text verbatim and renumbers its markers into the enclosing statement's parameter
 // space, so it composes with a statement that binds values of its own
-// [spec:pgorm:req:sql.render.subquery+3/test]
+// [spec:pgorm:req:sql.render.subquery+4/test]
 #[test]
 fn template_from_item_renumbers_into_the_enclosing_statement() {
     let fragment = SqlTemplate::from_sql(
@@ -431,7 +431,7 @@ fn template_from_sql_reads_real_sql() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+4/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+5/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -442,7 +442,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+4/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+5/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -517,7 +517,7 @@ fn the_binary_operator_vocabulary_is_complete() {
     }
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]    the null-safe comparisons join the IS family,
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]    the null-safe comparisons join the IS family,
 // so they render bare under a logical operator rather than parenthesised
 #[test]
 fn null_safe_comparisons_bind_like_the_is_family() {
@@ -536,7 +536,7 @@ fn null_safe_comparisons_bind_like_the_is_family() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]    SYMMETRIC is part of the operator, so the
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]    SYMMETRIC is part of the operator, so the
 // ternary's `AND` still unwraps and the bounds render bare
 #[test]
 fn symmetric_between_keeps_its_bounds_unparenthesised() {
@@ -558,7 +558,7 @@ fn symmetric_between_keeps_its_bounds_unparenthesised() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]    AT TIME ZONE takes an ordinary expression on
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]    AT TIME ZONE takes an ordinary expression on
 // the right, so a bound zone name and a column both reach it
 #[test]
 fn at_time_zone_takes_any_zone_expression() {

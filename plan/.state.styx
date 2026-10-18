@@ -1930,6 +1930,27 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.ast.cast-shape}
     )}
+    {id sql-select-extras, covered_rules (
+        exec.tie-limit
+        sql.ast.expr.similar-to
+        sql.ast.select.group-distinct
+        sql.ast.select.table-function
+        sql.ast.select.table-sample
+        sql.ast.select.tie-limit
+        sql.render.table-function
+        sql.render.table-sample
+        sql.render.tie-limit
+    ), covered_claims (
+        {impl_name main, rule exec.tie-limit}
+        {impl_name main, rule sql.ast.expr.similar-to}
+        {impl_name main, rule sql.ast.select.group-distinct}
+        {impl_name main, rule sql.ast.select.table-function}
+        {impl_name main, rule sql.ast.select.table-sample}
+        {impl_name main, rule sql.ast.select.tie-limit}
+        {impl_name main, rule sql.render.table-function}
+        {impl_name main, rule sql.render.table-sample}
+        {impl_name main, rule sql.render.tie-limit}
+    )}
     {id sql-views, covered_rules (
         napi.schema-views
         python.schema-views

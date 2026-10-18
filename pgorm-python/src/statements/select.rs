@@ -1,7 +1,12 @@
 use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement};
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{common, from_item::from_item, window::PyWindow};
+use super::{
+    common,
+    from_item::from_item,
+    grouping::{self, Grouped},
+    window::PyWindow,
+};
 use crate::{errors::ConstructionError, expressions::Compiled, identifiers::PyIdentifier};
 
 /// Join kinds which require an ON condition; CROSS JOIN has its own method.
@@ -25,12 +30,31 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+4]
+// [spec:pgorm:req:python.statements+5]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PySelect {
     pub inner: SelectStatement,
+}
+
+impl PySelect {
+    /// Refuse a tie limit PostgreSQL's grammar would refuse, with Rust's
+    /// `check_tie_limit`, which rendering leaves to its caller.
+    fn check_tie_limit(&self) -> PyResult<()> {
+        self.inner
+            .check_tie_limit()
+            .map_err(|error| ConstructionError::new_err(error.to_string()))
+    }
+
+    // [spec:pgorm:req:python.statements+5]
+    /// The statement as another builder reads it — a CTE body, a subquery.
+    /// Nothing can order it once it is embedded, so its tie limit is checked
+    /// as it is read rather than left to the server.
+    pub(crate) fn embedded(&self) -> PyResult<SelectStatement> {
+        self.check_tie_limit()?;
+        Ok(self.inner.clone())
+    }
 }
 
 #[pymethods]
@@ -89,11 +113,30 @@ impl PySelect {
         Ok(next)
     }
 
-    #[pyo3(signature = (*expressions))]
-    fn group_by(&self, expressions: &Bound<'_, PyTuple>) -> PyResult<Self> {
+    // [spec:pgorm:req:python.statements+5]
+    /// Append to the GROUP BY list, in call order: an expression is a set of
+    /// one, and a `GroupingElement` is `()`, a parenthesised set, `ROLLUP`,
+    /// `CUBE` or `GROUPING SETS`.
+    #[pyo3(signature = (*items))]
+    fn group_by(&self, items: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.add_group_by(common::expressions(expressions)?);
+        for item in items.iter() {
+            match grouping::element(&item)? {
+                Grouped::Expr(expr) => next.inner.add_group_by([expr]),
+                Grouped::Element(element) => next.inner.group_by_element(element),
+            };
+        }
         Ok(next)
+    }
+
+    // [spec:pgorm:req:python.statements+5]
+    /// `GROUP BY DISTINCT`: each grouping set the list names more than once
+    /// is grouped once. It quantifies the whole list, and renders nothing
+    /// while there is no GROUP BY.
+    fn group_by_distinct(&self) -> Self {
+        let mut next = self.clone();
+        next.inner.group_by_distinct();
+        next
     }
 
     fn having(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -109,6 +152,7 @@ impl PySelect {
         Ok(next)
     }
 
+    /// `LIMIT n`, replacing a tie limit; `None` clears either.
     fn limit(&self, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         if value.is_none() {
@@ -116,6 +160,17 @@ impl PySelect {
         } else {
             next.inner.limit(common::unsigned(value)?);
         }
+        Ok(next)
+    }
+
+    // [spec:pgorm:req:python.statements+5]
+    /// `FETCH FIRST n ROWS WITH TIES`: the first `count` rows and every row
+    /// tied with the last of them on the ORDER BY, in `limit`'s slot. It
+    /// needs an ORDER BY, which may come later in the chain, so the check is
+    /// made when the statement is inspected or executed.
+    fn limit_with_ties(&self, count: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut next = self.clone();
+        next.inner.limit_with_ties(common::unsigned(count)?);
         Ok(next)
     }
 
@@ -152,7 +207,11 @@ impl PySelect {
         next
     }
 
+    // [spec:pgorm:req:python.statements+5]
+    /// Every execution path renders through this method, so the tie-limit
+    /// check Rust leaves to the caller is made here, before any SQL exists.
     pub fn inspect(&self) -> PyResult<Compiled> {
+        self.check_tie_limit()?;
         common::compiled(self.inner.build())
     }
 

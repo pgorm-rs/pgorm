@@ -42,19 +42,96 @@ requires at least one item. `.from_` adds a source; a second is comma-joined.
 `.join` requires both the source and ON expression/condition and accepts
 `Join.Inner`, `Left`, `Right` or `Full`; `.cross_join` takes just its source.
 
-A source is a `Table` or a `FromItem`, a `FROM` item that is not a named table.
-`json_table` builds one (see [EXPRESSIONS.md](EXPRESSIONS.md#json_table)). A
+A source is a `Table` or a `FromItem`, a `FROM` item that is not a plain named
+table. `json_table` builds one (see [EXPRESSIONS.md](EXPRESSIONS.md#json_table)),
+as do a `TableFunction` and a table's `tablesample` (below). A value-producing
 `FromItem` always has an alias, as PostgreSQL requires of such items, so
 `item.col(name)` and `item.star()` qualify its columns by a name the caller
-chose. Anything else raises `ConstructionError`.
+chose; a sampled table is qualified by its alias, or by its unqualified name
+when it has none. Anything else raises `ConstructionError`.
 
 Repeated `.where_` and `.having` calls combine conditions through the Rust
-condition builder. `.group_by` accepts expressions, `.order_by` accepts typed
-`OrderBy` objects, and `.distinct()` sets Rust's DISTINCT option.
+condition builder. `.order_by` accepts typed `OrderBy` objects, and
+`.distinct()` sets Rust's DISTINCT option.
 Limits and offsets use the actual Rust `u64` builder methods, restricted to
 PostgreSQL's non-negative signed-bigint range. Booleans, floats, strings,
 negative values and overflow raise `ConstructionError`. Pass `None` to
 `limit` or `offset` to reset that clause.
+
+`.limit_with_ties(count)` is `FETCH FIRST count ROWS WITH TIES`: the first
+`count` rows and every further row tied with the last of them on the ORDER BY.
+It takes `limit`'s count and shares its slot (Rust's `limit_with_ties`), so
+either replaces the other and `limit(None)` clears both. The ties are
+measured on the ORDER BY, which may be added later in the chain, so the
+statement is checked — by Rust's `check_tie_limit` — when it is inspected or
+executed: one with no ORDER BY raises `ConstructionError` before any SQL is
+sent. A SELECT read into another statement, a `With` body or
+`json_array_query`'s subquery, can no longer be ordered, so it is checked as
+it is read.
+
+## Grouping
+
+`.group_by(*items)` appends to the GROUP BY list in call order. An item is an
+expression, a grouping set of that one expression, or a `GroupingElement`,
+built by the Rust constructor of the same name:
+
+| Python | SQL |
+| --- | --- |
+| `GroupingElement.set(a, b)` | `(a, b)`; one expression renders bare, none renders `()` |
+| `GroupingElement.empty()` | `()`, the whole input as one group |
+| `GroupingElement.rollup(a, b)` | `ROLLUP (a, b)`: the sets `(a, b)`, `(a)` and `()` |
+| `GroupingElement.cube(a, b)` | `CUBE (a, b)`: every subset of the list |
+| `GroupingElement.sets(first, *rest)` | `GROUPING SETS (..)` over elements or expressions |
+
+`sets` takes its first element, so the empty `GROUPING SETS` PostgreSQL
+refuses cannot be built. The list groups by every combination of its items'
+sets, and two combinations can name the same set: `ROLLUP (a, b), ROLLUP (a)`
+reaches `(a)` three ways, grouping its rows three times. `.group_by_distinct()`
+is `GROUP BY DISTINCT`, which groups each set once; it renders nothing while
+there is no GROUP BY.
+
+```python
+from pgorm import GroupingElement as G, Table, call, select
+
+sales = Table("sales")
+region, product = sales.col("region"), sales.col("product")
+totals = (select(region, product, call("sum", sales.col("amount")))
+          .from_(sales)
+          .group_by(G.rollup(region, product), G.rollup(region))
+          .group_by_distinct())
+```
+
+## Table functions and samples
+
+`TableFunction(call)` reads a set-returning function as a relation. Its call
+is an expression `call(..)` built — `call("generate_series", ..)` and
+`call("unnest", ..)` among them, see [EXPRESSIONS.md](EXPRESSIONS.md) — and any
+other expression raises `ConstructionError`. `.and_(call)` reads another call
+beside it, which makes it `ROWS FROM (..)`, the shorter calls padded with NULL;
+`TableFunction.rows_from(call)` starts one explicitly. `.with_ordinality()`
+adds a final `bigint` column numbering the rows from 1, `.columns(*names)`
+names the columns in the alias, the ordinal last, and `.alias(name)` finishes
+it as the `FromItem` that `from_` and the joins take. A function in FROM may
+read the columns of the items before it.
+
+```python
+from pgorm import SampleMethod, Table, TableFunction, call, select
+
+post = Table("post", alias="p")
+tags = TableFunction(call("unnest", post.col("tags"))).with_ordinality().columns("tag", "n").alias("t")
+numbered = select(post.col("id"), tags.col("tag"), tags.col("n")).from_(post).from_(tags)
+
+sample = Table("event").tablesample(SampleMethod.Bernoulli, 10, repeatable=42)
+some = select(sample.col("id")).from_(sample)
+```
+
+`table.tablesample(method, percentage, *, repeatable=None)` reads the table
+through `TABLESAMPLE`, Rust's `TableSample`: `SampleMethod.Bernoulli` draws
+each row, `SampleMethod.System` each page, with probability `percentage` out
+of 100, and `repeatable` seeds the draw so the same seed over unchanged data
+draws the same sample. Both numbers are `int` or `float` and are bound; an
+`int` a double cannot hold exactly raises `ConstructionError`, and a
+percentage outside 0 to 100 is PostgreSQL's refusal (`2202H`).
 
 ## Window functions
 

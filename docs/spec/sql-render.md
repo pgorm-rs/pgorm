@@ -40,7 +40,7 @@ an ideal Postgres renderer would emit.
 
 ## Render conformance
 
-> [spec:pgorm:req:sql.render.oracle+1]
+> [spec:pgorm:req:sql.render.oracle+2]
 > Every string `QueryBuilder` renders — through the `to_string()` path with
 > literals inlined, or through the `build()` path with `$N` placeholders — MUST
 > parse under the PostgreSQL grammar. The contract is enforced inside the test
@@ -75,6 +75,12 @@ an ideal Postgres renderer would emit.
 > misapplied type modifiers (`money(12, 2)`), an empty select list
 > (`SELECT  FROM "t"`, which is valid PostgreSQL), and cross-database references
 > all pass. The live-Postgres integration suite remains the semantic oracle.
+>
+> One shape renders text the grammar refuses by design rather than by defect:
+> a tie limit with no ORDER BY or beside `SKIP LOCKED`, which no type keeps
+> out and which `check_tie_limit` refuses before every pgorm, Python and
+> JavaScript path renders (`sql.ast.select.tie-limit`). Its render is held
+> rejected, with the parser's message, beside the check that refuses it.
 >
 > Known exceptions MUST be pinned, not skipped. Each render the grammar rejects
 > today has an `oracle_pins_*` test in
@@ -281,9 +287,10 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+5]
+> [spec:pgorm:def:sql.render.operators+6]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
-> `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `IS`, `IS NOT`,
+> `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `SIMILAR TO`,
+> `NOT SIMILAR TO`, `IS`, `IS NOT`,
 > `IS DISTINCT FROM`, `IS NOT DISTINCT FROM`, `IN`,
 > `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `BETWEEN SYMMETRIC`,
 > `NOT BETWEEN SYMMETRIC`, `AS`. Comparison: `=`, `<>`,
@@ -309,11 +316,12 @@ an ideal Postgres renderer would emit.
 > JSON operator it is and nothing in the client rewrites it.
 >
 > `ESCAPE` is not an operator: it is grammatical only as the tail of a `LIKE`
-> / `ILIKE` pattern, so it renders from `SimpleExpr::LikePattern` — the
-> pattern as a value, then ` ESCAPE ` and the escape character as an inline
-> constant — and there is no `BinOper` that could place it anywhere else.
+> / `ILIKE` / `SIMILAR TO` pattern, so it renders from
+> `SimpleExpr::LikePattern` — the pattern as a value, then ` ESCAPE ` and the
+> escape character as an inline constant — and there is no `BinOper` that
+> could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+8]
+> [spec:pgorm:def:sql.render.precedence+9]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -335,8 +343,10 @@ an ideal Postgres renderer would emit.
 > operator is logical (`AND`/`OR`/`NOT`). Each of those families is the whole
 > family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
 > `SYMMETRIC` forms, and IS is `IS`, `IS NOT`, `IS DISTINCT FROM` and
-> `IS NOT DISTINCT FROM` — a new operator added to one of these lexemes but
-> not to its `Oper` predicate is the failure mode this clause exists to name.
+> `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `SIMILAR TO` and
+> `NOT SIMILAR TO`, which the grammar ranks together — a new operator added to
+> one of these lexemes but not to its `Oper` predicate is the failure mode
+> this clause exists to name.
 > The Postgres-specific extension also
 > treats an inner `@>`, `<@`, `%` (similarity), `<%`, `<<%`, `@@`, `?`, `?|`,
 > or `?&` comparison as higher precedence than a logical outer operator — the
@@ -396,7 +406,7 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+4]
+> [spec:pgorm:req:sql.render.select-order+5]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
 > through the same `prepare_with_clause` the three write statements use and
@@ -404,11 +414,12 @@ an ideal Postgres renderer would emit.
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
-> expression per join; the WHERE condition; ` GROUP BY ` and its grouping
-> elements (`sql.render.grouping`); the
+> expression per join; the WHERE condition; ` GROUP BY `, its `DISTINCT`
+> when set, and its grouping elements (`sql.render.grouping`); the
 > HAVING condition; the optional named window declaration
 > ` WINDOW "name" AS ( … )`; any union clauses; ` ORDER BY ` expressions;
-> ` LIMIT $N`; ` OFFSET $N`; and the row-locking clause. The window
+> the row limit, ` LIMIT $N` or a tie limit in its place
+> (`sql.render.tie-limit`); ` OFFSET $N`; and the row-locking clause. The window
 > declaration belongs to the same query level as HAVING, so it MUST precede
 > the set operations and the ORDER BY/LIMIT/OFFSET/locking tail that apply to
 > the combined result — that is the position PostgreSQL's grammar requires,
@@ -438,6 +449,30 @@ an ideal Postgres renderer would emit.
 > A lock clause renders as `FOR ` plus `UPDATE`, `NO KEY UPDATE`, `SHARE`, or
 > `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
 > are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
+
+> [spec:pgorm:req:sql.render.tie-limit]
+> A tie limit MUST render ` FETCH FIRST $N ROWS WITH TIES` in the place
+> ` LIMIT $N` takes, its count a parameter as LIMIT's is, and an OFFSET
+> follows it as it follows `LIMIT` — the grammar admits OFFSET on either side
+> of a `FETCH FIRST`. Rendering does not consult `check_tie_limit`: a tie
+> limit with no ORDER BY, or beside `SKIP LOCKED`, renders the same text,
+> which the grammar refuses (`sql.ast.select.tie-limit`,
+> `sql.render.oracle`).
+
+> [spec:pgorm:req:sql.render.table-function]
+> A `FromItem::TableFunction` MUST render each call as a function call does
+> in FROM — its name, then its arguments parenthesised — comma-separated
+> inside `ROWS FROM (` … `)` when it is a `ROWS FROM`; then
+> ` WITH ORDINALITY` when it numbers its rows; then ` AS "alias"`, and the
+> column names parenthesised directly after the alias, `AS "t"("a", "b")`,
+> when it names them. The calls' arguments are bound as any argument is.
+
+> [spec:pgorm:req:sql.render.table-sample]
+> A `FromItem::TableSample` MUST render the sampled table as a named table
+> renders — its name, then ` AS "alias"` when one is bound, since the grammar
+> puts the alias before the clause — then ` TABLESAMPLE BERNOULLI (` or
+> ` TABLESAMPLE SYSTEM (`, the percentage as a parameter, and `)`; then, when
+> seeded, ` REPEATABLE (`, the seed as a parameter, and `)`.
 
 > [spec:pgorm:req:sql.render.window+5]
 > A window specification is never emitted bare: `prepare_window_spec` wraps it
@@ -593,17 +628,19 @@ an ideal Postgres renderer would emit.
 > context item, a `PASSING` value and a `DEFAULT` render as they do in the
 > query functions — typed and bound, typed and bound, and an escaped literal.
 
-> [spec:pgorm:req:sql.render.subquery+3]
+> [spec:pgorm:req:sql.render.subquery+4]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
 > `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
 > A `SimpleExpr::Tuple` renders `(e1, e2, …)`; `SimpleExpr::Values` renders
 > `(v1, v2, …)` with each element parameterized. As a FROM item,
 > `FromItem::SubQuery` renders `(SELECT …) AS "alias"`, `FromItem::ValuesList`
 > renders `(VALUES (…), (…)) AS "alias"`, `FromItem::FunctionCall` renders
-> `func(args) AS "alias"`, and `FromItem::JsonTable` renders per
-> `sql.render.json-table`; all such forms carry mandatory aliases, and
+> `func(args) AS "alias"`, `FromItem::JsonTable` renders per
+> `sql.render.json-table` and `FromItem::TableFunction` per
+> `sql.render.table-function`; all such forms carry mandatory aliases, and
 > `FromItem::Table` renders its `TableName` followed by ` AS "alias"` when an
-> alias is bound. Contexts that require a plain identifier reference — DDL
+> alias is bound, as `FromItem::TableSample` does before its sampling clause
+> (`sql.render.table-sample`). Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
 > a value-bearing reference never reaches them
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
@@ -829,9 +866,11 @@ an ideal Postgres renderer would emit.
 
 ## Grouping sets
 
-> [spec:pgorm:req:sql.render.grouping]
+> [spec:pgorm:req:sql.render.grouping+1]
 > The GROUP BY list MUST render ` GROUP BY ` and its elements
-> comma-separated, and nothing at all when it is empty. A set of one
+> comma-separated, and nothing at all when it is empty — its `DISTINCT`
+> quantifier included, which renders `DISTINCT ` between the keyword and the
+> first element (`sql.ast.select.group-distinct`). A set of one
 > expression renders that expression bare, so a list built only from the
 > plain group-by methods is byte-identical to the flat expression list it
 > replaced; a set of several renders them parenthesised, `("a", "b")`, and the
@@ -947,7 +986,7 @@ an ideal Postgres renderer would emit.
 > `SqlTemplate::from_sql(sql, values)` is the second constructor, for text
 > that is real SQL rather than a template authored for this machinery — a
 > caller's own statement, which is where relation-position fragments come
-> from (`[spec:pgorm:def:sql.types.table-ref+5]`). It differs in the `$`
+> from (`[spec:pgorm:def:sql.types.table-ref+6]`). It differs in the `$`
 > grammar and in nothing else: only `$N` is a substitution, and every other
 > `$` is reproduced verbatim — `$$` included, because in real SQL `$$` opens
 > a dollar-quoted body rather than standing in for a literal `$`. This is

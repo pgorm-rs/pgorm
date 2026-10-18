@@ -4,12 +4,15 @@ mod capabilities;
 mod common;
 mod conflict;
 mod from_item;
+mod grouping;
 mod insert;
 mod merge;
 mod merge_action;
 mod raw;
 mod select;
 mod table;
+mod table_function;
+mod table_sample;
 #[cfg(test)]
 mod tests;
 mod window;
@@ -21,6 +24,7 @@ pub(crate) use common::condition;
 pub(crate) use conflict::clause as conflict_clause;
 pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
 pub use from_item::PyFromItem;
+pub use grouping::PyGroupingElement;
 pub use insert::PyInsert;
 pub use merge::{PyMerge, PyPendingMerge};
 pub use merge_action::{
@@ -30,6 +34,8 @@ use pyo3::prelude::*;
 pub use raw::RawSQL;
 pub use select::{Join, PySelect};
 pub use table::PyTable;
+pub use table_function::PyTableFunction;
+pub use table_sample::PySampleMethod;
 pub(crate) use window::WindowCall;
 pub use window::{
     PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing, PyFramePreceding, PyFrameType,
@@ -76,6 +82,9 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyTable>()?;
     module.add_class::<PyFromItem>()?;
+    module.add_class::<PyTableFunction>()?;
+    module.add_class::<PySampleMethod>()?;
+    module.add_class::<PyGroupingElement>()?;
     module.add_class::<PyFrameType>()?;
     module.add_class::<PyFrameExclusion>()?;
     module.add_class::<PyFrame>()?;

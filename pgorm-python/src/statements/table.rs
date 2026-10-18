@@ -1,6 +1,10 @@
 use pgorm::pgorm_query::{ColumnRef, NamedTable, TableName};
 use pyo3::prelude::*;
 
+use super::{
+    from_item::PyFromItem,
+    table_sample::{PySampleMethod, sample},
+};
 use crate::{expressions::PyExpr, identifiers::PyIdentifier};
 
 /// A runtime table name and optional alias, owned by Rust's NamedTable.
@@ -56,6 +60,23 @@ impl PyTable {
             pgorm::pgorm_query::Expr::col(ColumnRef::TableAsterisk(self.inner.qualifier().clone()))
                 .into(),
         )
+    }
+
+    // [spec:pgorm:req:python.statements+5]
+    /// This table read through `TABLESAMPLE`, a `FromItem` qualified by the
+    /// table's alias, or by its unqualified name: `method` draws each row
+    /// (or page) with probability `percentage` out of 100, and `repeatable`
+    /// seeds the draw.
+    #[pyo3(signature = (method, percentage, *, repeatable=None))]
+    fn tablesample(
+        &self,
+        method: PySampleMethod,
+        percentage: &Bound<'_, PyAny>,
+        repeatable: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyFromItem> {
+        Ok(PyFromItem {
+            inner: sample(&self.inner, &method, percentage, repeatable)?,
+        })
     }
 
     #[getter]

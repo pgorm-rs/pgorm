@@ -1,14 +1,21 @@
 //! Tables and the other FROM items: a named table with its schema and alias,
-//! and an aliased subquery. A FROM item that is not a named table always has
-//! an alias, as PostgreSQL requires, so its columns are qualified by a name
-//! the caller chose.
+//! a table read through `TABLESAMPLE`, an aliased subquery and set-returning
+//! functions read as a relation. A FROM item that is not a named table always
+//! has an alias, as PostgreSQL requires, so its columns are qualified by a
+//! name the caller chose.
 
 use neon::prelude::*;
-use pgorm::pgorm_query::{ColumnRef, Expr, FromItem, NamedTable, TableName};
+use pgorm::pgorm_query::{
+    ColumnRef, Expr, FromItem, FunctionCall, NamedTable, SampleMethod, SimpleExpr, TableFunction,
+    TableName, TableSample,
+};
 
 use super::{
     Node,
-    args::{arg, name_at, optional_name, refuse, select_at, this},
+    args::{
+        absent, arg, choice, flag, items, list, name, name_at, optional_name, refuse, select_at,
+        this,
+    },
 };
 
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
@@ -16,11 +23,13 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
     ("tableAlias", table_alias),
     ("tableCol", table_col),
     ("tableStar", table_star),
+    ("tableSample", table_sample),
+    ("tableFunction", table_function),
     ("fromSubquery", from_subquery),
 ];
 
 /// `tableNew(name, schema, alias)`.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 fn table_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let schema = arg(cx, 1);
@@ -85,11 +94,103 @@ fn table_star(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `fromSubquery(select, alias)`: `(SELECT ..) AS "alias"`.
-// [spec:pgorm:req:napi.select]
+// [spec:pgorm:req:napi.select+1]
 fn from_subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
     let select = select_at(cx, 0)?;
     let alias = name_at(cx, 1)?;
     Ok(Node::FromItem(FromItem::SubQuery(select, alias)))
+}
+
+/// A sampling argument: any JavaScript number, bound and left to the server
+/// to judge, whose refusal a percentage outside 0 to 100 is (`2202H`).
+fn sample_number(cx: &mut FunctionContext, index: usize, what: &str) -> NeonResult<f64> {
+    let value = arg(cx, index);
+    match value.downcast::<JsNumber, _>(cx) {
+        Ok(number) => Ok(number.value(cx)),
+        Err(_) => refuse(cx, format!("a sample's {what} is a number")),
+    }
+}
+
+/// `tableSample(table, method, percentage, seed)`: the table read through
+/// `TABLESAMPLE BERNOULLI` or `SYSTEM`, its percentage and optional
+/// `REPEATABLE` seed bound. The table keeps its schema and alias, the name
+/// the item answers to.
+// [spec:pgorm:req:napi.select+1]
+fn table_sample(cx: &mut FunctionContext) -> NeonResult<Node> {
+    let Node::Table(table) = this(cx, 0)? else {
+        return refuse(cx, "only a Table is sampled");
+    };
+    let method = match choice(cx, 1, "a sampling method", &["bernoulli", "system"])? {
+        "bernoulli" => SampleMethod::Bernoulli,
+        _ => SampleMethod::System,
+    };
+    let percentage = sample_number(cx, 2, "percentage")?;
+    let mut sample = TableSample::new(table, method, percentage);
+    let seed = arg(cx, 3);
+    if !absent(cx, seed) {
+        sample = sample.repeatable(sample_number(cx, 3, "seed")?);
+    }
+    Ok(Node::FromItem(sample.into()))
+}
+
+/// A call a table function reads: a function call `call()` made, and no
+/// other expression, since PostgreSQL's `func_table` takes only calls.
+fn table_call<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<FunctionCall> {
+    match super::args::node(cx, value) {
+        Some(Node::Expr(SimpleExpr::FunctionCall(call))) => Ok(call),
+        Some(other) => {
+            let what = other.describe();
+            refuse(
+                cx,
+                format!("a table function reads a function call, not {what}"),
+            )
+        }
+        None => refuse(cx, "a table function reads a function call: call(name, ..)"),
+    }
+}
+
+/// `tableFunction(calls, alias, ordinality, columns, rowsFrom)`: at least one
+/// set-returning call as an aliased FROM item — `ROWS FROM (..)` when there
+/// are several or `rowsFrom` says, numbered `WITH ORDINALITY` when asked,
+/// its columns named in the alias.
+// [spec:pgorm:req:napi.select+1]
+fn table_function(cx: &mut FunctionContext) -> NeonResult<Node> {
+    let mut calls = Vec::new();
+    for value in list(cx, 0)? {
+        calls.push(table_call(cx, value)?);
+    }
+    let mut calls = calls.into_iter();
+    let Some(first) = calls.next() else {
+        return refuse(cx, "a table function reads at least one call");
+    };
+    let alias = arg(cx, 1);
+    if absent(cx, alias) {
+        return refuse(
+            cx,
+            "a table function needs its alias, as every FROM item that is not a table does",
+        );
+    }
+    let alias = name(cx, alias)?;
+    let mut function = if flag(cx, 4)? {
+        TableFunction::rows_from(first)
+    } else {
+        TableFunction::new(first)
+    };
+    for call in calls {
+        function = function.and(call);
+    }
+    if flag(cx, 2)? {
+        function = function.with_ordinality();
+    }
+    let columns = arg(cx, 3);
+    if !absent(cx, columns) {
+        let mut names = Vec::new();
+        for column in items(cx, columns)? {
+            names.push(name(cx, column)?);
+        }
+        function = function.columns(names);
+    }
+    Ok(Node::FromItem(function.alias(alias)))
 }
 
 /// The FROM item a `Table` or FROM-item argument stands for.

@@ -4,9 +4,10 @@ use std::str::FromStr;
 
 use pgorm::pgorm_query::{
     ArrayType, Asterisk, BinOper, ColumnRef, CommonTableExpression, Condition, Cycle, Expr,
-    FromItem, Func, JoinType, LikeExpr, LockBehavior, LockType, NamedTable, NullOrdering, Order,
-    Query, RecursiveWithClause, Search, SearchOrder, SelectStatement, SimpleExpr,
-    SubQueryStatement, Subscript, TableName, TypeName, UnionType, Value, Values, WithClause,
+    FromItem, Func, GroupingElement, JoinType, LikeExpr, LockBehavior, LockType, NamedTable,
+    NullOrdering, Order, Query, RecursiveWithClause, SampleMethod, Search, SearchOrder,
+    SelectStatement, SimpleExpr, SubQueryStatement, Subscript, TableFunction, TableName,
+    TableSample, TypeName, UnionType, Value, Values, WithClause,
 };
 
 use super::n;
@@ -422,6 +423,105 @@ fn conditions() -> SelectStatement {
         .to_owned()
 }
 
+fn ordered_ids() -> SelectStatement {
+    Query::select()
+        .expr(col!("id"))
+        .from(table!("t"))
+        .order_by_expr(col!("score"), Order::Desc)
+        .to_owned()
+}
+
+fn grouping_elements() -> SelectStatement {
+    let sets = GroupingElement::sets(GroupingElement::set([col!("a"), col!("b")]))
+        .add(GroupingElement::set([col!("b")]))
+        .add(GroupingElement::empty())
+        .add(GroupingElement::rollup([col!("a")]));
+    Query::select()
+        .expr(col!("a"))
+        .expr(col!("b"))
+        .expr(Func::count(col!("id")))
+        .from(table!("t"))
+        .add_group_by([col!("a")])
+        .group_by_element(GroupingElement::rollup([col!("a"), col!("b")]))
+        .group_by_element(GroupingElement::cube([
+            col!("b"),
+            SimpleExpr::from(Expr::tuple([col!("a"), col!("b")])),
+        ]))
+        .group_by_element(sets)
+        .group_by_element(GroupingElement::empty())
+        .group_by_element(GroupingElement::rollup(Vec::<SimpleExpr>::new()))
+        .group_by_distinct()
+        .to_owned()
+}
+
+fn similar_to() -> SelectStatement {
+    star!()
+        .from(table!("t"))
+        .cond_where(
+            Condition::all()
+                .add(Expr::expr(col!("a")).similar_to("(x|y)%"))
+                .add(Expr::expr(col!("b")).not_similar_to(LikeExpr::new("!%%").escape('!')))
+                .add(Expr::expr(col!("c")).similar_to(LikeExpr::new("a\\_b").escape('\\')))
+                .add(Expr::expr(col!("d")).similar_to("%z").not()),
+        )
+        .to_owned()
+}
+
+fn table_function_ordinality() -> SelectStatement {
+    let tags = TableFunction::new(Func::unnest(qualified!("a", "tags")))
+        .with_ordinality()
+        .columns([n("tag"), n("position")])
+        .alias(n("t"));
+    Query::select()
+        .expr(qualified!("a", "id"))
+        .expr(qualified!("t", "tag"))
+        .expr(qualified!("t", "position"))
+        .from(FromItem::Table(account()))
+        .cross_join(tags)
+        .to_owned()
+}
+
+fn rows_from() -> SelectStatement {
+    let letters = Value::Array(
+        ArrayType::String,
+        Some(Box::new(vec!["a".into(), "b".into(), "c".into()])),
+    );
+    let zipped = TableFunction::new(Func::generate_series_step(10i64, 1i64, -3i64))
+        .and(Func::unnest(letters))
+        .with_ordinality()
+        .columns([n("x"), n("y"), n("n")])
+        .alias(n("r"));
+    let single = TableFunction::rows_from(Func::generate_series(1i64, 2i64)).alias(n("s"));
+    Query::select()
+        .expr(Expr::col(ColumnRef::TableAsterisk(n("r"))))
+        .expr(qualified!("s", "s"))
+        .from(zipped)
+        .cross_join(single)
+        .to_owned()
+}
+
+fn tablesample() -> SelectStatement {
+    let events = TableSample::new(
+        NamedTable::from(TableName::Table(n("event"))),
+        SampleMethod::Bernoulli,
+        50,
+    );
+    Query::select()
+        .expr(qualified!("a", "id"))
+        .expr(qualified!("event", "kind"))
+        .from(TableSample::new(account(), SampleMethod::System, 12.5).repeatable(42))
+        .join(
+            JoinType::LeftJoin,
+            FromItem::from(events),
+            qualified!("a", "id").eq(qualified!("event", "account_id")),
+        )
+        .lock_with_tables(
+            LockType::Share,
+            [NamedTable::from(TableName::Table(n("a")))],
+        )
+        .to_owned()
+}
+
 pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
     vec![
         ("select-join-group", join_group().build()),
@@ -468,6 +568,42 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
                 .build(),
         ),
         ("conditions", conditions().build()),
+        (
+            "tie-limit",
+            ordered_ids()
+                .limit_with_ties(5)
+                .reset_limit()
+                .limit(3)
+                .limit_with_ties(2)
+                .offset(1)
+                .build(),
+        ),
+        (
+            "tie-limit-replaced",
+            ordered_ids().limit_with_ties(2).limit(4).build(),
+        ),
+        ("grouping-elements", grouping_elements().build()),
+        (
+            "group-by-distinct-ungrouped",
+            Query::select()
+                .expr(col!("a"))
+                .from(table!("t"))
+                .group_by_distinct()
+                .build(),
+        ),
+        ("similar-to", similar_to().build()),
+        (
+            "table-function",
+            star!()
+                .from(TableFunction::new(Func::generate_series(1i64, 3i64)).alias(n("n")))
+                .build(),
+        ),
+        (
+            "table-function-ordinality",
+            table_function_ordinality().build(),
+        ),
+        ("rows-from", rows_from().build()),
+        ("tablesample", tablesample().build()),
         (
             "expression-inspect",
             Query::select()

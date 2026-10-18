@@ -463,6 +463,25 @@ These rules capture what the code does today, including known gaps.
 > source graph's terminals through its own selector
 > (`[spec:pgorm:sem:query.graph.terminals+1]`).
 
+> [spec:pgorm:req:exec.tie-limit]
+> Every ORM path that sends a SELECT built from a `SelectStatement` MUST
+> call `check_tie_limit` before it renders (`sql.ast.select.tie-limit`),
+> beside the empty-projection guard those paths share, so a tie limit with no
+> ORDER BY or beside `SKIP LOCKED` comes back as an `Error::QueryBuilder`
+> naming it rather than as SQL the server refuses: a `Selector`'s and a
+> `Select`'s terminals and streams, a graph's, a paginator's pages and count,
+> and a cursor's executions. A tie limit reaches an ORM builder through
+> `QueryTrait::query`, which hands out the statement.
+>
+> Where the ORM writes a row limit of its own, it MUST NOT replace a tie
+> limit without a word. A paginator's `fetch_page` and `num_items` and a
+> cursor's executions refuse a statement carrying one, with an
+> `Error::Query` saying so, because pages and windows are counted in rows and
+> replacing the tie limit with them would drop its ties. `one` and `one_opt`
+> narrow any row limit to `LIMIT 1` (`exec.crud.select`), a tie limit
+> included: one row is asked for, and the first row of the order is the one a
+> tie limit returns first.
+
 > [spec:pgorm:req:exec.crud.exec-vocabulary+2]
 > A CRUD terminal's name MUST determine the shape of what it returns, so
 > that a reader of the call site needs no knowledge of which constructor

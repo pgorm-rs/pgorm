@@ -46,10 +46,15 @@ impl Oper {
         )
     }
 
+    /// LIKE and `SIMILAR TO`, which the grammar ranks together: both bind
+    /// tighter than the logical operators and looser than arithmetic.
     pub(crate) fn is_like(&self) -> bool {
         matches!(
             self,
-            Oper::BinOper(BinOper::Like) | Oper::BinOper(BinOper::NotLike)
+            Oper::BinOper(BinOper::Like)
+                | Oper::BinOper(BinOper::NotLike)
+                | Oper::BinOper(BinOper::SimilarTo)
+                | Oper::BinOper(BinOper::NotSimilarTo)
         )
     }
 

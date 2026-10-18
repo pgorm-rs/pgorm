@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+3/test]
-// [spec:pgorm:def:sql.ast.select+3/test]
+// [spec:pgorm:def:sql.ast.select+4/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
 fn select_1() {
@@ -43,7 +43,7 @@ fn select_3() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+3/test]
+// [spec:pgorm:req:sql.ast.select.from+4/test]
 #[test]
 fn select_4() {
     assert_eq!(
@@ -942,7 +942,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+4/test]
+// [spec:pgorm:req:sql.render.select-order+5/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -1080,7 +1080,7 @@ fn select_60() {
     assert_eq!(values, Values(vec![3i32.into(), 5u64.into()]));
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]
 #[test]
 fn select_61() {
     assert_eq!(
@@ -1097,8 +1097,8 @@ fn select_61() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.from+3/test]
-// [spec:pgorm:req:sql.render.subquery+3/test]
+// [spec:pgorm:req:sql.ast.select.from+4/test]
+// [spec:pgorm:req:sql.render.subquery+4/test]
 #[test]
 fn select_62() {
     let select = SelectStatement::new()
@@ -1826,7 +1826,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+5/test]
+// [spec:pgorm:def:sql.render.operators+6/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -1988,7 +1988,7 @@ fn select_array_overlap_bin_oper() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]
 #[test]
 fn get_json_field_bin_oper() {
     assert_eq!(
@@ -2082,7 +2082,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+8/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+9/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2139,7 +2139,7 @@ fn empty_json_key_list_is_typed_array() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.expr.operators+4/test]    `@>`, `<@` and `||` are one
+// [spec:pgorm:req:sql.ast.expr.operators+5/test]    `@>`, `<@` and `||` are one
 // operator each across every type that has them, so the JSON family names no
 // duplicate: these are already the JSON containment and merge tests
 #[test]
@@ -2222,7 +2222,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+8/test]
+// [spec:pgorm:def:sql.render.precedence+9/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());
@@ -2854,8 +2854,8 @@ fn a_with_clause_has_one_place_to_live() {
 // [spec:pgorm:sem:query.build.with.attach+1/test]    the prefix is legal PostgreSQL at every level a
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
-// [spec:pgorm:req:sql.render.oracle+1/test]
-// [spec:pgorm:req:sql.render.select-order+4/test]
+// [spec:pgorm:req:sql.render.oracle+2/test]
+// [spec:pgorm:req:sql.render.select-order+5/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {

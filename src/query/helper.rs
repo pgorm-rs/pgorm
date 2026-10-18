@@ -1147,12 +1147,8 @@ fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> 
 /// relation actually points at rather than whatever `search_path` resolves.
 // [spec:pgorm:sem:schema.from-entity+8]
 pub(crate) fn unpack_table_name(from_item: &FromItem) -> pgorm_query::TableName {
-    match from_item {
-        FromItem::Table(table) => table.name.clone(),
-        FromItem::SubQuery(_, alias)
-        | FromItem::ValuesList(_, alias)
-        | FromItem::FunctionCall(_, alias)
-        | FromItem::Template(_, alias)
-        | FromItem::JsonTable(_, alias) => pgorm_query::TableName::Table(Name::clone(alias)),
+    match from_item.table_name() {
+        Some(name) => name.clone(),
+        None => pgorm_query::TableName::Table(Name::clone(from_item.qualifier())),
     }
 }
