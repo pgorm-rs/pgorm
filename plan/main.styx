@@ -429,6 +429,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.ddl +9: the entry-point list gains Table::create_as, View (create/create_recursive/drop) and MaterializedView (create/refresh/drop), and the no-placeholder list gains view, materialized view and CREATE TABLE AS, whose Display impls carry the inlining note and whose renderers are pub(crate) (sql-views, 19a670c7). Annotations re-pinned from +8."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:40:16.722761Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered at sql.ddl +9 in a docs commit of its own, the node's kind; the re-check note above rode the refactor commit that delivered query-reexports-curated."
+                        after_done true
+                    }
                 )
             }
 
