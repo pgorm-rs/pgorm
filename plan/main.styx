@@ -239,6 +239,14 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped sql.render.window+6 (prepare_window_clause writes every entry in order, an extended window's ( \"base\" ORDER BY .. frame ), all in query_builder_window.rs) and sql.render.select-order+6 (the WINDOW clause with each further entry after a comma); sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:36:49.88187Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped sql.render.select-order+7: one ( per regrouping arm after the WITH clause and before SELECT, and the ) that closes it before that arm's operator; set-operation rendering moved to query_builder_set_operation.rs; sites re-pinned and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -390,6 +398,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at sql.ast.keywords +6 (sql-domains, d5d22226): Keyword gains Value, rendering VALUE, built by Expr::domain_value()."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T22:36:49.745426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped sql.ast.select.union+2: a chain of set operations means what it reads in call order, an INTERSECT arm after a UNION or EXCEPT arm parenthesising everything before it; site re-pinned and the renderer matches."
                         after_done true
                     }
                 )
@@ -6133,6 +6149,14 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped python.statements+7: Select.window appends to the WINDOW clause, ExtendedWindow(base) lowers into Rust's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError where the tie limit is checked; sites re-pinned, the binding matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:36:50.016024Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped python.statements+8: Select's set operations combine in call order as Rust's do, a.union(b).intersect(c) being (a UNION b) INTERSECT c; sites re-pinned, the binding matches, and test_set_operations holds every operator pair live."
+                        after_done true
+                    }
                 )
             }
 
@@ -9290,6 +9314,7 @@ children (
                 title "Chained set operations group in call order, so a.union(b).intersect(c) means (a UNION b) INTERSECT c, in Rust, Python and JavaScript"
                 kind @fix
                 deps (python-select-set-operations)
+                sealed true
                 log (
                     {
                         at 2026-10-18T19:21:23.735601Z
@@ -9303,6 +9328,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator 2026-10-18, offered either making chained set operations group in call order (the lead's recommendation: the builder parenthesizes what came before when a tighter-binding operator follows, changing the rendered SQL of affected queries) or keeping PostgreSQL's precedence and documenting it: \"as you recommend\". So the builders group left to right in Rust, Python and JavaScript."
+                    }
+
+                    {
+                        at 2026-10-18T22:36:40.246465Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
