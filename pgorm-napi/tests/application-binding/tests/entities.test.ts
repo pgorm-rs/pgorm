@@ -110,7 +110,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads/test]
+// [spec:pgorm:req:napi.entity-reads+1/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());
@@ -129,6 +129,23 @@ test("a query reads records through Select's terminals, keyed by SQL column", as
   assert.throws(() => Account.col("nickname"), refused(/no column "nickname"/));
   const counted = await pool().one("SELECT count(*) AS n FROM napi_entities.accounts WHERE id = $1", [2]);
   assert.equal(counted.n, 1n);
+});
+
+// [spec:pgorm:req:napi.entity-reads+1/test]
+test("one and oneOpt narrow a row limit and never widen one of zero", async () => {
+  await seed();
+  const none = Account.find().orderBy(Account.col("id").asc()).limit(0);
+  assert.deepStrictEqual(await none.all(pool()), []);
+  assert.equal(await none.oneOpt(pool()), null);
+  await assert.rejects(none.one(pool()), DecodeError);
+  for (const terminal of ["one", "oneOpt"] as const) {
+    const { sql, values } = none.inspect(terminal);
+    assert.match(sql, /LIMIT \$1$/);
+    assert.equal(String(values.at(-1)?.value), "0");
+  }
+  const five = Account.find().orderBy(Account.col("id").asc()).limit(5);
+  assert.equal((await five.one(pool())).id, 1);
+  assert.equal(String(five.inspect("one").values.at(-1)?.value), "1");
 });
 
 // [spec:pgorm:req:napi.entity-writes/test]

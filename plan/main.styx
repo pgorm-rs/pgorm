@@ -9276,12 +9276,20 @@ children (
                 title "Select::one() keeps a smaller limit, so a limit of zero returns no row"
                 kind @fix
                 deps (sql-select-extras)
+                sealed true
                 log (
                     {
                         at 2026-10-18T18:24:02.755892Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa); predates it. Select::one() / one_opt() narrow any row limit to LIMIT 1, so a statement built with limit(0), or a tie limit of 0, still returns a row through one(). Keep the smaller of the caller's limit and 1 (a limit of 0 returns no row; one() then reports no row as it does for an empty result), decide what one() does over a tie limit (it currently narrows to LIMIT 1; check that is still right), and cover it with live tests in Rust and the bindings that expose one()."
+                    }
+
+                    {
+                        at 2026-10-18T22:57:45.040473Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

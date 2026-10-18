@@ -27,7 +27,7 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
 /// [`SelectStatement`] both still reach it.
 // [spec:pgorm:sem:query.build.modifiers+9]
-// [spec:pgorm:req:exec.tie-limit]
+// [spec:pgorm:req:exec.tie-limit+1]
 // [spec:pgorm:def:sql.ast.window-statement+7]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
@@ -43,7 +43,7 @@ pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
 /// Refuse a tie limit where the ORM writes a row limit of its own: a
 /// paginator's pages and a cursor's window are counted in rows, so replacing
 /// a `FETCH FIRST .. WITH TIES` with them would drop its ties without a word.
-// [spec:pgorm:req:exec.tie-limit]
+// [spec:pgorm:req:exec.tie-limit+1]
 pub(crate) fn refuse_tie_limit(query: &SelectStatement, reader: &str) -> Result<(), Error> {
     if query.has_tie_limit() {
         return Err(Error::Query(RuntimeError::Internal(format!(
@@ -591,22 +591,28 @@ where
         })
     }
 
-    /// Get an item from the Select query
-    // [spec:pgorm:sem:exec.crud.select+3]
+    /// Get an item from the Select query, failing with
+    /// [`Error::RecordNotFound`] when it returns no rows.
+    ///
+    /// The row limit is narrowed to one row, never widened: a query limited
+    /// to no row reads none.
+    // [spec:pgorm:sem:exec.crud.select+4]
     pub async fn one<C>(mut self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,
     {
-        self.query.limit(1);
+        self.query.narrow_limit_to_one();
         self.into_selector_raw()?.one(db).await
     }
 
-    /// Get an item from the Select query
+    /// Get an item from the Select query, or `None` when it returns no rows.
+    /// The row limit is narrowed as on [`one`](Selector::one).
+    // [spec:pgorm:sem:exec.crud.select+4]
     pub async fn one_opt<C>(mut self, db: &C) -> Result<Option<S::Item>, Error>
     where
         C: ConnectionTrait,
     {
-        self.query.limit(1);
+        self.query.narrow_limit_to_one();
         self.into_selector_raw()?.one_opt(db).await
     }
 
@@ -765,7 +771,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    // [spec:pgorm:sem:exec.crud.select+3]
+    // [spec:pgorm:sem:exec.crud.select+4]
     pub async fn one<C>(self, db: &C) -> Result<S::Item, Error>
     where
         C: ConnectionTrait,

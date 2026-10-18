@@ -454,9 +454,13 @@ These rules capture what the code does today, including known gaps.
 > no injected limit, and no projection guard, since a caller-supplied string
 > has no projection list to inspect.
 
-> [spec:pgorm:sem:exec.crud.select+3]
-> `Selector::one` and `one_opt` set `LIMIT 1` on the query, then execute
-> through the connection's `query_opt`. The limit is set on the statement
+> [spec:pgorm:sem:exec.crud.select+4]
+> `Selector::one` and `one_opt` narrow the query's row limit to one row with
+> `narrow_limit_to_one` (`sql.ast.select.tie-limit`), then execute through
+> the connection's `query_opt`. The narrowing sets `LIMIT 1` and never widens
+> a limit: a query limited to no row, by `limit(0)` or a tie limit of zero,
+> keeps `LIMIT 0` and reads none, which `one` and `one_opt` report as they do
+> an empty result. The limit is set on the statement
 > the selector holds, which for a CTE query is the carrying select and never
 > a CTE body (`query.build.with.attach`). `SelectorRaw::one` and `one_opt`
 > execute the raw statement as-is (no limit is injected), so a raw statement
@@ -472,7 +476,7 @@ These rules capture what the code does today, including known gaps.
 > source graph's terminals through its own selector
 > (`[spec:pgorm:sem:query.graph.terminals+1]`).
 
-> [spec:pgorm:req:exec.tie-limit]
+> [spec:pgorm:req:exec.tie-limit+1]
 > Every ORM path that sends a SELECT built from a `SelectStatement` MUST
 > call `check_tie_limit` before it renders (`sql.ast.select.tie-limit`),
 > beside the empty-projection guard those paths share, so a tie limit with no
@@ -487,9 +491,10 @@ These rules capture what the code does today, including known gaps.
 > cursor's executions refuse a statement carrying one, with an
 > `Error::Query` saying so, because pages and windows are counted in rows and
 > replacing the tie limit with them would drop its ties. `one` and `one_opt`
-> narrow any row limit to `LIMIT 1` (`exec.crud.select`), a tie limit
-> included: one row is asked for, and the first row of the order is the one a
-> tie limit returns first.
+> narrow any row limit to one row (`exec.crud.select`), a tie limit included:
+> one row is asked for, and the first row of the order is the one a tie limit
+> returns first, while a tie limit of zero, which returns no row, narrows to
+> `LIMIT 0`.
 
 > [spec:pgorm:req:exec.crud.exec-vocabulary+2]
 > A CRUD terminal's name MUST determine the shape of what it returns, so

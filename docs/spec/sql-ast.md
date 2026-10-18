@@ -538,7 +538,7 @@ today, including panicking edges and deliberate failsafes.
 > the type cannot tell from a table's, and sampling one is the server's
 > refusal (`0A000`).
 
-> [spec:pgorm:req:sql.ast.select.tie-limit]
+> [spec:pgorm:req:sql.ast.select.tie-limit+1]
 > `limit_with_ties(count)` sets a tie limit, `FETCH FIRST count ROWS WITH
 > TIES`: the first `count` rows in the statement's ORDER BY and every further
 > row equal to the last of them on all its keys. It shares one slot with
@@ -546,6 +546,12 @@ today, including panicking edges and deliberate failsafes.
 > — so either replaces the other and `reset_limit` removes either;
 > `has_tie_limit` says which is set. OFFSET composes with it as with `LIMIT`.
 > The count is bound, which the server types `bigint`.
+>
+> `narrow_limit_to_one` narrows the slot to at most one row for a reader that
+> asks for the first, and never widens it: a statement whose limit counts no
+> row — `LIMIT 0`, or a tie limit of zero, which returns no row — gets
+> `LIMIT 0`, and any other gets `LIMIT 1`, a tie limit included, since the
+> first row a tie limit returns is the first row of the order. OFFSET is kept.
 >
 > The grammar refuses a tie limit in two places (`42601`): on a statement with
 > no ORDER BY, since the ties are measured on the order, and beside

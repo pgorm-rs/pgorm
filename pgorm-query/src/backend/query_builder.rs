@@ -321,11 +321,11 @@ impl QueryBuilder {
         match &select.limit {
             Some(RowLimit::Count(limit)) => {
                 write!(sql, " LIMIT ").unwrap();
-                sql.push_param(limit.clone());
+                sql.push_param((*limit).into());
             }
             Some(RowLimit::WithTies(count)) => {
                 write!(sql, " FETCH FIRST ").unwrap();
-                sql.push_param(count.clone());
+                sql.push_param((*count).into());
                 write!(sql, " ROWS WITH TIES").unwrap();
             }
             None => {}

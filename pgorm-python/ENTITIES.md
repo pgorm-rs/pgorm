@@ -107,8 +107,9 @@ connection if the operation's completion is uncertain. Closing its connection
 or pool also cancels an outstanding Rust hook. Cancellation does not guarantee
 rollback of a submitted write.
 
-`all` returns a list of detached models. Rust's `one` and `one_opt` apply
-`LIMIT 1`, including when an earlier query limit was larger. `one` raises
+`all` returns a list of detached models. Rust's `one` and `one_opt` narrow
+the query's limit to one row: `LIMIT 1`, including when an earlier query limit
+was larger, and `LIMIT 0` when it was zero, which finds no row. `one` raises
 `DatabaseError` on absence; `one_opt` returns `None`. `inspect(terminal="one")`
 or `inspect(terminal="one_opt")` includes that terminal's limit. A decoding
 failure remains `DecodeError`. These are the registered Rust selector's

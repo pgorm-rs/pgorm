@@ -172,7 +172,7 @@ export declare class EntityQuery<R = EntityRecord> {
   /** `null` removes it. */
   limit(count: number | null): EntityQuery<R>;
   offset(count: number | null): EntityQuery<R>;
-  /** The SQL and values a terminal sends, `one` and `oneOpt` with Rust's `LIMIT 1`. */
+  /** The SQL and values a terminal sends, `one` and `oneOpt` with the limit Rust narrows to one row. */
   inspect(terminal?: "all" | "one" | "oneOpt"): Compiled;
   /** Every row, by `Select::all`. */
   all(db: Queryable, options?: OperationOptions): Promise<R[]>;

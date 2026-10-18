@@ -329,7 +329,7 @@ impl<S, K> Cursor<S, K> {
     /// re-executed with a moved boundary or a flipped direction without the
     /// previous execution's clauses still on it.
     // [spec:pgorm:sem:exec.cursor.order+4]
-    // [spec:pgorm:req:exec.tie-limit]
+    // [spec:pgorm:req:exec.tie-limit+1]
     fn compose(&mut self) -> Result<SelectStatement, Error> {
         refuse_tie_limit(&self.query, "cursor")?;
         let mut query = self.query.clone();

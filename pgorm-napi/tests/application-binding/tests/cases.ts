@@ -1,7 +1,7 @@
 // The entity family's parity cases, built through the binding from the
 // application's registrations and held to `parity.json`, which the
 // application crate's Rust test builds with its entities directly.
-// [spec:pgorm:req:napi.entity-reads/test]
+// [spec:pgorm:req:napi.entity-reads+1/test]
 
 import { type Compiled, entity, graph, pipeline as pl } from "../../../lib/index.js";
 
@@ -19,6 +19,7 @@ export function cases(): Record<string, () => Compiled> {
       Account.find().where(Account.col("id").gte(10)).orderBy(Account.col("display name").desc()).limit(20).inspect(),
     "find-enum": () => Account.find().where(Account.col("mood").eq("busy")).inspect(),
     "find-one": () => Account.find().inspect("one"),
+    "find-one-limit-zero": () => Account.find().limit(0).inspect("one"),
     "find-composite": () =>
       Membership.find().where(Membership.col("account_id").eq(1)).where(Membership.col("team").eq("red")).inspect(),
     "graph-notes": () => notes.inspect(),

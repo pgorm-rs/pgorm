@@ -1575,7 +1575,7 @@ impl SelectStatement {
     /// );
     /// ```
     pub fn limit(&mut self, limit: u64) -> &mut Self {
-        self.limit = Some(RowLimit::Count(limit.into()));
+        self.limit = Some(RowLimit::Count(limit));
         self
     }
 

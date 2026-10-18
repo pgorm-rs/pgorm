@@ -1080,11 +1080,12 @@ the ones compiled in.
 > its state unknown — and a failure from PostgreSQL anywhere in its causes is
 > the error `napi.errors` classifies.
 
-> [spec:pgorm:req:napi.entity-reads]
+> [spec:pgorm:req:napi.entity-reads+1]
 > `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
 > and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
 > `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
-> adding the `LIMIT 1` Rust adds, and `one` finding no row a `DecodeError`.
+> narrowing the row limit to one row as Rust does, and `one` finding no row a
+> `DecodeError`.
 > `inspect(terminal)` gives the SQL and values the terminal sends. `col(name)`
 > is the column as the entity's `ColumnTrait` names it, and its comparisons
 > MUST be that trait's methods, a value converted to the column's declared

@@ -94,8 +94,8 @@ const first = await query.oneOpt(pool);      // Select::one_opt, LIMIT 1
 
 - `find()` is `E::find()`; `where`, `orderBy`, `limit` and `offset` are
   `Select<E>`'s; `all`, `one` and `oneOpt` are its terminals, `one` and
-  `oneOpt` with the `LIMIT 1` Rust adds, and `one` finding nothing a
-  `DecodeError`.
+  `oneOpt` narrowing the limit to one row as Rust does (a limit of zero stays
+  zero and finds no row), and `one` finding nothing a `DecodeError`.
 - `col(name)` names a column as the entity's `ColumnTrait` does. Its
   comparisons are that trait's: a value converts to the column's declared
   kind and is written through its `save_as`, so an enum's label is cast to

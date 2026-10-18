@@ -147,6 +147,21 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(query.inspect().params[0].kind, "i32")
 
     # [spec:pgorm:req:python.entities+3/test]
+    async def test_one_never_widens_a_zero_limit(self):
+        async with self.pool.connection() as connection:
+            await self.active(1).insert(connection)
+            none = self.account.find().limit(0)
+            self.assertEqual(await none.all(connection), [])
+            self.assertIsNone(await none.one_opt(connection))
+            with self.assertRaises(p.DatabaseError):
+                await none.one(connection)
+            for terminal in ("one", "one_opt"):
+                self.assertTrue(none.inspect(terminal=terminal).sql.endswith("LIMIT $1"))
+                self.assertEqual(none.inspect(terminal=terminal).params[-1].value, 0)
+            self.assertEqual((await self.account.find().limit(5).one(connection))["id"], 1)
+            self.assertEqual(self.account.find().limit(5).inspect(terminal="one").params[-1].value, 1)
+
+    # [spec:pgorm:req:python.entities+3/test]
     async def test_composite_key_entity_writes_by_whole_key(self):
         membership = p.entity("app.Membership")
         self.assertEqual(membership.describe()["primary_keys"], ["tenant_id", "id"])

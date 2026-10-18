@@ -56,7 +56,7 @@ const COUNT_SUBQUERY_ALIAS: &str = "sub_query";
 /// The statement for one page and the values to bind to it.
 // [spec:pgorm:sem:exec.paginator.fetch+3]
 // [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
-// [spec:pgorm:req:exec.tie-limit]
+// [spec:pgorm:req:exec.tie-limit+1]
 fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
     refuse_tie_limit(query, "paginator")?;
@@ -69,7 +69,7 @@ fn page_of(query: &SelectStatement, limit: u64, offset: u64) -> Result<(String, 
 /// bind to it.
 // [spec:pgorm:sem:exec.paginator.count]
 // [spec:pgorm:sem:exec.paginator.raw+6] (one shape for a built source and a raw one)
-// [spec:pgorm:req:exec.tie-limit]
+// [spec:pgorm:req:exec.tie-limit+1]
 fn count_of(query: &SelectStatement) -> Result<(String, Values), Error> {
     ensure_select_list(query)?;
     refuse_tie_limit(query, "paginator")?;

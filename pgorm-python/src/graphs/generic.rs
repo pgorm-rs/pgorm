@@ -85,7 +85,7 @@ where
     fn compile(&self, optional: bool) -> (String, Values) {
         let mut query = self.query.clone();
         if optional {
-            QueryTrait::query(&mut query).limit(1);
+            QueryTrait::query(&mut query).narrow_limit_to_one();
         }
         query.build()
     }

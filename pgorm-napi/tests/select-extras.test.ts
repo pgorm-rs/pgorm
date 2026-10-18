@@ -91,7 +91,7 @@ const byScore = score.col("score").desc();
 const unordered = ranked.limitWithTies(2);
 
 // [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
 test("a tie limit keeps every row tied with the last one counted, in LIMIT's slot", async () => {
   const tied = ranked.orderBy(byScore).limitWithTies(2);
   assert.deepStrictEqual(field(await pool().query(tied), "score"), [10, 9, 9]);
@@ -108,7 +108,7 @@ test("a tie limit keeps every row tied with the last one counted, in LIMIT's slo
 });
 
 // [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
 test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect() and every run before it is sent", async () => {
   const skipping = ranked.orderBy(byScore).limitWithTies(2).lock("update", { wait: "skipLocked" });
   for (const [statement, reason] of [[unordered, /needs an ORDER BY/], [skipping, /SKIP LOCKED/]] as const) {
@@ -145,7 +145,7 @@ test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect
 });
 
 // [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
 test("a refused tie limit cannot be read into another statement, where nothing could still order it", async () => {
   for (
     const embed of [

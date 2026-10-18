@@ -655,7 +655,7 @@ def over(name):
 }
 
 // [spec:pgorm:req:python.statements+7/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tie limit shares `limit`'s slot, either
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tie limit shares `limit`'s slot, either
 // replacing the other and `None` clearing both
 #[test]
 fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
@@ -709,7 +709,7 @@ fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.statements+7/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    a tie limit with no ORDER BY is refused at
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    a tie limit with no ORDER BY is refused at
 // inspection, at execution's compile and as a CTE body or subquery reads it, and its count is
 // checked as `limit`'s is
 #[test]

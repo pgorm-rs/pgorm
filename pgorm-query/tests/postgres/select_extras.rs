@@ -21,7 +21,7 @@ fn ordered() -> SelectStatement {
         .take()
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tie limit renders in LIMIT's place and
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tie limit renders in LIMIT's place and
 // parses as PostgreSQL's WITH TIES limit, its count bound
 // [spec:pgorm:req:sql.render.tie-limit/test]
 #[test]
@@ -46,7 +46,7 @@ fn tie_limit_renders_fetch_first_with_ties() {
     assert_eq!(query.check_tie_limit(), Ok(()));
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    `limit` and `limit_with_ties` share one slot,
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `limit` and `limit_with_ties` share one slot,
 // the last call winning, and `reset_limit` clears either
 #[test]
 fn row_limits_replace_each_other() {
@@ -77,7 +77,38 @@ fn row_limits_replace_each_other() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    the two shapes the grammar refuses are refused by
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `narrow_limit_to_one` narrows every row
+// limit to a plain LIMIT of at most one, keeping a limit of zero and the OFFSET
+#[test]
+fn narrowing_keeps_a_zero_limit() {
+    let narrowed = |query: SelectStatement| {
+        let narrowed = query.clone().narrow_limit_to_one().take();
+        assert!(!narrowed.has_tie_limit());
+        let (sql, values) = narrowed.build();
+        assert_eq!(
+            select_stmt(&sql)["limit_option"].as_i64(),
+            Some(LIMIT_COUNT)
+        );
+        (narrowed.to_string(), values.0)
+    };
+    let one = r#"SELECT "image" FROM "glyph" ORDER BY "aspect" DESC LIMIT 1"#;
+    let none = r#"SELECT "image" FROM "glyph" ORDER BY "aspect" DESC LIMIT 0"#;
+
+    assert_eq!(narrowed(ordered()), (one.to_owned(), vec![1u64.into()]));
+    assert_eq!(narrowed(ordered().limit(5).take()).0, one);
+    assert_eq!(narrowed(ordered().limit_with_ties(3).take()).0, one);
+    assert_eq!(
+        narrowed(ordered().limit(0).take()),
+        (none.to_owned(), vec![0u64.into()])
+    );
+    assert_eq!(narrowed(ordered().limit_with_ties(0).take()).0, none);
+    assert_eq!(
+        narrowed(ordered().limit_with_ties(2).offset(3).take()).0,
+        format!("{one} OFFSET 3")
+    );
+}
+
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two shapes the grammar refuses are refused by
 // `check_tie_limit`, and the grammar does refuse what they render
 // [spec:pgorm:req:sql.render.oracle+2/test]    the one render held rejected by design
 // [spec:pgorm:req:sql.render.tie-limit/test]

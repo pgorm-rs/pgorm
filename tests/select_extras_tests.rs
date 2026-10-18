@@ -139,7 +139,7 @@ fn sql_state(err: &Error) -> Option<&SqlState> {
     }
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    against a live server: the tied rows are kept,
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    against a live server: the tied rows are kept,
 // the count and offset bound, where a plain LIMIT cuts the tie
 // [spec:pgorm:req:sql.render.tie-limit/test]
 async fn tie_limit_keeps_rows_tied_with_the_last(db: &DatabaseConnection) -> Result<(), Error> {
@@ -169,9 +169,9 @@ async fn tie_limit_keeps_rows_tied_with_the_last(db: &DatabaseConnection) -> Res
     Ok(())
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit/test]    the two refused shapes come back as builder
+// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two refused shapes come back as builder
 // errors before anything is sent, where the server would refuse their text with 42601
-// [spec:pgorm:req:exec.tie-limit/test]
+// [spec:pgorm:req:exec.tie-limit+1/test]
 async fn refused_tie_limits_never_reach_the_server(db: &DatabaseConnection) -> Result<(), Error> {
     let unordered = Query::select()
         .expr(col("name"))
@@ -218,7 +218,7 @@ fn refusal_message(err: Error) -> String {
     }
 }
 
-// [spec:pgorm:req:exec.tie-limit/test]    the paginator and the cursor refuse a tie limit rather
+// [spec:pgorm:req:exec.tie-limit+1/test]    the paginator and the cursor refuse a tie limit rather
 // than replace it, `one` reads the first row of the order, and `all` keeps the ties
 async fn orm_row_limits_refuse_a_tie_limit(db: &DatabaseConnection) -> Result<(), Error> {
     let mut tied = player::Entity::find().order_by_desc(player::Column::Score);

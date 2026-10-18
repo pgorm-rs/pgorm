@@ -254,7 +254,7 @@ where
     fn compile(&self, terminal: Terminal) -> (String, Values) {
         let mut query = self.query.clone();
         if !matches!(terminal, Terminal::All) {
-            query = query.limit(1);
+            QueryTrait::query(&mut query).narrow_limit_to_one();
         }
         query.build()
     }
