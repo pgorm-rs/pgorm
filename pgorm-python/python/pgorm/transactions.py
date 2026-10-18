@@ -68,6 +68,10 @@ class Transaction:
         """Open a COPY TO; closing it before its end discards the transaction."""
         return CopyOutStream(await _native._copy_out(self._native, statement), None)
 
+    async def notify(self, channel: str, payload: str) -> None:
+        """Send a notification delivered when this transaction commits, never if it rolls back."""
+        await self._native.notify(channel, payload)
+
     async def commit(self) -> None:
         await self._native.finish(True)
 

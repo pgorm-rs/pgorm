@@ -89,6 +89,7 @@ from ._native import (
     merge,
     CopyFrom,
     CopyTo,
+    Notification,
     Entity,
     EntityColumn,
     EntityQuery,
@@ -117,6 +118,7 @@ from .results import Record, Field, ResultStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopySource
+from .listen import Listener
 
 select = Select
 insert = Insert
@@ -231,6 +233,8 @@ __all__ = [
     "CopyTo",
     "CopyOutStream",
     "CopySource",
+    "Listener",
+    "Notification",
     "Entity",
     "EntityColumn",
     "EntityQuery",

@@ -7,6 +7,7 @@ from typing import Any, NamedTuple
 
 from . import _native
 from .copy import CopyOutStream, CopySource, copy_in
+from .listen import Listener
 from .results import Query, Record, ResultStream
 from .transactions import Transaction, TransactionMode, IsolationLevel
 
@@ -138,6 +139,22 @@ class Pool:
             raise
         return CopyOutStream(native, connection)
 
+    async def listener(self, *, capacity: int = 1024) -> Listener:
+        """Open a dedicated listening connection with this pool's configuration.
+
+        The connection is the listener's own, outside the pool's size, and
+        closing the pool closes it. ``capacity`` bounds the notifications
+        waiting unread; see ``Listener``.
+        """
+        if type(capacity) is not int or capacity < 1:
+            raise _native.ConstructionError("capacity must be a positive integer")
+        return Listener(await self._native.listener(capacity))
+
+    async def notify(self, channel: str, payload: str) -> None:
+        """Send a notification on a connection of its own; see ``Connection.notify``."""
+        async with self.connection() as connection:
+            await connection.notify(channel, payload)
+
     async def close(self) -> None:
         """Reject waiters, cancel active operations and release connections."""
         await self._native.close()
@@ -221,6 +238,15 @@ class Connection:
     async def copy_out(self, statement: "_native.CopyTo[Any]") -> CopyOutStream:
         """Open a COPY TO; the stream reserves this connection until it ends."""
         return CopyOutStream(await _native._copy_out(self._native, statement), None)
+
+    async def notify(self, channel: str, payload: str) -> None:
+        """Send ``payload`` on ``channel`` with ``SELECT pg_notify($1, $2)``.
+
+        Both values are bound. Every session listening on the channel
+        receives it, at once here and at commit inside a transaction. The
+        server refuses a payload of 8000 bytes or more.
+        """
+        await self._native.notify(channel, payload)
 
     async def close(self) -> None:
         await self._native.close()

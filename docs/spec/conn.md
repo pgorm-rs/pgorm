@@ -719,3 +719,89 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > cannot parse is refused without closing anything. A COPY TO is one request
 > answered by one `ReadyForQuery` whether or not it starts, and a refused one
 > leaves the connection as it was.
+
+## LISTEN and NOTIFY
+
+> [spec:pgorm:req:conn.listen]
+> A notification is delivered to the session that ran `LISTEN`, as an
+> asynchronous message outside any statement's result, so no
+> `ConnectionTrait` method returns one (`sql.scope`), and a pooled connection
+> cannot receive one at all: pgorm-pool's task drives it and discards such
+> messages (`conn.pool.lifecycle`), and the pool lends it to another caller
+> once it is returned. A listener is therefore a connection of its own.
+> `connect_listener(config, tls, capacity)` opens one with a
+> `tokio_postgres::Config` and a TLS connector bounded as `connect_with`'s is
+> (`conn.pool`), and `DatabasePool::listener(capacity)` opens one with the
+> pool's configuration and connector through `pgorm_pool::Manager::connect_raw`,
+> which connects as the pool does and hands back the connection's I/O half
+> undriven, as a `RawConnection`. That connection is not taken from the pool,
+> counts against no size, has no statement cache and is never recycled. Each
+> returns a pair, a `Listener` and its `Notifications`.
+>
+> `Listener` is the connection's `LISTEN` set: `listen(channel)`,
+> `unlisten(channel)` and `unlisten_all()`, each taking `&self` and sending
+> `LISTEN`, `UNLISTEN` or `UNLISTEN *`. Cloning it is cheap and every clone
+> changes the same set, so one task can listen while another reads. A channel
+> MUST be sent as a quoted identifier, every `"` in it doubled and the whole
+> wrapped in `"`, so that a name is exact: its case and punctuation are kept,
+> `Jobs` and `jobs` are two channels, and the name is the text `pg_notify`
+> takes. Neither statement takes a parameter, so this is the only form the
+> name can travel in, and the quoting is total, as a savepoint name's is
+> (`conn.pool.savepoint-name`). A name longer than 63 bytes MUST be refused
+> with `ListenError::ChannelTooLong` before anything is sent: PostgreSQL
+> truncates a longer identifier with only a notice and would listen on the
+> truncated name, which nothing can send to, since `pg_notify` refuses a name
+> that long (`22023`). An empty name is the server's refusal (`42601`).
+>
+> `Listener` MUST NOT implement `ConnectionTrait`. Notifications arrive on its
+> connection whenever the server sends them; a statement there would wait
+> behind them, and a transaction there would hold back their delivery until it
+> ended. The metrics layer does not instrument it (`metric.layer`): it is none
+> of the wrapped types, and what it sends is not a statement a caller wrote.
+>
+> `Notifications` implements `Stream<Item = Result<Notification, Error>>`,
+> `Notification` being tokio-postgres's — the channel, the payload and the
+> sending session's process id — re-exported from `pgorm`. A task spawned when
+> the listener connects drives the connection and queues each notification as
+> it arrives, so `listen` and `unlisten` complete whether or not the stream is
+> read. The stream yields them in the order the server sent them, which is
+> PostgreSQL's: across transactions in commit order, within one in sending
+> order, with a notification that repeats an earlier one's channel and payload
+> in the same transaction folded into it, and a rolled-back transaction's never
+> sent. Once `listen` returns, a notification on the channel from a
+> transaction that commits afterwards is delivered; once `unlisten` returns,
+> none is, though one already received is still yielded. The stream holds the
+> connection open while it lives, and dropping it closes the connection, after
+> which every `Listener` method fails.
+>
+> The stream MUST end only after an error, and MUST NOT reconnect. A
+> notification sent while no session listens reaches none, so a reconnection
+> would hide a gap the caller has to know about, to re-read whatever the
+> notifications were tracking. When the connection fails or is terminated —
+> `pg_terminate_backend` ends it with SQLSTATE `57P01` — the stream yields every
+> notification already received, then the `Error::Postgres` it failed with, and
+> ends.
+>
+> The queue MUST be bounded by `capacity`, a `NonZeroUsize`
+> (`Listener::DEFAULT_CAPACITY` is 1024). When `capacity` notifications are
+> waiting unread and another arrives, the listener MUST close its connection,
+> and the stream yields those waiting, then `ListenError::Overflow { capacity
+> }`, and ends. Waiting for the reader instead would mean leaving the socket
+> unread, which holds the listener's own `LISTEN` and `UNLISTEN` replies behind
+> the unread notifications and stops its session consuming PostgreSQL's
+> notification queue. That queue is shared by every database in the cluster,
+> and once it fills every `NOTIFY` fails at commit; closing gives up the
+> session's place in it at once.
+>
+> `notify(db, channel, payload)` sends a notification from any
+> `ConnectionTrait` implementor as `SELECT pg_notify($1, $2)`, both values
+> bound. `NOTIFY channel, 'payload'` takes no parameter, so its payload would
+> have to be escaped into the statement, and each payload would be a statement
+> text of its own in the bounded statement cache
+> (`conn.pool.statement-cache.bound`); through `pg_notify` there is one text,
+> prepared once per connection. Being a `ConnectionTrait` call, it runs inside
+> a transaction when given one, delivering at commit, and through an
+> instrumented connection or transaction it is reported as the `execute` it is
+> (`metric.layer.delegate`). The bounds are the server's: a payload of 8000
+> bytes or more, an empty channel and one longer than 63 bytes are each refused
+> with SQLSTATE `22023`.

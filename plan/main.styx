@@ -11832,6 +11832,9 @@ children (
         id conn-listen
         title "A dedicated listening connection yields LISTEN notifications as a stream, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:conn.listen] [spec:pgorm:req:python.listen] [spec:pgorm:req:napi.listen])
+        }
         deps (query-second-tier conn-copy)
         log (
             {

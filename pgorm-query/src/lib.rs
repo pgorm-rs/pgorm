@@ -659,7 +659,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+18]
+// [spec:pgorm:req:sql.scope+19]
 mod backend;
 mod comment;
 mod copy;

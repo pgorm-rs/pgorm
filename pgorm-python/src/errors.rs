@@ -49,6 +49,11 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
     }
     match error {
         pgorm::Error::Pool(_) => ConnectionError::new_err("PostgreSQL pool acquisition failed"),
+        // [spec:pgorm:req:python.listen]
+        pgorm::Error::Listen(pgorm::ListenError::ChannelTooLong { .. }) => {
+            ConstructionError::new_err(secrets.apply(&error.to_string()))
+        }
+        pgorm::Error::Listen(_) => ConnectionError::new_err(secrets.apply(&error.to_string())),
         pgorm::Error::Conversion { .. } | pgorm::Error::Type(_) | pgorm::Error::Json(_) => {
             DecodeError::new_err(secrets.apply(&error.to_string()))
         }

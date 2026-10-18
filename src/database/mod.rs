@@ -2,10 +2,17 @@ mod connection;
 mod copy;
 mod db_connection;
 mod lifecycle;
+mod listen;
 
 pub use connection::*;
 pub use copy::{CopyInSink, CopyOutStream, CopyTrait};
 pub use db_connection::*;
+pub use listen::{Listener, Notifications, connect_listener, notify};
+
+/// What a [`Notifications`] stream yields: the channel, the payload, and the
+/// process id of the session that sent it.
+// [spec:pgorm:req:conn.listen]
+pub use tokio_postgres::Notification;
 
 /// The chunk type COPY's data travels in, both ways, re-exported so writing a
 /// [`CopyInSink`] needs no direct dependency on `bytes`.

@@ -106,6 +106,11 @@ sync or async source into a table, and `copy_out` streams a table's or a
 query's data out as `bytes`. See [COPY](STATEMENTS.md#copy) for the formats,
 chunking, abort and cancellation behaviour.
 
+`pool.listener()` opens a dedicated connection that receives `LISTEN`
+notifications as an async iterator, and `notify` on a pool, connection or
+transaction sends one. See [notifications](RESULTS.md#notifications) for the
+buffering, end and cancellation behaviour.
+
 The [direct builder integration suite](DIRECT_BUILDERS.md) installs a wheel in
 a fresh Python environment, runs 32 application query programs against
 PostgreSQL, and compares their SQL and tagged parameters with independent Rust

@@ -352,6 +352,51 @@ handle, and each is released by being closed.
 > reason, its connection is discarded and its transaction ends with nothing
 > committed.
 
+> [spec:pgorm:req:napi.listen]
+> `pool.listener({ capacity, signal })` MUST open a `Listener` through pgorm's
+> `DatabasePool::listener` (`conn.listen`): a connection of its own, opened
+> with the pool's configuration and TLS, never one the pool lends, holding at
+> most `capacity` notifications unread — a positive whole number, 1024 by
+> default, anything else refused with a `RangeError` or `TypeError` before
+> anything is sent. The listener belongs to its pool: closing the pool closes
+> it, and the pool's close resolves once its connection is released. Closing
+> the listener, a `for await` loop leaving it early, and collecting it unclosed
+> each close its connection; it holds nothing the event loop waits on unless a
+> pull is in flight.
+>
+> `listen(channel)`, `unlisten(channel)` and `unlistenAll()` MUST send pgorm's
+> `LISTEN`, `UNLISTEN` and `UNLISTEN *`, the channel an exact name, and run
+> while a pull waits. A channel longer than 63 bytes MUST be refused with a
+> `ConstructionError`, nothing sent, and one that is not a string with a
+> `TypeError`. An aborted `listen`, `unlisten` or `unlistenAll` MUST close the
+> listener, since which channels the server listens on is then unknown.
+>
+> The listener MUST be an async iterator of notifications, each a frozen `{
+> channel, payload, processId }`, pulled one per `next()` in the order the
+> server sent them, a second pull while one is pending refused with a
+> `LifecycleError`. An aborted pull MUST reject with the signal's reason and
+> leave the listener open, since the notification it waited for stays queued
+> for the next. Nothing reconnects a listener. When its connection fails or is
+> terminated, the pull that meets the end MUST yield the notifications already
+> received first and then reject with the failure, a `DatabaseError` carrying
+> the server's SQLSTATE where it sent one; when a notification arrives while
+> `capacity` wait unread, pgorm closes the connection and the pull past the
+> waiting ones MUST reject with a `ConnectionError`. Either closes the
+> listener. A pull pending when the listener or its pool closes MUST reject
+> with a `LifecycleError`, and one made after it closed resolves as done, as
+> does every iterator's after its end; `listen` and `unlisten` on a closed
+> listener reject with a `LifecycleError`.
+>
+> `notify(channel, payload)` on a pool, a connection and a transaction MUST
+> run pgorm's `notify`, `SELECT pg_notify($1, $2)` with both bound, as a
+> statement runs there — a pool's on a connection of its own, a connection's
+> or transaction's refusing other work meanwhile — so in a transaction it is
+> delivered at commit and never after a rollback, and an abort discards the
+> connection as `napi.cancellation` requires. A channel or payload that is not
+> a string MUST be refused with a `TypeError`; the server's bounds — a payload
+> of 8000 bytes or more, an empty channel, one longer than 63 bytes — are its
+> `DatabaseError`, SQLSTATE `22023`.
+
 ## Statements and expressions
 
 JavaScript builds pgorm-query's statements and expressions as pgorm-python

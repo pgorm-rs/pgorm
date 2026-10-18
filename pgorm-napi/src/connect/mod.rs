@@ -1,5 +1,5 @@
-//! Pools, connections, transactions, row streams and COPY, which JavaScript
-//! holds as boxed handles and releases explicitly.
+//! Pools, connections, transactions, row streams, COPY and listeners, which
+//! JavaScript holds as boxed handles and releases explicitly.
 //!
 //! A pool's connections live on the runtime; a JavaScript `Connection` owns
 //! one checked out of it until `close`, and every operation takes it out of
@@ -14,6 +14,7 @@
 mod config;
 mod copy;
 pub(crate) mod job;
+mod listen;
 mod stream;
 mod transaction;
 
@@ -56,6 +57,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     transaction::export(cx)?;
     stream::export(cx)?;
     copy::export(cx)?;
+    listen::export(cx)?;
     job::export(cx)?;
     Ok(())
 }
@@ -252,6 +254,9 @@ pub(crate) struct PoolState {
     pub(crate) closed: CancellationToken,
     acquire_timeout: Duration,
     connections: SyncMutex<Vec<Weak<ConnectionState>>>,
+    /// The listeners opened with this pool's configuration, which close
+    /// with it though their connections are not the pool's.
+    listeners: SyncMutex<Vec<Weak<listen::ListenerState>>>,
 }
 
 impl fmt::Debug for PoolState {
@@ -306,6 +311,17 @@ impl PoolState {
         let connections = registry.iter().filter_map(Weak::upgrade).collect();
         registry.clear();
         connections
+    }
+
+    /// The listeners still open, for release once the pool has closed.
+    fn take_listeners(&self) -> Vec<Arc<listen::ListenerState>> {
+        let mut registry = self
+            .listeners
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let listeners = registry.iter().filter_map(Weak::upgrade).collect();
+        registry.clear();
+        listeners
     }
 }
 
@@ -474,6 +490,7 @@ fn pool_new(mut cx: FunctionContext) -> JsResult<JsBox<PoolHandle>> {
         closed: CancellationToken::new(),
         acquire_timeout: built.acquire_timeout,
         connections: SyncMutex::new(Vec::new()),
+        listeners: SyncMutex::new(Vec::new()),
     }))))
 }
 
@@ -483,11 +500,15 @@ fn pool_new(mut cx: FunctionContext) -> JsResult<JsBox<PoolHandle>> {
 fn pool_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let connections = state.close_now();
+    let listeners = state.take_listeners();
     settle::promise(
         &mut cx,
         async move {
             for connection in connections {
                 drop(connection.slot.lock().await.take());
+            }
+            for listener in listeners {
+                listener.release().await;
             }
             Ok(())
         },

@@ -40,6 +40,8 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `pool.stream(query)`, `connection.stream(query)` | `ResultStream`, an `AsyncIterator[Record]` and async context manager |
 | `copy_in(statement, source)` on a pool, connection or transaction | `int` rows inserted |
 | `copy_out(statement)` on a pool, connection or transaction | `CopyOutStream`, an `AsyncIterator[bytes]` and async context manager |
+| `pool.listener(capacity=1024)` | `Listener`, an `AsyncIterator[Notification]` and async context manager |
+| `notify(channel, payload)` on a pool, connection or transaction | `None` |
 | `connection.begin()`, `transaction.begin()` | `Transaction` |
 | `Model.find().all(executor)` | `list[ModelRecord]` |
 | `Model.find().one_opt(executor)` | `ModelRecord \| None` |

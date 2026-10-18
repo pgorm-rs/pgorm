@@ -224,18 +224,18 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+18]
+> [spec:pgorm:req:sql.scope+19]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
 > `SqlTemplate` in expression position, `FromItem::Template` in relation
 > position, and `ConnectionTrait::execute` / `batch_execute` /
 > `query_raw` for a whole statement — so what follows records a decision about
-> the *typed* surface, never about what a caller can send. The exception is
-> named here too: `LISTEN`'s notifications travel outside any statement
-> result, so no route above reaches them. `COPY`'s data flow travels outside
-> one as well, and has a route of its own, `copy_in` and `copy_out`
-> (`conn.copy`). Each entry
+> the *typed* surface, never about what a caller can send. Two things travel
+> outside any statement's result, so no route above reaches them, and each has
+> a route of its own: `COPY`'s data flow, through `copy_in` and `copy_out`
+> (`conn.copy`), and `LISTEN`'s notifications, through a listening connection
+> (`conn.listen`). Each entry
 > MUST carry a verdict and the reason for it; "deferred" MUST additionally say
 > what closing it would take, because a deferral whose cost is unrecorded is
 > indistinguishable from an oversight. An entry graduates by being implemented
@@ -281,11 +281,6 @@ today, including panicking edges and deliberate failsafes.
 >   unlike a database, a schema belongs to one database and is created inside
 >   a transaction. Closing it takes the two statements, with `IF [NOT] EXISTS`
 >   and `CASCADE` / `RESTRICT` (`sql-schemas`).
-> - **`LISTEN`.** `NOTIFY` is a statement `execute` already sends (or
->   `pg_notify(..)` an expression), but a notification arrives on the
->   connection that listened, which the pool keeps out of reach. Closing it
->   takes a dedicated listening connection that yields notifications as a
->   stream, with quoted channel names (`conn-listen`).
 >
 > **Out of scope** — not the builder's job:
 >

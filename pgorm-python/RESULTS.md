@@ -138,6 +138,44 @@ their original asyncio loop. `asyncio.timeout()`/task cancellation discard an
 active query connection whose state is uncertain; cancellation never promises
 rollback of an already submitted write. No query is retried by the binding.
 
+## Notifications
+
+```python
+async with Pool(os.environ["DATABASE_URL"]) as pool:
+    async with await pool.listener() as listener:
+        await listener.listen("jobs")
+        async with pool.transaction() as tx:
+            await tx.notify("jobs", "42")
+        async for notification in listener:
+            print(notification.channel, notification.payload, notification.process_id)
+            break
+```
+
+`pool.listener()` opens a connection of its own with the pool's configuration
+and TLS, outside the pool's size: PostgreSQL delivers a notification only to
+the session that listened, which a pooled connection, lent onward once
+returned, cannot be. Closing the pool closes its listeners. `listen`,
+`unlisten` and `unlisten_all` change what it receives and may run while
+another task iterates it. A channel name is exact, sent as a quoted
+identifier, and one longer than 63 bytes raises `ConstructionError` before
+anything is sent.
+
+Iteration yields `Notification` objects in the order PostgreSQL sent them:
+commit order across transactions, a rolled-back transaction's never. At most
+`capacity` (default 1024) wait unread; one more closes the listener, and
+iteration raises `ConnectionError` after yielding those waiting. A failed or
+terminated connection raises its error the same way. Nothing reconnects,
+since a notification sent while nothing listened is lost and the reader must
+re-read what it tracks. Only one pull may run at a time; a cancelled pull
+loses nothing, while a cancelled `listen`, `unlisten` or `unlisten_all` closes
+the listener, since what the server did is then unknown. Closing the listener
+ends iteration.
+
+`notify(channel, payload)` on a pool, connection or transaction sends
+`SELECT pg_notify($1, $2)` with both values bound, delivered when the
+transaction commits. The server refuses a payload of 8000 bytes or more
+(`DatabaseError`, SQLSTATE `22023`).
+
 ## Verification
 
 Run the installed-wheel suite through the disposable PostgreSQL wrapper in
