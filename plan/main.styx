@@ -421,6 +421,14 @@ children (
                         text "Stale-epoch review: same as sql.ast — the DDL rule family was rewritten wholesale by ddl-empty-builders/ddl-table-target/foreign-key-shape with by-construction guarantees and oracle-checked coverage; the drift this staleness records is that work landing after the node's Done stamp. Re-acknowledging to open a new Done epoch."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:39:51.535052Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ddl +9: the entry-point list gains Table::create_as, View (create/create_recursive/drop) and MaterializedView (create/refresh/drop), and the no-placeholder list gains view, materialized view and CREATE TABLE AS, whose Display impls carry the inlining note and whose renderers are pub(crate) (sql-views, 19a670c7). Annotations re-pinned from +8."
+                        after_done true
+                    }
                 )
             }
 
@@ -8667,6 +8675,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at sql.surface +28, which adds Interval (sql.value.interval) to the register in f9db65b7; the merges of branches cut before the 2026-10-18 re-check had also restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T16:39:51.435781Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.surface +29: the register now records View, ViewCreateStatement, RecursiveViewCreateStatement, ViewCheckOption, ViewDropStatement, MaterializedView, MaterializedViewCreateStatement, MaterializedViewRefreshStatement, MaterializedViewDropStatement and TableCreateAsStatement (sql-views, 19a670c7), each named in lib.rs's explicit schema-statement re-exports with its module private; no glob, no new public module."
                         after_done true
                     }
                 )
