@@ -617,6 +617,14 @@ children (
                         text "Re-checked 2026-10-18 at entity.traits.column.enum-cast +7 (sql-domains, d5d22226): a domain over an enum or a created range is read and written through its base's casts, to the domain's name; PostgreSQL resolves no operator for a domain over an enum (42883), so a predicate on one is the server's refusal."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:44:42.195598Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "entity.traits.column.enum-cast +8 (domain-enum-predicates, 47aa595c): a column whose domain is over an enum compares as the enum, every ColumnTrait comparison casting the column and its value operands (an array operand to the enum's array) to the enum in place of save_as, the column-taking and expression-taking forms included."
+                        after_done true
+                    }
                 )
             }
 
@@ -703,6 +711,15 @@ children (
                         [spec:pgorm:sem:exec.paginator.raw]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T22:44:42.299384Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "exec.cursor.keyset +6 (domain-enum-predicates, 47aa595c): an order column whose domain is over an enum is cast to the enum in each boundary comparison, its boundary value to the enum in place of save_as, while ORDER BY keeps the bare column, which sorts as the enum does."
+                        after_done true
+                    }
+                )
             }
 
             {
