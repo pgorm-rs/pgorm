@@ -1,5 +1,5 @@
 use crate::Error;
-use proc_macro2::{Delimiter, Ident, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Ident, Spacing, TokenStream, TokenTree};
 use quote::format_ident;
 
 /// `format_ident!` panics on anything that is not a legal Rust identifier, so
@@ -32,7 +32,7 @@ fn is_ident(raw: &str) -> bool {
 /// transform would read from it is not the key written: one `PrimaryKey`
 /// variant twice over, or a unique key whose set of columns is narrower than
 /// its list.
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 // [spec:pgorm:sem:codegen.entity.transform+14]
 pub(crate) fn repeated_column<I>(columns: I) -> Option<String>
 where
@@ -45,8 +45,9 @@ where
 }
 
 /// `tokens` as the Rust a person writes: no space around `::`, `.` or
-/// brackets, one after each comma. The writers carry an expression as the
-/// text of an attribute, which no formatter reaches, so it is spaced here.
+/// brackets, one after each comma and after a field's `:`. The writers carry
+/// an expression or a column type as the text of an attribute, which no
+/// formatter reaches, so it is spaced here.
 // [spec:pgorm:sem:codegen.entity.expressions]
 pub(crate) fn rust_source(tokens: &TokenStream) -> String {
     let mut source = String::new();
@@ -56,8 +57,12 @@ pub(crate) fn rust_source(tokens: &TokenStream) -> String {
 
 fn write_source(tokens: &TokenStream, source: &mut String) {
     let mut words = false;
+    // The first `:` of a `::` is joined to the next; a `:` that closes one
+    // is not, so whether one is open decides which a lone `:` is.
+    let mut path = false;
     for token in tokens.clone() {
         let word = matches!(token, TokenTree::Ident(_) | TokenTree::Literal(_));
+        let after_word = words;
         if word && words {
             source.push(' ');
         }
@@ -67,14 +72,23 @@ fn write_source(tokens: &TokenStream, source: &mut String) {
                 let (open, close) = match group.delimiter() {
                     Delimiter::Parenthesis => ("(", ")"),
                     Delimiter::Bracket => ("[", "]"),
+                    Delimiter::Brace if after_word => (" { ", " }"),
                     Delimiter::Brace => ("{ ", " }"),
                     Delimiter::None => ("", ""),
                 };
                 source.push_str(open);
                 write_source(&group.stream(), source);
+                if group.delimiter() == Delimiter::Brace && source.ends_with(", ") {
+                    source.truncate(source.len() - 2);
+                }
                 source.push_str(close);
             }
             TokenTree::Punct(punct) if punct.as_char() == ',' => source.push_str(", "),
+            TokenTree::Punct(punct) if punct.as_char() == ':' => {
+                let joint = punct.spacing() == Spacing::Joint;
+                source.push_str(if joint || path { ":" } else { ": " });
+                path = joint;
+            }
             TokenTree::Punct(punct) => source.push(punct.as_char()),
             other => source.push_str(&other.to_string()),
         }

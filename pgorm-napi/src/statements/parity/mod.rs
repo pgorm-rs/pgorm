@@ -187,6 +187,7 @@ fn window_and_range_family_matches_its_golden_file() {
 // [spec:pgorm:req:napi.schema-sequences/test]
 // [spec:pgorm:req:napi.schema-views/test]
 // [spec:pgorm:req:napi.schema-schemas/test]
+// [spec:pgorm:req:napi.schema-domains/test]
 #[test]
 fn schema_family_matches_its_golden_file() {
     let mut cases = schema::cases();

@@ -335,7 +335,7 @@ struct Arrays {
     bytes: Vec<u8>,
 }
 
-// [spec:pgorm:def:exec.decode.array+1/test]    the array-decoding subset, and
+// [spec:pgorm:def:exec.decode.array+2/test]    the array-decoding subset, and
 // `Vec<u8>` staying bytes rather than an array
 #[pgorm_macros::test]
 async fn decode_arrays() -> Result<(), Error> {

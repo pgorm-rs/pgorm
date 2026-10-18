@@ -792,7 +792,7 @@ fn select_48a() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+5/test]    `Asterisk` as a bare projection
+// [spec:pgorm:def:sql.ast.keywords+6/test]    `Asterisk` as a bare projection
 #[test]
 fn select_49() {
     let statement = Query::select()
@@ -803,7 +803,7 @@ fn select_49() {
     assert_eq!(statement, r#"SELECT * FROM "character""#);
 }
 
-// [spec:pgorm:def:sql.ast.keywords+5/test]    `(Table, Asterisk)` renders `"table".*`
+// [spec:pgorm:def:sql.ast.keywords+6/test]    `(Table, Asterisk)` renders `"table".*`
 #[test]
 fn select_50() {
     let statement = Query::select()
@@ -2441,7 +2441,7 @@ fn cast_param_is_not_pinned_when_rendered_inline() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+5/test]    the bare-keyword expressions and their constructors
+// [spec:pgorm:def:sql.ast.keywords+6/test]    the bare-keyword expressions and their constructors
 #[test]
 fn keywords_1() {
     assert_eq!(
@@ -2450,12 +2450,13 @@ fn keywords_1() {
             .expr(Expr::current_time())
             .expr(Expr::current_timestamp())
             .expr(Keyword::Null)
+            .expr(Expr::domain_value())
             .to_string(),
-        "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, NULL"
+        "SELECT CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, NULL, VALUE"
     );
 }
 
-// [spec:pgorm:def:sql.ast.keywords+5/test]    `Name::runtime` wraps an arbitrary string as an
+// [spec:pgorm:def:sql.ast.keywords+6/test]    `Name::runtime` wraps an arbitrary string as an
 // identifier, and it is the only runtime-name helper — there is no empty-name alias
 #[test]
 fn keywords_2() {

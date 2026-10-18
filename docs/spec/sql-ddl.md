@@ -6,6 +6,7 @@ foreign key statements (`pgorm-query/src/index/`,
 `pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` / `AS RANGE` and extension
 statements (`pgorm-query/src/extension.rs`), sequence statements
 (`pgorm-query/src/sequence/`), schema statements (`pgorm-query/src/schema.rs`),
+domain statements (`pgorm-query/src/domain/`),
 view and materialized view statements
 (`pgorm-query/src/view/`) and `CREATE TABLE AS`
 (`pgorm-query/src/table/create_as.rs`), `COMMENT ON` statements
@@ -14,11 +15,12 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+10]
+> [spec:pgorm:req:sql.ddl+11]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`create_as`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
+> `Domain` (`create`/`alter`/`drop`),
 > `Schema` (`create`/`drop`/`rename`),
 > `Sequence` (`create`/`alter`/`drop`/`rename`),
 > `View` (`create`/`create_recursive`/`drop`),
@@ -41,9 +43,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > that pair is for inspection and the inlined rendering is what a caller
 > executes; both the `build` doc and the `Display` doc MUST say so.
 >
-> Every other DDL statement — schema, table, index, foreign-key, sequence,
-> view, materialized view, `CREATE TABLE AS`, comment, extension, `DROP TYPE` —
-> has
+> Every other DDL statement — schema, domain, table, index, foreign-key,
+> sequence, view, materialized view, `CREATE TABLE AS`, comment, extension,
+> `DROP TYPE` — has
 > no placeholder-emitting entry point at all: its renderer is
 > `pub(crate)` and its only public route is `Display` over a `String` sink, so
 > a value it carries (a column `DEFAULT`, a `CHECK` expression, a value in
@@ -438,7 +440,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > program text reaches that position. Anything expressible through the typed
 > setters MUST use them instead.
 
-> [spec:pgorm:req:sql.ddl.column-types+5]
+> [spec:pgorm:req:sql.ddl.column-types+6]
 > `prepare_column_type` defines the `ColumnType` → Postgres type-name
 > contract, and it is total: every variant has exactly one Postgres spelling
 > and none can fail. It MUST spell: `Char(Some(n))`→`char(n)`,
@@ -456,7 +458,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `VarBit(n)`→`varbit(n)`; `Boolean`→`bool`; `Money`→`money`; `Json`→`json`;
 > `JsonBinary`→`jsonb`; `Uuid`→`uuid`; `Array(t)`→ recursive element spelling
 > plus `[]`; `Vector(Some(n))`→`vector(n)`, `Vector(None)`→`vector`;
-> `Named(type_name)` and `Enum { name, .. }`→ the type name through
+> `Named(type_name)`, and `Enum`, `CreatedRange`, `CreatedMultirange` and
+> `Domain` by their `name` and `schema`→ the type name through
 > `TypeName`'s part policy (`sql.types.type-name`), a lowercase name that
 > is no restricted keyword bare and anything else quoted; `Cidr`→`cidr`;
 > `Inet`→`inet`; `MacAddr`→`macaddr`;
@@ -1594,6 +1597,100 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > creates objects every builder here already creates qualified by the
 > schema's name, and PostgreSQL refuses it beside `IF NOT EXISTS` (`0A000`),
 > the clause a migration reaches for.
+
+## Domains
+
+> [spec:pgorm:req:sql.ddl.domain]
+> `Domain` builds the statements a domain takes: `create(name, base)`,
+> `alter(name)` and `drop(name)`. A domain is a type, so each name is an
+> `IntoTypeRef` — a bare name or a `(schema, name)` pair — rendered as
+> `TypeRef`'s quoted, dot-joined parts, as an enum type's is
+> (`sql.ddl.type-enum`). The base is a `ColumnType`, spelled as a column's
+> type is (`sql.ddl.column-types`), another domain or an array included.
+>
+> - `DomainCreateStatement` MUST render `CREATE DOMAIN <name> AS <base>[
+>   COLLATE <collation>][ DEFAULT <expr>][ NOT NULL| NULL][ <check>...]`, the
+>   clauses in that order whatever order they were given in and the checks in
+>   the order added. A default and a nullability are one slot each, the last
+>   call winning, because PostgreSQL refuses two defaults and a `NULL` beside a
+>   `NOT NULL` (`42601`). The default sits where the grammar reads a `b_expr`,
+>   which has no logical operator, `IS`, `BETWEEN`, `IN` or `LIKE`, so a
+>   `Unary`, `Binary`, `Raw`, `Template` or `LikePattern` default MUST render
+>   parenthesised and any other expression bare.
+> - `Domain::alter` yields a `PendingDomainAlter`, and only choosing an action
+>   on it produces a `DomainAlterStatement`, which carries exactly that
+>   action: PostgreSQL has no `ALTER DOMAIN` without one and no list of them
+>   (`42601`), so neither MUST construct
+>   (`[dec:pgorm:invalid-states-unrepresentable]`). It MUST render `ALTER
+>   DOMAIN <name> ` followed by one of `SET DEFAULT <expr>`, `DROP DEFAULT`,
+>   `SET NOT NULL`, `DROP NOT NULL`, `ADD <check>[ NOT VALID]`, `DROP
+>   CONSTRAINT [IF EXISTS ]<name>[ CASCADE| RESTRICT]` (a `ConstraintDrop`,
+>   `sql.ddl.alter-table`), `RENAME CONSTRAINT <name> TO <new>`, `VALIDATE
+>   CONSTRAINT <name>` or `RENAME TO <new>`, the new name a bare `Name`
+>   because a rename leaves a domain in its schema (`42601` for a qualified
+>   one). `SET DEFAULT` reads the full expression grammar and renders its
+>   expression bare. `ALTER DOMAIN` has no `IF EXISTS` (`42601`), so neither
+>   type offers one.
+> - `DomainDropStatement` MUST render `DROP DOMAIN [IF EXISTS ]<name>[,
+>   <name>...][ CASCADE| RESTRICT]`. `Domain::drop` takes the first name and
+>   `name()` appends, so the list is non-empty; `cascade()` and `restrict()`
+>   share one `DropBehavior` slot, the last call winning.
+>
+> A check renders `[CONSTRAINT <name> ]CHECK (<expr>)`. It is a `DomainCheck`
+> — its expression, which the constructor takes, and an optional name — or
+> an expression, the unnamed check over it (`IntoDomainCheck`); unnamed,
+> PostgreSQL names it `<domain>_check`. It is not the table's `Check`, which
+> carries a `NO INHERIT` and an enforcement that a domain's check refuses
+> (`42P17` at `CREATE DOMAIN`, `0A000` at `ALTER DOMAIN`). `DomainCheck::
+> not_valid` wraps it in the `NotValid` that `add_check` takes beside a
+> plain check (`sql.ddl.alter-table`), leaving the values columns of the
+> domain already hold unchecked until `VALIDATE CONSTRAINT`;
+> `DomainCreateStatement::check` takes no `NotValid`, the grammar having no
+> `NOT VALID` at `CREATE DOMAIN` (`42601`). The value a check tests is
+> `Expr::domain_value()`, `Keyword::Value`, which renders `VALUE`
+> (`sql.ast.keywords`): PostgreSQL reads that name inside a domain's check as
+> the value tested and anywhere else as a column named `value`.
+>
+> Every statement renders through `Display` alone, a default and the values a
+> check compares with inlined (`[spec:pgorm:req:sql.ddl+11]`), and is undone
+> with the transaction it runs in. A column whose type is a domain is
+> `ColumnType::Domain` (`sql.types.column-type`), which renders the domain's
+> name through `TypeName`'s part policy alone, as an array's element and as
+> another domain's base.
+>
+> What the server refuses, no builder value can see, and the live suite holds
+> each refusal by SQLSTATE: a domain name a type already has, created or
+> renamed onto (`42710`); a second constraint of one name, added or renamed
+> onto (`42710`); a missing domain or constraint (`42704`, a notice under a
+> drop's `IF EXISTS`); a value outside a check (`23514`) and a null under `NOT
+> NULL` (`23502`), whether written to a column of the domain or met among the
+> values already there by `ADD CHECK`, `SET NOT NULL` or `VALIDATE
+> CONSTRAINT`; a subquery in a default or a check (`0A000`); a `COLLATE` on a
+> base type with no collation (`42804`); and a drop under `RESTRICT`, said or
+> unsaid, of a domain a column is typed with (`2BP01`), where `CASCADE` drops
+> the column too. A `NOT VALID` check holds every value written after it and
+> leaves the rest, which its `VALIDATE CONSTRAINT` then refuses with `23514`.
+> The suite also has an entity whose columns are domains read and write
+> through them, a check's refusal reaching the caller as pgorm's typed error.
+>
+> PostgreSQL's plan cache does not see a domain's default change. An insert
+> that leaves a column of the domain out is planned with the domain's default
+> in it, and `ALTER DOMAIN … SET DEFAULT` or `DROP DEFAULT` invalidates no
+> plan, so a statement a connection prepared before the change keeps writing
+> the default it was planned with — and pgorm prepares each statement once per
+> pooled connection and reuses it — while the same statement prepared after
+> it, or sent unprepared, writes the new one. A check or a `NOT NULL` added at
+> the same point holds at once, being tested as each value is written; the
+> suite holds both on 18.6. A migration that changes a domain's default runs
+> before the connections that insert through it are opened, or replaces them.
+>
+> Three spellings are not built. `ALTER DOMAIN … SET SCHEMA` the builder has
+> for no table, sequence or type either, and `OWNER TO` is a role change,
+> which `[spec:pgorm:req:sql.scope+21]` rules out with privileges. A named
+> `NOT NULL` — `CONSTRAINT <name> NOT NULL`, or one added with `ADD
+> CONSTRAINT` — adds nothing a caller needs: `not_null()` and
+> `set_not_null()` write the same constraint, which PostgreSQL names
+> `<domain>_not_null`, and `drop_not_null()` drops it by no name.
 
 ## Extensions
 

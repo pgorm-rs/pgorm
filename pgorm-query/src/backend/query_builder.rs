@@ -24,6 +24,8 @@ mod constraint;
 mod copy;
 #[path = "query_builder_cte.rs"]
 mod cte;
+#[path = "query_builder_domain.rs"]
+mod domain;
 #[path = "query_builder_from_item.rs"]
 mod from_item;
 #[path = "query_builder_generated.rs"]
@@ -1102,6 +1104,8 @@ impl QueryBuilder {
             Keyword::CurrentDate => write!(sql, "CURRENT_DATE").unwrap(),
             Keyword::CurrentTime => write!(sql, "CURRENT_TIME").unwrap(),
             Keyword::CurrentTimestamp => write!(sql, "CURRENT_TIMESTAMP").unwrap(),
+            // [spec:pgorm:req:sql.ddl.domain]
+            Keyword::Value => write!(sql, "VALUE").unwrap(),
         }
     }
 
@@ -1507,7 +1511,7 @@ impl QueryBuilder {
         });
     }
 
-    // [spec:pgorm:req:sql.ddl.column-types+5]
+    // [spec:pgorm:req:sql.ddl.column-types+6]
     // [spec:pgorm:def:sql.render.ddl.types+6]
     fn prepare_column_type(&self, column_type: &ColumnType, sql: &mut dyn SqlWriter) {
         write!(
@@ -1575,7 +1579,8 @@ impl QueryBuilder {
                 ColumnType::Named(type_name) => type_name.to_sql_string(),
                 ColumnType::Enum { name, schema, .. }
                 | ColumnType::CreatedRange { name, schema, .. }
-                | ColumnType::CreatedMultirange { name, schema, .. } => {
+                | ColumnType::CreatedMultirange { name, schema, .. }
+                | ColumnType::Domain { name, schema, .. } => {
                     let mut type_name = TypeName::new(Name::clone(name));
                     type_name.schema = schema.clone();
                     type_name.to_sql_string()
@@ -2457,19 +2462,7 @@ impl QueryBuilder {
         drop: &TypeDropStatement,
         sql: &mut dyn SqlWriter,
     ) {
-        write!(sql, "DROP TYPE ").unwrap();
-
-        if drop.if_exists {
-            write!(sql, "IF EXISTS ").unwrap();
-        }
-
-        drop.names_iter().fold(true, |first, name| {
-            if !first {
-                write!(sql, ", ").unwrap();
-            }
-            self.prepare_type_ref(name, sql);
-            false
-        });
+        self.prepare_type_names_drop("TYPE", drop.if_exists, drop.names_iter(), sql);
 
         if let Some(option) = &drop.option {
             write!(sql, " ").unwrap();

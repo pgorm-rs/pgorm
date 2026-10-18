@@ -358,7 +358,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > there are no relations; the `Related` impls; and
 > `impl ActiveModelBehavior for ActiveModel {}`.
 
-> [spec:pgorm:sem:codegen.entity.compact.attrs+7]
+> [spec:pgorm:sem:codegen.entity.compact.attrs+8]
 > In the compact Model, each field's `#[pgorm(...)]` attribute assembles
 > parts in this fixed order: `column_name = "..."` when the DB column name
 > is not already snake_case; `primary_key` when the column is in the primary
@@ -379,7 +379,10 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > spells its `IntervalSpec` (`codegen.entity.types`):
 > `Interval(IntervalSpec::Fields(PgInterval::YearToMonth))`,
 > `Interval(IntervalSpec::Any(Some(IntervalPrecision::P3)))`. An unqualified
-> `interval` is what an `Interval` field infers, and states none. An array
+> `interval` is what an `Interval` field infers, and states none. A domain
+> column always states one, `Domain { name: Name::runtime("..."), schema: ..,
+> base: Arc::new(..) }` as the expanded writer spells it
+> (`codegen.entity.types`), because no Rust type infers a domain. An array
 > carries `Array(Arc::new(ColumnType::<element>))` when its element is one of
 > these other than `Float`, `Double` and `Bytea`, which `f32`, `f64` and
 > `Vec<u8>` infer as they are: the derive infers an array as the array of
@@ -393,10 +396,11 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > The `column_type` part's string is re-parsed as tokens by
 > `DeriveEntityModel` and spliced after `ColumnType::`
 > (`macros.derive.entity-model.column-def`), so it is generated *program
-> text*, and the names it uses — `Arc`, `ColumnType`, `IntervalSpec`,
+> text*, and the names it uses — `Arc`, `ColumnType`, `Name`, `IntervalSpec`,
 > `PgInterval`, `IntervalPrecision` — resolve through the prelude glob the
-> entity file imports (`[spec:pgorm:def:entity.prelude+8]`). Every part of it
-> but the named type's name is fixed by this rule —
+> entity file imports (`[spec:pgorm:def:entity.prelude+8]`), as an enum a
+> domain is over resolves through the import of it. Every part of it
+> but the named type's and a domain's names is fixed by this rule —
 > `Decimal`'s precision and scale are integers, and an interval's qualifier
 > is one of a closed set of variants — and the name, which comes
 > from the described schema, MUST be written by rendering it as a string
@@ -406,7 +410,8 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > generated file or, given a comment opener, names a *different* type with
 > nothing reporting the difference. Rendered as a literal it round-trips
 > whole, so `named("...")` here and `ColumnType::named("...")` in the
-> expanded writer (`codegen.entity.types`) spell one name the same way. The
+> expanded writer (`codegen.entity.types`) spell one name the same way, as a
+> domain's name and schema are each spelled inside `Name::runtime("...")`. The
 > shapes that spelling cannot carry are refused before the writer runs
 > (`codegen.entity.types.unsupported`).
 >
@@ -479,7 +484,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Type mapping
 
-> [spec:pgorm:sem:codegen.entity.types+7]
+> [spec:pgorm:sem:codegen.entity.types+8]
 > Model field types come from `Column::get_rs_type`: a non-null column maps
 > to `T`, a nullable column to `Option<T>`, where `T` is:
 >
@@ -498,6 +503,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > | `Array(inner)` | `Vec<T(inner)>` (recursive) |
 > | `Range(t)` / `Multirange(t)` | `Range<E>` / `Multirange<E>`, `E` being `i32`, `i64`, `Decimal`, `Date`, `DateTime` or `DateTimeWithTimeZone` for `Int4` through `TimestampTz` |
 > | `CreatedRange { name, .. }` / `CreatedMultirange { name, .. }` | UpperCamelCase of `name`, the newtype over `Range<E>` / `Multirange<E>` that `pgorm_range_types.rs` declares |
+> | `Domain { base, .. }` | `T(base)` (recursive): a domain's values are its base type's |
 > | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime+1` |
 >
 > No row produces an unsigned Rust integer: Postgres has no unsigned integer
@@ -546,10 +552,29 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > over the same files `pgorm-codegen/tests/sql/created_range/` compares the
 > writer's output with.
 >
+> A domain column is a field of its base's Rust type — an integer, an enum's
+> `ActiveEnum`, a created range's newtype, a `Vec` for a domain over an array
+> — and an array of one a `Vec` of that. The domain's name rides in the
+> column's definition, as an interval's qualifier does, so that the table the
+> entity creates types the column with the domain and a value the entity
+> writes is held to the domain's default, `NOT NULL` and checks. Both writers
+> spell `ColumnType::Domain { name: Name::runtime("<name>"), schema:
+> <Some(Name::runtime("<schema>")) or None>, base: Arc::new(<base>) }` out,
+> the base spelled as a column's type is, but for an enum base, which is
+> `<Enum>::db_type().get_column_type().clone()`: the `Arc` holds a
+> `ColumnType`, where a field's own definition takes the `ColumnDef` that
+> `db_type()` returns. A domain over an enum or a created range imports and
+> generates that type as a column of it does. The live round trip of a
+> generated entity whose columns are domains over an integer, another
+> domain, a sized string, an enum, an array and a created range, a
+> schema-qualified one and arrays of two of them, is held at the workspace
+> root (`tests/codegen_domain_tests.rs`), over the files
+> `pgorm-codegen/tests/sql/domain/` compares the writer's output with.
+>
 > The `Eq` derive is added to the Model derive list only when no column's
 > type is `Float` or `Double`, checked recursively through `Array` element
-> types and a created range's or multirange's subtype; a single float column suppresses `Eq`
-> for the whole Model.
+> types, a created range's or multirange's subtype and a domain's base; a
+> single float column suppresses `Eq` for the whole Model.
 
 > [spec:pgorm:sem:codegen.entity.types.datetime+2]
 > Date/time columns map to one fixed set of field types, the prelude's
@@ -579,7 +604,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > glob rather than from any named crate, repointing the aliases is how the
 > temporal backing changes, and generated text does not move when it does.
 
-> [spec:pgorm:req:codegen.entity.types.unsupported+7]
+> [spec:pgorm:req:codegen.entity.types.unsupported+8]
 > Column types outside the mapping table are not supported, and support is
 > decided when a `Column` is built rather than when it is rendered. Both
 > `TryFrom<&ColumnDef> for Column` and — through it —
@@ -601,7 +626,12 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `RangeSubtype` covers")``, `<subtype>` in `Debug` form; an array of one is
 > refused as ``TransformError("... an array of range type `<name>` is not
 > supported by codegen; the newtype a created range generates has no array
-> conversion")``.
+> conversion")``. A domain is supported as its base is, a domain over a
+> domain recursively, and an array of one as an array of its base would be —
+> an array of a domain over a created range refused as that array is — but
+> for an array of a domain over an array, refused as ``TransformError("... an
+> array of a domain over an array is not supported by codegen; an entity
+> field holds one dimension")``.
 >
 > A type inside the table can still be beyond the writer, in which case the
 > same gate refuses it with its own message. `Enum { name, .. }` is refused
@@ -951,12 +981,12 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+15]
+> [spec:pgorm:req:codegen.ddl.unsupported+16]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints, and its `DEFAULT`s and generation expressions within the subset
 > `codegen.entity.expressions` reads; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
-> (`codegen.ddl.objects`); `CREATE INDEX`; and `COMMENT ON TABLE`
+> and `CREATE DOMAIN` (`codegen.ddl.objects`); `CREATE INDEX`; and `COMMENT ON TABLE`
 > / `COMMENT ON COLUMN` — with a column's `COLLATE` clause and a `NOT NULL`
 > constraint's name and `NO INHERIT`, which the bridged statement carries and
 > the entity, like a comment, does not (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
@@ -970,10 +1000,16 @@ compiling the C parser falls on people generating entities and on nobody else.
 > ``a CHECK constraint on column `t`.`c` `` — with `an unrecognised statement` as
 > the fallback for a statement kind the namer does not know.
 >
-> Named rejections MUST cover at least: every statement other than the five
+> Named rejections MUST cover at least: every statement other than the six
 > above; a range type option PostgreSQL does not have, a `SUBTYPE` that is not
 > a type name or is a `serial` spelling, and a range type with no `SUBTYPE`
-> (unresolved, as PostgreSQL refuses it with `42601`); `INHERITS`, `PARTITION BY`, `PARTITION OF`, `OF <type>`, `LIKE`, `WITH`
+> (unresolved, as PostgreSQL refuses it with `42601`); on a domain, a base
+> that is a `serial` spelling or names no type the file declared or the
+> vocabulary holds, a catalog-qualified domain name, and every constraint
+> PostgreSQL refuses there — ``a UNIQUE constraint on domain `d` ``, `a
+> PRIMARY KEY`, `a REFERENCES clause`, `a GENERATED clause`, `an identity
+> clause`, `a NO INHERIT constraint`, `a deferrable constraint`, `a NOT
+> ENFORCED constraint` and `an ENFORCED clause`, each `on domain <d>`; `INHERITS`, `PARTITION BY`, `PARTITION OF`, `OF <type>`, `LIKE`, `WITH`
 > storage options, `TABLESPACE`, `USING <access method>`, `ON COMMIT`,
 > catalog-qualified table and collation names and temporary or unlogged
 > tables; column
@@ -1107,7 +1143,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so there is no constraint a non-unique index could
 > be carried as. Its table must still exist.
 
-> [spec:pgorm:sem:codegen.ddl.types+8]
+> [spec:pgorm:sem:codegen.ddl.types+9]
 > Column types map back through the `ColumnType` → Postgres spelling contract of
 > `sql.ddl.column-types`, read over the names the grammar produces: keyword
 > spellings arrive qualified as `pg_catalog.<name>`, everything else bare or
@@ -1133,7 +1169,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > type, exactly as an enum resolves — by full identity, with no fallback to a
 > same-named range type under another qualification — and a name declared
 > as the multirange created beside one resolves to
-> `ColumnType::CreatedMultirange` the same way. `serial`, `bigserial` and `smallserial` (and
+> `ColumnType::CreatedMultirange` the same way. A name the file declared as a
+> domain resolves to `ColumnType::Domain` carrying its identity and its base's
+> column type, by full identity in the same way, the base read when the domain
+> was, so a domain over a domain carries it whole. `serial`, `bigserial` and `smallserial` (and
 > `serial4`/`serial8`/`serial2`) are `Integer`/`BigInteger`/`SmallInteger` plus
 > the auto-increment fact the renderer spells as the serial family. A name the
 > file declared as an enum type resolves to `ColumnType::Enum` carrying that
@@ -1170,7 +1209,9 @@ compiling the C parser falls on people generating entities and on nobody else.
 > `String(StringLen::None)`, since `StringLen::Max` renders the same bare
 > `varchar` and Postgres has no `varchar(max)` to have written it. Every other
 > `ColumnType` in the vocabulary has a reverse. `ColumnType::Named`
-> is deliberately not produced: a type name outside the table above is an error,
+> is deliberately not produced — a domain column is `Domain`, which says what
+> its values are, where `Named` would say only what DDL writes — and a type
+> name outside the table above is an error,
 > not a `String` column that quietly means something else. `varbit` without a
 > length, a modifier the vocabulary cannot hold (`timestamp(3)`), a sized or
 > multi-dimensional array, and a non-integer type modifier are all named
@@ -1291,7 +1332,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > a foreign key whose last pair is its period (`period(p, q)`), the grammar
 > putting `PERIOD` on the last column of each list and nowhere else.
 
-> [spec:pgorm:sem:codegen.ddl.objects+8]
+> [spec:pgorm:sem:codegen.ddl.objects+9]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -1317,8 +1358,20 @@ compiling the C parser falls on people generating entities and on nobody else.
 > 63 (`floatrange` → `floatmultirange`, `slot` → `slot_multirange`,
 > `"FloatRange"` → `"FloatRange_multirange"`; live on 18.6). A range or
 > multirange type is where `transform` discovers the newtypes it writes
-> (`codegen.entity.types`). Enums, ranges and multiranges share one
-> namespace, so `is declared twice` holds across the three kinds.
+> (`codegen.entity.types`). Enums, ranges, multiranges and domains share one
+> namespace, so `is declared twice` holds across the four kinds.
+>
+> A `CREATE DOMAIN` contributes its full identity and its base type, read as a
+> column's type is and so against the types declared before it, as
+> PostgreSQL requires: an enum, a range type or another domain may be a
+> domain's base, and an array or a sized type may be. Its `COLLATE`,
+> `DEFAULT`, `NOT NULL` or `NULL` and its `CHECK`s, named or not, are read
+> and set aside: the server holds every column of the domain to them, none
+> changes what a value of the domain is, and the entity names the domain,
+> which carries them. A domain's `NOT NULL` does not make a nullable column
+> of it a non-null field: the column reads as `NULL` wherever an outer join
+> or an absent row makes it one, and an insert leaving it out takes the
+> domain's default, so the field's nullability is the column's own.
 >
 > A unique `CREATE INDEX` is folded into its table as the unique key that
 > enforces the same uniqueness — a `TableKey<Unique>`

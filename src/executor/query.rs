@@ -1,6 +1,9 @@
 use crate::{SelectGetableValue, SelectorRaw, error::*};
 use std::error::Error as _;
 
+#[cfg(feature = "postgres-array")]
+#[path = "query_domain.rs"]
+mod domain;
 #[path = "query_range.rs"]
 mod range;
 
@@ -476,9 +479,10 @@ fn err_null_idx_col<I: RowIndex + std::fmt::Display>(_idx: I) -> TryGetError {
     TryGetError::Null("TODO".into()) //format!("{_idx:?}"))
 }
 
-// [spec:pgorm:def:exec.decode.array+1]
+// [spec:pgorm:def:exec.decode.array+2]
 #[cfg(feature = "postgres-array")]
 mod postgres_array {
+    use super::domain::Transparent;
     use super::*;
 
     #[allow(unused_macros)]
@@ -490,13 +494,14 @@ mod postgres_array {
                     res: &QueryResult,
                     idx: I,
                 ) -> Result<Self, TryGetError> {
-                    let result: Vec<$type> = res.row.try_get(idx).map_err(TryGetError::postgres)?;
-                    Ok(result)
+                    let result: Transparent<Vec<$type>> =
+                        res.row.try_get(idx).map_err(TryGetError::postgres)?;
+                    Ok(result.0)
                 }
 
                 // [spec:pgorm:sem:exec.verify.accepts]
                 fn accepts(ty: &Type) -> bool {
-                    <Vec<$type> as FromSql>::accepts(ty)
+                    <Transparent<Vec<$type>> as FromSql>::accepts(ty)
                 }
             }
         };
@@ -540,14 +545,14 @@ mod postgres_array {
                     res: &QueryResult,
                     idx: I,
                 ) -> Result<Self, TryGetError> {
-                    let res: Vec<uuid::Uuid> =
+                    let res: Transparent<Vec<uuid::Uuid>> =
                         res.row.try_get(idx).map_err(TryGetError::postgres)?;
-                    Ok(res.into_iter().map($conversion_fn).collect())
+                    Ok(res.0.into_iter().map($conversion_fn).collect())
                 }
 
                 // [spec:pgorm:sem:exec.verify.accepts]
                 fn accepts(ty: &Type) -> bool {
-                    <Vec<uuid::Uuid> as FromSql>::accepts(ty)
+                    <Transparent<Vec<uuid::Uuid>> as FromSql>::accepts(ty)
                 }
             }
         };

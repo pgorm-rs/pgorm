@@ -23,7 +23,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:exec.decode.array+1/test]    `Vec<i32>`, `Vec<Uuid>` and a
+// [spec:pgorm:def:exec.decode.array+2/test]    `Vec<i32>`, `Vec<Uuid>` and a
 // uuid format wrapper decoded element-wise from Postgres arrays
 // [spec:pgorm:def:exec.cursor.binding+6/test]    `Value::Array` binding by
 // recursively wrapping its elements, with a `None` array emitted as SQL NULL

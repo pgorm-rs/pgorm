@@ -2,6 +2,7 @@
 
 mod capabilities;
 mod column;
+mod domain;
 mod entity;
 mod enums;
 mod index;
@@ -13,6 +14,7 @@ mod view;
 
 pub(crate) use capabilities::operations as capabilities;
 pub use column::PyColumnDef;
+pub use domain::PyCreateDomain;
 pub use entity::PyEntitySchema;
 pub use index::PyCreateIndex;
 use pyo3::prelude::*;
@@ -26,6 +28,7 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyColumnDef>()?;
     module.add_class::<PyCreateTable>()?;
     module.add_class::<PyCreateIndex>()?;
+    module.add_class::<PyCreateDomain>()?;
     module.add_class::<PyDDL>()?;
     module.add_class::<PyEntitySchema>()?;
     module.add_function(wrap_pyfunction!(entity::schema_from_entity, module)?)?;
@@ -62,5 +65,18 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(namespace::create_schema, module)?)?;
     module.add_function(wrap_pyfunction!(namespace::drop_schema, module)?)?;
     module.add_function(wrap_pyfunction!(namespace::rename_schema, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::set_domain_default, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::drop_domain_default, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::set_domain_not_null, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::drop_domain_not_null, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::add_domain_check, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::drop_domain_constraint, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::rename_domain_constraint, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        domain::validate_domain_constraint,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(domain::rename_domain, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::drop_domain, module)?)?;
     Ok(())
 }

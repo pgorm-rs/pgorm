@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+6]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+7]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -170,6 +170,21 @@ explicit limitations.
 > the multirange created beside such a range is written the same way and read
 > as an enum column is, `select_as` casting it to `text`: tokio-postgres
 > reports that multirange as a simple type whose binary form it cannot read.
+>
+> A column whose type is a domain (`ColumnType::Domain`) is read and written
+> as its base is, and cast, where its base needs a cast, to the domain by its
+> own name. A domain over an enum — or over an array of one, or over another
+> such domain — is read as `text`, or `text[]` when what it holds is an
+> array, and a value written to it is cast to the domain, its array to the
+> domain's array; a domain over a created range or multirange is written
+> through `Expr::as_range` to the domain and its multirange read as `text`.
+> Every other domain needs no cast at all: its values travel as its base
+> type's (`exec.cursor.binding-accepts`), and a comparison with one resolves
+> its base type's operator. PostgreSQL resolves no enum operator for a domain
+> over an enum, though, not even between two values of the domain (`42883`,
+> *operator does not exist: d = d*), so a predicate on such a column is the
+> server's refusal; the column compares once cast to the enum, `Expr::col(c)
+> .cast_as(enum)` against a value cast the same way.
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
 > `save_as`: the scalar comparators, `between` / `not_between`, `if_null`, and

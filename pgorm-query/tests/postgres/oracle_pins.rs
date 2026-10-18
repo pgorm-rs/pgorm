@@ -248,7 +248,7 @@ fn alter_type_rename_emits_identifier() {
 // second-bearing fields and `interval HOUR(43)` has no spelling to render.
 // [spec:pgorm:req:sql.render.oracle+2/test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
-// [spec:pgorm:def:sql.types.column-type+10/test]
+// [spec:pgorm:def:sql.types.column-type+11/test]
 #[test]
 fn interval_precision_rides_on_seconds() {
     let hour = Table::create(Glyph::Table)
@@ -319,7 +319,7 @@ fn oracle_pins_extra_interpolated_raw() {
 // identifier PostgreSQL rejects has no constructor left.
 // [spec:pgorm:req:sql.render.oracle+2/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
-// [spec:pgorm:def:sql.ast.keywords+5/test]
+// [spec:pgorm:def:sql.ast.keywords+6/test]
 #[test]
 fn alias_identifiers_are_never_empty() {
     let sql = Query::select()

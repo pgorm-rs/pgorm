@@ -8,6 +8,7 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("literal", "pgorm_query::SimpleExpr::Constant"),
         ("tuple_expr", "pgorm_query::Expr::tuple"),
         ("call", "pgorm_query::Func"),
+        ("domain_value", "pgorm_query::Expr::domain_value"),
         ("expr.eq", "pgorm_query::SimpleExpr::binary(BinOper::Equal)"),
         (
             "expr.ne",

@@ -151,6 +151,70 @@
     "sql": "ALTER SCHEMA \"app\" RENAME TO \"App \"\"x\"\"\"",
     "values": []
   },
+  "create-domain": {
+    "sql": "CREATE DOMAIN \"app\".\"quantity\" AS integer DEFAULT 1 NOT NULL CONSTRAINT \"positive\" CHECK (VALUE > 0) CHECK (VALUE < 1000)",
+    "values": []
+  },
+  "create-domain-collated": {
+    "sql": "CREATE DOMAIN \"Code \"\"x\"\"\" AS text COLLATE \"pg_catalog\".\"C\" DEFAULT 'none' NULL",
+    "values": []
+  },
+  "create-domain-over-types": {
+    "sql": "CREATE DOMAIN \"tags\" AS varchar(20)[]",
+    "values": []
+  },
+  "create-domain-over-domain": {
+    "sql": "CREATE DOMAIN \"small\" AS app.quantity CHECK (VALUE BETWEEN 0 AND 10)",
+    "values": []
+  },
+  "alter-domain-set-default": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" SET DEFAULT 5",
+    "values": []
+  },
+  "alter-domain-drop-default": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" DROP DEFAULT",
+    "values": []
+  },
+  "alter-domain-set-not-null": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" SET NOT NULL",
+    "values": []
+  },
+  "alter-domain-drop-not-null": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" DROP NOT NULL",
+    "values": []
+  },
+  "alter-domain-add-check": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" ADD CHECK (VALUE <> 13)",
+    "values": []
+  },
+  "alter-domain-add-check-not-valid": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" ADD CONSTRAINT \"Small \"\"x\"\"\" CHECK (VALUE < 100) NOT VALID",
+    "values": []
+  },
+  "alter-domain-drop-constraint": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" DROP CONSTRAINT IF EXISTS \"small\" CASCADE",
+    "values": []
+  },
+  "alter-domain-rename-constraint": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" RENAME CONSTRAINT \"small\" TO \"tiny\"",
+    "values": []
+  },
+  "alter-domain-validate-constraint": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" VALIDATE CONSTRAINT \"small\"",
+    "values": []
+  },
+  "alter-domain-rename": {
+    "sql": "ALTER DOMAIN \"app\".\"quantity\" RENAME TO \"units\"",
+    "values": []
+  },
+  "drop-domain": {
+    "sql": "DROP DOMAIN \"quantity\"",
+    "values": []
+  },
+  "drop-domains": {
+    "sql": "DROP DOMAIN IF EXISTS \"quantity\", \"app\".\"quantity\" RESTRICT",
+    "values": []
+  },
   "comment-on-table": {
     "sql": "COMMENT ON TABLE \"app\".\"booking\" IS 'Rooms booked, and when'",
     "values": []

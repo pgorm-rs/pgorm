@@ -126,7 +126,7 @@ platforms (
     }
     {
         platform "python-codegen"
-        files (pgorm-python/tests/codegen-entities/** pgorm-python/tests/application-binding/src/account.rs pgorm-python/tests/application-binding/src/note.rs pgorm-codegen/tests/sql/interval/interval_span.rs)
+        files (pgorm-python/tests/codegen-entities/** pgorm-python/tests/application-binding/src/account.rs pgorm-python/tests/application-binding/src/note.rs pgorm-codegen/tests/sql/interval/interval_span.rs pgorm-codegen/tests/sql/domain/*.rs)
         checks {
             format {
                 cmd "cargo fmt --manifest-path pgorm-python/tests/codegen-entities/Cargo.toml --all -- --check"
@@ -386,6 +386,13 @@ quality {
         // Rust constructor over the coerced operand. Python can only reach
         // a Rust function through such an entry point; removing it removes
         // JSON_SCALAR from Python
-        allow-names (new account_only over raw json_scalar)
+        //
+        // drop_domain_default, set_domain_not_null and drop_domain_not_null
+        // are pgorm-python's bindings of the three ALTER DOMAIN actions that
+        // take nothing but the domain, so each body is the one call that
+        // chooses the action. Python reaches an action only through its own
+        // entry point; folding them into one function taking the action as a
+        // string would trade three typed names for one untyped argument
+        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null)
     }
 }

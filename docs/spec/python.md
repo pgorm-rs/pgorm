@@ -316,6 +316,44 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > schema that holds anything (`2BP01`). The capability manifest lists each
 > function as a `schema.` operation needing no registration.
 
+> [spec:pgorm:req:python.schema-domains]
+> `pgorm.schema` MUST build the statements over a domain through pgorm-query's
+> `Domain` (`sql.ddl.domain`), each domain named as an enum type is — a name,
+> or a `TypeName` carrying its schema — and every other name an identifier, a
+> `str` or an `Identifier`. `CreateDomain(name, base)`, also spelled
+> `create_domain`, is a builder as `CreateTable` is: the base is what
+> `ColumnDef` takes for a type, and `collate(name, *, schema)`,
+> `default(value)`, `not_null()`, `null()` and `check(condition, *, name)` each
+> return a new builder with that clause, the default and the nullability one
+> slot each, the later call winning, and the checks in the order added. Each
+> `ALTER DOMAIN` action is a function returning a `DDL` statement over the
+> domain it names first: `set_domain_default(domain, value)`,
+> `drop_domain_default(domain)`, `set_domain_not_null(domain)`,
+> `drop_domain_not_null(domain)`, `add_domain_check(domain, condition, *, name,
+> not_valid)`, `drop_domain_constraint(domain, name, *, if_exists, cascade)`,
+> `rename_domain_constraint(domain, name, new_name)`,
+> `validate_domain_constraint(domain, name)` and `rename_domain(domain,
+> new_name)`, none taking an `if_exists`, PostgreSQL's grammar having none for
+> `ALTER DOMAIN`; and `drop_domain(domain, *domains, if_exists, cascade)` drops
+> every domain it names, in order, the first required so the list is never
+> empty. A check's condition is a query expression, and
+> `pgorm.domain_value()` is the value it tests, the keyword `VALUE`.
+> `inspect()` gives an empty parameter list, a default and a check's values
+> inlined. A name that is not an identifier, a check that is not an expression
+> and an unknown base type MUST be refused as the statement is built, the
+> first two with `ConstructionError`. What only the server knows it refuses by
+> SQLSTATE, as a `DatabaseError`: a name a type or constraint already has
+> (`42710`), a missing domain or constraint (`42704`), a value outside a check
+> (`23514`) or a null under `NOT NULL` (`23502`) whether written to a column or
+> met among the values already there by `add_domain_check`,
+> `set_domain_not_null` or `validate_domain_constraint`, a `COLLATE` on a base
+> type without one (`42804`), and a drop under the default `RESTRICT` of a
+> domain a column is typed with (`2BP01`). A registered entity's column whose
+> type is a domain takes and reads back the values of its base type, its input
+> hint the base's. The capability manifest lists `CreateDomain` as
+> `schema.create_domain` and each function as a `schema.` operation needing no
+> registration, and `domain_value` among the expression constructors.
+
 > [spec:pgorm:req:python.runtime]
 > Database I/O MUST have an asyncio-compatible awaitable interface backed by
 > reusable Tokio runtime resources and pgorm pools. Native waiting MUST NOT
@@ -415,7 +453,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Downstream development and release
 
-> [spec:pgorm:req:python.codegen+1]
+> [spec:pgorm:req:python.codegen+2]
 > A documented code-generation/build workflow MUST create concrete Python
 > wrappers and matching type information for downstream Rust entities and
 > selected graph shapes. It MUST preserve qualified names, column mappings,
@@ -424,7 +462,11 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `pgorm.Value` carries maps to the Python type its values decode as — an
 > `Interval` field to `pgorm.Interval` whatever the column's field
 > qualifier, bound under the `interval` kind, and an array of them to
-> `list[pgorm.Interval]` — and a type outside them to `Any`.
+> `list[pgorm.Interval]` — and a type outside them to `Any`. A field over a
+> column whose type is a domain types and binds as the domain's base does,
+> the domain's name riding in the Rust entity's column definition: a domain
+> over an integer is an `int` bound as `i32`, one over an enum the enum's
+> `str`, one over an array a `list`.
 > Compilation occurs when those definitions or enabled shapes change, not
 > when a user constructs another query over the installed types. Generated
 > modules MUST declare compatibility with the binding registry and pgorm build.

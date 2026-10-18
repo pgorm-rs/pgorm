@@ -133,7 +133,7 @@ impl fmt::Debug for dyn SqlName {
 
 /// Column references
 // [spec:pgorm:def:sql.types.column-ref+1]
-// [spec:pgorm:def:sql.ast.keywords+5]
+// [spec:pgorm:def:sql.ast.keywords+6]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColumnRef {
     Column(Name),
@@ -750,13 +750,17 @@ struct RuntimeName(String);
 pub struct Asterisk;
 
 /// SQL Keywords
-// [spec:pgorm:def:sql.ast.keywords+5]
+// [spec:pgorm:def:sql.ast.keywords+6]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     Null,
     CurrentDate,
     CurrentTime,
     CurrentTimestamp,
+    /// `VALUE`: the value a domain's `CHECK` constraint is tested against
+    /// ([`Expr::domain_value`](crate::Expr::domain_value)).
+    // [spec:pgorm:req:sql.ddl.domain]
+    Value,
 }
 
 /// Like Expression

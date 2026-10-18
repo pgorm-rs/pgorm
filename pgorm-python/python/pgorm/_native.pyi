@@ -26,6 +26,15 @@ from ._schema_views import (
 from ._schema_schemas import (
     create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
 )
+from ._schema_domains import (
+    CreateDomain as CreateDomain, set_domain_default as set_domain_default,
+    drop_domain_default as drop_domain_default, set_domain_not_null as set_domain_not_null,
+    drop_domain_not_null as drop_domain_not_null, add_domain_check as add_domain_check,
+    drop_domain_constraint as drop_domain_constraint,
+    rename_domain_constraint as rename_domain_constraint,
+    validate_domain_constraint as validate_domain_constraint, rename_domain as rename_domain,
+    drop_domain as drop_domain,
+)
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
 from ._pipeline_sources import SourceSelection as SourceSelection, SelectedSources as SelectedSources
@@ -150,7 +159,7 @@ from ._query_types import (
 )
 from ._expressions import (
     Expr as Expr, Condition as Condition, col as col, bind as bind,
-    literal as literal, call as call, tuple_expr as tuple_expr,
+    literal as literal, call as call, tuple_expr as tuple_expr, domain_value as domain_value,
 )
 from ._statements import (
     Table as Table, FromItem as FromItem, Select as Select, Join as Join,

@@ -94,6 +94,13 @@ pub enum JsonValueType {
         schema: Option<Name>,
         subtype: Arc<ColumnType>,
     },
+    /// A domain, whose conversion clears the flag whatever its base, a
+    /// domain over `jsonb` included.
+    Domain {
+        name: Name,
+        schema: Option<Name>,
+        base: Arc<ColumnType>,
+    },
 }
 
 impl From<JsonValueType> for ColumnType {
@@ -155,6 +162,7 @@ impl From<JsonValueType> for ColumnType {
                 schema,
                 subtype,
             },
+            JsonValueType::Domain { name, schema, base } => Self::Domain { name, schema, base },
         }
     }
 }
@@ -222,6 +230,7 @@ impl TryFrom<ColumnType> for JsonValueType {
                 schema,
                 subtype,
             },
+            ColumnType::Domain { name, schema, base } => Self::Domain { name, schema, base },
         })
     }
 }

@@ -25,7 +25,7 @@ class CodegenTests(unittest.TestCase):
             ],
         }
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_registration_collisions_are_rejected(self):
         for update in (
             {"name": "different"},
@@ -53,7 +53,7 @@ class CodegenTests(unittest.TestCase):
         with self.assertRaises(CodegenError):
             validate(data, self.base)
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_build_input_does_not_accept_code(self):
         for path in (
             "crate::Entity",
@@ -76,7 +76,7 @@ class CodegenTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(CodegenError):
                 validate({**self.config, key: value}, self.base)
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_reflection_preserves_standard_value_tags(self):
         cases = [
             ("i8", "int", "i8"),
@@ -140,7 +140,7 @@ class CodegenTests(unittest.TestCase):
         self.assertEqual(enum.annotation, "str")
         self.assertIn("schema='a\"b'", enum.binding())
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_field_aliases_resolve_real_column_names(self):
         columns = [
             {

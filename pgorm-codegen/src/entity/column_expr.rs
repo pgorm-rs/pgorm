@@ -224,6 +224,9 @@ impl ColumnExpr {
             SimpleExpr::Column(_) => return Err("a qualified column".to_owned()),
             SimpleExpr::Value(value) | SimpleExpr::Constant(value) => Self::value(value)?,
             SimpleExpr::Keyword(Keyword::Null) => Self::Null,
+            SimpleExpr::Keyword(Keyword::Value) => {
+                return Err("`VALUE`, which only a domain's CHECK reads".to_owned());
+            }
             SimpleExpr::Keyword(keyword) => Self::Keyword(keyword.clone()),
             SimpleExpr::FunctionCall(call) => match call.get_func() {
                 Function::Named(_) if !call.is_plain() => {
@@ -339,7 +342,9 @@ impl ColumnExpr {
             Self::Keyword(keyword) => match keyword {
                 Keyword::CurrentDate => quote! { Expr::current_date() },
                 Keyword::CurrentTime => quote! { Expr::current_time() },
-                _ => quote! { Expr::current_timestamp() },
+                Keyword::CurrentTimestamp => quote! { Expr::current_timestamp() },
+                Keyword::Null => quote! { pgorm::pgorm_query::Keyword::Null },
+                Keyword::Value => quote! { Expr::domain_value() },
             },
             Self::Call(name, args) => {
                 let args = args.iter().map(Self::to_rust);

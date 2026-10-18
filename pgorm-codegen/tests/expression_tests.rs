@@ -75,7 +75,7 @@ fn refused(sql: &str) -> String {
 // [spec:pgorm:sem:codegen.entity.expressions/test]    and reach the entity as the Rust that
 // builds the same expressions: the schema built from the generated entities carries each
 // expression the bridge read, rendered alike
-// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]
+// [spec:pgorm:sem:codegen.entity.compact.attrs+8/test]
 #[test]
 fn schema_expressions_reach_the_entity() {
     let generated = files(SCHEMA, Opts::default());
@@ -169,7 +169,7 @@ fn a_generated_key_is_the_databases() {
     }
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+15/test]    a construct outside the subset codegen
+// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    a construct outside the subset codegen
 // reads is named with the expression it sits in, never approximated
 #[test]
 fn expressions_outside_the_subset_are_named() {

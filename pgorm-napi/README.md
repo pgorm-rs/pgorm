@@ -479,19 +479,22 @@ builders, and runs through `execute`:
 
 ```js
 import {
-  alterTable, col, ColumnDef, createIndex, createSchema, createSequence, createTable, createType,
-  DataType, Table, TypeName, Value,
+  alterTable, col, ColumnDef, createDomain, createIndex, createSchema, createSequence, createTable,
+  createType, DataType, domainValue, Table, TypeName, Value,
 } from "@necessary/pgorm";
 
 const mood = new TypeName("mood", { schema: "app" });
+const seats = new TypeName("seats", { schema: "app" });
 const booking = new Table("booking", { schema: "app" });
 
 await pool.execute(createSchema("app", { ifNotExists: true }));
 await pool.execute(createType(mood).values(["calm", "tense"]));
+await pool.execute(createDomain(seats, "smallint").default(1).check(domainValue().between(1, 12)));
 await pool.execute(
   createTable(booking)
     .column(new ColumnDef("id", "bigint").identity("always", { startWith: 1000 }))
     .column(new ColumnDef("room", "integer").notNull({ name: "room_present" }))
+    .column(new ColumnDef("seats", seats))
     .column(new ColumnDef("during", "tstzrange").notNull())
     .column(new ColumnDef("mood", mood).default(new Value("calm", mood)))
     .column(new ColumnDef("price", new DataType("numeric", { precision: 8, scale: 2 })).check(col("price").gte(0)))
@@ -542,6 +545,16 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   range — and `alterType(name)` with `addValue`, `renameTo`, `renameValue`,
   `renameAttribute` and a composite's `addAttribute`, `dropAttribute` and
   `alterAttribute`; `dropType`.
+- **Domains**: `createDomain(name, base)` over any column type, with
+  `collate`, `default`, `notNull` or `null` (one slot) and `check(condition,
+  { name })`, a condition over `domainValue()`, PostgreSQL's `VALUE`.
+  `alterDomain(name)` has no action and so nothing to run; one of
+  `setDefault`, `dropDefault`, `setNotNull`, `dropNotNull`,
+  `addCheck(condition, { name, notValid })`, `dropConstraint`,
+  `renameConstraint`, `validateConstraint` and `renameTo` is the whole
+  statement, PostgreSQL taking one action per `ALTER DOMAIN`. `dropDomain`
+  over one name or several. A column of a domain is a `ColumnDef` typed
+  with its `TypeName`.
 - **Sequences and extensions**: `createSequence(name)` and
   `alterSequence(name)` with `asType`, `options({ incrementBy, minValue,
   maxValue, startWith, cache, cycle })` — the options an identity column

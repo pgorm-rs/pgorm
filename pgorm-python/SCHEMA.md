@@ -168,6 +168,57 @@ holds as well; a missing one is refused (`3F000`) unless `if_exists`.
 has no `if_exists`, PostgreSQL having none for it. `AUTHORIZATION` and `OWNER
 TO`, which name a role, are not built.
 
+## Domains
+
+A domain is a named type over a base type, with a default, a `NOT NULL` and
+named `CHECK`s of its own. It is named as an enum type is: a `str` or a
+`p.Identifier`, or a `p.TypeName` carrying its schema. A column whose type is a
+domain names it as a `p.TypeName`, exactly as a column of an enum type does.
+
+```python
+quantity = p.TypeName("quantity", schema="billing")
+statements = [
+    s.create_domain(quantity, "integer").default(1).not_null()
+        .check(p.domain_value() > 0, name="positive"),
+    s.create_table(p.Table("line", schema="billing"))
+        .column(s.ColumnDef("qty", quantity)),
+    s.add_domain_check(quantity, p.domain_value() < 1000, name="small", not_valid=True),
+    s.validate_domain_constraint(quantity, "small"),
+    s.drop_domain(quantity, cascade=True),
+]
+```
+
+`CreateDomain(name, base)`, also spelled `create_domain`, builds as
+`CreateTable` does, each method returning a new builder: the base is any type
+`ColumnDef` takes, `collate(name, schema=None)` names a collation for a base
+type that has one (`42804` otherwise), `default(value)` and the pair
+`not_null()` / `null()` are one slot each, the later call winning, and
+`check(condition, name=None)` adds a check, in order. A check's condition is an
+expression over `p.domain_value()`, the keyword `VALUE`: inside a domain's
+check PostgreSQL reads it as the value tested.
+
+Each `ALTER DOMAIN` action is its own function, over the domain named first:
+`set_domain_default(domain, value)`, `drop_domain_default(domain)`,
+`set_domain_not_null(domain)`, `drop_domain_not_null(domain)`,
+`add_domain_check(domain, condition, name=None, not_valid=False)`,
+`drop_domain_constraint(domain, name, if_exists=False, cascade=False)`,
+`rename_domain_constraint(domain, name, new_name)`,
+`validate_domain_constraint(domain, name)` and `rename_domain(domain,
+new_name)`. None takes `if_exists`, PostgreSQL having none for `ALTER DOMAIN`.
+`drop_domain(domain, *domains, if_exists=False, cascade=False)` drops every
+domain it names; one a column is typed with is refused (`2BP01`) unless
+`cascade=True`, which drops the column too.
+
+A value outside a check (`23514`) or a null under `NOT NULL` (`23502`) is
+refused whether it is written to a column of the domain or already there when
+`add_domain_check`, `set_domain_not_null` or `validate_domain_constraint` runs;
+`not_valid=True` leaves the values already there for
+`validate_domain_constraint` to check. A name a type or a constraint already
+has is refused (`42710`), and a missing domain or constraint (`42704`) unless
+the drop says `if_exists`. An insert the connection prepared before
+`set_domain_default` or `drop_domain_default` keeps the default it was planned
+with: PostgreSQL's plan cache does not track a domain's default.
+
 ## Views, materialized views and tables from a query
 
 A view, a materialized view and `CREATE TABLE AS` wrap a `Select` in a name.

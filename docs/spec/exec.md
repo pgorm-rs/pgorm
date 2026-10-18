@@ -176,7 +176,7 @@ These rules capture what the code does today, including known gaps.
 > integer widths implement `TryGetable`; `u8`, `u16`, and `u64` cannot be
 > decoded from a row.
 
-> [spec:pgorm:def:exec.decode.array+1]
+> [spec:pgorm:def:exec.decode.array+2]
 > Under the `postgres-array` feature, `Vec<T>` implements `TryGetable` by
 > direct array delegation for a subset of the `exec.decode.types` scalars:
 > `bool`, `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `String`, plus the
@@ -189,6 +189,15 @@ These rules capture what the code does today, including known gaps.
 > macros delegate to `Row::try_get` for `Vec<$type>`, which the two
 > newtype-decoded types cannot satisfy without a separate unwrapping
 > macro.
+>
+> Each array decode reads an array of a domain as an array of the type the
+> domain is over, through any domains over domains. PostgreSQL reports a
+> domain column by its base type, so a scalar needs nothing, but an array of
+> a domain by the domain's own array type, whose element `postgres-types`
+> checks by identity and refuses; the element's representation is its base
+> type's, as it is when a value is bound (`exec.cursor.binding-accepts`), so
+> the decode and its acceptance answer for the array type with every domain
+> under it replaced by its base.
 
 > [spec:pgorm:req:exec.decode.interval+1]
 > `Interval` implements `TryGetable` through its own `FromSql`

@@ -1,7 +1,7 @@
 //! pgorm-query's DDL builders, from JavaScript: schemas, tables and their
 //! columns, keys and constraints, their alterations, indexes, types,
-//! sequences, views, materialized views and tables created from a query,
-//! extensions and comments.
+//! domains, sequences, views, materialized views and tables created from a
+//! query, extensions and comments.
 //!
 //! A DDL statement takes no parameters — PostgreSQL accepts none there — so
 //! every builder here renders through pgorm-query's own `Display`, which
@@ -10,12 +10,13 @@
 //! value into SQL: identifiers are minted with `Name::runtime` and quoted where
 //! pgorm-query writes them, and literals are pgorm-query's.
 //!
-//! The typestates pgorm-query holds — an `ALTER TABLE`, `ALTER TYPE` or
-//! `ALTER SEQUENCE` before its first action — are parts of their own, which
-//! no terminal runs and `inspect()` refuses.
+//! The typestates pgorm-query holds — an `ALTER TABLE`, `ALTER TYPE`,
+//! `ALTER DOMAIN` or `ALTER SEQUENCE` before its first action — are parts of
+//! their own, which no terminal runs and `inspect()` refuses.
 
 mod alter;
 mod column;
+mod domain;
 mod index;
 mod namespace;
 mod options;
@@ -28,9 +29,10 @@ pub(super) use options::{get, integer, names, object, pick, relation, text};
 
 use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,
-    IndexCreateStatement, IndexDropStatement, MaterializedViewCreateStatement,
-    MaterializedViewDropStatement, MaterializedViewRefreshStatement, PendingSequenceAlter,
-    PendingTableAlter, RecursiveViewCreateStatement, SchemaCreateStatement, SchemaDropStatement,
+    DomainAlterStatement, DomainCreateStatement, DomainDropStatement, IndexCreateStatement,
+    IndexDropStatement, MaterializedViewCreateStatement, MaterializedViewDropStatement,
+    MaterializedViewRefreshStatement, PendingDomainAlter, PendingSequenceAlter, PendingTableAlter,
+    RecursiveViewCreateStatement, SchemaCreateStatement, SchemaDropStatement,
     SchemaRenameStatement, SequenceAlterStatement, SequenceCreateStatement, SequenceDropStatement,
     SequenceRenameStatement, TableAlterStatement, TableCreateAsStatement, TableCreateStatement,
     TableDropStatement, TableName, TableRenameStatement, TableTruncateStatement,
@@ -59,6 +61,7 @@ pub(super) const EXPORTS: &[&[(&str, super::Build)]] = &[
     sequence::EXPORTS,
     view::EXPORTS,
     namespace::EXPORTS,
+    domain::EXPORTS,
 ];
 
 /// A complete DDL statement, which runs as it renders.
@@ -85,6 +88,9 @@ pub(crate) enum Ddl {
     AlterComposite(CompositeAlterStatement),
     RenameAttribute(AttributeRenameStatement),
     DropType(TypeDropStatement),
+    CreateDomain(DomainCreateStatement),
+    AlterDomain(DomainAlterStatement),
+    DropDomain(DomainDropStatement),
     CreateSequence(SequenceCreateStatement),
     AlterSequence(SequenceAlterStatement),
     DropSequence(SequenceDropStatement),
@@ -126,6 +132,9 @@ impl Ddl {
             Self::AlterComposite(statement) => statement.to_string(),
             Self::RenameAttribute(statement) => statement.to_string(),
             Self::DropType(statement) => statement.to_string(),
+            Self::CreateDomain(statement) => statement.to_string(),
+            Self::AlterDomain(statement) => statement.to_string(),
+            Self::DropDomain(statement) => statement.to_string(),
             Self::CreateSequence(statement) => statement.to_string(),
             Self::AlterSequence(statement) => statement.to_string(),
             Self::DropSequence(statement) => statement.to_string(),
@@ -153,6 +162,8 @@ pub(crate) enum Part {
     PendingAlterTable(TableName, PendingTableAlter),
     /// An `ALTER TYPE` naming its type and no change yet.
     PendingAlterType(PendingTypeAlter),
+    /// An `ALTER DOMAIN` naming its domain and no action yet.
+    PendingAlterDomain(PendingDomainAlter),
     /// An `ALTER SEQUENCE` naming its sequence and no clause yet.
     PendingAlterSequence(PendingSequenceAlter),
 }
@@ -165,6 +176,7 @@ impl Part {
             Self::Column(_) => "a ColumnDef",
             Self::PendingAlterTable(..) => "an ALTER TABLE with no action",
             Self::PendingAlterType(_) => "an ALTER TYPE with no change",
+            Self::PendingAlterDomain(_) => "an ALTER DOMAIN with no action",
             Self::PendingAlterSequence(_) => "an ALTER SEQUENCE with no clause",
         }
     }
@@ -183,6 +195,10 @@ impl Part {
             Self::PendingAlterType(_) => Err(
                 "an ALTER TYPE needs a change before it can be inspected or run: addValue(..), \
                  renameTo(..), addAttribute(..) and the rest",
+            ),
+            Self::PendingAlterDomain(_) => Err(
+                "an ALTER DOMAIN needs an action before it can be inspected or run: setDefault(..), \
+                 addCheck(..), renameTo(..) and the rest",
             ),
             Self::PendingAlterSequence(_) => Err(
                 "an ALTER SEQUENCE needs a clause before it can be inspected or run: options(..), \

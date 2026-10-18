@@ -58,38 +58,69 @@ pub(crate) fn escape_like_text(text: &str) -> String {
         .replace('_', "\\_")
 }
 
+/// A type's name and schema as the structured [`TypeName`] a cast renders.
+fn qualified(name: &Name, schema: &Option<Name>) -> pgorm_query::TypeName {
+    let type_name = pgorm_query::TypeName::new(Name::clone(name));
+    match schema {
+        Some(schema) => type_name.schema(Name::clone(schema)),
+        None => type_name,
+    }
+}
+
 /// The enum type a column stores, as the structured [`TypeName`] every cast
 /// renders — schema qualification carried, the array flag set for a column
 /// holding an array of the enum.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+6]
+///
+/// A domain over an enum is cast to by its own name, which is the type a
+/// value written to its column becomes; over an enum array the domain is the
+/// array type, so its name carries no `[]`. PostgreSQL resolves no enum
+/// operator for such a domain at all (`42883`, *operator does not exist: d =
+/// d*), so a comparison with its column is refused however the operand is
+/// cast, and the column has to be cast to the enum to be compared.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+7]
 pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     match col_type {
-        ColumnType::Enum { name, schema, .. } => {
-            let type_name = pgorm_query::TypeName::new(Name::clone(name));
-            Some(match schema {
-                Some(schema) => type_name.schema(Name::clone(schema)),
-                None => type_name,
-            })
-        }
+        ColumnType::Enum { name, schema, .. } => Some(qualified(name, schema)),
         ColumnType::Array(col_type) => Some(enum_type_name(col_type)?.array()),
+        ColumnType::Domain { name, schema, base } => {
+            enum_type_name(base).map(|_| qualified(name, schema))
+        }
         _ => None,
     }
 }
 
+/// Whether a column holds an array, under any domains it is typed with: what
+/// decides whether an enum column is read as `text` or `text[]`.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+pub(crate) fn holds_array(col_type: &ColumnType) -> bool {
+    match col_type {
+        ColumnType::Array(_) => true,
+        ColumnType::Domain { base, .. } => holds_array(base),
+        _ => false,
+    }
+}
+
+/// The type a column's values are, under any domains it is typed with.
+pub(crate) fn under_domains(col_type: &ColumnType) -> &ColumnType {
+    match col_type {
+        ColumnType::Domain { base, .. } => under_domains(base),
+        _ => col_type,
+    }
+}
+
 /// The range or multirange type a schema created that a column stores, as
-/// the [`TypeName`] a value written to it is cast to.
+/// the [`TypeName`] a value written to it is cast to: a domain over one is
+/// cast to by the domain's name, which reads the same text.
 // [spec:pgorm:def:sql.value.created-range+2]
 pub(crate) fn created_range_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
-    let (ColumnType::CreatedRange { name, schema, .. }
-    | ColumnType::CreatedMultirange { name, schema, .. }) = col_type
-    else {
-        return None;
-    };
-    let type_name = pgorm_query::TypeName::new(Name::clone(name));
-    Some(match schema {
-        Some(schema) => type_name.schema(Name::clone(schema)),
-        None => type_name,
-    })
+    match col_type {
+        ColumnType::CreatedRange { name, schema, .. }
+        | ColumnType::CreatedMultirange { name, schema, .. } => Some(qualified(name, schema)),
+        ColumnType::Domain { name, schema, base } => {
+            created_range_type_name(base).map(|_| qualified(name, schema))
+        }
+        _ => None,
+    }
 }
 
 /// What fills a column an insert leaves out: a `DEFAULT` expression, the
@@ -261,11 +292,11 @@ where
 mod tests {
     use crate::{ColumnTrait, EntityTrait};
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+6/test]    every
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+7/test]    every
     // value-position operand passes through `save_as` — between, if_null and
     // the array membership forms included — for the derive-generated override
     // and the enum default alike
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+6/test]    a
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+7/test]    a
     // schema-qualified enum type reaches every rendering qualified: the value
     // cast, the array cast, the CREATE TABLE column type and CREATE TYPE
     #[test]

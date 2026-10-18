@@ -9051,6 +9051,9 @@ children (
                 id sql-domains
                 title "pgorm builds CREATE, ALTER and DROP DOMAIN from Rust, Python and JavaScript, and codegen reads a domain column as its base type"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ddl.domain] [spec:pgorm:req:python.schema-domains] [spec:pgorm:req:napi.schema-domains])
+                }
                 deps (
                     query-second-tier
                     sql-views

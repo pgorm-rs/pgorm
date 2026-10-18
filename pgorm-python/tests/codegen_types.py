@@ -1,5 +1,6 @@
 """Type-check this consumer against the installed generated application stubs."""
 
+from decimal import Decimal
 from typing import assert_type
 from pgorm import Connection, Interval
 from pgorm.app import (
@@ -13,6 +14,9 @@ from pgorm.app import (
     IntervalSpanModel,
     NoteModel,
     RequiredNotes,
+    StockLine,
+    StockLineActive,
+    StockLineModel,
 )
 
 
@@ -51,3 +55,11 @@ async def consumer(connection: Connection) -> None:
         IntervalSpan.active().set_months(Interval(1)).set_budgets(None),
         IntervalSpanActive,
     )
+    line = await StockLine.find().one(connection)
+    assert_type(line, StockLineModel)
+    assert_type(line.qty, int | None)
+    assert_type(line.small, int)
+    assert_type(line.codes, list[str])
+    assert_type(line.labels, list[str] | None)
+    assert_type(line.amount, Decimal)
+    assert_type(StockLine.active().set_qty(None).set_small(1), StockLineActive)
