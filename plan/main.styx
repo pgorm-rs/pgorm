@@ -5083,6 +5083,14 @@ children (
                         text "Re-checked 2026-10-18 against pipeline.select-sources at +4 (seen at +3; v4 has pgorm write the read cast as CAST(column AS type) through TypeName::to_sql_string instead of prqlc's std.as). The code meets it: read_cast in src/pipeline/sources.rs builds the CAST s-string from the TypeName that source_read_cast returns, which the SelectStatement writer renders with the same to_sql_string; held by select_sources_writes_read_casts_by_type_policy, select_sources_casts_enum_columns_to_text, the live select_sources_applies_read_casts and the identifier-oracle site pgorm/pipeline.select-sources.read-cast. v3's distinct refusal (an owed or settled hoist) and every earlier clause (Option per position, up to six sources, s{i}_ aliases, terminals-only SelectedSources, ReshapedSources naming the first offender) are held by tests. No gaps."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T14:26:17.060541Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (pipeline.select-sources +4), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
                 )
             }
 
@@ -5712,6 +5720,14 @@ children (
                         text "Re-checked 2026-10-18 against python.values at +2 (seen at +0; v1 added the built-in ranges and multiranges, v2 the range types a schema created). The code meets it: exact-type scalar conversion (bool never on the int path, bounds, bit-exact f32, Decimal through from_str_exact, non-finite refused), every built-in range and multirange both ways with typed NULLs and refusals, and created ranges carried as a quoted, schema-qualifiable PyTypeName with one of 12 subtypes, written through Expr::as_range; held by test_values.py, test_ranges.py, test_created_ranges.py (all 12 subtypes live under a hostile schema and name), created_ranges_match_their_rust_newtypes and the Rust round-trip tests. python.value-tags (+0) holds too. Deliberate, tested limits rather than gaps: a NULL range bound reads back unbounded; a created multirange result column is a DecodeError to be read through text, and arrays of created ranges are refused, both matching Rust (sql.value.range), though the rule's \"MUST cover ... the range and multirange types a schema created\" reads broader. \"where the corresponding Rust feature exists\" looks like leftover wording, since ranges have no feature gate."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T14:26:17.1699Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (python.values +2), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
                 )
             }
 
@@ -5758,6 +5774,14 @@ children (
                         text "Re-checked 2026-10-18 against python.expressions at +1 (seen at +0; v1 added SQL/JSON). The code meets it: base composition (comparison, arithmetic, &/|/~, NULL tests, membership including empty sets, LikePattern, the closed call() list, qualified casts); every SQL/JSON builder has a Python function applying each clause through the builder's own method, behaviours typed per function, and what Rust cannot express (NULLS FIRST/LAST in an aggregate's ORDER BY, an enum- or range-typed DEFAULT, json/jsonb RETURNING on json_value) raises rather than being dropped; empty all is TRUE and empty any FALSE; truth testing raises on Expr, Condition, AliasedExpr, OrderBy, WindowedExpr and every statement. Held by native tests, test_expressions.py and the live test_sql_json.py. The other rules on the node hold. Minor gap, filed separately: JsonInput and WindowFunction have no __bool__ refusal, so bool() of either is True."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T14:26:17.425839Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (python.expressions +1), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
                 )
             }
 
@@ -5797,6 +5821,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 against python.statements at +3 (seen at +0; v1 MERGE and RETURNING row versions, v2 JSON_TABLE as a FROM item, v3 windows). The code meets it: the SELECT/CRUD clauses, JSON_TABLE through Func::json_table with every column kind, windows with OVER only after a function call or a JSON aggregate and frame classes mirroring pgorm-query's, ReturningRow with old_as/new_as on every write, MERGE's typestate (PendingMerge cannot compile, arm actions checked by row kind, merge_action() only through returning_action), one compile path for execution and inspection, tagged binds, a complete capability manifest and signature-checked stubs; held by native parity tests and test_statements.py, test_direct_builders.py, test_json_table.py, test_windows.py and test_merge.py. python.raw (+0) holds too. Gaps, filed separately: the Query alias in python/pgorm/results.py omits _native.Merge, so await pool.fetch_all(merge) fails mypy --strict though it runs; test_statement_truth_testing_is_rejected omits Merge and PendingMerge. Rule text: \"a frame whose end comes before its start cannot be built\" overclaims (the typestate stops only an end on an earlier side of the current row; preceding(1).and_preceding(5) builds in Rust and Python), and the WINDOW clause holds one named window, a second call replacing the first."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T14:26:17.343908Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (python.statements +3), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
                 )
@@ -6008,6 +6040,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 against python.entities at +2 (seen at +0; v1 made registration declare a WITHOUT OVERLAPS key and each relation's columns, PERIOD pair, enforcement and deferrability; v2 made exec_returning_change(s) and exec_returning_upsert(s) reachable as hook-free terminals returning Change / Upserted). The code meets it: EntityInfo.without_overlaps from PrimaryKeyTrait, relations::describe reporting every relation field, pinned by temporal_keys_and_period_relations_match_rust and registered_temporal.py; entities/versions.rs and generic.rs call the real Update/Insert terminals, with PyChange and PyUpserted stubs, exports and capability entries, held by registered_versions.py (no hooks run, unchanged and missing rows, batches, empty batch, foreign ActiveModel, a table named old). Minor: no test asserts an entity's describe()[\"terminals\"] list; the rule says enforcement and deferrability change what a join means (they don't) while leaving out condition_type and on_condition, which do and which describe() doesn't report."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T14:26:17.26183Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (python.entities +2), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
                 )
@@ -8430,6 +8470,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 against sql.scope at +15 (seen at +0). Every bump graduated one deferred entry as it was built, and every specific claim holds in the code: the escape hatches (Expr::raw, Expr::template, FromItem::Template, execute and batch_execute), the eleven constructs built at +0, every graduated entry (simple CASE, subscripts, GROUPING SETS, frame EXCLUDE and offsets, deferrable keys, COLLATE, ON CONFLICT ON CONSTRAINT, sequences, composite types and their alteration, ranges, MERGE and its PostgreSQL 17 grammar, JSON_TABLE), each with live tests; the deferred list is empty and nothing on the out-of-scope list exists in the builder. The rule fails its own completeness clause, which makes a construct absent from both its list and the builder a defect in the rule: TABLESAMPLE, FETCH FIRST .. WITH TIES, GROUP BY DISTINCT, SIMILAR TO, WITH ORDINALITY and ROWS FROM, CREATE DOMAIN, CREATE TABLE AS, EXPLAIN, LOCK TABLE and LISTEN/NOTIFY are in neither. Its text also errs: COPY is said to belong to the driver surface reachable through execute, but pgorm has no COPY API and hides the client, so COPY FROM STDIN cannot be reached (LISTEN likewise); FromItem::Template is called raw; the CREATE SCHEMA reason holds only for CREATE DATABASE; \"an entity maps to a view as readily as to a table\" has no test; a history sentence remains; sql-ddl.md cites sql.scope+11. The verdicts on those constructs are the operator's to make; they are put to the operator, and the census lands as its own node once decided."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T14:26:17.507037Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (sql.scope +15), on the re-check recorded above: every construct the rule lists holds in the code, and the rule's own completeness clause makes the unlisted constructs a defect in the rule rather than in this node's code; they wait on the operator's verdicts. The earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
                 )
