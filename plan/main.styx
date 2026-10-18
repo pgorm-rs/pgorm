@@ -5261,6 +5261,14 @@ children (
                         text "Re-checked at security.sqlmap.pin+1 and security.sqlmap.profiles+4 (sqlmap-harness-fixes): Python series check with recorded release, declared field through adapter and interpreter, lock timeout/UNION columns/UNION fuzzing/verbosity declared by profiles, --remeasure-exemptions guard; runner tests (26) and verdict tests (6) pass."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:34:56.57468Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at security.sqlmap.profiles +4 and .pin +1 (sqlmap-harness-fixes, merged 1ecaad8f, smoke scan passing on main 2026-10-18): the later merges restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
                 )
             }
 
@@ -5347,6 +5355,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked at security.sqlmap.ci+2 (sqlmap-harness-fixes): per-run concurrency groups for scheduled/dispatched runs with PR smoke still cancelling superseded runs, setup-python takes 3.14's latest patch, sqlmap-verdict refuses re-measurement reports; verdict tests pass and actionlint is clean."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:34:56.655885Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at security.sqlmap.ci +2 (sqlmap-harness-fixes, merged 1ecaad8f): the later merges restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
                 )
