@@ -991,6 +991,15 @@ children (
                 implements {
                     main ([spec:pgorm:def:error.model] [spec:pgorm:def:error.model.runtime] [spec:pgorm:sem:error.model.sql-class])
                 }
+                log (
+                    {
+                        at 2026-10-18T19:22:54.931478Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "error.model +9 (conn-listen) adds Listen(ListenError) to the variants that convert in through From: a listener's refusal of a channel name past 63 bytes and the overflow that ends its notifications (conn.listen), and ListenError to the names spelled in full."
+                        after_done true
+                    }
+                )
             }
 
             {
