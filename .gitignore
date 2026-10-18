@@ -15,7 +15,8 @@ __pycache__/
 .idea/*
 */.idea/*
 .env.local
-.DS_Store.nplan/
+.DS_Store
+.nplan/
 # Native extension builds `maturin develop` writes beside the package source
 pgorm-python/python/pgorm/*.so
 pgorm-python/python/pgorm/*.pyd
