@@ -5599,6 +5599,21 @@ children (
                     }
                 )
             }
+
+            {
+                id sqlmap-harness-fixes
+                title "The sqlmap harness takes Python 3.14's latest patch and runs exactly the settings its profiles and cases declare"
+                kind @fix
+                deps (sqlmap.runner sqlmap.ci)
+                log (
+                    {
+                        at 2026-10-18T14:28:24.709884Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found re-checking sqlmap.runner and sqlmap.ci on 2026-10-18 (notes on both). (1) Python is pinned exactly to 3.14.4: pins.json, the runner's equality check (security/sqlmap harness mod.rs), sqlmap-run.yml's setup-python and the README's \"exact Python version\". That breaks the operator's 2026-10-09 rule that no tool version is exact-pinned except git forks by rev; the sweep that day moved generative CI to '3.14' and missed this. Take 3.14's latest patch (a floor, not an equality), record the interpreter version actually used in the run's evidence as was done for maturin, and reword security.sqlmap.pin, whose \"Python/runtime dependencies ... pinned through a lock or immutable image identity\" a bare version string satisfies neither way. (2) The HTTP adapter (main.rs) and the result interpreter (result.rs) hard-code the test parameter as input instead of reading the case's declared field, which reaches only -p and the target URL; every case uses input today, so make the field reach both and extend declared_settings_reach_scanner_and_fixture to prove it. (3) lock_timeout 2s (fixture.rs), --union-cols 1-4 and -v 2 (mod.rs) are fixed in code rather than declared by the profile, which security.sqlmap.profiles says declares every setting; declare them, or name them in the rule as harness constants with the reason (lock_timeout sits below full's 3 s time_sec; harmless because pg_sleep takes no locks). (4) The detected-exempt-pair failure cannot fire in a normal run because exempt pairs are never scanned; exemptions were re-measured only by hand-editing the manifest. Either give the harness a way to re-measure exemptions (a profile that scans exempt pairs and expects no detection) or reword the rule so it does not promise a guard that is empty. (5) security.sqlmap.profiles still says \"both run noninteractively\" though there are three profiles. (6) sqlmap.yml's cancel-in-progress would kill a running five-hour full scan on a second dispatch; key concurrency so a scheduled or dispatched full run is not cancelled by another. Bumping security.sqlmap.profiles or .pin stales sqlmap.runner (kind test) and .ci stales sqlmap.ci (kind test): re-deliver them with a test-typed commit naming them."
+                    }
+                )
+            }
         )
         log (
             {
@@ -8664,6 +8679,21 @@ children (
                     }
                 )
             }
+
+            {
+                id query-surface-cast-tests
+                title "nextest holds pgorm-query's public surface and every cast spelling's node shape"
+                kind @test
+                deps (query-reexports-curated single-cast-node statement-interval-value)
+                log (
+                    {
+                        at 2026-10-18T14:28:24.802325Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found re-checking query-reexports-curated and single-cast-node on 2026-10-18 (notes on both). (1) sql.surface is held only by two compile_fail,E0603 doctests in pgorm-query/src/lib.rs, which nextest never runs. Add tests that run under nextest and hold: exactly three public modules (error, extension, value); the doc-hidden residue named in the rule; that pgorm_query::Write and the pub(crate) clause shapes cannot be named (a trybuild compile-fail case; the repo already uses trybuild); and that the rule's register and lib.rs's root exports agree both ways, so an export added without a register entry fails. Also decide value::with_vector, a public module holding only impls that is a reachable path not among the rule's spellings. (2) every_cast_spelling_builds_one_node_shape (pgorm-query/tests/postgres/query.rs) and entity_layer_casts_build_the_one_cast_node (tests/enum_tests.rs) were not extended when sql.ast.cast-shape +1 added as_range and the entity layer's created-range casts; add as_range, CreatedRange::into_expr, and the read and write casts on created range and created multirange columns, plus SimpleExpr::cast_as / cast_as_type, so each is held structurally rather than only by CAST( render goldens. Waits on statement-interval-value, which adds a value and may add exports to the same register."
+                    }
+                )
+            }
         )
     }
 
@@ -11355,6 +11385,27 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by napi-statements (757ed91e, 2026-10-09). pgorm-query's statement values have no interval variant, so a built statement cannot bind one. pgorm-napi refuses an Interval in a built statement with a ConstructionError naming the workaround, which is raw SQL with a bound parameter, where napi-connections' interval codec already round-trips months/days/microseconds exactly. pgorm-python has the same gap. Acceptance: a Value variant (or a typed value path) carrying PostgreSQL's months/days/microseconds triple exactly, bound in binary and rendered as an escaped literal; it reaches pgorm-query builders, the ORM's ActiveValue if an entity field can be an interval, pgorm-python and pgorm-napi built statements; live round trips including mixed signs (1 mon -2 days). Every exhaustive Value consumer is updated (pgorm-python, the generative replay and emitters)."
+            }
+        )
+    }
+
+    {
+        id python-statement-typing
+        title "Python's execution methods type-check a MERGE, every query object refuses truth testing, and the Python rules say what the code does"
+        kind @fix
+        deps (
+            python.statements
+            python.expressions
+            python.values
+            python.entities
+            statement-interval-value
+        )
+        log (
+            {
+                at 2026-10-18T14:28:24.899368Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found re-checking python.statements, python.expressions, python.values and python.entities on 2026-10-18 (notes on each). Code: (1) the Query alias in pgorm-python/python/pgorm/results.py, which execute / fetch_* / stream take in runtime.py and transactions.py, omits _native.Merge, so await pool.fetch_all(merge) fails mypy --strict although it runs; add it, and put a MERGE through a type-checked path (examples/application.py or the typing checks) so the check sees it. (2) test_statement_truth_testing_is_rejected omits Merge and PendingMerge, whose __bool__ refusals exist. (3) JsonInput (from format_json) and WindowFunction have no __bool__ refusal. (4) No test asserts a registered entity's describe()[\"terminals\"] list. Rule text: python.statements says \"a frame whose end comes before its start cannot be built\", but the typestate stops only an end on an earlier side of the current row (Rows.preceding(1).and_preceding(5) builds in Rust and Python), and should say the WINDOW clause holds one named window, a second call replacing the first; python.values' \"where the corresponding Rust feature exists\" is leftover (ranges have no feature gate) and its \"MUST cover ... the range and multirange types a schema created\" reads broader than the documented limits (created multirange result columns read through text, no arrays of created ranges); python.entities says enforcement and deferrability \"change what a join means\" (they don't) while describe() omits condition_type and on_condition, which do: decide whether describe() reports them or the rule stops implying it. Rule bumps stale the owning nodes (all kind feat): re-deliver them with a feat-typed commit naming them, separate from this node's fix commit. Waits on statement-interval-value, which changes the same Python values code."
             }
         )
     }
