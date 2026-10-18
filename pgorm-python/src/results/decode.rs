@@ -2,7 +2,7 @@ use jiff::{
     Timestamp,
     civil::{Date, DateTime, Time},
 };
-use pgorm::pgorm_query::{ArrayType, Value, Vector};
+use pgorm::pgorm_query::{ArrayType, Interval, Value, Vector};
 use pyo3::prelude::*;
 use tokio_postgres::{
     Row,
@@ -105,6 +105,8 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
         Type::MACADDR => typed::<Mac>(row, index, array, ArrayType::MacAddress, |v| {
             Value::MacAddress(v.map(|v| Box::new(v.0)))
         }),
+        // [spec:pgorm:req:python.values+3]
+        Type::INTERVAL => boxed!(Interval, Interval),
         _ if ty.name() == "vector" && matches!(ty.kind(), Kind::Simple) => boxed!(Vector, Vector),
         _ => {
             return Err(DecodeError::new_err(format!(

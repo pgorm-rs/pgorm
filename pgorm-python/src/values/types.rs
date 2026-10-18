@@ -111,7 +111,7 @@ scalar_kinds! {
     Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
     Date => "date", Time => "time", DateTime => "datetime",
     DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
-    MacAddress => "mac_address", Vector => "vector",
+    MacAddress => "mac_address", Vector => "vector", Interval => "interval",
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

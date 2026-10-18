@@ -63,6 +63,7 @@ impl PartialEq for Value {
             (Self::Vector(a), Self::Vector(b)) => eq_vector(a.as_deref(), b.as_deref()),
             (Self::IpNetwork(a), Self::IpNetwork(b)) => a == b,
             (Self::MacAddress(a), Self::MacAddress(b)) => a == b,
+            (Self::Interval(a), Self::Interval(b)) => a == b,
             // Bounds compare through this same impl, as array elements do.
             (Self::Range(a_ty, a), Self::Range(b_ty, b)) => a_ty == b_ty && a == b,
             (Self::Multirange(a_ty, a), Self::Multirange(b_ty, b)) => a_ty == b_ty && a == b,
@@ -127,6 +128,7 @@ impl Hash for Value {
             Value::Vector(value) => hash_vector(value.as_deref(), state),
             Value::IpNetwork(value) => value.hash(state),
             Value::MacAddress(value) => value.hash(state),
+            Value::Interval(value) => value.hash(state),
             Value::Range(_, value) => value.hash(state),
             Value::Multirange(_, value) => value.hash(state),
         }

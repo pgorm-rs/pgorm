@@ -46,6 +46,7 @@ supplying a different kind with that value raises `ConstructionError`.
 | `ipnetwork` | `IpNetwork` | IP/prefix string; native formatting on output, host bits retained |
 | `mac_address` | `MacAddress` | exactly six bytes |
 | `vector` | `Vector` | list/tuple of exact `f32` values; returns a list |
+| `interval` | `Interval` | `pgorm.Interval(months, days, microseconds)`; see [Intervals](#intervals) |
 | `array` | `Array` | `Value.array(element_kind, list_or_tuple_or_none)` |
 | `enum` | `String` plus `TypeName` | `Value(label_or_none, type_name)` |
 | `int4range` … `tstzmultirange` | `Range`, `Multirange` | `pgorm.Range`, `pgorm.Multirange`; see [Ranges](#ranges) |
@@ -185,6 +186,29 @@ column of one raises `DecodeError`; select it cast to `text` and pass the text
 to `Value(text, CreatedMultirange(...))`. Arrays of a created range are refused
 both ways. The pipeline and SQL/JSON's `JsonDefault` refuse a created range's
 value, as they refuse a qualified enum's, having no place for its cast.
+
+## Intervals
+
+`pgorm.Interval(months=0, days=0, microseconds=0)` is PostgreSQL's
+`interval`: three fields, each an exact `int` with its own sign, `months` and
+`days` within 32 bits and `microseconds` within 64. Nothing normalises one
+field into another, so `Interval(months=1)` and `Interval(days=30)` are
+different values, though PostgreSQL's `=` calls them equal, and `1 mon -2 days`
+is a value of its own. `datetime.timedelta` is not accepted: it has no months,
+and it keeps only its days signed, so `-1 hour` would arrive as
+`-1 day +23 hours`. A `pgorm.Interval` infers as `interval`, binds in binary
+and decodes back field for field, the two triples with every field at its
+limit being PostgreSQL's `infinity` and `-infinity`. `str()` gives the text
+PostgreSQL reads back as the same value; a snapshot carries the three fields
+as integer strings.
+
+```python
+from pgorm import Interval, TypeName, Value, bind, select
+
+span = Interval(months=1, days=-2, microseconds=3_000_004)
+query = select(bind(span).cast(TypeName("text")).as_("text"))  # '1 mon -2 days +00:00:03.000004'
+spans = Value.array("interval", [span, None])
+```
 
 ## Inspection and equality
 

@@ -24,7 +24,7 @@ use super::{
 use crate::{
     codec::Codec,
     errors::Failure,
-    values::{Datum, Tag, read},
+    values::{Tag, read},
 };
 
 /// PostgreSQL's limit on a statement's bound parameters.
@@ -117,9 +117,9 @@ fn scope_close(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// A value to bind: any parameter, inferred or declared with `Value`, but none
-/// whose kind needs a cast pgorm's pipeline cannot write, an interval, which
-/// pgorm's values do not hold, or `null`, which has no kind.
-// [spec:pgorm:req:napi.pipeline-expressions]
+/// whose kind needs a cast pgorm's pipeline cannot write, or `null`, which has
+/// no kind.
+// [spec:pgorm:req:napi.pipeline-expressions+1]
 pub(super) fn bindable<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<Value> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -129,12 +129,7 @@ pub(super) fn bindable<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> Neo
              Value.null(kind)",
         );
     };
-    let Datum::Value(value) = tagged.datum else {
-        return refuse(
-            cx,
-            "an interval has no value in pgorm's pipeline: bind its text and cast(\"interval\")",
-        );
-    };
+    let value = tagged.datum;
     match tagged.tag {
         Tag::Enum(_) | Tag::Created(_) => refuse(
             cx,

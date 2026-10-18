@@ -56,6 +56,11 @@ fn payload(value: &PyValue) -> PyResult<Json> {
         Value::DateTimeWithTimeZone(value) => string!(value),
         Value::IpNetwork(value) => string!(value),
         Value::MacAddress(value) => json!(value.as_ref().map(|value| value.bytes())),
+        Value::Interval(value) => json!(value.as_ref().map(|value| json!({
+            "months": value.months.to_string(),
+            "days": value.days.to_string(),
+            "microseconds": value.microseconds.to_string(),
+        }))),
         Value::Vector(value) => json!(value.as_ref().map(|value| {
             value
                 .to_vec()

@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+27]
+> [spec:pgorm:req:sql.surface+28]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -89,6 +89,8 @@ today, including panicking edges and deliberate failsafes.
 > `IdentityGeneration`, whether an identity column is generated `ALWAYS` or
 > `BY DEFAULT` (`sql.ddl.column-def`); `IndexColumnTarget`, whether an index
 > entry indexes a column or an expression (`sql.ddl.index-create`);
+> `Interval`, an interval value as PostgreSQL's months, days and microseconds
+> (`sql.value.interval`);
 > `CaseOperand` and `SimpleCaseStatement`,
 > the simple form of `CASE` (`sql.ast.case`); `Subscript`, what an array
 > subscript holds between its brackets (`sql.ast.expr.subscript`);

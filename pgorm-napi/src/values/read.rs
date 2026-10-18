@@ -14,12 +14,14 @@ use neon::{
     prelude::*,
     types::{JsBigInt, buffer::TypedArray},
 };
-use pgorm::pgorm_query::{ArrayType, IpNetwork, MacAddress, Multirange, Range, Value, Vector};
+use pgorm::pgorm_query::{
+    ArrayType, Interval, IpNetwork, MacAddress, Multirange, Range, Value, Vector,
+};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use super::{
-    CREATED_SUBTYPES, CreatedKind, Datum, Interval, Scalar, Tag, Tagged, TypeName, created,
+    CREATED_SUBTYPES, CreatedKind, Tag, Tagged, TypeName, created,
     json::{self, MAX_SAFE_INTEGER},
     parse_scalar, range_element, scalar_name, scalar_null,
 };
@@ -112,7 +114,7 @@ pub(crate) fn kind<'cx>(
             let multirange = description.field(cx, 3);
             let multirange = multirange.downcast_or_throw::<JsBoolean, _>(cx)?.value(cx);
             let subtype = match parse_scalar(&subtype) {
-                Some(Scalar::Value(kind)) if CREATED_SUBTYPES.contains(&kind) => kind,
+                Some(kind) if CREATED_SUBTYPES.contains(&kind) => kind,
                 _ => {
                     return refuse(
                         cx,
@@ -186,12 +188,9 @@ pub(crate) fn tagged<'cx>(
         return Ok(value);
     }
     let datum = match tag {
-        Tag::Scalar(Scalar::Value(kind)) => Datum::Value(scalar(cx, codec, data, kind)?),
-        Tag::Scalar(Scalar::Interval) => Datum::Interval(Some(interval(cx, codec, data)?)),
-        Tag::Enum(_) => Datum::Value(Value::String(Some(Box::new(string(cx, data)?)))),
-        Tag::Created(kind) => Datum::Value(Value::String(Some(Box::new(created_text(
-            cx, codec, data, kind,
-        )?)))),
+        Tag::Scalar(kind) => scalar(cx, codec, data, kind)?,
+        Tag::Enum(_) => Value::String(Some(Box::new(string(cx, data)?))),
+        Tag::Created(kind) => Value::String(Some(Box::new(created_text(cx, codec, data, kind)?))),
         Tag::Array(element) => array(cx, codec, data, element)?,
     };
     Ok(Tagged {
@@ -208,23 +207,13 @@ pub(crate) fn array<'cx>(
     codec: Codec<'cx>,
     data: Handle<'cx, JsValue>,
     element: &Tag,
-) -> NeonResult<Datum> {
+) -> NeonResult<Value> {
     let items = match data.downcast::<JsArray, _>(cx) {
         Ok(array) => array.to_vec(cx)?,
         Err(_) => return refuse(cx, "expected an array"),
     };
     let element_kind = match element {
-        Tag::Scalar(Scalar::Value(kind)) => kind.clone(),
-        Tag::Scalar(Scalar::Interval) => {
-            let mut intervals = Vec::with_capacity(items.len());
-            for item in items {
-                intervals.push(match tagged(cx, codec, item, element)?.datum {
-                    Datum::Interval(interval) => interval,
-                    _ => return cx.throw_error("an interval read as another kind"),
-                });
-            }
-            return Ok(Datum::Intervals(Some(intervals)));
-        }
+        Tag::Scalar(kind) => kind.clone(),
         Tag::Enum(_) => ArrayType::String,
         Tag::Created(_) => {
             return refuse(
@@ -236,15 +225,9 @@ pub(crate) fn array<'cx>(
     };
     let mut values = Vec::with_capacity(items.len());
     for item in items {
-        values.push(match tagged(cx, codec, item, element)?.datum {
-            Datum::Value(value) => value,
-            _ => return cx.throw_error("an array element read as another kind"),
-        });
+        values.push(tagged(cx, codec, item, element)?.datum);
     }
-    Ok(Datum::Value(Value::Array(
-        element_kind,
-        Some(Box::new(values)),
-    )))
+    Ok(Value::Array(element_kind, Some(Box::new(values))))
 }
 
 /// An integer of `T`, from a number that is a safe integer or from a bigint.
@@ -469,11 +452,11 @@ fn interval<'cx>(
 }
 
 fn interval_fields<'cx>(cx: &mut Cx<'cx>, description: &Description<'cx>) -> NeonResult<Interval> {
-    Ok(Interval {
-        months: field::<i32>(cx, description, 0, "an interval's months")?,
-        days: field::<i32>(cx, description, 1, "an interval's days")?,
-        microseconds: field::<i64>(cx, description, 2, "an interval's microseconds")?,
-    })
+    Ok(Interval::new(
+        field::<i32>(cx, description, 0, "an interval's months")?,
+        field::<i32>(cx, description, 1, "an interval's days")?,
+        field::<i64>(cx, description, 2, "an interval's microseconds")?,
+    ))
 }
 
 fn decimal<'cx>(
@@ -725,6 +708,7 @@ fn scalar<'cx>(
             let ranges = ranges(cx, codec, data, &range_element(*range_type), true)?;
             Value::Multirange(*range_type, Some(Box::new(Multirange::from(ranges))))
         }
+        ArrayType::Interval => Value::from(interval(cx, codec, data)?),
     })
 }
 
@@ -797,12 +781,7 @@ pub(crate) fn infer<'cx>(
             let text = string(cx, text)?;
             Value::Uuid(Some(Box::new(parse_uuid(cx, &text)?)))
         }
-        "interval" => {
-            return Ok(Some(Tagged {
-                datum: Datum::Interval(Some(interval_fields(cx, &description)?)),
-                tag: Tag::Scalar(Scalar::Interval),
-            }));
-        }
+        "interval" => Value::from(interval_fields(cx, &description)?),
         "date" | "time" | "datetime" | "instant" => temporal_value(cx, &description)?,
         "json" => Value::Json(Some(Box::new(json::read(cx, codec, data, 0)?))),
         "range" | "multirange" => {
@@ -871,7 +850,7 @@ fn infer_array<'cx>(
         let all_integers = values
             .iter()
             .flatten()
-            .all(|value| matches!(value.datum, Datum::Value(Value::BigInt(_))));
+            .all(|value| matches!(value.datum, Value::BigInt(_)));
         let kind = if all_integers {
             ArrayType::BigInt
         } else {
@@ -881,10 +860,7 @@ fn infer_array<'cx>(
         for (item, value) in items.iter().zip(&values) {
             elements.push(match value {
                 None => scalar_null(&kind),
-                Some(_) if all_integers => match value.as_ref().map(|value| &value.datum) {
-                    Some(Datum::Value(value)) => value.clone(),
-                    _ => return cx.throw_error("an integer item lost its value"),
-                },
+                Some(value) if all_integers => value.datum.clone(),
                 Some(_) => {
                     let number = item.downcast_or_throw::<JsNumber, _>(cx)?.value(cx);
                     Value::Double(Some(number))
@@ -892,8 +868,8 @@ fn infer_array<'cx>(
             });
         }
         return Ok(Tagged {
-            datum: Datum::Value(Value::Array(kind.clone(), Some(Box::new(elements)))),
-            tag: Tag::Array(Box::new(Tag::Scalar(Scalar::Value(kind)))),
+            datum: Value::Array(kind.clone(), Some(Box::new(elements))),
+            tag: Tag::Array(Box::new(Tag::Scalar(kind))),
         });
     }
     let element = values
@@ -901,7 +877,7 @@ fn infer_array<'cx>(
         .flatten()
         .next()
         .map(|value| value.tag.clone())
-        .unwrap_or(Tag::Scalar(Scalar::Value(ArrayType::String)));
+        .unwrap_or(Tag::Scalar(ArrayType::String));
     if values.iter().flatten().any(|value| value.tag != element) {
         return refuse(cx, "an array's items infer as different kinds");
     }
@@ -914,35 +890,21 @@ fn infer_array<'cx>(
             "arrays of a created range or multirange type are not supported",
         );
     }
-    let datum = match &element {
-        Tag::Scalar(Scalar::Interval) => Datum::Intervals(Some(
-            values
-                .into_iter()
-                .map(|value| match value.map(|value| value.datum) {
-                    Some(Datum::Interval(interval)) => interval,
-                    _ => None,
-                })
-                .collect(),
-        )),
-        _ => {
-            let kind = match &element {
-                Tag::Scalar(Scalar::Value(kind)) => kind.clone(),
-                _ => ArrayType::String,
-            };
-            let mut elements = Vec::with_capacity(values.len());
-            for value in values {
-                elements.push(match value.map(|value| value.datum) {
-                    None => match &element {
-                        Tag::Enum(_) => Value::String(None),
-                        _ => scalar_null(&kind),
-                    },
-                    Some(Datum::Value(value)) => value,
-                    Some(_) => return cx.throw_error("an array item lost its value"),
-                });
-            }
-            Datum::Value(Value::Array(kind, Some(Box::new(elements))))
-        }
+    let kind = match &element {
+        Tag::Scalar(kind) => kind.clone(),
+        _ => ArrayType::String,
     };
+    let elements = values
+        .into_iter()
+        .map(|value| match value {
+            Some(value) => value.datum,
+            None => match &element {
+                Tag::Enum(_) => Value::String(None),
+                _ => scalar_null(&kind),
+            },
+        })
+        .collect();
+    let datum = Value::Array(kind, Some(Box::new(elements)));
     Ok(Tagged {
         datum,
         tag: Tag::Array(Box::new(element)),

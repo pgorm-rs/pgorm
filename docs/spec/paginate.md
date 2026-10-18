@@ -361,6 +361,18 @@ bound parameter is held to.
 > error or wrong bytes.
 
 
+> [spec:pgorm:req:exec.cursor.binding-interval]
+> `ValueHolder` binds a `Value::Interval` against a placeholder whose type is
+> `interval`, or a domain over it, unwrapped as every binding decision is
+> (`[spec:pgorm:req:exec.cursor.binding-accepts+1]`), writing the sixteen
+> bytes of `Interval::to_binary` (`[spec:pgorm:def:sql.value.interval]`). Any
+> other type is refused before the statement is sent, with ``cannot bind a
+> `Interval` value to Postgres type `<type>` ``, and a `None` payload is
+> `NULL` against any type. Nothing is coerced: no other type's wire format
+> holds three fields, and writing the microseconds alone into a `time` or a
+> `bigint` would drop the months and the days. An array of intervals binds
+> through the `Array` arm, each element against the member type.
+
 > [spec:pgorm:req:exec.cursor.binding-range+1]
 > A `Value::Range` binds against a placeholder whose type is a range — the
 > built-in six, or a range type a schema created, which tokio-postgres

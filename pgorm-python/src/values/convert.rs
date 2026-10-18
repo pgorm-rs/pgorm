@@ -9,7 +9,7 @@ use pyo3::{
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use super::{json, ranges, temporal};
+use super::{interval::PyInterval, json, ranges, temporal};
 use crate::errors::{ConstructionError, DecodeError};
 
 pub(super) fn infer(data: &Bound<'_, PyAny>) -> PyResult<ArrayType> {
@@ -38,6 +38,8 @@ pub(super) fn infer(data: &Bound<'_, PyAny>) -> PyResult<ArrayType> {
         ArrayType::Decimal
     } else if instance(data, "uuid", "UUID")? {
         ArrayType::Uuid
+    } else if data.is_exact_instance_of::<PyInterval>() {
+        ArrayType::Interval
     } else {
         return Err(ConstructionError::new_err(
             "ambiguous or unsupported value: supply an explicit kind",
@@ -72,7 +74,7 @@ fn strict<'a, 'py, T: pyo3::type_object::PyTypeInfo>(
     }
 }
 
-// [spec:pgorm:req:python.values+2]
+// [spec:pgorm:req:python.values+3]
 pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Value> {
     let value = match kind {
         ArrayType::Bool => Value::Bool(Some(strict::<PyBool>(data)?.extract()?)),
@@ -125,6 +127,12 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
             )?)),
         ),
         ArrayType::Multirange(range) => ranges::multirange_from_python(data, *range)?,
+        ArrayType::Interval => Value::from(
+            data.cast::<PyInterval>()
+                .map_err(|_| ConstructionError::new_err("expected pgorm.Interval"))?
+                .get()
+                .0,
+        ),
         _ => temporal::from_python(data, kind)?,
     };
     Ok(value)
@@ -249,6 +257,10 @@ pub(super) fn to_python(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
         Value::Multirange(_, value) => value
             .as_deref()
             .map(|multirange| ranges::multirange_to_python(py, multirange))
+            .transpose(),
+        Value::Interval(value) => value
+            .as_deref()
+            .map(|interval| Ok(Py::new(py, PyInterval(*interval))?.into_any()))
             .transpose(),
         _ => temporal::to_python(py, value),
     };

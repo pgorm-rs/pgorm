@@ -406,6 +406,15 @@ impl ToSql for ValueHolder {
                     Ok(IsNull::No)
                 }
             },
+            // [spec:pgorm:req:exec.cursor.binding-interval]
+            Value::Interval(x) => match x.as_deref() {
+                None => Ok(IsNull::Yes),
+                Some(_) if *wire_type(ty) != Type::INTERVAL => Err(mismatch("Interval", ty)),
+                Some(x) => {
+                    out.extend_from_slice(&x.to_binary());
+                    Ok(IsNull::No)
+                }
+            },
             Value::Range(_, Some(x)) => range::bind_range(x, ty, out),
             Value::Multirange(_, Some(x)) => range::bind_multirange(x, ty, out),
             Value::Range(_, None) | Value::Multirange(_, None) => Ok(IsNull::Yes),
@@ -743,6 +752,42 @@ mod tests {
             vec![0x00, 0x11, 0x22, 0x33, 0x44, 0x55]
         );
         assert_eq!(encode_as(Value::MacAddress(None), &Type::MACADDR), Ok(None));
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-interval/test]
+    #[test]
+    fn binds_interval_fields_in_wire_order() {
+        let interval = pgorm_query::Interval::new(1, -2, 3_000_004);
+        let wire = [
+            &3_000_004i64.to_be_bytes()[..],
+            &(-2i32).to_be_bytes()[..],
+            &1i32.to_be_bytes()[..],
+        ]
+        .concat();
+        assert_eq!(bytes(interval.into(), &Type::INTERVAL), wire);
+        let span = named("span", Kind::Domain(Type::INTERVAL));
+        assert_eq!(bytes(interval.into(), &span), wire);
+        assert_eq!(encode_as(Value::Interval(None), &Type::INT8), Ok(None));
+        assert_eq!(
+            bytes(Value::array([interval]), &Type::INTERVAL_ARRAY).len(),
+            20 + 4 + 16
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-interval/test]
+    #[test]
+    fn refuses_interval_bound_to_other_types() {
+        let interval = pgorm_query::Interval::new(0, 1, 0);
+        for ty in [&Type::INT8, &Type::TEXT, &Type::TIME, &Type::TIMESTAMP] {
+            assert_eq!(
+                error(interval.into(), ty),
+                format!("cannot bind a `Interval` value to Postgres type `{ty}`")
+            );
+        }
+        assert_eq!(
+            error(Value::array([interval]), &Type::INTERVAL),
+            "cannot bind a `Array` value to Postgres type `interval`"
+        );
     }
 
     /// The defect this check exists for: ASCII digits written into an `int4`

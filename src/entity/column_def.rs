@@ -78,7 +78,7 @@ pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeN
 
 /// The range or multirange type a schema created that a column stores, as
 /// the [`TypeName`] a value written to it is cast to.
-// [spec:pgorm:def:sql.value.created-range+1]
+// [spec:pgorm:def:sql.value.created-range+2]
 pub(crate) fn created_range_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     let (ColumnType::CreatedRange { name, schema, .. }
     | ColumnType::CreatedMultirange { name, schema, .. }) = col_type

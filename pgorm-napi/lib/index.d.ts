@@ -98,8 +98,7 @@ export type MultirangeKind =
 
 /**
  * A value kind with no type name, spelled as pgorm-python spells it. Each is
- * one of pgorm's value variants, and `interval` the one PostgreSQL type pgorm
- * has no variant for.
+ * one of pgorm's value variants.
  *
  * | Kind | PostgreSQL | JavaScript |
  * | --- | --- | --- |

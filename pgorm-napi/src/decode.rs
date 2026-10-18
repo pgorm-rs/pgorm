@@ -15,7 +15,7 @@ use jiff::{
     civil::{Date, DateTime, Time},
 };
 use pgorm::pgorm_query::{
-    ArrayType, IpNetwork, MacAddress, Multirange, Range, RangeType, Value, Vector,
+    ArrayType, Interval, IpNetwork, MacAddress, Multirange, Range, RangeType, Value, Vector,
 };
 use postgres_protocol::types::{self as wire, RangeBound};
 use rust_decimal::Decimal;
@@ -27,10 +27,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::Failure,
-    values::{
-        CreatedKind, Datum, Interval, Scalar, Tag, Tagged, TypeName, created, interval::wire_type,
-        json::ExactJson,
-    },
+    values::{CreatedKind, Tag, Tagged, TypeName, created, json::ExactJson, wire_type},
 };
 
 type CodecError = Box<dyn Error + Send + Sync>;
@@ -114,29 +111,18 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
         return Err("only one-dimensional arrays with lower bound 1 are supported".into());
     }
     let items = array.values().collect::<Vec<_>>()?;
-    let datum = match &element {
-        Tag::Scalar(Scalar::Interval) => Datum::Intervals(Some(
-            items
-                .into_iter()
-                .map(|item| item.map(|raw| Interval::from_sql(member, raw)).transpose())
-                .collect::<Result<_, _>>()?,
-        )),
-        _ => {
-            let kind = match &element {
-                Tag::Scalar(Scalar::Value(kind)) => kind.clone(),
-                _ => ArrayType::String,
-            };
-            let values = items
-                .into_iter()
-                .map(|item| match scalar(member, item)?.datum {
-                    Datum::Value(value) => Ok(value),
-                    _ => Err::<_, CodecError>("an array item decoded as another kind".into()),
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            Datum::Value(Value::Array(kind, Some(Box::new(values))))
-        }
+    let kind = match &element {
+        Tag::Scalar(kind) => kind.clone(),
+        _ => ArrayType::String,
     };
-    Ok(Tagged { datum, tag })
+    let values = items
+        .into_iter()
+        .map(|item| scalar(member, item).map(|item| item.datum))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Tagged {
+        datum: Value::Array(kind, Some(Box::new(values))),
+        tag,
+    })
 }
 
 /// Whether `ty` is one of the six built-in range types or their multiranges,
@@ -187,11 +173,11 @@ fn tag(ty: &Type) -> Result<Tag, CodecError> {
         Kind::Range(subtype) | Kind::Multirange(subtype) => {
             let multirange = matches!(ty.kind(), Kind::Multirange(_));
             if let Some(range) = built_in(ty) {
-                return Ok(Tag::Scalar(Scalar::Value(if multirange {
+                return Ok(Tag::Scalar(if multirange {
                     ArrayType::Multirange(range)
                 } else {
                     ArrayType::Range(range)
-                })));
+                }));
             }
             let Some(subtype) = subtype_kind(subtype) else {
                 return Err(format!(
@@ -231,7 +217,7 @@ fn tag(ty: &Type) -> Result<Tag, CodecError> {
         Type::NUMERIC => ArrayType::Decimal,
         Type::INET | Type::CIDR => ArrayType::IpNetwork,
         Type::MACADDR => ArrayType::MacAddress,
-        Type::INTERVAL => return Ok(Tag::Scalar(Scalar::Interval)),
+        Type::INTERVAL => ArrayType::Interval,
         Type::TIMETZ => {
             return Err(
                 "timetz is not supported: no Temporal type holds a time of day at a \
@@ -242,7 +228,7 @@ fn tag(ty: &Type) -> Result<Tag, CodecError> {
         _ if ty.name() == "vector" && matches!(ty.kind(), Kind::Simple) => ArrayType::Vector,
         _ => return Err("the type is not supported".into()),
     };
-    Ok(Tag::Scalar(Scalar::Value(kind)))
+    Ok(Tag::Scalar(kind))
 }
 
 fn scalar(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
@@ -252,18 +238,12 @@ fn scalar(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
         return Ok(Tagged::null(tag));
     };
     let datum = match &tag {
-        Tag::Scalar(Scalar::Interval) => Datum::Interval(Some(Interval::from_sql(ty, raw)?)),
         // The server sends only the type's labels, and the client's copy of
         // the label list can be older than an `ALTER TYPE ... ADD VALUE`, so
         // the label is not checked against it.
-        Tag::Enum(_) => Datum::Value(Value::String(Some(Box::new(String::from_sql(
-            &Type::TEXT,
-            raw,
-        )?)))),
-        Tag::Created(kind) => {
-            Datum::Value(Value::String(Some(Box::new(created_text(ty, kind, raw)?))))
-        }
-        Tag::Scalar(Scalar::Value(kind)) => Datum::Value(value(ty, kind, raw)?),
+        Tag::Enum(_) => Value::String(Some(Box::new(String::from_sql(&Type::TEXT, raw)?))),
+        Tag::Created(kind) => Value::String(Some(Box::new(created_text(ty, kind, raw)?))),
+        Tag::Scalar(kind) => value(ty, kind, raw)?,
         Tag::Array(_) => return Err("nested arrays are not supported".into()),
     };
     Ok(Tagged { datum, tag })
@@ -320,6 +300,7 @@ fn value(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, CodecError> {
                 )?))),
             )
         }
+        ArrayType::Interval => Value::from(Interval::from_sql(ty, raw)?),
         ArrayType::BigUnsigned | ArrayType::Char => {
             return Err("no PostgreSQL type decodes as this kind".into());
         }

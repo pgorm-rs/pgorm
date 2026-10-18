@@ -129,6 +129,7 @@ class Value:
     def items(self, /) -> list[Value] | None: ...
     def snapshot(self, /) -> dict[str, Any]: ...
 
+from ._intervals import Interval as Interval
 from ._ranges import (
     Range as Range, Multirange as Multirange,
     CreatedRange as CreatedRange, CreatedMultirange as CreatedMultirange,

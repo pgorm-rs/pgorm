@@ -106,13 +106,15 @@ macro_rules! scalar_kinds {
         /// The portable name of a Rust scalar variant.
         ///
         /// A range is named by its catalogue type, as `wire.RANGES` names it. A
-        /// multirange has a name here so the function is total, but no portable
-        /// kind, so [`validate`] refuses a value tagged with one.
+        /// multirange and an interval have names here so the function is
+        /// total, but no portable kind, so [`validate`] refuses a value tagged
+        /// with either.
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
             match kind {
                 $(ArrayType::$variant => $name,)+
                 ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(_) => "multirange",
+                ArrayType::Interval => "interval",
             }
         }
 
@@ -130,6 +132,7 @@ macro_rules! scalar_kinds {
                 $(ArrayType::$variant => Value::$variant(None),)+
                 ArrayType::Range(ty) => Value::Range(*ty, None),
                 ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
+                ArrayType::Interval => Value::Interval(None),
             }
         }
 
@@ -140,6 +143,7 @@ macro_rules! scalar_kinds {
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
                 Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
                 Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
+                Value::Interval(_) => Tag::Scalar(ArrayType::Interval),
             }
         }
 
@@ -153,6 +157,7 @@ macro_rules! scalar_kinds {
                 Value::Array(_, value) => value.is_none(),
                 Value::Range(_, value) => value.is_none(),
                 Value::Multirange(_, value) => value.is_none(),
+                Value::Interval(value) => value.is_none(),
             }
         }
     };
@@ -338,10 +343,12 @@ impl Tagged {
             Value::Range(_, value) => value
                 .as_ref()
                 .map_or(Json::Null, |range| range_payload(range)),
-            // No portable encoding exists, and the kind is refused by
+            // Neither has a portable encoding, and both kinds are refused by
             // `validate`; the data is the value's SQL literal, a description
             // rather than an invented payload.
+            // [spec:pgorm:def:sql.value.interval]
             Value::Multirange(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
+            Value::Interval(value) => json!(value.as_ref().map(|_| self.inner.to_string())),
         }
     }
 }

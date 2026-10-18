@@ -1102,6 +1102,7 @@ impl QueryBuilder {
             Value::Uuid(None) => write!(s, "NULL").unwrap(),
             Value::IpNetwork(None) => write!(s, "NULL").unwrap(),
             Value::MacAddress(None) => write!(s, "NULL").unwrap(),
+            Value::Interval(None) => write!(s, "NULL").unwrap(),
             Value::Range(_, None) | Value::Multirange(_, None) => write!(s, "NULL").unwrap(),
             Value::Array(_, None) => write!(s, "NULL").unwrap(),
             Value::Vector(None) => write!(s, "NULL").unwrap(),
@@ -1177,6 +1178,14 @@ impl QueryBuilder {
             }
             Value::IpNetwork(Some(v)) => write!(s, "'{v}'").unwrap(),
             Value::MacAddress(Some(v)) => write!(s, "'{v}'").unwrap(),
+            // Cast, unlike the temporal literals: an untyped string is `text`
+            // wherever no column types it, and an array of them is a `text[]`
+            // no `interval[]` column takes.
+            // [spec:pgorm:sem:sql.value.interval-text]
+            Value::Interval(Some(v)) => {
+                self.write_string_quoted(&v.to_string(), &mut s);
+                write!(s, "::interval").unwrap()
+            }
             Value::Range(ty, Some(v)) => self.write_range(*ty, v, &mut s),
             Value::Multirange(ty, Some(v)) => self.write_multirange(*ty, v, &mut s),
         };

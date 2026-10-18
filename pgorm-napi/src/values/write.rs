@@ -6,7 +6,7 @@ use std::ops::Bound;
 use neon::{prelude::*, types::JsBigInt};
 use pgorm::pgorm_query::{Range, Value};
 
-use super::{Datum, Interval, Tag, Tagged, created, value_is_null};
+use super::{Tag, Tagged, created, value_is_null};
 use crate::{codec::Codec, errors::Failure};
 
 /// Throw a `DecodeError`: a value has no form in the JavaScript type its kind
@@ -24,7 +24,7 @@ pub(crate) fn plain<'cx>(
     tagged: &Tagged,
 ) -> JsResult<'cx, JsValue> {
     match (&tagged.tag, &tagged.datum) {
-        (Tag::Created(kind), Datum::Value(Value::String(Some(text)))) => {
+        (Tag::Created(kind), Value::String(Some(text))) => {
             let Some(ranges) = created::ranges(&kind.subtype, text, kind.multirange) else {
                 return undecodable(cx, format!("{text:?} is no value of {}", kind.name.name));
             };
@@ -37,30 +37,12 @@ pub(crate) fn plain<'cx>(
                 }
             }
         }
-        (_, Datum::Value(value)) => self::value(cx, codec, value),
-        (_, Datum::Interval(None) | Datum::Intervals(None)) => Ok(cx.null().upcast()),
-        (_, Datum::Interval(Some(value))) => interval(cx, codec, *value),
-        (_, Datum::Intervals(Some(values))) => {
-            let array = JsArray::new(cx, values.len());
-            for (index, item) in values.iter().enumerate() {
-                let item = match item {
-                    Some(item) => interval(cx, codec, *item)?,
-                    None => cx.null().upcast(),
-                };
-                array.set(cx, index_u32(index), item)?;
-            }
-            Ok(array.upcast())
-        }
+        (_, value) => self::value(cx, codec, value),
     }
 }
 
 fn index_u32(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(u32::MAX)
-}
-
-fn interval<'cx>(cx: &mut Cx<'cx>, codec: Codec<'cx>, value: Interval) -> JsResult<'cx, JsValue> {
-    let microseconds = JsBigInt::from_i64(cx, value.microseconds);
-    codec.make(cx, ("interval", value.months, value.days, microseconds))
 }
 
 fn range<'cx>(cx: &mut Cx<'cx>, codec: Codec<'cx>, range: &Range<Value>) -> JsResult<'cx, JsValue> {
@@ -195,6 +177,13 @@ pub(crate) fn value<'cx>(
         Value::Multirange(_, Some(value)) => {
             let ranges: Vec<Range<Value>> = value.iter().cloned().collect();
             multirange(cx, codec, &ranges)?
+        }
+        Value::Interval(Some(interval)) => {
+            let microseconds = JsBigInt::from_i64(cx, interval.microseconds);
+            codec.make(
+                cx,
+                ("interval", interval.months, interval.days, microseconds),
+            )?
         }
         _ => cx.null().upcast(),
     })

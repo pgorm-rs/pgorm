@@ -82,7 +82,7 @@ test("a pipeline's stages run as any statement does, through each terminal", asy
   assert.equal(await pool().transaction((tx) => tx.execute(base.select(id))), 6);
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions/test]
+// [spec:pgorm:req:napi.pipeline-expressions+1/test]
 test("a value an operand is given is bound; only literal() writes one into the SQL", async () => {
   const awkward = "O'Brien; -- \\";
   const bound = base.filter(category.eq(awkward)).select(id);
@@ -101,6 +101,19 @@ test("a value an operand is given is bound; only literal() writes one into the S
   assert.deepStrictEqual(await pool().query(sized), [{ id: 1n, size: "small" }, { id: 2n, size: "big" }]);
   const cast = base.filter(id.eq(1)).select(amount.cast("text").as("spelled"), amount.coalesce(0).neg().as("negated"));
   assert.deepStrictEqual(await pool().query(cast), [{ spelled: "5", negated: -5 }]);
+});
+
+// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+test("an interval binds in a pipeline as any value does", async () => {
+  const span = new Interval({ months: 1, days: -2, microseconds: 3_000_004n });
+  const selected = base.filter(id.eq(1)).selectWith((binder) => [
+    binder.bind(span).cast("interval").as("span"),
+    binder.bind(Temporal.Duration.from({ days: 1, hours: 2 })).cast("interval").as("duration"),
+  ]);
+  assert.deepStrictEqual(selected.inspect().values.map((value) => value.kind), ["i64", "interval", "interval"]);
+  assert.deepStrictEqual(await pool().query(selected), [
+    { span, duration: new Interval({ days: 1, microseconds: 7_200_000_000n }) },
+  ]);
 });
 
 // [spec:pgorm:req:napi.pipeline/test]
@@ -218,13 +231,12 @@ test("a placeholder used outside the stage its binder's function returns it to i
 });
 
 // [spec:pgorm:req:napi.pipeline-binder/test]
-// [spec:pgorm:req:napi.pipeline-expressions/test]
+// [spec:pgorm:req:napi.pipeline-expressions+1/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);
   assert.throws(() => base.filterWith(42 as never), TypeError);
   assert.throws(() => base.filter(null as never), construction(/null has no kind/));
-  assert.throws(() => base.filter(id.eq(Interval.from("P1D") as never)), construction(/interval/));
   assert.throws(() => base.filter(category.eq(new Value("calm", new TypeName("mood")))), construction(/enum/));
   assert.throws(() => base.filter(statementCol("id") as never), construction(/expected a pipeline expression/));
   assert.throws(() => pl.literal(Number.NaN), construction(/a literal is/));

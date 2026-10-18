@@ -646,8 +646,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+27]
-// [spec:pgorm:req:sql.surface+27/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+28]
+// [spec:pgorm:req:sql.surface+28/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them.
 //
@@ -680,6 +680,7 @@ mod token;
 mod types;
 pub mod value;
 mod value_identity;
+mod value_interval;
 mod value_range;
 mod value_range_text;
 
@@ -724,6 +725,7 @@ pub use value::{
     ArrayType, IntoValueTuple, IpNetwork, MacAddress, Nullable, TryFromValueTuple, Value,
     ValueTuple, ValueTupleError, ValueType, ValueTypeError, Values, Vector,
 };
+pub use value_interval::Interval;
 pub use value_range::{Multirange, Range, RangeElement, RangeType};
 pub use value_range_text::RangeSubtype;
 

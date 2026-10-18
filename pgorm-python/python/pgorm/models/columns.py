@@ -30,6 +30,7 @@ MODEL_KINDS = frozenset(
         "ipnetwork",
         "mac_address",
         "vector",
+        "interval",
         "int4range",
         "int8range",
         "numrange",

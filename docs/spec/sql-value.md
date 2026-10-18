@@ -301,7 +301,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Range types a schema creates
 
-> [spec:pgorm:def:sql.value.created-range+1]
+> [spec:pgorm:def:sql.value.created-range+2]
 > A range type a schema creates with `CREATE TYPE ... AS RANGE`
 > (`[spec:pgorm:req:sql.ddl.type-range+2]`) is named by that schema, so no
 > `RangeType` variant can carry it, and `Value` does not: it stays one pointer
@@ -322,9 +322,11 @@ including panic semantics and quirks inherited from sea-query.
 > scalars PostgreSQL can range over (each type has a default b-tree operator
 > class) whose text form the type's input function reads back as the same
 > value and whose binary form a `FromSql` of the Rust type decodes. The rest
-> are left out: `bool` has two values to range over, `interval` and `money`
-> have no `Value` of their own, and `inet` and `macaddr` decode through
-> pgorm's own newtypes rather than a `FromSql` the range reader can use.
+> are left out: `bool` has two values to range over, `money` has no `Value` of
+> its own, `interval` has no text parsing in pgorm — the server writes one in
+> the session's `IntervalStyle`, and a created multirange is read back as its
+> text — and `inet` and `macaddr` decode through pgorm's own newtypes rather
+> than a `FromSql` the range reader can use.
 >
 > The text form is `Display` and `FromStr` on `Range<T>` and `Multirange<T>`
 > for `T: RangeSubtype`. `Display` writes `empty`, or a bracket, each bound
@@ -412,6 +414,81 @@ including panic semantics and quirks inherited from sea-query.
 > checks the subtype on the way in: a newtype naming another subtype than
 > the column's refuses text it cannot read, and reads numerals of another
 > numeric type as its own.
+
+## Intervals
+
+> [spec:pgorm:def:sql.value.interval]
+> `Interval` is PostgreSQL's `interval` as a value: the public fields
+> `months: i32`, `days: i32` and `microseconds: i64`, each with its own sign,
+> built by `Interval::new(months, days, microseconds)` or `Default`, which is
+> zero. The three fields MUST stay apart: a month has no fixed number of days
+> and a day no fixed number of microseconds across a daylight-saving change,
+> so `1 mon` is not `30 days`, and `1 mon -2 days` is a value no single-signed
+> duration spells. Nothing in pgorm normalises one field into another or
+> carries the time as float seconds. Every triple is a value the server
+> stores; the two whose every field is at its maximum or at its minimum are
+> PostgreSQL's `infinity` and `-infinity` (`is_infinity`, `is_neg_infinity`).
+> Equality and hashing are field by field, so `1 mon` and `30 days` are two
+> values here where PostgreSQL's `=` on `interval` calls them equal.
+>
+> `Value::Interval(Option<Box<Interval>>)` carries one, beside the variants
+> `[spec:pgorm:def:sql.value+3]` lists, and `ArrayType::Interval` tags an
+> `interval[]`, beside the tags of `[spec:pgorm:def:sql.value.array+6]`. The
+> payload is boxed though it holds no pointer: inline, its sixteen bytes and
+> the `Option` around them would widen every `Value` from 24 bytes to 32.
+> `From<Interval>`, `Nullable` and `ValueType` give the variant, its typed
+> `NULL` and its extraction — `type_name` `Interval`, `array_type`
+> `ArrayType::Interval`, `column_type` `ColumnType::Interval(IntervalSpec::Any(None))`,
+> the unqualified `interval` — and `Interval` is `NotU8`, so `Vec<Interval>` is
+> an `interval[]`. `is_interval` and `as_ref_interval` are its accessor pair,
+> and neither panics (`[spec:pgorm:sem:sql.value.accessor-panics+2]`).
+> `source_type_name` is `interval`, so a cast operand's placeholder is pinned
+> `$1::interval` and an array's `$1::interval[]`
+> (`[spec:pgorm:req:sql.render.cast-param-type+4]`), and an empty array's
+> literal is `ARRAY []::interval[]`.
+>
+> The binary form is `interval_send`'s: the microseconds, the days and then
+> the months, each big-endian, sixteen bytes in all. `Interval::to_binary`
+> writes it, and `Interval` implements `postgres_types::FromSql`, which reads
+> it from `interval` or a domain over it and refuses any other length. The
+> codec sits on the type, unlike a range's
+> (`[spec:pgorm:def:exec.decode.range+3]`), because pgorm, pgorm-python and
+> pgorm-napi all decode an interval through it, and `postgres-types` is
+> already a dependency of pgorm-query, so no detached workspace locks a new
+> crate. There is no `ToSql`: its signature names `bytes`' `BytesMut`, which
+> pgorm-query does not depend on, and its one writer, `ValueHolder`, writes
+> `to_binary` (`[spec:pgorm:req:exec.cursor.binding-interval]`).
+>
+> The Python binding carries it as `pgorm.Interval`
+> (`[spec:pgorm:req:python.values+3]`), and the JavaScript binding as its
+> `Interval`, a `Temporal.Duration` converting to one
+> (`[spec:pgorm:req:napi.temporal]`); both bind it in built statements as
+> this variant. The generative campaign has no portable kind for it: its
+> replay names the tag `interval` so the encoder is total, describes the
+> value by its literal, and its validation refuses it, as it refuses a
+> multirange.
+
+> [spec:pgorm:sem:sql.value.interval-text]
+> `Display` for `Interval` writes the text PostgreSQL's interval input reads
+> back as the same triple: `infinity` and `-infinity` for the two infinite
+> triples, `+0 days` when every field is zero, and otherwise each nonzero
+> field, in the order months, days, microseconds, as an explicitly signed
+> integer and its unit — `+1 months -2 days +3000004 microseconds`. Every
+> field MUST carry its sign: under `IntervalStyle` `sql_standard` the server
+> applies a leading `-` to every field after it unless another field is
+> signed too, so `-1 days 2 hours` would be read as `-1 days -2 hours`. The
+> microseconds are an integer, so no field passes through a fraction the
+> server would round, and the infinities are words because the server's
+> input refuses to compute an infinity from finite fields (`interval out of
+> range`).
+>
+> The literal rendering (`[spec:pgorm:sem:sql.value.render+2]`) writes that
+> text single-quoted through `write_string_quoted` and cast,
+> `'+1 months -2 days +3000004 microseconds'::interval`, and a `None` payload
+> as `NULL`. Unlike the temporal literals it carries its cast: an untyped
+> string is `text` wherever no column types it, and an array of them is a
+> `text[]`, which an `interval[]` column refuses (`42804`). The literal and
+> the bound value are one triple, under every `IntervalStyle`.
 
 ## Value tuples
 

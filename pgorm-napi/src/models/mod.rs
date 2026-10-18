@@ -35,7 +35,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
 // [spec:pgorm:req:napi.model-records]
 pub(crate) fn kind_key(tag: &Tag) -> String {
     match tag {
-        Tag::Scalar(scalar) => scalar.name().to_owned(),
+        Tag::Scalar(kind) => crate::values::scalar_name(kind).to_owned(),
         Tag::Enum(name) => format!("enum {}", quoted(name)),
         Tag::Created(kind) => format!(
             "{} {} of {}",

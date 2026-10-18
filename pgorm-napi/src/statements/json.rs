@@ -19,7 +19,7 @@ use super::{
 };
 use crate::{
     codec::Codec,
-    values::{Datum, Tag, read},
+    values::{Tag, read},
 };
 
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
@@ -119,8 +119,7 @@ fn json_default(cx: &mut FunctionContext) -> NeonResult<Node> {
             "a JSON DEFAULT is written as a plain literal, which cannot carry an enum's or a \
              created range's cast",
         ),
-        (Datum::Value(value), _) => Ok(Node::JsonDefault(value)),
-        _ => refuse(cx, "an interval has no value in pgorm's statements"),
+        (value, _) => Ok(Node::JsonDefault(value)),
     }
 }
 

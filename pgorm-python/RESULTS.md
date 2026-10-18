@@ -98,7 +98,7 @@ reports a multirange a schema created as a simple type, so a column of one,
 like an array of a created range, raises `DecodeError`; read it cast to `text`.
 A range's numeric bound is held to the exactness a numeric column is.
 Multi-dimensional/non-default-bound arrays,
-domains, composites, intervals and unlisted types raise `DecodeError`,
+domains, composites, `timetz` and unlisted types raise `DecodeError`,
 including typed NULLs of unsupported types. A query/decode error never becomes
 an empty list, `None`, or stream exhaustion. Server errors retain SQLSTATE;
 local cardinality errors have no PostgreSQL SQLSTATE.

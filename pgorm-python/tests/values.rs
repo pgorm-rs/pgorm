@@ -1,11 +1,11 @@
 use std::ffi::CString;
 
 use jiff::civil::{date, time};
-use pgorm::pgorm_query::{ArrayType, Value};
-use pgorm_python::values::{PyTypeName, PyValue};
+use pgorm::pgorm_query::{ArrayType, Interval, Value};
+use pgorm_python::values::{PyInterval, PyTypeName, PyValue};
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.values+2/test]
+// [spec:pgorm:req:python.values+3/test]
 #[test]
 fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     Python::initialize();
@@ -51,6 +51,54 @@ fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     })
 }
 
+// [spec:pgorm:req:python.values+3/test]
+#[test]
+fn python_interval_is_the_rust_interval() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        for interval in [
+            Interval::new(1, -2, 3_000_004),
+            Interval::new(i32::MIN, i32::MAX, i64::MIN),
+            Interval::new(i32::MAX, i32::MAX, i64::MAX),
+        ] {
+            let fields = (interval.months, interval.days, interval.microseconds);
+            let input = py.get_type::<PyInterval>().call1(fields)?;
+            let value = py.get_type::<PyValue>().call1((input, "interval"))?;
+            assert_eq!(
+                value.extract::<PyRef<'_, PyValue>>()?.rust_value(),
+                &Value::from(interval)
+            );
+            let output = Py::new(py, PyValue::from_rust(Value::from(interval))?)?;
+            assert!(value.eq(&output)?);
+            let read = output.bind(py).getattr("value")?;
+            assert_eq!(
+                (
+                    read.getattr("months")?.extract::<i32>()?,
+                    read.getattr("days")?.extract::<i32>()?,
+                    read.getattr("microseconds")?.extract::<i64>()?,
+                ),
+                fields
+            );
+        }
+        let array = Py::new(
+            py,
+            PyValue::from_rust(Value::array([Interval::new(0, 1, 0)]))?,
+        )?;
+        assert_eq!(
+            array
+                .bind(py)
+                .getattr("element_type")?
+                .extract::<String>()?,
+            "interval"
+        );
+        assert!(matches!(
+            array.borrow(py).rust_value(),
+            Value::Array(ArrayType::Interval, Some(_))
+        ));
+        Ok(())
+    })
+}
+
 // [spec:pgorm:req:python.value-tags/test]
 #[test]
 fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
@@ -73,7 +121,7 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+2/test]
+// [spec:pgorm:req:python.values+3/test]
 // [spec:pgorm:req:python.value-tags/test]
 #[test]
 fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
@@ -114,7 +162,7 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
 
 // [spec:pgorm:def:sql.value.range+4/test]    a range or multirange reaches Python as a
 // `pgorm.Range` or `pgorm.Multirange`, tagged with its range type, and converts back unchanged
-// [spec:pgorm:req:python.values+2/test]
+// [spec:pgorm:req:python.values+3/test]
 #[test]
 fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     use pgorm::pgorm_query::{Multirange, Range, RangeType};
@@ -160,7 +208,7 @@ fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+2/test]    a created range's Python value is the Value its Rust
+// [spec:pgorm:req:python.values+3/test]    a created range's Python value is the Value its Rust
 // newtype converts into, written as the newtype writes itself, and reads back as the range
 #[test]
 fn created_ranges_match_their_rust_newtypes() -> PyResult<()> {

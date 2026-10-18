@@ -9,14 +9,14 @@ import unittest
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from pgorm import ConstructionError, TypeName, Value, capabilities
+from pgorm import ConstructionError, Interval, TypeName, Value, capabilities
 
 
 def bits(value):
     return struct.pack(">d", value).hex()
 
 
-# [spec:pgorm:req:python.values+2/test]
+# [spec:pgorm:req:python.values+3/test]
 # [spec:pgorm:req:python.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
@@ -32,6 +32,7 @@ class ValueTests(unittest.TestCase):
             "datetime_utc": instant.replace(tzinfo=dt.timezone.utc),
             "ipnetwork": "192.0.2.7/24", "mac_address": b"\x00\x01\x02\x03\xfe\xff",
             "vector": [1.5, -0.0, float("inf")],
+            "interval": Interval(1, -2, 3_000_004),
         }
         ranges = {f"{name}{kind}" for name in ("int4", "int8", "num", "date", "ts", "tstz")
                   for kind in ("range", "multirange")}
@@ -206,6 +207,42 @@ class ValueTests(unittest.TestCase):
         value = Value(1)
         with self.assertRaises(AttributeError):
             value.kind = "text"
+
+    # [spec:pgorm:req:python.values+3/test]
+    def test_interval_keeps_three_signed_fields(self):
+        interval = Interval(1, -2, 3_000_004)
+        self.assertEqual((interval.months, interval.days, interval.microseconds), (1, -2, 3_000_004))
+        self.assertEqual(Interval(), Interval(0, 0, 0))
+        self.assertEqual(Interval(days=1), Interval(0, 1, 0))
+        self.assertEqual(hash(Interval(days=1)), hash(Interval(0, 1, 0)))
+        # No field is normalised into another, as PostgreSQL's own `=` would.
+        self.assertNotEqual(Interval(months=1), Interval(days=30))
+        self.assertNotEqual(Interval(days=1), Interval(microseconds=86_400_000_000))
+        self.assertEqual(str(interval), "+1 months -2 days +3000004 microseconds")
+        self.assertEqual(repr(interval), "Interval(months=1, days=-2, microseconds=3000004)")
+        with self.assertRaises(AttributeError):
+            interval.months = 2
+
+        value = Value(interval)
+        self.assertEqual(value.kind, "interval")
+        self.assertEqual(value.value, interval)
+        self.assertEqual(value.snapshot()["data"],
+                         {"months": "1", "days": "-2", "microseconds": "3000004"})
+        self.assertEqual(Value.array("interval", [interval, None]).value, [interval, None])
+        for extreme in (Interval(2**31 - 1, 2**31 - 1, 2**63 - 1),
+                        Interval(-(2**31), -(2**31), -(2**63))):
+            self.assertEqual(Value(extreme, "interval").value, extreme)
+
+        for invalid in (dict(months=2**31), dict(days=-(2**31) - 1), dict(microseconds=2**63),
+                        dict(months=True), dict(days=1.0), dict(microseconds="1")):
+            with self.subTest(fields=invalid), self.assertRaises(ConstructionError):
+                Interval(**invalid)
+        # A timedelta has no months and only one signed field, so it is no interval.
+        for data in (dt.timedelta(hours=-1), "1 day", 1):
+            with self.subTest(data=data), self.assertRaises(ConstructionError):
+                Value(data, "interval")
+        with self.assertRaises(ConstructionError):
+            Value(dt.timedelta(days=1))
 
     def test_snapshot_is_json_compatible_and_detached(self):
         value = Value.array("f64", [math.nan, -0.0, None])

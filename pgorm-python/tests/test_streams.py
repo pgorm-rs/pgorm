@@ -70,7 +70,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
 
     # [spec:pgorm:req:python.results/test]
     async def test_decode_failure_is_not_stream_exhaustion(self):
-        rows = await self.pool.stream(p.RawSQL("SELECT interval '1 day' AS n"))
+        rows = await self.pool.stream(p.RawSQL("SELECT timetz '12:00+02' AS n"))
         with self.assertRaises(p.DecodeError):
             await anext(rows)
         self.assertTrue(rows.closed)

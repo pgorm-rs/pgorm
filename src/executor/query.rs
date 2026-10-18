@@ -313,7 +313,7 @@ impl TryGetable for Decimal {
     }
 }
 
-use pgorm_query::{IpNetwork, MacAddress, Values, Vector};
+use pgorm_query::{Interval, IpNetwork, MacAddress, Values, Vector};
 #[cfg(feature = "with-json")]
 use tokio_postgres::types::Json;
 use tokio_postgres::{
@@ -435,6 +435,9 @@ impl TryGetable for MacAddress {
     }
 }
 
+// [spec:pgorm:req:exec.decode.interval]
+try_getable_all!(Interval);
+
 // [spec:pgorm:def:exec.decode.types+3]
 impl TryGetable for Vector {
     fn try_get_by<I: RowIndex + std::fmt::Display>(
@@ -524,6 +527,9 @@ mod postgres_array {
     try_getable_postgres_array!(jiff::Timestamp);
 
     try_getable_postgres_array!(rust_decimal::Decimal);
+
+    // [spec:pgorm:req:exec.decode.interval]
+    try_getable_postgres_array!(Interval);
 
     #[allow(unused_macros)]
     macro_rules! try_getable_postgres_array_uuid {
