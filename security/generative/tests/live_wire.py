@@ -36,7 +36,7 @@ def main():
         "date": date(2024, 1, 2),
         "time": time(3, 4, 5, 123000),
         # Naive on purpose: the `timestamp without time zone` round trip.
-        "datetime": datetime(2024, 1, 2, 3, 4, 5, 123456),  # noqa: DTZ001
+        "datetime": datetime(2024, 1, 2, 3, 4, 5, 123456),
         "datetime_utc": datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC),
         "ipnetwork": "192.0.2.129/24",
         "mac_address": b"\x00\x11\x22\x33\x44\xff",

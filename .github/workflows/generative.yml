@@ -17,9 +17,13 @@ on:
 permissions:
   contents: read
 
+# A pull request's runs share one group, so a newer push cancels the superseded
+# smoke run. A scheduled or dispatched run gets a group of its own: a full
+# campaign runs for hours, and no later trigger may cancel it or displace it
+# from a queue.
 concurrency:
-  group: generative-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: generative-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   smoke:

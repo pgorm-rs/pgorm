@@ -1211,8 +1211,6 @@ impl_evidence (
         generative.ci
     ), covered_claims (
         {impl_name main, rule generative.ci}
-    ), rule_versions_seen (
-        {id generative.ci, version 0}
     )}
     {id generative.compile, covered_rules (
         generative.compile-suite
@@ -1244,9 +1242,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule generative.build-amortization}
         {impl_name main, rule generative.execution}
-    ), rule_versions_seen (
-        {id generative.build-amortization, version 0}
-        {id generative.execution, version 0}
     )}
     {id generative.fixtures, covered_rules (
         generative.fixtures
@@ -1283,10 +1278,6 @@ impl_evidence (
         {impl_name main, rule generative.format}
         {impl_name main, rule generative.matrix}
         {impl_name main, rule generative.program}
-    ), rule_versions_seen (
-        {id generative.format, version 0}
-        {id generative.matrix, version 0}
-        {id generative.program, version 0}
     )}
     {id generative.replay, covered_rules (
         generative.replay
