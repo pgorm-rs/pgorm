@@ -8904,6 +8904,21 @@ children (
                     }
                 )
             }
+
+            {
+                id select-named-windows
+                title "A SELECT's WINDOW clause holds every named window, from Rust, Python and JavaScript"
+                kind @fix
+                deps (sql-select-extras)
+                log (
+                    {
+                        at 2026-10-18T16:22:56.441121Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by python-statement-typing (6b3c7eed). PostgreSQL's WINDOW clause takes a list of named windows, but pgorm-query's SelectStatement holds window: Option<..>, so a second .window(name, spec) call silently replaces the first and a query that refers to the dropped name fails at the server (42704) instead of when it is built; python.statements +4 currently documents the replacement. Make the clause a list (keeping names unique: refuse or make unrepresentable a duplicate name, which PostgreSQL rejects with 42P20), render every entry, let a named window reference an earlier one as PostgreSQL allows (WINDOW w2 AS (w1 ORDER BY ..)) if the builder can express it, and give Python and JavaScript the same; update sql.ast.window-statement / sql.render.window and python.statements, with oracle-checked renders and live tests. Waits on sql-select-extras, which changes the same SELECT builder in three languages."
+                    }
+                )
+            }
         )
     }
 
@@ -11708,6 +11723,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. A notification arrives on the connection that ran LISTEN, as an AsyncMessage on tokio-postgres's Connection future, which pgorm-pool's manager polls internally and pooled connections recycle, so LISTEN cannot work on a pooled connection. Build a dedicated listener: created from the pool's config (or from a tokio_postgres::Config plus a TLS connector, as connect_with is), owning its connection outright, with listen(channel) / unlisten(channel) / unlisten_all and a Stream of notifications (channel, payload, sender pid). Channel names are quoted identifiers; NOTIFY gets a typed helper too (NOTIFY channel, 'payload' or pg_notify with a bound payload). Decide and document what happens when the connection drops (the stream ends with an error; no silent reconnect that would miss notifications) and how backpressure works (bounded buffer, an overflow error rather than unbounded growth). Live tests on 18.6: a notification sent from a pooled connection inside a committed transaction arrives, one from a rolled-back transaction does not, unlisten stops delivery, a quoted channel name with odd characters works, payload limits. Python and JavaScript get the listener as an async iterator, with stubs, .d.ts and live tests. sql.scope's LISTEN entry graduates (bump; query-second-tier re-delivers). Waits on conn-copy, which changes the same connection surfaces in three languages."
+            }
+        )
+    }
+
+    {
+        id python-schema-truth-testing
+        title "Python's schema statements and Compiled refuse truth testing, as every query object does"
+        kind @fix
+        deps (python-statement-typing sql-views)
+        log (
+            {
+                at 2026-10-18T16:22:56.216054Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-statement-typing (6b3c7eed). Every query-expression and statement object in pgorm-python refuses truth testing (__bool__ raises), but the schema module's statements (CreateTable, CreateIndex, the DDL wrapper and the rest of src/schema) and Compiled still evaluate as true. Add the refusal to each, including whatever builders sql-views adds, extend test_boolean_conversion_fails_at_the_boundary / test_statement_truth_testing_is_rejected to cover them, and say so in SCHEMA.md. Waits on sql-views, which is editing src/schema."
             }
         )
     }
