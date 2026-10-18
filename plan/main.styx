@@ -368,6 +368,14 @@ children (
                         text "sql-select-extras (2e2d393a) bumped sql.ast.select+4 (tie limit slot, GROUP BY DISTINCT quantifier), sql.ast.select.from+4 (FromItem::TableFunction/TableSample), sql.ast.func+10 (generate_series, generate_series_step, unnest) and sql.ast.expr.operators+5 (similar_to); every site re-read and re-pinned, the code still says what the rules say."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:44:56.215991Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ast.keywords +6 (sql-domains, d5d22226): Keyword gains Value, rendering VALUE, built by Expr::domain_value()."
+                        after_done true
+                    }
                 )
             }
 
@@ -397,6 +405,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sql-select-extras (2e2d393a) bumped sql.types.opers+5 (BinOper::SimilarTo/NotSimilarTo) and sql.types.table-ref+6 (FromItem::TableFunction and TableSample, table_name and qualifier for a sample); sites re-pinned and the types match."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.339824Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.types.column-type +11 (sql-domains, d5d22226): ColumnType gains Domain { name, schema, base }, the one spelling of a domain column, equal by rendered name, schema and base."
                         after_done true
                     }
                 )
@@ -469,6 +485,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sql.ddl +10: Schema (create/drop/rename) joins the entry-point helpers and schema statements the no-placeholder list; every_ddl_entry_point_is_reachable reaches all three."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.073097Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ddl +11 and sql.ddl.column-types +6 (sql-domains, d5d22226): the entry points name Domain (create/alter/drop) and the no-placeholder list the domain statements; prepare_column_type spells Domain, CreatedRange and CreatedMultirange by name and schema through TypeName's part policy."
                         after_done true
                     }
                 )
@@ -569,6 +593,14 @@ children (
                         text "Two entity rules overclaimed since adoption, found by verify.entity: (1) entity.relation said has_one/has_many derive their builder \"by reversing the related entity's definition\" — RelationBuilder::from_rel keeps only tables and columns of the reversed definition, discarding on_delete/on_update actions, condition hooks and fk_name (baker declares on_delete=SetNull; Bakery::has_many(Baker) yields on_delete None). (2) entity.active-model.json said set_from_json restores key states \"preserving Set/Unchanged values\" — the restore path calls set(), so an Unchanged key returns as Set with its value intact. Both rules corrected at +1 with operator approval, refs re-pinned; behavior deliberately unchanged."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:44:56.451994Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at entity.traits.column.enum-cast +7 (sql-domains, d5d22226): a domain over an enum or a created range is read and written through its base's casts, to the domain's name; PostgreSQL resolves no operator for a domain over an enum (42883), so a predicate on one is the server's refusal."
+                        after_done true
+                    }
                 )
             }
 
@@ -624,6 +656,15 @@ children (
                         [spec:pgorm:def:exec.crud.exec-result]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T20:44:56.564772Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at exec.decode.array +2 (sql-domains, d5d22226): every Vec<T> decode reads an array of a domain as an array of the type the domain is over."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -1408,6 +1449,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "codegen.entity.types +7, codegen.entity.types.unsupported +7 and codegen.entity.compact.attrs +7 (30f11b85, codegen-interval-columns): interval columns map to Interval with the qualifier carried in the column definition, and a compact array names an element type the derive cannot infer."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.682786Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at codegen.entity.types +8, codegen.entity.compact.attrs +8 and codegen.entity.types.unsupported +8 (sql-domains, d5d22226): a domain column is a field of its base's Rust type with the domain spelled in its column definition by both writers; an array of a domain over an array is refused by name."
                         after_done true
                     }
                 )
