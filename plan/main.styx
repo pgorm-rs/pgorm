@@ -1402,6 +1402,14 @@ children (
                         text "codegen.entity.types +7, codegen.entity.types.unsupported +7 and codegen.entity.compact.attrs +7 (30f11b85, codegen-interval-columns): interval columns map to Interval with the qualifier carried in the column definition, and a compact array names an element type the derive cannot infer."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T19:30:08.398181Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "value-serde-impls (a2bece89) bumped codegen.entity.serde+1 and codegen.entity.serde.derives+1 (a range type's newtype in pgorm_range_types.rs carries the with_serde derives, after DeriveCreatedRange) and codegen.entity.imports+3 (gen_import heads pgorm_range_types.rs); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
                 )
             }
 
