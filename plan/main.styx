@@ -8748,6 +8748,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.surface +29: the register now records View, ViewCreateStatement, RecursiveViewCreateStatement, ViewCheckOption, ViewDropStatement, MaterializedView, MaterializedViewCreateStatement, MaterializedViewRefreshStatement, MaterializedViewDropStatement and TableCreateAsStatement (sql-views, 19a670c7), each named in lib.rs's explicit schema-statement re-exports with its module private; no glob, no new public module."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T18:41:17.237095Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.surface +31: Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement are re-exported by name from lib.rs and recorded in the register with sql.ddl.schema."
+                        after_done true
+                    }
                 )
             }
 
