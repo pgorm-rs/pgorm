@@ -247,6 +247,14 @@ children (
                         text "set-operation-grouping (a5a85e10) bumped sql.render.select-order+7: one ( per regrouping arm after the WITH clause and before SELECT, and the ) that closes it before that arm's operator; set-operation rendering moved to query_builder_set_operation.rs; sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T23:06:22.288312Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped sql.render.window+7: an inline window built on a declared one renders OVER ( \"base\" ORDER BY .. ) through prepare_extended_window; sites re-pinned and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -406,6 +414,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "set-operation-grouping (a5a85e10) bumped sql.ast.select.union+2: a chain of set operations means what it reads in call order, an INTERSECT arm after a UNION or EXCEPT arm parenthesising everything before it; site re-pinned and the renderer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:22.146738Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped sql.ast.window-statement+8: WindowSelectType gains Extended, expr_window/expr_window_as take any WindowDefinition, and check_windows holds an inline extended window to an extended entry's refusals with any entry as its base, the error's window None; sites re-pinned and the code matches."
                         after_done true
                     }
                 )
@@ -660,6 +676,15 @@ children (
                         [spec:pgorm:req:query.loader.table-ref-limitation]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T23:06:22.423711Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) reworded query.build.window+2: QuerySelect::window appends a WindowStatement or an ExtendedWindow to the WINDOW clause, held to check_windows by every terminal; the code was already so, and the four references are pinned."
+                        after_done true
+                    }
+                )
             }
 
             {

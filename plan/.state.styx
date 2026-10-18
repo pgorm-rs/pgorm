@@ -1745,7 +1745,6 @@ impl_evidence (
     )}
     {id orm.query, covered_rules (
         query.build
-        query.build.debug-query
         query.build.delete
         query.build.filter
         query.build.insert
@@ -1763,7 +1762,6 @@ impl_evidence (
         query.loader.table-ref-limitation
     ), covered_claims (
         {impl_name main, rule query.build}
-        {impl_name main, rule query.build.debug-query}
         {impl_name main, rule query.build.delete}
         {impl_name main, rule query.build.filter}
         {impl_name main, rule query.build.insert}
