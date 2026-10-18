@@ -9,7 +9,7 @@
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
-import type { Window, Windowed } from "./windows.d.ts";
+import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
 
 /** The SQL and the bound values a builder makes, exactly as running it would. */
 export interface Compiled {
@@ -109,10 +109,11 @@ export declare class Expr extends Builder {
   /** An array slice, `a[lower:upper]`; `null` leaves that end open. */
   slice(lower: Operand | null, upper: Operand | null): Expr;
   /**
-   * This call over a window, inline or named by the statement; only a function
-   * call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   * This call over a window, inline or named by the statement; an inline
+   * `ExtendedWindow` builds on an entry the statement declares. Only a
+   * function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
    */
-  over(window: Window | string): Windowed;
+  over(window: Window | ExtendedWindow | string): Windowed;
   /** A projection naming its output column. */
   as(alias: string): Aliased;
   asc(options?: { readonly nulls?: Nulls }): OrderBy;

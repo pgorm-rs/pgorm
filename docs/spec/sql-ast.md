@@ -1528,7 +1528,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Window statements
 
-> [spec:pgorm:def:sql.ast.window-statement+7]
+> [spec:pgorm:def:sql.ast.window-statement+8]
 > `WindowStatement` describes an OVER window: PARTITION BY expressions
 > (`partition_by`, and the `OverStatement` trait's
 > `partition_by_columns`), ORDER BY expressions (shared
@@ -1587,11 +1587,13 @@ today, including panicking edges and deliberate failsafes.
 > with it — so `Group` and `Ties` differ from `CurrentRow` only where the
 > ordering ties, and `NoOthers` removes nothing: it is the default, spelled.
 >
-> A select projection references a window in one of two ways
-> (`WindowSelectType`): `Query` embeds the window inline (`expr_window`,
-> `expr_window_as` render `OVER ( ... )`), while `Name` references a named
-> window (`expr_window_name`, `expr_window_name_as` render `OVER "w"`) that
-> the statement's WINDOW clause declares. The clause is a list, as
+> A select projection references a window in one of three ways
+> (`WindowSelectType`): `Query` embeds a window of its own inline, `Extended`
+> embeds one built on an entry of the statement's WINDOW clause, `OVER (
+> "w" ORDER BY ... )` — `expr_window` and `expr_window_as` take either, as a
+> `WindowDefinition` — while `Name` references a named window
+> (`expr_window_name`, `expr_window_name_as` render `OVER "w"`) that the
+> statement's WINDOW clause declares. The clause is a list, as
 > PostgreSQL's is: `SelectStatement::window(name, window)` appends an entry,
 > `"w" AS ( ... )`, the entries render in call order, and a statement reads as
 > many named windows as it declares. An entry's window is a
@@ -1609,8 +1611,12 @@ today, including panicking edges and deliberate failsafes.
 > (`42P20`); an extended window whose base is no earlier entry, a later one
 > included (`42704`), whose base has a frame (`42P20`), or which adds an
 > ORDER BY to a base that orders its rows, by its own ORDER BY or one copied
-> down a chain of extended windows (`42P20`); and a projection over a name no
-> entry declares (`42704`). `check_windows` refuses each before anything
+> down a chain of extended windows (`42P20`); a projection over a name no
+> entry declares (`42704`); and a projection over an inline extended window
+> held to the same three refusals as an extended entry, except that its base
+> may be any entry, earlier or later, since PostgreSQL reads the inline
+> window after the whole clause — the refusal then names no window, the
+> inline one having no name. `check_windows` refuses each before anything
 > renders — `Error::WindowRedefined`, `Error::WindowBaseUndefined`,
 > `Error::WindowFrameCopied`, `Error::WindowOrderOverridden` and
 > `Error::WindowUndefined` — and every pgorm executor and the Python and

@@ -21,7 +21,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+8/test]
+# [spec:pgorm:req:python.statements+9/test]
 class WindowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -146,6 +146,37 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"pair" AS ( "ordered" ROWS BETWEEN $1 PRECEDING AND CURRENT ROW )', sql)
         rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
         self.assertEqual(rows, [(1, 1, 1, 1), (2, 2, 3, 1), (3, 5, 6, 2), (4, 10, 12, 2)])
+
+    # [spec:pgorm:req:python.statements+9/test]    an inline ExtendedWindow builds on any entry of
+    # the WINDOW clause, held to what an extended entry is held to
+    async def test_inline_window_builds_on_a_named_one(self):
+        query = (p.Select(self.r("id"),
+                          p.call("sum", self.r("weight")).over(
+                              p.ExtendedWindow("kinds").order_by(self.r("id").asc())).as_("running"),
+                          p.call("count", self.r("id")).over(p.ExtendedWindow("kinds")).as_("of kind"))
+                 .from_(self.reading).window("kinds", p.Window().partition_by(self.r("kind")))
+                 .order_by(self.r("id").asc()))
+        sql = query.inspect().sql
+        self.assertIn('OVER ( "kinds" ORDER BY "r"."id" ASC ) AS "running"', sql)
+        self.assertIn('OVER ( "kinds" ) AS "of kind"', sql)
+        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        self.assertEqual(rows, [(1, 1, 2), (2, 2, 2), (3, 5, 2), (4, 10, 2)])
+
+        def over(window):
+            return p.Select(p.call("count", self.r("id")).over(window)).from_(self.reading)
+        ordered = p.Window().order_by(self.r("id").asc())
+        refused = [
+            over(p.ExtendedWindow("v")).window("w", p.Window()),
+            over(p.ExtendedWindow("v")).window("v", p.Window().frame(F.Rows.current_row())),
+            over(p.ExtendedWindow("v").order_by(self.r("id").desc())).window("v", ordered),
+        ]
+        for query in refused:
+            with self.assertRaises(p.ConstructionError):
+                query.inspect()
+            with self.assertRaises(p.ConstructionError):
+                await self.connection.fetch_all(query)
+        accepted = over(p.ExtendedWindow("v").frame(F.Rows.current_row())).window("v", ordered)
+        self.assertEqual(len(await self.connection.fetch_all(accepted)), 4)
 
     async def test_refused_window_clause_raises_construction_error(self):
         def over(name):

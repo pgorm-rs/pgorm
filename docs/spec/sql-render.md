@@ -484,13 +484,14 @@ an ideal Postgres renderer would emit.
 > ` TABLESAMPLE SYSTEM (`, the percentage as a parameter, and `)`; then, when
 > seeded, ` REPEATABLE (`, the seed as a parameter, and `)`.
 
-> [spec:pgorm:req:sql.render.window+6]
+> [spec:pgorm:req:sql.render.window+7]
 > A window specification is never emitted bare: `prepare_window_spec` wraps a
 > `WindowStatement` in `( ` … ` )` (note the spaces inside the parentheses),
 > `prepare_extended_window` wraps an `ExtendedWindow` the same way, and they
 > are the only ways a specification reaches the sink. Both spelling sites
-> therefore agree — an inline windowed projection renders ` OVER ( … )` and a
-> WINDOW clause entry renders `"name" AS ( … )` — and an empty specification
+> therefore agree, for either kind of window — an inline windowed projection
+> renders ` OVER ( … )`, ` OVER ( "base" ORDER BY … )` when it is built on a
+> declared window, and a WINDOW clause entry renders `"name" AS ( … )` — and an empty specification
 > renders as the legal `(  )`. `prepare_window_clause` writes the clause:
 > ` WINDOW ` and its entries in the order the statement holds them, separated
 > by `, `, or nothing when it declares no window. An extended window writes

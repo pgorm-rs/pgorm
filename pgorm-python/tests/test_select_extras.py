@@ -24,7 +24,7 @@ def text_array(values):
     return p.bind(p.Value.array("text", values)).cast(p.TypeName("text"), array=True)
 
 
-# [spec:pgorm:req:python.statements+8/test]
+# [spec:pgorm:req:python.statements+9/test]
 # [spec:pgorm:req:python.expressions+2/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

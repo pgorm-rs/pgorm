@@ -60,10 +60,11 @@ export class Expr extends Predicate {
   }
 
   /**
-   * This call over a `Window`, or over the window the statement names; only
-   * a function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   * This call over a `Window` or an `ExtendedWindow` written inline, or over
+   * the window the statement names; only a function call or `jsonArrayAgg` /
+   * `jsonObjectAgg` takes one.
    *
-   * @param {import("./windows.js").Window | string} window
+   * @param {import("./windows.js").Window | import("./windows.js").ExtendedWindow | string} window
    */
   over(window) {
     return new Windowed(native.exprOver(arg(this), arg(window)), TRUSTED);

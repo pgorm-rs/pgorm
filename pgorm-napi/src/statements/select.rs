@@ -310,7 +310,7 @@ fn select_with(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// clause, `"name" AS (..)`, which `over(name)` reads. A clause PostgreSQL
 /// refuses is refused where the tie limit is: when the statement is compiled
 /// or read into another.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn select_window(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let name = super::args::name_at(cx, 1)?;

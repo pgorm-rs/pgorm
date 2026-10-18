@@ -3,6 +3,10 @@
     "sql": "SELECT \"r\".\"id\", SUM(\"r\".\"weight\") OVER ( PARTITION BY \"r\".\"kind\" ORDER BY \"r\".\"at\" ASC ) AS \"running\", row_number() OVER \"by_kind\" AS \"n\", AVG(\"r\".\"weight\") OVER (  ) FROM \"reading\" AS \"r\" WINDOW \"by_kind\" AS ( PARTITION BY \"r\".\"kind\" )",
     "values": []
   },
+  "window-inline-extended": {
+    "sql": "SELECT SUM(\"r\".\"weight\") OVER ( \"by_kind\" ORDER BY \"r\".\"at\" ASC ROWS BETWEEN $1 PRECEDING AND CURRENT ROW ), rank() OVER ( \"by_kind\" ) AS \"rank\" FROM \"reading\" AS \"r\" WINDOW \"by_kind\" AS ( PARTITION BY \"r\".\"kind\" )",
+    "values": [["i64","1"]]
+  },
   "window-clause-entries": {
     "sql": "SELECT SUM(\"r\".\"weight\") OVER \"running\", rank() OVER \"ordered\" AS \"rank\" FROM \"reading\" AS \"r\" WINDOW \"by_kind\" AS ( PARTITION BY \"r\".\"kind\" ), \"ordered\" AS ( \"by_kind\" ORDER BY \"r\".\"at\" ASC ), \"running\" AS ( \"ordered\" ROWS BETWEEN $1 PRECEDING AND CURRENT ROW )",
     "values": [["i64","1"]]

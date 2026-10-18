@@ -339,14 +339,19 @@ builder is or what its rows decode into.
 > (`SimpleExpr::Constant`), never a bound parameter, because a bare `$n` in that
 > position has no type to resolve from (`sql.render.placeholder-typing`).
 
-> [spec:pgorm:sem:query.build.window]
-> `QuerySelect::window(name, spec)` declares a named window in place and returns
-> `Self`. `window_expr_as(func, window, alias)` projects
-> `<func>(…) OVER <window> AS <alias>` and, being a projection, returns
-> `QuerySelect::Projected` — it steps the `select_only` typestate forward exactly
-> as `column` and `expr_as` do (`query.build.modifiers`). The window declaration
-> is rendered at its own query level, ahead of the set operations and the
-> ORDER BY/LIMIT tail (`sql.render.select-order`).
+> [spec:pgorm:sem:query.build.window+2]
+> `QuerySelect::window(name, window)` appends an entry to the statement's
+> WINDOW clause and returns `Self`: a `WindowStatement`, or an
+> `ExtendedWindow` built on an entry appended before it. The clause holds
+> every entry in call order, and every terminal holds it to
+> `SelectStatement::check_windows` before it sends anything
+> (`sql.ast.window-statement`). `window_expr_as(func, window, alias)` projects
+> `<func>(…) OVER "window" AS <alias>` over an entry by name and, being a
+> projection, returns `QuerySelect::Projected` — it steps the `select_only`
+> typestate forward exactly as `column` and `expr_as` do
+> (`query.build.modifiers`). The WINDOW clause is rendered at its own query
+> level, ahead of the set operations and the ORDER BY/LIMIT tail
+> (`sql.render.select-order`).
 
 > [spec:pgorm:sem:query.build.union]
 > `QuerySelect::union(union_type, other)` appends a set-operation arm, where

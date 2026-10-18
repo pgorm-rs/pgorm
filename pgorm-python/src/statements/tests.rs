@@ -40,7 +40,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -90,7 +90,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -127,7 +127,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -160,7 +160,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -218,7 +218,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -287,7 +287,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -332,7 +332,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -386,7 +386,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -422,7 +422,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn windows_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -491,7 +491,7 @@ w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 #[test]
 fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     Python::initialize();
@@ -551,9 +551,9 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]    the WINDOW clause holds every window `window`
-// declares, an `ExtendedWindow` among them, and `check_windows` refuses at inspection and as the
-// statement is read into another
+// [spec:pgorm:req:python.statements+9/test]    the WINDOW clause holds every window `window`
+// declares, an `ExtendedWindow` among them, an item's inline window may build on one, and
+// `check_windows` refuses at inspection and as the statement is read into another
 #[test]
 fn window_clause_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -591,10 +591,41 @@ def over(name):
                 )
                 .build(),
         )?;
+        parity(
+            py,
+            &globals,
+            "p.Select(p.call('sum', r.col('weight')).over(p.ExtendedWindow('by kind').order_by(r.col('id').asc())).as_('running')).from_(r).window('by kind', p.Window().partition_by(r.col('kind')))",
+            Query::select()
+                .expr_window_as(
+                    Func::sum(r("weight")),
+                    ExtendedWindow::new(n("by kind"))
+                        .order_by_expr(r("id").into(), Order::Asc)
+                        .to_owned(),
+                    n("running"),
+                )
+                .from(n("reading").into_named_table().alias(n("r")))
+                .window(
+                    n("by kind"),
+                    WindowStatement::partition_by((n("r"), n("kind"))),
+                )
+                .build(),
+        )?;
         for (source, refusal) in [
             (
                 "over('w').window('w', p.Window()).window('w', p.Window())",
                 "names two windows",
+            ),
+            (
+                "over(p.ExtendedWindow('v')).window('w', p.Window())",
+                "the window after OVER extends \"v\"",
+            ),
+            (
+                "over(p.ExtendedWindow('v')).window('v', p.Window().frame(F.Rows.current_row()))",
+                "which has a frame",
+            ),
+            (
+                "over(p.ExtendedWindow('v').order_by(r.col('id').desc())).window('v', p.Window().order_by(r.col('id').asc()))",
+                "already orders its rows",
             ),
             ("over('w').window('v', p.Window())", "no window \"w\""),
             (
@@ -654,7 +685,7 @@ def over(name):
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tie limit shares `limit`'s slot, either
 // replacing the other and `None` clearing both
 #[test]
@@ -708,7 +739,7 @@ fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]    a tie limit with no ORDER BY is refused at
 // inspection, at execution's compile and as a CTE body or subquery reads it, and its count is
 // checked as `limit`'s is
@@ -785,7 +816,7 @@ fn tie_limits_without_order_are_refused() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 // [spec:pgorm:req:sql.ast.select.group-distinct/test]    grouping elements interleave with
 // expressions in call order, and DISTINCT quantifies the whole list
 #[test]
@@ -856,7 +887,7 @@ fn grouping_elements_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 // [spec:pgorm:req:sql.ast.select.table-function/test]    one call, ROWS FROM, ordinality and
 // column names, the lone plain call as Rust's FunctionCall item, and anything but a call refused
 #[test]
@@ -946,7 +977,7 @@ fn table_functions_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]
+// [spec:pgorm:req:python.statements+9/test]
 // [spec:pgorm:req:sql.ast.select.table-sample/test]    both methods, the percentage and seed
 // bound as doubles, and numbers a double cannot hold exactly refused
 #[test]
@@ -1019,7 +1050,7 @@ fn table_samples_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]    each operator appends one parenthesised arm in
+// [spec:pgorm:req:python.statements+9/test]    each operator appends one parenthesised arm in
 // call order, and the receiver's ORDER BY, limits and WITH clause cover the combined rows
 #[test]
 fn set_operations_match_rust_builders() -> PyResult<()> {
@@ -1091,7 +1122,7 @@ fn set_operations_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+8/test]    an arm is read into the statement, so its tie
+// [spec:pgorm:req:python.statements+9/test]    an arm is read into the statement, so its tie
 // limit is checked as it is read; anything but a Select is a TypeError
 #[test]
 fn set_operation_arms_are_checked_when_read() -> PyResult<()> {

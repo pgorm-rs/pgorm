@@ -9397,12 +9397,27 @@ children (
                 title "An inline window builds on a named one, OVER (\"w\" ORDER BY ..), from Rust, Python and JavaScript"
                 kind @feat
                 deps (select-named-windows)
+                sealed true
                 log (
                     {
                         at 2026-10-18T21:52:40.429965Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by select-named-windows (e5df312c). PostgreSQL accepts an inline window built on a named one, OVER (\"w\" ORDER BY ..), with the same restrictions as a named window extending another (no PARTITION BY, no ORDER BY over one the base has, no base with a frame). ExtendedWindow could feed expr_window and the bindings' over() so this is expressible, held by check_windows. Also update query.build.window, whose text still says the method \"declares a named window in place\" without mentioning appending or ExtendedWindow."
+                    }
+
+                    {
+                        at 2026-10-18T22:38:13.651239Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T22:59:11.487034Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

@@ -764,7 +764,7 @@ pub trait QuerySelect: Sized {
     /// PostgreSQL refuses — two entries of one name, an extended window over
     /// a base it cannot copy — is refused by every terminal before it sends
     /// anything (`SelectStatement::check_windows`).
-    // [spec:pgorm:sem:query.build.window]
+    // [spec:pgorm:sem:query.build.window+2]
     fn window<A, W>(mut self, name: A, window: W) -> Self
     where
         A: IntoName,
@@ -780,7 +780,7 @@ pub trait QuerySelect: Sized {
     /// [`window`](QuerySelect::window). Being a projection, this steps the
     /// builder to [`Projected`](QuerySelect::Projected) exactly as
     /// [`column`](QuerySelect::column) and [`expr_as`](QuerySelect::expr_as) do.
-    // [spec:pgorm:sem:query.build.window]
+    // [spec:pgorm:sem:query.build.window+2]
     fn window_expr_as<W, A>(mut self, func: FunctionCall, window: W, alias: A) -> Self::Projected
     where
         W: IntoName,

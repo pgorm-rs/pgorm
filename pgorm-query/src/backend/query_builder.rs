@@ -569,7 +569,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+6] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+7] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -580,6 +580,10 @@ impl QueryBuilder {
             Some(WindowSelectType::Query(window)) => {
                 write!(sql, " OVER ").unwrap();
                 self.prepare_window_spec(window, sql);
+            }
+            Some(WindowSelectType::Extended(window)) => {
+                write!(sql, " OVER ").unwrap();
+                self.prepare_extended_window(window, sql);
             }
             None => {}
         };

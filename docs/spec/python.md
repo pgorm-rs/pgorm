@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+8]
+> [spec:pgorm:req:python.statements+9]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -180,7 +180,8 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > and its alias required so an empty column list or an unnamed item cannot be
 > built. A SELECT item MUST be able to call a function over a window, inline or
 > named in the statement's WINDOW clause, lowered into `WindowStatement` and
-> the `expr_window` family. The WINDOW clause MUST hold every window
+> the `expr_window` family; an inline window may be an `ExtendedWindow(base)`
+> built on an entry of the clause, `OVER ( "base" ORDER BY … )`. The WINDOW clause MUST hold every window
 > `window(name, window)` declares, in call order, as Rust's
 > `SelectStatement::window` appends them: a `Window`, or an
 > `ExtendedWindow(base)`, lowered into Rust's `ExtendedWindow`, which builds
@@ -188,8 +189,10 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > (`sql.ast.window-statement`); anything else declared is a `TypeError`. A
 > clause PostgreSQL refuses — a name declared twice, an extended window whose
 > base is no earlier entry, has a frame, or already orders its rows when it
-> adds an ORDER BY — and an item over a name the clause does not declare are
-> refused by Rust's `check_windows`, as a `ConstructionError`, where the tie
+> adds an ORDER BY — an item over a name the clause does not declare, and an
+> item over an inline `ExtendedWindow` whose base no entry declares, has a
+> frame, or already orders its rows when it adds an ORDER BY are refused by
+> Rust's `check_windows`, as a `ConstructionError`, where the tie
 > limit is checked: when the statement is inspected or executed, and as a
 > method reads it into another statement.
 > `OVER` MUST attach only to what Rust's `WindowFunction` admits — a function

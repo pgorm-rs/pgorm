@@ -59,7 +59,7 @@ use crate::{
 ///
 /// ExtendedWindow::new(Name::runtime("by_size")).partition_by(Char::SizeW);
 /// ```
-// [spec:pgorm:def:sql.ast.window-statement+7]
+// [spec:pgorm:def:sql.ast.window-statement+8]
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtendedWindow {
     pub(crate) base: Name,
@@ -70,7 +70,7 @@ pub struct ExtendedWindow {
 impl ExtendedWindow {
     /// A window copying the partitioning, and any ordering, of the entry the
     /// WINDOW clause names `base`.
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn new<B>(base: B) -> Self
     where
         B: IntoName,
@@ -84,7 +84,7 @@ impl ExtendedWindow {
 
     /// Sets the window's frame, replacing any frame already set, as
     /// [`WindowStatement::frame`] does.
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn frame<F>(&mut self, frame: F) -> &mut Self
     where
         F: Into<FrameClause>,
@@ -137,7 +137,7 @@ impl OrderedStatement for ExtendedWindow {
 
 /// What an entry of a WINDOW clause defines: a window of its own, or one
 /// built on an earlier entry.
-// [spec:pgorm:def:sql.ast.window-statement+7]
+// [spec:pgorm:def:sql.ast.window-statement+8]
 #[derive(Debug, Clone, PartialEq)]
 pub enum WindowDefinition {
     /// `( PARTITION BY … ORDER BY … <frame> )`.
@@ -158,8 +158,18 @@ impl From<ExtendedWindow> for WindowDefinition {
     }
 }
 
+/// A definition written inline after `OVER`, as a projection holds it.
+impl From<WindowDefinition> for WindowSelectType {
+    fn from(window: WindowDefinition) -> Self {
+        match window {
+            WindowDefinition::Spec(window) => Self::Query(window),
+            WindowDefinition::Extended(window) => Self::Extended(window),
+        }
+    }
+}
+
 /// One entry of a WINDOW clause, `"name" AS ( … )`.
-// [spec:pgorm:def:sql.ast.window-statement+7]
+// [spec:pgorm:def:sql.ast.window-statement+8]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct NamedWindow {
     pub(crate) name: Name,
@@ -207,7 +217,7 @@ impl SelectStatement {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn window<A, W>(&mut self, name: A, window: W) -> &mut Self
     where
         A: IntoName,
@@ -230,7 +240,11 @@ impl SelectStatement {
     ///   a base that orders its rows, by its own ORDER BY or one it copied
     ///   ([`Error::WindowOrderOverridden`], `42P20`);
     /// - a projection over a window name no entry declares
-    ///   ([`Error::WindowUndefined`], `42704`).
+    ///   ([`Error::WindowUndefined`], `42704`), and one over an inline
+    ///   extended window whose base no entry declares, has a frame, or orders
+    ///   its rows when the inline window adds an ORDER BY — the refusals of
+    ///   an extended entry, except that the base may be any entry, the inline
+    ///   window being read after the whole clause.
     ///
     /// Rendering is infallible, so it writes what the statement holds and
     /// leaves the refusal to this check; pgorm's executors and the Python
@@ -261,7 +275,7 @@ impl SelectStatement {
     ///     Err(Error::WindowRedefined { name: "w".to_owned() })
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn check_windows(&self) -> Result<()> {
         // Whether each entry so far orders its rows: an extended window
         // carries its base's ORDER BY, so the answer is read down the chain.
@@ -279,37 +293,48 @@ impl SelectStatement {
             ordered.push(match &entry.definition {
                 WindowDefinition::Spec(window) => !window.order_by.is_empty(),
                 WindowDefinition::Extended(window) => {
-                    check_base(&entry.name, window, earlier, &ordered)?
+                    check_base(Some(&entry.name), window, earlier, &ordered)?
                 }
             });
         }
         for select in &self.selects {
-            if let Some(WindowSelectType::Name(name)) = select.window()
-                && !self
-                    .windows
-                    .iter()
-                    .any(|entry| same_window(&entry.name, name))
-            {
-                return Err(Error::WindowUndefined {
-                    name: name.to_string(),
-                });
+            match select.window() {
+                Some(WindowSelectType::Name(name))
+                    if !self
+                        .windows
+                        .iter()
+                        .any(|entry| same_window(&entry.name, name)) =>
+                {
+                    return Err(Error::WindowUndefined {
+                        name: name.to_string(),
+                    });
+                }
+                Some(WindowSelectType::Extended(window)) => {
+                    check_base(None, window, &self.windows, &ordered)?;
+                }
+                _ => {}
             }
         }
         Ok(())
     }
 }
 
-/// Refuse what the entry `name`, extending `window.base`, cannot copy from
-/// the `earlier` entries, whose orderings `ordered` holds; answer whether the
+/// Refuse what the window `name` — an entry, or `None` for one written
+/// inline after `OVER` — extending `window.base`, cannot copy from the
+/// `earlier` entries, whose orderings `ordered` holds; answer whether the
 /// extended window orders its rows.
 fn check_base(
-    name: &Name,
+    name: Option<&Name>,
     window: &ExtendedWindow,
     earlier: &[NamedWindow],
     ordered: &[bool],
 ) -> Result<bool> {
-    let refused =
-        |error: fn(String, String) -> Error| Err(error(name.to_string(), window.base.to_string()));
+    let refused = |error: fn(Option<String>, String) -> Error| {
+        Err(error(
+            name.map(|name| name.to_string()),
+            window.base.to_string(),
+        ))
+    };
     let Some(at) = earlier
         .iter()
         .position(|entry| same_window(&entry.name, &window.base))

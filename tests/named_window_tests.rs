@@ -73,7 +73,7 @@ struct Totals {
 
 /// Two named windows, each read by its own projection, through the ORM's
 /// executor.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    against a live server: the WINDOW clause
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    against a live server: the WINDOW clause
 // holds every named window, and each is read
 async fn every_declared_window_is_read(db: &DatabaseConnection) -> Result<(), Error> {
     let query = reading()
@@ -106,9 +106,9 @@ struct Running {
 /// `running` extends `by_kind` with an ORDER BY, and `pair` extends
 /// `running` with a frame: each sums within its kind in id order, `pair`
 /// over the row before and the row itself. The frame's offset is bound.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    against a live server: an extended window
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    against a live server: an extended window
 // copies its base's PARTITION BY and ORDER BY and adds what the base left open
-// [spec:pgorm:req:sql.render.window+6/test]    `( "base" ORDER BY … <frame> )`, its offset bound
+// [spec:pgorm:req:sql.render.window+7/test]    `( "base" ORDER BY … <frame> )`, its offset bound
 async fn an_extended_window_runs_over_its_base(db: &DatabaseConnection) -> Result<(), Error> {
     let query = reading()
         .expr_window_name_as(Func::sum(col("weight")), n("running"), n("running"))
@@ -192,7 +192,7 @@ fn extending(base: &str) -> ExtendedWindow {
 /// Each clause `check_windows` refuses, sent as written, is refused by the
 /// server with the SQLSTATE its refusal names; the clauses it passes, the
 /// server runs.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    against a live server: `check_windows`
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    against a live server: `check_windows`
 // refuses exactly what the server refuses, with the same codes
 async fn the_server_refuses_each_refused_clause(db: &DatabaseConnection) -> Result<(), Error> {
     let cases: Vec<(Vec<(&str, WindowDefinition)>, SqlState)> = vec![
@@ -285,7 +285,7 @@ async fn the_server_refuses_each_refused_clause(db: &DatabaseConnection) -> Resu
 
 /// pgorm's executor checks the clause before it renders: a refused one comes
 /// back as the query builder's error and sends nothing.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    every pgorm executor calls `check_windows`
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    every pgorm executor calls `check_windows`
 // before it renders
 async fn executors_refuse_before_sending(db: &DatabaseConnection) -> Result<(), Error> {
     let query = declaring(vec![("w", by_kind().into()), ("w", ordered())]);

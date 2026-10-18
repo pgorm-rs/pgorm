@@ -303,7 +303,7 @@ fn sweep_cte_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    window functions over a real function call
-// [spec:pgorm:req:sql.render.window+6/test]
+// [spec:pgorm:req:sql.render.window+7/test]
 #[test]
 fn sweep_window_function_shapes() {
     let over = |window: WindowStatement| {

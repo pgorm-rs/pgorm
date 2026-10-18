@@ -409,18 +409,20 @@ await pool.query(select().from(new Table("booking"))
   `.value`, `.query`, `.exists` and `.nested`, each with its own options. It
   needs a column and an alias, and is implicitly LATERAL, so `join(items,
   bind(true), { kind: "left" })` keeps a row whose document yields nothing.
-- **Windows**: `expr.over(window | name)` on a function call or a JSON
-  aggregate; `new Window().partitionBy(..).orderBy(..).frame(..)`; frames from
+- **Windows**: `expr.over(window | extended | name)` on a function call or a
+  JSON aggregate; `new Window().partitionBy(..).orderBy(..).frame(..)`; frames from
   `FrameType.rows`, `.range` or `.groups` offer only the ends that may follow
   their start; `windowFunction(name, ..)` for `row_number`, `rank`, `lag` and
   the others, usable only with `over`. Each `select.window(name, window)`
   appends an entry to the WINDOW clause, and `new ExtendedWindow(base)` builds
   one on an earlier entry, copying its partitioning and any ordering and
-  adding `orderBy(..)` and `frame(..)`. A clause PostgreSQL refuses — a name
+  adding `orderBy(..)` and `frame(..)`; given to `over`, it is written inline,
+  `OVER ("base" ..)`, on any entry. A clause PostgreSQL refuses — a name
   declared twice, an extended window whose base is no earlier entry, has a
-  frame, or already orders its rows when it adds an ORDER BY — and an
-  `over(name)` no entry declares are a `ConstructionError` when the statement
-  is inspected, run or read into another.
+  frame, or already orders its rows when it adds an ORDER BY — an
+  `over(name)` no entry declares, and an inline extended window over a base
+  it could not extend as an entry are a `ConstructionError` when the
+  statement is inspected, run or read into another.
 - **Ranges**: `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`)
   over ranges, multiranges and arrays. A range binds as a `Value` naming its
   kind — a built-in one or a `CreatedRange` — never inferred.

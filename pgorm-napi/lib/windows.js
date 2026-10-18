@@ -4,7 +4,7 @@
 // start offers only the ends that may follow it, so no frame whose end comes
 // before its start can be built, and a function PostgreSQL computes only over
 // a window has no form but `over`.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -209,7 +209,7 @@ export class WindowFunction extends Handle {
     super(handle);
   }
 
-  /** @param {Window | string} window */
+  /** @param {Window | ExtendedWindow | string} window */
   over(window) {
     return new Windowed(native.exprOver(arg(this), arg(window)), TRUSTED);
   }

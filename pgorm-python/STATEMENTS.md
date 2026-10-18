@@ -217,7 +217,11 @@ identifiers, quoted case-exactly like every other.
 An entry may build on an earlier one: `ExtendedWindow(base)` is
 `"name" AS ("base" ..)`, which copies the base's PARTITION BY and any ORDER BY
 it has and adds `.order_by(*orderings)` and `.frame(frame)`. It has no
-`partition_by`, because PostgreSQL refuses one there.
+`partition_by`, because PostgreSQL refuses one there. `over` takes one inline
+too, `OVER ("base" ..)`, built on any entry the statement declares, so a
+single item can order or frame a shared partitioning without an entry of its
+own: `call("sum", reading.col("weight")).over(ExtendedWindow("by_kind")
+.order_by(reading.col("at").asc()))`.
 
 ```python
 from pgorm import ExtendedWindow, FrameType, Table, Window, call, select
@@ -240,8 +244,10 @@ What PostgreSQL refuses of a clause depends on its other entries, so
 operation's arm, a CTE body) raise `ConstructionError` for it, through Rust's
 `check_windows`: a name declared twice, an extended window whose base is no
 earlier entry, has a frame, or already orders its rows when it adds an ORDER
-BY, and an `over(name)` no entry declares. `.window` takes a `Window` or an
-`ExtendedWindow`; anything else raises `TypeError`.
+BY, an `over(name)` no entry declares, and an inline `ExtendedWindow` whose
+base no entry declares, has a frame, or already orders its rows when it adds
+an ORDER BY. `.window` takes a `Window` or an `ExtendedWindow`; anything else
+raises `TypeError`.
 
 PostgreSQL writes `OVER` only after a function call, and Rust's
 `expr_window` takes only a `WindowFunction`: a `FunctionCall` or one of the

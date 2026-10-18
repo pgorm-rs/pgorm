@@ -6,7 +6,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 
 import type { Expr, Operand, OrderBy } from "./expressions.d.ts";
 
@@ -20,10 +20,12 @@ export declare class Window {
 }
 
 /**
- * A window built on an earlier entry of a SELECT's WINDOW clause, named
- * `base`: it copies the base's PARTITION BY and any ORDER BY, and adds an
- * ORDER BY and a frame. It has no `partitionBy`, which PostgreSQL refuses
- * there. Every method returns a new window.
+ * A window built on an entry of a SELECT's WINDOW clause, named `base`: it
+ * copies the base's PARTITION BY and any ORDER BY, and adds an ORDER BY and a
+ * frame. Appended with `window` it builds on an earlier entry; given to
+ * `over` it is written inline, `OVER ("base" ..)`, and builds on any. It has
+ * no `partitionBy`, which PostgreSQL refuses there. Every method returns a
+ * new window.
  */
 export declare class ExtendedWindow {
   constructor(base: string);
@@ -84,7 +86,7 @@ export declare class Windowed {
 /** A function PostgreSQL computes only over a window; its one method is `over`. */
 export declare class WindowFunction {
   private constructor();
-  over(window: Window | string): Windowed;
+  over(window: Window | ExtendedWindow | string): Windowed;
 }
 
 /** The general-purpose window functions, at the argument counts each takes. */

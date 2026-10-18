@@ -45,16 +45,18 @@ pub enum Error {
     /// A window extending a base that is no earlier entry of its WINDOW
     /// clause, which PostgreSQL reads as no window at all (`42704`).
     WindowBaseUndefined {
-        /// The extending window.
-        window: String,
+        /// The extending window's name in the WINDOW clause, or `None` for
+        /// one written inline after `OVER`.
+        window: Option<String>,
         /// The base it names.
         base: String,
     },
     /// A window extending a base that has a frame, which PostgreSQL refuses
     /// to copy (`42P20`).
     WindowFrameCopied {
-        /// The extending window.
-        window: String,
+        /// The extending window's name in the WINDOW clause, or `None` for
+        /// one written inline after `OVER`.
+        window: Option<String>,
         /// The base it names.
         base: String,
     },
@@ -62,8 +64,9 @@ pub enum Error {
     /// by its own ORDER BY or one it copied, which PostgreSQL refuses to
     /// override (`42P20`).
     WindowOrderOverridden {
-        /// The extending window.
-        window: String,
+        /// The extending window's name in the WINDOW clause, or `None` for
+        /// one written inline after `OVER`.
+        window: Option<String>,
         /// The base it names.
         base: String,
     },
@@ -128,20 +131,43 @@ impl std::fmt::Display for Error {
             Self::WindowUndefined { name } => {
                 write!(f, "no window \"{name}\" is declared in the WINDOW clause")
             }
-            Self::WindowBaseUndefined { window, base } => write!(
+            Self::WindowBaseUndefined {
+                window: Some(window),
+                base,
+            } => write!(
                 f,
                 "window \"{window}\" extends \"{base}\", which no earlier entry of the \
                  WINDOW clause declares"
             ),
+            Self::WindowBaseUndefined { window: None, base } => write!(
+                f,
+                "the window after OVER extends \"{base}\", which the WINDOW clause does \
+                 not declare"
+            ),
             Self::WindowFrameCopied { window, base } => write!(
                 f,
-                "window \"{window}\" cannot extend \"{base}\", which has a frame"
+                "{} cannot extend \"{base}\", which has a frame",
+                WindowSubject(window)
             ),
             Self::WindowOrderOverridden { window, base } => write!(
                 f,
-                "window \"{window}\" cannot add an ORDER BY to \"{base}\", which already \
-                 orders its rows"
+                "{} cannot add an ORDER BY to \"{base}\", which already orders its rows",
+                WindowSubject(window)
             ),
+        }
+    }
+}
+
+/// How a window refusal names the window it refuses: by its name in the
+/// WINDOW clause, or as the one written inline after `OVER`.
+#[derive(Debug)]
+struct WindowSubject<'a>(&'a Option<String>);
+
+impl std::fmt::Display for WindowSubject<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.0 {
+            Some(name) => write!(f, "window \"{name}\""),
+            None => f.write_str("the window after OVER"),
         }
     }
 }

@@ -563,12 +563,13 @@ SQL text running a built statement.
 > its paths written as escaped literals and its PASSING values bound. Its
 > `onError` is `"error"` or `"empty"`.
 
-> [spec:pgorm:req:napi.windows+1]
+> [spec:pgorm:req:napi.windows+2]
 > `over` MUST attach a window only to what pgorm-query's `WindowFunction`
 > admits — a function call, or `jsonArrayAgg` or `jsonObjectAgg` — and
 > anything else is a `ConstructionError`; the call under it is a projection
-> item, named with `as`. Its window is a `Window`, written inline, or the name
-> of one the SELECT's WINDOW clause declares. `window(name, window)` MUST
+> item, named with `as`. Its window is a `Window` or an `ExtendedWindow(base)`
+> built on an entry of the SELECT's WINDOW clause, written inline, or the
+> name of one the clause declares. `window(name, window)` MUST
 > append an entry, the clause holding every one in call order as
 > pgorm-query's `SelectStatement::window` does: a `Window`, or an
 > `ExtendedWindow(base)`, which builds pgorm-query's `ExtendedWindow` on an
@@ -576,8 +577,10 @@ SQL text running a built statement.
 > (`sql.ast.window-statement`); anything else is a `ConstructionError`. A
 > clause PostgreSQL refuses — a name declared twice, an extended window whose
 > base is no earlier entry, has a frame, or already orders its rows when it
-> adds an ORDER BY — and a call over a name the clause does not declare are
-> refused by pgorm-query's `check_windows`, as a `ConstructionError`, where
+> adds an ORDER BY — a call over a name the clause does not declare, and one
+> over an inline `ExtendedWindow` whose base no entry declares, has a frame,
+> or already orders its rows when it adds an ORDER BY are refused by
+> pgorm-query's `check_windows`, as a `ConstructionError`, where
 > the tie limit is checked: by `inspect()` and every run, and by a method
 > reading the statement into another as it is called. A `Window`
 > builds pgorm-query's `WindowStatement` with PARTITION BY, ORDER BY and a

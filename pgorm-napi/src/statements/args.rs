@@ -279,7 +279,7 @@ pub(crate) fn select<'cx>(
 /// refuses them in a statement run on its own, rather than by the server
 /// once the outer statement is sent.
 // [spec:pgorm:req:napi.select+1]
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 pub(crate) fn embedded<'cx>(
     cx: &mut Cx<'cx>,
     select: SelectStatement,
@@ -292,7 +292,7 @@ pub(crate) fn embedded<'cx>(
 
 /// pgorm-query's two checks of a SELECT that rendering leaves to its caller:
 /// its tie limit and its WINDOW clause.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 pub(crate) fn checked(select: &SelectStatement) -> pgorm::pgorm_query::error::Result<()> {
     select.check_tie_limit()?;
     select.check_windows()

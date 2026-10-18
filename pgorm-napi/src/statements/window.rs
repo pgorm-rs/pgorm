@@ -50,11 +50,12 @@ pub(crate) enum Call {
     ObjectAgg(JsonObjectAgg),
 }
 
-/// The window a call runs over: one written inline, or the name of the one
-/// the statement declares.
+/// The window a call runs over: one written inline, which may build on an
+/// entry of the statement's WINDOW clause, or the name of the one the
+/// statement declares.
 #[derive(Debug, Clone)]
 pub(crate) enum Over {
-    Inline(WindowStatement),
+    Inline(WindowDefinition),
     Named(Name),
 }
 
@@ -99,7 +100,7 @@ fn window(cx: &mut FunctionContext) -> NeonResult<WindowStatement> {
 }
 
 /// `windowNew()`: an empty window, `OVER ()`.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn window_new(_: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Window(WindowStatement::default()))
 }
@@ -122,7 +123,7 @@ fn window_order_by(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// The frame at `index`: a whole frame, or a preceding or current-row start
 /// standing alone. A following start cannot stand alone, PostgreSQL reading a
 /// lone start as running to the current row, which lies behind it.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn frame_at(cx: &mut FunctionContext, index: usize) -> NeonResult<FrameClause> {
     let frame = arg(cx, index);
     match node(cx, frame) {
@@ -141,7 +142,7 @@ fn frame_at(cx: &mut FunctionContext, index: usize) -> NeonResult<FrameClause> {
 }
 
 /// `windowFrame(window, frame)`: the frame, replacing any.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn window_frame(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut window = window(cx)?;
     window.frame(frame_at(cx, 1)?);
@@ -161,7 +162,7 @@ fn extended_window(cx: &mut FunctionContext) -> NeonResult<ExtendedWindow> {
 /// `extendedWindowNew(base)`: a window built on the entry of the WINDOW
 /// clause named `base`, copying its PARTITION BY and any ORDER BY. It takes
 /// no PARTITION BY of its own, which PostgreSQL refuses there.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn extended_window_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let base = super::args::name_at(cx, 0)?;
     Ok(Node::ExtendedWindow(ExtendedWindow::new(base)))
@@ -175,7 +176,7 @@ fn extended_window_order_by(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `extendedWindowFrame(window, frame)`: the frame, replacing any.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn extended_window_frame(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut window = extended_window(cx)?;
     window.frame(frame_at(cx, 1)?);
@@ -184,7 +185,7 @@ fn extended_window_frame(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// What a SELECT's `window(name, window)` declares the name as: a `Window`,
 /// or an `ExtendedWindow` built on an earlier entry.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 pub(super) fn definition_at(
     cx: &mut FunctionContext,
     index: usize,
@@ -199,7 +200,7 @@ pub(super) fn definition_at(
 
 /// `frameStart(type, start, offset)`: where a frame of a mode begins. There
 /// is no unbounded-following start: PostgreSQL's grammar refuses one.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn frame_start(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mode = match choice(cx, 0, "a frame's mode", &["rows", "range", "groups"])? {
         "rows" => FrameType::Rows,
@@ -223,7 +224,7 @@ fn frame_start(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `frameEnd(start, end, offset)`: a whole frame, the end one the start
 /// admits — a preceding end only after a preceding start, a current-row end
 /// never after a following one.
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn frame_end(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::FrameStart(start) = this(cx, 0)? else {
         return refuse(cx, "a frame's end follows its start");
@@ -305,20 +306,21 @@ fn call_of(cx: &mut FunctionContext, node: Node) -> NeonResult<Call> {
     }
 }
 
-/// `exprOver(call, window)`: the call over a `Window`, or over the window
-/// a statement names.
-// [spec:pgorm:req:napi.windows+1]
+/// `exprOver(call, window)`: the call over a `Window` or an `ExtendedWindow`
+/// written inline, or over the window a statement names.
+// [spec:pgorm:req:napi.windows+2]
 fn expr_over(cx: &mut FunctionContext) -> NeonResult<Node> {
     let receiver = this(cx, 0)?;
     let call = call_of(cx, receiver)?;
     let window = arg(cx, 1);
     let over = match node(cx, window) {
-        Some(Node::Window(window)) => Over::Inline(window),
+        Some(Node::Window(window)) => Over::Inline(window.into()),
+        Some(Node::ExtendedWindow(window)) => Over::Inline(window.into()),
         Some(other) => {
             let what = other.describe();
             return refuse(
                 cx,
-                format!("OVER takes a Window or a window's name, not {what}"),
+                format!("OVER takes a Window, an ExtendedWindow or a window's name, not {what}"),
             );
         }
         None => Over::Named(name(cx, window)?),
@@ -344,7 +346,7 @@ fn windowed_alias(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `windowFunction(name, args)`: one of PostgreSQL's general-purpose window
 /// functions at the argument counts it takes, usable only through `over`, as
 /// the server refuses one without a window (`42809`).
-// [spec:pgorm:req:napi.windows+1]
+// [spec:pgorm:req:napi.windows+2]
 fn window_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = if name.is_a::<JsString, _>(cx) {
