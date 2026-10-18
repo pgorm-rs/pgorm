@@ -33,7 +33,16 @@ SCALARS = frozenset(INTEGER_BITS) | {
     "ipnetwork",
     "mac_address",
     "vector",
+    "interval",
 }
+
+# An interval's three fields by the integer kind of each. They stay apart, as
+# PostgreSQL stores them: a month has no fixed number of days and a day no
+# fixed number of microseconds, so `1 mon` and `30 days` are two values even
+# though the server's `=` on interval calls them equal. PostgreSQL's infinity
+# and -infinity are the two triples whose every field is at its maximum or its
+# minimum, and travel as those triples.
+INTERVAL_FIELDS = {"months": "i32", "days": "i32", "microseconds": "i64"}
 
 # The built-in range types, each by the scalar kind of its bounds. A range is
 # not a scalar of the value matrix: its bounds are, and a range's payload is
@@ -236,6 +245,24 @@ def _scalar(kind, data):
             raise FormatError("vector payload must be a bounded list")
         for item in data:
             _bits(item, 8)
+    elif kind == "interval":
+        fields(data, INTERVAL_FIELDS)
+        for name, width in INTERVAL_FIELDS.items():
+            _integer(width, data[name])
+
+
+def interval(months, days, microseconds):
+    """An interval payload: each field its own exact decimal text."""
+    return {"months": str(months), "days": str(days), "microseconds": str(microseconds)}
+
+
+INTERVAL_INFINITY = interval(2**31 - 1, 2**31 - 1, 2**63 - 1)
+INTERVAL_NEGATIVE_INFINITY = interval(-(2**31), -(2**31), -(2**63))
+
+
+def interval_fields(data):
+    """The months, days and microseconds of a validated interval payload."""
+    return tuple(int(data[name]) for name in INTERVAL_FIELDS)
 
 
 def _range(kind, data):

@@ -133,6 +133,70 @@ def cast(state, expression, value):
     )
 
 
+# A month moved to or from 30 days, or a day to or from 86,400,000,000
+# microseconds: changes PostgreSQL's interval comparison cannot see.
+RESPELLINGS = (
+    (-1, 30, 0),
+    (1, -30, 0),
+    (0, -1, 86_400_000_000),
+    (0, 1, -86_400_000_000),
+)
+
+
+def respelled(value):
+    """A different interval PostgreSQL's `=` calls equal to this one, if any.
+
+    The two infinities equal only themselves, and a triple near its fields'
+    limits may have no neighbour that fits; both yield None.
+    """
+    if value["data"] in (wire.INTERVAL_INFINITY, wire.INTERVAL_NEGATIVE_INFINITY):
+        return None
+    fields = wire.interval_fields(value["data"])
+    for step in RESPELLINGS:
+        candidate = [field + change for field, change in zip(fields, step, strict=True)]
+        try:
+            return wire.scalar("interval", wire.interval(*candidate))
+        except wire.FormatError:
+            continue
+    return None
+
+
+def equality(state, value, columns):
+    """Project an interval beside its respelling and PostgreSQL's `=` on the two.
+
+    Both values decode as the distinct triples they are, compared field by
+    field, while the server, on either side, answers that they are equal: value
+    identity and SQL comparison are different questions about an interval.
+    """
+    other = respelled(value)
+    if other is None:
+        return
+    left, right = (
+        cast(
+            state,
+            state.node(
+                "expr.value",
+                {"value": state.node("value", data={"value": item})},
+                {"mode": mode},
+            ),
+            item,
+        )
+        for item, mode in ((value, "bound"), (other, "literal"))
+    )
+    for name, expression in (
+        ("respelled", right),
+        (
+            "equal",
+            state.node(
+                "expr.binary", {"left": left, "right": right}, {"operator": "eq"}
+            ),
+        ),
+    ):
+        columns.append(
+            state.node("expr.alias", {"value": expression}, {"name": state.name(name)})
+        )
+
+
 # [spec:pgorm:req:generative.grammar]
 def types(state):
     kind = state.choices.take(LIVE)
@@ -169,6 +233,8 @@ def types(state):
             columns.append(
                 state.node("expr.alias", {"value": expression}, {"name": name})
             )
+    if kind == "interval":
+        equality(state, selected.value(), columns)
     columns.append(
         state.node(
             "expr.alias",

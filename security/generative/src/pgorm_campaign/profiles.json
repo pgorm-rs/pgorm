@@ -65,8 +65,8 @@
       },
       "controls": {
         "required": true,
-        "catalog_version": 1,
-        "minimum_controls": 22,
+        "catalog_version": 2,
+        "minimum_controls": 23,
         "require_declared_families": true
       },
       "run_classes": {
@@ -163,8 +163,8 @@
       },
       "controls": {
         "required": true,
-        "catalog_version": 1,
-        "minimum_controls": 22,
+        "catalog_version": 2,
+        "minimum_controls": 23,
         "require_declared_families": true
       },
       "run_classes": {

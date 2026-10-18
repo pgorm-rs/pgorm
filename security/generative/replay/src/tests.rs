@@ -673,19 +673,73 @@ fn temporal_graphs_join_by_period_and_key() {
     assert!(!sql.contains("&&"), "{sql}");
 }
 
-/// An interval has no portable kind: its tag is named so the encoder is total,
-/// its data describes the value as its literal, and validation refuses it.
-// [spec:pgorm:def:sql.value.interval/test]
+/// An interval travels as its three fields, each its own decimal text, so a
+/// month and thirty days stay two values and an infinity is its triple.
+// [spec:pgorm:def:sql.value.interval+1/test]
 #[test]
-fn interval_has_no_portable_kind() {
-    let tagged = Tagged::from_value(Value::from(Interval::new(1, -2, 3)));
-    let encoded = tagged.encode();
-    assert_eq!(encoded["type"], json!({"kind": "interval"}));
+fn an_interval_travels_as_its_three_fields() -> TestResult {
+    let interval = |value: Interval| encoded(Value::from(value));
     assert_eq!(
-        encoded["data"],
-        json!("'+1 months -2 days +3 microseconds'::interval")
+        interval(Interval::new(1, -2, 3_000_004))?,
+        json!({
+            "version": 1,
+            "type": {"kind": "interval"},
+            "sql_null": false,
+            "data": {"months": "1", "days": "-2", "microseconds": "3000004"},
+        })
     );
-    assert!(validate(&encoded).is_err());
-    assert!(tagged.encode_checked().is_err());
-    assert!(Tagged::from_value(Value::Interval(None)).is_sql_null());
+    assert_ne!(
+        interval(Interval::new(1, 0, 0))?,
+        interval(Interval::new(0, 30, 0))?
+    );
+    assert_eq!(
+        interval(Interval::new(i32::MAX, i32::MAX, i64::MAX))?["data"],
+        json!({"months": "2147483647", "days": "2147483647", "microseconds": "9223372036854775807"})
+    );
+    assert_eq!(
+        interval(Interval::new(i32::MIN, i32::MIN, i64::MIN))?["data"],
+        json!({"months": "-2147483648", "days": "-2147483648", "microseconds": "-9223372036854775808"})
+    );
+    assert_eq!(
+        encoded(Value::Interval(None))?,
+        json!({"version": 1, "type": {"kind": "interval"}, "sql_null": true, "data": Json::Null})
+    );
+    let array = encoded(Value::Array(
+        ArrayType::Interval,
+        Some(Box::new(vec![
+            Value::from(Interval::new(0, 0, -1)),
+            Value::Interval(None),
+        ])),
+    ))?;
+    assert_eq!(
+        array["type"],
+        json!({"kind": "array", "element": {"kind": "interval"}})
+    );
+    assert_eq!(
+        array["data"][0]["data"],
+        json!({"months": "0", "days": "0", "microseconds": "-1"})
+    );
+    assert_eq!(array["data"][1]["sql_null"], json!(true));
+    Ok(())
+}
+
+// [spec:pgorm:def:sql.value.interval+1/test]
+#[test]
+fn interval_validation_rejects_what_the_python_format_rejects() {
+    let interval = |data: Json| json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": data});
+    for data in [
+        json!({"months": "1", "days": "0"}),
+        json!({"months": "1", "days": "0", "microseconds": "0", "hours": "0"}),
+        json!({"months": "2147483648", "days": "0", "microseconds": "0"}),
+        json!({"months": "0", "days": "-2147483649", "microseconds": "0"}),
+        json!({"months": "0", "days": "0", "microseconds": "9223372036854775808"}),
+        json!({"months": "01", "days": "0", "microseconds": "0"}),
+        json!({"months": 1, "days": 0, "microseconds": 0}),
+        json!("'+1 months'::interval"),
+    ] {
+        assert!(validate(&interval(data.clone())).is_err(), "{data}");
+    }
+    let multirange =
+        json!({"version": 1, "type": {"kind": "multirange"}, "sql_null": true, "data": Json::Null});
+    assert!(validate(&multirange).is_err());
 }

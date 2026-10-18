@@ -138,7 +138,11 @@ an explicit invariant accounting for the cancellation race.
 
 Literal reference values remain bound, with independent PostgreSQL type
 inference for integers, finite floats, decimals, unknown strings/NULLs and
-arrays. Literal temporal values follow the whole-second conversion explicitly
+arrays. An interval literal carries its own cast, so the reference binds its
+own exact spelling (`+1 mon -2 day +3000004 us`, every field signed so no
+`IntervalStyle` can move a sign) cast to `interval`, and decodes `interval_send`'s
+sixteen bytes itself rather than through a driver loader that would fold the
+three fields into one duration. Literal temporal values follow the whole-second conversion explicitly
 specified by `sql.render.value-literals+2`; bound temporal values retain their
 fractional seconds, down to the microsecond the wire format admits and no
 further — finer precision is rejected at the boundary rather than rounded, so a
@@ -190,7 +194,7 @@ PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
   security/generative/tests/live_controls.py
 ```
 
-The versioned catalog contains 22 controls across 21 mandatory comparison
+The versioned catalog contains 23 controls across 22 mandatory comparison
 categories. Each starts with a passing public pgorm execution and independent
 reference. Deliberately incorrect SQL runs through a separate driver in the
 owned subject database, after both databases reset to the program's fixture.
@@ -200,7 +204,7 @@ carry their own dispatch evidence and cannot claim native execution.
 Controls cover missing value/name escaping, broadened predicates, swapped binds,
 wrong bound/decoded types, missing/duplicate/reordered rows, optional joins,
 SQL/JSON NULL distinctions, arrays, enum identity, float bits, decimal scale,
-temporal precision, affected counts, omitted writes/schema, committed rollbacks,
+temporal precision, an interval's month normalised into thirty days, affected counts, omitted writes/schema, committed rollbacks,
 stream closure and exact error causes. A valid control requires exactly its
 declared difference; arbitrary failures, inactive or unchanged mutations, missing
 work and a failed native baseline fail the command. Aggregate validation
@@ -219,10 +223,14 @@ Python/Rust execution parity remain the separate replay node's work.
 
 ## Input corpus
 
-`corpus_builtin.builtin()` provides 308 repository-owned inputs: hostile text,
+`corpus_builtin.builtin()` provides 319 repository-owned inputs: hostile text,
 identifier lengths around PostgreSQL's 63-byte boundary, exact numeric limits,
 IEEE float bits, typed NULLs, arrays (including empty/NULL/NULL elements), JSON,
-Decimal, UUID, enum, temporal, network, bytes and vector values.
+Decimal, UUID, enum, temporal, interval, network, bytes and vector values. The
+intervals mix signs across fields (`1 mon -2 days`), take each field to its
+limits, hold a single microsecond either side of zero and both infinities, and
+pair `1 mon` with `30 days` and `1 day` with `24 hours`: values PostgreSQL's `=`
+equates and the campaign keeps apart.
 `corpus_random.sample(seed, index)` produces deterministic typed values using a
 versioned SHA-256 counter, independent of iteration order or worker partitioning.
 Neither function imports pgorm, starts PostgreSQL, accesses the network or needs
@@ -301,8 +309,12 @@ the rule. Unexpected valid-program failures remain failures.
 
 Recursive text uses NUL-free corpus entries up to 4 KiB and identifiers have a
 smaller byte budget. The type family separately draws exact built-in and random
-numeric, float, Decimal, JSON, array, enum and temporal boundaries, through bound
-and literal paths with explicit PostgreSQL types. It pins the local-time worker
+numeric, float, Decimal, JSON, array, enum, temporal and interval boundaries,
+through bound and literal paths with explicit PostgreSQL types. A finite interval
+is also projected beside a respelling PostgreSQL's comparison treats as equal (a
+month moved to 30 days, or a day to 86,400,000,000 microseconds) and the server's
+`=` on the two: both decode as the distinct triples they are, and both sides'
+servers answer true. It pins the local-time worker
 to UTC. It does not draw u64 or vector values, which have no installed
 PostgreSQL type to round-trip through; their cells are the rejection family's,
 which carries what fits int8 and checks the refusal of what does not, and has
@@ -359,7 +371,10 @@ PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
 `shrink.reduce(checker, program)` searches for a smaller program that still
 fails the same way. It reduces effect sequences, transaction nesting, expression
 and pipeline structure, bound values and the declared fixture, then re-validates
-every candidate against the portable format before running it. Each candidate
+every candidate against the portable format before running it. An interval
+shrinks toward zero one field at a time — all three zeroed, then each field
+zeroed alone, then each brought to a single unit of its own sign — and never by
+moving a month into days. Each candidate
 goes through the same `Checker`, which restores its own declared baseline on
 both databases first, so no attempt inherits the previous one's state.
 

@@ -115,6 +115,7 @@ def type_cases(*, finite=False):
         ("datetime_utc", "2024-01-02 03:04:05.123456+00:00", "timestamptz"),
         ("ipnetwork", "192.0.2.129/24", "inet"),
         ("mac_address", [0, 17, 34, 51, 68, 255], "macaddr"),
+        ("interval", wire.interval(1, -2, 3_000_004), "interval"),
     ]
     result = [
         ("type-" + kind, values(kind, data, postgres))
@@ -122,6 +123,11 @@ def type_cases(*, finite=False):
     ]
     enum = {"kind": "enum", "schema": "fixture", "name": 'State" 雪'}
     result.append(("type-enum", values(enum, "O'Brien 雪", enum["name"], "fixture")))
+    for name, data in (
+        ("type-interval-infinity", wire.INTERVAL_INFINITY),
+        ("type-interval-negative-infinity", wire.INTERVAL_NEGATIVE_INFINITY),
+    ):
+        result.append((name, values("interval", data, "interval")))
     if not finite:
         result.append(("type-nan", values("f32", "7fc00001", "float4")))
     return result

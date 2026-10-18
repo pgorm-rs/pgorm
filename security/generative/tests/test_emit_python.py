@@ -176,6 +176,17 @@ class EmitPythonTests(unittest.TestCase):
             emit_python.value_source(empty), "p.Value(p.Range.empty(), 'int4range')"
         )
 
+    def test_intervals_rebuild_through_public_interval_values(self):
+        value = wire.scalar("interval", wire.interval(1, -2, 3_000_004))
+        self.assertEqual(
+            emit_python.value_source(value),
+            "p.Value(p.Interval(months=1, days=-2, microseconds=3000004), 'interval')",
+        )
+        self.assertEqual(
+            emit_python.value_source(wire.scalar("interval", None, sql_null=True)),
+            "p.Value.null('interval')",
+        )
+
     def test_version_writes_reach_the_public_terminals(self):
         for index in range(60):
             program = generate(20260913, index, family="active").program

@@ -113,9 +113,14 @@ class FamilyVariationTest(unittest.TestCase):
 
     # [spec:pgorm:req:generative.matrix/test]
     def test_declared_families_are_reachable_from_generated_programs(self):
+        # The types family draws one kind per program from the whole value
+        # matrix, and some of its cells need one payload of one kind (a signed
+        # zero is two of the float corpus's 26 patterns), so it takes more
+        # programs than a family whose cells are structural.
+        budgets = {"types": 400}
         reached = set()
         for family in (*grammar.FAMILIES, "rejection"):
-            for index in range(60):
+            for index in range(budgets.get(family, 60)):
                 reached |= self.tokens(family, index)
         declared = {
             item["id"] + "." + variation

@@ -6920,6 +6920,14 @@ children (
                         text "After checkpoint 5f171d10 was integrated, nplan derived generative.oracles Done from committed implementation/verification coverage despite the explicit chore checkpoint type. The earlier note's statement that the node remains Doing is therefore stale. The delivered kernel checks supported programs independently and fails closed on unsupported semantics, as these two rules require. This component status does not claim full matrix coverage, controls, generic native replay or campaign acceptance; those remain existing downstream WBS obligations. Known invalid-conversion and unsupported-policy paths continue to report incomplete."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T17:11:32.601887Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at generative.comparison +1 (generative-interval-kind): an observed interval compares by its months, days and microseconds, while a comparison a program asks PostgreSQL for keeps the server's answer, which calls 1 mon and 30 days equal."
+                        after_done true
+                    }
                 )
             }
 
@@ -11709,6 +11717,14 @@ children (
                 kind @note
                 text "Found by napi-statements (757ed91e, 2026-10-09). pgorm-query's statement values have no interval variant, so a built statement cannot bind one. pgorm-napi refuses an Interval in a built statement with a ConstructionError naming the workaround, which is raw SQL with a bound parameter, where napi-connections' interval codec already round-trips months/days/microseconds exactly. pgorm-python has the same gap. Acceptance: a Value variant (or a typed value path) carrying PostgreSQL's months/days/microseconds triple exactly, bound in binary and rendered as an escaped literal; it reaches pgorm-query builders, the ORM's ActiveValue if an entity field can be an interval, pgorm-python and pgorm-napi built statements; live round trips including mixed signs (1 mon -2 days). Every exhaustive Value consumer is updated (pgorm-python, the generative replay and emitters)."
             }
+
+            {
+                at 2026-10-18T17:13:05.697687Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered again at sql.value.interval +1 (d945e094, generative-interval-kind): the generative campaign now carries interval as a portable kind, its payload the three fields as exact decimal text, bound, inlined and decoded through both bindings and compared field by field."
+                after_done true
+            }
         )
     }
 
@@ -11759,6 +11775,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from statement-interval-value (f9db65b7). The generative replay accepts an interval value tag (named interval, carrying the SQL literal) the way it does a multirange, but the campaign never generates one: interval is not a portable kind in the program format, wire.py, the corpus, the reference codec or the emitters. Add it so programs bind and compare intervals across Rust and Python, with the reference semantics keeping months, days and microseconds apart (no 1 mon = 30 days equivalence), mixed signs and the two infinities among the generated values. Filed as a root node because the generative container is sealed."
+            }
+
+            {
+                at 2026-10-18T17:11:32.48455Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

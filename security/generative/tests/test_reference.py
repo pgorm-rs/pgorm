@@ -65,7 +65,7 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(values, [hostile])
         self.assertNotIn("pgorm", Resolution.__module__.split("."))
 
-    # [spec:pgorm:req:generative.comparison/test]
+    # [spec:pgorm:req:generative.comparison+1/test]
     def test_binary_decode_preserves_bits_nulls_and_types(self):
         codec = Codec(None)
         codec.types = {
@@ -142,6 +142,39 @@ class ReferenceTests(unittest.TestCase):
             )
         # Inlined digits are the server's to refuse, never the binding's.
         self.assertEqual(literal(past).command()[1], ["9223372036854775808"])
+
+    # [spec:pgorm:req:generative.comparison+1/test]
+    def test_intervals_decode_and_bind_field_by_field(self):
+        from pgorm_campaign.reference_values import interval_text
+
+        codec = Codec(None)
+        codec.types = {1186: ("pg_catalog", "interval", "b", 0, "T")}
+        raw = struct.pack("!qii", 3_000_004, -2, 1)
+        self.assertEqual(
+            codec.value(1186, raw),
+            wire.scalar("interval", wire.interval(1, -2, 3_000_004)),
+        )
+        infinity = struct.pack("!qii", 2**63 - 1, 2**31 - 1, 2**31 - 1)
+        self.assertEqual(codec.value(1186, infinity)["data"], wire.INTERVAL_INFINITY)
+        with self.assertRaises(comparison.InvalidOracle):
+            codec.value(1186, raw[:12])
+        self.assertEqual(
+            interval_text(wire.interval(1, -2, 3_000_004)),
+            "+1 mon -2 day +3000004 us",
+        )
+        self.assertEqual(interval_text(wire.interval(0, 0, 0)), "+0 mon +0 day +0 us")
+        self.assertEqual(interval_text(wire.INTERVAL_INFINITY), "infinity")
+        self.assertEqual(interval_text(wire.INTERVAL_NEGATIVE_INFINITY), "-infinity")
+        value = wire.scalar("interval", wire.interval(0, 30, 0))
+        self.assertEqual(
+            bound(value).command(), ("%s::interval", ["+0 mon +30 day +0 us"])
+        )
+        # The subject's literal carries its cast, so the reference's does too.
+        self.assertEqual(literal(value).command(), bound(value).command())
+        # Identity is field by field: a month is not thirty days here, though
+        # PostgreSQL's `=` says it is.
+        month = wire.scalar("interval", wire.interval(1, 0, 0))
+        self.assertNotEqual(comparison.value_key(month), comparison.value_key(value))
 
     def test_vectors_spell_their_exact_elements(self):
         from pgorm_campaign.reference_values import vector_text

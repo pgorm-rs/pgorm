@@ -106,15 +106,13 @@ macro_rules! scalar_kinds {
         /// The portable name of a Rust scalar variant.
         ///
         /// A range is named by its catalogue type, as `wire.RANGES` names it. A
-        /// multirange and an interval have names here so the function is
-        /// total, but no portable kind, so [`validate`] refuses a value tagged
-        /// with either.
+        /// multirange has a name here so the function is total, but no
+        /// portable kind, so [`validate`] refuses a value tagged with one.
         pub fn scalar_name(kind: &ArrayType) -> &'static str {
             match kind {
                 $(ArrayType::$variant => $name,)+
                 ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(_) => "multirange",
-                ArrayType::Interval => "interval",
             }
         }
 
@@ -132,7 +130,6 @@ macro_rules! scalar_kinds {
                 $(ArrayType::$variant => Value::$variant(None),)+
                 ArrayType::Range(ty) => Value::Range(*ty, None),
                 ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-                ArrayType::Interval => Value::Interval(None),
             }
         }
 
@@ -143,7 +140,6 @@ macro_rules! scalar_kinds {
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
                 Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
                 Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-                Value::Interval(_) => Tag::Scalar(ArrayType::Interval),
             }
         }
 
@@ -157,7 +153,6 @@ macro_rules! scalar_kinds {
                 Value::Array(_, value) => value.is_none(),
                 Value::Range(_, value) => value.is_none(),
                 Value::Multirange(_, value) => value.is_none(),
-                Value::Interval(value) => value.is_none(),
             }
         }
     };
@@ -170,7 +165,7 @@ scalar_kinds! {
     Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
     Date => "date", Time => "time", DateTime => "datetime",
     DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
-    MacAddress => "mac_address", Vector => "vector",
+    MacAddress => "mac_address", Vector => "vector", Interval => "interval",
 }
 
 /// Every built-in range type by its portable name and the scalar kind of its
@@ -343,12 +338,18 @@ impl Tagged {
             Value::Range(_, value) => value
                 .as_ref()
                 .map_or(Json::Null, |range| range_payload(range)),
-            // Neither has a portable encoding, and both kinds are refused by
-            // `validate`; the data is the value's SQL literal, a description
-            // rather than an invented payload.
-            // [spec:pgorm:def:sql.value.interval]
+            // Each field its own decimal text, as `wire.INTERVAL_FIELDS`
+            // names them; none is folded into another.
+            // [spec:pgorm:def:sql.value.interval+1]
+            Value::Interval(value) => json!(value.as_ref().map(|value| json!({
+                "months": value.months.to_string(),
+                "days": value.days.to_string(),
+                "microseconds": value.microseconds.to_string(),
+            }))),
+            // No portable encoding, and the kind is refused by `validate`; the
+            // data is the value's SQL literal, a description rather than an
+            // invented payload.
             Value::Multirange(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
-            Value::Interval(value) => json!(value.as_ref().map(|_| self.inner.to_string())),
         }
     }
 }

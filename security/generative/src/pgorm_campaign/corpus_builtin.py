@@ -120,7 +120,39 @@ def _other():
         ),
         "mac_address": ([0] * 6, [255] * 6),
         "vector": ([], ["00000000", "80000000", "3f800000"], ["7fc00000"]),
+        "interval": _intervals(),
     }
+
+
+def _intervals():
+    """Signs mixed across fields, single microseconds, each field's limits and
+    both infinities. `1 mon` and `30 days`, and `1 day` and `24 hours`, are the
+    pairs PostgreSQL's `=` equates while the values stay distinct; the triples a
+    microsecond short of each infinity are finite.
+    """
+    i32, i64 = 2**31, 2**63
+    return (
+        wire.interval(0, 0, 0),
+        wire.interval(1, 0, 0),
+        wire.interval(0, 30, 0),
+        wire.interval(0, 1, 0),
+        wire.interval(0, 0, 86_400_000_000),
+        wire.interval(1, -2, 0),
+        wire.interval(1, -2, 3_000_004),
+        wire.interval(-1, 2, -3_000_004),
+        wire.interval(0, 0, 1),
+        wire.interval(0, 0, -1),
+        wire.interval(i32 - 1, 0, 0),
+        wire.interval(-i32, 0, 0),
+        wire.interval(0, i32 - 1, 0),
+        wire.interval(0, -i32, 0),
+        wire.interval(0, 0, i64 - 1),
+        wire.interval(0, 0, -i64),
+        wire.interval(i32 - 1, i32 - 1, i64 - 2),
+        wire.interval(-i32, -i32, -i64 + 1),
+        wire.INTERVAL_INFINITY,
+        wire.INTERVAL_NEGATIVE_INFINITY,
+    )
 
 
 # [spec:pgorm:req:generative.corpus]

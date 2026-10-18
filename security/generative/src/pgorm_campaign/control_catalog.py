@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from . import control_programs as programs
 from .program import Program
 
-VERSION = 1
+VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -114,7 +114,7 @@ def catalog():
         Control(
             name, name, programs.numeric(name), expected_reason="row multisets differ"
         )
-        for name in ("float", "decimal", "temporal")
+        for name in ("float", "decimal", "temporal", "interval")
     )
     return controls
 
@@ -142,5 +142,6 @@ REQUIRED_FAMILIES = frozenset(
         "float",
         "decimal",
         "temporal",
+        "interval",
     }
 )

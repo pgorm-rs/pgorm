@@ -96,7 +96,7 @@ async def catalog(connection, text):
         return [list(row) for row in await cursor.fetchall()]
 
 
-# [spec:pgorm:req:generative.comparison]
+# [spec:pgorm:req:generative.comparison+1]
 async def snapshot(driver, *, row_limit=10000):
     result = {}
     async with driver.connection.transaction():

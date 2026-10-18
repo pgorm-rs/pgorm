@@ -3,7 +3,7 @@
 import asyncio
 import unittest
 
-from pgorm_campaign import shrink
+from pgorm_campaign import shrink, wire
 from pgorm_campaign.grammar import generate
 from pgorm_campaign.parameters import input_ids
 from pgorm_campaign.program import Program
@@ -235,6 +235,53 @@ class CandidateTests(unittest.TestCase):
         self.assertIn("keep 0 rows in fixture.stays", offered)
         self.assertIn("keep 0 rows in fixture.accounts", offered)
         self.assertIn("drop table fixture.stays", offered)
+
+    def test_intervals_shrink_toward_zero_by_field(self):
+        self.assertEqual(
+            [
+                wire.interval_fields(data)
+                for data in shrink._toward_zero(wire.interval(3, -2, 1))
+            ],
+            [
+                (0, 0, 0),
+                (0, -2, 1),
+                (3, 0, 1),
+                (3, -2, 0),
+                (1, -2, 1),
+                (3, -1, 1),
+            ],
+        )
+        self.assertEqual(
+            [
+                wire.interval_fields(data)
+                for data in shrink._toward_zero(wire.INTERVAL_NEGATIVE_INFINITY)
+            ][:2],
+            [(0, 0, 0), (0, -(2**31), -(2**63))],
+        )
+        self.assertEqual(shrink._toward_zero(wire.interval(0, 0, 0)), [])
+        source = next(
+            program
+            for program in (
+                generate(20260913, index, family="types").program
+                for index in range(200)
+            )
+            if any(
+                node["op"] == "value"
+                and node["data"]["value"]["type"]["kind"] == "interval"
+                and not node["data"]["value"]["sql_null"]
+                and node["data"]["value"]["data"] != wire.interval(0, 0, 0)
+                for node in program.data()["nodes"]
+            )
+        )
+        offered = [
+            shrink._candidate(rewritten)
+            for description, rewritten in shrink._value_reductions(source.data())
+            if description.startswith("simplify interval value")
+        ]
+        self.assertTrue(offered)
+        for candidate in offered:
+            self.assertIsNotNone(candidate)
+            self.assertNotEqual(candidate.digest, source.digest)
 
     def test_a_reduction_never_returns_the_program_unchanged(self):
         source = generate(20260911, 3).program

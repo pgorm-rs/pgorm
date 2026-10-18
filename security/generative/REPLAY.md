@@ -57,6 +57,9 @@ where a literal would lose information:
   format is IEEE bits precisely so NaN payloads and signed zero survive
 - bytes and MAC addresses are integer arrays, not string escapes
 - decimals, UUIDs, temporals and IP networks are parsed from canonical text
+- intervals are `Interval::new(months, days, microseconds)`, each field an
+  integer literal of its own width, and are read back through `Interval`'s own
+  exact `FromSql`; no field is folded into another
 - temporals are re-rendered and compared against the text they were read from,
   because the native parsers are permissive: they accept a basic-format date,
   and they accept and then silently discard an offset on a civil type

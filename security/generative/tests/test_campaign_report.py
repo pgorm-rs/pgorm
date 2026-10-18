@@ -72,7 +72,7 @@ class ReportShapeTest(unittest.TestCase):
         )
         self.assertEqual(counts["live_database_programs_checked"]["scheduled"], 30)
         self.assertEqual(counts["invalid_input_programs_checked"]["scheduled"], 6)
-        self.assertEqual(counts["control_programs_checked"]["scheduled"], 22)
+        self.assertEqual(counts["control_programs_checked"]["scheduled"], 23)
 
     # [spec:pgorm:req:generative.profiles/test]
     def test_the_report_never_totals_across_run_classes(self):
@@ -107,8 +107,8 @@ class ReportShapeTest(unittest.TestCase):
     # [spec:pgorm:req:generative.verdict/test]
     def test_native_evidence_counts_live_items_only(self):
         evidence = self.document["native_evidence"]
-        self.assertEqual(evidence["live_items"], 58)
-        self.assertEqual(evidence["live_items_with_native_dispatch"], 58)
+        self.assertEqual(evidence["live_items"], 59)
+        self.assertEqual(evidence["live_items_with_native_dispatch"], 59)
         self.assertEqual(evidence["distinct_native_paths"], 1)
 
     # [spec:pgorm:req:generative.profiles/test]

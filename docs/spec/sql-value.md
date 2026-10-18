@@ -417,7 +417,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Intervals
 
-> [spec:pgorm:def:sql.value.interval]
+> [spec:pgorm:def:sql.value.interval+1]
 > `Interval` is PostgreSQL's `interval` as a value: the public fields
 > `months: i32`, `days: i32` and `microseconds: i64`, each with its own sign,
 > built by `Interval::new(months, days, microseconds)` or `Default`, which is
@@ -463,10 +463,11 @@ including panic semantics and quirks inherited from sea-query.
 > (`[spec:pgorm:req:python.values+3]`), and the JavaScript binding as its
 > `Interval`, a `Temporal.Duration` converting to one
 > (`[spec:pgorm:req:napi.temporal]`); both bind it in built statements as
-> this variant. The generative campaign has no portable kind for it: its
-> replay names the tag `interval` so the encoder is total, describes the
-> value by its literal, and its validation refuses it, as it refuses a
-> multirange.
+> this variant. The generative campaign carries it as the portable kind
+> `interval`, whose payload is the three fields as exact decimal text, the
+> Python binding's snapshot of one (`[spec:pgorm:req:generative.format]`):
+> its programs bind, inline and decode intervals through both bindings and
+> compare them field by field, and its replay encodes the same triple.
 
 > [spec:pgorm:sem:sql.value.interval-text]
 > `Display` for `Interval` writes the text PostgreSQL's interval input reads

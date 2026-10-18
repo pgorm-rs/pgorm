@@ -41,6 +41,7 @@ def main():
         "ipnetwork": "192.0.2.129/24",
         "mac_address": b"\x00\x11\x22\x33\x44\xff",
         "vector": [1.5, -0.0],
+        "interval": p.Interval(months=1, days=-2, microseconds=3000004),
     }
     observed = []
     inputs = list(cases.items()) + [

@@ -9,7 +9,7 @@ use jiff::{
     Timestamp,
     civil::{Date, DateTime, Time},
 };
-use pgorm::pgorm_query::{ArrayType, Value, Vector};
+use pgorm::pgorm_query::{ArrayType, Interval, Value, Vector};
 use tokio_postgres::{
     Row,
     types::{FromSql, Kind, Type},
@@ -99,6 +99,7 @@ pub(crate) fn value(row: &Row, index: usize) -> Result<Tagged, FormatError> {
         Type::TIME => boxed!(Time, Time),
         Type::TIMESTAMP => boxed!(DateTime, DateTime),
         Type::TIMESTAMPTZ => boxed!(Timestamp, DateTimeWithTimeZone),
+        Type::INTERVAL => boxed!(Interval, Interval),
         Type::NUMERIC => typed::<ExactDecimal>(row, index, array, ArrayType::Decimal, |v| {
             Value::Decimal(v.map(|v| Box::new(v.0)))
         }),

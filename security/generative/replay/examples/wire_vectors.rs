@@ -27,7 +27,7 @@
 #![allow(clippy::print_stdout, clippy::unwrap_used)]
 
 use jiff::{civil::time, tz::TimeZone};
-use pgorm::pgorm_query::{ArrayType, MacAddress, Value, Vector};
+use pgorm::pgorm_query::{ArrayType, Interval, MacAddress, Value, Vector};
 use pgorm_generative_replay::wire::{Tagged, TypeName, validate};
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, json};
@@ -140,6 +140,28 @@ fn main() {
             Tagged::from_value(Value::Vector(Some(Box::new(Vector::from(vec![
                 -0.0f32, 1.0f32,
             ]))))),
+        ),
+        (
+            "interval-mixed-signs",
+            Tagged::from_value(Value::from(Interval::new(1, -2, 3_000_004))),
+        ),
+        (
+            "interval-infinity",
+            Tagged::from_value(Value::from(Interval::new(i32::MAX, i32::MAX, i64::MAX))),
+        ),
+        (
+            "interval-negative-infinity",
+            Tagged::from_value(Value::from(Interval::new(i32::MIN, i32::MIN, i64::MIN))),
+        ),
+        (
+            "interval-array",
+            Tagged::from_value(Value::Array(
+                ArrayType::Interval,
+                Some(Box::new(vec![
+                    Value::from(Interval::new(0, 30, 0)),
+                    Value::Interval(None),
+                ])),
+            )),
         ),
         (
             "text-hostile",
@@ -325,6 +347,26 @@ fn main() {
             // refuse it on the kind, not fall through to a temporal parser.
             "unknown-datetime-kind",
             json!({"version": 1, "type": {"kind": "datetime_fixed"}, "sql_null": false, "data": "2024-01-02 03:04:05+05:45"}),
+        ),
+        (
+            "interval-missing-field",
+            json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": {"months": "1", "days": "0"}}),
+        ),
+        (
+            "interval-month-overflow",
+            json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": {"months": "2147483648", "days": "0", "microseconds": "0"}}),
+        ),
+        (
+            "interval-number-field",
+            json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": {"months": 1, "days": "0", "microseconds": "0"}}),
+        ),
+        (
+            "interval-literal-text",
+            json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": "'+1 months'::interval"}),
+        ),
+        (
+            "multirange-kind",
+            json!({"version": 1, "type": {"kind": "multirange"}, "sql_null": true, "data": Json::Null}),
         ),
         (
             "unknown-kind",

@@ -81,6 +81,7 @@ RESULT_READS = {
     "time": f"{PRELUDE}::Time",
     "datetime": f"{PRELUDE}::DateTime",
     "datetime_utc": f"{PRELUDE}::DateTimeWithTimeZone",
+    "interval": f"{PRELUDE}::Interval",
 }
 # Kinds whose driver decoder is only nearly lossless: `numeric` can round,
 # JSON numbers can change spelling, and inet/macaddr have no `FromSql` at all.
@@ -95,7 +96,7 @@ CHECKED_READS = {
 }
 # Variants whose payload is boxed in `pgorm_query::Value`.
 BOXED_READS = frozenset(
-    {"text", "bytes", "uuid", "date", "time", "datetime", "datetime_utc"}
+    {"text", "bytes", "uuid", "date", "time", "datetime", "datetime_utc", "interval"}
     | CHECKED_READS.keys()
 )
 

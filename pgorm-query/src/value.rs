@@ -62,7 +62,7 @@ pub enum ArrayType {
     Vector,
 
     /// `interval[]`.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     Interval,
 
     /// A range over one of the built-in range types, `int4range[]`.
@@ -127,7 +127,7 @@ pub enum Value {
     /// An `interval`, its three fields kept apart. Boxed though it holds no
     /// pointer: inline, its sixteen bytes and the `Option` around them would
     /// widen every `Value` from 24 bytes to 32.
-    // [spec:pgorm:def:sql.value.interval]
+    // [spec:pgorm:def:sql.value.interval+1]
     Interval(Option<Box<Interval>>),
 
     /// A range, tagged with the built-in range type it is so that a NULL and

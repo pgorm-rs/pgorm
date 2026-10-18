@@ -5,7 +5,7 @@ import copy
 from .comparison import InvalidOracle
 from .control_programs import IDENTIFIER, PAYLOAD
 from .reference_sql import SQL, Parameter
-from .wire import scalar
+from .wire import interval, scalar
 
 
 def observation(report, identity):
@@ -47,6 +47,9 @@ def typed(value, identity):
         value["data"] = "123.45"
     elif identity == "temporal":
         value["data"] = "2024-01-02 03:04:05"
+    elif identity == "interval":
+        # A month normalised into thirty days: PostgreSQL's `=` would accept it.
+        value["data"] = interval(0, 30, 0)
     else:
         raise InvalidOracle("unknown observation control: " + identity)
 

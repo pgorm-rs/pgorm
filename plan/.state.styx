@@ -833,6 +833,7 @@ assertions (
     {id ergo.prql-macro, kind @complete, author "brendan@necessary.nu", at 2026-09-04T14:41:22.291401Z}
     {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
     {id from-json-serialization, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:10.825951Z}
+    {id generative-interval-kind, kind @complete, author "brendan@necessary.nu", at 2026-10-18T17:11:32.48455Z}
     {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
     {id graph-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T17:40:27.266491Z}
     {id graph-long-column-aliases, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:53:25.354727Z}
@@ -1274,9 +1275,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule generative.comparison}
         {impl_name main, rule generative.oracles}
-    ), rule_versions_seen (
-        {id generative.comparison, version 0}
-        {id generative.oracles, version 0}
     )}
     {id generative.program, covered_rules (
         generative.format
@@ -1770,6 +1768,8 @@ impl_evidence (
         python.codegen
     ), covered_claims (
         {impl_name main, rule python.codegen}
+    ), rule_versions_seen (
+        {id python.codegen, version 0}
     )}
     {id python.direct-builders, covered_rules (
         python.direct-builders
