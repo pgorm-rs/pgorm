@@ -1090,6 +1090,14 @@ children (
                         text "error.model +9 (conn-listen) adds Listen(ListenError) to the variants that convert in through From: a listener's refusal of a channel name past 63 bytes and the overflow that ends its notifications (conn.listen), and ListenError to the names spelled in full."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:34:50.305209Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "error.model +10 and error.model.sql-class +4 (sql-error-check-not-null, 6eba8855): SqlError adds CheckConstraintViolation (23514), NotNullConstraintViolation (23502) and ExclusionConstraintViolation (23P01), and every variant carries a ConstraintViolation with the server message and its schema, table, column, datatype and constraint names, in place of the bare message string."
+                        after_done true
+                    }
                 )
             }
 
