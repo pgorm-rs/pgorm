@@ -8669,6 +8669,14 @@ children (
                         text "Delivered again at sql.surface +28, which adds Interval (sql.value.interval) to the register in f9db65b7; the merges of branches cut before the 2026-10-18 re-check had also restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T17:36:49.165049Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.surface +29 (conn-copy) records the COPY exports: CopyFromStatement, CopyToStatement, CopyFormat, CopyDelimitedFormat, CopyText, CopyCsv, CopyBinary, CopyIgnore, CopyLogVerbosity, CopySource and IntoCopySource (sql.ast.copy), in a COPY group of their own in lib.rs."
+                        after_done true
+                    }
                 )
             }
 
