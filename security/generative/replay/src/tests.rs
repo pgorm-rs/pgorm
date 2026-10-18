@@ -675,7 +675,7 @@ fn temporal_graphs_join_by_period_and_key() {
 
 /// An interval travels as its three fields, each its own decimal text, so a
 /// month and thirty days stay two values and an infinity is its triple.
-// [spec:pgorm:def:sql.value.interval+1/test]
+// [spec:pgorm:def:sql.value.interval+2/test]
 #[test]
 fn an_interval_travels_as_its_three_fields() -> TestResult {
     let interval = |value: Interval| encoded(Value::from(value));
@@ -723,7 +723,7 @@ fn an_interval_travels_as_its_three_fields() -> TestResult {
     Ok(())
 }
 
-// [spec:pgorm:def:sql.value.interval+1/test]
+// [spec:pgorm:def:sql.value.interval+2/test]
 #[test]
 fn interval_validation_rejects_what_the_python_format_rejects() {
     let interval = |data: Json| json!({"version": 1, "type": {"kind": "interval"}, "sql_null": false, "data": data});

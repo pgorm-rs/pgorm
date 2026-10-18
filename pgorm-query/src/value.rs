@@ -62,15 +62,15 @@ pub enum ArrayType {
     Vector,
 
     /// `interval[]`.
-    // [spec:pgorm:def:sql.value.interval+1]
+    // [spec:pgorm:def:sql.value.interval+2]
     Interval,
 
     /// A range over one of the built-in range types, `int4range[]`.
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     Range(RangeType),
 
     /// A multirange over one of the built-in range types, `int4multirange[]`.
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     Multirange(RangeType),
 }
 
@@ -127,18 +127,18 @@ pub enum Value {
     /// An `interval`, its three fields kept apart. Boxed though it holds no
     /// pointer: inline, its sixteen bytes and the `Option` around them would
     /// widen every `Value` from 24 bytes to 32.
-    // [spec:pgorm:def:sql.value.interval+1]
+    // [spec:pgorm:def:sql.value.interval+2]
     Interval(Option<Box<Interval>>),
 
     /// A range, tagged with the built-in range type it is so that a NULL and
     /// an empty range still name one. Its bounds are values of the variant
     /// the range type ranges over — `Int` for `int4range` — and a NULL bound
     /// is no bound, as it is to PostgreSQL's range constructors.
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     Range(RangeType, Option<Box<Range<Value>>>),
 
     /// A multirange, tagged as [`Value::Range`] is.
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     Multirange(RangeType, Option<Box<Multirange<Value>>>),
 }
 

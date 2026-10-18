@@ -164,7 +164,11 @@ metrics-fingerprint = []
 # forwards to it; the live suite then holds 19's answers where the two
 # releases' servers differ, and DATABASE_URL has to name a 19 server.
 pg-19 = ["pgorm-query/pg-19"]
-with-json = ["serde_json", "jiff/serde", "uuid?/serde"]
+# A Model deriving `Serialize` / `Deserialize` (`from_json`, codegen's
+# `with_serde`) needs each field's type to serialize: the temporal, uuid and
+# numeric payloads do through their crates' `serde` features, and
+# pgorm-query's `Interval`, `Range` and `Multirange` through its own.
+with-json = ["serde_json", "jiff/serde", "uuid?/serde", "rust_decimal/serde", "pgorm-query/serde"]
 with-jiff = []
 with-uuid = ["uuid"]
 postgres-array = []

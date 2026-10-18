@@ -35,9 +35,15 @@ rust_decimal = { version = "1.43", default-features = false }
 uuid = { version = "1.27", default-features = false }
 ipnetwork = { version = "0.21.1", default-features = false }
 mac_address = { version = "1.2.0", default-features = false }
+# `Serialize` and `Deserialize` for `Interval`, `Range` and `Multirange`
+# ([spec:pgorm:def:sql.value.interval], [spec:pgorm:def:sql.value.range]),
+# behind the `serde` feature. A range's impls are generic over its subtype, so
+# whether `Range<Decimal>` serializes is rust_decimal's own `serde` feature,
+# which pgorm's `with-json` turns on beside this one.
+serde = { version = "1.0.229", default-features = false, features = ["std", "derive"], optional = true }
 
 [dev-dependencies]
-pgorm-query = { workspace = true, features = ["tests-cfg"] }
+pgorm-query = { workspace = true, features = ["tests-cfg", "serde"] }
 criterion = { version = "0.8" }
 pretty_assertions = { version = "1.4" }
 # The render oracle (tests/postgres/oracle.rs) parses with the pg_query fork at
@@ -54,6 +60,7 @@ default = ["derive"]
 derive = ["pgorm-query-derive"]
 attr = ["pgorm-query-attr"]
 tests-cfg = []
+serde = ["dep:serde"]
 # Target PostgreSQL 19 instead of 18, the floor and the default, which no
 # feature names ([spec:pgorm:req:sql.target] in docs/spec/sql-ast.md). Additive:
 # it adds what only 19 accepts and leaves every 18 render as it is.
@@ -61,6 +68,7 @@ pg-19 = []
 all-features = [
     "derive",
     "attr",
+    "serde",
 ]
 
 [[test]]

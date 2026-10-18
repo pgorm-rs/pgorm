@@ -37,5 +37,9 @@ rust_decimal = { version = "1.43", default-features = false }
 [dev-dependencies]
 pretty_assertions = { version = "1.4" }
 # `postgres-array` lets a generated entity's `Vec<T>` field compile here, as
-# a fixture holding an array column has to.
-pgorm = { path = "../", default-features = false, features = ["macros", "postgres-array"] }
+# a fixture holding an array column has to; `with-jiff` gives a temporal
+# field its prelude name, and `with-json` the serde impls a fixture generated
+# under `with_serde` needs of every field (tests/serde_values_tests.rs).
+pgorm = { path = "../", default-features = false, features = ["macros", "postgres-array", "with-jiff", "with-json"] }
+serde = { workspace = true }
+serde_json = { version = "1.0.151" }

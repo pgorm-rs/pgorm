@@ -174,7 +174,7 @@ fn a_created_range_declares_its_multirange() {
 // schema, `Eq` but for a float subtype; the entity's fields name the newtypes
 // [spec:pgorm:req:codegen.entity.files+1/test]    `pgorm_range_types.rs` is
 // written and declared beside the entities
-// [spec:pgorm:sem:codegen.entity.imports+2/test]    each entity imports the
+// [spec:pgorm:sem:codegen.entity.imports+3/test]    each entity imports the
 // newtypes its columns name
 #[test]
 fn a_created_range_generates_a_compiling_newtype() {

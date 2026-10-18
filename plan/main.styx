@@ -1419,6 +1419,14 @@ children (
                         text "codegen.entity.types +7, codegen.entity.types.unsupported +7 and codegen.entity.compact.attrs +7 (30f11b85, codegen-interval-columns): interval columns map to Interval with the qualifier carried in the column definition, and a compact array names an element type the derive cannot infer."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T19:30:08.398181Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "value-serde-impls (a2bece89) bumped codegen.entity.serde+1 and codegen.entity.serde.derives+1 (a range type's newtype in pgorm_range_types.rs carries the with_serde derives, after DeriveCreatedRange) and codegen.entity.imports+3 (gen_import heads pgorm_range_types.rs); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -1485,7 +1493,7 @@ children (
                 id codegen-accepts-create-schema
                 title "Codegen reads a schema dump that creates its schemas, instead of refusing CREATE SCHEMA"
                 kind @fix
-                deps (sql-schemas)
+                deps (sql-schemas sql-domains)
                 log (
                     {
                         at 2026-10-18T19:21:23.94957Z
@@ -11915,6 +11923,14 @@ children (
                 text "Delivered again at sql.value.interval +1 (d945e094, generative-interval-kind): the generative campaign now carries interval as a portable kind, its payload the three fields as exact decimal text, bound, inlined and decoded through both bindings and compared field by field."
                 after_done true
             }
+
+            {
+                at 2026-10-18T19:30:08.282013Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "value-serde-impls (a2bece89) bumped sql.value.interval+2, adding Interval's serde representation under pgorm-query's serde feature (its three fields by name, missing or unknown fields refused); every site was re-read against the new text and re-pinned, and the code still says what the rule says."
+                after_done true
+            }
         )
     }
 
@@ -12083,6 +12099,13 @@ children (
                 kind @note
                 text "Found by codegen-interval-columns (17cd4eca). pgorm-codegen with with_serde set to anything but none emits serde derives on the entity model, which do not compile for an Interval, Range or Multirange field because pgorm_query::Interval and the range types have no serde impls (the built-in range columns already had this gap before intervals). Add Serialize/Deserialize for Interval (the three fields, lossless), Range and Multirange (bounds with inclusivity, and empty), behind the crate's existing serde feature gating, decide the representation and record it in the value rules, and add a codegen test generating with each with_serde mode over interval, range and multirange columns and compiling the result."
             }
+
+            {
+                at 2026-10-18T19:16:24.718286Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -12172,7 +12195,7 @@ children (
         id python-view-body-check
         title "Python's view and CREATE TABLE AS builders check their query as JavaScript's do, refusing a tie limit without ORDER BY"
         kind @fix
-        deps (sql-views sql-select-extras)
+        deps (sql-views sql-select-extras sql-domains)
         log (
             {
                 at 2026-10-18T19:21:23.848757Z

@@ -23,7 +23,7 @@ pub struct OutputFile {
     pub content: String,
 }
 
-// [spec:pgorm:def:codegen.entity.serde]
+// [spec:pgorm:def:codegen.entity.serde+1]
 #[derive(PartialEq, Eq, Debug, Default)]
 pub enum WithSerde {
     #[default]
@@ -67,7 +67,7 @@ pub struct EntityWriterContext {
 }
 
 impl WithSerde {
-    // [spec:pgorm:sem:codegen.entity.serde.derives]
+    // [spec:pgorm:sem:codegen.entity.serde.derives+1]
     pub fn extra_derive(&self) -> TokenStream {
         let mut extra_derive = match self {
             Self::None => {
@@ -144,7 +144,7 @@ fn parse_bonus(option: &str, source: &str) -> Result<TokenStream, Error> {
 impl FromStr for WithSerde {
     type Err = crate::Error;
 
-    // [spec:pgorm:def:codegen.entity.serde]
+    // [spec:pgorm:def:codegen.entity.serde+1]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "none" => Self::None,
@@ -201,7 +201,7 @@ impl EntityWriter {
             ));
         }
         if !self.ranges.is_empty() {
-            files.push(self.write_pgorm_range_types());
+            files.push(self.write_pgorm_range_types(&context.with_serde));
         }
         WriterOutput { files }
     }
@@ -438,7 +438,7 @@ impl EntityWriter {
         code_blocks
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports+2]
+    // [spec:pgorm:sem:codegen.entity.imports+3]
     pub fn gen_import(with_serde: &WithSerde) -> TokenStream {
         let prelude_import = quote!(
             use pgorm::entity::prelude::*;
@@ -498,7 +498,7 @@ impl EntityWriter {
         }
     }
 
-    // [spec:pgorm:sem:codegen.entity.imports+2]    active-enum imports
+    // [spec:pgorm:sem:codegen.entity.imports+3]    active-enum imports
     pub fn gen_import_active_enum(entity: &Entity) -> TokenStream {
         entity
             .columns

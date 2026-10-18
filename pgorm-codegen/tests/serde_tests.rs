@@ -20,7 +20,7 @@ fn task_schema() -> Vec<pgorm_query::TableCreateStatement> {
     )]
 }
 
-// [spec:pgorm:def:codegen.entity.serde/test]    the four variant names parse; any
+// [spec:pgorm:def:codegen.entity.serde+1/test]    the four variant names parse; any
 // other string is a `TransformError`
 #[test]
 fn with_serde_parses_its_four_variant_names() {
@@ -43,7 +43,7 @@ fn with_serde_parses_its_four_variant_names() {
     }
 }
 
-// [spec:pgorm:def:codegen.entity.serde/test]    each variant contributes its
+// [spec:pgorm:def:codegen.entity.serde+1/test]    each variant contributes its
 // import and its derives, to Models and to generated active enums alike
 #[test]
 fn with_serde_contributes_matching_imports_and_derives() {
@@ -197,7 +197,7 @@ fn serde_skip_flags_are_inert_without_serde() {
     assert_not_contains(task, "#[serde(skip_deserializing)]");
 }
 
-// [spec:pgorm:sem:codegen.entity.serde.derives/test]    `extra_derive` is the one
+// [spec:pgorm:sem:codegen.entity.serde.derives+1/test]    `extra_derive` is the one
 // producer of the serde derive fragment
 #[test]
 fn with_serde_extra_derive_produces_comma_fragment() {
@@ -216,7 +216,7 @@ fn with_serde_extra_derive_produces_comma_fragment() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.serde.derives/test]    both Model writers splice
+// [spec:pgorm:sem:codegen.entity.serde.derives+1/test]    both Model writers splice
 // the fragment after the base derives and the conditional `Eq`, before
 // `model_extra_derives`
 #[test]
@@ -268,7 +268,7 @@ fn serde_derives_are_spliced_after_the_eq_slot() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.serde.derives/test]    the same fragment is
+// [spec:pgorm:sem:codegen.entity.serde.derives+1/test]    the same fragment is
 // appended to generated active enums after the base derives and optional `Copy`,
 // and always travels with the serde import
 #[test]
