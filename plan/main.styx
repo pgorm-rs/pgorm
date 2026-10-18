@@ -11898,6 +11898,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-10-18T22:45:13.80964Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "napi.entity-reads +1 (domain-enum-predicates, 47aa595c): a registered entity's column whose domain is over an enum compares as the enum, the column and the label each cast to it, through ColumnTrait."
+                        after_done true
+                    }
                 )
             }
 
