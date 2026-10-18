@@ -2,8 +2,8 @@
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Enforcement, Expr,
     GeneratedKind, Index, IndexOrder, IndexType, IntoName, MaterializedView, Name,
-    NotNullConstraint, Query, SelectStatement, StringLen, Table, TableKey, TableName, TypeName,
-    Values, View, ViewCheckOption, extension::Type,
+    NotNullConstraint, Query, Schema, SelectStatement, StringLen, Table, TableKey, TableName,
+    TypeName, Values, View, ViewCheckOption, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -390,7 +390,35 @@ fn programs() -> BTreeMap<&'static str, String> {
     ]
     .into_iter()
     .chain(views(&table))
+    .chain(schemas())
     .collect()
+}
+
+/// The statements over a schema, its name carrying a quote and a non-ASCII
+/// character.
+fn schemas() -> BTreeMap<&'static str, String> {
+    let name = || a("schema \"雪\"");
+    BTreeMap::from([
+        ("create_schema", Schema::create(name()).to_string()),
+        (
+            "create_schema_if_not_exists",
+            Schema::create(name()).if_not_exists().to_string(),
+        ),
+        ("drop_schema", Schema::drop(name()).to_string()),
+        (
+            "drop_schemas",
+            Schema::drop(name())
+                .name(a("archive"))
+                .name(a("Old \"x\""))
+                .if_exists()
+                .cascade()
+                .to_string(),
+        ),
+        (
+            "rename_schema",
+            Schema::rename(name(), a("renamed \"雪\"")).to_string(),
+        ),
+    ])
 }
 
 /// The view, materialized view and `CREATE TABLE AS` statements over one
@@ -480,6 +508,8 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
 // [spec:pgorm:req:python.schema+1/test]
 // [spec:pgorm:req:python.schema-views/test]    every view, materialized view and CREATE TABLE AS
 // option renders as the Rust builder renders it
+// [spec:pgorm:req:python.schema-schemas/test]    every schema create, drop and rename renders as
+// the Rust builder renders it
 #[test]
 fn ddl_matches_native_rust() -> Result<(), Box<dyn std::error::Error>> {
     Python::initialize();

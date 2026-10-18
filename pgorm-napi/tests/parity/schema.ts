@@ -1,4 +1,4 @@
-// The schema family's parity cases — tables, their columns, keys and
+// The schema family's parity cases — schemas, tables, their columns, keys and
 // constraints and their alterations, indexes, types, sequences, views,
 // materialized views and tables created from a query, extensions and
 // comments — held to `schema.json` as `select.ts`'s are to theirs. A DDL
@@ -10,6 +10,7 @@
 // [spec:pgorm:req:napi.schema-types/test]
 // [spec:pgorm:req:napi.schema-sequences/test]
 // [spec:pgorm:req:napi.schema-views/test]
+// [spec:pgorm:req:napi.schema-schemas/test]
 
 import {
   alterSequence,
@@ -26,6 +27,7 @@ import {
   createIndex,
   createMaterializedView,
   createRecursiveView,
+  createSchema,
   createSequence,
   createTable,
   createTableAs,
@@ -36,6 +38,7 @@ import {
   dropExtension,
   dropIndex,
   dropMaterializedView,
+  dropSchema,
   dropSequence,
   dropTable,
   dropType,
@@ -43,6 +46,7 @@ import {
   refreshMaterializedView,
   renameColumn,
   renameConstraint,
+  renameSchema,
   renameSequence,
   renameTable,
   select,
@@ -192,6 +196,11 @@ export const cases: Record<string, () => Builder> = {
   "create-extension": () =>
     createExtension("btree_gist", { ifNotExists: true, schema: "public", version: "1.7", cascade: true }),
   "drop-extension": () => dropExtension("btree_gist", { ifExists: true, behavior: "restrict" }),
+  "create-schema": () => createSchema("app"),
+  "create-schema-if-not-exists": () => createSchema('App "x"', { ifNotExists: true }),
+  "drop-schema": () => dropSchema("app", { behavior: "restrict" }),
+  "drop-schemas": () => dropSchema(["app", "archive"], { ifExists: true, behavior: "cascade" }),
+  "rename-schema": () => renameSchema("app", 'App "x"'),
   "create-view": () => createView(app("large_room"), largeRooms()),
   "create-view-options": () =>
     createView(app("large_room"), largeRooms())

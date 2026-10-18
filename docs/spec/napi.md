@@ -804,6 +804,20 @@ a schema is made of, in the builder conventions the statements above use.
 > concurrent refresh without a unique index (`55000`) or of an unpopulated
 > view (`0A000`), and a drop of the other kind (`42809`).
 
+> [spec:pgorm:req:napi.schema-schemas]
+> The statements over a schema MUST be built through pgorm-query's `Schema`
+> (`sql.ddl.schema`), under the contract `napi.schema` gives every DDL
+> builder, each schema named by a string, one identifier, quoted; a `Table`
+> is refused, a schema having no schema of its own. `createSchema(name, {
+> ifNotExists })` creates one; `dropSchema(names, { ifExists, behavior })`
+> drops one name or a non-empty array of them, an empty array being refused
+> with a `ConstructionError`, `behavior` being `"cascade"` or `"restrict"`;
+> and `renameSchema(name, newName)` renames one, with no `ifExists`, which
+> PostgreSQL's grammar does not have for it. What only the server knows it
+> refuses by SQLSTATE, as a `DatabaseError`: a schema that exists (`42P06`),
+> a `pg_` name (`42939`), a missing schema (`3F000`) and a drop under
+> `RESTRICT`, said or unsaid, of a schema that holds anything (`2BP01`).
+
 ## Pipelines
 
 JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as

@@ -2189,6 +2189,15 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id sql-schemas, covered_rules (
+        napi.schema-schemas
+        python.schema-schemas
+        sql.ddl.schema
+    ), covered_claims (
+        {impl_name main, rule napi.schema-schemas}
+        {impl_name main, rule python.schema-schemas}
+        {impl_name main, rule sql.ddl.schema}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

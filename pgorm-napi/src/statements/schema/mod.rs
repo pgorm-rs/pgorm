@@ -1,7 +1,7 @@
-//! pgorm-query's DDL builders, from JavaScript: tables and their columns,
-//! keys and constraints, their alterations, indexes, types, sequences, views,
-//! materialized views and tables created from a query, extensions and
-//! comments.
+//! pgorm-query's DDL builders, from JavaScript: schemas, tables and their
+//! columns, keys and constraints, their alterations, indexes, types,
+//! sequences, views, materialized views and tables created from a query,
+//! extensions and comments.
 //!
 //! A DDL statement takes no parameters — PostgreSQL accepts none there — so
 //! every builder here renders through pgorm-query's own `Display`, which
@@ -17,6 +17,7 @@
 mod alter;
 mod column;
 mod index;
+mod namespace;
 mod options;
 mod sequence;
 mod table;
@@ -29,10 +30,11 @@ use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,
     IndexCreateStatement, IndexDropStatement, MaterializedViewCreateStatement,
     MaterializedViewDropStatement, MaterializedViewRefreshStatement, PendingSequenceAlter,
-    PendingTableAlter, RecursiveViewCreateStatement, SequenceAlterStatement,
-    SequenceCreateStatement, SequenceDropStatement, SequenceRenameStatement, TableAlterStatement,
-    TableCreateAsStatement, TableCreateStatement, TableDropStatement, TableName,
-    TableRenameStatement, TableTruncateStatement, ViewCreateStatement, ViewDropStatement,
+    PendingTableAlter, RecursiveViewCreateStatement, SchemaCreateStatement, SchemaDropStatement,
+    SchemaRenameStatement, SequenceAlterStatement, SequenceCreateStatement, SequenceDropStatement,
+    SequenceRenameStatement, TableAlterStatement, TableCreateAsStatement, TableCreateStatement,
+    TableDropStatement, TableName, TableRenameStatement, TableTruncateStatement,
+    ViewCreateStatement, ViewDropStatement,
     extension::{
         AttributeRenameStatement, CompositeAlterStatement, ExtensionCreateStatement,
         ExtensionDropStatement, PendingTypeAlter, TypeAlterStatement, TypeCreateStatement,
@@ -56,6 +58,7 @@ pub(super) const EXPORTS: &[&[(&str, super::Build)]] = &[
     types::EXPORTS,
     sequence::EXPORTS,
     view::EXPORTS,
+    namespace::EXPORTS,
 ];
 
 /// A complete DDL statement, which runs as it renders.
@@ -63,6 +66,9 @@ pub(super) const EXPORTS: &[&[(&str, super::Build)]] = &[
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub(crate) enum Ddl {
+    CreateSchema(SchemaCreateStatement),
+    DropSchema(SchemaDropStatement),
+    RenameSchema(SchemaRenameStatement),
     CreateTable(TableCreateStatement),
     /// The table is kept beside the statement for the foreign keys a later
     /// action adds, which name it.
@@ -103,6 +109,9 @@ impl Ddl {
     // [spec:pgorm:req:napi.schema]
     fn sql(&self) -> String {
         match self {
+            Self::CreateSchema(statement) => statement.to_string(),
+            Self::DropSchema(statement) => statement.to_string(),
+            Self::RenameSchema(statement) => statement.to_string(),
             Self::CreateTable(statement) => statement.to_string(),
             Self::AlterTable(_, statement) => statement.to_string(),
             Self::DropTable(statement) => statement.to_string(),

@@ -12,7 +12,7 @@ use pgorm::{
     pgorm_query::{
         Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Expr, ForeignKey, Func,
         Index, IntoNamedTable, MergeInsert, MergeUpdate, Multirange, Name, OnConflict, Order,
-        Query, Range, Sequence, SequenceOption, Table, TypeName, Values, WindowStatement,
+        Query, Range, Schema, Sequence, SequenceOption, Table, TypeName, Values, WindowStatement,
         WithClause,
         extension::{RangeDefinition, Type},
     },
@@ -515,6 +515,59 @@ async fn live_sequence_names() {
         )
         .await;
         assert_eq!(left, 0, "the sequence {renamed:?} survived its drop");
+    }
+    close(ctx, db).await;
+}
+
+/// `CreateSchemaStmt.schemaname`, `RenameStmt.subname` / `newname` and a
+/// schema `DropStmt`'s names: a schema created under the hostile name, a
+/// table put in it, the schema renamed, then dropped with what it holds.
+// [spec:pgorm:req:security.ident-oracle+14/test]
+#[tokio::test]
+async fn live_schema_names() {
+    let (ctx, db) = open("ident_oracle_live_schema").await;
+    for name in NASTY {
+        let renamed = format!("{name}_renamed");
+        run(&db, &Schema::create(Name::runtime(name)).to_string()).await;
+        let created = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_namespace WHERE nspname = $1",
+            name,
+        )
+        .await;
+        assert_eq!(created, 1, "no schema {name:?}");
+        db.batch_execute(&format!("CREATE TABLE {}.held (id integer)", ident(name)))
+            .await
+            .expect("a table is created in the schema");
+
+        run(
+            &db,
+            &Schema::rename(Name::runtime(name), Name::runtime(renamed.as_str())).to_string(),
+        )
+        .await;
+        let moved = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace \
+             WHERE ns.nspname = $1 AND c.relname = 'held'",
+            &renamed,
+        )
+        .await;
+        assert_eq!(moved, 1, "the table did not move to {renamed:?}");
+
+        run(
+            &db,
+            &Schema::drop(Name::runtime(renamed.as_str()))
+                .cascade()
+                .to_string(),
+        )
+        .await;
+        let left = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_namespace WHERE nspname = $1",
+            &renamed,
+        )
+        .await;
+        assert_eq!(left, 0, "the schema {renamed:?} survived its drop");
     }
     close(ctx, db).await;
 }

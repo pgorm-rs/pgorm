@@ -5,6 +5,7 @@ mod column;
 mod entity;
 mod enums;
 mod index;
+mod namespace;
 mod statement;
 mod table;
 mod types;
@@ -58,5 +59,8 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(view::refresh_materialized_view, module)?)?;
     module.add_function(wrap_pyfunction!(view::drop_materialized_view, module)?)?;
     module.add_function(wrap_pyfunction!(view::create_table_as, module)?)?;
+    module.add_function(wrap_pyfunction!(namespace::create_schema, module)?)?;
+    module.add_function(wrap_pyfunction!(namespace::drop_schema, module)?)?;
+    module.add_function(wrap_pyfunction!(namespace::rename_schema, module)?)?;
     Ok(())
 }

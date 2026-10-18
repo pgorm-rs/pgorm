@@ -268,6 +268,24 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > query that does not read the view: the `UNION` that joins a non-recursive
 > term to one reading the view has no Python spelling yet.
 
+> [spec:pgorm:req:python.schema-schemas]
+> `pgorm.schema` MUST build the statements over a schema through
+> pgorm-query's `Schema` (`sql.ddl.schema`), each a function returning a
+> `DDL` statement under the contract of `python.schema`, every schema name an
+> identifier — a `str` or an `Identifier`, one part, quoted — and none
+> schema-qualified, since schemas do not nest. The functions are
+> `create_schema(name, *, if_not_exists)`; `drop_schema(name, *names,
+> if_exists, cascade)`, which drops every schema it names, in order, the
+> first required so the list is never empty; and `rename_schema(name,
+> new_name)`, which has no `if_exists`, PostgreSQL's grammar having none for
+> it. `inspect()` gives an empty parameter list. A name that is not an
+> identifier MUST be refused with `ConstructionError` as the statement is
+> built. What only the server knows it refuses by SQLSTATE, as a
+> `DatabaseError`: a schema that exists (`42P06`), a `pg_` name (`42939`), a
+> missing schema (`3F000`) and a drop under the default `RESTRICT` of a
+> schema that holds anything (`2BP01`). The capability manifest lists each
+> function as a `schema.` operation needing no registration.
+
 > [spec:pgorm:req:python.runtime]
 > Database I/O MUST have an asyncio-compatible awaitable interface backed by
 > reusable Tokio runtime resources and pgorm pools. Native waiting MUST NOT

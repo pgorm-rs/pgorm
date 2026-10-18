@@ -8978,6 +8978,9 @@ children (
                 id sql-schemas
                 title "pgorm builds CREATE SCHEMA and DROP SCHEMA from Rust, Python and JavaScript"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ddl.schema] [spec:pgorm:req:python.schema-schemas] [spec:pgorm:req:napi.schema-schemas])
+                }
                 deps (query-second-tier sql-views python-schema-truth-testing)
                 log (
                     {

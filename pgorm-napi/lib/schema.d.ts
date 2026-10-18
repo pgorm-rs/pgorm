@@ -393,6 +393,23 @@ export declare function dropExtension(
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): SchemaStatement;
 
+// [spec:pgorm:req:napi.schema-schemas]
+
+/** `CREATE SCHEMA`: a schema is named by one identifier, never qualified. */
+export declare function createSchema(
+  name: string,
+  options?: { readonly ifNotExists?: boolean },
+): SchemaStatement;
+
+/** `DROP SCHEMA`: one schema or several; `"restrict"`, said or not, refuses a schema that holds anything. */
+export declare function dropSchema(
+  names: string | readonly [string, ...string[]],
+  options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
+): SchemaStatement;
+
+/** `ALTER SCHEMA ... RENAME TO`, which PostgreSQL gives no `IF EXISTS`. */
+export declare function renameSchema(name: string, newName: string): SchemaStatement;
+
 // [spec:pgorm:req:napi.schema-views]
 
 /**

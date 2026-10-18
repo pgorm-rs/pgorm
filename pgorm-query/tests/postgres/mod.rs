@@ -5,6 +5,7 @@ mod collate;
 mod comment;
 mod composite;
 mod conflict_constraint;
+mod create_schema;
 mod deferrability;
 mod extension;
 mod foreign_key;

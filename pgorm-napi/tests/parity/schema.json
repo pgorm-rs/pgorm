@@ -131,6 +131,26 @@
     "sql": "DROP EXTENSION IF EXISTS \"btree_gist\" RESTRICT",
     "values": []
   },
+  "create-schema": {
+    "sql": "CREATE SCHEMA \"app\"",
+    "values": []
+  },
+  "create-schema-if-not-exists": {
+    "sql": "CREATE SCHEMA IF NOT EXISTS \"App \"\"x\"\"\"",
+    "values": []
+  },
+  "drop-schema": {
+    "sql": "DROP SCHEMA \"app\" RESTRICT",
+    "values": []
+  },
+  "drop-schemas": {
+    "sql": "DROP SCHEMA IF EXISTS \"app\", \"archive\" CASCADE",
+    "values": []
+  },
+  "rename-schema": {
+    "sql": "ALTER SCHEMA \"app\" RENAME TO \"App \"\"x\"\"\"",
+    "values": []
+  },
   "comment-on-table": {
     "sql": "COMMENT ON TABLE \"app\".\"booking\" IS 'Rooms booked, and when'",
     "values": []

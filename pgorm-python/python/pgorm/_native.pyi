@@ -23,6 +23,9 @@ from ._schema_views import (
     refresh_materialized_view as refresh_materialized_view,
     drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
 )
+from ._schema_schemas import (
+    create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
+)
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
 from ._pipeline_sources import SourceSelection as SourceSelection, SelectedSources as SelectedSources

@@ -1,9 +1,11 @@
 // @ts-check
 
 // CREATE INDEX and DROP INDEX; sequences, created, altered over pgorm-query's
-// typestate, dropped and renamed; and extensions.
+// typestate, dropped and renamed; extensions; and schemas, created, dropped
+// and renamed.
 // [spec:pgorm:req:napi.schema-indexes]
 // [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:napi.schema-schemas]
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -210,4 +212,28 @@ export function createExtension(name, options) {
  */
 export function dropExtension(name, options) {
   return statement(native.ddlDropExtension(name, options));
+}
+
+/**
+ * @param {string} name
+ * @param {{ ifNotExists?: boolean }} [options]
+ */
+export function createSchema(name, options) {
+  return statement(native.ddlCreateSchema(name, options));
+}
+
+/**
+ * @param {string | readonly string[]} names
+ * @param {object} [options]
+ */
+export function dropSchema(names, options) {
+  return statement(native.ddlDropSchema(names, options));
+}
+
+/**
+ * @param {string} name
+ * @param {string} newName
+ */
+export function renameSchema(name, newName) {
+  return statement(native.ddlRenameSchema(name, newName));
 }

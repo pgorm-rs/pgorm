@@ -2,9 +2,10 @@ use crate::{errors::ConstructionError, expressions::Compiled};
 use pgorm::pgorm_query::{
     ColumnRenameStatement, CommentStatement, ConstraintRenameStatement, IndexDropStatement,
     MaterializedViewCreateStatement, MaterializedViewDropStatement,
-    MaterializedViewRefreshStatement, RecursiveViewCreateStatement, TableAlterStatement,
-    TableCreateAsStatement, TableDropStatement, TableRenameStatement, TableTruncateStatement,
-    Values, ViewCreateStatement, ViewDropStatement,
+    MaterializedViewRefreshStatement, RecursiveViewCreateStatement, SchemaCreateStatement,
+    SchemaDropStatement, SchemaRenameStatement, TableAlterStatement, TableCreateAsStatement,
+    TableDropStatement, TableRenameStatement, TableTruncateStatement, Values, ViewCreateStatement,
+    ViewDropStatement,
     extension::{TypeAlterStatement, TypeCreateStatement, TypeDropStatement},
 };
 use pyo3::prelude::*;
@@ -30,6 +31,9 @@ pub(crate) enum Statement {
     RefreshMaterializedView(MaterializedViewRefreshStatement),
     DropMaterializedView(MaterializedViewDropStatement),
     CreateTableAs(TableCreateAsStatement),
+    CreateSchema(SchemaCreateStatement),
+    DropSchema(SchemaDropStatement),
+    RenameSchema(SchemaRenameStatement),
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +65,9 @@ impl PyDDL {
             Statement::RefreshMaterializedView(s) => s.to_string(),
             Statement::DropMaterializedView(s) => s.to_string(),
             Statement::CreateTableAs(s) => s.to_string(),
+            Statement::CreateSchema(s) => s.to_string(),
+            Statement::DropSchema(s) => s.to_string(),
+            Statement::RenameSchema(s) => s.to_string(),
         };
         Compiled {
             sql,
