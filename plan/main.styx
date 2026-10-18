@@ -11998,6 +11998,14 @@ children (
                 kind @note
                 text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. pgorm exposes no route to COPY's data flow: DatabaseConnection hides the client, and execute cannot carry COPY FROM STDIN. Build a typed COPY statement (table, optional column list, FROM STDIN or TO STDOUT, or TO STDOUT over a SelectStatement; FORMAT text | csv | binary from a closed set with that format's options: DELIMITER, NULL, HEADER [MATCH], QUOTE, ESCAPE, FORCE_QUOTE / FORCE_NOT_NULL / FORCE_NULL, ENCODING, FREEZE where valid) and copy_in / copy_out on DatabaseConnection and DatabaseTransaction over tokio-postgres's CopyInSink / CopyOutStream: copy_in takes bytes (a Sink or an async iterator of Bytes) and reports the row count; copy_out yields a byte stream. Decide whether a typed row writer for binary COPY belongs here (pgorm already has Value and its binary codecs) or is a follow-up; say which. Cancellation and errors follow the connection's existing rules (a dropped sink aborts the COPY; a server error is the usual typed error). Live tests on 18.6: text, csv and binary in both directions, a column subset, a constraint violation mid-copy (23505) leaving the transaction aborted, an aborted copy_in, large streams. Python (async iterator of bytes in, async iterator out) and JavaScript (async iterable / ReadableStream) get the same, with stubs, .d.ts and live tests. sql.scope's COPY entry graduates (bump; query-second-tier re-delivers). The metrics wrappers (InstrumentedConnection / InstrumentedTransaction) forward the new methods."
             }
+
+            {
+                at 2026-10-18T20:23:40.366763Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered again at sql.ast.copy +1, python.copy +1 and napi.copy +1 (copy-to-source-returning, be37b37f): a write without RETURNING no longer converts into a CopySource, and Python's CopyTo and JavaScript's copyTo refuse it with a ConstructionError."
+                after_done true
+            }
         )
     }
 
