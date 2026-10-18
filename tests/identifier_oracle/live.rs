@@ -10,10 +10,10 @@
 use pgorm::{
     ConnectionTrait, DatabaseConnection, DecodeRaw,
     pgorm_query::{
-        Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Expr, ExtendedWindow,
-        ForeignKey, Func, Index, IntoNamedTable, MergeInsert, MergeUpdate, Multirange, Name,
-        OnConflict, Order, Query, Range, Schema, Sequence, SequenceOption, Table, TypeName, Values,
-        WindowStatement, WithClause,
+        Asterisk, ColumnDef, ColumnType, Comment, CommonTableExpression, Domain, DomainCheck, Expr,
+        ExtendedWindow, ForeignKey, Func, Index, IntoNamedTable, MergeInsert, MergeUpdate,
+        Multirange, Name, OnConflict, Order, Query, Range, Schema, Sequence, SequenceOption, Table,
+        TypeName, Values, WindowStatement, WithClause,
         extension::{RangeDefinition, Type},
     },
 };
@@ -576,6 +576,92 @@ async fn live_schema_names() {
         )
         .await;
         assert_eq!(left, 0, "the schema {renamed:?} survived its drop");
+    }
+    close(ctx, db).await;
+}
+
+/// `CreateDomainStmt.domainname`, a domain check's `Constraint.conname`, a
+/// column typed with the domain, `RenameStmt.subname` / `newname` and a
+/// domain `DropStmt`'s names: a domain created under the hostile name with a
+/// check of that name, a table column typed with it, both renamed, then the
+/// domain dropped with the column.
+// [spec:pgorm:req:security.ident-oracle+14/test]
+#[tokio::test]
+async fn live_domain_names() {
+    let (ctx, db) = open("ident_oracle_live_domain").await;
+    for name in NASTY {
+        let renamed = format!("{name}_renamed");
+        run(
+            &db,
+            &Domain::create(Name::runtime(name), ColumnType::Integer)
+                .check(DomainCheck::new(Expr::domain_value().gt(0)).name(Name::runtime(name)))
+                .to_string(),
+        )
+        .await;
+        let created = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_type t JOIN pg_constraint c ON c.contypid = t.oid \
+             WHERE t.typname = $1 AND t.typtype = 'd' AND c.conname = t.typname",
+            name,
+        )
+        .await;
+        assert_eq!(created, 1, "no domain {name:?} with its check");
+        run(
+            &db,
+            &Table::create(Name::runtime("typed"))
+                .col(ColumnDef::new_with_type(
+                    Name::runtime("v"),
+                    ColumnType::Domain {
+                        name: Name::runtime(name),
+                        schema: None,
+                        base: std::sync::Arc::new(ColumnType::Integer),
+                    },
+                ))
+                .to_string(),
+        )
+        .await;
+
+        run(
+            &db,
+            &Domain::alter(Name::runtime(name))
+                .rename_constraint(Name::runtime(name), Name::runtime(renamed.as_str()))
+                .to_string(),
+        )
+        .await;
+        run(
+            &db,
+            &Domain::alter(Name::runtime(name))
+                .rename_to(Name::runtime(renamed.as_str()))
+                .to_string(),
+        )
+        .await;
+        let moved = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid \
+             JOIN pg_constraint c ON c.contypid = t.oid \
+             WHERE a.attrelid = 'typed'::regclass AND t.typname = $1 AND c.conname = t.typname",
+            &renamed,
+        )
+        .await;
+        assert_eq!(moved, 1, "the column is not typed with {renamed:?}");
+
+        run(
+            &db,
+            &Domain::drop(Name::runtime(renamed.as_str()))
+                .cascade()
+                .to_string(),
+        )
+        .await;
+        let left = catalogue_count(
+            &db,
+            "SELECT count(*) FROM pg_type WHERE typname = $1",
+            &renamed,
+        )
+        .await;
+        assert_eq!(left, 0, "the domain {renamed:?} survived its drop");
+        db.batch_execute("DROP TABLE typed")
+            .await
+            .expect("the table is dropped");
     }
     close(ctx, db).await;
 }

@@ -4,10 +4,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use pgorm::pgorm_query::{
-    Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Deferrability, Enforcement,
-    Expr, ForeignKeyAction, ForeignKeyCreateStatement, Func, GeneratedKind, IdentityGeneration,
-    Index, IndexColumn, IndexOrder, IndexType, NotNullConstraint, Schema, Sequence, SequenceOption,
-    SequenceType, SimpleExpr, StringLen, Table, TableKey, TableName, TypeName, Unique, Values,
+    Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Deferrability, Domain,
+    DomainCheck, Enforcement, Expr, ForeignKeyAction, ForeignKeyCreateStatement, Func,
+    GeneratedKind, IdentityGeneration, Index, IndexColumn, IndexOrder, IndexType,
+    NotNullConstraint, Schema, Sequence, SequenceOption, SequenceType, SimpleExpr, StringLen,
+    Table, TableKey, TableName, TypeName, Unique, Values,
     extension::{Extension, RangeDefinition, Type, TypeRef},
 };
 use rust_decimal::Decimal;
@@ -44,6 +45,11 @@ fn mood_column() -> ColumnType {
         schema: Some(n("app")),
         variants: Vec::new(),
     }
+}
+
+/// The domain the domain cases name, qualified by its schema.
+fn quantity() -> TypeRef {
+    TypeRef::SchemaType(n("app"), n("quantity"))
 }
 
 fn ddl(statement: impl ToString) -> (String, Values) {
@@ -470,6 +476,97 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         (
             "rename-schema",
             ddl(Schema::rename(n("app"), n("App \"x\""))),
+        ),
+        (
+            "create-domain",
+            ddl(Domain::create(quantity(), ColumnType::Integer)
+                .check(DomainCheck::new(Expr::domain_value().gt(0)).name(n("positive")))
+                .not_null()
+                .default(1)
+                .check(Expr::domain_value().lt(1000))
+                .to_owned()),
+        ),
+        (
+            "create-domain-collated",
+            ddl(Domain::create(n("Code \"x\""), ColumnType::Text)
+                .collate((n("pg_catalog"), n("C")))
+                .null()
+                .default("none")
+                .to_owned()),
+        ),
+        (
+            "create-domain-over-types",
+            ddl(Domain::create(
+                n("tags"),
+                ColumnType::Array(Arc::new(ColumnType::String(StringLen::N(20)))),
+            )),
+        ),
+        (
+            "create-domain-over-domain",
+            ddl(Domain::create(
+                n("small"),
+                ColumnType::Enum {
+                    name: n("quantity"),
+                    schema: Some(n("app")),
+                    variants: Vec::new(),
+                },
+            )
+            .check(Expr::domain_value().between(0, 10))
+            .to_owned()),
+        ),
+        (
+            "alter-domain-set-default",
+            ddl(Domain::alter(quantity()).set_default(5)),
+        ),
+        (
+            "alter-domain-drop-default",
+            ddl(Domain::alter(quantity()).drop_default()),
+        ),
+        (
+            "alter-domain-set-not-null",
+            ddl(Domain::alter(quantity()).set_not_null()),
+        ),
+        (
+            "alter-domain-drop-not-null",
+            ddl(Domain::alter(quantity()).drop_not_null()),
+        ),
+        (
+            "alter-domain-add-check",
+            ddl(Domain::alter(quantity()).add_check(Expr::domain_value().ne(13))),
+        ),
+        (
+            "alter-domain-add-check-not-valid",
+            ddl(Domain::alter(quantity()).add_check(
+                DomainCheck::new(Expr::domain_value().lt(100))
+                    .name(n("Small \"x\""))
+                    .not_valid(),
+            )),
+        ),
+        (
+            "alter-domain-drop-constraint",
+            ddl(Domain::alter(quantity())
+                .drop_constraint(ConstraintDrop::new(n("small")).if_exists().cascade())),
+        ),
+        (
+            "alter-domain-rename-constraint",
+            ddl(Domain::alter(quantity()).rename_constraint(n("small"), n("tiny"))),
+        ),
+        (
+            "alter-domain-validate-constraint",
+            ddl(Domain::alter(quantity()).validate_constraint(n("small"))),
+        ),
+        (
+            "alter-domain-rename",
+            ddl(Domain::alter(quantity()).rename_to(n("units"))),
+        ),
+        ("drop-domain", ddl(Domain::drop(n("quantity")))),
+        (
+            "drop-domains",
+            ddl(Domain::drop(n("quantity"))
+                .name(quantity())
+                .if_exists()
+                .restrict()
+                .to_owned()),
         ),
         (
             "comment-on-table",

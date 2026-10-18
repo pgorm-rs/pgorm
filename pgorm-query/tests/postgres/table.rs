@@ -115,7 +115,7 @@ fn create_4() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+5/test]
+// [spec:pgorm:req:sql.ddl.column-types+6/test]
 #[test]
 fn create_5() {
     assert_eq!(
@@ -210,7 +210,7 @@ fn create_9() {
     );
 }
 
-// [spec:pgorm:def:sql.types.column-type+10/test]    a precision rides on the second-bearing
+// [spec:pgorm:def:sql.types.column-type+11/test]    a precision rides on the second-bearing
 // field, the only place PostgreSQL takes one
 #[test]
 fn create_10() {
@@ -252,7 +252,7 @@ fn create_11() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-types+5/test]
+// [spec:pgorm:req:sql.ddl.column-types+6/test]
 #[test]
 fn create_12() {
     assert_eq!(

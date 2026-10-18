@@ -46,8 +46,11 @@ fn scalar(ty: &ColumnType) -> Option<ArrayType> {
 }
 
 /// The kind a column's values bind and read as, or `None` for a type the
-/// binding has no kind for, whose values a caller declares with `Value`.
+/// binding has no kind for, whose values a caller declares with `Value`. A
+/// domain's values travel as its base type's do, so a domain column is the
+/// kind of the type it is over.
 // [spec:pgorm:req:napi.entities]
+// [spec:pgorm:req:napi.schema-domains]
 pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
     let name =
         |name: &pgorm::pgorm_query::Name, schema: &Option<pgorm::pgorm_query::Name>| TypeName {
@@ -76,6 +79,7 @@ pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
             }))
         }
         ColumnType::Array(member) => column_tag(member).map(|tag| Tag::Array(Box::new(tag))),
+        ColumnType::Domain { base, .. } => column_tag(base),
         other => scalar(other).map(Tag::Scalar),
     }
 }
@@ -92,8 +96,10 @@ pub(crate) struct ColumnInfo {
     pub(crate) labels: Option<Vec<String>>,
 }
 
-/// An enum column's labels, in declaration order, an array of one's
-/// included: what a generated declaration types its values as.
+/// An enum column's labels, in declaration order, an array of one's and a
+/// domain over one included: what a generated declaration types its values
+/// as.
+// [spec:pgorm:req:napi.schema-domains]
 fn labels(ty: &ColumnType) -> Option<Vec<String>> {
     use pgorm::pgorm_query::SqlName;
     match ty {
@@ -103,7 +109,7 @@ fn labels(ty: &ColumnType) -> Option<Vec<String>> {
                 .map(|variant| SqlName::to_string(&**variant))
                 .collect(),
         ),
-        ColumnType::Array(member) => labels(member),
+        ColumnType::Array(member) | ColumnType::Domain { base: member, .. } => labels(member),
         _ => None,
     }
 }
@@ -325,5 +331,43 @@ mod tests {
             key(&ColumnType::Interval(IntervalSpec::Any(None))).as_deref(),
             Some("interval")
         );
+    }
+
+    // [spec:pgorm:req:napi.schema-domains/test]    a domain column is the kind
+    // of the type it is over, through a domain over a domain, an array of one
+    // and a domain over an enum, whose labels it carries
+    #[test]
+    fn domain_columns_take_their_base_kind() {
+        let over = |name: &str, base: ColumnType| ColumnType::Domain {
+            name: Name::runtime(name),
+            schema: Some(Name::runtime("billing")),
+            base: Arc::new(base),
+        };
+        let quantity = over("quantity", ColumnType::Integer);
+        assert_eq!(key(&quantity).as_deref(), Some("i32"));
+        assert_eq!(
+            key(&over("small", quantity.clone())).as_deref(),
+            Some("i32")
+        );
+        assert_eq!(
+            key(&ColumnType::Array(Arc::new(quantity))).as_deref(),
+            Some("i32[]")
+        );
+        assert_eq!(
+            key(&over("tags", ColumnType::Array(Arc::new(ColumnType::Text)))).as_deref(),
+            Some("text[]")
+        );
+        let mood = ColumnType::Enum {
+            name: Name::runtime("mood"),
+            schema: None,
+            variants: vec![Name::runtime("calm"), Name::runtime("tense")],
+        };
+        let calm = over("calm_mood", mood);
+        assert_eq!(key(&calm).as_deref(), Some("enum \"mood\""));
+        assert_eq!(
+            labels(&calm),
+            Some(vec!["calm".to_owned(), "tense".to_owned()])
+        );
+        assert_eq!(key(&over("money", ColumnType::Money)), None);
     }
 }

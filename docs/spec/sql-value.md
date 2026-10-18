@@ -906,7 +906,7 @@ including panic semantics and quirks inherited from sea-query.
 > Carrying the answer here rather than in a second node shape is what lets a
 > cast have exactly one shape (`[spec:pgorm:req:sql.ast.cast-shape]`).
 
-> [spec:pgorm:def:sql.types.column-type+10]
+> [spec:pgorm:def:sql.types.column-type+11]
 > `ColumnType` (in `pgorm-query/src/table/column.rs`, `#[non_exhaustive]`) is
 > the type vocabulary shared by DDL generation, `ValueType::column_type()` and
 > codegen, and every variant MUST name a type Postgres has: `Char(Option<u32>)`,
@@ -927,8 +927,13 @@ including panic semantics and quirks inherited from sea-query.
 > built-in range and multirange types (`[spec:pgorm:def:sql.value.range+4]`),
 > `CreatedRange { name, schema, subtype }`, a range type a schema created,
 > named in full as an enum type is and carrying the `ColumnType` of its
-> subtype, and `CreatedMultirange { name, schema, subtype }`, the multirange
-> created beside one (`[spec:pgorm:def:sql.value.created-range+1]`).
+> subtype, `CreatedMultirange { name, schema, subtype }`, the multirange
+> created beside one (`[spec:pgorm:def:sql.value.created-range+1]`), and
+> `Domain { name, schema, base }`, a domain (`sql.ddl.domain`), named in full
+> and carrying the `ColumnType` of its base. `Domain` is the one spelling of a
+> column whose type is a domain: `Named` renders the same DDL but says nothing
+> of what the column holds, where the base is what a value is read and written
+> as and what codegen generates the field from.
 > `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
 > (`[spec:pgorm:req:sql.ddl.column-def+4]`).
@@ -970,6 +975,7 @@ including panic semantics and quirks inherited from sea-query.
 > compares `Named` and `Enum` by rendered identifier strings (and variant
 > lists), compares `Array` element types recursively, compares `Range` and
 > `Multirange` by the range type they name, compares `CreatedRange` and
-> `CreatedMultirange` by rendered name and schema and subtype, and otherwise compares enum
+> `CreatedMultirange` by rendered name and schema and subtype, compares
+> `Domain` by rendered name and schema and base, and otherwise compares enum
 > discriminants. Convenience constructors: `ColumnType::named(str)`,
 > `ColumnType::string(Option<u32>)` and `ColumnType::var_binary(u32)`.

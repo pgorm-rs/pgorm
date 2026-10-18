@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+34]
+> [spec:pgorm:req:sql.surface+35]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -175,6 +175,11 @@ today, including panicking edges and deliberate failsafes.
 > from a query (`sql.ddl.create-table-as`); `Schema`,
 > `SchemaCreateStatement`, `SchemaDropStatement` and `SchemaRenameStatement`,
 > the statements that create, drop and rename a schema (`sql.ddl.schema`);
+> `Domain`, `DomainCreateStatement`, `PendingDomainAlter`,
+> `DomainAlterStatement`, `DomainDropStatement`, `DomainCheck` and
+> `IntoDomainCheck`, the statements that create, alter and drop a domain, the
+> alter awaiting its one action, and a domain's `CHECK` with the conversion
+> into it (`sql.ddl.domain`);
 > `CopyFromStatement` and `CopyToStatement`, the two COPY statements;
 > `CopyFormat` and `CopyDelimitedFormat`, the sealed traits a statement's
 > format type implements, and `CopyText`, `CopyCsv` and `CopyBinary`, the
@@ -232,7 +237,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+21]
+> [spec:pgorm:req:sql.scope+22]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -256,7 +261,8 @@ today, including panicking edges and deliberate failsafes.
 > storage and `ALTER MATERIALIZED VIEW` (`sql.ddl.materialized-view`),
 > `CREATE TABLE AS`'s persistence and storage, `SELECT INTO` and `EXECUTE`
 > (`sql.ddl.create-table-as`), a schema's `AUTHORIZATION`, owner and element
-> list (`sql.ddl.schema`), COPY TO's column list (`sql.ast.copy`), and
+> list (`sql.ddl.schema`), a domain's `SET SCHEMA`, owner and named `NOT
+> NULL` (`sql.ddl.domain`), COPY TO's column list (`sql.ast.copy`), and
 > syntax only PostgreSQL 19 parses (`sql.target`).
 >
 > Three tests decide which verdict an entry gets. *Does the ORM need it to do
@@ -269,13 +275,7 @@ today, including panicking edges and deliberate failsafes.
 > new renderer and a new `SubQueryStatement` arm; a clause on an existing
 > statement costs a field.
 >
-> **Deferred** — worth building, not built:
->
-> - **`CREATE DOMAIN`, its `ALTER` and `DROP`.** A named type with a base
->   type, a default, `NOT NULL` and named `CHECK`s, which a schema uses where
->   an entity has a column; codegen refuses a schema that uses one. Closing it
->   takes the statements and codegen reading a domain column as its base type
->   (`sql-domains`).
+> **Deferred** — worth building, not built: none at present.
 >
 > **Out of scope** — not the builder's job:
 >
@@ -1000,11 +1000,13 @@ today, including panicking edges and deliberate failsafes.
 > lower-case `c` included. A `compile_fail` doctest on `Collation` shows that
 > an expression does not convert into one.
 
-> [spec:pgorm:def:sql.ast.keywords+5]
+> [spec:pgorm:def:sql.ast.keywords+6]
 > `Keyword` represents bare SQL keywords usable as expressions, and the variant
-> set is closed: `Null`, `CurrentDate`, `CurrentTime`, and `CurrentTimestamp`,
-> constructed by `Expr::current_date()`, `Expr::current_time()` and
-> `Expr::current_timestamp()`. There is no caller-supplied keyword — an
+> set is closed: `Null`, `CurrentDate`, `CurrentTime`, `CurrentTimestamp` and
+> `Value`, constructed by `Expr::current_date()`, `Expr::current_time()`,
+> `Expr::current_timestamp()` and `Expr::domain_value()`. `Value` renders
+> `VALUE`, the value a domain's `CHECK` tests (`sql.ddl.domain`); anywhere
+> else PostgreSQL reads that word as a column named `value`. There is no caller-supplied keyword — an
 > arbitrary word reaches keyword position only as an `Expr::raw`, which says
 > raw SQL where a `Keyword` would have said identifier. Name helpers:
 > `Name::runtime` wraps a runtime string as an identifier and `Asterisk`

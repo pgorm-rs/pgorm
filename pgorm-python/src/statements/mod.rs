@@ -70,6 +70,8 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
         Ok(query.inspect())
     } else if let Ok(query) = value.extract::<PyRef<'_, crate::schema::PyCreateIndex>>() {
         Ok(query.inspect())
+    } else if let Ok(query) = value.extract::<PyRef<'_, crate::schema::PyCreateDomain>>() {
+        Ok(query.inspect())
     } else if let Ok(query) = value.extract::<PyRef<'_, crate::schema::PyDDL>>() {
         Ok(query.inspect())
     } else {

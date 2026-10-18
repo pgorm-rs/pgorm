@@ -93,7 +93,7 @@ impl TableCreateAsStatement {
 /// Renders the statement with every value inlined as an SQL literal. This is
 /// its only rendering: a DDL statement takes no bind parameters, so the values
 /// its query carries are written into it as escaped literals.
-// [spec:pgorm:req:sql.ddl+10]
+// [spec:pgorm:req:sql.ddl+11]
 impl std::fmt::Display for TableCreateAsStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

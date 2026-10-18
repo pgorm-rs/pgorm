@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 Query: TypeAlias = (
     _native.Select | _native.Insert | _native.Update | _native.Delete
     | _native.Merge | _native.RawSQL | _native.Compiled | _native.Pipeline
-    | _native.DDL | _native.CreateTable | _native.CreateIndex
+    | _native.DDL | _native.CreateTable | _native.CreateIndex | _native.CreateDomain
 )
 
 Mapping.register(Record)

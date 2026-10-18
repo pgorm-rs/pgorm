@@ -212,7 +212,7 @@ macro_rules! impl_schema_display {
         $(
             /// Renders the statement, its only rendering: a schema statement
             /// carries names and nothing to bind, so there is no `build`.
-            // [spec:pgorm:req:sql.ddl+10]
+            // [spec:pgorm:req:sql.ddl+11]
             impl std::fmt::Display for $struct_name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     let mut sql = String::with_capacity(64);

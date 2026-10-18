@@ -384,6 +384,14 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped sql.ast.window-statement+7 (the WINDOW clause a list, ExtendedWindow and WindowDefinition, check_windows and its five refusals) and sql.ast.select+5 (the WINDOW clause a list of named windows); every site re-read and re-pinned, the code still says what the rules say."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:44:56.215991Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ast.keywords +6 (sql-domains, d5d22226): Keyword gains Value, rendering VALUE, built by Expr::domain_value()."
+                        after_done true
+                    }
                 )
             }
 
@@ -413,6 +421,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sql-select-extras (2e2d393a) bumped sql.types.opers+5 (BinOper::SimilarTo/NotSimilarTo) and sql.types.table-ref+6 (FromItem::TableFunction and TableSample, table_name and qualifier for a sample); sites re-pinned and the types match."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.339824Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.types.column-type +11 (sql-domains, d5d22226): ColumnType gains Domain { name, schema, base }, the one spelling of a domain column, equal by rendered name, schema and base."
                         after_done true
                     }
                 )
@@ -485,6 +501,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "sql.ddl +10: Schema (create/drop/rename) joins the entry-point helpers and schema statements the no-placeholder list; every_ddl_entry_point_is_reachable reaches all three."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.073097Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ddl +11 and sql.ddl.column-types +6 (sql-domains, d5d22226): the entry points name Domain (create/alter/drop) and the no-placeholder list the domain statements; prepare_column_type spells Domain, CreatedRange and CreatedMultirange by name and schema through TypeName's part policy."
                         after_done true
                     }
                 )
@@ -585,6 +609,14 @@ children (
                         text "Two entity rules overclaimed since adoption, found by verify.entity: (1) entity.relation said has_one/has_many derive their builder \"by reversing the related entity's definition\" — RelationBuilder::from_rel keeps only tables and columns of the reversed definition, discarding on_delete/on_update actions, condition hooks and fk_name (baker declares on_delete=SetNull; Bakery::has_many(Baker) yields on_delete None). (2) entity.active-model.json said set_from_json restores key states \"preserving Set/Unchanged values\" — the restore path calls set(), so an Unchanged key returns as Set with its value intact. Both rules corrected at +1 with operator approval, refs re-pinned; behavior deliberately unchanged."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:44:56.451994Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at entity.traits.column.enum-cast +7 (sql-domains, d5d22226): a domain over an enum or a created range is read and written through its base's casts, to the domain's name; PostgreSQL resolves no operator for a domain over an enum (42883), so a predicate on one is the server's refusal."
+                        after_done true
+                    }
                 )
             }
 
@@ -640,6 +672,15 @@ children (
                         [spec:pgorm:def:exec.crud.exec-result]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T20:44:56.564772Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at exec.decode.array +2 (sql-domains, d5d22226): every Vec<T> decode reads an array of a domain as an array of the type the domain is over."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -1441,6 +1482,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "value-serde-impls (a2bece89) bumped codegen.entity.serde+1 and codegen.entity.serde.derives+1 (a range type's newtype in pgorm_range_types.rs carries the with_serde derives, after DeriveCreatedRange) and codegen.entity.imports+3 (gen_import heads pgorm_range_types.rs); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T20:44:56.682786Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at codegen.entity.types +8, codegen.entity.compact.attrs +8 and codegen.entity.types.unsupported +8 (sql-domains, d5d22226): a domain column is a field of its base's Rust type with the domain spelled in its column definition by both writers; an array of a domain over an array is refused by name."
                         after_done true
                     }
                 )
@@ -8886,6 +8935,14 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped sql.surface+34, recording ExtendedWindow and WindowDefinition (sql.ast.window-statement) in the register; lib.rs names both and test-surface passes."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:45:14.596715Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.surface +34 (sql-domains, d5d22226): the register records Domain, DomainCreateStatement, PendingDomainAlter, DomainAlterStatement, DomainDropStatement, DomainCheck and IntoDomainCheck, lib.rs exports them in its schema-statement group, and test-surface passes."
+                        after_done true
+                    }
                 )
             }
 
@@ -9108,6 +9165,9 @@ children (
                 id sql-domains
                 title "pgorm builds CREATE, ALTER and DROP DOMAIN from Rust, Python and JavaScript, and codegen reads a domain column as its base type"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ddl.domain] [spec:pgorm:req:python.schema-domains] [spec:pgorm:req:napi.schema-domains])
+                }
                 deps (
                     query-second-tier
                     sql-views

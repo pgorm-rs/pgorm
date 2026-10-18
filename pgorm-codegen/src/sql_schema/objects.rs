@@ -2,29 +2,117 @@ use super::{Declared, TypeIdentity, table, types, unresolved, unsupported};
 use crate::{Error, TableIdent, util::repeated_column};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
-    CommentStmt, CreateEnumStmt, CreateRangeStmt, IndexStmt, ObjectType, SortByDir, SortByNulls,
+    CommentStmt, ConstrType, Constraint, CreateDomainStmt, CreateEnumStmt, CreateRangeStmt,
+    IndexStmt, ObjectType, SortByDir, SortByNulls,
 };
 use pgorm_query::{ColumnType, Name, TableKey, Unique};
 
 /// The full identity — schema and name — a `CREATE TYPE` declares.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 fn type_identity(type_name: &[pg_query::protobuf::Node], at: usize) -> Result<TypeIdentity, Error> {
+    declared_identity(type_name, "CREATE TYPE", at)
+}
+
+/// The full identity a statement creating a type declares, `statement` naming
+/// it in an error.
+// [spec:pgorm:sem:codegen.ddl.objects+9]
+fn declared_identity(
+    type_name: &[pg_query::protobuf::Node],
+    statement: &str,
+    at: usize,
+) -> Result<TypeIdentity, Error> {
     let names = types::idents(type_name)
-        .ok_or_else(|| unsupported("a computed type name in CREATE TYPE", at))?;
+        .ok_or_else(|| unsupported(format!("a computed type name in {statement}"), at))?;
     match names.as_slice() {
         [name] => Ok((None, name.clone())),
         [schema, name] => Ok((Some(schema.clone()), name.clone())),
-        [] => Err(unresolved("CREATE TYPE without a type name", at)),
+        [] => Err(unresolved(format!("{statement} without a type name"), at)),
         _ => Err(unsupported(
-            "a catalog-qualified type name in CREATE TYPE",
+            format!("a catalog-qualified type name in {statement}"),
             at,
         )),
     }
 }
 
+/// A `CREATE DOMAIN` as its full identity and the column type of its base,
+/// read as a column's type is and so against the types declared before it,
+/// as PostgreSQL requires the base to exist — an enum, a range type or
+/// another domain among them.
+///
+/// The base is all a column of the domain carries into `ColumnType::Domain`.
+/// The domain's `COLLATE`, `DEFAULT`, `NOT NULL` and `CHECK`s are read and
+/// set aside: the server applies them to every column of the domain, and none
+/// changes what a value of it is. A constraint PostgreSQL refuses on a domain
+/// is named, as the server would refuse the file.
+// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
+pub(super) fn domain(
+    stmt: &CreateDomainStmt,
+    declared: &Declared,
+    at: usize,
+) -> Result<(TypeIdentity, ColumnType), Error> {
+    let identity = declared_identity(&stmt.domainname, "CREATE DOMAIN", at)?;
+    let spelled = types::spell_identity(&identity);
+    let Some(type_name) = stmt.type_name.as_ref() else {
+        return Err(unresolved(
+            format!("domain `{spelled}` has no base type"),
+            at,
+        ));
+    };
+    let context = format!("the base type of domain `{spelled}`");
+    let base = types::column_kind(type_name, declared, &context, at)?;
+    if base.auto_increment {
+        return Err(unsupported(format!("a serial type as {context}"), at));
+    }
+    for node in &stmt.constraints {
+        let Some(NodeEnum::Constraint(constraint)) = &node.node else {
+            return Err(unsupported(
+                format!("an unrecognised constraint on domain `{spelled}`"),
+                at,
+            ));
+        };
+        if let Some(what) = refused_on_domain(constraint) {
+            return Err(unsupported(format!("{what} on domain `{spelled}`"), at));
+        }
+    }
+    Ok((identity, base.col_type))
+}
+
+/// How a constraint PostgreSQL refuses on a domain was written, or `None` for
+/// the four it takes.
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
+fn refused_on_domain(constraint: &Constraint) -> Option<&'static str> {
+    let kind = ConstrType::try_from(constraint.contype).ok();
+    if constraint.is_no_inherit {
+        return Some("a NO INHERIT constraint");
+    }
+    match kind {
+        Some(
+            ConstrType::ConstrNull
+            | ConstrType::ConstrNotnull
+            | ConstrType::ConstrDefault
+            | ConstrType::ConstrCheck,
+        ) => None,
+        Some(ConstrType::ConstrPrimary) => Some("a PRIMARY KEY"),
+        Some(ConstrType::ConstrUnique) => Some("a UNIQUE constraint"),
+        Some(ConstrType::ConstrForeign) => Some("a REFERENCES clause"),
+        Some(ConstrType::ConstrGenerated) => Some("a GENERATED clause"),
+        Some(ConstrType::ConstrIdentity) => Some("an identity clause"),
+        Some(
+            ConstrType::ConstrAttrDeferrable
+            | ConstrType::ConstrAttrNotDeferrable
+            | ConstrType::ConstrAttrDeferred
+            | ConstrType::ConstrAttrImmediate,
+        ) => Some("a deferrable constraint"),
+        Some(ConstrType::ConstrAttrNotEnforced) => Some("a NOT ENFORCED constraint"),
+        Some(ConstrType::ConstrAttrEnforced) => Some("an ENFORCED clause"),
+        _ => Some("an unrecognised constraint"),
+    }
+}
+
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -56,7 +144,7 @@ pub(super) struct ParsedRange {
 /// holds. The multirange is `MULTIRANGE_TYPE_NAME` as written — unqualified,
 /// it is created where an unqualified name is, not beside the range — or
 /// otherwise the name PostgreSQL derives, in the range's schema.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 pub(super) fn range_type(
     stmt: &CreateRangeStmt,
     declared: &Declared,
@@ -124,7 +212,7 @@ pub(super) fn range_type(
 /// `range` in it (case-sensitive) becomes `multirange`, or, when there is
 /// none, `_multirange` follows the name cut to 52 bytes; the result is cut to
 /// the 63 bytes of an identifier. Each cut falls on a character boundary.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 fn derived_multirange_name(range: &str) -> String {
     let derived = match range.find("range") {
         Some(at) => {
@@ -154,8 +242,8 @@ pub(super) struct ParsedIndex {
     pub(super) constraint: Option<TableKey<Unique>>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+8]
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -277,7 +365,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

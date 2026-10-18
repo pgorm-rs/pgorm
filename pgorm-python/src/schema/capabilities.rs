@@ -1,6 +1,7 @@
 // [spec:pgorm:req:python.schema+1]
 // [spec:pgorm:req:python.schema-views+1]
 // [spec:pgorm:req:python.schema-schemas]
+// [spec:pgorm:req:python.schema-domains]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
         ("schema.data_type", "pgorm_query::ColumnType"),
@@ -40,6 +41,17 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         ("schema.create_schema", "pgorm_query::SchemaCreateStatement"),
         ("schema.drop_schema", "pgorm_query::SchemaDropStatement"),
         ("schema.rename_schema", "pgorm_query::SchemaRenameStatement"),
+        ("schema.create_domain", "pgorm_query::DomainCreateStatement"),
+        ("schema.set_domain_default", "pgorm_query::PendingDomainAlter::set_default"),
+        ("schema.drop_domain_default", "pgorm_query::PendingDomainAlter::drop_default"),
+        ("schema.set_domain_not_null", "pgorm_query::PendingDomainAlter::set_not_null"),
+        ("schema.drop_domain_not_null", "pgorm_query::PendingDomainAlter::drop_not_null"),
+        ("schema.add_domain_check", "pgorm_query::PendingDomainAlter::add_check"),
+        ("schema.drop_domain_constraint", "pgorm_query::PendingDomainAlter::drop_constraint"),
+        ("schema.rename_domain_constraint", "pgorm_query::PendingDomainAlter::rename_constraint"),
+        ("schema.validate_domain_constraint", "pgorm_query::PendingDomainAlter::validate_constraint"),
+        ("schema.rename_domain", "pgorm_query::PendingDomainAlter::rename_to"),
+        ("schema.drop_domain", "pgorm_query::DomainDropStatement"),
         ("schema.from_entity", "Schema::{create_table_from_entity,create_enum_from_entity,create_index_from_entity,create_comments_from_entity}"),
     ].into_iter().map(|(name, api)| (name.to_owned(), serde_json::json!({
         "rust_api": format!("pgorm::{api}"), "features": [],

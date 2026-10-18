@@ -1,6 +1,6 @@
 // The schema family's parity cases — schemas, tables, their columns, keys and
-// constraints and their alterations, indexes, types, sequences, views,
-// materialized views and tables created from a query, extensions and
+// constraints and their alterations, indexes, types, domains, sequences,
+// views, materialized views and tables created from a query, extensions and
 // comments — held to `schema.json` as `select.ts`'s are to theirs. A DDL
 // statement binds nothing, so every case's values are empty.
 // [spec:pgorm:req:napi.schema/test]
@@ -11,8 +11,10 @@
 // [spec:pgorm:req:napi.schema-sequences/test]
 // [spec:pgorm:req:napi.schema-views/test]
 // [spec:pgorm:req:napi.schema-schemas/test]
+// [spec:pgorm:req:napi.schema-domains/test]
 
 import {
+  alterDomain,
   alterSequence,
   alterTable,
   alterType,
@@ -23,6 +25,7 @@ import {
   commentOnColumn,
   commentOnTable,
   CreatedRange,
+  createDomain,
   createExtension,
   createIndex,
   createMaterializedView,
@@ -35,6 +38,8 @@ import {
   createView,
   DataType,
   Decimal,
+  domainValue,
+  dropDomain,
   dropExtension,
   dropIndex,
   dropMaterializedView,
@@ -57,6 +62,7 @@ import {
 } from "../../lib/index.js";
 
 const booking = new Table("booking", { schema: "app" });
+const quantity = new TypeName("quantity", { schema: "app" });
 const room = new Table("room", { schema: "app" });
 const mood = new TypeName("mood", { schema: "app" });
 
@@ -201,6 +207,29 @@ export const cases: Record<string, () => Builder> = {
   "drop-schema": () => dropSchema("app", { behavior: "restrict" }),
   "drop-schemas": () => dropSchema(["app", "archive"], { ifExists: true, behavior: "cascade" }),
   "rename-schema": () => renameSchema("app", 'App "x"'),
+  "create-domain": () =>
+    createDomain(quantity, "integer")
+      .check(domainValue().gt(0), { name: "positive" })
+      .notNull()
+      .default(1)
+      .check(domainValue().lt(1000)),
+  "create-domain-collated": () =>
+    createDomain('Code "x"', "text").collate("C", { schema: "pg_catalog" }).null().default("none"),
+  "create-domain-over-types": () => createDomain("tags", new DataType("varchar", { length: 20 }).array()),
+  "create-domain-over-domain": () => createDomain("small", quantity).check(domainValue().between(0, 10)),
+  "alter-domain-set-default": () => alterDomain(quantity).setDefault(5),
+  "alter-domain-drop-default": () => alterDomain(quantity).dropDefault(),
+  "alter-domain-set-not-null": () => alterDomain(quantity).setNotNull(),
+  "alter-domain-drop-not-null": () => alterDomain(quantity).dropNotNull(),
+  "alter-domain-add-check": () => alterDomain(quantity).addCheck(domainValue().ne(13)),
+  "alter-domain-add-check-not-valid": () =>
+    alterDomain(quantity).addCheck(domainValue().lt(100), { name: 'Small "x"', notValid: true }),
+  "alter-domain-drop-constraint": () => alterDomain(quantity).dropConstraint("small", { ifExists: true, behavior: "cascade" }),
+  "alter-domain-rename-constraint": () => alterDomain(quantity).renameConstraint("small", "tiny"),
+  "alter-domain-validate-constraint": () => alterDomain(quantity).validateConstraint("small"),
+  "alter-domain-rename": () => alterDomain(quantity).renameTo("units"),
+  "drop-domain": () => dropDomain("quantity"),
+  "drop-domains": () => dropDomain(["quantity", quantity], { ifExists: true, behavior: "restrict" }),
   "create-view": () => createView(app("large_room"), largeRooms()),
   "create-view-options": () =>
     createView(app("large_room"), largeRooms())

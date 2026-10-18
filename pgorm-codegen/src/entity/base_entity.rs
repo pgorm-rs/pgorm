@@ -266,7 +266,7 @@ impl Entity {
             .collect()
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+7]
+    // [spec:pgorm:sem:codegen.entity.types+8]
     pub fn get_eq_needed(&self) -> TokenStream {
         fn is_floats(col_type: &ColumnType) -> bool {
             match col_type {
@@ -274,6 +274,7 @@ impl Entity {
                 ColumnType::Array(col_type) => is_floats(col_type),
                 ColumnType::CreatedRange { subtype, .. }
                 | ColumnType::CreatedMultirange { subtype, .. } => is_floats(subtype),
+                ColumnType::Domain { base, .. } => is_floats(base),
                 _ => false,
             }
         }

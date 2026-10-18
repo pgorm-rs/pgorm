@@ -6,7 +6,7 @@ use crate::{
 use heck::{ToSnakeCase, ToUpperCamelCase};
 use pgorm_query::{
     ColumnDef, ColumnSpec, ColumnType, GeneratedKind, IdentityGeneration, IntervalPrecision,
-    IntervalSpec, PgInterval, RangeType, StringLen,
+    IntervalSpec, Name, PgInterval, RangeType, StringLen,
 };
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::{format_ident, quote};
@@ -36,7 +36,7 @@ impl Column {
     /// Reject anything the writer could not render: a type outside the mapping
     /// table, and a DB name whose case-converted forms are not Rust
     /// identifiers.
-    // [spec:pgorm:req:codegen.entity.types.unsupported+7]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+8]
     // [spec:pgorm:sem:codegen.entity.keywords+1]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         let context = format!("column `{}`", self.name);
@@ -62,9 +62,9 @@ impl Column {
         self.name.to_snake_case() == self.name
     }
 
-    // [spec:pgorm:sem:codegen.entity.types+7]
+    // [spec:pgorm:sem:codegen.entity.types+8]
     // [spec:pgorm:sem:codegen.entity.types.datetime+2]
-    // [spec:pgorm:req:codegen.entity.types.unsupported+7]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+8]
     pub fn get_rs_type(&self) -> TokenStream {
         fn write_rs_type(col_type: &ColumnType) -> String {
             #[allow(unreachable_patterns)]
@@ -100,6 +100,7 @@ impl Column {
                 ColumnType::Multirange(range) => {
                     format!("Multirange<{}>", range_element(*range))
                 }
+                ColumnType::Domain { base, .. } => write_rs_type(base),
                 other => unreachable!(
                     "column type {other:?} reached the writer; \
                      every Column is type-checked when it is built"
@@ -118,108 +119,13 @@ impl Column {
     /// The `column_type = "..."` part of the compact `#[pgorm(..)]` attribute,
     /// whose string the derive re-parses as tokens and splices after
     /// `ColumnType::`.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+7]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+8]
     pub fn get_col_type_attrs(&self) -> Option<TokenStream> {
         col_type_attr(&self.col_type).map(|ty| quote! { column_type = #ty })
     }
 
-    // [spec:pgorm:req:codegen.entity.types.unsupported+7]
+    // [spec:pgorm:req:codegen.entity.types.unsupported+8]
     pub fn get_def(&self) -> TokenStream {
-        fn write_col_def(col_type: &ColumnType) -> TokenStream {
-            match col_type {
-                ColumnType::Char(s) => match s {
-                    Some(s) => quote! { ColumnType::Char(Some(#s)) },
-                    None => quote! { ColumnType::Char(None) },
-                },
-                ColumnType::String(s) => match s {
-                    StringLen::N(s) => quote! { ColumnType::String(StringLen::N(#s)) },
-                    StringLen::None => quote! { ColumnType::String(StringLen::None) },
-                    StringLen::Max => quote! { ColumnType::String(StringLen::Max) },
-                },
-                ColumnType::Text => quote! { ColumnType::Text },
-                ColumnType::SmallInteger => quote! { ColumnType::SmallInteger },
-                ColumnType::Integer => quote! { ColumnType::Integer },
-                ColumnType::BigInteger => quote! { ColumnType::BigInteger },
-                ColumnType::Float => quote! { ColumnType::Float },
-                ColumnType::Double => quote! { ColumnType::Double },
-                ColumnType::Decimal(s) => match s {
-                    Some((s1, s2)) => quote! { ColumnType::Decimal(Some((#s1, #s2))) },
-                    None => quote! { ColumnType::Decimal(None) },
-                },
-                ColumnType::Timestamp => quote! { ColumnType::Timestamp },
-                ColumnType::TimestampWithTimeZone => {
-                    quote! { ColumnType::TimestampWithTimeZone }
-                }
-                ColumnType::Time => quote! { ColumnType::Time },
-                ColumnType::Date => quote! { ColumnType::Date },
-                ColumnType::Interval(spec) => {
-                    let spec = interval_spec_tokens(spec);
-                    quote! { ColumnType::Interval(#spec) }
-                }
-                ColumnType::Bytea => quote! { ColumnType::Bytea },
-                ColumnType::Boolean => quote! { ColumnType::Boolean },
-                ColumnType::Money => quote! { ColumnType::Money },
-                ColumnType::Json => quote! { ColumnType::Json },
-                ColumnType::JsonBinary => quote! { ColumnType::JsonBinary },
-                ColumnType::Uuid => quote! { ColumnType::Uuid },
-                ColumnType::Named(type_name) => {
-                    let s = type_name.raw_text();
-                    quote! { ColumnType::named(#s) }
-                }
-                ColumnType::Enum { name, .. } => {
-                    let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
-                    quote! { #enum_ident::db_type() }
-                }
-                ColumnType::Array(column_type) => {
-                    let column_type = write_col_def(column_type);
-                    quote! { ColumnType::Array(Arc::new(#column_type)) }
-                }
-                ColumnType::Range(range) => {
-                    let range = range_type_tokens(*range);
-                    quote! { ColumnType::Range(#range) }
-                }
-                ColumnType::Multirange(range) => {
-                    let range = range_type_tokens(*range);
-                    quote! { ColumnType::Multirange(#range) }
-                }
-                ColumnType::CreatedRange {
-                    name,
-                    schema,
-                    subtype,
-                }
-                | ColumnType::CreatedMultirange {
-                    name,
-                    schema,
-                    subtype,
-                } => {
-                    let variant = match col_type {
-                        ColumnType::CreatedRange { .. } => quote! { CreatedRange },
-                        _ => quote! { CreatedMultirange },
-                    };
-                    let name = name.to_string();
-                    let schema = match schema {
-                        Some(schema) => {
-                            let schema = schema.to_string();
-                            quote! { Some(Name::runtime(#schema)) }
-                        }
-                        None => quote! { None },
-                    };
-                    let subtype = write_col_def(subtype);
-                    quote! {
-                        ColumnType::#variant {
-                            name: Name::runtime(#name),
-                            schema: #schema,
-                            subtype: Arc::new(#subtype),
-                        }
-                    }
-                }
-                #[allow(unreachable_patterns)]
-                other => unreachable!(
-                    "column type {other:?} reached the writer; \
-                     every Column is type-checked when it is built"
-                ),
-            }
-        }
         let mut col_def = write_col_def(&self.col_type);
         col_def.extend(quote! {
             .def()
@@ -276,7 +182,7 @@ impl Column {
     }
 
     /// The field attribute declaring the column's identity, if it is one.
-    // [spec:pgorm:sem:codegen.entity.compact.attrs+7]
+    // [spec:pgorm:sem:codegen.entity.compact.attrs+8]
     pub fn get_identity_attr(&self) -> Option<TokenStream> {
         self.identity.map(|identity| match identity {
             IdentityGeneration::Always => quote! { identity },
@@ -338,16 +244,158 @@ impl Column {
         }
     }
 
+    /// The type the column's values are made of: an array's element, under
+    /// any domains either is typed with.
     pub fn get_inner_col_type(&self) -> &ColumnType {
-        match &self.col_type {
-            ColumnType::Array(inner_col_type) => inner_col_type.as_ref(),
-            _ => &self.col_type,
+        match under_domains(&self.col_type) {
+            ColumnType::Array(inner_col_type) => under_domains(inner_col_type),
+            col_type => col_type,
         }
     }
 }
 
+/// The Rust that builds a column's `ColumnType`, which `get_def` follows with
+/// `.def()`. An enum's is its `ActiveEnum`'s `db_type()`, a `ColumnDef`
+/// that `.def()` passes through.
+// [spec:pgorm:req:codegen.entity.types.unsupported+8]
+fn write_col_def(col_type: &ColumnType) -> TokenStream {
+    match col_type {
+        ColumnType::Char(s) => match s {
+            Some(s) => quote! { ColumnType::Char(Some(#s)) },
+            None => quote! { ColumnType::Char(None) },
+        },
+        ColumnType::String(s) => match s {
+            StringLen::N(s) => quote! { ColumnType::String(StringLen::N(#s)) },
+            StringLen::None => quote! { ColumnType::String(StringLen::None) },
+            StringLen::Max => quote! { ColumnType::String(StringLen::Max) },
+        },
+        ColumnType::Text => quote! { ColumnType::Text },
+        ColumnType::SmallInteger => quote! { ColumnType::SmallInteger },
+        ColumnType::Integer => quote! { ColumnType::Integer },
+        ColumnType::BigInteger => quote! { ColumnType::BigInteger },
+        ColumnType::Float => quote! { ColumnType::Float },
+        ColumnType::Double => quote! { ColumnType::Double },
+        ColumnType::Decimal(s) => match s {
+            Some((s1, s2)) => quote! { ColumnType::Decimal(Some((#s1, #s2))) },
+            None => quote! { ColumnType::Decimal(None) },
+        },
+        ColumnType::Timestamp => quote! { ColumnType::Timestamp },
+        ColumnType::TimestampWithTimeZone => {
+            quote! { ColumnType::TimestampWithTimeZone }
+        }
+        ColumnType::Time => quote! { ColumnType::Time },
+        ColumnType::Date => quote! { ColumnType::Date },
+        ColumnType::Interval(spec) => {
+            let spec = interval_spec_tokens(spec);
+            quote! { ColumnType::Interval(#spec) }
+        }
+        ColumnType::Bytea => quote! { ColumnType::Bytea },
+        ColumnType::Boolean => quote! { ColumnType::Boolean },
+        ColumnType::Money => quote! { ColumnType::Money },
+        ColumnType::Json => quote! { ColumnType::Json },
+        ColumnType::JsonBinary => quote! { ColumnType::JsonBinary },
+        ColumnType::Uuid => quote! { ColumnType::Uuid },
+        ColumnType::Named(type_name) => {
+            let s = type_name.raw_text();
+            quote! { ColumnType::named(#s) }
+        }
+        ColumnType::Enum { name, .. } => {
+            let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
+            quote! { #enum_ident::db_type() }
+        }
+        ColumnType::Array(column_type) => {
+            let column_type = write_col_def(column_type);
+            quote! { ColumnType::Array(Arc::new(#column_type)) }
+        }
+        ColumnType::Range(range) => {
+            let range = range_type_tokens(*range);
+            quote! { ColumnType::Range(#range) }
+        }
+        ColumnType::Multirange(range) => {
+            let range = range_type_tokens(*range);
+            quote! { ColumnType::Multirange(#range) }
+        }
+        ColumnType::CreatedRange {
+            name,
+            schema,
+            subtype,
+        }
+        | ColumnType::CreatedMultirange {
+            name,
+            schema,
+            subtype,
+        } => {
+            let variant = match col_type {
+                ColumnType::CreatedRange { .. } => quote! { CreatedRange },
+                _ => quote! { CreatedMultirange },
+            };
+            let name = name.to_string();
+            let schema = match schema {
+                Some(schema) => {
+                    let schema = schema.to_string();
+                    quote! { Some(Name::runtime(#schema)) }
+                }
+                None => quote! { None },
+            };
+            let subtype = write_col_def(subtype);
+            quote! {
+                ColumnType::#variant {
+                    name: Name::runtime(#name),
+                    schema: #schema,
+                    subtype: Arc::new(#subtype),
+                }
+            }
+        }
+        ColumnType::Domain { name, schema, base } => domain_tokens(name, schema, base),
+        #[allow(unreachable_patterns)]
+        other => unreachable!(
+            "column type {other:?} reached the writer; \
+                 every Column is type-checked when it is built"
+        ),
+    }
+}
+
+/// A domain column's `ColumnType::Domain`, its name and schema as runtime
+/// names and its base built as a column's type is. An enum base is its
+/// `ActiveEnum`'s column type itself, the `Arc` holding a `ColumnType` where
+/// a field's own definition takes the `ColumnDef` `db_type()` returns.
+// [spec:pgorm:sem:codegen.entity.types+8]
+fn domain_tokens(name: &Name, schema: &Option<Name>, base: &ColumnType) -> TokenStream {
+    let name = name.to_string();
+    let schema = match schema {
+        Some(schema) => {
+            let schema = schema.to_string();
+            quote! { Some(Name::runtime(#schema)) }
+        }
+        None => quote! { None },
+    };
+    let base = match base {
+        ColumnType::Enum { name, .. } => {
+            let enum_ident = format_ident!("{}", name.to_string().to_upper_camel_case());
+            quote! { #enum_ident::db_type().get_column_type().clone() }
+        }
+        base => write_col_def(base),
+    };
+    quote! {
+        ColumnType::Domain {
+            name: Name::runtime(#name),
+            schema: #schema,
+            base: Arc::new(#base)
+        }
+    }
+}
+
+/// The type a domain's values are, under any domains it is over; any other
+/// type itself.
+pub(crate) fn under_domains(col_type: &ColumnType) -> &ColumnType {
+    match col_type {
+        ColumnType::Domain { base, .. } => under_domains(base),
+        _ => col_type,
+    }
+}
+
 /// The Rust type a built-in range ranges over, as the prelude names it.
-// [spec:pgorm:sem:codegen.entity.types+7]
+// [spec:pgorm:sem:codegen.entity.types+8]
 fn range_element(range: RangeType) -> &'static str {
     match range {
         RangeType::Int4 => "i32",
@@ -382,7 +430,7 @@ fn range_element(range: RangeType) -> &'static str {
 /// seconds the column discards. `f32`, `f64` and `Vec<u8>` infer `Float`,
 /// `Double` and `Bytea` as they are, so their arrays name nothing, though the
 /// scalar columns carry the attribute regardless.
-// [spec:pgorm:sem:codegen.entity.compact.attrs+7]
+// [spec:pgorm:sem:codegen.entity.compact.attrs+8]
 fn col_type_attr(col_type: &ColumnType) -> Option<String> {
     match col_type {
         ColumnType::Float => Some("Float".to_owned()),
@@ -406,6 +454,10 @@ fn col_type_attr(col_type: &ColumnType) -> Option<String> {
             element => col_type_attr(element)
                 .map(|element| format!("Array(Arc::new(ColumnType::{element}))")),
         },
+        ColumnType::Domain { name, schema, base } => {
+            let source = rust_source(&domain_tokens(name, schema, base));
+            source.strip_prefix("ColumnType::").map(str::to_owned)
+        }
         _ => None,
     }
 }
@@ -413,7 +465,7 @@ fn col_type_attr(col_type: &ColumnType) -> Option<String> {
 /// The `IntervalSpec` an interval column carries, as generated source spells
 /// it: the qualifier vocabulary resolves through the prelude, as `RangeType`
 /// does.
-// [spec:pgorm:sem:codegen.entity.types+7]
+// [spec:pgorm:sem:codegen.entity.types+8]
 fn interval_spec_tokens(spec: &IntervalSpec) -> TokenStream {
     let precision = |precision: &Option<IntervalPrecision>| match precision {
         Some(precision) => {
@@ -474,7 +526,7 @@ fn range_type_tokens(range: RangeType) -> TokenStream {
 /// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
 /// through `Array` element types, over the enum names they will emit, and over
 /// the named types they will respell.
-// [spec:pgorm:req:codegen.entity.types.unsupported+7]
+// [spec:pgorm:req:codegen.entity.types.unsupported+8]
 fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> {
     match col_type {
         ColumnType::Char(_)
@@ -536,7 +588,7 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
             }
             Ok(())
         }
-        ColumnType::Array(inner_col_type) => match inner_col_type.as_ref() {
+        ColumnType::Array(inner_col_type) => match under_domains(inner_col_type) {
             ColumnType::CreatedRange { name, .. } | ColumnType::CreatedMultirange { name, .. } => {
                 Err(Error::TransformError(format!(
                     "{context}: an array of range type `{name}` is not supported by codegen; \
@@ -544,8 +596,19 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
                     name = name.to_string(),
                 )))
             }
-            inner_col_type => validate_col_type(context, inner_col_type),
+            ColumnType::Array(_)
+                if matches!(inner_col_type.as_ref(), ColumnType::Domain { .. }) =>
+            {
+                Err(Error::TransformError(format!(
+                    "{context}: an array of a domain over an array is not supported by codegen; \
+                     an entity field holds one dimension"
+                )))
+            }
+            _ => validate_col_type(context, inner_col_type),
         },
+        // A domain's column holds its base type's values, so it is generated
+        // as its base is; the name rides in the column's definition.
+        ColumnType::Domain { base, .. } => validate_col_type(context, base),
         other => Err(Error::TransformError(format!(
             "{context}: column type {other:?} is not supported by codegen"
         ))),

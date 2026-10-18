@@ -25,10 +25,18 @@ from .._native import (
     refresh_materialized_view as refresh_materialized_view,
     drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
     create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
+    CreateDomain as CreateDomain, set_domain_default as set_domain_default,
+    drop_domain_default as drop_domain_default, set_domain_not_null as set_domain_not_null,
+    drop_domain_not_null as drop_domain_not_null, add_domain_check as add_domain_check,
+    drop_domain_constraint as drop_domain_constraint,
+    rename_domain_constraint as rename_domain_constraint,
+    validate_domain_constraint as validate_domain_constraint, rename_domain as rename_domain,
+    drop_domain as drop_domain,
 )
 
 create_table = CreateTable
 create_index = CreateIndex
+create_domain = CreateDomain
 
 __all__ = [
     "DataType", "ColumnDef", "DDL", "CreateTable", "CreateIndex", "EntitySchema",
@@ -43,4 +51,7 @@ __all__ = [
     "create_view", "create_recursive_view", "drop_view", "create_materialized_view",
     "refresh_materialized_view", "drop_materialized_view", "create_table_as",
     "create_schema", "drop_schema", "rename_schema",
+    "CreateDomain", "create_domain", "set_domain_default", "drop_domain_default",
+    "set_domain_not_null", "drop_domain_not_null", "add_domain_check", "drop_domain_constraint",
+    "rename_domain_constraint", "validate_domain_constraint", "rename_domain", "drop_domain",
 ]

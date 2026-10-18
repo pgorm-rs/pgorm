@@ -6,6 +6,14 @@ pub mod account;
 pub mod interval_span;
 #[path = "../../application-binding/src/note.rs"]
 pub mod note;
+/// The enum, the range type's newtype and the entity pgorm-codegen generates
+/// from a table of domain columns: each field types as its domain's base.
+#[path = "../../../../pgorm-codegen/tests/sql/domain/pgorm_active_enums.rs"]
+pub mod pgorm_active_enums;
+#[path = "../../../../pgorm-codegen/tests/sql/domain/pgorm_range_types.rs"]
+pub mod pgorm_range_types;
+#[path = "../../../../pgorm-codegen/tests/sql/domain/stock_line.rs"]
+pub mod stock_line;
 
 use pgorm::pgorm_query::Name;
 use pgorm::{EntityTrait, Opt, RelationDef, Req, SelectGraph};

@@ -935,6 +935,39 @@ a schema is made of, in the builder conventions the statements above use.
 > a `pg_` name (`42939`), a missing schema (`3F000`) and a drop under
 > `RESTRICT`, said or unsaid, of a schema that holds anything (`2BP01`).
 
+> [spec:pgorm:req:napi.schema-domains]
+> The statements over a domain MUST be built through pgorm-query's `Domain`
+> (`sql.ddl.domain`), under the contract `napi.schema` gives every DDL
+> builder, each domain named as a type is, by a string or a `TypeName`.
+> `createDomain(name, base)` takes its base as a column takes its type — a
+> `DataType`, a built-in type's name, a `TypeName` (another domain's among
+> them) or a created range — and `collate`, `default`, an expression or a
+> value written as a literal, `notNull` and `null`, which share one slot,
+> and `check(condition, { name })`, appended; a check takes no `notValid`,
+> PostgreSQL having no `NOT VALID` at `CREATE DOMAIN`, so that option is a
+> `TypeError` there. `domainValue()` is `Expr::domain_value()`, the `VALUE` a
+> check's condition tests. `alterDomain(name)` names the domain and nothing
+> more, so, as `napi.schema` holds for every pending `ALTER`, it MUST have no
+> `inspect()` and every terminal MUST refuse it with a `ConstructionError`;
+> each of its actions — `setDefault`, `dropDefault`, `setNotNull`,
+> `dropNotNull`, `addCheck(condition, { name, notValid })`,
+> `dropConstraint(name, { ifExists, behavior })`, `renameConstraint`,
+> `validateConstraint` and `renameTo`, whose new name is bare — gives the
+> whole statement, PostgreSQL taking one action per `ALTER DOMAIN` and no
+> `IF EXISTS`. `dropDomain(names, { ifExists, behavior })` drops one name or a
+> non-empty array of them, an empty array being refused with a
+> `ConstructionError`. A registered entity's column whose type is a domain
+> (`ColumnType::Domain`) reports, binds and reads as the kind of the type it
+> is over, an enum's labels included, so its records and the declarations
+> generated for it are typed by its base. What only the server knows it
+> refuses by SQLSTATE, as a `DatabaseError`: a domain or constraint name
+> already taken (`42710`), a missing domain or constraint (`42704`), a value
+> a check refuses (`23514`) and a null under `NOT NULL` (`23502`), written to
+> a column of the domain or met among the values already there by `addCheck`,
+> `setNotNull` or `validateConstraint`, a collation on a base type without
+> one (`42804`), and a drop under `RESTRICT`, said or unsaid, of a domain a
+> column is typed with (`2BP01`).
+
 ## Pipelines
 
 JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as

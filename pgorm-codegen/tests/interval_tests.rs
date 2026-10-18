@@ -107,7 +107,7 @@ fn column_type_of(sql: &str) -> ColumnType {
         .expect("a column has a type")
 }
 
-// [spec:pgorm:sem:codegen.ddl.types+8/test]    each qualifier and precision
+// [spec:pgorm:sem:codegen.ddl.types+9/test]    each qualifier and precision
 // `interval` takes reads back as the `IntervalSpec` that renders it, through
 // an array as on its own
 #[test]
@@ -164,10 +164,10 @@ fn the_bridge_reads_each_interval_qualifier() {
     );
 }
 
-// [spec:pgorm:req:codegen.ddl.unsupported+15/test]    a qualifier no
+// [spec:pgorm:req:codegen.ddl.unsupported+16/test]    a qualifier no
 // `IntervalSpec` holds is named, as is a precision the server would quietly
 // reduce
-// [spec:pgorm:sem:codegen.ddl.types+8/test]
+// [spec:pgorm:sem:codegen.ddl.types+9/test]
 #[test]
 fn an_interval_modifier_beyond_the_spec_is_named() {
     for (sql, what) in [
@@ -200,12 +200,12 @@ fn an_interval_modifier_beyond_the_spec_is_named() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+7/test]    an interval column is an
+// [spec:pgorm:sem:codegen.entity.types+8/test]    an interval column is an
 // `Interval` field, an array of them a `Vec<Interval>`, whatever the qualifier
-// [spec:pgorm:sem:codegen.entity.compact.attrs+7/test]    the compact writer
+// [spec:pgorm:sem:codegen.entity.compact.attrs+8/test]    the compact writer
 // names the column type exactly where the field's `Interval` does not: a
 // qualifier or a precision, alone or as an array's element
-// [spec:pgorm:req:codegen.entity.types.unsupported+7/test]    no interval
+// [spec:pgorm:req:codegen.entity.types.unsupported+8/test]    no interval
 // shape is refused
 #[test]
 fn interval_columns_generate_a_compiling_entity() {
@@ -227,7 +227,7 @@ fn interval_columns_generate_a_compiling_entity() {
     }
 }
 
-// [spec:pgorm:sem:codegen.entity.types+7/test]    the expanded writer spells
+// [spec:pgorm:sem:codegen.entity.types+8/test]    the expanded writer spells
 // each qualifier out through the prelude, and defines every column as the
 // compact derive does
 #[test]

@@ -1,6 +1,7 @@
 """Execute concrete generated wrappers from a freshly installed application wheel."""
 
 import copy
+from decimal import Decimal
 import inspect
 import os
 from pathlib import Path
@@ -18,7 +19,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
     asyncSetUp = fixture.RegisteredEntities.asyncSetUp
     asyncTearDown = fixture.RegisteredEntities.asyncTearDown
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     async def test_generated_models_keep_native_states(self):
         original = (
             app.Account.active()
@@ -63,7 +64,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await updated.into_active().delete(connection), 1)
                 self.assertIsNone(await query.one_opt(connection))
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     # [spec:pgorm:req:python.entities+3/test]
     async def test_generated_views_return_typed_versions(self):
         def active(identity, name):
@@ -100,7 +101,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 case other:
                     self.fail(f"expected an update then an insert, got {other!r}")
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     async def test_graph_views_keep_optional_models(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2):
@@ -133,7 +134,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
             required = await app.RequiredNotes.find().all(connection)
             self.assertEqual([(a.id, n.id) for a, n in required], [(1, 10)])
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     async def test_views_reject_foreign_entities(self):
         with self.assertRaises(p.LifecycleError):
             app.AccountActive(p.entity("app.Note").active())
@@ -172,7 +173,7 @@ class GeneratedIntervals(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP TABLE IF EXISTS interval_span"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     async def test_interval_fields_are_pgorm_intervals(self):
         behind = p.Interval(14, -3, -(4 * HOUR + 1_234_567))
         ahead = p.Interval(-1, 2, HOUR + 3_000_004)
@@ -218,8 +219,74 @@ class GeneratedIntervals(unittest.IsolatedAsyncioTestCase):
             app.IntervalSpan.active().set_plain(p.Value(1, "i64"))
 
 
+class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
+    """The wrappers over the entity pgorm-codegen generates from its domain
+    schema, against the table that schema creates: each field is its domain's
+    base, and each domain's checks hold what the wrappers write."""
+
+    async def asyncSetUp(self):
+        schema = Path(__file__).resolve().parents[2] / (
+            "pgorm-codegen/tests/sql/domain/schema.sql"
+        )
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        await self.drop()
+        await self.pool.execute(p.RawSQL("CREATE SCHEMA billing"))
+        # A raw statement is prepared, and a prepared statement is one
+        # command, so the file runs a statement at a time.
+        for statement in schema.read_text().split(";"):
+            if statement.strip():
+                await self.pool.execute(p.RawSQL(statement))
+
+    async def drop(self):
+        for statement in (
+            "DROP TABLE IF EXISTS stock_line",
+            "DROP SCHEMA IF EXISTS billing CASCADE",
+            "DROP DOMAIN IF EXISTS small_quantity, quantity, code, cheerful, labels, span",
+            "DROP TYPE IF EXISTS mood, floatrange",
+        ):
+            await self.pool.execute(p.RawSQL(statement))
+
+    async def asyncTearDown(self):
+        await self.drop()
+        await self.pool.close()
+
+    # [spec:pgorm:req:python.codegen+2/test]
+    async def test_domain_fields_are_their_bases(self):
+        active = (
+            app.StockLine.active()
+            .set_id(1)
+            .set_qty(3)
+            .set_small(40)
+            .set_code("AB")
+            .set_codes(["X", "YZ"])
+            .set_mood("glad")
+            .set_moods(["calm", "glad"])
+            .set_labels(["new"])
+            .set_span(None)
+            .set_amount(Decimal("19.99"))
+        )
+        self.assertEqual(active.get("qty").value.kind, "i32")
+        async with self.pool.connection() as connection:
+            model = await active.insert(connection)
+            self.assertIsInstance(model, app.StockLineModel)
+            self.assertEqual(
+                (model.qty, model.small, model.code, model.codes),
+                (3, 40, "AB", ["X", "YZ"]),
+            )
+            self.assertEqual((model.mood, model.moods), ("glad", ["calm", "glad"]))
+            self.assertEqual((model.labels, model.span), (["new"], None))
+            self.assertEqual(model.amount, Decimal("19.99"))
+            found = await app.StockLine.find().filter(
+                app.StockLine.col("small") > 10
+            ).one(connection)
+            self.assertEqual(found.codes, ["X", "YZ"])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await active.set_id(2).set_small(150).insert(connection)
+            self.assertEqual(refused.exception.sqlstate, "23514")
+
+
 class GeneratedContract(unittest.TestCase):
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_compatibility_fails_before_queries(self):
         for key in ("package_version", "pgorm_version", "registry_abi", "features"):
             expected = copy.deepcopy(app._COMPATIBILITY)
@@ -244,7 +311,7 @@ class GeneratedContract(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             exec(compile(code, "incompatible.py", "exec"), {})
 
-    # [spec:pgorm:req:python.codegen+1/test]
+    # [spec:pgorm:req:python.codegen+2/test]
     def test_generated_types_follow_compiled_metadata(self):
         stub = Path(app.__file__).with_suffix(".pyi").read_text()
         self.assertIn("def id(self) -> int:", stub)
@@ -264,6 +331,11 @@ class GeneratedContract(unittest.TestCase):
             "def set_history(self, value: list[p.Interval] | p.Value) -> IntervalSpanActive:",
             stub,
         )
+        self.assertIn("def qty(self) -> int | None:", stub)
+        self.assertIn("def small(self) -> int:", stub)
+        self.assertIn("def codes(self) -> list[str]:", stub)
+        self.assertIn("def labels(self) -> list[str] | None:", stub)
+        self.assertIn("def amount(self) -> Decimal:", stub)
         self.assertEqual(app.Account.col("id").describe()["rust_decode_type"], "i32")
         self.assertEqual(
             app.Account.col("display name").describe()["json_key"], "displayName"

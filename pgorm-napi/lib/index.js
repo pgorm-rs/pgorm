@@ -107,6 +107,14 @@ export {
   RenameAttribute,
 } from "./schema-types.js";
 export {
+  alterDomain,
+  createDomain,
+  CreateDomain,
+  domainValue,
+  dropDomain,
+  PendingAlterDomain,
+} from "./schema-domains.js";
+export {
   AlterSequence,
   alterSequence,
   createExtension,

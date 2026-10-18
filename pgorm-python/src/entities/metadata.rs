@@ -56,6 +56,10 @@ impl InputKind {
             ColumnType::Range(range) => range.range_type_name(),
             ColumnType::Multirange(range) => range.multirange_type_name(),
             ColumnType::Array(member) => return Self::Array(Box::new(Self::from_column(member))),
+            // A domain's values travel as its base type's do, so its column
+            // takes and reads back what a column of the base would.
+            // [spec:pgorm:req:python.schema-domains]
+            ColumnType::Domain { base, .. } => return Self::from_column(base),
             _ => return Self::Explicit,
         };
         Self::Scalar(scalar)
@@ -384,6 +388,48 @@ mod tests {
             let other = InputKind::from_column(&multirange)
                 .coerce(pyo3::types::PyString::new(py, "{[1,2)}").as_any())?;
             assert!(input.coerce(Py::new(py, other)?.bind(py).as_any()).is_err());
+            Ok(())
+        })
+    }
+
+    // [spec:pgorm:req:python.schema-domains/test]    a domain column hints its base type, through
+    // a domain over a domain, an array of the domain and a domain over an enum, so a registered
+    // entity's field binds and reads back as a column of the base would
+    #[test]
+    fn domain_columns_hint_their_base_type() -> PyResult<()> {
+        use pgorm::pgorm_query::Name;
+
+        let domain = |name: &str, base: ColumnType| ColumnType::Domain {
+            name: Name::runtime(name),
+            schema: Some(Name::runtime("billing")),
+            base: Arc::new(base),
+        };
+        let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
+        let quantity = domain("quantity", ColumnType::Integer);
+        assert_eq!(describe(quantity.clone()), json!({"kind": "i32"}));
+        assert_eq!(
+            describe(domain("small", quantity.clone())),
+            json!({"kind": "i32"})
+        );
+        assert_eq!(
+            describe(ColumnType::Array(Arc::new(quantity.clone()))),
+            json!({"kind": "array", "element": {"kind": "i32"}})
+        );
+        let mood = ColumnType::Enum {
+            name: Name::runtime("mood"),
+            schema: None,
+            variants: Vec::new(),
+        };
+        assert_eq!(
+            describe(domain("cheerful", mood)),
+            json!({"kind": "enum", "name": "mood", "schema": null})
+        );
+
+        Python::initialize();
+        Python::attach(|py| {
+            let value = InputKind::from_column(&quantity)
+                .coerce(7i64.into_pyobject(py)?.into_any().as_any())?;
+            assert_eq!(value.rust_value(), &Value::Int(Some(7)));
             Ok(())
         })
     }

@@ -74,6 +74,7 @@ class SchemaConstruction(unittest.TestCase):
                 action()
 
     # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema-domains/test]    a domain's builder refuses truth testing too
     def test_schema_objects_refuse_truth_testing(self):
         table, query = p.Table("test"), p.select(p.col("id")).from_(p.Table("source"))
         samples = [
@@ -81,7 +82,7 @@ class SchemaConstruction(unittest.TestCase):
             s.create_index(table, "id"), s.drop_table(table), s.create_enum("mood", ["calm"]),
             s.create_view(table, query), s.create_recursive_view(table, ["id"], query),
             s.create_materialized_view(table, query), s.refresh_materialized_view(table),
-            s.create_table_as(table, query),
+            s.create_table_as(table, query), s.create_domain("quantity", "integer"),
         ]
         for sample in [*samples, s.create_table(table).inspect()]:
             with self.subTest(sample=sample), self.assertRaises(p.ConstructionError):

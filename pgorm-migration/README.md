@@ -35,3 +35,29 @@ refused while the schema holds anything unless it `cascade()`s, which drops
 what it holds too. The prelude's `Schema` is pgorm-query's statement builder;
 `pgorm::Schema`, which generates an entity's DDL, is a different type, so a
 migration that uses both names that one by its path.
+
+## Domains
+
+A column whose type is a domain needs the domain first, and a migration
+creates it with `Domain`, checks written over `Expr::domain_value()`, the
+`VALUE` a check tests:
+
+```rust,ignore
+async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error> {
+    let quantity = Domain::create(Name::runtime("quantity"), ColumnType::Integer)
+        .default(1)
+        .not_null()
+        .check(DomainCheck::new(Expr::domain_value().gt(0)).name(Name::runtime("positive")))
+        .to_string();
+    tx.batch_execute(&quantity).await?;
+    Ok(())
+}
+```
+
+`Domain::alter(..)` takes one action per statement — a default, `NOT NULL`, a
+check added (`NOT VALID` or not), validated, renamed or dropped, or the
+domain renamed — and `Domain::drop(..)` is refused while a column has the
+type unless it `cascade()`s. A changed default reaches only statements
+prepared after it: PostgreSQL's plan cache keeps the default an insert was
+planned with, so a migration that changes one runs before the application
+opens the connections that insert through it.

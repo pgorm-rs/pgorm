@@ -2,9 +2,10 @@
 //! how to add one.
 
 use pgorm::pgorm_query::{
-    Check, ColumnDef, ColumnType, Comment, ConstraintChange, ConstraintDrop, Enforcement, Expr,
-    ForeignKey, Index, IndexColumn, IndexType, MaterializedView, NotNullConstraint, Query, Schema,
-    SelectStatement, Sequence, SequenceOption, Table, TableForeignKey, TableKey, TypeName, View,
+    Check, ColumnDef, ColumnType, Comment, ConstraintChange, ConstraintDrop, Domain, DomainCheck,
+    Enforcement, Expr, ForeignKey, Index, IndexColumn, IndexType, MaterializedView,
+    NotNullConstraint, Query, Schema, SelectStatement, Sequence, SequenceOption, Table,
+    TableForeignKey, TableKey, TypeName, View,
     extension::{Extension, RangeDefinition, Type},
 };
 
@@ -1474,6 +1475,162 @@ pub fn sites() -> Vec<Site> {
             kinds: &["RenameStmt.newname"],
             policy: Quoted,
             render: |n| sql(&Schema::rename(fixed("s"), n_(n))),
+        },
+        // -- DOMAIN --------------------------------------------------------
+        Site {
+            id: "ddl/create-domain.name",
+            api: "Domain::create(Name, base)",
+            kinds: &["CreateDomainStmt.domainname[0]"],
+            policy: Quoted,
+            render: |n| sql(&Domain::create(n_(n), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/create-domain.schema",
+            api: "Domain::create((Name, domain), base) — the schema part",
+            kinds: &["CreateDomainStmt.domainname[0]"],
+            policy: Quoted,
+            render: |n| sql(&Domain::create((n_(n), fixed("d")), ColumnType::Integer)),
+        },
+        Site {
+            id: "ddl/create-domain.database",
+            api: "Domain::create((Name, schema, domain), base) — the database part",
+            kinds: &["CreateDomainStmt.domainname[0]"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Domain::create(
+                    (n_(n), fixed("s"), fixed("d")),
+                    ColumnType::Integer,
+                ))
+            },
+        },
+        Site {
+            id: "ddl/create-domain.base",
+            api: "Domain::create(name, ColumnType::named(String))",
+            kinds: &["CreateDomainStmt.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| sql(&Domain::create(fixed("d"), ColumnType::named(n))),
+        },
+        Site {
+            id: "ddl/create-domain.collation",
+            api: "DomainCreateStatement::collate(Name)",
+            kinds: &["CreateDomainStmt.coll_clause.collname[0]"],
+            policy: Quoted,
+            render: |n| sql(Domain::create(fixed("d"), ColumnType::Text).collate(n_(n))),
+        },
+        Site {
+            id: "ddl/create-domain.check-name",
+            api: "DomainCheck::name(Name)",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(Domain::create(fixed("d"), ColumnType::Integer)
+                    .check(DomainCheck::new(Expr::domain_value().gt(0)).name(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/alter-domain.name",
+            api: "Domain::alter(Name)",
+            kinds: &["AlterDomainStmt.type_name[0]"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(n_(n)).drop_default()),
+        },
+        Site {
+            id: "ddl/alter-domain.add-check-name",
+            api: "PendingDomainAlter::add_check(DomainCheck::name(Name))",
+            kinds: &["Constraint.conname"],
+            policy: Quoted,
+            render: |n| {
+                sql(&Domain::alter(fixed("d"))
+                    .add_check(DomainCheck::new(Expr::domain_value().gt(0)).name(n_(n))))
+            },
+        },
+        Site {
+            id: "ddl/alter-domain.drop-constraint",
+            api: "PendingDomainAlter::drop_constraint(Name)",
+            kinds: &["AlterDomainStmt.name"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(fixed("d")).drop_constraint(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-domain.validate-constraint",
+            api: "PendingDomainAlter::validate_constraint(Name)",
+            kinds: &["AlterDomainStmt.name"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(fixed("d")).validate_constraint(n_(n))),
+        },
+        Site {
+            id: "ddl/alter-domain.rename-constraint-from",
+            api: "PendingDomainAlter::rename_constraint(Name, to)",
+            kinds: &["RenameStmt.subname"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(fixed("d")).rename_constraint(n_(n), fixed("c"))),
+        },
+        Site {
+            id: "ddl/alter-domain.rename-constraint-to",
+            api: "PendingDomainAlter::rename_constraint(from, Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(fixed("d")).rename_constraint(fixed("c"), n_(n))),
+        },
+        Site {
+            id: "ddl/alter-domain.rename-name",
+            api: "Domain::alter(Name).rename_to(new)",
+            kinds: &["RenameStmt.object.List.items[0]"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(n_(n)).rename_to(fixed("e"))),
+        },
+        Site {
+            id: "ddl/alter-domain.rename-to",
+            api: "PendingDomainAlter::rename_to(Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Domain::alter(fixed("d")).rename_to(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-domain.name",
+            api: "Domain::drop(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| sql(&Domain::drop(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-domain.further-name",
+            api: "DomainDropStatement::name(Name)",
+            kinds: &["TypeName.names[0]"],
+            policy: Quoted,
+            render: |n| sql(Domain::drop(fixed("d")).name(n_(n))),
+        },
+        Site {
+            id: "ddl/create-table.column-type-domain",
+            api: "ColumnType::Domain { name: Name, .. }",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(ColumnDef::new_with_type(
+                    fixed("c"),
+                    ColumnType::Domain {
+                        name: n_(n),
+                        schema: None,
+                        base: std::sync::Arc::new(ColumnType::Integer),
+                    },
+                )))
+            },
+        },
+        Site {
+            id: "ddl/create-table.column-type-domain-schema",
+            api: "ColumnType::Domain { schema: Some(Name), .. }",
+            kinds: &["ColumnDef.type_name.names[0]"],
+            policy: TypePart,
+            render: |n| {
+                sql(Table::create(fixed("t")).col(ColumnDef::new_with_type(
+                    fixed("c"),
+                    ColumnType::Domain {
+                        name: fixed("d"),
+                        schema: Some(n_(n)),
+                        base: std::sync::Arc::new(ColumnType::Integer),
+                    },
+                )))
+            },
         },
         // -- EXTENSION -----------------------------------------------------
         Site {

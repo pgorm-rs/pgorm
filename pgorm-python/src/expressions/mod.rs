@@ -258,5 +258,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(construct::literal, module)?)?;
     module.add_function(wrap_pyfunction!(construct::call, module)?)?;
     module.add_function(wrap_pyfunction!(construct::tuple_expr, module)?)?;
+    module.add_function(wrap_pyfunction!(construct::domain_value, module)?)?;
     Ok(())
 }

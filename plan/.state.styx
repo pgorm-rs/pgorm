@@ -1801,8 +1801,6 @@ impl_evidence (
         python.codegen
     ), covered_claims (
         {impl_name main, rule python.codegen}
-    ), rule_versions_seen (
-        {id python.codegen, version 0}
     )}
     {id python.direct-builders, covered_rules (
         python.direct-builders
@@ -1943,6 +1941,15 @@ impl_evidence (
         sql.ast.cast-shape
     ), covered_claims (
         {impl_name main, rule sql.ast.cast-shape}
+    )}
+    {id sql-domains, covered_rules (
+        napi.schema-domains
+        python.schema-domains
+        sql.ddl.domain
+    ), covered_claims (
+        {impl_name main, rule napi.schema-domains}
+        {impl_name main, rule python.schema-domains}
+        {impl_name main, rule sql.ddl.domain}
     )}
     {id sql-schemas, covered_rules (
         napi.schema-schemas

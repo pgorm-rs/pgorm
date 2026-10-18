@@ -8,7 +8,7 @@
 //!
 //! The bridge understands the DDL the entity model has a place for — tables,
 //! columns, primary keys, unique constraints, foreign keys, enum and range
-//! types, indexes and comments. Anything else in the file is a named error rather
+//! types, domains, indexes and comments. Anything else in the file is a named error rather
 //! than a silent omission: a schema that generates entities is a schema the
 //! bridge understood in full.
 //!
@@ -58,10 +58,12 @@ pub(crate) enum DeclaredType {
     Range(ColumnType),
     /// The multirange created beside a range, by the same subtype.
     Multirange(ColumnType),
+    /// A domain, by the column type of its base.
+    Domain(ColumnType),
 }
 
-/// Declared types keyed by full identity. An enum and a range share one
-/// namespace, as every type in a schema does.
+/// Declared types keyed by full identity. An enum, a range and a domain share
+/// one namespace, as every type in a schema does.
 type Declared = BTreeMap<TypeIdentity, DeclaredType>;
 
 /// Read DDL text as the schema statements the entity transformer consumes.
@@ -70,7 +72,7 @@ type Declared = BTreeMap<TypeIdentity, DeclaredType>;
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
 // [spec:pgorm:def:codegen.ddl+3]
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
         .map_err(|err| Error::TransformError(format!("schema SQL did not parse: {err}")))?;
@@ -90,13 +92,13 @@ pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<Writ
 }
 
 /// A construct the bridge does not carry into the entity model.
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 fn unsupported(what: impl Display, at: usize) -> Error {
     Error::TransformError(format!("unsupported DDL: {what} at statement {at}"))
 }
 
 /// A construct the bridge understands but cannot resolve in this schema.
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 fn unresolved(problem: impl Display, at: usize) -> Error {
     Error::TransformError(format!("statement {at}: {problem}"))
 }
@@ -113,7 +115,7 @@ struct Collected<'a> {
 
 /// Sort every statement in the file into the four the bridge reads, refusing
 /// anything else by name.
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Error> {
     let mut collected = Collected::default();
     for (index, raw) in parsed.stmts.iter().enumerate() {
@@ -145,6 +147,15 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
                 )?;
                 declare(&mut collected.declared, parsed.multirange, subtype, at)?;
             }
+            NodeEnum::CreateDomainStmt(stmt) => {
+                let (identity, base) = objects::domain(stmt, &collected.declared, at)?;
+                declare(
+                    &mut collected.declared,
+                    identity,
+                    DeclaredType::Domain(base),
+                    at,
+                )?;
+            }
             other => return Err(unsupported(statement_kind(other), at)),
         }
     }
@@ -153,7 +164,7 @@ fn collect(parsed: &pg_query::protobuf::ParseResult) -> Result<Collected<'_>, Er
 
 /// Record a type the file declares, refusing a second declaration of one
 /// identity — whichever kinds the two are.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 fn declare(
     declared: &mut Declared,
     identity: TypeIdentity,
@@ -172,7 +183,7 @@ fn declare(
 
 /// Resolve the collected statements against each other: declared types into
 /// the columns naming them, indexes and comments into the table they describe.
-// [spec:pgorm:sem:codegen.ddl.objects+8]
+// [spec:pgorm:sem:codegen.ddl.objects+9]
 fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
     let Collected {
         declared: types,
@@ -252,7 +263,7 @@ fn build(collected: Collected<'_>) -> Result<Vec<TableCreateStatement>, Error> {
 
 /// The SQL a statement the bridge does not read was written as, named the way
 /// its author wrote it.
-// [spec:pgorm:req:codegen.ddl.unsupported+15]
+// [spec:pgorm:req:codegen.ddl.unsupported+16]
 fn statement_kind(node: &NodeEnum) -> &'static str {
     match node {
         NodeEnum::AlterTableStmt(_) => "ALTER TABLE",
@@ -265,7 +276,6 @@ fn statement_kind(node: &NodeEnum) -> &'static str {
         NodeEnum::CreateSeqStmt(_) => "CREATE SEQUENCE",
         NodeEnum::CreateTrigStmt(_) => "CREATE TRIGGER",
         NodeEnum::CreateFunctionStmt(_) => "CREATE FUNCTION",
-        NodeEnum::CreateDomainStmt(_) => "CREATE DOMAIN",
         NodeEnum::CreateExtensionStmt(_) => "CREATE EXTENSION",
         NodeEnum::CreatePolicyStmt(_) => "CREATE POLICY",
         NodeEnum::CreateForeignTableStmt(_) => "CREATE FOREIGN TABLE",

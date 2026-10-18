@@ -4,7 +4,7 @@ use pgorm::pgorm_query::Name;
 use pgorm::pgorm_query::extension::{Type, TypeRef};
 use pyo3::prelude::*;
 
-fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
+pub(super) fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
     if let Ok(name) = name.extract::<PyRef<'_, PyTypeName>>() {
         let local = Name::runtime(&name.name);
         return Ok(match &name.schema {

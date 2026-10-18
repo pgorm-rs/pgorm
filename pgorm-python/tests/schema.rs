@@ -1,9 +1,9 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
-    Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Enforcement, Expr,
-    GeneratedKind, Index, IndexOrder, IndexType, IntoName, MaterializedView, Name,
-    NotNullConstraint, Query, Schema, SelectStatement, StringLen, Table, TableKey, TableName,
-    TypeName, Values, View, ViewCheckOption, extension::Type,
+    Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Domain, DomainCheck,
+    Enforcement, Expr, GeneratedKind, Index, IndexOrder, IndexType, IntoName, MaterializedView,
+    Name, NotNullConstraint, Query, Schema, SelectStatement, SimpleExpr, StringLen, Table,
+    TableKey, TableName, TypeName, Values, View, ViewCheckOption, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -391,6 +391,7 @@ fn programs() -> BTreeMap<&'static str, String> {
     .into_iter()
     .chain(views(&table))
     .chain(schemas())
+    .chain(domains())
     .collect()
 }
 
@@ -417,6 +418,118 @@ fn schemas() -> BTreeMap<&'static str, String> {
         (
             "rename_schema",
             Schema::rename(name(), a("renamed \"雪\"")).to_string(),
+        ),
+    ])
+}
+
+/// The statements over a domain, its name schema-qualified and carrying a
+/// quote and a non-ASCII character.
+fn domains() -> BTreeMap<&'static str, String> {
+    let name = || (a("schema \"雪\""), a("Qty \"雪\""));
+    let value = Expr::domain_value;
+    let small = || a("small \"x\"");
+    let column_type = ColumnType::Enum {
+        name: a("Qty \"雪\""),
+        schema: Some(a("schema \"雪\"")),
+        variants: vec![],
+    };
+    BTreeMap::from([
+        (
+            "create_domain",
+            Domain::create(a("qty \"雪\""), ColumnType::Integer).to_string(),
+        ),
+        (
+            "create_domain_clauses",
+            Domain::create(name(), ColumnType::Text)
+                .check(DomainCheck::new(value().ne("")).name(a("filled \"x\"")))
+                .not_null()
+                .default("O'Brien \\ 雪")
+                .collate((a("pg_catalog"), a("C")))
+                .check(value().ne("none"))
+                .to_string(),
+        ),
+        (
+            "create_domain_over_array",
+            Domain::create(
+                name(),
+                ColumnType::Array(Arc::new(ColumnType::String(StringLen::N(20)))),
+            )
+            .null()
+            .default(Expr::expr(SimpleExpr::Constant(1i64.into())).add(2i64))
+            .to_string(),
+        ),
+        (
+            "create_domain_over_domain",
+            Domain::create(a("small"), column_type)
+                .not_null()
+                .null()
+                .to_string(),
+        ),
+        (
+            "set_domain_default",
+            Domain::alter(name()).set_default(5i64).to_string(),
+        ),
+        (
+            "drop_domain_default",
+            Domain::alter(name()).drop_default().to_string(),
+        ),
+        (
+            "set_domain_not_null",
+            Domain::alter(name()).set_not_null().to_string(),
+        ),
+        (
+            "drop_domain_not_null",
+            Domain::alter(name()).drop_not_null().to_string(),
+        ),
+        (
+            "add_domain_check",
+            Domain::alter(name())
+                .add_check(value().gt(0i64))
+                .to_string(),
+        ),
+        (
+            "add_domain_check_not_valid",
+            Domain::alter(name())
+                .add_check(
+                    DomainCheck::new(value().lt(1000i64))
+                        .name(small())
+                        .not_valid(),
+                )
+                .to_string(),
+        ),
+        (
+            "drop_domain_constraint",
+            Domain::alter(name())
+                .drop_constraint(ConstraintDrop::new(small()).if_exists().cascade())
+                .to_string(),
+        ),
+        (
+            "rename_domain_constraint",
+            Domain::alter(name())
+                .rename_constraint(small(), a("tiny \"雪\""))
+                .to_string(),
+        ),
+        (
+            "validate_domain_constraint",
+            Domain::alter(name())
+                .validate_constraint(small())
+                .to_string(),
+        ),
+        (
+            "rename_domain",
+            Domain::alter(name())
+                .rename_to(a("units \"雪\""))
+                .to_string(),
+        ),
+        ("drop_domain", Domain::drop(name()).to_string()),
+        (
+            "drop_domains",
+            Domain::drop(name())
+                .name(a("plain"))
+                .name((a("archive"), a("other")))
+                .if_exists()
+                .cascade()
+                .to_string(),
         ),
     ])
 }
@@ -510,6 +623,8 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
 // option renders as the Rust builder renders it
 // [spec:pgorm:req:python.schema-schemas/test]    every schema create, drop and rename renders as
 // the Rust builder renders it
+// [spec:pgorm:req:python.schema-domains/test]    every domain create, alter action and drop renders
+// as the Rust builder renders it
 #[test]
 fn ddl_matches_native_rust() -> Result<(), Box<dyn std::error::Error>> {
     Python::initialize();

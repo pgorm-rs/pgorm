@@ -58,7 +58,8 @@ pub trait IntoColumnDef {
 /// | Multirange            | int4multirange, ...      |
 /// | CreatedRange          | RANGE_TYPE_NAME          |
 /// | CreatedMultirange     | MULTIRANGE_TYPE_NAME     |
-// [spec:pgorm:def:sql.types.column-type+10]
+/// | Domain                | DOMAIN_NAME              |
+// [spec:pgorm:def:sql.types.column-type+11]
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum ColumnType {
@@ -128,6 +129,21 @@ pub enum ColumnType {
         schema: Option<Name>,
         subtype: Arc<ColumnType>,
     },
+    /// A domain a schema created, named in full as an enum type is, and the
+    /// type it is over. The name is what DDL writes, and what a value is cast
+    /// to where the base type needs a cast to be compared; the base is what a
+    /// value is, since a domain's values travel as its base type's do.
+    ///
+    /// This is the one spelling of a domain column. [`Named`](Self::Named)
+    /// renders the same DDL but says nothing of what the column holds, which
+    /// is what an entity reads and writes by.
+    // [spec:pgorm:def:sql.types.column-type+11]
+    // [spec:pgorm:req:sql.ddl.domain]
+    Domain {
+        name: Name,
+        schema: Option<Name>,
+        base: Arc<ColumnType>,
+    },
 }
 
 /// Length for var-char; default to 255
@@ -140,7 +156,7 @@ pub enum StringLen {
     None,
 }
 
-// [spec:pgorm:def:sql.types.column-type+10]
+// [spec:pgorm:def:sql.types.column-type+11]
 impl PartialEq for ColumnType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -203,6 +219,23 @@ impl PartialEq for ColumnType {
                     && l_subtype == r_subtype
             }
             (Self::Multirange(l0), Self::Multirange(r0)) => l0 == r0,
+            (
+                Self::Domain {
+                    name: l_name,
+                    schema: l_schema,
+                    base: l_base,
+                },
+                Self::Domain {
+                    name: r_name,
+                    schema: r_schema,
+                    base: r_base,
+                },
+            ) => {
+                l_name.to_string() == r_name.to_string()
+                    && l_schema.as_ref().map(|s| s.to_string())
+                        == r_schema.as_ref().map(|s| s.to_string())
+                    && l_base == r_base
+            }
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -583,7 +616,7 @@ impl ColumnDef {
     ///     .join(" ")
     /// );
     /// ```
-    // [spec:pgorm:def:sql.types.column-type+10]
+    // [spec:pgorm:def:sql.types.column-type+11]
     pub fn interval(&mut self, spec: IntervalSpec) -> &mut Self {
         self.types = Some(ColumnType::Interval(spec));
         self

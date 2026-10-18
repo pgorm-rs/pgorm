@@ -5,7 +5,8 @@
   "entities": [
     {"name": "app.Account", "rust": "account::Entity", "python": "Account", "fields": {"display name": "display_name"}},
     {"name": "app.Note", "rust": "note::Entity", "python": "Note"},
-    {"name": "app.IntervalSpan", "rust": "interval_span::Entity", "python": "IntervalSpan"}
+    {"name": "app.IntervalSpan", "rust": "interval_span::Entity", "python": "IntervalSpan"},
+    {"name": "app.StockLine", "rust": "stock_line::Entity", "python": "StockLine"}
   ],
   "graphs": [
     {"name": "app.AccountOnly", "rust": "account_only", "python": "AccountOnly"},

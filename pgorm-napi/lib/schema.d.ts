@@ -1,7 +1,7 @@
 /**
  * DDL over pgorm-query's builders: tables, their columns, keys and
- * constraints and their alterations, indexes, types, sequences, views,
- * materialized views and tables created from a query, extensions and
+ * constraints and their alterations, indexes, types, domains, sequences,
+ * views, materialized views and tables created from a query, extensions and
  * comments.
  *
  * A DDL statement takes no parameters, so each renders with every value it
@@ -329,6 +329,71 @@ export declare function dropType(
   names: TypeRef | readonly [TypeRef, ...TypeRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): SchemaStatement;
+
+// [spec:pgorm:req:napi.schema-domains]
+
+/**
+ * `CREATE DOMAIN`; every method returns a new statement. The clauses render
+ * in one order whatever order they are given in.
+ */
+export declare class CreateDomain extends SchemaStatement {
+  /** The collation the domain's values compare under, for a base type that has one. */
+  collate(collation: string, options?: { readonly schema?: string }): CreateDomain;
+  /** `DEFAULT`: an expression, or a value written as an escaped literal; a later default replaces it. */
+  default(value: Operand): CreateDomain;
+  /** `NOT NULL`, replacing a `null()`: PostgreSQL refuses the two together. */
+  notNull(): CreateDomain;
+  /** `NULL`, the default, replacing a `notNull()`. */
+  null(): CreateDomain;
+  /**
+   * A `CHECK` over {@link domainValue}, appended. It takes no `notValid`:
+   * PostgreSQL has no `NOT VALID` at `CREATE DOMAIN`.
+   */
+  check(condition: Expr, options?: { readonly name?: string }): CreateDomain;
+}
+
+/** A domain over `base`: any column type, another domain's `TypeName` included. */
+export declare function createDomain(name: TypeRef, base: ColumnType): CreateDomain;
+
+/**
+ * An `ALTER DOMAIN` before its action. PostgreSQL parses none without one,
+ * nor one with two, so it has no `inspect()`, a terminal refuses it, and each
+ * action gives the whole statement. `ALTER DOMAIN` has no `IF EXISTS`.
+ */
+export declare class PendingAlterDomain {
+  private constructor();
+  /** The default columns of the domain take from now on, where they have none of their own. */
+  setDefault(value: Operand): SchemaStatement;
+  dropDefault(): SchemaStatement;
+  /** Refused while a column of the domain holds a null (`23502`). */
+  setNotNull(): SchemaStatement;
+  dropNotNull(): SchemaStatement;
+  /**
+   * A `CHECK` added: checked against the values already held (`23514` for one
+   * that fails), or, `notValid`, left unchecked until `validateConstraint`.
+   */
+  addCheck(condition: Expr, options?: { readonly name?: string } & NotValidOption): SchemaStatement;
+  dropConstraint(name: string, options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior }): SchemaStatement;
+  renameConstraint(name: string, newName: string): SchemaStatement;
+  /** Checks the values a `NOT VALID` check left unchecked (`23514` for one that fails). */
+  validateConstraint(name: string): SchemaStatement;
+  /** The domain renamed; the new name is bare, the domain staying in its schema. */
+  renameTo(name: string): SchemaStatement;
+}
+
+export declare function alterDomain(name: TypeRef): PendingAlterDomain;
+
+/** `DROP DOMAIN`: one domain or several; `"restrict"`, said or not, refuses one a column is typed with. */
+export declare function dropDomain(
+  names: TypeRef | readonly [TypeRef, ...TypeRef[]],
+  options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
+): SchemaStatement;
+
+/**
+ * `VALUE`: inside a domain's `CHECK`, the value tested. PostgreSQL reads it
+ * anywhere else as a column named `value`.
+ */
+export declare function domainValue(): Expr;
 
 export type SequenceType = "smallint" | "integer" | "bigint";
 

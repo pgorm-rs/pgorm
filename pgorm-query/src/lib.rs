@@ -647,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+34]
-// [spec:pgorm:req:sql.surface+34/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+35]
+// [spec:pgorm:req:sql.surface+35/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.
@@ -659,10 +659,11 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+21]
+// [spec:pgorm:req:sql.scope+22]
 mod backend;
 mod comment;
 mod copy;
+mod domain;
 pub mod error;
 mod expr;
 pub mod extension;
@@ -771,6 +772,10 @@ pub use types::{NullOrdering, Order, OrderExpr};
 
 // Schema statements: the DDL builders and the column vocabulary they share.
 pub use comment::{Comment, CommentStatement, CommentTarget};
+pub use domain::{
+    Domain, DomainAlterStatement, DomainCheck, DomainCreateStatement, DomainDropStatement,
+    IntoDomainCheck, PendingDomainAlter,
+};
 pub use foreign_key::{
     Deferrability, ForeignKey, ForeignKeyAction, ForeignKeyCreateStatement, TableForeignKey,
 };

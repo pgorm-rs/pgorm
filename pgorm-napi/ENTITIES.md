@@ -108,7 +108,9 @@ const first = await query.oneOpt(pool);      // Select::one_opt, LIMIT 1
 - `describe()` reports the table, each column's SQL name, type, nullability,
   key membership and kind, the primary key and whether it ends `WITHOUT
   OVERLAPS`, every relation with its columns, period, enforcement and
-  deferrability, and the Rust types behind it.
+  deferrability, and the Rust types behind it. A column whose type is a
+  domain has the kind of the type the domain is over, its values travelling
+  as that type's do.
 
 Every operation runs on a pool, a connection or a transaction, with what a
 statement of SQL text gets: a busy connection refuses it, an `AbortSignal`

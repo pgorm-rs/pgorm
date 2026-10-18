@@ -31,6 +31,14 @@ pub(crate) fn col(
     Ok(PyExpr::from_rust(Expr::col(column).into()))
 }
 
+/// The keyword `VALUE`, the value a domain's `CHECK` tests; anywhere else
+/// PostgreSQL reads it as a column named `value`.
+// [spec:pgorm:req:python.schema-domains]
+#[pyfunction]
+pub(crate) fn domain_value() -> PyExpr {
+    PyExpr::from_rust(Expr::domain_value().into())
+}
+
 #[pyfunction]
 pub(crate) fn bind(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     value_expr(value, false)

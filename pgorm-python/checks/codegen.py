@@ -46,7 +46,7 @@ def install(wheel, destination, environment):
     return python
 
 
-# [spec:pgorm:req:python.codegen+1/test]
+# [spec:pgorm:req:python.codegen+2/test]
 # [spec:pgorm:req:python.typing/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -206,9 +206,9 @@ def main():
                 "passed": True,
                 "wheel": wheel.name,
                 "fresh_installs": 3,
-                "generated_entities": 3,
+                "generated_entities": 4,
                 "generated_graphs": 3,
-                "database_cases": 5,
+                "database_cases": 6,
                 "deterministic_emission": True,
                 "compatibility_checked": True,
                 "type_checker": checker,

@@ -1,11 +1,11 @@
 use crate::{errors::ConstructionError, expressions::Compiled};
 use pgorm::pgorm_query::{
-    ColumnRenameStatement, CommentStatement, ConstraintRenameStatement, IndexDropStatement,
-    MaterializedViewCreateStatement, MaterializedViewDropStatement,
-    MaterializedViewRefreshStatement, RecursiveViewCreateStatement, SchemaCreateStatement,
-    SchemaDropStatement, SchemaRenameStatement, TableAlterStatement, TableCreateAsStatement,
-    TableDropStatement, TableRenameStatement, TableTruncateStatement, Values, ViewCreateStatement,
-    ViewDropStatement,
+    ColumnRenameStatement, CommentStatement, ConstraintRenameStatement, DomainAlterStatement,
+    DomainDropStatement, IndexDropStatement, MaterializedViewCreateStatement,
+    MaterializedViewDropStatement, MaterializedViewRefreshStatement, RecursiveViewCreateStatement,
+    SchemaCreateStatement, SchemaDropStatement, SchemaRenameStatement, TableAlterStatement,
+    TableCreateAsStatement, TableDropStatement, TableRenameStatement, TableTruncateStatement,
+    Values, ViewCreateStatement, ViewDropStatement,
     extension::{TypeAlterStatement, TypeCreateStatement, TypeDropStatement},
 };
 use pyo3::prelude::*;
@@ -34,6 +34,8 @@ pub(crate) enum Statement {
     CreateSchema(SchemaCreateStatement),
     DropSchema(SchemaDropStatement),
     RenameSchema(SchemaRenameStatement),
+    AlterDomain(DomainAlterStatement),
+    DropDomain(DomainDropStatement),
 }
 
 #[derive(Clone, Debug)]
@@ -68,6 +70,8 @@ impl PyDDL {
             Statement::CreateSchema(s) => s.to_string(),
             Statement::DropSchema(s) => s.to_string(),
             Statement::RenameSchema(s) => s.to_string(),
+            Statement::AlterDomain(s) => s.to_string(),
+            Statement::DropDomain(s) => s.to_string(),
         };
         Compiled {
             sql,

@@ -67,6 +67,39 @@ def programs(p):
         "enum_drop": p.drop_enum(kind, if_exists=True, cascade=True),
         **views(p, table),
         **schemas(p),
+        **domains(p),
+    }
+
+
+def domains(p):
+    name = p.TypeName('Qty "雪"', schema='schema "雪"')
+    value = p.domain_value()
+    return {
+        "create_domain": p.CreateDomain('qty "雪"', "integer"),
+        "create_domain_clauses": p.CreateDomain(name, "text")
+            .check(value != "", name='filled "x"').not_null().default("O'Brien \\ 雪")
+            .collate("C", schema="pg_catalog").check(value != "none"),
+        "create_domain_over_array": p.CreateDomain(name, p.DataType("varchar", length=20).array())
+            .null().default(p.literal(1) + 2),
+        "create_domain_over_domain": p.CreateDomain("small", name).not_null().null(),
+        "set_domain_default": p.set_domain_default(name, 5),
+        "drop_domain_default": p.drop_domain_default(name),
+        "set_domain_not_null": p.set_domain_not_null(name),
+        "drop_domain_not_null": p.drop_domain_not_null(name),
+        "add_domain_check": p.add_domain_check(name, value > 0),
+        "add_domain_check_not_valid": p.add_domain_check(
+            name, value < 1000, name='small "x"', not_valid=True,
+        ),
+        "drop_domain_constraint": p.drop_domain_constraint(
+            name, 'small "x"', if_exists=True, cascade=True,
+        ),
+        "rename_domain_constraint": p.rename_domain_constraint(name, 'small "x"', 'tiny "雪"'),
+        "validate_domain_constraint": p.validate_domain_constraint(name, 'small "x"'),
+        "rename_domain": p.rename_domain(name, 'units "雪"'),
+        "drop_domain": p.drop_domain(name),
+        "drop_domains": p.drop_domain(
+            name, "plain", p.TypeName("other", schema="archive"), if_exists=True, cascade=True,
+        ),
     }
 
 
