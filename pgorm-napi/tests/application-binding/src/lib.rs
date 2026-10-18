@@ -7,6 +7,7 @@ pub mod account;
 pub mod graphs;
 pub mod membership;
 pub mod note;
+pub mod parcel;
 pub mod sources;
 
 #[cfg(test)]
@@ -22,6 +23,7 @@ pub fn registry() -> Result<Registry, RegistrationError> {
     registry.entity::<account::Entity>("app.Account")?;
     registry.entity::<note::Entity>("app.Note")?;
     registry.entity::<membership::Entity>("app.Membership")?;
+    registry.entity::<parcel::Entity>("app.Parcel")?;
     graphs::register(&mut registry)?;
     sources::register(&mut registry)?;
     Ok(registry)

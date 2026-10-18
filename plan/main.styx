@@ -12563,12 +12563,27 @@ children (
         title "pgorm-napi's live suite reads and writes a registered entity whose column is a domain"
         kind @test
         deps (sql-domains)
+        sealed true
         log (
             {
                 at 2026-10-18T21:52:40.650617Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-domains (2fa97891). The domain column path in pgorm-napi's registered entities is covered only by a Rust unit test; the live suite has no registered entity whose column is a domain. Add one to the application-binding crate and a live test reading and writing it in Node and Deno, including an array of a domain."
+            }
+
+            {
+                at 2026-10-18T22:45:51.460346Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-18T22:48:59.551771Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
