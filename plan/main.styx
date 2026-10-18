@@ -1352,6 +1352,14 @@ children (
                         text "codegen.entity.transform v0 overclaimed since adoption: (1) it said repeated FKs to one target get num_suffix \"in declaration order\", but the rev/map/rev pipeline in transformer.rs hands suffixes out in reverse — first-declared gets the highest; behavior deliberately kept so regenerated entities keep their relation variant names. (2) It said `unique` comes from the matching ColumnSpec, but the transform path unconditionally overwrites it from single-column unique indexes, discarding ColumnSpec::UniqueKey (which is live only in the public From<&ColumnDef> conversion). Found by verify.codegen; rule corrected at +1 with operator approval, all 13 refs re-pinned."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:52:16.110426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "codegen.entity.types +7, codegen.entity.types.unsupported +7 and codegen.entity.compact.attrs +7 (30f11b85, codegen-interval-columns): interval columns map to Interval with the qualifier carried in the column definition, and a compact array names an element type the derive cannot infer."
+                        after_done true
+                    }
                 )
             }
 
