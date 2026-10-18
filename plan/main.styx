@@ -5067,6 +5067,15 @@ children (
                     main ([spec:pgorm:sem:pipeline.select-sources])
                 }
                 deps (core)
+                log (
+                    {
+                        at 2026-10-18T14:24:00.09159Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against pipeline.select-sources at +4 (seen at +3; v4 has pgorm write the read cast as CAST(column AS type) through TypeName::to_sql_string instead of prqlc's std.as). The code meets it: read_cast in src/pipeline/sources.rs builds the CAST s-string from the TypeName that source_read_cast returns, which the SelectStatement writer renders with the same to_sql_string; held by select_sources_writes_read_casts_by_type_policy, select_sources_casts_enum_columns_to_text, the live select_sources_applies_read_casts and the identifier-oracle site pgorm/pipeline.select-sources.read-cast. v3's distinct refusal (an owed or settled hoist) and every earlier clause (Option per position, up to six sources, s{i}_ aliases, terminals-only SelectedSources, ReshapedSources naming the first offender) are held by tests. No gaps."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -5196,6 +5205,14 @@ children (
                         kind @note
                         text "Deliver the external sqlmap installation pin, smoke/full profile manifests, isolated per-case sessions, noninteractive execution, bounded retries/timeouts and result-interface adapter. Record source state and scanner/runtime/database identities, expected/executed case inventory, findings and replay artifacts on every run, including failures. Coordinate time-based control delay with DB/HTTP deadlines. An exit code alone never establishes scan completion."
                     }
+
+                    {
+                        at 2026-10-18T14:24:00.633196Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against security.sqlmap.profiles at +3 (seen at +0; there was never a +1: 40dd9e51 added the exemption-evidence rules without bumping; +2 (77528abb) made the runner apply every declared setting and refuse timeouts that don't nest, fixing a hard-coded --time-sec 1; +3 (ac5b4d5a) the identifiers profile and exemption ceilings). The code meets it: profiles.json declares every setting, which reaches sqlmap's flags, the container and fixture role's statement timeout and the per-scan deadline; bad or non-nesting profiles are refused before sqlmap is fetched; fresh state per case; full schedules 117 and exempts 93, identifiers 28/38, smoke 3, matching the README; exemption evidence is checked field by field and exempt pairs never count as passes; PostgreSQL is 18.6 by digest. The sqlmap pin is a commit tarball re-verified by sha256, a fork-style pin. Gaps, filed separately: Python is pinned exactly to 3.14.4 (pins.json, the runner's equality check, sqlmap-run.yml, README), against the operator's 2026-10-09 rule against exact pins, missed by the sweep that moved generative CI to 3.14; the HTTP adapter and result interpreter hard-code the test parameter as input instead of reading the case's field; the detected-exempt-pair check cannot fire in a normal run because exempt pairs are never scanned; lock_timeout, --union-cols and -v are fixed in code rather than declared in the profile; the rule's \"both run noninteractively\" predates the third profile."
+                        after_done true
+                    }
                 )
             }
 
@@ -5259,6 +5276,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Added PR smoke and scheduled/manual full entrypoints through one reusable hosted-runner workflow. Both use the Rust runner, existing profiles/pins and fast-check entrypoint, preserve artifacts under always(), use contents:read without secrets/persisted checkout credentials, and retain explicit not-run/incomplete statuses. Full also requires direct regressions on the disposable server. Scan/job deadlines leave time for cancellation cleanup. Workflow coverage is registered through nplan sidecars with both inline/sidecar mode. Documented local reproduction and required trusted revision runs when fork policy prevents execution. Validation: actionlint v1.7.7 passes; 24 Python and 17 Rust fast tests pass. Hosted execution has not yet run."
+                    }
+
+                    {
+                        at 2026-10-18T14:24:00.729863Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against security.sqlmap.ci at +1 (seen at +0; v1 added the identifiers job). The code meets it: smoke on relevant pull requests, full and identifiers weekly and on dispatch, each its own job with its own deadline, check name and artifact, all through the one reusable workflow (harness then verdict); artifacts uploaded on failure, kept 14 days, an empty upload an error; separate status files and a not-run status when the report is missing or the build failed; outside the pre-commit check budget; contents: read, no credentials persisted, no secrets. GitHub shows the weekly run executing, the latest on 2026-10-12 passing (2026-10-05 failed and was fixed). Minor: cancel-in-progress would kill a running full scan if the workflow is dispatched again; the fork pull-request policy is documented, not enforced by branch protection; the node's title still says smoke and full."
+                        after_done true
                     }
                 )
             }
@@ -5655,6 +5680,14 @@ children (
                         kind @note
                         text "Implemented immutable native Value wrappers for every current Rust scalar variant, typed SQL NULLs, one-dimensional arrays and qualified enum metadata. Installed-wheel conversion tests pass (10); Rust parity and unrepresentable-output tests pass (3). Conversions reject width/precision loss and ambiguous inputs; snapshot v1 retains tags and IEEE bits. Final rebuilt-wheel regressions and required platform checks remain before delivery."
                     }
+
+                    {
+                        at 2026-10-18T14:24:00.237814Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against python.values at +2 (seen at +0; v1 added the built-in ranges and multiranges, v2 the range types a schema created). The code meets it: exact-type scalar conversion (bool never on the int path, bounds, bit-exact f32, Decimal through from_str_exact, non-finite refused), every built-in range and multirange both ways with typed NULLs and refusals, and created ranges carried as a quoted, schema-qualifiable PyTypeName with one of 12 subtypes, written through Expr::as_range; held by test_values.py, test_ranges.py, test_created_ranges.py (all 12 subtypes live under a hostile schema and name), created_ranges_match_their_rust_newtypes and the Rust round-trip tests. python.value-tags (+0) holds too. Deliberate, tested limits rather than gaps: a NULL range bound reads back unbounded; a created multirange result column is a DecodeError to be read through text, and arrays of created ranges are refused, both matching Rust (sql.value.range), though the rule's \"MUST cover ... the range and multirange types a schema created\" reads broader. \"where the corresponding Rust feature exists\" looks like leftover wording, since ranges have no feature gate."
+                        after_done true
+                    }
                 )
             }
 
@@ -5693,6 +5726,14 @@ children (
                         kind @note
                         text "Implemented native owned SimpleExpr/Condition composition, identifier/type/pattern/ordering boundaries, separate Constant/Value paths and Rust-built inspection. Installed expression tests (11) pass; Rust AST/SQL/parameter parity tests (5) pass. Literal substring helpers lower through Rust Func string functions, so no duplicate escaping algorithm is introduced. Final artifact rebuild and required checks remain. Execution/result terminals remain with the existing statements/results/direct-builders nodes."
                     }
+
+                    {
+                        at 2026-10-18T14:24:00.530636Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against python.expressions at +1 (seen at +0; v1 added SQL/JSON). The code meets it: base composition (comparison, arithmetic, &/|/~, NULL tests, membership including empty sets, LikePattern, the closed call() list, qualified casts); every SQL/JSON builder has a Python function applying each clause through the builder's own method, behaviours typed per function, and what Rust cannot express (NULLS FIRST/LAST in an aggregate's ORDER BY, an enum- or range-typed DEFAULT, json/jsonb RETURNING on json_value) raises rather than being dropped; empty all is TRUE and empty any FALSE; truth testing raises on Expr, Condition, AliasedExpr, OrderBy, WindowedExpr and every statement. Held by native tests, test_expressions.py and the live test_sql_json.py. The other rules on the node hold. Minor gap, filed separately: JsonInput and WindowFunction have no __bool__ refusal, so bool() of either is True."
+                        after_done true
+                    }
                 )
             }
 
@@ -5725,6 +5766,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Implemented runtime NamedTable/SELECT/INSERT/UPDATE/DELETE wrappers with typed joins/orderings, Rust-checked insert arity, explicit write intent, conflict typestates, RETURNING and raw SQL templates. All 44 current installed-wheel Python tests pass; native library parity suite passes 10 tests (5 statement families plus 5 expression families). Raw inline inspection delegates to inject_parameters; statements::compile prepares the exact same validated state as inspect. Generic async result/execution terminals remain python.results, so the direct-builders milestone is not yet claimed."
+                    }
+
+                    {
+                        at 2026-10-18T14:24:00.430966Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against python.statements at +3 (seen at +0; v1 MERGE and RETURNING row versions, v2 JSON_TABLE as a FROM item, v3 windows). The code meets it: the SELECT/CRUD clauses, JSON_TABLE through Func::json_table with every column kind, windows with OVER only after a function call or a JSON aggregate and frame classes mirroring pgorm-query's, ReturningRow with old_as/new_as on every write, MERGE's typestate (PendingMerge cannot compile, arm actions checked by row kind, merge_action() only through returning_action), one compile path for execution and inspection, tagged binds, a complete capability manifest and signature-checked stubs; held by native parity tests and test_statements.py, test_direct_builders.py, test_json_table.py, test_windows.py and test_merge.py. python.raw (+0) holds too. Gaps, filed separately: the Query alias in python/pgorm/results.py omits _native.Merge, so await pool.fetch_all(merge) fails mypy --strict though it runs; test_statement_truth_testing_is_rejected omits Merge and PendingMerge. Rule text: \"a frame whose end comes before its start cannot be built\" overclaims (the typestate stops only an end on an earlier side of the current row; preceding(1).and_preceding(5) builds in Rust and Python), and the WINDOW clause holds one named window, a second call replacing the first."
+                        after_done true
                     }
                 )
             }
@@ -5928,6 +5977,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "The independent application crate now registers real Rust Account and Note entities into the shared native module, with downstream defaults disabled to avoid duplicate PyO3 DSOs. Clean wheel installation passed nine PostgreSQL tests covering real selector cardinality, ActiveValue states, model conversion, enum identity, before/after hook outcomes and cancellation. Three Rust tests additionally verify registry collision rejection and exact Python/Rust SELECT SQL, parameters and ActiveValue parity. Native error translation now distinguishes the pinned driver's FromSql/ToSql errors at the Python boundary while preserving the original errors inside Rust hooks."
+                    }
+
+                    {
+                        at 2026-10-18T14:24:00.336403Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against python.entities at +2 (seen at +0; v1 made registration declare a WITHOUT OVERLAPS key and each relation's columns, PERIOD pair, enforcement and deferrability; v2 made exec_returning_change(s) and exec_returning_upsert(s) reachable as hook-free terminals returning Change / Upserted). The code meets it: EntityInfo.without_overlaps from PrimaryKeyTrait, relations::describe reporting every relation field, pinned by temporal_keys_and_period_relations_match_rust and registered_temporal.py; entities/versions.rs and generic.rs call the real Update/Insert terminals, with PyChange and PyUpserted stubs, exports and capability entries, held by registered_versions.py (no hooks run, unchanged and missing rows, batches, empty batch, foreign ActiveModel, a table named old). Minor: no test asserts an entity's describe()[\"terminals\"] list; the rule says enforcement and deferrability change what a join means (they don't) while leaving out condition_type and on_condition, which do and which describe() doesn't report."
+                        after_done true
                     }
                 )
             }
@@ -8341,6 +8398,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Closed by disposition rather than by decomposition: `[spec:pgorm:req:sql.scope]` (docs/spec/sql-ast.md) now holds every checklist item with a verdict, and the rule requires that a deferral state what closing it would take — so the list is a work queue rather than a list of absences. Eleven of the twenty-six were small enough to build in the same pass: IS [NOT] DISTINCT FROM, BETWEEN [NOT] SYMMETRIC, AT TIME ZONE, INTERSECT ALL, EXCEPT ALL, OVERRIDING SYSTEM/USER VALUE, FrameType::Groups, and DEFERRABLE foreign keys in all three states. The filed list was wrong in one direction only — everything it named as missing was still missing, with the line numbers drifted (select.rs:102-107 is now 96-118, window.rs:44-57 is now 30-53, extension.rs:478-487 is now 490-507). Two findings worth keeping. First, the renderer classifies BinOper variants, not lexemes: `Oper::is_between` is what unwraps the AND binary a BETWEEN's bounds are encoded as, so a symmetric form spelled through BinOper::Raw renders `x BETWEEN SYMMETRIC (a AND b)` — valid SQL meaning something else. That is why these got variants and why sql.render.parens+3 now states the rule as a general one. Second, ON CONFLICT ON CONSTRAINT looked like a fourth arbiter form and is not: the constraint arbiter takes no column list and no WHERE, both of which live inside ConflictTarget today, so a ConflictElement variant would make two invalid states constructible and the honest fix is splitting the arbiter into inference-or-constraint with its own small typestate. Deferred with that design recorded. Simple-form CASE resisted for the same reason (the arms would have two incompatible shapes) and array subscripts for a different one (a new SimpleExpr variant, whose match is exhaustive crate-wide). The five new Expr methods live in expr_keyword_operators.rs rather than expr.rs: the function-density ratchet refused the addition, and the crate already had the pattern in expr_json.rs and expr_membership.rs."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T14:24:00.819366Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 against sql.scope at +15 (seen at +0). Every bump graduated one deferred entry as it was built, and every specific claim holds in the code: the escape hatches (Expr::raw, Expr::template, FromItem::Template, execute and batch_execute), the eleven constructs built at +0, every graduated entry (simple CASE, subscripts, GROUPING SETS, frame EXCLUDE and offsets, deferrable keys, COLLATE, ON CONFLICT ON CONSTRAINT, sequences, composite types and their alteration, ranges, MERGE and its PostgreSQL 17 grammar, JSON_TABLE), each with live tests; the deferred list is empty and nothing on the out-of-scope list exists in the builder. The rule fails its own completeness clause, which makes a construct absent from both its list and the builder a defect in the rule: TABLESAMPLE, FETCH FIRST .. WITH TIES, GROUP BY DISTINCT, SIMILAR TO, WITH ORDINALITY and ROWS FROM, CREATE DOMAIN, CREATE TABLE AS, EXPLAIN, LOCK TABLE and LISTEN/NOTIFY are in neither. Its text also errs: COPY is said to belong to the driver surface reachable through execute, but pgorm has no COPY API and hides the client, so COPY FROM STDIN cannot be reached (LISTEN likewise); FromItem::Template is called raw; the CREATE SCHEMA reason holds only for CREATE DATABASE; \"an entity maps to a view as readily as to a table\" has no test; a history sentence remains; sql-ddl.md cites sql.scope+11. The verdicts on those constructs are the operator's to make; they are put to the operator, and the census lands as its own node once decided."
                         after_done true
                     }
                 )
