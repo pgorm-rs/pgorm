@@ -680,6 +680,14 @@ children (
                         text "Re-checked 2026-10-18 at exec.decode.array +2 (sql-domains, d5d22226): every Vec<T> decode reads an array of a domain as an array of the type the domain is over."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T23:11:03.708975Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at exec.crud.select +4 (select-one-zero-limit, cfadc574): Selector::one and one_opt narrow the row limit with narrow_limit_to_one and never widen it, so a query limited to no row reads none."
+                        after_done true
+                    }
                 )
             }
 
