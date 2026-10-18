@@ -5,8 +5,8 @@
 use std::num::NonZeroU32;
 
 use pgorm::pgorm_query::{
-    BinOper, CopyBinary, CopyCsv, CopyFromStatement, CopyIgnore, CopyLogVerbosity, CopyText,
-    CopyToStatement, Expr, FromItem, NamedTable, Query, SimpleExpr, TableName, Values,
+    BinOper, CopyBinary, CopyCsv, CopyFromStatement, CopyIgnore, CopyLogVerbosity, CopySource,
+    CopyText, CopyToStatement, Expr, FromItem, NamedTable, Query, SimpleExpr, TableName, Values,
 };
 
 use super::n;
@@ -85,7 +85,8 @@ fn to_delete_returning() -> (String, Values) {
         .cond_where(col!("id").binary(BinOper::GreaterThan, 3i64))
         .returning(Query::returning().all())
         .to_owned();
-    copy(CopyToStatement::new(delete, CopyCsv).force_quote_all())
+    let source = CopySource::try_from(delete).expect("a DELETE with RETURNING is a source");
+    copy(CopyToStatement::new(source, CopyCsv).force_quote_all())
 }
 
 fn to_insert_returning() -> (String, Values) {
@@ -95,7 +96,8 @@ fn to_insert_returning() -> (String, Values) {
         .values_panic(["x".into()])
         .returning(Query::returning().exprs([col!("id")]))
         .to_owned();
-    copy(CopyToStatement::new(insert, CopyBinary))
+    let source = CopySource::try_from(insert).expect("an INSERT with RETURNING is a source");
+    copy(CopyToStatement::new(source, CopyBinary))
 }
 
 /// Every case, named as the golden file names it.

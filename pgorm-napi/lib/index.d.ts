@@ -479,7 +479,7 @@ export declare abstract class Queryable {
     params?: readonly Param[],
     options?: O,
   ): Promise<RowFor<O> | null>;
-  // [spec:pgorm:req:napi.copy]
+  // [spec:pgorm:req:napi.copy+1]
   /**
    * Run a `COPY … FROM STDIN`, writing the bytes `source` yields, and resolve
    * with the rows it wrote. The source is pulled only as the COPY takes its

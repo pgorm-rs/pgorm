@@ -1,6 +1,8 @@
 //! `COPY … TO STDOUT`, its format chosen by name at construction.
 
-use pgorm::pgorm_query::{CopyBinary, CopyCsv, CopyText, CopyToStatement, IntoCopySource, Values};
+use pgorm::pgorm_query::{
+    CopyBinary, CopyCsv, CopySource, CopyText, CopyToStatement, IntoCopySource, Values,
+};
 use pyo3::{
     prelude::*,
     types::{PyDict, PyTuple},
@@ -48,7 +50,16 @@ impl CopyTo {
     }
 }
 
-// [spec:pgorm:req:python.copy]
+/// A write as a COPY TO source, refused as Rust refuses one with no RETURNING
+/// list.
+fn write_source<W>(write: W) -> PyResult<CopySource>
+where
+    CopySource: TryFrom<W, Error = pgorm::pgorm_query::error::Error>,
+{
+    CopySource::try_from(write).map_err(|error| ConstructionError::new_err(error.to_string()))
+}
+
+// [spec:pgorm:req:python.copy+1]
 /// `COPY { table | (query) } TO STDOUT` in a format chosen at construction.
 #[pyclass(name = "CopyTo", module = "pgorm", frozen, generic, from_py_object)]
 #[derive(Clone, Debug)]
@@ -59,7 +70,8 @@ pub struct PyCopyTo {
 #[pymethods]
 impl PyCopyTo {
     /// A table, or a statement whose rows are copied; a write is a source
-    /// only with a RETURNING list, which the server checks.
+    /// only with a RETURNING list, refused here without one as Rust's
+    /// conversion into a `CopySource` refuses it.
     #[new]
     fn new(source: &Bound<'_, PyAny>, format: &Bound<'_, PyAny>) -> PyResult<Self> {
         let format = super::format(format)?;
@@ -70,16 +82,16 @@ impl PyCopyTo {
             CopyTo::new(query.inner.clone(), format)
         } else if let Ok(query) = source.extract::<PyRef<'_, PyInsert>>() {
             query.inspect()?;
-            CopyTo::new(query.inner.clone(), format)
+            CopyTo::new(write_source(query.inner.clone())?, format)
         } else if let Ok(query) = source.extract::<PyRef<'_, PyUpdate>>() {
             query.inspect()?;
-            CopyTo::new(query.inner.clone(), format)
+            CopyTo::new(write_source(query.inner.clone())?, format)
         } else if let Ok(query) = source.extract::<PyRef<'_, PyDelete>>() {
             query.inspect()?;
-            CopyTo::new(query.inner.clone(), format)
+            CopyTo::new(write_source(query.inner.clone())?, format)
         } else if let Ok(query) = source.extract::<PyRef<'_, PyMerge>>() {
             query.inspect()?;
-            CopyTo::new(query.inner.clone(), format)
+            CopyTo::new(write_source(query.inner.clone())?, format)
         } else if source.extract::<PyRef<'_, PyPendingMerge>>().is_ok() {
             return Err(ConstructionError::new_err(
                 "a MERGE needs a WHEN arm before it can be copied",

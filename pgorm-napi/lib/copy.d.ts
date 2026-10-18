@@ -14,7 +14,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 
 import type { Builder, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
@@ -40,7 +40,8 @@ export interface CopyIgnoreOptions {
 
 /**
  * What a COPY TO reads: a table, or the rows of a `Select`, or of an INSERT,
- * UPDATE, DELETE or MERGE with a RETURNING list, which PostgreSQL requires.
+ * UPDATE, DELETE or MERGE through its RETURNING list. A write without one is
+ * refused with a `ConstructionError` when the COPY is built.
  */
 export type CopyToSource = TableRef | Select | Insert | Update | Delete | Merge;
 
@@ -111,7 +112,7 @@ export declare class CopyTo<F extends CopyFormat = CopyFormat> extends Builder {
 /** `COPY table FROM STDIN` in `format`, the table a name or a `Table` without an alias. */
 export declare function copyFrom<F extends CopyFormat>(table: TableRef, format: F): CopyFrom<F>;
 
-/** `COPY … TO STDOUT` in `format`, reading a table or a statement's rows. */
+/** `COPY … TO STDOUT` in `format`, reading a table or a statement's rows; a write needs a RETURNING list. */
 export declare function copyTo<F extends CopyFormat>(source: CopyToSource, format: F): CopyTo<F>;
 
 /**

@@ -12052,6 +12052,14 @@ children (
                 text "Operator 2026-10-18, on the bindings' differing COPY spellings (Python where_ with variadic columns, JavaScript where with arrays, each following its binding's existing convention and Python's reserved word): \"it's fine\". They stay as they are. The operator also asked whether COPY FROM STDIN belongs in an ORM at all; the lead set out keeping it, replacing it with a documented raw-client escape hatch, or removing it, recommending keeping it, and the answer is pending."
                 after_done true
             }
+
+            {
+                at 2026-10-18T20:23:40.366763Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered again at sql.ast.copy +1, python.copy +1 and napi.copy +1 (copy-to-source-returning, be37b37f): a write without RETURNING no longer converts into a CopySource, and Python's CopyTo and JavaScript's copyTo refuse it with a ConstructionError."
+                after_done true
+            }
         )
     }
 
@@ -12210,6 +12218,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b). COPY TO's source can be any of the five statements (IntoCopySource), but PostgreSQL refuses an INSERT, UPDATE, DELETE or MERGE without RETURNING there (0A000, \"COPY query must have a RETURNING clause\"). Refuse it when the statement is built (or make it unrepresentable by accepting only a write that carries RETURNING), with tests and the bindings' equivalent."
+            }
+
+            {
+                at 2026-10-18T20:23:14.97164Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

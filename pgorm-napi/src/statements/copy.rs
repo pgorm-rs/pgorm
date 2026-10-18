@@ -69,7 +69,7 @@ pub(crate) enum CopyTo {
 }
 
 /// The COPY one JavaScript builder owns.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 #[derive(Debug, Clone)]
 pub(crate) enum CopyStatement {
     CopyFrom(CopyFrom),
@@ -108,7 +108,7 @@ impl CopyStatement {
     /// The SQL the statement runs as, which `inspect()` gives with no
     /// values. A value written into it as a literal cannot carry NUL, which
     /// the protocol's NUL-terminated statement text cannot hold.
-    // [spec:pgorm:req:napi.copy]
+    // [spec:pgorm:req:napi.copy+1]
     pub(crate) fn sql<'cx>(&self, cx: &mut Cx<'cx>) -> NeonResult<String> {
         let sql = self.rendered();
         if sql.contains('\0') {
@@ -247,7 +247,7 @@ macro_rules! apply {
 }
 
 /// `copyFromNew(table, format)`: COPY into `table` from the client.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = arg(cx, 0);
     let table = relation(cx, table)?;
@@ -260,26 +260,30 @@ fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// What a COPY TO reads: a table, named as a schema statement names one, or
-/// the rows of a `Select`, or of an INSERT, UPDATE, DELETE or MERGE, which
-/// the server reads only through a `RETURNING` list. A write the binding
-/// would refuse to run is refused here as well.
+/// the rows of a `Select`, or of an INSERT, UPDATE, DELETE or MERGE through
+/// its `RETURNING` list. A write the binding would refuse to run is refused
+/// here as well, and so is one with no `RETURNING` list, as pgorm-query's
+/// conversion into a `CopySource` refuses it.
+// [spec:pgorm:req:napi.copy+1]
 fn source<'cx>(
     cx: &mut FunctionContext<'cx>,
     value: Handle<'cx, JsValue>,
 ) -> NeonResult<CopySource> {
     let statement = match node(cx, value) {
-        None | Some(Node::Table(_)) => return relation(cx, value).map(CopySource::Table),
+        None | Some(Node::Table(_)) => {
+            return relation(cx, value).map(IntoCopySource::into_copy_source);
+        }
         Some(statement) => statement,
     };
     if let Some(Err(reason)) = write::built(&statement) {
         return refuse(cx, reason);
     }
-    Ok(match statement {
-        Node::Select(select) => select.into_copy_source(),
-        Node::Insert(insert) => insert.inner.into_copy_source(),
-        Node::Update(update) => update.inner.into_copy_source(),
-        Node::Delete(delete) => delete.inner.into_copy_source(),
-        Node::Merge(merge) => (*merge).into_copy_source(),
+    let write = match statement {
+        Node::Select(select) => return Ok(select.into_copy_source()),
+        Node::Insert(insert) => CopySource::try_from(insert.inner),
+        Node::Update(update) => CopySource::try_from(update.inner),
+        Node::Delete(delete) => CopySource::try_from(delete.inner),
+        Node::Merge(merge) => CopySource::try_from(*merge),
         Node::PendingMerge(_) => {
             return refuse(cx, "a MERGE needs a WHEN arm before a COPY can read it");
         }
@@ -292,12 +296,16 @@ fn source<'cx>(
                 ),
             );
         }
-    })
+    };
+    match write {
+        Ok(source) => Ok(source),
+        Err(error) => refuse(cx, error.to_string()),
+    }
 }
 
 /// `copyToNew(source, format)`: COPY a table's rows, or a statement's, to
 /// the client.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 fn copy_to_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let source = source(cx, value)?;

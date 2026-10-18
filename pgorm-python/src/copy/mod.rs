@@ -146,7 +146,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.capabilities]
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 pub(crate) fn capabilities() -> Map<String, Value> {
     let builders = [
         (
@@ -194,7 +194,7 @@ pub(crate) fn capabilities() -> Map<String, Value> {
         ),
         (
             "copy_to",
-            "pgorm_query::CopyToStatement::new with IntoCopySource and CopyText, CopyCsv or CopyBinary",
+            "pgorm_query::CopyToStatement::new with IntoCopySource or CopySource::try_from, and CopyText, CopyCsv or CopyBinary",
         ),
         ("copy_to.delimiter", "pgorm_query::CopyToStatement::delimiter"),
         (

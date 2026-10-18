@@ -23,6 +23,13 @@ pub enum Error {
     /// grammar refuses (`42601`): skipping locked rows would make the tied
     /// set depend on what other transactions hold.
     TiesWithSkipLocked,
+    /// A write converted into a COPY TO's source without a `RETURNING`
+    /// list. COPY TO copies the rows a write returns, and PostgreSQL refuses
+    /// a write that returns none (`0A000`).
+    CopyWithoutReturning {
+        /// The write's keyword: `INSERT`, `UPDATE`, `DELETE` or `MERGE`.
+        write: &'static str,
+    },
 }
 
 /// Why a placeholder template and its substitutions do not pair up.
@@ -74,6 +81,10 @@ impl std::fmt::Display for Error {
             Self::TiesWithSkipLocked => {
                 f.write_str("FETCH FIRST .. WITH TIES cannot be combined with SKIP LOCKED")
             }
+            Self::CopyWithoutReturning { write } => write!(
+                f,
+                "COPY TO copies the rows a write returns, and this {write} has no RETURNING list"
+            ),
         }
     }
 }

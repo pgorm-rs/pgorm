@@ -784,6 +784,7 @@ assertions (
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
     {id constraint-drop-rename, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:25:32.290402Z}
     {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
+    {id copy-to-source-returning, kind @complete, author "brendan@necessary.nu", at 2026-10-18T20:23:14.97164Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
     {id coverage-remaining-gaps, kind @complete, author "brendan@necessary.nu", at 2026-09-24T15:04:46.850667Z}

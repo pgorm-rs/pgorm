@@ -1383,18 +1383,28 @@ today, including panicking edges and deliberate failsafes.
 
 ## COPY statements
 
-> [spec:pgorm:def:sql.ast.copy]
+> [spec:pgorm:def:sql.ast.copy+1]
 > `CopyFromStatement<F>` (`COPY … FROM STDIN`) and `CopyToStatement<F>`
 > (`COPY … TO STDOUT`) are the COPY AST nodes: the statements that open
 > COPY's data flow, which `conn.copy` runs. Each is made by `new` with what
 > PostgreSQL cannot do without. `CopyFromStatement::new(table, format)` takes
 > the table, any `IntoTableName`, bare or schema-qualified.
 > `CopyToStatement::new(source, format)` takes its source, any
-> `IntoCopySource`: a table, or one of the five statements
-> `IntoSubQueryStatement` covers (`sql.ast`), whose rows are a `SELECT`'s or a
-> write's `RETURNING` list. A write without one is the server's to refuse
-> (`0A000`), as a CTE body's missing `RETURNING` is (`sql.ast.with`).
-> `CopySource` is the enum a source converts into. Neither statement is a
+> `IntoCopySource`, which converts into a `CopySource`: a table, or the rows
+> of one of the five statements `IntoSubQueryStatement` covers (`sql.ast`),
+> a `SELECT`'s or a write's `RETURNING` list. PostgreSQL refuses a write
+> without one there (`0A000`), when the COPY starts. A COPY TO over one MUST
+> NOT be buildable. `CopySource`'s contents are private, so it holds only
+> what a conversion into it accepted. A table name and a `SELECT` are
+> `IntoCopySource`. An INSERT, UPDATE, DELETE or MERGE, or a
+> `SubQueryStatement`, converts through `CopySource`'s `TryFrom`, which
+> refuses a write with no `RETURNING` list as
+> `Error::CopyWithoutReturning`, naming the write. A write is no
+> `IntoCopySource`, so handing one to `new` directly is a compile error. A
+> MERGE's `returning_action` is a `RETURNING` list by itself. The check reads
+> the source statement's own clauses, as the server's does: a `SELECT` whose
+> data-modifying CTE returns nothing is a source, the server running that
+> CTE as it runs one in any query (`sql.ast.with`). Neither statement is a
 > `SubQueryStatement` or a `QueryStatementBuilder`: COPY nests nowhere, and it
 > binds nothing, so its rendering is `Display` alone (`sql.render.copy`).
 >

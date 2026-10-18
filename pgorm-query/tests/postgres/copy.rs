@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 
 use super::*;
 use crate::oracle::{assert_eq, parsed_nodes};
+use pgorm_query::error::Error;
 use serde_json::{Value as Json, json};
 
 fn n(name: &str) -> Name {
@@ -56,7 +57,7 @@ fn attributes(copy: &Json) -> Vec<&str> {
         .collect()
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    a bare COPY FROM names its table, its direction and its format
+// [spec:pgorm:def:sql.ast.copy+1/test]    a bare COPY FROM names its table, its direction and its format
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_from_names_table_and_format() {
@@ -70,7 +71,7 @@ fn copy_from_names_table_and_format() {
     assert_eq!(options(&copy), [option("format", string("text"))]);
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    the table is schema-qualifiable and every name is quoted, a hostile one included
+// [spec:pgorm:def:sql.ast.copy+1/test]    the table is schema-qualifiable and every name is quoted, a hostile one included
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_names_are_quoted_identifiers() {
@@ -97,7 +98,7 @@ fn copy_names_are_quoted_identifiers() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    every option a text-format COPY FROM takes, read back as the option it was written as
+// [spec:pgorm:def:sql.ast.copy+1/test]    every option a text-format COPY FROM takes, read back as the option it was written as
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_from_text_takes_its_options() {
@@ -139,7 +140,7 @@ fn copy_from_text_takes_its_options() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    ignoring errors without a limit or a verbosity writes ON_ERROR alone
+// [spec:pgorm:def:sql.ast.copy+1/test]    ignoring errors without a limit or a verbosity writes ON_ERROR alone
 #[test]
 fn copy_from_ignore_alone() {
     let sql = CopyFromStatement::new(Glyph::Table, CopyCsv)
@@ -152,7 +153,7 @@ fn copy_from_ignore_alone() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    the CSV-only options, and FORCE_NULL over every column
+// [spec:pgorm:def:sql.ast.copy+1/test]    the CSV-only options, and FORCE_NULL over every column
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_from_csv_takes_quote_and_forces() {
@@ -185,7 +186,7 @@ fn copy_from_csv_takes_quote_and_forces() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    an empty forced list forces nothing, since `FORCE_QUOTE ()` is a syntax error
+// [spec:pgorm:def:sql.ast.copy+1/test]    an empty forced list forces nothing, since `FORCE_QUOTE ()` is a syntax error
 #[test]
 fn copy_empty_force_list_is_left_out() {
     let none: [Name; 0] = [];
@@ -200,7 +201,7 @@ fn copy_empty_force_list_is_left_out() {
     assert_eq!(to, r#"COPY "glyph" TO STDOUT WITH (FORMAT csv)"#);
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    a binary COPY FROM takes a column list, FREEZE and a WHERE, and nothing textual
+// [spec:pgorm:def:sql.ast.copy+1/test]    a binary COPY FROM takes a column list, FREEZE and a WHERE, and nothing textual
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_from_binary_with_where() {
@@ -222,7 +223,7 @@ fn copy_from_binary_with_where() {
     assert!(copy.get("where_clause").is_some(), "{copy}");
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    a COPY TO reads a whole table
+// [spec:pgorm:def:sql.ast.copy+1/test]    a COPY TO reads a whole table
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_to_reads_a_table() {
@@ -255,7 +256,7 @@ fn copy_to_reads_a_table() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    a COPY TO over a query inlines its values, since COPY binds none
+// [spec:pgorm:def:sql.ast.copy+1/test]    a COPY TO over a query inlines its values, since COPY binds none
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_to_query_inlines_values() {
@@ -286,7 +287,7 @@ fn copy_to_query_inlines_values() {
     assert!(copy["query"].get("SelectStmt").is_some(), "{copy}");
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    a write with RETURNING, and a WITH-prefixed SELECT, are sources too
+// [spec:pgorm:def:sql.ast.copy+1/test]    a write with RETURNING, and a WITH-prefixed SELECT, are sources too
 // [spec:pgorm:req:sql.render.copy/test]
 #[test]
 fn copy_to_write_and_with_query() {
@@ -296,7 +297,8 @@ fn copy_to_write_and_with_query() {
         .values_panic(["new".into()])
         .returning_col(Glyph::Id)
         .to_owned();
-    let sql = CopyToStatement::new(insert, CopyBinary).to_string();
+    let source = CopySource::try_from(insert).expect("an INSERT with RETURNING is a source");
+    let sql = CopyToStatement::new(source, CopyBinary).to_string();
     assert_eq!(
         sql,
         r#"COPY (INSERT INTO "glyph" ("image") VALUES ('new') RETURNING "id") TO STDOUT WITH (FORMAT binary)"#
@@ -321,4 +323,149 @@ fn copy_to_write_and_with_query() {
         ]
         .join(" ")
     );
+}
+
+/// A MERGE that writes `glyph` from `font`, with no RETURNING list yet.
+fn merge() -> MergeStatement {
+    Query::merge(
+        Glyph::Table,
+        Font::Table,
+        Expr::col((Glyph::Table, Glyph::Id)).equals((Font::Table, Font::Id)),
+    )
+    .when_matched(MergeUpdate::value(
+        Glyph::Image,
+        Expr::col((Font::Table, Font::Name)),
+    ))
+}
+
+// [spec:pgorm:def:sql.ast.copy+1/test]    each write without RETURNING is refused as it converts, naming the write
+#[test]
+fn copy_to_refuses_writes_without_returning() {
+    let insert = Query::insert()
+        .into_table(Glyph::Table)
+        .columns([Glyph::Image])
+        .values_panic(["new".into()])
+        .to_owned();
+    let update = Query::update()
+        .table(Glyph::Table)
+        .value(Glyph::Aspect, 2)
+        .to_owned();
+    let delete = Query::delete().from_table(Glyph::Table).to_owned();
+    let refused = |write: &'static str| Some(Error::CopyWithoutReturning { write });
+
+    assert_eq!(
+        CopySource::try_from(insert.clone()).err(),
+        refused("INSERT")
+    );
+    assert_eq!(
+        CopySource::try_from(update.clone()).err(),
+        refused("UPDATE")
+    );
+    assert_eq!(
+        CopySource::try_from(delete.clone()).err(),
+        refused("DELETE")
+    );
+    assert_eq!(CopySource::try_from(merge()).err(), refused("MERGE"));
+
+    // The same check holds a write reached as a `SubQueryStatement`.
+    let nested = [
+        (insert.into_sub_query_statement(), "INSERT"),
+        (update.into_sub_query_statement(), "UPDATE"),
+        (delete.into_sub_query_statement(), "DELETE"),
+        (merge().into_sub_query_statement(), "MERGE"),
+    ];
+    for (statement, write) in nested {
+        assert_eq!(CopySource::try_from(statement).err(), refused(write));
+    }
+
+    // The message is no SQL, so it bypasses the oracle's `assert_eq`.
+    std::assert_eq!(
+        Error::CopyWithoutReturning { write: "MERGE" }.to_string(),
+        "COPY TO copies the rows a write returns, and this MERGE has no RETURNING list"
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy+1/test]    UPDATE, DELETE and MERGE with RETURNING are sources, merge_action() alone a list
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_to_writes_with_returning() {
+    let update = Query::update()
+        .table(Glyph::Table)
+        .value(Glyph::Aspect, 2)
+        .and_where(Expr::col(Glyph::Id).eq(1))
+        .returning(Query::returning().columns([
+            (ReturningRow::Old, Glyph::Aspect),
+            (ReturningRow::New, Glyph::Aspect),
+        ]))
+        .to_owned();
+    let delete = Query::delete()
+        .from_table(Glyph::Table)
+        .and_where(Expr::col(Glyph::Id).eq(1))
+        .returning_all()
+        .to_owned();
+    let listed = merge()
+        .returning(Query::returning().column(Glyph::Id))
+        .to_owned();
+    let action = merge().returning_action().to_owned();
+
+    let cases = [
+        (
+            CopySource::try_from(update),
+            "UpdateStmt",
+            r#"COPY (UPDATE "glyph" SET "aspect" = 2 WHERE "id" = 1 RETURNING old."aspect", new."aspect") TO STDOUT WITH (FORMAT text)"#,
+        ),
+        (
+            CopySource::try_from(delete),
+            "DeleteStmt",
+            r#"COPY (DELETE FROM "glyph" WHERE "id" = 1 RETURNING *) TO STDOUT WITH (FORMAT text)"#,
+        ),
+        (
+            CopySource::try_from(listed),
+            "MergeStmt",
+            r#"COPY (MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id" WHEN MATCHED THEN UPDATE SET "image" = "font"."name" RETURNING "id") TO STDOUT WITH (FORMAT text)"#,
+        ),
+        (
+            CopySource::try_from(action),
+            "MergeStmt",
+            r#"COPY (MERGE INTO "glyph" USING "font" ON "glyph"."id" = "font"."id" WHEN MATCHED THEN UPDATE SET "image" = "font"."name" RETURNING merge_action()) TO STDOUT WITH (FORMAT text)"#,
+        ),
+    ];
+    for (source, kind, expected) in cases {
+        let source = source.expect("a write with RETURNING is a source");
+        let sql = CopyToStatement::new(source, CopyText).to_string();
+        assert_eq!(sql, expected);
+        let returned = &statement(&sql)["query"][kind]["returning_clause"]["exprs"];
+        assert!(
+            returned.as_array().is_some_and(|exprs| !exprs.is_empty()),
+            "{sql}"
+        );
+    }
+}
+
+// [spec:pgorm:def:sql.ast.copy+1/test]    a SELECT whose write CTE returns nothing is a source, as the server holds
+#[test]
+fn copy_to_select_over_silent_write_cte() {
+    let write = Query::delete()
+        .from_table(Glyph::Table)
+        .and_where(Expr::col(Glyph::Id).eq(1))
+        .to_owned();
+    let select = Query::select()
+        .expr(Expr::val(1))
+        .with(WithClause::new(CommonTableExpression::new(
+            n("gone"),
+            write,
+        )))
+        .to_owned();
+    let source = CopySource::try_from(select.into_sub_query_statement())
+        .expect("a SELECT is a source whatever its CTEs return");
+    let sql = CopyToStatement::new(source, CopyCsv).to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY (WITH "gone" AS (DELETE FROM "glyph" WHERE "id" = 1) SELECT 1)"#,
+            r#"TO STDOUT WITH (FORMAT csv)"#,
+        ]
+        .join(" ")
+    );
+    assert!(statement(&sql)["query"].get("SelectStmt").is_some());
 }

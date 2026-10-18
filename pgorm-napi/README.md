@@ -169,7 +169,8 @@ for await (const chunk of await pool.copyOut(dump)) output.write(chunk);   // Ui
 - **`copyFrom(table, format)`** and **`copyTo(source, format)`** build
   `COPY … FROM STDIN` and `COPY … TO STDOUT` in `"text"`, `"csv"` or
   `"binary"`; a COPY TO reads a table, or a `select`, or a write with a
-  `returning` list. The format is the builder's type: an option it does not
+  `returning` list, and a write without one is a `ConstructionError` when
+  `copyTo` is called. The format is the builder's type: an option it does not
   take — `quote` on text, `header` on binary, `freeze` on a COPY TO — is no
   method of its type, and called anyway is a `ConstructionError`. COPY takes
   no parameters, so a value in its `where` or query is written into the SQL as

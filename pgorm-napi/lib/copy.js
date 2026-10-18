@@ -6,7 +6,7 @@
 // direction does not take is refused as it is called. COPY takes no bind
 // parameters, so `inspect()` gives its SQL, every value in it a literal, and
 // no values.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 
 import { arg, Builder, trusted, TRUSTED } from "./builder.js";
 import { LifecycleError } from "./errors.js";
