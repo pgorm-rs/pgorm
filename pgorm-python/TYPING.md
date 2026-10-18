@@ -38,6 +38,8 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `fetch_one(query)` | `Record`; raises `DatabaseError` unless exactly one row exists |
 | `fetch_optional(query)` | `Record \| None`; raises `DatabaseError` if more than one row exists |
 | `pool.stream(query)`, `connection.stream(query)` | `ResultStream`, an `AsyncIterator[Record]` and async context manager |
+| `copy_in(statement, source)` on a pool, connection or transaction | `int` rows inserted |
+| `copy_out(statement)` on a pool, connection or transaction | `CopyOutStream`, an `AsyncIterator[bytes]` and async context manager |
 | `connection.begin()`, `transaction.begin()` | `Transaction` |
 | `Model.find().all(executor)` | `list[ModelRecord]` |
 | `Model.find().one_opt(executor)` | `ModelRecord \| None` |
@@ -51,7 +53,7 @@ immutable until an execution method is called. Native methods returning an
 `Awaitable[T]` must be awaited just like the Python `async def` facade methods.
 The stream must be closed or used with `async with` when iteration can stop
 early. A transaction reserves its connection; a savepoint reserves its parent
-transaction until it finishes. Transaction streaming is not exposed.
+transaction until it finishes. Transaction row streaming is not exposed.
 
 The stubs mark positional-only parameters and keyword-only options. An opaque
 native result such as `Record`, `Compiled` or `Expr` is obtained from its

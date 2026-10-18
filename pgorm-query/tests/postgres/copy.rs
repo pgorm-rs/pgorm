@@ -1,0 +1,324 @@
+use std::num::NonZeroU32;
+
+use super::*;
+use crate::oracle::{assert_eq, parsed_nodes};
+use serde_json::{Value as Json, json};
+
+fn n(name: &str) -> Name {
+    Name::runtime(name)
+}
+
+/// The one `CopyStmt` in `sql`, as PostgreSQL's parser read it.
+fn statement(sql: &str) -> Json {
+    let mut found = parsed_nodes(sql, "CopyStmt");
+    assert_eq!(found.len(), 1, "exactly one CopyStmt in {sql}");
+    found.remove(0)
+}
+
+/// The statement's options as the parser read them: each `DefElem`'s name and
+/// argument, in order.
+fn options(copy: &Json) -> Vec<(String, Json)> {
+    copy["options"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .map(|option| {
+            let def = &option["DefElem"];
+            (
+                def["defname"].as_str().expect("an option name").to_owned(),
+                def.get("arg").cloned().unwrap_or(Json::Null),
+            )
+        })
+        .collect()
+}
+
+fn string(value: &str) -> Json {
+    json!({ "String": { "sval": value } })
+}
+
+fn names(values: &[&str]) -> Json {
+    json!({ "List": { "items": values.iter().map(|value| string(value)).collect::<Vec<_>>() } })
+}
+
+fn option(name: &str, arg: Json) -> (String, Json) {
+    (name.to_owned(), arg)
+}
+
+/// The column names a parsed list holds.
+fn attributes(copy: &Json) -> Vec<&str> {
+    copy["attlist"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .map(|item| item["String"]["sval"].as_str().expect("a column name"))
+        .collect()
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    a bare COPY FROM names its table, its direction and its format
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_from_names_table_and_format() {
+    let sql = CopyFromStatement::new(Glyph::Table, CopyText).to_string();
+    assert_eq!(sql, r#"COPY "glyph" FROM STDIN WITH (FORMAT text)"#);
+    let copy = statement(&sql);
+    assert_eq!(copy["relation"]["relname"], "glyph");
+    assert_eq!(copy["is_from"], true);
+    assert_eq!(copy["filename"], "", "{sql}");
+    assert_eq!(copy["is_program"], false, "{sql}");
+    assert_eq!(options(&copy), [option("format", string("text"))]);
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    the table is schema-qualifiable and every name is quoted, a hostile one included
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_names_are_quoted_identifiers() {
+    let sql = CopyFromStatement::new((n("bulk"), n("in\"box")), CopyCsv)
+        .columns([n("id"), n("weird, \"name\"")])
+        .columns([n("Mixed")])
+        .force_not_null([n("weird, \"name\"")])
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY "bulk"."in""box" ("id", "weird, ""name""", "Mixed") FROM STDIN"#,
+            r#"WITH (FORMAT csv, FORCE_NOT_NULL ("weird, ""name"""))"#,
+        ]
+        .join(" ")
+    );
+    let copy = statement(&sql);
+    assert_eq!(copy["relation"]["schemaname"], "bulk");
+    assert_eq!(copy["relation"]["relname"], "in\"box");
+    assert_eq!(attributes(&copy), ["id", "weird, \"name\"", "Mixed"]);
+    assert_eq!(
+        options(&copy)[1],
+        option("force_not_null", names(&["weird, \"name\""]))
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    every option a text-format COPY FROM takes, read back as the option it was written as
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_from_text_takes_its_options() {
+    let sql = CopyFromStatement::new(Glyph::Table, CopyText)
+        .freeze()
+        .delimiter('|')
+        .null_string("\\N")
+        .default_string("\\D")
+        .header_match()
+        .encoding("UTF8")
+        .on_error_ignore(CopyIgnore {
+            reject_limit: NonZeroU32::new(10),
+            log_verbosity: Some(CopyLogVerbosity::Verbose),
+        })
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY "glyph" FROM STDIN WITH (FORMAT text, FREEZE true, DELIMITER '|',"#,
+            r#"NULL E'\\N', DEFAULT E'\\D', HEADER match, ON_ERROR ignore,"#,
+            r#"REJECT_LIMIT 10, ENCODING 'UTF8', LOG_VERBOSITY verbose)"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        options(&statement(&sql)),
+        [
+            option("format", string("text")),
+            option("freeze", string("true")),
+            option("delimiter", string("|")),
+            option("null", string("\\N")),
+            option("default", string("\\D")),
+            option("header", string("match")),
+            option("on_error", string("ignore")),
+            option("reject_limit", json!({ "Integer": { "ival": 10 } })),
+            option("encoding", string("UTF8")),
+            option("log_verbosity", string("verbose")),
+        ]
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    ignoring errors without a limit or a verbosity writes ON_ERROR alone
+#[test]
+fn copy_from_ignore_alone() {
+    let sql = CopyFromStatement::new(Glyph::Table, CopyCsv)
+        .on_error_ignore(CopyIgnore::default())
+        .header()
+        .to_string();
+    assert_eq!(
+        sql,
+        r#"COPY "glyph" FROM STDIN WITH (FORMAT csv, HEADER true, ON_ERROR ignore)"#
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    the CSV-only options, and FORCE_NULL over every column
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_from_csv_takes_quote_and_forces() {
+    let sql = CopyFromStatement::new(Glyph::Table, CopyCsv)
+        .columns([Glyph::Id, Glyph::Image])
+        .delimiter(';')
+        .quote('\'')
+        .escape('\\')
+        .force_not_null([Glyph::Id])
+        .force_null_all()
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY "glyph" ("id", "image") FROM STDIN WITH (FORMAT csv, DELIMITER ';',"#,
+            r#"QUOTE E'\'', ESCAPE E'\\', FORCE_NOT_NULL ("id"), FORCE_NULL *)"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        options(&statement(&sql)),
+        [
+            option("format", string("csv")),
+            option("delimiter", string(";")),
+            option("quote", string("'")),
+            option("escape", string("\\")),
+            option("force_not_null", names(&["id"])),
+            option("force_null", json!({ "AStar": {} })),
+        ]
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    an empty forced list forces nothing, since `FORCE_QUOTE ()` is a syntax error
+#[test]
+fn copy_empty_force_list_is_left_out() {
+    let none: [Name; 0] = [];
+    let from = CopyFromStatement::new(Glyph::Table, CopyCsv)
+        .force_null(none.clone())
+        .force_not_null(none.clone())
+        .to_string();
+    assert_eq!(from, r#"COPY "glyph" FROM STDIN WITH (FORMAT csv)"#);
+    let to = CopyToStatement::new(Glyph::Table, CopyCsv)
+        .force_quote(none)
+        .to_string();
+    assert_eq!(to, r#"COPY "glyph" TO STDOUT WITH (FORMAT csv)"#);
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    a binary COPY FROM takes a column list, FREEZE and a WHERE, and nothing textual
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_from_binary_with_where() {
+    let sql = CopyFromStatement::new(Glyph::Table, CopyBinary)
+        .columns([Glyph::Id, Glyph::Aspect])
+        .freeze()
+        .and_where(Expr::col(Glyph::Aspect).gt(2))
+        .and_where(Expr::col(Glyph::Id).ne(7))
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY "glyph" ("id", "aspect") FROM STDIN WITH (FORMAT binary, FREEZE true)"#,
+            r#"WHERE "aspect" > 2 AND "id" <> 7"#,
+        ]
+        .join(" ")
+    );
+    let copy = statement(&sql);
+    assert!(copy.get("where_clause").is_some(), "{copy}");
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    a COPY TO reads a whole table
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_to_reads_a_table() {
+    let sql = CopyToStatement::new((n("public"), n("glyph")), CopyText)
+        .delimiter('\t')
+        .null_string("")
+        .header()
+        .encoding("LATIN1")
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY "public"."glyph" TO STDOUT WITH (FORMAT text, DELIMITER E'\t',"#,
+            r#"NULL '', HEADER true, ENCODING 'LATIN1')"#,
+        ]
+        .join(" ")
+    );
+    let copy = statement(&sql);
+    assert_eq!(copy["is_from"], false, "{copy}");
+    assert_eq!(copy["relation"]["relname"], "glyph");
+    assert_eq!(
+        options(&copy),
+        [
+            option("format", string("text")),
+            option("delimiter", string("\t")),
+            option("null", string("")),
+            option("header", string("true")),
+            option("encoding", string("LATIN1")),
+        ]
+    );
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    a COPY TO over a query inlines its values, since COPY binds none
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_to_query_inlines_values() {
+    let select = Query::select()
+        .columns([Glyph::Id, Glyph::Image])
+        .from(Glyph::Table)
+        .and_where(Expr::col(Glyph::Image).eq("it's"))
+        .and_where(Expr::col(Glyph::Aspect).between(1.5, 2.5))
+        .order_by(Glyph::Id, Order::Asc)
+        .take();
+    let sql = CopyToStatement::new(select, CopyCsv)
+        .header()
+        .quote('"')
+        .escape('"')
+        .force_quote([Glyph::Image])
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY (SELECT "id", "image" FROM "glyph" WHERE "image" = E'it\'s'"#,
+            r#"AND ("aspect" BETWEEN 1.5 AND 2.5) ORDER BY "id" ASC) TO STDOUT"#,
+            r#"WITH (FORMAT csv, HEADER true, QUOTE '"', ESCAPE '"', FORCE_QUOTE ("image"))"#,
+        ]
+        .join(" ")
+    );
+    let copy = statement(&sql);
+    assert!(copy.get("relation").is_none(), "{copy}");
+    assert!(copy["query"].get("SelectStmt").is_some(), "{copy}");
+}
+
+// [spec:pgorm:def:sql.ast.copy/test]    a write with RETURNING, and a WITH-prefixed SELECT, are sources too
+// [spec:pgorm:req:sql.render.copy/test]
+#[test]
+fn copy_to_write_and_with_query() {
+    let insert = Query::insert()
+        .into_table(Glyph::Table)
+        .columns([Glyph::Image])
+        .values_panic(["new".into()])
+        .returning_col(Glyph::Id)
+        .to_owned();
+    let sql = CopyToStatement::new(insert, CopyBinary).to_string();
+    assert_eq!(
+        sql,
+        r#"COPY (INSERT INTO "glyph" ("image") VALUES ('new') RETURNING "id") TO STDOUT WITH (FORMAT binary)"#
+    );
+    assert!(statement(&sql)["query"].get("InsertStmt").is_some());
+
+    let cte = CommonTableExpression::new(
+        n("ids"),
+        Query::select().column(Glyph::Id).from(Glyph::Table).take(),
+    );
+    let select = Query::select()
+        .column(Asterisk)
+        .from(n("ids"))
+        .with(WithClause::new(cte))
+        .to_owned();
+    let sql = CopyToStatement::new(select, CopyText).to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"COPY (WITH "ids" AS (SELECT "id" FROM "glyph") SELECT * FROM "ids")"#,
+            r#"TO STDOUT WITH (FORMAT text)"#,
+        ]
+        .join(" ")
+    );
+}

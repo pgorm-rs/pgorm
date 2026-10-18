@@ -312,6 +312,46 @@ handle, and each is released by being closed.
 > refuses other work meanwhile. A transaction offers no stream, as
 > pgorm-python's does not.
 
+> [spec:pgorm:req:napi.copy]
+> `copyFrom(table, format)` and `copyTo(source, format)` MUST build
+> pgorm-query's `CopyFromStatement` and `CopyToStatement` in the format named,
+> `"text"`, `"csv"` or `"binary"`, a COPY TO reading a table or the rows of a
+> `Select`, or of an INSERT, UPDATE, DELETE or MERGE, whose `RETURNING` list
+> the server requires. They are immutable builders as `napi.statements`
+> describes, each option the pgorm-query method of its name offered exactly
+> where pgorm-query's typed statement has it: an option the statement's
+> format or direction does not take MUST be refused with a
+> `ConstructionError` as it is called, never written for the server to
+> refuse, and a one-character option takes a one-character string. COPY takes
+> no parameters, so `inspect()` gives pgorm-query's rendering, every value in
+> it a literal, and no values, and a statement terminal MUST refuse a COPY.
+>
+> `copyIn(statement, source)` and `copyOut(statement)` MUST run a COPY through
+> pgorm's `CopyTrait` (`conn.copy`) on a pool, a connection and — unlike
+> `stream` — a transaction or savepoint, a task on the runtime owning the sink
+> or stream that borrows what the COPY runs on: a pool's COPY takes a
+> connection of its own, and a connection's or transaction's holds it,
+> refusing other work with a `LifecycleError` until the COPY ends. `copyIn`
+> writes a `Uint8Array`, or an iterable or async iterable of them, a string
+> refused with a `TypeError`, pulling the source only as the COPY takes its
+> data, so that a large one streams rather than accumulates, and resolves
+> with the rows written as an exact number. A source that throws or yields
+> anything else MUST abandon the COPY, so that nothing is written, and reject
+> with that error: outside a transaction the connection stays usable, and
+> inside one the transaction is aborted until it rolls back. A row the server
+> refuses rejects with its `DatabaseError` once the data is sent; a COPY FROM
+> it refuses before the data flow starts leaves its connection unusable, so
+> that connection is discarded and a transaction on it ends. `copyOut`
+> resolves, once the server accepts the statement, with an async iterator of
+> `Uint8Array` chunks, pulled one per `next()` with bounded buffering and
+> refusing a second pull while one is pending; its end frees what it holds,
+> and `close()` or `return()` before the end discards the connection, which
+> the server would otherwise go on sending to. A failure the server reports
+> part way leaves the connection as a failed statement does. An aborted COPY
+> MUST behave as `napi.cancellation` requires: it rejects with the signal's
+> reason, its connection is discarded and its transaction ends with nothing
+> committed.
+
 ## Statements and expressions
 
 JavaScript builds pgorm-query's statements and expressions as pgorm-python

@@ -5,6 +5,7 @@
 
 mod capabilities;
 mod config;
+mod copy;
 pub mod entities;
 mod errors;
 mod execution;
@@ -62,6 +63,7 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     json::register(module)?;
     identifiers::register(module)?;
     statements::register(module)?;
+    copy::register(module)?;
     results::register(module)?;
     entities::install(module, registry)?;
     graphs::install(module)?;

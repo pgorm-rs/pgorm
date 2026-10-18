@@ -52,14 +52,14 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+30]
+> [spec:pgorm:req:sql.surface+31]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
-> statements, schema statements, rendering — and the modules those items are
-> defined in MUST be private, so `use pgorm_query::*` and that list are the same
-> set and nothing becomes API by being declared `pub` inside a module a caller
-> can reach. Exactly three modules stay public, each because a path through it
+> statements, COPY, schema statements, rendering — and the modules those items
+> are defined in MUST be private, so `use pgorm_query::*` and that list are the
+> same set and nothing becomes API by being declared `pub` inside a module a
+> caller can reach. Exactly three modules stay public, each because a path through it
 > is the spelling callers write: `error` (`Error`, `Result`, `TemplateError`),
 > `extension` (the `CREATE EXTENSION` / `CREATE TYPE` surface, deliberately not
 > flattened into the root) and `value` (whose `value::with_array::NotU8` pgorm's
@@ -170,7 +170,13 @@ today, including panicking edges and deliberate failsafes.
 > `MaterializedViewCreateStatement`, `MaterializedViewRefreshStatement` and
 > `MaterializedViewDropStatement`, the materialized view statements
 > (`sql.ddl.materialized-view`); `TableCreateAsStatement`, a table created
-> from a query (`sql.ddl.create-table-as`); and
+> from a query (`sql.ddl.create-table-as`);
+> `CopyFromStatement` and `CopyToStatement`, the two COPY statements;
+> `CopyFormat` and `CopyDelimitedFormat`, the sealed traits a statement's
+> format type implements, and `CopyText`, `CopyCsv` and `CopyBinary`, the
+> three formats; `CopyIgnore` and `CopyLogVerbosity`, what `ON_ERROR ignore`
+> carries; and `CopySource` and `IntoCopySource`, what a COPY TO reads and the
+> conversion into it (`sql.ast.copy`); and
 > `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
 > item leaves the list with the state it described: `Frame` went when a
 > frame's bounds stopped being one enum, the frame builder replacing it
@@ -218,16 +224,18 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+17]
+> [spec:pgorm:req:sql.scope+18]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
 > `SqlTemplate` in expression position, `FromItem::Template` in relation
 > position, and `ConnectionTrait::execute` / `batch_execute` /
 > `query_raw` for a whole statement — so what follows records a decision about
-> the *typed* surface, never about what a caller can send. The exceptions are
-> named here too: `COPY`'s data flow and `LISTEN`'s notifications travel
-> outside any statement result, so no route above reaches them. Each entry
+> the *typed* surface, never about what a caller can send. The exception is
+> named here too: `LISTEN`'s notifications travel outside any statement
+> result, so no route above reaches them. `COPY`'s data flow travels outside
+> one as well, and has a route of its own, `copy_in` and `copy_out`
+> (`conn.copy`). Each entry
 > MUST carry a verdict and the reason for it; "deferred" MUST additionally say
 > what closing it would take, because a deferral whose cost is unrecorded is
 > indistinguishable from an oversight. An entry graduates by being implemented
@@ -239,8 +247,8 @@ today, including panicking edges and deliberate failsafes.
 > persistence and `ALTER VIEW` (`sql.ddl.view`), a materialized view's
 > storage and `ALTER MATERIALIZED VIEW` (`sql.ddl.materialized-view`),
 > `CREATE TABLE AS`'s persistence and storage, `SELECT INTO` and `EXECUTE`
-> (`sql.ddl.create-table-as`), and syntax only PostgreSQL 19 parses
-> (`sql.target`).
+> (`sql.ddl.create-table-as`), COPY TO's column list (`sql.ast.copy`), and
+> syntax only PostgreSQL 19 parses (`sql.target`).
 >
 > Three tests decide which verdict an entry gets. *Does the ORM need it to do
 > its job?* — the builder exists to render the statements an entity layer
@@ -273,11 +281,6 @@ today, including panicking edges and deliberate failsafes.
 >   unlike a database, a schema belongs to one database and is created inside
 >   a transaction. Closing it takes the two statements, with `IF [NOT] EXISTS`
 >   and `CASCADE` / `RESTRICT` (`sql-schemas`).
-> - **`COPY`.** `COPY … FROM STDIN` and `TO STDOUT` are a message flow the
->   driver carries, not rows a statement returns, and pgorm exposes no route
->   to it. Closing it takes `copy_in` and `copy_out` on a connection and a
->   transaction, over a typed `COPY` statement whose table and column names
->   are quoted and whose format is chosen from a closed set (`conn-copy`).
 > - **`LISTEN`.** `NOTIFY` is a statement `execute` already sends (or
 >   `pg_notify(..)` an expression), but a notification arrives on the
 >   connection that listened, which the pool keeps out of reach. Closing it
@@ -313,6 +316,15 @@ today, including panicking edges and deliberate failsafes.
 >   application connects to. `CREATE EXTENSION` is built (`sql.ddl.extension`),
 >   because an extension is what makes a *column type* available and so is
 >   reachable from an entity.
+> - **`COPY` to or from a file on the server, and `PROGRAM`.** The server
+>   reads or writes the file, or runs the program, as its own operating-system
+>   user, which is why PostgreSQL reserves both for superusers and the
+>   `pg_read_server_files`, `pg_write_server_files` and
+>   `pg_execute_server_program` roles. That is access to the database host
+>   rather than to its data, and a library that can widen its own reach is a
+>   hazard, as with privileges. The data an application moves travels over its
+>   connection, which is what `FROM STDIN` and `TO STDOUT` are (`sql.ast.copy`,
+>   `conn.copy`).
 > - **`EXPLAIN`.** A diagnostic no ORM path issues, whose result is a plan
 >   rather than rows of the entity's shape; `query_raw` sends it with a built
 >   statement's text and parameters.
@@ -1253,6 +1265,68 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.on-conflict`). A caller runs a MERGE by building it and
 > executing the `(String, Values)` pair, and with a RETURNING list reads the
 > rows it wrote.
+
+## COPY statements
+
+> [spec:pgorm:def:sql.ast.copy]
+> `CopyFromStatement<F>` (`COPY … FROM STDIN`) and `CopyToStatement<F>`
+> (`COPY … TO STDOUT`) are the COPY AST nodes: the statements that open
+> COPY's data flow, which `conn.copy` runs. Each is made by `new` with what
+> PostgreSQL cannot do without. `CopyFromStatement::new(table, format)` takes
+> the table, any `IntoTableName`, bare or schema-qualified.
+> `CopyToStatement::new(source, format)` takes its source, any
+> `IntoCopySource`: a table, or one of the five statements
+> `IntoSubQueryStatement` covers (`sql.ast`), whose rows are a `SELECT`'s or a
+> write's `RETURNING` list. A write without one is the server's to refuse
+> (`0A000`), as a CTE body's missing `RETURNING` is (`sql.ast.with`).
+> `CopySource` is the enum a source converts into. Neither statement is a
+> `SubQueryStatement` or a `QueryStatementBuilder`: COPY nests nowhere, and it
+> binds nothing, so its rendering is `Display` alone (`sql.render.copy`).
+>
+> The format is the statement's type parameter, chosen at construction from
+> the closed set PostgreSQL 18 has: `CopyText`, `CopyCsv` and `CopyBinary`,
+> unit types implementing the sealed `CopyFormat`; `CopyDelimitedFormat`, also
+> sealed, marks the two text formats. An option MUST be a method only where
+> the server accepts it in that direction and that format, so a combination
+> it refuses has no spelling:
+>
+> - Every COPY FROM: a column list (`columns`, which a later call extends;
+>   none supplies every column in the table's order), `FREEZE` (`freeze`), and
+>   a `WHERE` through `ConditionalStatement`.
+> - Text and CSV, both directions: `DELIMITER`, `NULL`, `HEADER` and `ENCODING`
+>   (`delimiter`, `null_string`, `header`, `encoding`). COPY FROM adds
+>   `DEFAULT` (`default_string`), `HEADER MATCH` (`header_match`) and
+>   `ON_ERROR ignore` (`on_error_ignore`).
+> - CSV, both directions: `QUOTE` and `ESCAPE` (`quote`, `escape`). COPY FROM
+>   adds `FORCE_NOT_NULL` and `FORCE_NULL`, COPY TO adds `FORCE_QUOTE`, each over
+>   named columns or over every column (`*`, the `_all` method).
+> - Binary takes none of the text options. The server refuses `HEADER`,
+>   `NULL`, `DEFAULT` and `ON_ERROR ignore` in binary mode (`0A000`), and
+>   accepts `ENCODING` there without it changing a byte that is sent, so the
+>   type leaves that out as well.
+>
+> `ON_ERROR stop` is the server's default and has no value, as `NOT
+> DEFERRABLE` has none (`conn.tx`): selecting it says nothing. `CopyIgnore`
+> carries the two options that mean nothing without `ignore`, so neither can be
+> written without it: `REJECT_LIMIT`, a `NonZeroU32` because the server refuses
+> zero, and `LOG_VERBOSITY` (`CopyLogVerbosity::Verbose` or `Silent`; no value
+> is the server's default).
+>
+> COPY TO has no column list. `COPY t (a, b) TO STDOUT` copies what `COPY
+> (SELECT a, b FROM t) TO STDOUT` copies, and the query form can also filter,
+> order and join, so a subset of a table's columns is a `SELECT`.
+>
+> What turns on a value or on the catalog is left to the server, which
+> refuses it when `conn.copy` starts the statement: a delimiter, quote or
+> escape that is not a single one-byte character (`0A000`), a delimiter the
+> text format reserves or a newline (`22023`), `NULL` and `DEFAULT` strings
+> that are equal or hold the delimiter (`22023`), a forced column the COPY
+> does not name (`42P10`), an encoding the server does not know (`22023`), and
+> `FREEZE` on a table not created or truncated in the current subtransaction
+> (`55000`). An empty forced-column list is no option at all: `FORCE_QUOTE ()`
+> is a syntax error, and forcing no column is the option left out. COPY to or
+> from a file on the server, and through `PROGRAM`, is not built
+> (`sql.scope`).
 
 ## WITH clauses and CTEs
 

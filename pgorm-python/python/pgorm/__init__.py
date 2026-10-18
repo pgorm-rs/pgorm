@@ -87,6 +87,8 @@ from ._native import (
     With,
     ReturningRow,
     merge,
+    CopyFrom,
+    CopyTo,
     Entity,
     EntityColumn,
     EntityQuery,
@@ -114,6 +116,7 @@ from .runtime import Connection, Pool, PoolStatus, connect
 from .results import Record, Field, ResultStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 from .transactions import Transaction, TransactionMode, IsolationLevel
+from .copy import CopyOutStream, CopySource
 
 select = Select
 insert = Insert
@@ -224,6 +227,10 @@ __all__ = [
     "With",
     "ReturningRow",
     "merge",
+    "CopyFrom",
+    "CopyTo",
+    "CopyOutStream",
+    "CopySource",
     "Entity",
     "EntityColumn",
     "EntityQuery",

@@ -1172,6 +1172,21 @@ impl_evidence (
         {impl_name main, rule macros.derive.test-attr}
         {impl_name main, rule macros.derive.value-type}
     )}
+    {id conn-copy, covered_rules (
+        conn.copy
+        metric.layer.copy
+        napi.copy
+        python.copy
+        sql.ast.copy
+        sql.render.copy
+    ), covered_claims (
+        {impl_name main, rule conn.copy}
+        {impl_name main, rule metric.layer.copy}
+        {impl_name main, rule napi.copy}
+        {impl_name main, rule python.copy}
+        {impl_name main, rule sql.ast.copy}
+        {impl_name main, rule sql.render.copy}
+    )}
     {id core, covered_rules (
         query.graph
         query.graph.aliases

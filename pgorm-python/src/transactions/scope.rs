@@ -4,7 +4,10 @@ use super::{
     state::{Finished, State},
     work::{Output, Work},
 };
-use crate::execution::Database;
+use crate::{
+    copy::{CopyFrom, CopyTo, Message, Piece},
+    execution::Database,
+};
 use futures_util::future::BoxFuture;
 use pgorm::{DatabaseTransaction, Error, TransactionTrait};
 use std::{sync::Arc, time::Duration};
@@ -26,6 +29,17 @@ pub(super) enum Command {
         receiver: mpsc::UnboundedReceiver<Command>,
         opened: oneshot::Sender<Result<(), Error>>,
         parent_lock: OwnedMutexGuard<()>,
+    },
+    CopyIn {
+        statement: CopyFrom,
+        messages: mpsc::Receiver<Message>,
+        opened: oneshot::Sender<Result<(), Error>>,
+        reply: oneshot::Sender<Result<Option<u64>, Error>>,
+    },
+    CopyOut {
+        statement: CopyTo,
+        pieces: mpsc::Sender<Piece>,
+        opened: oneshot::Sender<Result<(), Error>>,
     },
 }
 
@@ -78,6 +92,37 @@ pub(super) fn serve<'a>(
                         result = work.run(Database::Transaction(&tx)) => result,
                     };
                     if reply.send(result).is_err() {
+                        return Completion::discarded();
+                    }
+                }
+                // [spec:pgorm:req:python.copy]
+                Command::CopyIn {
+                    statement,
+                    mut messages,
+                    opened,
+                    reply,
+                } => {
+                    let result = tokio::select! {
+                        _ = state.abandoned.cancelled() => return Completion::discarded(),
+                        result = super::copy::run_in(&mut tx, &statement, &mut messages, opened) => result,
+                    };
+                    let Some(result) = result else {
+                        return Completion::discarded();
+                    };
+                    if reply.send(result).is_err() {
+                        return Completion::discarded();
+                    }
+                }
+                Command::CopyOut {
+                    statement,
+                    pieces,
+                    opened,
+                } => {
+                    let known = tokio::select! {
+                        _ = state.abandoned.cancelled() => return Completion::discarded(),
+                        known = super::copy::run_out(&mut tx, &statement, &pieces, opened) => known,
+                    };
+                    if !known {
                         return Completion::discarded();
                     }
                 }

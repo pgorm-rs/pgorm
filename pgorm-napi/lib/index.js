@@ -28,6 +28,7 @@ installConnections(native);
 
 export { connect, Connection, Pool, Queryable, Transaction } from "./connections.js";
 export { RowStream } from "./streams.js";
+export { CopyFrom, copyFrom, CopyOutStream, CopyTo, copyTo } from "./copy.js";
 export { CaseOperand, caseOf, caseWhen, Condition, SearchedCase, SimpleCase } from "./conditions.js";
 export { Aliased, bind, call, col, exists, Expr, OrderBy, scalar, tuple } from "./expressions.js";
 export { Builder } from "./builder.js";

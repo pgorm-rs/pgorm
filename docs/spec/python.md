@@ -309,6 +309,34 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > documented Rust decode path; a database or decode error MUST NOT become an
 > empty result, None or a missing joined row.
 
+> [spec:pgorm:req:python.copy]
+> `COPY … FROM STDIN` and `COPY … TO STDOUT` MUST be reachable on a pool, a
+> connection and a transaction through `conn.copy`'s `CopyTrait`, over
+> `CopyFrom` and `CopyTo` statements lowered into the Rust statements of
+> `sql.ast.copy`. The format MUST be chosen when a statement is built, and an
+> option the chosen format or direction does not accept MUST raise a
+> construction error when it is set, never render SQL the server refuses.
+> COPY FROM's source MUST be bytes-like data or a synchronous or asynchronous
+> iterable of it; text and any other item MUST be refused, never encoded
+> implicitly, and the source MUST be pulled only as the COPY accepts data
+> through a bounded queue, so a large source streams rather than
+> materialises. A source that raises, or yields an item that is not bytes,
+> MUST abort the COPY and propagate its own exception unchanged: outside a
+> transaction nothing is written and the connection stays usable; inside one
+> the transaction is aborted until it is rolled back. A row the server
+> refuses MUST raise the database error carrying its SQLSTATE, and a COPY FROM
+> the server refuses before any data moves MUST close its connection, and any
+> transaction on it, as `conn.copy` requires. COPY TO MUST be an async
+> iterator of `bytes` with bounded buffering, holding the server back when
+> nothing reads. A copy MUST reserve its connection or transaction, refusing
+> other work on it with a lifecycle error, until a COPY FROM finishes or
+> aborts or a COPY TO's end is read; a pool's copy acquires and releases a
+> connection of its own. Closing a COPY TO before its end MUST discard its
+> connection, and any transaction on it. Cancellation MUST follow
+> `python.cancellation`: before finishing it aborts the COPY, and while
+> finishing, when the outcome is unknown, it discards the connection or
+> transaction.
+
 > [spec:pgorm:req:python.errors]
 > The package MUST expose a stable exception hierarchy for construction/type,
 > unsupported capability, connection, database, decode, timeout/cancellation

@@ -101,6 +101,11 @@ and `fetch_optional` return detached records; `stream` opens an async iterator.
 See [execution, result types and stream ownership](RESULTS.md) for examples,
 PostgreSQL decoding limits and cancellation behavior.
 
+`CopyFrom` and `CopyTo` build COPY statements: `copy_in` streams bytes from a
+sync or async source into a table, and `copy_out` streams a table's or a
+query's data out as `bytes`. See [COPY](STATEMENTS.md#copy) for the formats,
+chunking, abort and cancellation behaviour.
+
 The [direct builder integration suite](DIRECT_BUILDERS.md) installs a wheel in
 a fresh Python environment, runs 32 application query programs against
 PostgreSQL, and compares their SQL and tagged parameters with independent Rust

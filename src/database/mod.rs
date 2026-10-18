@@ -1,9 +1,16 @@
 mod connection;
+mod copy;
 mod db_connection;
 mod lifecycle;
 
 pub use connection::*;
+pub use copy::{CopyInSink, CopyOutStream, CopyTrait};
 pub use db_connection::*;
+
+/// The chunk type COPY's data travels in, both ways, re-exported so writing a
+/// [`CopyInSink`] needs no direct dependency on `bytes`.
+// [spec:pgorm:req:conn.copy]
+pub use bytes::Bytes;
 pub use tokio_postgres::{Config, IsolationLevel};
 
 /// The pool and manager knobs [`connect_with`] takes, re-exported so shaping a

@@ -14,6 +14,7 @@
 
 mod args;
 mod conflict;
+mod copy;
 mod data_type;
 mod expr;
 mod json;
@@ -40,6 +41,7 @@ use pgorm::pgorm_query::{
 use crate::{codec::Codec, rows, values::Tagged};
 pub(crate) use args::node;
 use args::refuse;
+pub(crate) use copy::{CopyFrom, CopyTo, copy_from_at, copy_to_at};
 
 /// A projection: an expression with the name its output column takes.
 #[derive(Debug, Clone)]
@@ -101,6 +103,9 @@ pub(crate) enum Node {
     /// pgorm's pipeline state: a pipeline, a grouping, an expression, a
     /// source, a window or a binder's scope.
     Pipeline(Box<pipeline::Part>),
+    /// A `COPY … FROM STDIN` or `COPY … TO STDOUT`, which only `copyIn` and
+    /// `copyOut` run.
+    Copy(Box<copy::CopyStatement>),
 }
 
 impl Finalize for Node {}
@@ -137,6 +142,7 @@ impl Node {
             Self::WindowFunction(_) => "a window function with no window",
             Self::Schema(part) => part.describe(),
             Self::Pipeline(part) => part.describe(),
+            Self::Copy(copy) => copy.describe(),
         }
     }
 }
@@ -160,6 +166,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
         json::EXPORTS,
         json_table::EXPORTS,
         window::EXPORTS,
+        copy::EXPORTS,
     ] {
         for &(name, build) in exports {
             cx.export_function(name, move |mut cx| {
@@ -200,6 +207,15 @@ pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String,
                 cx,
                 "a MERGE needs a WHEN arm before it can be inspected or run: whenMatched(..), \
                  whenNotMatched(..) or whenNotMatchedBySource(..)",
+            );
+        }
+        // A COPY opens a data flow no statement terminal reads or feeds.
+        // [spec:pgorm:req:napi.copy]
+        Node::Copy(copy) => {
+            let what = copy.describe();
+            return refuse(
+                cx,
+                format!("{what} runs through copyIn(..) or copyOut(..), which carry its data"),
             );
         }
         other => match write::built(other) {
@@ -244,6 +260,7 @@ fn inspect(mut cx: FunctionContext) -> JsResult<JsArray> {
                 .to_owned();
             limited(&mut cx, select.build())?
         }
+        Node::Copy(copy) => (copy.sql(&mut cx)?, Values(Vec::new())),
         other => compile(&mut cx, other)?,
     };
     let codec = Codec::get(&mut cx)?;

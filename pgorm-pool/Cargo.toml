@@ -18,6 +18,9 @@ default = []
 
 [dependencies]
 async-trait.workspace = true # = "0.1.80"
+# `Buf`, the bound tokio-postgres puts on what a COPY FROM STDIN sink takes,
+# which the transaction wrapper's forwarding `copy_in` has to name.
+bytes = "1.12"
 deadpool.workspace = true
 serde.workspace = true
 # = { package = "serde", version = "1.0", features = [

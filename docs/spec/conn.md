@@ -426,7 +426,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > per-connection `StatementCache` (`conn.pool.statement-cache`) and nested
 > transactions go through the wrapper's savepoint logic.
 
-> [spec:pgorm:req:conn.pool.savepoint-name+2]
+> [spec:pgorm:req:conn.pool.savepoint-name+3]
 > `pgorm_pool::Transaction::savepoint(name)` MUST quote `name` as a
 > PostgreSQL identifier — every `"` in it doubled, the whole wrapped in
 > `"` — before handing it to `tokio_postgres`.
@@ -473,8 +473,10 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `tokio_postgres::Transaction::savepoint(&mut *txn, name)` compiled and
 > skipped the quoting. The wrapper forwards the statement methods its
 > callers use instead — `execute`, `execute_raw`, `query`, `query_one`,
-> `query_opt`, `query_raw` and `batch_execute`, each a call with the
-> caller's own statement text — and holds the inner transaction privately.
+> `query_opt`, `query_raw`, `batch_execute`, `copy_in` and `copy_out`, each a
+> call with the caller's own statement — and holds the inner transaction
+> privately. `copy_in` adds the guard `conn.copy` requires of a COPY FROM
+> refused at its start.
 
 ## Transactions
 
@@ -637,3 +639,83 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > attempt, which makes replayability the caller's obligation: work the closure
 > does inside the transaction is undone by the rollback, but any effect outside
 > it happens again on every attempt.
+
+## COPY
+
+> [spec:pgorm:req:conn.copy]
+> `CopyTrait` is COPY's data flow on a connection: `copy_in(&mut self,
+> &CopyFromStatement<F>)` starts `COPY … FROM STDIN` and returns a
+> `CopyInSink<'_>`, and `copy_out(&mut self, &CopyToStatement<F>)` starts `COPY
+> … TO STDOUT` and returns a `CopyOutStream<'_>`, over the typed statements of
+> `sql.ast.copy`. It MUST be implemented for `DatabaseConnection` and
+> `DatabaseTransaction`, savepoints included, and for the metrics wrappers
+> (`metric.layer.copy`). A COPY's rows travel as `CopyData` messages beside the
+> statement, which no `ConnectionTrait` method sends or returns (`sql.scope`).
+>
+> The methods take only the typed statements. Text that is not a COPY would
+> reach the driver's `copy_in` as a statement that runs to completion before
+> the driver notices that no data flow opened — a `DELETE` passed to it would
+> delete and then fail — so text is not accepted at all.
+>
+> Both MUST borrow the connection or transaction exclusively for as long as
+> the sink or stream they return is alive. A COPY in progress holds the
+> connection's request queue: a statement sent while a COPY FROM is open waits
+> behind data the caller has not yet sent, and one sent while a COPY TO is
+> unread waits behind data the caller has not yet read, so within one task
+> either never completes; a transaction committed while its COPY is open waits
+> the same way. The exclusive borrow makes each a compile error, and is why
+> `CopyTrait` is a trait of its own rather than two more `ConnectionTrait`
+> methods, which borrow shared and which `&DatabaseConnection` implements.
+>
+> The statement is sent as its one rendering (`sql.render.copy`) and is
+> prepared afresh, never through the statement cache
+> (`conn.pool.statement-cache`): the text of a COPY over a query carries that
+> query's values, so caching it would fill the bounded cache with statements
+> run once, and one prepare per COPY is nothing beside the transfer it starts.
+>
+> `CopyInSink` implements `Sink<Bytes>` with pgorm's `Error`, and
+> `finish(self)` returns the number of rows the COPY inserted; `Bytes` is
+> re-exported from `pgorm`. A chunk is the format's own encoding, split
+> anywhere. The sink MUST send a chunk longer than a mebibyte as several
+> `CopyData` messages: the driver sends every chunk past four kilobytes as a
+> single message, and PostgreSQL ends the session on a message past 1 GiB. The
+> sink applies backpressure, so a source written through it streams rather
+> than accumulates. A row the server refuses — a unique violation (`23505`), a
+> field that does not parse — is the `Error::Postgres` that `finish` returns,
+> after the rest of the data has been sent, since the protocol carries no error
+> back to a client that is still sending; inside a transaction the failure
+> aborts the transaction, as any failed statement does. Dropping the sink
+> unfinished MUST abort the COPY: the driver sends `CopyFail` and no row is
+> written; outside a transaction the connection is left as it was, and inside
+> one the transaction is aborted. `Sink::close` finishes as `finish` does but
+> discards the count. Cancelling `finish` once the data is sent leaves the
+> outcome unknown: outside a transaction the rows may have been committed.
+>
+> `CopyOutStream` implements `Stream<Item = Result<Bytes, Error>>`. Each item
+> is one `CopyData` message, which the server sends per row in the text
+> formats without the protocol promising that boundary. Rows arrive as the
+> stream is polled, so an unread stream holds the server back. Dropping it
+> early does not stop the server: the connection reads and discards the rest
+> before its next statement runs.
+>
+> A refusal at the start is the error `copy_in` or `copy_out` returns: an
+> undefined table or column, an option the server refuses (`sql.ast.copy`), a
+> transaction already aborted. A COPY FROM refused there MUST close its
+> connection. tokio-postgres sends `Bind`, `Execute` and `Sync` together and a
+> second `Sync` when the sink ends. The server ignores the first while it is
+> in copy-in mode, so a COPY that starts is answered by one `ReadyForQuery`;
+> a COPY refused before copy-in mode answers both, and the driver hands the
+> second answer to the next request, which reads it as its own and leaves its
+> own to the request after it, so that every later response on the connection
+> answers the wrong request. Nothing in the driver's public API sends a
+> message the server leaves unanswered, so the extra answer cannot be
+> absorbed. pgorm-pool aborts the connection's driver task instead, through an
+> abort handle `ClientWrapper` and every transaction opened from it carry:
+> every later call on the connection fails as closed, the pool's recycling
+> discards it (`conn.pool.recycle`), and a transaction open on it ends without
+> committing. A `copy_in` dropped before it completes closes the connection
+> too, since whether the server refused is then unknown. The statement is
+> prepared before the start, as a request of its own, so one the server
+> cannot parse is refused without closing anything. A COPY TO is one request
+> answered by one `ReadyForQuery` whether or not it starts, and a refused one
+> leaves the connection as it was.

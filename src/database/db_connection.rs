@@ -395,7 +395,7 @@ impl<'a> DatabaseTransaction<'a> {
     /// The open transaction. The `Option` is emptied only by `commit` and
     /// `rollback`, both of which consume the handle, so it is always `Some`
     /// here.
-    fn tx(&self) -> &Transaction<'a> {
+    pub(super) fn tx(&self) -> &Transaction<'a> {
         self.0.as_ref().expect("transaction already consumed")
     }
 

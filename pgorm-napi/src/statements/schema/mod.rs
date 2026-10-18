@@ -23,7 +23,7 @@ mod table;
 mod types;
 mod view;
 
-pub(super) use options::integer;
+pub(super) use options::{get, integer, names, object, pick, relation, text};
 
 use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,

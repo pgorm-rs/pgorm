@@ -7,9 +7,11 @@ use std::{
     sync::Arc,
 };
 
+use bytes::Buf;
+use tokio::task::AbortHandle;
 use tokio_postgres::{
-    Error, IsolationLevel, Row, RowStream, Statement, ToStatement, Transaction as PgTransaction,
-    TransactionBuilder as PgTransactionBuilder,
+    CopyInSink, CopyOutStream, Error, IsolationLevel, Row, RowStream, Statement, ToStatement,
+    Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder,
     types::{BorrowToSql, ToSql, Type},
 };
 
@@ -29,13 +31,17 @@ use crate::StatementCache;
 ///     let _ = pgorm_pool::tokio_postgres::Transaction::savepoint(&mut *txn, "x").await;
 /// }
 /// ```
-// [spec:pgorm:req:conn.pool.savepoint-name+2]
+// [spec:pgorm:req:conn.pool.savepoint-name+3]
 pub struct Transaction<'a> {
     /// Original [`PgTransaction`].
     pub(crate) txn: PgTransaction<'a>,
 
     /// [`StatementCache`] of this [`Transaction`].
     pub statement_cache: Arc<StatementCache>,
+
+    /// The task driving the connection, which [`copy_in`](Self::copy_in)
+    /// aborts when a COPY's refusal leaves the connection unusable.
+    pub(crate) connection: AbortHandle,
 }
 
 impl Transaction<'_> {
@@ -136,6 +142,28 @@ impl Transaction<'_> {
         self.txn.batch_execute(query).await
     }
 
+    /// Like [`tokio_postgres::Transaction::copy_in()`], but a COPY the server
+    /// refuses before its data flow starts closes the connection, as
+    /// [`ClientWrapper::copy_in`](crate::ClientWrapper::copy_in) does and for
+    /// the same reason. The transaction then ends without committing.
+    // [spec:pgorm:req:conn.copy]    the transaction wrapper forwards COPY FROM STDIN
+    pub async fn copy_in<T, U>(&self, statement: &T) -> Result<CopyInSink<U>, Error>
+    where
+        T: ?Sized + ToStatement,
+        U: Buf + 'static + Send,
+    {
+        crate::copy::guarded(&self.connection, self.txn.copy_in(statement)).await
+    }
+
+    /// Like [`tokio_postgres::Transaction::copy_out()`].
+    // [spec:pgorm:req:conn.copy]    the transaction wrapper forwards COPY TO STDOUT
+    pub async fn copy_out<T>(&self, statement: &T) -> Result<CopyOutStream, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        self.txn.copy_out(statement).await
+    }
+
     /// Like [`tokio_postgres::Transaction::commit()`].
     pub async fn commit(self) -> Result<(), Error> {
         self.txn.commit().await
@@ -153,6 +181,7 @@ impl Transaction<'_> {
         Ok(Transaction {
             txn: PgTransaction::transaction(&mut self.txn).await?,
             statement_cache: self.statement_cache.clone(),
+            connection: self.connection.clone(),
         })
     }
 
@@ -177,7 +206,7 @@ impl Transaction<'_> {
     /// containing one under any quoting at all, and the protocol encoder
     /// rejects it before a byte reaches the server, so the `Err` arrives with
     /// the transaction untouched.
-    // [spec:pgorm:req:conn.pool.savepoint-name+2]
+    // [spec:pgorm:req:conn.pool.savepoint-name+3]
     #[allow(unused_lifetimes)] // false positive
     pub async fn savepoint<I>(&mut self, name: I) -> Result<Transaction<'_>, Error>
     where
@@ -186,6 +215,7 @@ impl Transaction<'_> {
         Ok(Transaction {
             txn: PgTransaction::savepoint(&mut self.txn, quote_identifier(&name.into())).await?,
             statement_cache: self.statement_cache.clone(),
+            connection: self.connection.clone(),
         })
     }
 }
@@ -197,7 +227,7 @@ impl Transaction<'_> {
 /// identifier gives special meaning to, and doubling is how PostgreSQL spells
 /// an escaped one, so there is no name this can fail on and no name it can
 /// turn into something other than an identifier.
-// [spec:pgorm:req:conn.pool.savepoint-name+2]
+// [spec:pgorm:req:conn.pool.savepoint-name+3]
 fn quote_identifier(name: &str) -> String {
     let mut quoted = String::with_capacity(name.len() + 2);
     quoted.push('"');
@@ -229,6 +259,9 @@ pub struct TransactionBuilder<'a> {
 
     /// [`StatementCache`] of this [`TransactionBuilder`].
     pub(crate) statement_cache: Arc<StatementCache>,
+
+    /// The task driving the connection, handed to the [`Transaction`].
+    pub(crate) connection: AbortHandle,
 }
 
 impl<'a> TransactionBuilder<'a> {
@@ -238,7 +271,7 @@ impl<'a> TransactionBuilder<'a> {
     pub fn isolation_level(self, isolation_level: IsolationLevel) -> Self {
         Self {
             builder: self.builder.isolation_level(isolation_level),
-            statement_cache: self.statement_cache,
+            ..self
         }
     }
 
@@ -248,7 +281,7 @@ impl<'a> TransactionBuilder<'a> {
     pub fn read_only(self, read_only: bool) -> Self {
         Self {
             builder: self.builder.read_only(read_only),
-            statement_cache: self.statement_cache,
+            ..self
         }
     }
 
@@ -263,7 +296,7 @@ impl<'a> TransactionBuilder<'a> {
     pub fn deferrable(self, deferrable: bool) -> Self {
         Self {
             builder: self.builder.deferrable(deferrable),
-            statement_cache: self.statement_cache,
+            ..self
         }
     }
 
@@ -277,6 +310,7 @@ impl<'a> TransactionBuilder<'a> {
         Ok(Transaction {
             txn: self.builder.start().await?,
             statement_cache: self.statement_cache,
+            connection: self.connection,
         })
     }
 }

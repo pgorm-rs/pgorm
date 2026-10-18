@@ -185,3 +185,7 @@ from ._merge import (
     MergeUpdate as MergeUpdate, MergeInsert as MergeInsert, PendingMerge as PendingMerge,
     Merge as Merge, With as With, ReturningRow as ReturningRow, merge as merge,
 )
+from ._copy import (
+    CopyFrom as CopyFrom, CopyTo as CopyTo, _CopyIn as _CopyIn, _CopyOut as _CopyOut,
+    _copy_in as _copy_in, _copy_out as _copy_out,
+)

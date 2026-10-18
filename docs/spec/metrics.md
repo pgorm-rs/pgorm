@@ -61,10 +61,11 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Query identity
 
-> [spec:pgorm:req:metric.fingerprint+2]
+> [spec:pgorm:req:metric.fingerprint+3]
 > `QueryContext` is what a query hook is told about the statement it reports
-> on: `operation()` — one of the seven `ConnectionTrait` method names, or
-> `"begin"` / `"commit"` / `"rollback"` for a failed transaction round trip —,
+> on: `operation()` — one of the seven `ConnectionTrait` method names,
+> `"copy_in"` / `"copy_out"` for a COPY (`metric.layer.copy`), or `"begin"` /
+> `"commit"` / `"rollback"` for a failed transaction round trip —,
 > `sql()` (the
 > statement text, where it survives per `conn.sql-text`), and `fingerprint()`.
 > It borrows for the duration of the call, so a collector that keeps anything
@@ -137,6 +138,23 @@ chooses to construct, so unused metrics cost nothing.
 > times pool acquisition, reporting `record_connection_acquired` on success
 > (and returning an `InstrumentedConnection` sharing a clone of the
 > collector) or `record_connection_error` on failure.
+
+## COPY instrumentation
+
+> [spec:pgorm:req:metric.layer.copy]
+> `InstrumentedConnection` and `InstrumentedTransaction` MUST implement
+> `CopyTrait` (`conn.copy`) by delegating to the wrapped connection or
+> transaction and returning its sink or stream unchanged, timing the start
+> and reporting it as `metric.layer.delegate` reports a statement: on success
+> `record_query_success` under the operation `"copy_in"` or `"copy_out"`, with
+> the statement's rendered text as `sql()` and no row count, and on failure
+> `record_query_error` under the same context. The row count is `None` for the
+> reason a stream's is (`exec.stream.decode`): what the hook times is the
+> start, and the rows have not moved yet. The trait's return types are the
+> plain `CopyInSink` and `CopyOutStream`, so what happens after the start — the
+> count `finish` returns, a row the server refuses there, the bytes a stream
+> yields — reaches the caller and not the collector, as a stream's rows and
+> its mid-stream failures do.
 
 ## Transaction instrumentation
 

@@ -8748,6 +8748,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.surface +29: the register now records View, ViewCreateStatement, RecursiveViewCreateStatement, ViewCheckOption, ViewDropStatement, MaterializedView, MaterializedViewCreateStatement, MaterializedViewRefreshStatement, MaterializedViewDropStatement and TableCreateAsStatement (sql-views, 19a670c7), each named in lib.rs's explicit schema-statement re-exports with its module private; no glob, no new public module."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T17:36:49.165049Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.surface +29 (conn-copy) records the COPY exports: CopyFromStatement, CopyToStatement, CopyFormat, CopyDelimitedFormat, CopyText, CopyCsv, CopyBinary, CopyIgnore, CopyLogVerbosity, CopySource and IntoCopySource (sql.ast.copy), in a COPY group of their own in lib.rs."
+                        after_done true
+                    }
                 )
             }
 
@@ -11799,6 +11807,16 @@ children (
         id conn-copy
         title "A connection or transaction runs COPY FROM STDIN and TO STDOUT through copy_in and copy_out over a typed COPY statement, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main (
+                [spec:pgorm:def:sql.ast.copy]
+                [spec:pgorm:req:sql.render.copy]
+                [spec:pgorm:req:conn.copy]
+                [spec:pgorm:req:metric.layer.copy]
+                [spec:pgorm:req:python.copy]
+                [spec:pgorm:req:napi.copy]
+            )
+        }
         deps (query-second-tier)
         log (
             {

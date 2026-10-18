@@ -6,8 +6,10 @@
 // [spec:pgorm:req:napi.connections]
 // [spec:pgorm:req:napi.results]
 // [spec:pgorm:req:napi.transactions]
+// [spec:pgorm:req:napi.copy]
 
 import { statementArgs } from "./builder.js";
+import { COPY, CopyRunner } from "./copy.js";
 import { abortable, native, queryOptions, row, signalOf, TRUSTED } from "./operations.js";
 import { RowStream } from "./streams.js";
 
@@ -24,10 +26,12 @@ const JOB = Symbol("job");
  * What a pool, a connection and a transaction run statements through: bound
  * SQL, its result decoded to rows. Every method that does I/O is an async
  * function, so an argument the addon refuses synchronously rejects its
- * promise rather than throwing at the call site.
+ * promise rather than throwing at the call site. COPY's `copyIn` and
+ * `copyOut` come from {@link CopyRunner}, each class opening a COPY in the
+ * addon on what it holds.
  * [spec:pgorm:req:napi.promises]
  */
-export class Queryable {
+export class Queryable extends CopyRunner {
   /**
    * @param {"execute" | "all" | "one" | "optional"} _terminal
    * @param {unknown} _sql
@@ -288,6 +292,16 @@ export class Pool extends Queryable {
   [JOB](job, token) {
     return native.poolJob(this.#native, job, token);
   }
+
+  /**
+   * @override
+   * @param {"in" | "out"} direction
+   * @param {unknown} copy
+   * @param {unknown} token
+   */
+  [COPY](direction, copy, token) {
+    return (direction === "in" ? native.poolCopyIn : native.poolCopyOut)(this.#native, copy, token);
+  }
 }
 
 /**
@@ -455,6 +469,16 @@ export class Connection extends Queryable {
   [JOB](job, token) {
     return native.connectionJob(this.#native, job, token);
   }
+
+  /**
+   * @override
+   * @param {"in" | "out"} direction
+   * @param {unknown} copy
+   * @param {unknown} token
+   */
+  [COPY](direction, copy, token) {
+    return (direction === "in" ? native.connectionCopyIn : native.connectionCopyOut)(this.#native, copy, token);
+  }
 }
 
 /**
@@ -574,5 +598,15 @@ export class Transaction extends Queryable {
    */
   [JOB](job, token) {
     return native.transactionJob(this.#native, job, token);
+  }
+
+  /**
+   * @override
+   * @param {"in" | "out"} direction
+   * @param {unknown} copy
+   * @param {unknown} token
+   */
+  [COPY](direction, copy, token) {
+    return (direction === "in" ? native.transactionCopyIn : native.transactionCopyOut)(this.#native, copy, token);
   }
 }
