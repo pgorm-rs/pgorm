@@ -359,6 +359,7 @@ test("copyIn pulls its source only as the server takes the data", async () => {
   const controller = new AbortController();
   const reason = new Error("enough");
   const copying = single.copyIn(copyFrom("slow", "text"), endless(), { signal: controller.signal });
+  const aborted = assert.rejects(copying, (error: unknown) => error === reason);
   await new Promise((resolve) => setTimeout(resolve, 1500));
   // The server takes about a megabyte a second here. What runs ahead of it is
   // the binding's queue and the two sockets' buffers, which the kernel sizes
@@ -366,7 +367,7 @@ test("copyIn pulls its source only as the server takes the data", async () => {
   // gigabytes ahead in the time the test waits.
   assert.ok(produced < 32 * 1024 * 1024, `the source ran ${produced} bytes ahead of the server`);
   controller.abort(reason);
-  await assert.rejects(copying, (error: unknown) => error === reason);
+  await aborted;
   assert.equal(await count("slow"), 0);
   assert.equal((await single.one("SELECT 2 AS n")).n, 2);
   // The server works through the data already in its socket before it sees
@@ -570,10 +571,13 @@ test("closing what a COPY runs on ends the COPY at once, its source still waitin
   }
   const connection = await pool().acquire();
   const copying = connection.copyIn(copyFrom("items", "text").columns(["id", "note"]), waiting());
+  // The check is attached before the close, so the rejection the close causes
+  // is never unhandled while the close is awaited.
+  const ended = assert.rejects(within(copying), lifecycle(/connection closed during the COPY/));
   await new Promise((resolve) => setTimeout(resolve, 50));
   const started = performance.now();
   await connection.close();
-  await assert.rejects(within(copying), lifecycle(/connection closed during the COPY/));
+  await ended;
   assert.ok(performance.now() - started < 2000);
   held.open();
   assert.equal(await count("items"), 0);

@@ -1801,6 +1801,8 @@ impl_evidence (
         python.codegen
     ), covered_claims (
         {impl_name main, rule python.codegen}
+    ), rule_versions_seen (
+        {id python.codegen, version 0}
     )}
     {id python.direct-builders, covered_rules (
         python.direct-builders
