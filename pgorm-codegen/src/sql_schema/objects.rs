@@ -3,19 +3,19 @@ use crate::{Error, TableIdent, util::repeated_column};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
     CommentStmt, ConstrType, Constraint, CreateDomainStmt, CreateEnumStmt, CreateRangeStmt,
-    IndexStmt, ObjectType, SortByDir, SortByNulls,
+    CreateSchemaStmt, IndexStmt, ObjectType, RoleSpecType, SortByDir, SortByNulls,
 };
 use pgorm_query::{ColumnType, Name, TableKey, Unique};
 
 /// The full identity — schema and name — a `CREATE TYPE` declares.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn type_identity(type_name: &[pg_query::protobuf::Node], at: usize) -> Result<TypeIdentity, Error> {
     declared_identity(type_name, "CREATE TYPE", at)
 }
 
 /// The full identity a statement creating a type declares, `statement` naming
 /// it in an error.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn declared_identity(
     type_name: &[pg_query::protobuf::Node],
     statement: &str,
@@ -44,8 +44,8 @@ fn declared_identity(
 /// set aside: the server applies them to every column of the domain, and none
 /// changes what a value of it is. A constraint PostgreSQL refuses on a domain
 /// is named, as the server would refuse the file.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 pub(super) fn domain(
     stmt: &CreateDomainStmt,
     declared: &Declared,
@@ -80,7 +80,7 @@ pub(super) fn domain(
 
 /// How a constraint PostgreSQL refuses on a domain was written, or `None` for
 /// the four it takes.
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 fn refused_on_domain(constraint: &Constraint) -> Option<&'static str> {
     let kind = ConstrType::try_from(constraint.contype).ok();
     if constraint.is_no_inherit {
@@ -110,9 +110,49 @@ fn refused_on_domain(constraint: &Constraint) -> Option<&'static str> {
     }
 }
 
+/// The schema a `CREATE SCHEMA` creates, by name, or `None` when the name is
+/// the role a session runs as (`CREATE SCHEMA AUTHORIZATION CURRENT_USER`),
+/// which the file does not say.
+///
+/// The schema holds no fact the entity model does: a table or type in it
+/// carries its qualifier itself. Its `AUTHORIZATION` role is read and set
+/// aside: who owns the schema is a privilege, not a fact about any value an
+/// entity reads or writes. A schema element — a `CREATE TABLE` or other statement written
+/// inside the `CREATE SCHEMA` — is named: the server qualifies an element's
+/// unqualified names with the schema when it runs it, which the parse tree
+/// does not, so reading one would place its table outside the schema.
+// [spec:pgorm:sem:codegen.ddl.objects+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
+pub(super) fn schema(stmt: &CreateSchemaStmt, at: usize) -> Result<Option<String>, Error> {
+    let name = match (stmt.schemaname.as_str(), &stmt.authrole) {
+        ("", Some(role)) if role.roletype == RoleSpecType::RolespecCstring as i32 => {
+            Some(role.rolename.clone())
+        }
+        ("", _) => None,
+        (name, _) => Some(name.to_owned()),
+    };
+    if let Some(element) = stmt.schema_elts.first() {
+        let kind = match &element.node {
+            Some(NodeEnum::CreateStmt(_)) => "CREATE TABLE",
+            Some(NodeEnum::IndexStmt(_)) => "CREATE INDEX",
+            Some(other) => super::statement_kind(other),
+            None => "an empty statement",
+        };
+        let schema = match &name {
+            Some(name) => format!(" `{name}`"),
+            None => String::new(),
+        };
+        return Err(unsupported(
+            format!("{kind} inside CREATE SCHEMA{schema}"),
+            at,
+        ));
+    }
+    Ok(name)
+}
+
 /// A `CREATE TYPE ... AS ENUM` as the full identity — schema and name — and
 /// values a column of that type carries into `ColumnType::Enum`.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 pub(super) fn enum_type(
     stmt: &CreateEnumStmt,
     at: usize,
@@ -144,7 +184,7 @@ pub(super) struct ParsedRange {
 /// holds. The multirange is `MULTIRANGE_TYPE_NAME` as written — unqualified,
 /// it is created where an unqualified name is, not beside the range — or
 /// otherwise the name PostgreSQL derives, in the range's schema.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 pub(super) fn range_type(
     stmt: &CreateRangeStmt,
     declared: &Declared,
@@ -212,7 +252,7 @@ pub(super) fn range_type(
 /// `range` in it (case-sensitive) becomes `multirange`, or, when there is
 /// none, `_multirange` follows the name cut to 52 bytes; the result is cut to
 /// the 63 bytes of an identifier. Each cut falls on a character boundary.
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 fn derived_multirange_name(range: &str) -> String {
     let derived = match range.find("range") {
         Some(at) => {
@@ -242,8 +282,8 @@ pub(super) struct ParsedIndex {
     pub(super) constraint: Option<TableKey<Unique>>,
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9]
-// [spec:pgorm:req:codegen.ddl.unsupported+16]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
+// [spec:pgorm:req:codegen.ddl.unsupported+17]
 pub(super) fn index(stmt: &IndexStmt, at: usize) -> Result<ParsedIndex, Error> {
     let table = match stmt.relation.as_ref() {
         Some(relation) if !relation.relname.is_empty() => TableIdent {
@@ -365,7 +405,7 @@ impl ParsedComment {
     }
 }
 
-// [spec:pgorm:sem:codegen.ddl.objects+9]
+// [spec:pgorm:sem:codegen.ddl.objects+10]
 pub(super) fn comment(stmt: &CommentStmt, at: usize) -> Result<ParsedComment, Error> {
     let kind = match ObjectType::try_from(stmt.objtype) {
         Ok(kind @ (ObjectType::ObjectTable | ObjectType::ObjectColumn)) => kind,

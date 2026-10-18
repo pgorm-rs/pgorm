@@ -37,7 +37,7 @@ use pgorm_range_types::Floatrange;
 const SCHEMA: &str = include_str!("../pgorm-codegen/tests/sql/domain/schema.sql");
 
 /// The schema the file's one qualified domain lives in, which the file
-/// itself does not create: pgorm-codegen does not read `CREATE SCHEMA`.
+/// itself does not create.
 async fn schema(db: &impl ConnectionTrait) -> Result<(), Error> {
     db.batch_execute(&pgorm::pgorm_query::Schema::create(Name::runtime("billing")).to_string())
         .await?;

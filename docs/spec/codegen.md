@@ -1012,12 +1012,13 @@ compiling the C parser falls on people generating entities and on nobody else.
 > (`sql.ddl.create-table`), so a key the statement declares and the key the
 > bridge reads back from its rendering are one fact.
 
-> [spec:pgorm:req:codegen.ddl.unsupported+16]
+> [spec:pgorm:req:codegen.ddl.unsupported+17]
 > The supported subset is what the entity model can hold: `CREATE TABLE` with
 > its columns, `NULL`/`NOT NULL`, primary-key, unique and foreign-key
 > constraints, and its `DEFAULT`s and generation expressions within the subset
 > `codegen.entity.expressions` reads; `CREATE TYPE ... AS ENUM`; `CREATE TYPE ... AS RANGE`
-> and `CREATE DOMAIN` (`codegen.ddl.objects`); `CREATE INDEX`; and `COMMENT ON TABLE`
+> and `CREATE DOMAIN` (`codegen.ddl.objects`); `CREATE INDEX`; `CREATE SCHEMA`,
+> `IF NOT EXISTS` or not (`codegen.ddl.objects`); and `COMMENT ON TABLE`
 > / `COMMENT ON COLUMN` — with a column's `COLLATE` clause and a `NOT NULL`
 > constraint's name and `NO INHERIT`, which the bridged statement carries and
 > the entity, like a comment, does not (`codegen.ddl.tables`). Everything else in the file MUST be reported — never
@@ -1031,8 +1032,9 @@ compiling the C parser falls on people generating entities and on nobody else.
 > ``a CHECK constraint on column `t`.`c` `` — with `an unrecognised statement` as
 > the fallback for a statement kind the namer does not know.
 >
-> Named rejections MUST cover at least: every statement other than the six
-> above; a range type option PostgreSQL does not have, a `SUBTYPE` that is not
+> Named rejections MUST cover at least: every statement other than the seven
+> above; a statement written inside a `CREATE SCHEMA` as one of its elements,
+> named by its kind (``CREATE TABLE inside CREATE SCHEMA `s` ``); a range type option PostgreSQL does not have, a `SUBTYPE` that is not
 > a type name or is a `serial` spelling, and a range type with no `SUBTYPE`
 > (unresolved, as PostgreSQL refuses it with `42601`); on a domain, a base
 > that is a `serial` spelling or names no type the file declared or the
@@ -1112,7 +1114,10 @@ compiling the C parser falls on people generating entities and on nobody else.
 > Unresolved references are named as well: an index or comment naming a table
 > the file never creates, a column comment naming a column its table does not
 > have, and a table or a type declared twice — each is keyed by name
-> downstream, so a duplicate would otherwise overwrite in silence. So is a table
+> downstream, so a duplicate would otherwise overwrite in silence. So is a
+> schema created a second time without `IF NOT EXISTS`, which PostgreSQL
+> refuses (`42P06`, *schema already exists*), as ``TransformError("statement
+> <n>: schema `<s>` is declared twice")``. So is a table
 > declaring more than one primary key, in each spelling PostgreSQL refuses
 > (`42P16`, *multiple primary keys for table are not allowed*): `PRIMARY KEY` on
 > two columns, on a column beside a table-level `PRIMARY KEY (...)`, as two table
@@ -1363,7 +1368,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > a foreign key whose last pair is its period (`period(p, q)`), the grammar
 > putting `PERIOD` on the last column of each list and nowhere else.
 
-> [spec:pgorm:sem:codegen.ddl.objects+9]
+> [spec:pgorm:sem:codegen.ddl.objects+10]
 > Statements are resolved against each other rather than in file order: a
 > `CREATE TYPE ... AS ENUM` may follow the table whose column names it, and a
 > `CREATE INDEX` or `COMMENT ON` may precede its table. An enum type contributes
@@ -1403,6 +1408,25 @@ compiling the C parser falls on people generating entities and on nobody else.
 > of it a non-null field: the column reads as `NULL` wherever an outer join
 > or an absent row makes it one, and an insert leaving it out takes the
 > domain's default, so the field's nullability is the column's own.
+>
+> A `CREATE SCHEMA` contributes no statement and no type: a table or a type in
+> the schema carries the schema as its qualifier, which is what the entity
+> generated for it names (`codegen.entity.context`). Its `AUTHORIZATION` role
+> is read and set aside, ownership being a privilege rather than a fact about
+> any value an entity reads or writes. The schema's name is read for one check
+> alone: a second `CREATE SCHEMA` of a name, unless it says `IF NOT EXISTS`, is
+> refused, as the server refuses it (`codegen.ddl.unsupported`). `CREATE SCHEMA
+> AUTHORIZATION <role>`, naming no schema, creates the one named for its role,
+> and a role keyword — `CURRENT_USER`, `CURRENT_ROLE`, `SESSION_USER` — is
+> answered by the session the file runs in, so such a schema is read with no
+> name and takes no part in the check. A qualified name elsewhere in the
+> file is not held to the schemas it creates, so a dump that creates its
+> schemas and one that does not are read alike: `public` exists without being
+> created, and a dump of some schemas names types and tables in others. A
+> schema element — `CREATE SCHEMA s CREATE TABLE t (..)` — is named, not read
+> (`codegen.ddl.unsupported`): the server qualifies an element's unqualified
+> names with the schema as it runs it, which the parse tree does not record,
+> so the element read as written would be a table outside its schema.
 >
 > A unique `CREATE INDEX` is folded into its table as the unique key that
 > enforces the same uniqueness — a `TableKey<Unique>`
