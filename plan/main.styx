@@ -8962,6 +8962,7 @@ children (
                     sql-views
                     codegen-interval-columns
                     python-schema-truth-testing
+                    sql-schemas
                 )
                 log (
                     {
@@ -11857,6 +11858,51 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-views (19a670c7). pgorm-python's statement Select has no set operation: Rust's SelectStatement has union/intersect/except with ALL (sql.ast.select.union) and pgorm-napi's Select has union, unionAll, intersect, intersectAll and the rest, but Python reaches set operations only through the pipeline API. So create_recursive_view exists in Python but cannot build a body that reads the view (a recursive view's body is a UNION), and any statement-level UNION needs RawSQL. Give Python's Select the same set operations as Rust and JavaScript, with ORDER BY / LIMIT on the combined result as Rust allows, stubs, capability entries, parity cases against Rust, live tests including a recursive view built end to end, and python.statements' text; drop the caveat sql-views wrote into python.schema-views and SCHEMA.md. Waits on sql-select-extras, which changes the same Python Select."
+            }
+        )
+    }
+
+    {
+        id value-serde-impls
+        title "Interval, Range and Multirange serialize with serde, so generated entities with serde derives compile for those columns"
+        kind @fix
+        deps (codegen-interval-columns)
+        log (
+            {
+                at 2026-10-18T17:34:03.512306Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by codegen-interval-columns (17cd4eca). pgorm-codegen with with_serde set to anything but none emits serde derives on the entity model, which do not compile for an Interval, Range or Multirange field because pgorm_query::Interval and the range types have no serde impls (the built-in range columns already had this gap before intervals). Add Serialize/Deserialize for Interval (the three fields, lossless), Range and Multirange (bounds with inclusivity, and empty), behind the crate's existing serde feature gating, decide the representation and record it in the value rules, and add a codegen test generating with each with_serde mode over interval, range and multirange columns and compiling the result."
+            }
+        )
+    }
+
+    {
+        id generative-live-wire-kinds
+        title "The generative campaign's live wire check constructs every value kind the extension advertises"
+        kind @test
+        deps (generative-interval-kind)
+        log (
+            {
+                at 2026-10-18T17:34:04.080474Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by generative-interval-kind (12959726). security/generative/tests/live_wire.py asserts that the value kinds it saw equal the extension's advertised value_types, which include the range, multirange and created-range kinds, but the script never constructs those, so it fails before and after interval was added (interval's own cases validate and round-trip). Construct every advertised kind (built-in ranges and multiranges of each subtype, a created range and multirange over a schema-qualified type the fixture creates) so the check passes and stays exhaustive: a newly advertised kind without a case should fail it by name. Filed as a root node because the generative container is sealed."
+            }
+        )
+    }
+
+    {
+        id python-truth-testing-rest
+        title "Every remaining pgorm-python query object refuses truth testing: entity write terminals, windows, WITH, FROM items, joins, tables, conflicts, frames and MERGE actions"
+        kind @fix
+        deps (python-schema-truth-testing sql-select-extras)
+        log (
+            {
+                at 2026-10-18T17:34:04.304813Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-schema-truth-testing (9248d83a). After it, every schema object, Compiled, expression and statement refuses truth testing, but other native classes still evaluate as true: EntityUpdate, EntityUpdateMany, EntityInsert, EntityInsertMany (src/entities/versions.rs), Window, With, FromItem, Join, Table, Conflict, ConflictTarget, ConflictUpdate, the frame classes and the MERGE action classes. Add the refusal to each, and make one test enumerate every class pgorm._native defines (with an explicit, reasoned allow-list for value types where truthiness is meaningful, if any) so a new class without the refusal fails; extend python.statements / python.expressions text as needed (bump, re-deliver the feat owners in a separate feat commit). Waits on sql-select-extras, which adds Python classes in the same modules."
             }
         )
     }
