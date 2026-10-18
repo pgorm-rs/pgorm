@@ -128,13 +128,26 @@ The format and matrix define the contract for generation, execution, shrinking
 and replay. Passing their validation tests alone does not establish a completed
 campaign.
 
-Run the installed native value-format check from the repository root:
+Run the installed native value-format check from the repository root, with the
+extension `pgorm_campaign.build` installs (it opens no database):
 
 ```sh
-PYTHONPATH=security/generative/src target/python-check/bin/python \
+PYTHONPATH=security/generative/src target/generative-build/venv/bin/python \
   security/generative/tests/live_wire.py
 ```
 
-It validates snapshots for every advertised scalar/enum kind, plus typed NULL,
-nullable-element, empty and NULL arrays. The report records the native extension
-hash and inventory in `target/generative-program/values.json`.
+Every kind `capabilities()["value_types"]` advertises needs a non-NULL case;
+one without fails the check by name. A kind the format carries (every scalar,
+an enum, and each built-in range in every bracket pairing, unbounded on either
+or both sides, and empty) must pass `wire.validate` and come back unchanged
+through the public-constructor materializer, with its typed NULL and
+nullable-element, empty and NULL arrays. Multiranges and created ranges have no
+portable kind (the matrix's `range-values` entry): each built-in multirange, and
+a created range and multirange over a schema-qualified type for each of the
+twelve subtypes a created range takes, must be refused by `wire.validate` and
+still rebuild the same snapshot through pgorm's public constructors, a
+multirange from members that are each a portable range payload and a created
+kind from its text form. A kind the format starts carrying, or a created
+subtype or created-type array the binding starts accepting, fails the check
+until its case moves. The report records the native extension hash and
+inventory in `target/generative-program/values.json`.
