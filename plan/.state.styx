@@ -1898,8 +1898,6 @@ impl_evidence (
         sql.surface
     ), covered_claims (
         {impl_name main, rule sql.surface}
-    ), rule_versions_seen (
-        {id sql.surface, version 0}
     )}
     {id query-second-tier, covered_rules (
         sql.scope
@@ -1912,8 +1910,6 @@ impl_evidence (
         sql.ast.cast-shape
     ), covered_claims (
         {impl_name main, rule sql.ast.cast-shape}
-    ), rule_versions_seen (
-        {id sql.ast.cast-shape, version 0}
     )}
     {id sql.ast, covered_rules (
         sql.ast
