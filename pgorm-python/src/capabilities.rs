@@ -77,6 +77,14 @@ fn manifest() -> Value {
             "pool.close": {"rust_api": "pgorm::DatabasePool::close", "features": ["runtime-tokio"]},
             "connection.ping": {"rust_api": "pgorm::ConnectionTrait::query_one", "features": ["runtime-tokio"]},
             "connection.close": {"rust_api": "pgorm::DatabaseConnection::drop", "features": ["runtime-tokio"]},
+            "pool.listener": {"rust_api": "pgorm::DatabasePool::listener", "features": ["runtime-tokio"]},
+            "listener.listen": {"rust_api": "pgorm::Listener::listen", "features": ["runtime-tokio"]},
+            "listener.unlisten": {"rust_api": "pgorm::Listener::unlisten", "features": ["runtime-tokio"]},
+            "listener.unlisten_all": {"rust_api": "pgorm::Listener::unlisten_all", "features": ["runtime-tokio"]},
+            "listener.next": {"rust_api": "pgorm::Notifications as Stream", "features": ["runtime-tokio"]},
+            "listener.close": {"rust_api": "pgorm::Notifications::drop", "features": ["runtime-tokio"]},
+            "connection.notify": {"rust_api": "pgorm::notify for DatabaseConnection", "features": ["runtime-tokio"]},
+            "transaction.notify": {"rust_api": "pgorm::notify for DatabaseTransaction", "features": ["runtime-tokio"]},
             "value": {"rust_api": "pgorm::pgorm_query::Value", "features": []},
             "value.array": {"rust_api": "pgorm::pgorm_query::Value::Array", "features": ["postgres-array"]},
             "value.json": {"rust_api": "pgorm::pgorm_query::Value::Json", "features": ["with-json"]},
@@ -235,6 +243,7 @@ fn manifest() -> Value {
         forms.extend(["copy_from", "copy_to", "copy_count", "copy_stream"].map(Value::from));
     }
     manifest["copy_policy"] = crate::copy::policy();
+    manifest["listen_policy"] = crate::listen::policy();
     manifest
 }
 

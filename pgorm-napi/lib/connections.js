@@ -7,9 +7,11 @@
 // [spec:pgorm:req:napi.results]
 // [spec:pgorm:req:napi.transactions]
 // [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.listen]
 
 import { statementArgs } from "./builder.js";
 import { COPY, CopyRunner } from "./copy.js";
+import { Listener, LISTENER, listenerOptions, notifyJob } from "./listen.js";
 import { abortable, native, queryOptions, row, signalOf, TRUSTED } from "./operations.js";
 import { RowStream } from "./streams.js";
 
@@ -41,6 +43,15 @@ export class Queryable extends CopyRunner {
    * @returns {Promise<any>}
    */
   [RUN](_terminal, _sql, _params, _tagged, _token) {
+    return Promise.reject(new TypeError("Queryable is implemented by Pool, Connection and Transaction"));
+  }
+
+  /**
+   * @param {unknown} _job
+   * @param {unknown} _token
+   * @returns {Promise<any>}
+   */
+  [JOB](_job, _token) {
     return Promise.reject(new TypeError("Queryable is implemented by Pool, Connection and Transaction"));
   }
 
@@ -104,6 +115,22 @@ export class Queryable extends CopyRunner {
    */
   async optional(statement, params, options) {
     return (await this.#rows("optional", statement, params, options))[0] ?? null;
+  }
+
+  /**
+   * Send `payload` on `channel` through `SELECT pg_notify($1, $2)`, both
+   * bound. In a transaction it is delivered when the transaction commits, and
+   * never if it rolls back.
+   *
+   * @param {string} channel
+   * @param {string} payload
+   * @param {{ signal?: AbortSignal }} [options]
+   * @returns {Promise<void>}
+   */
+  async notify(channel, payload, options = {}) {
+    const job = notifyJob(channel, payload);
+    const { signal } = queryOptions(options);
+    await abortable(signal, (token) => this[JOB](job, token));
   }
 }
 
@@ -260,6 +287,20 @@ export class Pool extends Queryable {
   }
 
   /**
+   * A listener on a connection of its own, opened with the pool's
+   * configuration and closed with the pool, holding at most `capacity`
+   * notifications unread.
+   *
+   * @param {import("./index.d.ts").ListenerOptions} [options]
+   * @returns {Promise<Listener>}
+   */
+  async listener(options = {}) {
+    const { capacity, signal } = listenerOptions(options);
+    const handle = await abortable(signal, (token) => native.poolListener(this.#native, capacity, token));
+    return new Listener(handle, LISTENER);
+  }
+
+  /**
    * Refuse new work, cancel what runs, and resolve once every connection is
    * released.
    *
@@ -286,6 +327,7 @@ export class Pool extends Queryable {
   }
 
   /**
+   * @override
    * @param {unknown} job
    * @param {unknown} token
    */
@@ -463,6 +505,7 @@ export class Connection extends Queryable {
   }
 
   /**
+   * @override
    * @param {unknown} job
    * @param {unknown} token
    */
@@ -593,6 +636,7 @@ export class Transaction extends Queryable {
   }
 
   /**
+   * @override
    * @param {unknown} job
    * @param {unknown} token
    */

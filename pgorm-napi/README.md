@@ -9,8 +9,8 @@ are [docs/spec/napi.md](../docs/spec/napi.md).
 The addon loads in both runtimes, runs pgorm's asynchronous work on a tokio
 runtime of its own, settles a Promise with the outcome, and lets the process
 exit when its work is done. JavaScript connects through pools, runs bound SQL,
-scopes transactions and savepoints, streams rows and runs COPY
-([Connections](#connections)), builds pgorm-query's statements
+scopes transactions and savepoints, streams rows, runs COPY and listens for
+notifications ([Connections](#connections)), builds pgorm-query's statements
 ([Statements](#statements)), DDL ([Schema](#schema)) and pipelines
 ([Pipelines](#pipelines)), declares models and reads and writes them, their
 relations and graphs ([Models](#models)), and every value pgorm holds crosses
@@ -191,6 +191,43 @@ for await (const chunk of await pool.copyOut(dump)) output.write(chunk);   // Ui
   the COPY ends — and, unlike `stream`, it runs in a transaction. Leaving a
   `CopyOutStream` early, or aborting a COPY with its `signal`, discards the
   connection; an aborted COPY in a transaction ends it.
+
+### LISTEN and NOTIFY
+
+```js
+await using listener = await pool.listener({ capacity: 1024 });
+await listener.listen("jobs");                                    // exact name: case and punctuation kept
+
+await pool.transaction(async (tx) => {
+  await tx.notify("jobs", JSON.stringify({ id: 42 }));            // delivered at commit
+});
+
+for await (const { channel, payload, processId } of listener) {
+  console.log(channel, payload, processId);
+}
+```
+
+- **`pool.listener()`** opens a `Listener` on a connection of its own, with
+  the pool's configuration and TLS; it is not one the pool lends, and it
+  closes with the pool. `listen`, `unlisten` and `unlistenAll` change its
+  channels, and may run while a pull waits; a channel name longer than 63
+  bytes is a `ConstructionError`, since PostgreSQL would listen on it
+  truncated.
+- The listener is an async iterator of frozen `{ channel, payload, processId
+  }` notifications, one per `next()`, in the order the server sent them;
+  another pull while one waits is a `LifecycleError`. Nothing reconnects it:
+  a lost connection ends it with that failure after the notifications already
+  received, and a notification arriving while `capacity` wait unread closes it
+  with a `ConnectionError`, since one would otherwise be lost. Either way,
+  re-read what the notifications were tracking and open a new listener.
+- `next({ signal })` takes an `AbortSignal`, and an aborted pull leaves the
+  listener open; an aborted `listen` or `unlisten` closes it, since the
+  server may have acted on it. `close()`, `await using` and a `for await`
+  loop leaving early close the listener and its connection.
+- **`notify(channel, payload)`** on a pool, connection or transaction sends
+  `SELECT pg_notify($1, $2)` with both bound; in a transaction it is
+  delivered when the transaction commits, and never if it rolls back. A
+  payload of 8000 bytes or more is the server's `DatabaseError`.
 
 ## Statements
 

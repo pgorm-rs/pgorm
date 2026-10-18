@@ -385,6 +385,31 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > finishing, when the outcome is unknown, it discards the connection or
 > transaction.
 
+> [spec:pgorm:req:python.listen]
+> `pool.listener(capacity=1024)` MUST open a listener through `conn.listen`'s
+> `DatabasePool::listener`, a connection of its own with the pool's
+> configuration and TLS, outside the pool's size, and closing the pool MUST
+> close it. `listen`, `unlisten` and `unlisten_all` change what it receives
+> and MUST be usable while another task iterates it; a channel MUST be a
+> `str`, and a name longer than 63 bytes MUST raise a construction error
+> before anything is sent. The listener MUST be an async iterator of
+> `Notification` objects carrying `channel`, `payload` and `process_id`, one
+> pull at a time, a second pending pull refused with a lifecycle error. At
+> most `capacity` notifications MUST wait unread: one more closes the
+> listener, and iteration raises a connection error after yielding those
+> waiting; a failed or terminated connection raises its database error the
+> same way, and iteration ends after either, with nothing reconnected.
+> Closing the listener MUST end iteration, a pending pull included, and
+> closing the pool MUST interrupt a pending pull with a lifecycle error.
+> Cancellation MUST follow `python.cancellation`: a cancelled pull loses no
+> notification and leaves the listener open, while a cancelled `listen`,
+> `unlisten` or `unlisten_all` closes it, since the server may have acted on
+> a request whose answer never arrived. `notify(channel, payload)` on a pool,
+> a connection and a transaction MUST send through pgorm's `notify`, both
+> values `str` and bound, so a notification sent in a transaction is
+> delivered when it commits and never if it rolls back. `Listener` and
+> `Notification` MUST refuse truth testing with a construction error.
+
 > [spec:pgorm:req:python.errors]
 > The package MUST expose a stable exception hierarchy for construction/type,
 > unsupported capability, connection, database, decode, timeout/cancellation

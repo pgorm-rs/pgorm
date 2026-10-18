@@ -184,6 +184,8 @@ On failure the same context goes to `record_query_error`, and the `Error` is pro
 
 Both wrappers also implement `CopyTrait`. `copy_in` and `copy_out` are reported under `"copy_in"` and `"copy_out"`, with the COPY statement's rendered text as `sql()` and `rows` as `None`: the hook times the start of the COPY, as `query_raw`'s times the start of a stream, and the sink or stream comes back unwrapped. The row count `CopyInSink::finish` returns, and a row the server refuses there, reach the caller rather than the collector.
 
+A listener is not instrumented. `DatabasePool::listener` (reached through `InstrumentedPool::inner()`) and `connect_listener` open a connection of the listener's own rather than one from the pool, so no acquisition is recorded, and the `LISTEN` and `UNLISTEN` it sends and the notifications it yields reach no hook. `pgorm::notify` is a `ConnectionTrait` call, so through an `InstrumentedConnection` or `InstrumentedTransaction` it is reported as the `"execute"` it is, with `SELECT pg_notify($1, $2)` as its `sql()` and `Some(1)` rows.
+
 ### Transactions
 
 `TransactionTrait::begin` on `InstrumentedConnection` times the `BEGIN` and reports `record_transaction_begin` on success. A *failed* begin is reported through `record_query_error`, with a context whose `operation()` is `"begin"` and whose `sql()` is `None` — not through a dedicated hook.

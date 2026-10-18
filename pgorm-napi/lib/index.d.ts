@@ -12,6 +12,7 @@ import type { Delete, Insert, Update } from "./writes.d.ts";
 import type { SchemaStatement } from "./schema.d.ts";
 import type { Pipeline } from "./pipeline.d.ts";
 import type { CopyFrom, CopyOutStream, CopySource, CopyTo } from "./copy.d.ts";
+import type { Listener, ListenerOptions } from "./listen.d.ts";
 
 export * from "./expressions.d.ts";
 export * from "./json.d.ts";
@@ -25,6 +26,7 @@ export * from "./models.d.ts";
 export * from "./graphs.d.ts";
 export * from "./entities.d.ts";
 export * from "./copy.d.ts";
+export * from "./listen.d.ts";
 
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
@@ -497,6 +499,16 @@ export declare abstract class Queryable {
    * own.
    */
   copyOut(statement: CopyTo, options?: OperationOptions): Promise<CopyOutStream>;
+  // [spec:pgorm:req:napi.listen]
+  /**
+   * Send `payload` on `channel` through `SELECT pg_notify($1, $2)`, both
+   * bound; the channel is exact, as {@link Listener.listen} names it. In a
+   * transaction it is delivered when the transaction commits, and never if it
+   * rolls back. A payload of 8000 bytes or more, an empty channel and one
+   * longer than 63 bytes are the server's {@link DatabaseError}, SQLSTATE
+   * `22023`.
+   */
+  notify(channel: string, payload: string, options?: OperationOptions): Promise<void>;
 }
 
 /**
@@ -521,7 +533,12 @@ export declare class Pool extends Queryable implements AsyncDisposable {
   stream<O extends QueryOptions = QueryOptions>(sql: string, params?: readonly Param[], options?: O): RowStream<RowFor<O>>;
   /** Whether the server answers. */
   ping(options?: OperationOptions): Promise<boolean>;
-  /** Refuse new work, cancel what runs, and resolve once every connection is released. */
+  /**
+   * A {@link Listener} on a connection of its own, opened with the pool's
+   * configuration and closed with the pool; it is not one the pool lends.
+   */
+  listener(options?: ListenerOptions): Promise<Listener>;
+  /** Refuse new work, cancel what runs, and resolve once every connection and listener is released. */
   close(): Promise<void>;
   [Symbol.asyncDispose](): Promise<void>;
 }

@@ -22,6 +22,8 @@ pub(crate) enum Work {
     Graph(Graph, bool),
     Cursor(Graph, CursorPlan),
     Sources(Sources, SourceTerminal),
+    /// `pgorm::notify`'s channel and payload.
+    Notify(String, String),
 }
 
 pub(crate) enum Output {
@@ -55,6 +57,9 @@ impl Work {
             Self::Graph(query, optional) => query.run(db, optional).await.map(Output::Graph),
             Self::Cursor(query, cursor) => query.cursor(db, cursor).await.map(Output::Graph),
             Self::Sources(query, terminal) => query.run(db, terminal).await.map(Output::Graph),
+            Self::Notify(channel, payload) => pgorm::notify(&db, &channel, &payload)
+                .await
+                .map(|()| Output::Finished),
         }
     }
 }

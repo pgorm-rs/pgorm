@@ -23,6 +23,7 @@
 mod config;
 mod copy;
 mod generic_client;
+mod raw;
 mod transaction;
 
 use std::{
@@ -62,6 +63,7 @@ pub use self::config::{
 };
 
 pub use self::generic_client::GenericClient;
+pub use self::raw::{RawConnection, Unpooled};
 pub use self::transaction::{Transaction, TransactionBuilder};
 
 pub use deadpool::managed::reexports::*;
@@ -152,6 +154,15 @@ impl Manager {
     pub fn tag(&self) -> Arc<String> {
         self.tag.0.clone()
     }
+
+    /// Open a connection with this manager's configuration and connector,
+    /// outside the pool: it is not counted against the pool's size, gets no
+    /// statement cache and is never recycled, and its I/O half is returned
+    /// undriven (see [`Connect::connect_raw`]).
+    // [spec:pgorm:req:conn.listen]    a pool's listener connects as its connections do
+    pub async fn connect_raw(&self) -> Result<Unpooled, Error> {
+        self.connect.connect_raw(&self.pg_config).await
+    }
 }
 
 impl fmt::Debug for Manager {
@@ -214,6 +225,11 @@ pub trait Connect: Sync + Send {
         &self,
         pg_config: &PgConfig,
     ) -> BoxFuture<'_, Result<(PgClient, JoinHandle<()>), Error>>;
+
+    /// Establishes a new `tokio_postgres` connection and returns its I/O half
+    /// undriven, for an owner that polls it itself to see the asynchronous
+    /// messages a spawned connection task discards.
+    fn connect_raw(&self, pg_config: &PgConfig) -> BoxFuture<'_, Result<Unpooled, Error>>;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -254,6 +270,15 @@ where
                 }
             });
             Ok((client, conn_task))
+        })
+    }
+
+    fn connect_raw(&self, pg_config: &PgConfig) -> BoxFuture<'_, Result<Unpooled, Error>> {
+        let tls = self.tls.clone();
+        let pg_config = pg_config.clone();
+        Box::pin(async move {
+            let (client, connection) = pg_config.connect(tls).await?;
+            Ok((client, Box::new(connection) as Box<dyn RawConnection>))
         })
     }
 }

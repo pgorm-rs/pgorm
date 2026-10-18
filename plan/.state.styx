@@ -1189,6 +1189,15 @@ impl_evidence (
         {impl_name main, rule sql.ast.copy}
         {impl_name main, rule sql.render.copy}
     )}
+    {id conn-listen, covered_rules (
+        conn.listen
+        napi.listen
+        python.listen
+    ), covered_claims (
+        {impl_name main, rule conn.listen}
+        {impl_name main, rule napi.listen}
+        {impl_name main, rule python.listen}
+    )}
     {id core, covered_rules (
         query.graph
         query.graph.aliases

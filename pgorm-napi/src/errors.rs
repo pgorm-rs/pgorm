@@ -184,6 +184,12 @@ pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
     }
     match error {
         pgorm::Error::Pool(_) => Failure::Connection("PostgreSQL pool acquisition failed".into()),
+        // A channel name the listener refuses before sending anything is the
+        // caller's input, as a parameter that cannot be bound is.
+        // [spec:pgorm:req:napi.listen]
+        pgorm::Error::Listen(pgorm::ListenError::ChannelTooLong { .. }) => {
+            Failure::Construction(secrets.apply(&error.to_string()))
+        }
         pgorm::Error::Conversion { .. } | pgorm::Error::Type(_) | pgorm::Error::Json(_) => {
             Failure::Decode(secrets.apply(&error.to_string()))
         }

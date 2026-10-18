@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     config::PoolConfig,
     errors::{InternalError, LifecycleError, Redactions, TimeoutError, database_error},
+    listen::ListenerState,
 };
 
 pub(crate) struct PoolState {
@@ -22,6 +23,7 @@ pub(crate) struct PoolState {
     owner: Py<PyAny>,
     acquire_timeout: Duration,
     connections: RegistryMutex<Vec<Weak<ConnectionState>>>,
+    listeners: RegistryMutex<Vec<Weak<ListenerState>>>,
 }
 
 impl fmt::Debug for PoolState {
@@ -51,9 +53,34 @@ impl PoolState {
         }
     }
 
+    /// Record `listener` so that closing the pool closes it; a listener
+    /// opened while the pool closed is closed here instead.
+    // [spec:pgorm:req:python.listen]
+    pub(crate) fn register_listener(&self, listener: &Arc<ListenerState>) -> PyResult<()> {
+        let mut registry = self
+            .listeners
+            .lock()
+            .map_err(|_| InternalError::new_err("listener registry lock failed"))?;
+        if self.cancelled.is_cancelled() {
+            listener.close_now();
+            return Err(LifecycleError::new_err("pool is closed"));
+        }
+        registry.retain(|item| item.strong_count() > 0);
+        registry.push(Arc::downgrade(listener));
+        Ok(())
+    }
+
+    fn close_listeners(&self) {
+        if let Ok(mut registry) = self.listeners.lock() {
+            crate::listen::close_all(&registry);
+            registry.clear();
+        }
+    }
+
     fn close_now(&self) -> PyResult<Vec<Arc<ConnectionState>>> {
         self.cancelled.cancel();
         self.pool.close();
+        self.close_listeners();
         let mut registry = self
             .connections
             .lock()
@@ -119,6 +146,7 @@ impl NativePool {
                 acquire_timeout,
                 cancelled: CancellationToken::new(),
                 connections: RegistryMutex::new(Vec::new()),
+                listeners: RegistryMutex::new(Vec::new()),
             }),
         })
     }
@@ -174,6 +202,12 @@ impl NativePool {
         self.state.cancelled.is_cancelled()
     }
 
+    /// Open a dedicated listening connection with this pool's configuration.
+    #[pyo3(signature = (capacity=1024))]
+    fn listener<'py>(&self, py: Python<'py>, capacity: usize) -> PyResult<Bound<'py, PyAny>> {
+        crate::listen::open(py, self.state.clone(), capacity)
+    }
+
     fn status(&self, py: Python<'_>) -> PyResult<(usize, usize, usize, usize)> {
         self.state.check_owner(py)?;
         let status = self.state.pool.status();
@@ -195,6 +229,7 @@ impl Drop for NativePool {
         // Cleanup may run after the Python event loop has stopped.
         self.state.cancelled.cancel();
         self.state.pool.close();
+        self.state.close_listeners();
         if let Ok(registry) = self.state.connections.lock() {
             for state in registry.iter().filter_map(Weak::upgrade) {
                 state.close_now();
@@ -345,6 +380,20 @@ impl NativeConnection {
         query: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         crate::results::open(py, self.state.clone(), query)
+    }
+
+    fn notify<'py>(
+        &self,
+        py: Python<'py>,
+        channel: &Bound<'_, PyAny>,
+        payload: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        crate::listen::notify(
+            py,
+            crate::execution::Target::Connection(self.state.clone()),
+            channel,
+            payload,
+        )
     }
 
     fn ping<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

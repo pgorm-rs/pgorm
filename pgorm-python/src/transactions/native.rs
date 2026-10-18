@@ -127,6 +127,20 @@ impl NativeTransaction {
     ) -> PyResult<Bound<'py, PyAny>> {
         results::fetch(py, Target::Transaction(self.state.clone()), query, mode)
     }
+
+    fn notify<'py>(
+        &self,
+        py: Python<'py>,
+        channel: &Bound<'_, PyAny>,
+        payload: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        crate::listen::notify(
+            py,
+            Target::Transaction(self.state.clone()),
+            channel,
+            payload,
+        )
+    }
 }
 
 impl Drop for NativeTransaction {

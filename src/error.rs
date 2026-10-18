@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+8]
+// [spec:pgorm:def:error.model+9]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -59,6 +59,9 @@ pub enum Error {
     /// The statement builder rejected its input
     #[error("Query Builder Error: {0}")]
     QueryBuilder(#[from] pgorm_query::error::Error),
+    /// A listener refused a channel name, or stopped its notifications
+    #[error("Listen Error: {0}")]
+    Listen(#[from] ListenError),
     /// A custom error
     #[error("Custom Error: {0}")]
     Custom(String),
@@ -111,6 +114,32 @@ pub enum VerifyError {
     },
 }
 
+/// Why a [`Listener`](crate::Listener) refused a channel name, or why its
+/// [`Notifications`](crate::Notifications) ended.
+// [spec:pgorm:req:conn.listen]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ListenError {
+    /// The channel name is longer than the 63 bytes PostgreSQL keeps of an
+    /// identifier, so the server would listen on a truncated name instead
+    #[error(
+        "channel name `{channel}` is longer than the 63 bytes PostgreSQL keeps of an identifier"
+    )]
+    ChannelTooLong {
+        /// The name as given
+        channel: String,
+    },
+    /// Another notification arrived while `capacity` were waiting unread, so
+    /// the listener closed its connection rather than drop one
+    #[error(
+        "a notification arrived while {capacity} were waiting unread; the listener closed its connection"
+    )]
+    Overflow {
+        /// How many notifications the stream holds unread
+        capacity: usize,
+    },
+}
+
 /// The result of a fallible pgorm operation, defaulting to [`Error`].
 ///
 /// The default type parameter lets callers write `pgorm::Result<Model>` for
@@ -125,7 +154,7 @@ pub enum VerifyError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+8]    crate-root Result alias
+// [spec:pgorm:def:error.model+9]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -137,7 +166,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+8]    Display-string equality
+// [spec:pgorm:def:error.model+9]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
