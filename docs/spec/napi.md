@@ -78,12 +78,18 @@ process's clean exit in both runtimes.
 > loop open, and Node.js finishes a loop with its deliveries still pending
 > where Deno delivers them first, so a promise left to it may never settle.
 
-> [spec:pgorm:req:napi.errors+1]
+> [spec:pgorm:req:napi.errors+2]
 > Failures MUST reject with instances of the module's error classes, all
 > derived from `PgormError` and `Error`: `DatabaseError` when PostgreSQL
 > reports an error, carrying its SQLSTATE as `sqlstate` with its severity and
 > optional diagnostic fields (`detail`, `hint`, `schema`, `table`, `column`,
-> `constraint`, each a string or `null`); `ConnectionError` when the server
+> `datatype`, `constraint`, each a string or `null`), and rejecting as the
+> subclass of `DatabaseError` named for a constraint violation pgorm's
+> `SqlError` classifies (`[spec:pgorm:sem:error.model.sql-class+4]`):
+> `UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),
+> `CheckViolationError` (`23514`), `NotNullViolationError` (`23502`) or
+> `ExclusionViolationError` (`23P01`), with the same fields, a domain's name
+> in `datatype`; `ConnectionError` when the server
 > cannot be reached or the connection breaks; `ConstructionError` for an
 > argument that cannot become the value pgorm sends; `DecodeError` for a result
 > that cannot become the JavaScript value asked for; `LifecycleError` for a

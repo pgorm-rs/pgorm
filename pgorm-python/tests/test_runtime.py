@@ -95,7 +95,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(asyncio.to_thread(foreign), 1)
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:python.errors/test]
+    # [spec:pgorm:req:python.errors+1/test]
     async def test_acquisition_timeout_is_distinct_from_cancellation(self):
         async with self.pool.connection():
             with self.assertRaises(pgorm.TimeoutError):
@@ -103,7 +103,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self.pool.ping())
         self.assertIs(pgorm.CancelledError, asyncio.CancelledError)
 
-    # [spec:pgorm:req:python.errors/test]
+    # [spec:pgorm:req:python.errors+1/test]
     async def test_bad_configuration_is_an_explicit_construction_error(self):
         for options in (
             {"max_size": 0}, {"max_size": -1}, {"max_size": True},
@@ -119,7 +119,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             pgorm.Pool(f"unknown-key={secret}")
         self.assertNotIn(secret, str(caught.exception))
 
-    # [spec:pgorm:req:python.errors/test]
+    # [spec:pgorm:req:python.errors+1/test]
     # [spec:pgorm:req:python.connections/test]
     async def test_sqlstate_and_credential_redaction(self):
         parts = urlsplit(self.dsn)
@@ -230,6 +230,97 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await pool.ping()
         finally:
             await pool.close()
+
+
+class ConstraintViolationTests(unittest.IsolatedAsyncioTestCase):
+    """Each constraint class pgorm's SqlError names raises its own DatabaseError."""
+
+    NAMESPACE = "python_violations"
+
+    async def asyncSetUp(self):
+        self.pool = pgorm.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        ns = self.NAMESPACE
+        for sql in (
+            f"DROP SCHEMA IF EXISTS {ns} CASCADE",
+            f"CREATE SCHEMA {ns}",
+            f"CREATE DOMAIN {ns}.positive AS int4 NOT NULL CONSTRAINT positive_check CHECK (VALUE > 0)",
+            f"CREATE TABLE {ns}.parent (id int4 PRIMARY KEY)",
+            f"""CREATE TABLE {ns}.gauge (
+                id int4 PRIMARY KEY,
+                reading int4 NOT NULL CONSTRAINT reading_bounded CHECK (reading < 100),
+                level {ns}.positive,
+                parent_id int4 CONSTRAINT gauge_parent REFERENCES {ns}.parent,
+                span int4range,
+                CONSTRAINT gauge_apart EXCLUDE USING gist (span WITH &&)
+            )""",
+            f"INSERT INTO {ns}.gauge (id, reading, level, span) VALUES (1, 1, 1, '[1,5)')",
+        ):
+            await self.pool.execute(pgorm.RawSQL(sql))
+
+    async def asyncTearDown(self):
+        await self.pool.execute(pgorm.RawSQL(f"DROP SCHEMA {self.NAMESPACE} CASCADE"))
+        await self.pool.close()
+
+    # [spec:pgorm:req:python.errors+1/test]
+    async def test_constraint_violations_raise_their_own_class(self):
+        ns = self.NAMESPACE
+        insert = f"INSERT INTO {ns}.gauge (id, reading, level, parent_id, span) VALUES "
+        cases = (
+            (insert + "(1, 1, 1, NULL, NULL)", pgorm.UniqueViolationError, "23505",
+             {"table": "gauge", "constraint": "gauge_pkey"}),
+            (insert + "(2, 1, 1, 9, NULL)", pgorm.ForeignKeyViolationError, "23503",
+             {"table": "gauge", "constraint": "gauge_parent"}),
+            (insert + "(2, 100, 1, NULL, NULL)", pgorm.CheckViolationError, "23514",
+             {"table": "gauge", "constraint": "reading_bounded"}),
+            (insert + "(2, 1, 0, NULL, NULL)", pgorm.CheckViolationError, "23514",
+             {"datatype": "positive", "constraint": "positive_check"}),
+            (insert + "(2, NULL, 1, NULL, NULL)", pgorm.NotNullViolationError, "23502",
+             {"table": "gauge", "column": "reading"}),
+            (f"INSERT INTO {ns}.gauge (id, reading) VALUES (2, 1)", pgorm.NotNullViolationError,
+             "23502", {"datatype": "positive"}),
+            (insert + "(2, 1, 1, NULL, '[4,8)')", pgorm.ExclusionViolationError, "23P01",
+             {"table": "gauge", "constraint": "gauge_apart"}),
+        )
+        classes = {case[1] for case in cases}
+        for sql, cls, sqlstate, names in cases:
+            with self.subTest(sqlstate=sqlstate, names=names):
+                with self.assertRaises(cls) as caught:
+                    await self.pool.execute(pgorm.RawSQL(sql))
+                error = caught.exception
+                self.assertIsInstance(error, pgorm.DatabaseError)
+                self.assertIsInstance(error, pgorm.PgOrmError)
+                for other in classes - {cls}:
+                    self.assertNotIsInstance(error, other)
+                self.assertEqual(error.sqlstate, sqlstate)
+                self.assertEqual(error.severity, "ERROR")
+                self.assertEqual(str(error), error.message)
+                self.assertEqual(
+                    {
+                        field: getattr(error, field)
+                        for field in ("schema", "table", "column", "datatype", "constraint")
+                    },
+                    {
+                        "schema": ns,
+                        "table": None,
+                        "column": None,
+                        "datatype": None,
+                        "constraint": None,
+                    } | names,
+                )
+
+    # [spec:pgorm:req:python.errors+1/test]
+    async def test_other_errors_stay_plain_database_errors(self):
+        with self.assertRaises(pgorm.DatabaseError) as caught:
+            await self.pool.execute(pgorm.RawSQL("SELECT 1 / 0"))
+        self.assertIs(type(caught.exception), pgorm.DatabaseError)
+        self.assertEqual(caught.exception.sqlstate, "22012")
+        self.assertIsNone(caught.exception.datatype)
+        for cls in (
+            pgorm.UniqueViolationError, pgorm.ForeignKeyViolationError, pgorm.CheckViolationError,
+            pgorm.NotNullViolationError, pgorm.ExclusionViolationError,
+        ):
+            self.assertTrue(issubclass(cls, pgorm.DatabaseError))
+            self.assertIsNone(cls.datatype)
 
 
 if __name__ == "__main__":

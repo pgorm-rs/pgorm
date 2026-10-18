@@ -126,7 +126,7 @@ test("closing a connection returns it to its pool at once, and a closed connecti
 });
 
 // [spec:pgorm:req:napi.connections/test]
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("acquiring waits for a free connection within acquireTimeout, then fails with a TimeoutError", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 200 });
   await using held = await single.acquire();
@@ -137,7 +137,7 @@ test("acquiring waits for a free connection within acquireTimeout, then fails wi
 });
 
 // [spec:pgorm:req:napi.connections/test]
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("a connection runs one operation at a time and refuses a second rather than racing it", async () => {
   await using connection = await pool().acquire();
   // Refusal follows the order JavaScript calls in, whichever runtime thread

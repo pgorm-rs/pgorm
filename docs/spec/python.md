@@ -461,11 +461,19 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > delivered when it commits and never if it rolls back. `Listener` and
 > `Notification` MUST refuse truth testing with a construction error.
 
-> [spec:pgorm:req:python.errors]
+> [spec:pgorm:req:python.errors+1]
 > The package MUST expose a stable exception hierarchy for construction/type,
 > unsupported capability, connection, database, decode, timeout/cancellation
 > and lifecycle failures. Where available, database exceptions MUST retain
-> SQLSTATE and structured diagnostic fields without credentials. Invalid input
+> SQLSTATE and structured diagnostic fields (`detail`, `hint`, `schema`,
+> `table`, `column`, `datatype`, `constraint`) without credentials. A server
+> error whose SQLSTATE is a constraint violation pgorm's `SqlError` classifies
+> (`[spec:pgorm:sem:error.model.sql-class+4]`) MUST raise the matching
+> subclass of `DatabaseError`: `UniqueViolationError` (`23505`),
+> `ForeignKeyViolationError` (`23503`), `CheckViolationError` (`23514`),
+> `NotNullViolationError` (`23502`) or `ExclusionViolationError` (`23P01`),
+> carrying the same fields, so the names the server reported (a domain's in
+> `datatype`) are read as from any other `DatabaseError`. Invalid input
 > MUST NOT become process termination, a swallowed panic or an ordinary result.
 > Any caught internal Rust panic MUST remain an identifiable implementation
 > failure and MUST NOT be classified as an expected input rejection.

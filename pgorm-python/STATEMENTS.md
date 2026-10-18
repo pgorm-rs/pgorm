@@ -497,9 +497,10 @@ not end at a row boundary.
   transaction nothing is written and the connection stays usable; inside one
   the transaction is aborted and refuses statements (`25P02`) until it is
   rolled back.
-- A row the server refuses raises `DatabaseError` with its SQLSTATE (`23505`
-  for a duplicate key) when the COPY finishes, after the rest of the source
-  has been sent: the protocol reports nothing while data is still flowing.
+- A row the server refuses raises `DatabaseError` with its SQLSTATE (a
+  duplicate key's `UniqueViolationError`, `23505`) when the COPY finishes,
+  after the rest of the source has been sent: the protocol reports nothing
+  while data is still flowing.
 - A COPY FROM the server refuses before any data moves (a missing table or
   column, an option it rejects) raises `DatabaseError` and closes the
   connection, and with it any transaction on it; the pool lends a fresh
