@@ -199,10 +199,15 @@ jobs:
         run: |
           brew install llvm
           echo "LIBCLANG_PATH=$(brew --prefix llvm)/lib" >> "$GITHUB_ENV"
+      # The build step builds with the crate's `addon` profile on every
+      # release platform's runner, and refuses an addon still carrying a
+      # symbol table. The job summary records the addon's size.
+      # [spec:pgorm:req:napi.release-builds+1]
       - name: Build and check the release addon
         run: |
           node pgorm-napi/checks/package.js build
           test -f "target/napi-package/binaries/$EXPECTED_PLATFORM/binary.json"
+          node -e 'const b = require(`./target/napi-package/binaries/${process.env.EXPECTED_PLATFORM}/binary.json`); console.log(`${b.package}: pgorm_napi.node, ${b.size} bytes`);' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain the addon
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

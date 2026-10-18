@@ -21,6 +21,8 @@ import { fileURLToPath } from "node:url";
 
 import { col, column, connect, Decimal, insert, model, Pool, select, Table, version } from "@necessary/pgorm";
 
+import { localSymbols } from "./symbols.ts";
+
 const dsn = required("PGORM_TEST_DSN");
 const expectedVersion = required("PGORM_NAPI_VERSION");
 const platformPackage = required("PGORM_NAPI_PLATFORM_PACKAGE");
@@ -72,12 +74,13 @@ test("the installed module loads its addon from the platform package", () => {
   assert.equal(mainRequire.resolve(platformPackage), join(platformDirectory, "pgorm_napi.node"));
 });
 
-// [spec:pgorm:req:napi.release-builds/test]
-test("the installed addon is a release build of this version", () => {
+// [spec:pgorm:req:napi.release-builds+1/test]
+test("the installed addon is a stripped release build of this version", () => {
   const addon = mainRequire(platformPackage);
   assert.equal(addon.version, expectedVersion);
   assert.equal(addon.probePanic, undefined);
   assert.equal(addon.probeDropQueue, undefined);
+  assert.equal(localSymbols(readFileSync(mainRequire.resolve(platformPackage))), 0);
 });
 
 // [spec:pgorm:req:napi.packages+1/test]

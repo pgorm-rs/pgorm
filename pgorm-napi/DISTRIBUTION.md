@@ -130,12 +130,14 @@ node pgorm-napi/checks/package.js all --partial
 
 It runs three steps, which CI runs on separate runners:
 
-1. **`build`**: builds the release addon for the machine it runs on into
+1. **`build`**: builds the release addon for the machine it runs on, with
+   the crate's `addon` profile ([The addon's size](#the-addons-size)), into
    `target/napi-package/binaries/<platform>/`. It refuses the build if it
    carries the debug-only exports `probePanic` or `probeDropQueue`, checking
-   both by loading the addon and by searching its bytes for their names, or if
-   its `version` is not the package's. The npm version always matches the
-   crate's.
+   both by loading the addon and by searching its bytes for their names; if
+   it still carries symbols its loading does not need, an ELF symbol table or
+   Mach-O local symbols, read from its bytes; or if its `version` is not the
+   package's. The npm version always matches the crate's.
 2. **`pack`**: checks that the committed notices match the lockfile, checks
    each addon again (by its bytes, so any platform's binary can be checked on
    any runner), stages the main package and one package per release platform,
@@ -150,9 +152,11 @@ It runs three steps, which CI runs on separate runners:
    project, installs `npm:@necessary/pgorm`, each with its own cache and no
    user configuration. It checks that only the matching platform package was
    installed, then runs `tests/package/smoke.test.ts` under `node --test` and
-   `deno test`: connecting, a bound query, a built statement, a model, a
-   transaction that commits and one that rolls back, `Temporal`, `bigint` and
-   `Decimal` round trips, and a fresh process that has to exit on its own. In
+   `deno test`. The suite checks that the installed addon is a stripped
+   release build of this version, then covers connecting, a bound query, a
+   built statement, a model, a transaction that commits and one that rolls
+   back, `Temporal`, `bigint` and `Decimal` round trips, and a fresh process
+   that has to exit on its own. In
    both runtimes it then makes the loader refuse a missing platform package,
    one with a different version, and a platform the main package does not
    offer, each with its error.
@@ -167,6 +171,58 @@ weekly. Its `addon` jobs build on `macos-15` (arm64) and `ubuntu-24.04`
 `install` jobs install that one set on both platforms against PostgreSQL 18
 and run the suite in Node.js 26 and Deno 2. The tarballs, the addons and each
 install's report are kept as workflow artifacts for 14 days.
+
+## The addon's size
+
+The packages ship the addon built with pgorm-napi's `addon` Cargo profile,
+which `node pgorm-napi/scripts/build.mjs --release` and the packaging check's
+`build` step both use:
+
+```toml
+[profile.addon]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+```
+
+Fat LTO across one codegen unit lets the optimiser see the whole addon at
+once and drop the code nothing reaches. Stripping removes the symbol table,
+which no runtime reads: a Node-API host looks up only
+`napi_register_module_v1`, which stays exported. Panics still unwind, as in
+every other build, because Neon turns a panic into a JavaScript exception
+where `panic = "abort"` would end the host process. The `release` profile
+itself is unchanged, in pgorm-napi and in the main workspace.
+
+Measured on macOS arm64 (rustc 1.99.0), `pgorm_napi.node` built from one
+commit under each setting, then stripped with `strip -x`:
+
+| Profile | As built | Stripped |
+| --- | --- | --- |
+| Cargo's `release` (16 codegen units, no cross-crate LTO) | 23.2 MB | 18.4 MB |
+| `release` with fat LTO | 17.8 MB | 14.6 MB |
+| `release` with one codegen unit | 14.9 MB | 12.1 MB |
+| `release` with fat LTO and one codegen unit: **`addon`** | 14.1 MB | **11.8 MB** |
+| `addon` with `opt-level = "s"` | 11.5 MB | 9.1 MB |
+| `addon` with `opt-level = "z"` | 10.4 MB | 6.8 MB |
+
+A release build carries no debug information to begin with, since Cargo
+strips it when `debug` is off; what stripping removes is the symbol table,
+about 55,000 local symbols. One codegen unit buys more than LTO does, because
+sixteen units each carry their own copies of the generic and inlined code
+they use.
+
+The profile keeps the release profile's `opt-level = 3`. Counted by
+instructions retired and CPU cycles on macOS, the `addon` build decodes rows
+in about 4% fewer cycles than the `release` build. `opt-level = "s"` would
+give that back for another 2.6 MB, and `"z"` spends about 40% more cycles
+decoding rows and nearly twice as many compiling a pipeline.
+
+Packed, the macOS arm64 platform package is 5.3 MB, where it was 8.3 MB with
+the `release` build. The `build` step records the addon's size in its
+`binary.json`, and each CI `addon` job writes it to the job summary. CI's
+Linux x86-64 addon was 28.7 MB built with the `release` profile, 21.2 MB of it
+left once stripped.
 
 ## Dependencies and notices
 

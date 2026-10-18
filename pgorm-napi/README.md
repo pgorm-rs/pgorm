@@ -47,12 +47,16 @@ dependency notices and how the packages are built and checked.
 
 ```sh
 node pgorm-napi/scripts/build.mjs            # debug build
-node pgorm-napi/scripts/build.mjs --release  # optimised build
+node pgorm-napi/scripts/build.mjs --release  # release build, as the packages ship it
 ```
 
 The script runs Cargo (into the repository's `target/` unless
 `CARGO_TARGET_DIR` says otherwise) and copies the library it produces to
-`pgorm-napi/lib/pgorm_napi.node`, which git ignores. The addon targets
+`pgorm-napi/lib/pgorm_napi.node`, which git ignores. A release build uses the
+crate's `addon` profile, Cargo's release profile with fat LTO, one codegen
+unit and the symbol table stripped: about 11.8 MB on macOS arm64 rather than
+23 MB, at the cost of a longer link
+([DISTRIBUTION.md](DISTRIBUTION.md#the-addons-size)). The addon targets
 Node-API 6 and resolves its Node-API symbols from whichever runtime loads it,
 so one build serves both. The module loads a library it finds there before
 looking for an installed platform package, so a checkout runs its own build.

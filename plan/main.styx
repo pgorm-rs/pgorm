@@ -11093,6 +11093,22 @@ children (
                 title "pgorm-napi's release addon ships stripped and as small as a release build makes it, down from about 23 MB"
                 kind @build
                 deps (napi-packaging)
+                sealed true
+                log (
+                    {
+                        at 2026-10-18T14:41:16.446465Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Measured on macOS arm64 (rustc 1.99.0), release addon as built / stripped (strip -x): release 23.2/18.4 MB; +lto=fat 17.8/14.6; +codegen-units=1 alone 14.9/12.1; fat LTO + one codegen unit 14.1/11.8; that + opt-level \"s\" 11.5/9.1; + \"z\" 10.4/6.8. Release builds already carry no DWARF (Cargo strips debuginfo when debug is off); stripping removes ~55,000 local symbols (4.8 MB). Speed, by instructions retired and cycles under /usr/bin/time -l (wall time was too noisy at load 40-110): decoding 500k rows, release 10.8-11.0G cycles, fat+cgu1 10.3-10.5G, \"s\" 10.8-10.9G, \"z\" 14.9G; compiling the PRQL parity pipelines x40, release 4.39G, fat+cgu1 4.11G, \"s\" 4.14G, \"z\" 7.87G. Decision: the `addon` profile is release + lto=\"fat\" + codegen-units=1 + strip=\"symbols\" with opt-level 3 kept, 11.8 MB and slightly faster than release; \"s\" would save another 2.6 MB for about 4% more cycles decoding, left to the operator; \"z\" is too slow. panic stays unwind. Packaged darwin-arm64 tarball 8.3 MB -> 5.3 MB. A linux-arm64 glibc container build of the profile is 12.3 MB, has no .symtab, keeps napi_register_module_v1 in .dynsym and loads under Node 26; linux-x64-gnu (28.7 MB unstripped, 21.2 MB stripped in CI's last run) is exercised only by CI."
+                    }
+
+                    {
+                        at 2026-10-18T14:41:20.074691Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
         log (

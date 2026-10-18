@@ -5,10 +5,12 @@
 // The crate is an rlib for the applications that link it, so the addon's
 // cdylib is asked of `cargo rustc`. Cargo names a cdylib for the platform
 // (libpgorm_napi.dylib, .so, pgorm_napi.dll); Node-API hosts load it from any
-// path, so it is copied to lib/pgorm_napi.node. Builds go to the repository's
-// target directory, which the nplan checks share, unless CARGO_TARGET_DIR
-// says otherwise. checks/package.js builds the platform packages' addon
-// through `buildLibrary`, and copies it nowhere in lib/.
+// path, so it is copied to lib/pgorm_napi.node. A release build uses the
+// crate's `addon` profile, the release profile with whole-program LTO and the
+// symbol table stripped, which is what the platform packages ship. Builds go
+// to the repository's target directory, which the nplan checks share, unless
+// CARGO_TARGET_DIR says otherwise. checks/package.js builds the platform
+// packages' addon through `buildLibrary`, and copies it nowhere in lib/.
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, rmSync } from "node:fs";
@@ -35,7 +37,7 @@ export function buildLibrary({ release = false } = {}) {
     "cdylib",
     "--message-format=json-render-diagnostics",
   ];
-  if (release) args.push("--release");
+  if (release) args.push("--profile", "addon");
   if (!process.env.CARGO_TARGET_DIR) {
     args.push("--target-dir", join(root, "..", "target"));
   }

@@ -7,14 +7,15 @@
 //   node pgorm-napi/checks/package.js install           # install and smoke-test them here
 //   node pgorm-napi/checks/package.js all [--partial]   # build, pack and install
 //
-// `build` makes the release addon and refuses one carrying the debug-only
-// probe exports. `pack` makes the main package and one package per release
-// platform in support.json from the addons built, verifies their contents,
-// and packs them with `npm pack`; a release packs every release platform, so
-// CI builds each on its own runner first, and `--partial` packs only the ones
-// built here, its main package naming only those. `install` serves the
-// tarballs from a registry of its own on loopback, installs them into fresh
-// Node.js and Deno projects as an application would — `npm install
+// `build` makes the release addon with the crate's `addon` profile and
+// refuses one carrying the debug-only probe exports or a symbol table its
+// loading does not need. `pack` makes the main package and one package per
+// release platform in support.json from the addons built, verifies their
+// contents, and packs them with `npm pack`; a release packs every release
+// platform, so CI builds each on its own runner first, and `--partial` packs
+// only the ones built here, its main package naming only those. `install`
+// serves the tarballs from a registry of its own on loopback, installs them
+// into fresh Node.js and Deno projects as an application would — `npm install
 // @necessary/pgorm`, and `npm:@necessary/pgorm` in a `nodeModulesDir: "auto"`
 // Deno project — runs tests/package/smoke.test.ts in each against the server
 // PGORM_TEST_DSN or DATABASE_URL names, and holds the loader to refusing a
@@ -40,6 +41,7 @@ import { fileURLToPath } from "node:url";
 import { manifest as cargoManifest } from "../codegen/scaffold.js";
 import { platform } from "../lib/native.js";
 import { buildLibrary } from "../scripts/build.mjs";
+import { localSymbols } from "../tests/package/symbols.ts";
 import { dsn } from "../tests/support.ts";
 import { generate, NOTICES } from "./notices.js";
 
@@ -150,15 +152,17 @@ function manifests() {
 }
 
 /**
- * Refuse an addon that is not a release build of this version: one carrying
- * a probe export, checked by name in its bytes — which works for any
- * platform's binary — and, where it can be loaded here, by its exports.
+ * Refuse an addon that is not a stripped release build of this version: one
+ * carrying a probe export, checked by name in its bytes — which works for any
+ * platform's binary — and, where it can be loaded here, by its exports; or
+ * one still carrying symbols its loading does not need, read from its ELF or
+ * Mach-O symbol tables, which any runner can read for any platform's binary.
  *
  * @param {string} path
  * @param {string} version
  * @param {{ load: boolean }} options
  */
-// [spec:pgorm:req:napi.release-builds]
+// [spec:pgorm:req:napi.release-builds+1]
 function verifyAddon(path, version, { load }) {
   /** @type {string[] | undefined} */
   let exports;
@@ -178,6 +182,9 @@ function verifyAddon(path, version, { load }) {
   const data = readFileSync(path);
   const named = PROBES.filter((probe) => data.includes(probe));
   ensure(named.length === 0, `${path} names ${named.join(" and ")}, which only a debug build carries: package a release build`);
+  const symbols = localSymbols(data);
+  ensure(symbols !== undefined, `${path} is neither a 64-bit ELF nor a Mach-O library, so whether it is stripped cannot be read`);
+  ensure(symbols === 0, `${path} carries ${symbols} symbols beyond the ones it is loaded by: package the addon profile's stripped build`);
   return { sha256: hash("sha256", data, "hex"), size: data.length, exports };
 }
 
@@ -447,7 +454,7 @@ function project(directory, files) {
   for (const [name, content] of Object.entries(files)) {
     writeFileSync(join(directory, name), typeof content === "string" ? content : `${JSON.stringify(content, null, 2)}\n`);
   }
-  for (const file of ["smoke.test.ts", "exit.ts"]) copyFileSync(join(napi, "tests", "package", file), join(directory, file));
+  for (const file of ["smoke.test.ts", "exit.ts", "symbols.ts"]) copyFileSync(join(napi, "tests", "package", file), join(directory, file));
 }
 
 async function install() {
