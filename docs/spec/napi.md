@@ -1082,12 +1082,18 @@ is the user-facing account of it.
 > does; and when the installed platform package's version, or its addon's
 > `version`, differs from the main package's, naming both.
 
-> [spec:pgorm:req:napi.release-builds]
-> A platform package MUST hold a release build of the addon. The packaging
-> check MUST refuse an addon carrying the debug-only probe exports, both by
-> loading it on the platform that built it and by finding their names in its
-> bytes, which any runner can check for any platform's binary, and MUST refuse
-> one whose `version` is not the package version.
+> [spec:pgorm:req:napi.release-builds+1]
+> A platform package MUST hold a stripped release build of the addon, built
+> with the crate's `addon` profile: Cargo's release profile with fat LTO, one
+> codegen unit and the symbol table stripped. Its panics MUST still unwind,
+> so that a panic reaches JavaScript as an exception rather than ending the
+> host process, and the crate's own `release` profile stays as Cargo has it.
+> The packaging check MUST refuse an addon carrying the debug-only probe
+> exports, both by loading it on the platform that built it and by finding
+> their names in its bytes, which any runner can check for any platform's
+> binary; MUST refuse one carrying symbols its loading does not need (an ELF
+> symbol table, or Mach-O local symbols), read from its bytes the same way;
+> and MUST refuse one whose `version` is not the package version.
 
 > [spec:pgorm:req:napi.notices]
 > Each platform package MUST carry an inventory and the notice texts of the

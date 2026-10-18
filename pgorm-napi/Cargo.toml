@@ -52,6 +52,22 @@ rustls-native-certs = "0.8.4"
 tokio-postgres-rustls = "0.14.0"
 tokio-util = "0.7.20"
 
+# The release addon's profile, which scripts/build.mjs --release and the
+# packaging check build with ([spec:pgorm:req:napi.release-builds+1]); the
+# crate's own release profile is left as Cargo has it. Whole-program LTO
+# through one codegen unit drops the code nothing reaches, and stripping
+# removes the symbol table, which a host never reads: it looks up only
+# `napi_register_module_v1`, which stays among the exported symbols (the
+# Mach-O external symbols, the ELF dynamic table), and the bounds of the
+# sections Neon collects its exports in are fixed when the library is linked,
+# before it is stripped. Panics still unwind: Neon turns one into a
+# JavaScript exception, where an abort would end the host process.
+[profile.addon]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
 [lints.rust]
 unsafe_code = "forbid"
 missing_debug_implementations = "deny"
