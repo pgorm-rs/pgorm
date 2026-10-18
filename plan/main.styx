@@ -11842,6 +11842,14 @@ children (
                 text "Delivered again at sql.value.interval +1 (d945e094, generative-interval-kind): the generative campaign now carries interval as a portable kind, its payload the three fields as exact decimal text, bound, inlined and decoded through both bindings and compared field by field."
                 after_done true
             }
+
+            {
+                at 2026-10-18T19:30:08.282013Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "value-serde-impls (a2bece89) bumped sql.value.interval+2, adding Interval's serde representation under pgorm-query's serde feature (its three fields by name, missing or unknown fields refused); every site was re-read against the new text and re-pinned, and the code still says what the rule says."
+                after_done true
+            }
         )
     }
 
