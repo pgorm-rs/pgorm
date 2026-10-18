@@ -6157,6 +6157,14 @@ children (
                         text "set-operation-grouping (a5a85e10) bumped python.statements+8: Select's set operations combine in call order as Rust's do, a.union(b).intersect(c) being (a UNION b) INTERSECT c; sites re-pinned, the binding matches, and test_set_operations holds every operator pair live."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:37:36.41601Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "python.statements+8 evidence: test_chains_combine_in_call_order and test_intersect_after_union_groups_the_union (pgorm-python/tests/test_set_operations.py) pass against PostgreSQL 18.6, with the full suite and checks/typing.py."
+                        after_done true
+                    }
                 )
             }
 
