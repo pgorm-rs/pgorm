@@ -44,6 +44,10 @@ pretty_assertions = { version = "1.4" }
 # the root crate's revision, so a render is held to the grammar the runtime
 # parses with. The root manifest says why it is a git dependency.
 pg_query = { git = "https://github.com/necessary-nu/pg_query.rs.git", rev = "09ebc3a4c7f50f3682e890a8372b4c4c99382ed9" }
+# The surface tests (tests/surface) read lib.rs as a syntax tree, and hold
+# what a caller cannot name with compile-fail fixtures.
+syn = { version = "3", default-features = false, features = ["parsing", "full"] }
+trybuild = "1.0.122"
 
 [features]
 default = ["derive"]
@@ -73,6 +77,10 @@ required-features = ["tests-cfg"]
 name = "test-postgres"
 path = "tests/postgres/mod.rs"
 required-features = ["tests-cfg"]
+
+[[test]]
+name = "test-surface"
+path = "tests/surface/mod.rs"
 
 [[bench]]
 name = "basic"

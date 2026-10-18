@@ -2291,11 +2291,15 @@ fn test_pgvector_select() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.cast-shape+2/test]    every cast spelling — the quoted name and the
-// verbatim type expression alike — is one `AsEnum` node differing only in its `TypeName`
+// [spec:pgorm:req:sql.ast.cast-shape+2/test]    every cast spelling — `cast_as`, `cast_as_raw`,
+// `as_enum`, `cast_as_type` and `as_range` on `Expr`, `cast_as` and `cast_as_type` on
+// `SimpleExpr`, the quoted name and the verbatim type expression alike — is one `AsEnum`
+// node differing only in its `TypeName`, and `as_range` writing a range value as its
+// text first still builds that node
 #[test]
 fn every_cast_spelling_builds_one_node_shape() {
     let operand = Expr::col(Char::SizeW);
+    let slot = || TypeName::new(Name::runtime("slot")).schema(Name::runtime("booking"));
     let casts = [
         operand.clone().cast_as(Name::runtime("citext")),
         operand.clone().cast_as_raw("numeric(10, 2)"),
@@ -2303,6 +2307,9 @@ fn every_cast_spelling_builds_one_node_shape() {
         operand
             .clone()
             .cast_as_type(TypeName::new(Name::runtime("status")).schema(Name::runtime("tenant_a"))),
+        operand.clone().as_range(slot()),
+        SimpleExpr::from(operand.clone()).cast_as(Name::runtime("citext")),
+        SimpleExpr::from(operand.clone()).cast_as_type(TypeName::new(Name::runtime("tea")).array()),
     ];
 
     let type_names: Vec<TypeName> = casts
@@ -2327,7 +2334,29 @@ fn every_cast_spelling_builds_one_node_shape() {
             TypeName::raw("numeric(10, 2)"),
             TypeName::new(Name::runtime("citext")),
             TypeName::new(Name::runtime("status")).schema(Name::runtime("tenant_a")),
+            slot(),
+            TypeName::new(Name::runtime("citext")),
+            TypeName::new(Name::runtime("tea")).array(),
         ]
+    );
+
+    // A range or multirange value reaches a created range type only as its
+    // text, so `as_range` rewrites that operand; the node stays the one cast.
+    let text = |text: &str| SimpleExpr::Value(Value::String(Some(Box::new(text.to_owned()))));
+    assert_eq!(
+        Expr::val(Range::from(1..5)).as_range(slot()),
+        SimpleExpr::AsEnum(Box::new(slot()), Box::new(text("[1,5)")))
+    );
+    assert_eq!(
+        Expr::val(Multirange::from(vec![Range::from(1..5), Range::from(7..9)])).as_range(slot()),
+        SimpleExpr::AsEnum(Box::new(slot()), Box::new(text("{[1,5),[7,9)}")))
+    );
+    assert_eq!(
+        Expr::val(Value::Range(RangeType::Int4, None)).as_range(slot()),
+        SimpleExpr::AsEnum(
+            Box::new(slot()),
+            Box::new(SimpleExpr::Value(Value::String(None)))
+        )
     );
 
     // Quoted or verbatim is the `TypeName`'s answer, never the node's.

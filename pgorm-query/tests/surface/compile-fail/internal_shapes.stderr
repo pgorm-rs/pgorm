@@ -1,0 +1,120 @@
+error[E0432]: unresolved import `pgorm_query::Mode`
+ --> tests/surface/compile-fail/internal_shapes.rs:7:5
+  |
+7 | use pgorm_query::Mode;
+  |     ^^^^^^^^^^^^^----
+  |                  |
+  |                  no `Mode` in the root
+
+error[E0603]: trait `Write` is private
+ --> tests/surface/compile-fail/internal_shapes.rs:5:18
+  |
+5 | use pgorm_query::Write;
+  |                  ^^^^^ private trait
+  |
+note: the trait `Write` is defined here
+ --> src/lib.rs
+  |
+  | pub(crate) use prepare::Write;
+  |                ^^^^^^^^^^^^^^
+help: import `Write` directly
+  |
+5 - use pgorm_query::Write;
+5 + use core::fmt::Write;
+  |
+
+error[E0603]: enum `Oper` is private
+ --> tests/surface/compile-fail/internal_shapes.rs:8:18
+  |
+8 | use pgorm_query::Oper;
+  |                  ^^^^ private enum
+  |
+note: the enum `Oper` is defined here
+ --> src/lib.rs
+  |
+  | pub(crate) use backend::Oper;
+  |                ^^^^^^^^^^^^^
+
+error[E0603]: struct `ConditionHolder` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:10:18
+   |
+10 | use pgorm_query::ConditionHolder;
+   |                  ^^^^^^^^^^^^^^^ private struct
+   |
+note: the struct `ConditionHolder` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use query::ConditionHolder;
+   |                ^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: enum `InsertValueSource` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:11:18
+   |
+11 | use pgorm_query::InsertValueSource;
+   |                  ^^^^^^^^^^^^^^^^^ private enum
+   |
+note: the enum `InsertValueSource` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use query::InsertValueSource;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: struct `JoinExpr` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:12:18
+   |
+12 | use pgorm_query::JoinExpr;
+   |                  ^^^^^^^^ private struct
+   |
+note: the struct `JoinExpr` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use query::JoinExpr;
+   |                ^^^^^^^^^^^^^^^
+
+error[E0603]: enum `JoinKind` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:13:18
+   |
+13 | use pgorm_query::JoinKind;
+   |                  ^^^^^^^^ private enum
+   |
+note: the enum `JoinKind` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use types::JoinKind;
+   |                ^^^^^^^^^^^^^^^
+
+error[E0603]: enum `JoinOn` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:14:18
+   |
+14 | use pgorm_query::JoinOn;
+   |                  ^^^^^^ private enum
+   |
+note: the enum `JoinOn` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use types::JoinOn;
+   |                ^^^^^^^^^^^^^
+
+error[E0603]: struct `LockClause` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:15:18
+   |
+15 | use pgorm_query::LockClause;
+   |                  ^^^^^^^^^^ private struct
+   |
+note: the struct `LockClause` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use query::LockClause;
+   |                ^^^^^^^^^^^^^^^^^
+
+error[E0603]: enum `ReturningItems` is private
+  --> tests/surface/compile-fail/internal_shapes.rs:16:18
+   |
+16 | use pgorm_query::ReturningItems;
+   |                  ^^^^^^^^^^^^^^ private enum
+   |
+note: the enum `ReturningItems` is defined here
+  --> src/lib.rs
+   |
+   | pub(crate) use query::ReturningItems;
+   |                ^^^^^^^^^^^^^^^^^^^^^

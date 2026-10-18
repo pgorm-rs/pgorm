@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+28]
+> [spec:pgorm:req:sql.surface+29]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -64,7 +64,9 @@ today, including panicking edges and deliberate failsafes.
 > `extension` (the `CREATE EXTENSION` / `CREATE TYPE` surface, deliberately not
 > flattened into the root) and `value` (whose `value::with_array::NotU8` pgorm's
 > derives name in generated code). `tests_cfg` is `#[doc(hidden)]` behind its
-> own feature and is not surface.
+> own feature and is not surface. No module inside the three is public but
+> `value::with_array`, the path that spelling takes, and `value` exports
+> nothing the list does not.
 >
 > What the crate reads but a caller cannot use is `pub(crate)`: the renderer's
 > `Mode` and `Oper` helpers, the clause shapes a statement holds internally
@@ -82,8 +84,9 @@ today, including panicking edges and deliberate failsafes.
 > individually in `lib.rs` rather than left to a glob, so the residue is a list
 > a later pass can work through rather than a category.
 >
-> The list grows only by a named item that a rule specifies, and each addition
-> is recorded here with that rule: `Deferrability`, when a constraint's check
+> The list grows only by a named item that a rule specifies, and so does
+> `extension`; each addition to either is recorded here with that rule:
+> `Deferrability`, when a constraint's check
 > runs (`sql.ddl.deferrability`); `Overriding`, the `OVERRIDING SYSTEM VALUE`
 > or `OVERRIDING USER VALUE` an insert carries (`sql.ast.insert`);
 > `IdentityGeneration`, whether an identity column is generated `ALWAYS` or
@@ -98,8 +101,8 @@ today, including panicking edges and deliberate failsafes.
 > a plain expression and the `GROUPING()` that reads them
 > (`sql.ast.select.grouping`); `FrameStart`, its three side markers
 > `FramePreceding`, `FrameCurrentRow` and `FrameFollowing`, and
-> `FrameExclusion`, the frame builder and its `EXCLUDE` clause, which replace
-> the bound enum `Frame` (`sql.ast.window-statement`); `TableKey`,
+> `FrameExclusion`, the frame builder and its `EXCLUDE` clause
+> (`sql.ast.window-statement`); `TableKey`,
 > `IntoTableKey`, `Primary` and `Unique`, a table's key — one type for the
 > primary key and the unique keys, a tuple of one or more columns that one
 > column or a tuple converts into, and its two kinds — and the one table-level
@@ -146,27 +149,32 @@ today, including panicking edges and deliberate failsafes.
 > the conversion an expression takes into one (`sql.ddl.create-table`),
 > `Enforcement`, whether a foreign key or `CHECK` is enforced
 > (`sql.ddl.enforcement`), `ReturningRow`, which version of a written
-> row a RETURNING reference reads (`sql.ast.returning`), and SQL/JSON
-> (`sql.ast.expr.sql-json`): `SqlJson`, the expression node's payload;
+> row a RETURNING reference reads (`sql.ast.returning`), and SQL/JSON's
+> items: `SqlJson`, the expression node's payload;
 > `JsonExists`, `JsonValue` and `JsonQuery`, the three query functions, with
 > `JsonExistsBehavior`, `JsonValueBehavior` and `JsonQueryBehavior`, what each
 > answers on an empty or failed path, and `JsonValueType`, the types
 > `JSON_VALUE` returns its scalar as; `JsonObject`, `JsonArray`,
 > `JsonArrayQuery`, `JsonObjectAgg`, `JsonArrayAgg`, `JsonParse` and
 > `JsonSerialize`, the constructors; `JsonInput`, an operand with or without
-> `FORMAT JSON`; `JsonKind` and `JsonTest`, what `IS JSON` tests; and
+> `FORMAT JSON`; `JsonKind` and `JsonTest`, what `IS JSON` tests
+> (`sql.ast.expr.sql-json`); and
 > `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`); and
 > `JsonTable`, `JsonTableBehavior`, `JsonTableColumn`, `JsonValueColumn`,
 > `JsonQueryColumn`, `JsonExistsColumn` and `JsonNestedColumns`: `JSON_TABLE`,
 > its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`); and
 > `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
-> item leaves the list with the state it described: `StandaloneIndexKind`
-> went when the primary-key index kind it screened the standalone renderer
-> from did (`sql.ddl.index-create`), and `IndexConstraint` when the key a
+> item leaves the list with the state it described: `Frame` went when a
+> frame's bounds stopped being one enum, the frame builder replacing it
+> (`sql.ast.window-statement`), `StandaloneIndexKind` when the primary-key
+> index kind it screened the standalone renderer from did
+> (`sql.ddl.index-create`), and `IndexConstraint` when the key a
 > column could also declare did, `TableKey` replacing it
 > (`sql.ddl.create-table`), and `ForeignKeyDropStatement` when the drop named
 > for one constraint kind did, `ConstraintDrop` replacing it
-> (`sql.ddl.alter-table`).
+> (`sql.ddl.alter-table`). What the list and `extension` held when this rule
+> was first written has no entry, being the baseline the record counts from;
+> everything either has exported since is recorded here.
 
 > [spec:pgorm:req:sql.ast.build+3]
 > Every statement type implements the single `QueryStatementBuilder`, whose
