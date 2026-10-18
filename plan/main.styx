@@ -1471,6 +1471,21 @@ children (
                     }
                 )
             }
+
+            {
+                id codegen-accepts-create-schema
+                title "Codegen reads a schema dump that creates its schemas, instead of refusing CREATE SCHEMA"
+                kind @fix
+                deps (sql-schemas)
+                log (
+                    {
+                        at 2026-10-18T19:21:23.94957Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-schemas (f767aea9). pgorm-codegen refuses CREATE SCHEMA in its input (\"unsupported DDL: CREATE SCHEMA at statement 1\"), so a schema dump that creates its own schemas cannot be fed to it, though codegen already emits schema_name for schema-qualified tables. Accept CREATE SCHEMA [IF NOT EXISTS] (and ignore it, or record the schema so a table in an undeclared schema can be reported), update codegen.ddl.unsupported, and add a fixture with a schema, a table and an enum in it."
+                    }
+                )
+            }
         )
     }
 
@@ -9130,6 +9145,36 @@ children (
                     }
                 )
             }
+
+            {
+                id set-operation-grouping
+                title "Chained set operations group in call order, so a.union(b).intersect(c) means (a UNION b) INTERSECT c, in Rust, Python and JavaScript"
+                kind @fix
+                deps (python-select-set-operations)
+                log (
+                    {
+                        at 2026-10-18T19:21:23.735601Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by python-select-set-operations (e4152e18). The builders write set-operation arms in call order with no grouping, so PostgreSQL's precedence decides the meaning: INTERSECT binds tighter than UNION and EXCEPT, and a.union(b).intersect(c) runs as a UNION (b INTERSECT c). A live test confirms it returns {1} where reading the chain left to right gives the empty set. This holds in Rust (SelectStatement::union), Python and JavaScript, and neither sql.ast.select.union nor the bindings' docs mention it. A builder chain reads left to right, so make the rendered SQL mean that: when an arm is appended with an operator that binds tighter than an earlier one, parenthesize everything before it (render ((a UNION b)) INTERSECT c or the equivalent PostgreSQL accepts, checking that parenthesized set-operation operands with their own ORDER BY / LIMIT still render correctly). Hold it with oracle-checked renders and live tests in all three languages for each operator pair, and update sql.ast.select.union, the render rule and the bindings' docs. The lead's recommendation, filed for the operator to confirm: the alternative is to keep PostgreSQL's precedence and document it."
+                    }
+                )
+            }
+
+            {
+                id schema-statement-wrapper
+                title "The doc-hidden SchemaStatement wrapper goes, so Schema means only a database schema"
+                kind @refactor
+                deps (sql-schemas)
+                log (
+                    {
+                        at 2026-10-18T19:21:24.056875Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-schemas (f767aea9). pgorm-query's doc-hidden SchemaStatement (wrapping table, index and foreign-key statements; one of the five statement-dispatch wrappers sql.surface lists as residue no builder produces and no renderer takes) now reads as \"a CREATE/DROP SCHEMA statement\" beside the new Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement. Delete it (and, if nothing reads them, the other four dispatch wrappers sql.surface names as residue), update sql.surface's residue paragraph and the test-surface residue list, and bump sql.surface."
+                    }
+                )
+            }
         )
     }
 
@@ -12107,6 +12152,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b), whose Python half skipped these to avoid colliding with the typing work then in flight. Add COPY cases to pgorm-python/tests/public_types_invalid.py (a wrong-format option, e.g. quote on text or header on binary, a COPY TO option on COPY FROM, a str passed to copy_in) so mypy --strict holds the per-format stubs, and COPY statements to the direct-builder parity suite against the Rust builders."
+            }
+        )
+    }
+
+    {
+        id python-view-body-check
+        title "Python's view and CREATE TABLE AS builders check their query as JavaScript's do, refusing a tie limit without ORDER BY"
+        kind @fix
+        deps (sql-views sql-select-extras)
+        log (
+            {
+                at 2026-10-18T19:21:23.848757Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-select-set-operations (e4152e18). pgorm-python's create_view, create_recursive_view, create_materialized_view and create_table_as (src/schema/view.rs) take query.inner.clone() instead of query.embedded()?, so a view body with a tie limit and no ORDER BY reaches the server, while pgorm-napi's view builders refuse it as they read the query. Use embedded() so the check runs, and add a test per builder."
             }
         )
     }
