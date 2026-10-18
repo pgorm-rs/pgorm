@@ -53,7 +53,7 @@ impl CopyFrom {
     }
 }
 
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
 /// `COPY table [(columns)] FROM STDIN` in a format chosen at construction.
 #[pyclass(name = "CopyFrom", module = "pgorm", frozen, generic, from_py_object)]
 #[derive(Clone, Debug)]

@@ -642,7 +642,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## COPY
 
-> [spec:pgorm:req:conn.copy]
+> [spec:pgorm:req:conn.copy+1]
 > `CopyTrait` is COPY's data flow on a connection: `copy_in(&mut self,
 > &CopyFromStatement<F>)` starts `COPY … FROM STDIN` and returns a
 > `CopyInSink<'_>`, and `copy_out(&mut self, &CopyToStatement<F>)` starts `COPY
@@ -666,6 +666,12 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > the same way. The exclusive borrow makes each a compile error, and is why
 > `CopyTrait` is a trait of its own rather than two more `ConnectionTrait`
 > methods, which borrow shared and which `&DatabaseConnection` implements.
+>
+> `copy_out` MUST run `CopyToStatement::check_source` before anything is
+> sent, so a `SELECT` source whose tie limit or WINDOW clause the grammar
+> refuses (`sql.ast.copy`) is the `Error::QueryBuilder` naming it, as on every
+> path that sends a `SELECT` (`exec.tie-limit`), and the connection is not
+> touched.
 >
 > The statement is sent as its one rendering (`sql.render.copy`) and is
 > prepared afresh, never through the statement cache

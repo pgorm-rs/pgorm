@@ -25,7 +25,7 @@ mod sealed {
 /// The set is closed. A statement carries its format as a type parameter, so
 /// an option the format does not accept is a method the statement does not
 /// have.
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 pub trait CopyFormat: sealed::Sealed + Clone + fmt::Debug + Send + Sync + 'static {}
 
 /// The two formats that are lines of delimited text, [`CopyText`] and
@@ -186,7 +186,7 @@ pub(crate) struct CopyOptions {
 ///
 /// CopyFromStatement::new(Glyph::Table, CopyBinary).header();
 /// ```
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 #[derive(Debug, Clone)]
 pub struct CopyFromStatement<F: CopyFormat> {
     pub(crate) table: TableName,
@@ -415,7 +415,7 @@ impl<F: CopyFormat> fmt::Display for CopyFromStatement<F> {
 ///
 /// CopyToStatement::new(Query::delete().from_table(Glyph::Table).to_owned(), CopyText);
 /// ```
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 #[derive(Debug, Clone)]
 pub struct CopySource(pub(crate) Source);
 
@@ -438,7 +438,7 @@ pub(crate) enum Source {
 /// list says nothing that query does not. A write is a source only with a
 /// `RETURNING` list, so it converts through [`CopySource`]'s [`TryFrom`]
 /// instead.
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 pub trait IntoCopySource {
     fn into_copy_source(self) -> CopySource;
 }
@@ -490,7 +490,7 @@ fn returns_nothing(statement: &SubQueryStatement) -> Option<&'static str> {
 
 /// A `SELECT` converts, and a write converts when it carries a `RETURNING`
 /// list; a write without one is [`Error::CopyWithoutReturning`].
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 impl TryFrom<SubQueryStatement> for CopySource {
     type Error = Error;
 
@@ -586,7 +586,7 @@ impl TryFrom<MergeStatement> for CopySource {
 ///
 /// CopyToStatement::new(Glyph::Table, CopyCsv).force_null_all();
 /// ```
-// [spec:pgorm:def:sql.ast.copy+1]
+// [spec:pgorm:def:sql.ast.copy+2]
 #[derive(Debug, Clone)]
 pub struct CopyToStatement<F: CopyFormat> {
     pub(crate) source: CopySource,
@@ -604,6 +604,47 @@ impl<F: CopyFormat> CopyToStatement<F> {
             source: source.into_copy_source(),
             format,
             options: CopyOptions::default(),
+        }
+    }
+
+    /// Refuse a `SELECT` source PostgreSQL's grammar would refuse: a tie
+    /// limit with no ORDER BY or beside `SKIP LOCKED`
+    /// ([`check_tie_limit`](SelectStatement::check_tie_limit)) and a WINDOW
+    /// clause, or a reference to one, it refuses
+    /// ([`check_windows`](SelectStatement::check_windows)).
+    ///
+    /// Rendering leaves both to its caller, as a `SELECT`'s own rendering
+    /// does, and pgorm runs this before it sends a COPY TO. A table has
+    /// nothing to check, and a write's `RETURNING` list was checked when it
+    /// became a source. A `SELECT` nested inside the source is the server's
+    /// to refuse, as it is for the two checks on their own.
+    ///
+    /// ```
+    /// use pgorm_query::{error::Error, tests_cfg::*, *};
+    ///
+    /// let mut select = Query::select()
+    ///     .column(Glyph::Image)
+    ///     .from(Glyph::Table)
+    ///     .limit_with_ties(3)
+    ///     .to_owned();
+    /// let copy = CopyToStatement::new(select.clone(), CopyText);
+    /// assert_eq!(copy.check_source(), Err(Error::TiesWithoutOrder));
+    ///
+    /// select.order_by(Glyph::Aspect, Order::Asc);
+    /// let copy = CopyToStatement::new(select, CopyText);
+    /// assert_eq!(copy.check_source(), Ok(()));
+    /// ```
+    // [spec:pgorm:def:sql.ast.copy+2]
+    pub fn check_source(&self) -> Result<(), Error> {
+        match &self.source.0 {
+            Source::Query(query) => match query.as_ref() {
+                SubQueryStatement::SelectStatement(select) => {
+                    select.check_tie_limit()?;
+                    select.check_windows()
+                }
+                _ => Ok(()),
+            },
+            Source::Table(_) => Ok(()),
         }
     }
 }

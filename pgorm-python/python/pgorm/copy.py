@@ -81,7 +81,7 @@ async def _pieces(items: AsyncIterator[memoryview]) -> AsyncGenerator[Buffer]:
         yield gathered
 
 
-# [spec:pgorm:req:python.copy+1]
+# [spec:pgorm:req:python.copy+2]
 # [spec:pgorm:req:python.cancellation]
 async def copy_in(
     native: _native._Connection | _native._Transaction,
@@ -106,7 +106,7 @@ async def copy_in(
     return await copy.finish()
 
 
-# [spec:pgorm:req:python.copy+1]
+# [spec:pgorm:req:python.copy+2]
 class CopyOutStream:
     """COPY TO's data as an async iterator of ``bytes`` chunks.
 

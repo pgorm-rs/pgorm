@@ -312,14 +312,18 @@ handle, and each is released by being closed.
 > refuses other work meanwhile. A transaction offers no stream, as
 > pgorm-python's does not.
 
-> [spec:pgorm:req:napi.copy+1]
+> [spec:pgorm:req:napi.copy+2]
 > `copyFrom(table, format)` and `copyTo(source, format)` MUST build
 > pgorm-query's `CopyFromStatement` and `CopyToStatement` in the format named,
 > `"text"`, `"csv"` or `"binary"`, a COPY TO reading a table or the rows of a
 > `Select`, or of an INSERT, UPDATE, DELETE or MERGE through its `RETURNING`
 > list. A write with no `RETURNING` list MUST be refused with a
 > `ConstructionError` when `copyTo` is called, as pgorm-query refuses to make
-> it a source (`sql.ast.copy`). They are immutable builders as `napi.statements`
+> it a source (`sql.ast.copy`). A `Select` source is final once `copyTo` reads
+> it, so its tie limit and WINDOW clause MUST be checked then by pgorm-query's
+> `check_tie_limit` and `check_windows`, a refused one a `ConstructionError`,
+> as a method reading a `Select` into another statement checks them
+> (`napi.select`). They are immutable builders as `napi.statements`
 > describes, each option the pgorm-query method of its name offered exactly
 > where pgorm-query's typed statement has it: an option the statement's
 > format or direction does not take MUST be refused with a

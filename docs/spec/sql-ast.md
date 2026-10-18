@@ -1388,7 +1388,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## COPY statements
 
-> [spec:pgorm:def:sql.ast.copy+1]
+> [spec:pgorm:def:sql.ast.copy+2]
 > `CopyFromStatement<F>` (`COPY … FROM STDIN`) and `CopyToStatement<F>`
 > (`COPY … TO STDOUT`) are the COPY AST nodes: the statements that open
 > COPY's data flow, which `conn.copy` runs. Each is made by `new` with what
@@ -1412,6 +1412,21 @@ today, including panicking edges and deliberate failsafes.
 > CTE as it runs one in any query (`sql.ast.with`). Neither statement is a
 > `SubQueryStatement` or a `QueryStatementBuilder`: COPY nests nowhere, and it
 > binds nothing, so its rendering is `Display` alone (`sql.render.copy`).
+>
+> A `SELECT` source carries what the server refuses of any `SELECT` when the
+> COPY starts: a tie limit with no ORDER BY or beside `SKIP LOCKED`
+> (`sql.ast.select.tie-limit`), and a WINDOW clause, or a reference to one,
+> that it refuses (`sql.ast.window-statement`). A `SELECT` converts into a
+> source infallibly, so the conversion does not check it.
+> `CopyToStatement::check_source` runs the source's `check_tie_limit` and
+> `check_windows`, and finds nothing to refuse in a table or a write, and every
+> pgorm executor of a COPY TO and the Python and JavaScript builders run those
+> checks before it renders (`conn.copy`, `[dec:pgorm:no-panic]`). A source is
+> final once converted, so the `SELECT` checked is the one that renders.
+> Rendering is infallible, as a `SELECT`'s is, so a caller of pgorm-query alone
+> who skips the check sends SQL the server refuses. The check reads the
+> source's own clauses: a `SELECT` nested in it, a write's included, is the
+> server's refusal.
 >
 > The format is the statement's type parameter, chosen at construction from
 > the closed set PostgreSQL 18 has: `CopyText`, `CopyCsv` and `CopyBinary`,

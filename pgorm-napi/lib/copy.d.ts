@@ -14,7 +14,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 
 import type { Builder, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";

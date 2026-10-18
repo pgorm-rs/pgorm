@@ -67,7 +67,7 @@ impl State {
         self.root.finished.cancelled().await;
     }
 
-    // [spec:pgorm:req:python.copy+1]
+    // [spec:pgorm:req:python.copy+2]
     pub(crate) async fn copy_in(
         self: &Arc<Self>,
         statement: CopyFrom,
@@ -88,7 +88,7 @@ impl State {
         Ok((lease, settled))
     }
 
-    // [spec:pgorm:req:python.copy+1]
+    // [spec:pgorm:req:python.copy+2]
     pub(crate) async fn copy_out(
         self: &Arc<Self>,
         statement: CopyTo,

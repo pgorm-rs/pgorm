@@ -12416,12 +12416,20 @@ children (
         title "A COPY TO over a SELECT runs the tie-limit and window checks before anything is sent, in Rust and JavaScript as in Python"
         kind @fix
         deps (copy-to-source-returning select-named-windows)
+        sealed true
         log (
             {
                 at 2026-10-18T21:52:40.199972Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by copy-to-source-returning (dc4d1192). pgorm-napi's COPY TO source does not run the tie-limit check on a Select (Python's CopyTo does, through query.inspect()), and Rust's copy_out does not either, so a COPY over a SELECT with limit_with_ties and no ORDER BY reaches the server (42601), against sql.ast.select.tie-limit's requirement that executors and the JavaScript builders check first. select-named-windows has since added check_windows to the same paths. Call args::embedded on the Select in napi's source(), and run check_tie_limit and check_windows on a SELECT source in Rust's copy_out (or when the CopySource is built), with tests in all three languages."
+            }
+
+            {
+                at 2026-10-18T22:11:08.642586Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

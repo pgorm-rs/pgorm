@@ -146,7 +146,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.capabilities]
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
 pub(crate) fn capabilities() -> Map<String, Value> {
     let builders = [
         (

@@ -6,7 +6,7 @@
 // [spec:pgorm:req:napi.connections]
 // [spec:pgorm:req:napi.results]
 // [spec:pgorm:req:napi.transactions]
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 // [spec:pgorm:req:napi.listen]
 
 import { statementArgs } from "./builder.js";
