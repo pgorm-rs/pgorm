@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Locked Cargo graph, including build and platform-conditional dependencies; a superset of any one wheel",
-  "cargo_lock_sha256": "f1a7d7e75f2e4d839f81eeb87104c8322732b0e3032975e14b73c2108659c418",
+  "cargo_lock_sha256": "6b67522e14964082bfb4d3d5ff0dddb488eb76a8a0d33aacbbbe1242a03e0a9a",
   "python_runtime_dependencies": [],
   "packages": [
     {
@@ -3530,7 +3530,7 @@
     },
     {
       "name": "rustls",
-      "version": "0.23.45",
+      "version": "0.23.46",
       "license": "Apache-2.0 OR ISC OR MIT",
       "repository": "https://github.com/rustls/rustls",
       "source": "registry+https://github.com/rust-lang/crates.io-index",

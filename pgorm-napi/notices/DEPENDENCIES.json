@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Locked Cargo graph, including build and platform-conditional dependencies; a superset of any one platform's addon",
-  "cargo_lock_sha256": "38708ccae15031780c650c803b17161749d2a3e0999dcfde4eb9b58cee57c17d",
+  "cargo_lock_sha256": "736c55d99953e94471f040b159c2a0b1265b31bdb6becb557b1116e4c7675704",
   "javascript_runtime_dependencies": [],
   "packages": [
     {
@@ -3450,7 +3450,7 @@
     },
     {
       "name": "rustls",
-      "version": "0.23.45",
+      "version": "0.23.46",
       "license": "Apache-2.0 OR ISC OR MIT",
       "repository": "https://github.com/rustls/rustls",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
