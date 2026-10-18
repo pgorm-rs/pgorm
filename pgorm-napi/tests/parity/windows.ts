@@ -1,7 +1,7 @@
 // The window family's parity cases — calls over inline and named windows,
 // frames and the window functions — and the range operators', held to
 // `windows.json` as `select.ts`'s are to theirs.
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 // [spec:pgorm:req:napi.ranges/test]
 
 import {

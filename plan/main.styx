@@ -6037,6 +6037,14 @@ children (
                         text "Re-checked 2026-10-18 at python.statements +4 (python-statement-typing, 73a0ada5, which rewrote the frame and WINDOW-clause text): the frame typestate builds no end on an earlier side of the current row, no UNBOUNDED FOLLOWING start or UNBOUNDED PRECEDING end and no lone following start, and builds same-side offsets (Rows.preceding(1).and_preceding(3)) as a frame holding no rows; a second Select.window replaces the first, an item over the dropped name failing 42704. Both are tested live in test_windows.py; Merge is in the Query alias the execution methods take and runs through the typed example."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T20:42:57.587595Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "select-named-windows (d4f6c3e3) bumped python.statements+7: Select.window appends to the WINDOW clause, ExtendedWindow(base) lowers into Rust's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError where the tie limit is checked; sites re-pinned, the binding matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -11597,6 +11605,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T20:42:57.775632Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "select-named-windows (d4f6c3e3) bumped napi.windows+1: select.window appends to the WINDOW clause, new ExtendedWindow(base) builds pgorm-query's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError in compile and embedded; the sites written before the bump re-read and pinned at +1, the binding matches."
+                        after_done true
                     }
                 )
             }

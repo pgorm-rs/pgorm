@@ -78,7 +78,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 
 const byId = reading.col("id").asc();
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("a call runs over an inline window and over one the statement names", async () => {
   const running = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const rows = await pool().query(
@@ -151,7 +151,7 @@ test("a WINDOW clause PostgreSQL refuses is refused before anything is sent", as
   assert.throws(() => new ExtendedWindow("w").frame(FrameType.rows.following(1) as never), refused(/following start needs an end/));
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("a frame's mode, start, end and exclusion decide which rows a call reads", async () => {
   const ordered = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const sum = (frame: Parameters<Window["frame"]>[0]) => call("sum", reading.col("weight")).over(ordered.frame(frame));
@@ -177,7 +177,7 @@ test("a frame's mode, start, end and exclusion decide which rows a call reads", 
   ]);
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("the window-only functions and the JSON aggregates run over a window", async () => {
   const ordered = new Window().orderBy(reading.col("weight").desc());
   const rows = await pool().query(
@@ -204,7 +204,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
   );
 });
 
-// [spec:pgorm:req:napi.windows/test]
+// [spec:pgorm:req:napi.windows+1/test]
 test("OVER follows only a call, a frame only ends after its start, and a window-only function needs its window", () => {
   const ordered = new Window().orderBy(byId);
   assert.throws(() => col("x").over(ordered), refused(/OVER follows only a function call/));

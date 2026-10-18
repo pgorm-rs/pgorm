@@ -6,7 +6,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 
 import type { Expr, Operand, OrderBy } from "./expressions.d.ts";
 

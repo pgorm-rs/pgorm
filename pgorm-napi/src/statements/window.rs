@@ -99,7 +99,7 @@ fn window(cx: &mut FunctionContext) -> NeonResult<WindowStatement> {
 }
 
 /// `windowNew()`: an empty window, `OVER ()`.
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 fn window_new(_: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Window(WindowStatement::default()))
 }
@@ -199,7 +199,7 @@ pub(super) fn definition_at(
 
 /// `frameStart(type, start, offset)`: where a frame of a mode begins. There
 /// is no unbounded-following start: PostgreSQL's grammar refuses one.
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 fn frame_start(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mode = match choice(cx, 0, "a frame's mode", &["rows", "range", "groups"])? {
         "rows" => FrameType::Rows,
@@ -223,7 +223,7 @@ fn frame_start(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `frameEnd(start, end, offset)`: a whole frame, the end one the start
 /// admits — a preceding end only after a preceding start, a current-row end
 /// never after a following one.
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 fn frame_end(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::FrameStart(start) = this(cx, 0)? else {
         return refuse(cx, "a frame's end follows its start");
@@ -307,7 +307,7 @@ fn call_of(cx: &mut FunctionContext, node: Node) -> NeonResult<Call> {
 
 /// `exprOver(call, window)`: the call over a `Window`, or over the window
 /// a statement names.
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 fn expr_over(cx: &mut FunctionContext) -> NeonResult<Node> {
     let receiver = this(cx, 0)?;
     let call = call_of(cx, receiver)?;
@@ -344,7 +344,7 @@ fn windowed_alias(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `windowFunction(name, args)`: one of PostgreSQL's general-purpose window
 /// functions at the argument counts it takes, usable only through `over`, as
 /// the server refuses one without a window (`42809`).
-// [spec:pgorm:req:napi.windows]
+// [spec:pgorm:req:napi.windows+1]
 fn window_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = if name.is_a::<JsString, _>(cx) {
