@@ -1,7 +1,7 @@
 //! `COPY … FROM STDIN` and `COPY … TO STDOUT`.
 
 use super::*;
-use crate::copy::{CopyColumns, CopyHeader, CopyOptions, CopySource, format_keyword};
+use crate::copy::{CopyColumns, CopyHeader, CopyOptions, Source, format_keyword};
 
 impl QueryBuilder {
     // [spec:pgorm:req:sql.render.copy]
@@ -28,9 +28,9 @@ impl QueryBuilder {
         sql: &mut dyn SqlWriter,
     ) {
         write!(sql, "COPY ").unwrap();
-        match &copy.source {
-            CopySource::Table(table) => self.prepare_table_name(table, sql),
-            CopySource::Query(query) => {
+        match &copy.source.0 {
+            Source::Table(table) => self.prepare_table_name(table, sql),
+            Source::Query(query) => {
                 write!(sql, "(").unwrap();
                 query.prepare_statement(sql);
                 write!(sql, ")").unwrap();

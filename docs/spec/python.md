@@ -357,13 +357,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > documented Rust decode path; a database or decode error MUST NOT become an
 > empty result, None or a missing joined row.
 
-> [spec:pgorm:req:python.copy]
+> [spec:pgorm:req:python.copy+1]
 > `COPY … FROM STDIN` and `COPY … TO STDOUT` MUST be reachable on a pool, a
 > connection and a transaction through `conn.copy`'s `CopyTrait`, over
 > `CopyFrom` and `CopyTo` statements lowered into the Rust statements of
 > `sql.ast.copy`. The format MUST be chosen when a statement is built, and an
 > option the chosen format or direction does not accept MUST raise a
 > construction error when it is set, never render SQL the server refuses.
+> `CopyTo` MUST raise a construction error for an `Insert`, `Update`,
+> `Delete` or `Merge` source with no RETURNING list, as Rust refuses to make
+> it a source.
 > COPY FROM's source MUST be bytes-like data or a synchronous or asynchronous
 > iterable of it; text and any other item MUST be refused, never encoded
 > implicitly, and the source MUST be pulled only as the COPY accepts data

@@ -12,11 +12,15 @@ import {
   copyFrom,
   copyTo,
   DatabaseError,
+  deleteFrom,
   insert,
   LifecycleError,
+  merge,
+  MergeAction,
   Pool,
   select,
   Table,
+  update,
 } from "../lib/index.js";
 import { same, scratchDatabase } from "./support.ts";
 
@@ -110,7 +114,7 @@ function gate(): { wait: Promise<void>; open(): void } {
   return { wait, open };
 }
 
-// [spec:pgorm:req:napi.copy/test]    an option outside the statement's format or direction is refused by its type and as it is called
+// [spec:pgorm:req:napi.copy+1/test]    an option outside the statement's format or direction is refused by its type and as it is called
 // [spec:pgorm:req:napi.typing/test]
 test("an option a COPY's format or direction does not take is a ConstructionError as it is called", () => {
   const text = copyFrom("items", "text");
@@ -157,7 +161,7 @@ test("an option a COPY's format or direction does not take is a ConstructionErro
   assert.equal(binary.format, "binary");
 });
 
-// [spec:pgorm:req:napi.copy/test]    a statement terminal refuses a COPY, and copyIn and copyOut refuse what is no COPY
+// [spec:pgorm:req:napi.copy+1/test]    a statement terminal refuses a COPY, and copyIn and copyOut refuse what is no COPY
 test("a COPY runs through copyIn and copyOut alone, and a source of the wrong shape is a TypeError", async () => {
   await assert.rejects(pool().execute(copyFrom("items", "text")), ConstructionError);
   await assert.rejects(pool().query(copyTo("items", "text")), /runs through copyIn\(\.\.\) or copyOut\(\.\.\)/);
@@ -171,7 +175,7 @@ test("a COPY runs through copyIn and copyOut alone, and a source of the wrong sh
   assert.equal(await count("items"), 0);
 });
 
-// [spec:pgorm:req:napi.copy/test]    text and csv each round-trip through copyIn and copyOut, NULL included
+// [spec:pgorm:req:napi.copy+1/test]    text and csv each round-trip through copyIn and copyOut, NULL included
 test("text and csv data written by copyIn reads back through copyOut", async () => {
   await reset("items");
   const text = "1\tplain\t1.50\t\\N\t\\\\x6869\n2\t\\N\t\\N\t2026-01-02 03:04:05+00\t\\N\n";
@@ -194,7 +198,7 @@ test("text and csv data written by copyIn reads back through copyOut", async () 
   assert.equal(decoder.decode(await drained(out)), 'id,note\n3,"with, comma"\n4,\n5,"say ""hi"""\n');
 });
 
-// [spec:pgorm:req:napi.copy/test]    binary copied out of one table copies into another exactly
+// [spec:pgorm:req:napi.copy+1/test]    binary copied out of one table copies into another exactly
 test("binary data copied out of one table copies into another", async () => {
   await reset("items", "items_copy");
   await pool().execute(
@@ -207,7 +211,7 @@ test("binary data copied out of one table copies into another", async () => {
   same(await pool().query(read.replace("%s", "items_copy")), await pool().query(read.replace("%s", "items")));
 });
 
-// [spec:pgorm:req:napi.copy/test]    a column subset writes those columns and the rest take their defaults
+// [spec:pgorm:req:napi.copy+1/test]    a column subset writes those columns and the rest take their defaults
 test("a COPY naming a subset of columns leaves the rest to their defaults", async () => {
   await pool().execute(
     "CREATE TABLE defaults (id int PRIMARY KEY, note text NOT NULL DEFAULT 'none', made int DEFAULT 7, marked text)",
@@ -224,7 +228,7 @@ test("a COPY naming a subset of columns leaves the rest to their defaults", asyn
   assert.equal((await pool().one("SELECT note FROM defaults WHERE id = 3")).note, "none");
 });
 
-// [spec:pgorm:req:napi.copy/test]    COPY TO over a select inlines its WHERE value as a literal
+// [spec:pgorm:req:napi.copy+1/test]    COPY TO over a select inlines its WHERE value as a literal
 test("a COPY TO over a select reads only the rows its WHERE value picks", async () => {
   await reset("items");
   await pool().execute("INSERT INTO items (id, note) VALUES (1, 'o''k'), (2, 'other'), (3, 'o''k')");
@@ -236,15 +240,50 @@ test("a COPY TO over a select reads only the rows its WHERE value picks", async 
   );
   assert.deepEqual(copy.inspect().values, []);
   assert.equal(decoder.decode(await drained(await pool().copyOut(copy))), "1\n3\n");
-  const returning = copyTo(insert(new Table("items")).columns("id", "note").values(9, "new").returning([col("id")]), "text");
-  assert.equal(decoder.decode(await drained(await pool().copyOut(returning))), "9\n");
-  await assert.rejects(
-    pool().copyOut(copyTo(insert(new Table("items")).columns("id").values(10), "text")),
-    sqlstate("0A000"),
-  );
 });
 
-// [spec:pgorm:req:napi.copy/test]    a ReadableStream, a sync iterable and an async generator each feed copyIn
+// [spec:pgorm:req:napi.copy+1/test]    each write is a COPY TO source through its RETURNING list, and refused as one without it
+test("a COPY TO reads a write's RETURNING list, and a write without one is a ConstructionError", async () => {
+  await reset("items", "items_copy");
+  await pool().execute("INSERT INTO items (id, note) VALUES (1, 'one'), (2, 'two')");
+  await pool().execute("INSERT INTO items_copy (id, note) VALUES (5, 'five')");
+  const items = new Table("items");
+  const mirror = new Table("items_copy");
+  const read = async (source: Parameters<typeof copyTo>[0], format: "text" | "csv") =>
+    decoder.decode(await drained(await pool().copyOut(copyTo(source, format))));
+
+  assert.equal(await read(insert(items).columns("id", "note").values(9, "new").returning([col("id")]), "text"), "9\n");
+  const renamed = update(items).set("note", "uno").where(col("id").eq(1)).returning([col("id"), col("note")]);
+  assert.equal(await read(renamed, "csv"), "1,uno\n");
+  assert.equal(await read(deleteFrom(items).where(col("id").eq(2)).returning([col("note")]), "text"), "two\n");
+  const merged = merge(items, mirror, items.col("id").eq(mirror.col("id")))
+    .whenNotMatched(MergeAction.insert("id", mirror.col("id")).set("note", mirror.col("note")))
+    .returningAction();
+  assert.equal(await read(merged, "text"), "INSERT\n");
+
+  const silent = [
+    [insert(items).columns("id").values(10), "INSERT"],
+    [update(items).set("note", "x").allRows(), "UPDATE"],
+    [deleteFrom(items).allRows(), "DELETE"],
+    [merge(items, mirror, items.col("id").eq(mirror.col("id"))).whenMatched(MergeAction.delete()), "MERGE"],
+  ] as const;
+  for (const [write, keyword] of silent) {
+    for (const format of ["text", "csv", "binary"] as const) {
+      assert.throws(
+        () => copyTo(write, format),
+        (error: unknown) => {
+          assert.ok(error instanceof ConstructionError, `expected a ConstructionError, got ${error}`);
+          assert.match(error.message, new RegExp(`this ${keyword} has no RETURNING list`));
+          return true;
+        },
+      );
+    }
+  }
+  const rows = await pool().query("SELECT id, note FROM items ORDER BY id");
+  assert.deepEqual(rows.map((row) => [row.id, row.note]), [[1, "uno"], [5, "five"], [9, "new"]]);
+});
+
+// [spec:pgorm:req:napi.copy+1/test]    a ReadableStream, a sync iterable and an async generator each feed copyIn
 test("copyIn reads a ReadableStream, an iterable and an async generator", async () => {
   await reset("items");
   const rows = ["1\ta\n", "2\tb\n", "3\tc\n"];
@@ -265,7 +304,7 @@ test("copyIn reads a ReadableStream, an iterable and an async generator", async 
   assert.equal(await count("items"), 6);
 });
 
-// [spec:pgorm:req:napi.copy/test]    eight megabytes stream in from a generator and out chunk by chunk
+// [spec:pgorm:req:napi.copy+1/test]    eight megabytes stream in from a generator and out chunk by chunk
 test("a large source streams in, and its COPY TO is read chunk by chunk", async () => {
   await pool().execute("CREATE TABLE big (id int, padding text)");
   const padding = "x".repeat(40);
@@ -301,7 +340,7 @@ test("a large source streams in, and its COPY TO is read chunk by chunk", async 
   assert.equal((await connection.one("SELECT count(DISTINCT id)::int AS n FROM big")).n, rows + 50_000);
 });
 
-// [spec:pgorm:req:napi.copy/test]    a source is pulled only as the server takes the data, never run ahead of it
+// [spec:pgorm:req:napi.copy+1/test]    a source is pulled only as the server takes the data, never run ahead of it
 test("copyIn pulls its source only as the server takes the data", async () => {
   await pool().execute("CREATE TABLE slow (id int, padding text)");
   await pool().execute(
@@ -338,7 +377,7 @@ test("copyIn pulls its source only as the server takes the data", async () => {
   );
 });
 
-// [spec:pgorm:req:napi.copy/test]    a source that throws aborts the COPY, rejects with its own error and leaves the connection usable
+// [spec:pgorm:req:napi.copy+1/test]    a source that throws aborts the COPY, rejects with its own error and leaves the connection usable
 test("a source that throws abandons the COPY, writes nothing and leaves the connection usable", async () => {
   await reset("items");
   await using connection = await pool().acquire();
@@ -369,7 +408,7 @@ test("a source that throws abandons the COPY, writes nothing and leaves the conn
   assert.deepEqual((await connection.query("SELECT id FROM items")).map((row) => row.id), [5]);
 });
 
-// [spec:pgorm:req:napi.copy/test]    a unique violation mid-copy in a transaction rejects 23505 and leaves it aborted until rolled back
+// [spec:pgorm:req:napi.copy+1/test]    a unique violation mid-copy in a transaction rejects 23505 and leaves it aborted until rolled back
 test("a row the server refuses rejects with its SQLSTATE, and aborts the transaction it ran in", async () => {
   await reset("items");
   await using connection = await pool().acquire();
@@ -394,7 +433,7 @@ test("a row the server refuses rejects with its SQLSTATE, and aborts the transac
   assert.equal(await count("items"), 3);
 });
 
-// [spec:pgorm:req:napi.copy/test]    a COPY FROM the server refuses at the start rejects 42P01 and its connection is discarded
+// [spec:pgorm:req:napi.copy+1/test]    a COPY FROM the server refuses at the start rejects 42P01 and its connection is discarded
 test("a COPY FROM refused before its data flows rejects with the refusal, discarding its connection", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 2000 });
   let pulled = false;
@@ -416,7 +455,7 @@ test("a COPY FROM refused before its data flows rejects with the refusal, discar
   assert.equal((await single.one("SELECT 4 AS n")).n, 4);
 });
 
-// [spec:pgorm:req:napi.copy/test]    a connection or transaction holding a COPY refuses other work with a LifecycleError
+// [spec:pgorm:req:napi.copy+1/test]    a connection or transaction holding a COPY refuses other work with a LifecycleError
 test("a connection and a transaction refuse other work while a COPY holds them", async () => {
   await reset("items");
   await using connection = await pool().acquire();
@@ -449,7 +488,7 @@ test("a connection and a transaction refuse other work while a COPY holds them",
   });
 });
 
-// [spec:pgorm:req:napi.copy/test]    a pool's COPY takes a connection of its own, returned at the end and discarded if closed early
+// [spec:pgorm:req:napi.copy+1/test]    a pool's COPY takes a connection of its own, returned at the end and discarded if closed early
 test("a pool's COPY runs on a connection of its own, returned at its end and discarded if left early", async () => {
   await reset("items");
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 2000 });
@@ -472,7 +511,7 @@ test("a pool's COPY runs on a connection of its own, returned at its end and dis
   assert.equal(connection.closed, true);
 });
 
-// [spec:pgorm:req:napi.copy/test]    an abort mid-COPY rejects with its reason, discards the connection and commits nothing
+// [spec:pgorm:req:napi.copy+1/test]    an abort mid-COPY rejects with its reason, discards the connection and commits nothing
 test("aborting a COPY rejects with the signal's reason, discards its connection and commits nothing", async () => {
   await reset("items");
   const held = gate();
@@ -519,7 +558,7 @@ test("aborting a COPY rejects with the signal's reason, discards its connection 
   assert.equal(await count("items"), 0);
 });
 
-// [spec:pgorm:req:napi.copy/test]    closing the connection or pool under a COPY ends it without waiting on its source or reader
+// [spec:pgorm:req:napi.copy+1/test]    closing the connection or pool under a COPY ends it without waiting on its source or reader
 // [spec:pgorm:req:napi.cancellation/test]
 test("closing what a COPY runs on ends the COPY at once, its source still waiting", async () => {
   await reset("items");

@@ -205,7 +205,7 @@ fn pipeline_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.copy/test]
+// [spec:pgorm:req:napi.copy+1/test]
 #[test]
 fn copy_family_matches_its_golden_file() {
     check(

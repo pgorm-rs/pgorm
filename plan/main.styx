@@ -12143,12 +12143,20 @@ children (
         title "A COPY TO over a write without RETURNING is refused when it is built"
         kind @fix
         deps (conn-copy)
+        sealed true
         log (
             {
                 at 2026-10-18T18:24:03.318242Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b). COPY TO's source can be any of the five statements (IntoCopySource), but PostgreSQL refuses an INSERT, UPDATE, DELETE or MERGE without RETURNING there (0A000, \"COPY query must have a RETURNING clause\"). Refuse it when the statement is built (or make it unrepresentable by accepting only a write that carries RETURNING), with tests and the bindings' equivalent."
+            }
+
+            {
+                at 2026-10-18T20:23:14.97164Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

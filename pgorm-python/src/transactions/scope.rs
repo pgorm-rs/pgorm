@@ -95,7 +95,7 @@ pub(super) fn serve<'a>(
                         return Completion::discarded();
                     }
                 }
-                // [spec:pgorm:req:python.copy]
+                // [spec:pgorm:req:python.copy+1]
                 Command::CopyIn {
                     statement,
                     mut messages,

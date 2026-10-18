@@ -9,7 +9,7 @@ use inherent::inherent;
 use crate::{
     ConditionHolder, ConditionalStatement, DeleteStatement, InsertStatement, IntoCondition,
     IntoName, IntoTableName, MergeStatement, Name, QueryBuilder, SelectStatement, SimpleExpr,
-    SubQueryStatement, TableName, UpdateStatement,
+    SubQueryStatement, TableName, UpdateStatement, error::Error,
 };
 
 mod sealed {
@@ -25,7 +25,7 @@ mod sealed {
 /// The set is closed. A statement carries its format as a type parameter, so
 /// an option the format does not accept is a method the statement does not
 /// have.
-// [spec:pgorm:def:sql.ast.copy]
+// [spec:pgorm:def:sql.ast.copy+1]
 pub trait CopyFormat: sealed::Sealed + Clone + fmt::Debug + Send + Sync + 'static {}
 
 /// The two formats that are lines of delimited text, [`CopyText`] and
@@ -186,7 +186,7 @@ pub(crate) struct CopyOptions {
 ///
 /// CopyFromStatement::new(Glyph::Table, CopyBinary).header();
 /// ```
-// [spec:pgorm:def:sql.ast.copy]
+// [spec:pgorm:def:sql.ast.copy+1]
 #[derive(Debug, Clone)]
 pub struct CopyFromStatement<F: CopyFormat> {
     pub(crate) table: TableName,
@@ -374,9 +374,55 @@ impl<F: CopyFormat> fmt::Display for CopyFromStatement<F> {
 }
 
 /// What a COPY TO reads: a whole table, or the rows a statement yields.
-// [spec:pgorm:def:sql.ast.copy]
+///
+/// Its contents are private, so it holds only what a conversion into it
+/// accepted. A table and a `SELECT` convert through [`IntoCopySource`]. A
+/// write converts with [`TryFrom`], which refuses one without a `RETURNING`
+/// list ([`Error::CopyWithoutReturning`]): COPY TO copies the rows a write
+/// returns, and PostgreSQL refuses a write that returns none (`0A000`).
+///
+/// ```
+/// use pgorm_query::{error::Error, tests_cfg::*, *};
+///
+/// let mut insert = Query::insert()
+///     .into_table(Glyph::Table)
+///     .columns([Glyph::Image])
+///     .values_panic(["new".into()])
+///     .to_owned();
+/// assert_eq!(
+///     CopySource::try_from(insert.clone()).err(),
+///     Some(Error::CopyWithoutReturning { write: "INSERT" })
+/// );
+///
+/// insert.returning_col(Glyph::Id);
+/// let copy = CopyToStatement::new(CopySource::try_from(insert)?, CopyText);
+/// assert_eq!(
+///     copy.to_string(),
+///     [
+///         r#"COPY (INSERT INTO "glyph" ("image") VALUES ('new') RETURNING "id")"#,
+///         r#"TO STDOUT WITH (FORMAT text)"#,
+///     ]
+///     .join(" ")
+/// );
+/// # Ok::<(), Error>(())
+/// ```
+///
+/// A write is not an [`IntoCopySource`], so one goes to
+/// [`CopyToStatement::new`] only through that check:
+///
+/// ```compile_fail,E0277
+/// use pgorm_query::{tests_cfg::*, *};
+///
+/// CopyToStatement::new(Query::delete().from_table(Glyph::Table).to_owned(), CopyText);
+/// ```
+// [spec:pgorm:def:sql.ast.copy+1]
 #[derive(Debug, Clone)]
-pub enum CopySource {
+pub struct CopySource(pub(crate) Source);
+
+/// A [`CopySource`]'s contents. A `Query` is a `SELECT`, or a write carrying
+/// a `RETURNING` list.
+#[derive(Debug, Clone)]
+pub(crate) enum Source {
     /// `COPY table TO STDOUT`: every column of the table, in its order.
     Table(TableName),
     /// `COPY (query) TO STDOUT`: the rows of a `SELECT`, or of a write's
@@ -384,11 +430,15 @@ pub enum CopySource {
     Query(Box<SubQueryStatement>),
 }
 
-/// Conversion into the [`CopySource`] a [`CopyToStatement`] reads.
+/// Conversion into the [`CopySource`] a [`CopyToStatement`] reads, for the
+/// sources that always convert: a table name, a `SELECT`, and a
+/// [`CopySource`] itself.
 ///
-/// A table name, and each of the five statements, converts. A column subset of
-/// a table is a `SELECT` of those columns: COPY TO's column list says nothing
-/// that query does not.
+/// A column subset of a table is a `SELECT` of those columns: COPY TO's column
+/// list says nothing that query does not. A write is a source only with a
+/// `RETURNING` list, so it converts through [`CopySource`]'s [`TryFrom`]
+/// instead.
+// [spec:pgorm:def:sql.ast.copy+1]
 pub trait IntoCopySource {
     fn into_copy_source(self) -> CopySource;
 }
@@ -404,43 +454,88 @@ where
     T: IntoTableName,
 {
     fn into_copy_source(self) -> CopySource {
-        CopySource::Table(self.into_table_name())
-    }
-}
-
-impl IntoCopySource for SubQueryStatement {
-    fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(self))
+        CopySource(Source::Table(self.into_table_name()))
     }
 }
 
 impl IntoCopySource for SelectStatement {
     fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(SubQueryStatement::SelectStatement(self)))
+        CopySource(Source::Query(Box::new(SubQueryStatement::SelectStatement(
+            self,
+        ))))
     }
 }
 
-impl IntoCopySource for InsertStatement {
-    fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(SubQueryStatement::InsertStatement(self)))
+/// The write keyword `statement` names when it is a write that returns
+/// nothing, which COPY TO cannot read; `None` for a `SELECT` and for a write
+/// with a `RETURNING` list.
+fn returns_nothing(statement: &SubQueryStatement) -> Option<&'static str> {
+    match statement {
+        SubQueryStatement::SelectStatement(_) => None,
+        SubQueryStatement::InsertStatement(insert) => {
+            insert.returning.is_none().then_some("INSERT")
+        }
+        SubQueryStatement::UpdateStatement(update) => {
+            update.returning.is_none().then_some("UPDATE")
+        }
+        SubQueryStatement::DeleteStatement(delete) => {
+            delete.returning.is_none().then_some("DELETE")
+        }
+        // `merge_action()` alone is a RETURNING list.
+        SubQueryStatement::MergeStatement(merge) => {
+            (merge.returning.is_none() && !merge.returns_action).then_some("MERGE")
+        }
     }
 }
 
-impl IntoCopySource for UpdateStatement {
-    fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(SubQueryStatement::UpdateStatement(self)))
+/// A `SELECT` converts, and a write converts when it carries a `RETURNING`
+/// list; a write without one is [`Error::CopyWithoutReturning`].
+// [spec:pgorm:def:sql.ast.copy+1]
+impl TryFrom<SubQueryStatement> for CopySource {
+    type Error = Error;
+
+    fn try_from(statement: SubQueryStatement) -> Result<Self, Error> {
+        match returns_nothing(&statement) {
+            Some(write) => Err(Error::CopyWithoutReturning { write }),
+            None => Ok(Self(Source::Query(Box::new(statement)))),
+        }
     }
 }
 
-impl IntoCopySource for DeleteStatement {
-    fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(SubQueryStatement::DeleteStatement(self)))
+/// Converts when the INSERT carries a `RETURNING` list.
+impl TryFrom<InsertStatement> for CopySource {
+    type Error = Error;
+
+    fn try_from(insert: InsertStatement) -> Result<Self, Error> {
+        Self::try_from(SubQueryStatement::InsertStatement(insert))
     }
 }
 
-impl IntoCopySource for MergeStatement {
-    fn into_copy_source(self) -> CopySource {
-        CopySource::Query(Box::new(SubQueryStatement::MergeStatement(Box::new(self))))
+/// Converts when the UPDATE carries a `RETURNING` list.
+impl TryFrom<UpdateStatement> for CopySource {
+    type Error = Error;
+
+    fn try_from(update: UpdateStatement) -> Result<Self, Error> {
+        Self::try_from(SubQueryStatement::UpdateStatement(update))
+    }
+}
+
+/// Converts when the DELETE carries a `RETURNING` list.
+impl TryFrom<DeleteStatement> for CopySource {
+    type Error = Error;
+
+    fn try_from(delete: DeleteStatement) -> Result<Self, Error> {
+        Self::try_from(SubQueryStatement::DeleteStatement(delete))
+    }
+}
+
+/// Converts when the MERGE carries a `RETURNING` list, which
+/// [`returning_action`](MergeStatement::returning_action) alone also makes.
+impl TryFrom<MergeStatement> for CopySource {
+    type Error = Error;
+
+    fn try_from(merge: MergeStatement) -> Result<Self, Error> {
+        Self::try_from(SubQueryStatement::MergeStatement(Box::new(merge)))
     }
 }
 
@@ -454,8 +549,8 @@ impl IntoCopySource for MergeStatement {
 ///
 /// A query's values are written into the SQL as escaped literals, because COPY
 /// takes no bind parameters: [`Display`](fmt::Display) is the only rendering. A
-/// write statement is a source only with a `RETURNING` list; PostgreSQL refuses
-/// one without (`0A000`).
+/// write statement is a source only with a `RETURNING` list, which converting
+/// it into a [`CopySource`] checks.
 ///
 /// ```
 /// use pgorm_query::{tests_cfg::*, *};
@@ -491,7 +586,7 @@ impl IntoCopySource for MergeStatement {
 ///
 /// CopyToStatement::new(Glyph::Table, CopyCsv).force_null_all();
 /// ```
-// [spec:pgorm:def:sql.ast.copy]
+// [spec:pgorm:def:sql.ast.copy+1]
 #[derive(Debug, Clone)]
 pub struct CopyToStatement<F: CopyFormat> {
     pub(crate) source: CopySource,

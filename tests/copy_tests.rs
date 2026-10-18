@@ -16,8 +16,9 @@ use pgorm::{
     Bytes, ConnectionTrait, CopyTrait, DatabaseConnection, Error, TransactionTrait,
     metric::{InstrumentedPool, MetricsCollector, QueryContext},
     pgorm_query::{
-        CopyBinary, CopyCsv, CopyFormat, CopyFromStatement, CopyIgnore, CopyLogVerbosity, CopyText,
-        CopyToStatement, Expr, Name, Order, Query,
+        CopyBinary, CopyCsv, CopyFormat, CopyFromStatement, CopyIgnore, CopyLogVerbosity,
+        CopySource, CopyText, CopyToStatement, Expr, MergeUpdate, Name, Order, Query,
+        error::Error as QueryError,
     },
 };
 use pretty_assertions::assert_eq;
@@ -422,15 +423,94 @@ async fn copy_out_of_a_select() -> Result<(), Error> {
     let out = copy_out_all(&mut db, &CopyToStatement::new(select, CopyCsv)).await?;
     assert_eq!(out, b"1,3\n");
 
-    // A write is a source through its RETURNING list.
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.copy/test]    each write is a COPY TO source through its RETURNING list
+#[pgorm_macros::test]
+async fn copy_out_of_writes_returning() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_out_of_writes_returning").await;
+    let mut db = ctx.db.get().await?;
+    db.execute(ITEMS, &[]).await?;
+    db.execute("INSERT INTO item VALUES (1, 'one', 3), (2, 'two', 4)", &[])
+        .await?;
+
     let insert = Query::insert()
         .into_table(n("item"))
         .columns([n("id"), n("name")])
         .values_panic([4.into(), "new".into()])
         .returning(Query::returning().columns([n("id"), n("qty")]))
         .to_owned();
-    let out = copy_out_all(&mut db, &CopyToStatement::new(insert, CopyText)).await?;
-    assert_eq!(out, b"4\t7\n");
+    let copy = CopyToStatement::new(CopySource::try_from(insert)?, CopyText);
+    assert_eq!(copy_out_all(&mut db, &copy).await?, b"4\t7\n");
+
+    let update = Query::update()
+        .table(n("item"))
+        .value(n("qty"), Expr::col(n("qty")).add(10))
+        .and_where(Expr::col(n("id")).eq(1))
+        .returning(Query::returning().columns([n("id"), n("qty")]))
+        .to_owned();
+    let copy = CopyToStatement::new(CopySource::try_from(update)?, CopyCsv);
+    assert_eq!(copy_out_all(&mut db, &copy).await?, b"1,13\n");
+
+    let delete = Query::delete()
+        .from_table(n("item"))
+        .and_where(Expr::col(n("id")).eq(2))
+        .returning(Query::returning().column(n("name")))
+        .to_owned();
+    let copy = CopyToStatement::new(CopySource::try_from(delete)?, CopyText);
+    assert_eq!(copy_out_all(&mut db, &copy).await?, b"two\n");
+
+    // `merge_action()` alone is the list a MERGE's rows are read through.
+    db.execute("CREATE TABLE zeroed (id int)", &[]).await?;
+    db.execute("INSERT INTO zeroed VALUES (1), (4)", &[])
+        .await?;
+    let merge = Query::merge(
+        n("item"),
+        n("zeroed"),
+        Expr::col((n("item"), n("id"))).equals((n("zeroed"), n("id"))),
+    )
+    .when_matched(MergeUpdate::value(n("qty"), 0))
+    .returning_action()
+    .to_owned();
+    let copy = CopyToStatement::new(CopySource::try_from(merge)?, CopyText);
+    assert_eq!(copy_out_all(&mut db, &copy).await?, b"UPDATE\nUPDATE\n");
+
+    assert_eq!(
+        items(&db, "item").await?,
+        vec![(1, Some("one".into()), 0), (4, Some("new".into()), 0)]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.copy/test]    a write without RETURNING is refused as a source before anything runs
+#[pgorm_macros::test]
+async fn copy_out_refuses_silent_write() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_out_refuses_silent_write").await;
+    let db = ctx.db.get().await?;
+    db.execute(ITEMS, &[]).await?;
+
+    let insert = Query::insert()
+        .into_table(n("item"))
+        .columns([n("id")])
+        .values_panic([1.into()])
+        .to_owned();
+    let refused = CopySource::try_from(insert).map_err(Error::from);
+    assert!(
+        matches!(
+            refused,
+            Err(Error::QueryBuilder(QueryError::CopyWithoutReturning {
+                write: "INSERT"
+            }))
+        ),
+        "{refused:?}"
+    );
+    assert_eq!(items(&db, "item").await?, vec![]);
 
     drop(db);
     ctx.delete().await;
@@ -549,7 +629,7 @@ async fn copy_out_dropped_early() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:def:sql.ast.copy/test]    every option each direction and format offers is one PostgreSQL 18 accepts
+// [spec:pgorm:def:sql.ast.copy+1/test]    every option each direction and format offers is one PostgreSQL 18 accepts
 #[pgorm_macros::test]
 async fn copy_every_offered_option_runs() -> Result<(), Error> {
     let ctx = TestContext::new("copy_every_offered_option").await;

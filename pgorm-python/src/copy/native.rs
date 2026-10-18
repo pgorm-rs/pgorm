@@ -193,7 +193,7 @@ async fn pump_out(
 
 /// Start a COPY FROM on a Connection or Transaction and answer the handle
 /// its data is written through.
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 #[pyfunction]
 #[pyo3(name = "_copy_in")]
 pub(crate) fn copy_in<'py>(
@@ -242,7 +242,7 @@ pub(crate) fn copy_in<'py>(
 
 /// Start a COPY TO on a Connection or Transaction and answer the stream its
 /// data is read from.
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 #[pyfunction]
 #[pyo3(name = "_copy_out")]
 pub(crate) fn copy_out<'py>(
@@ -299,7 +299,7 @@ pub(crate) fn copy_out<'py>(
     })
 }
 
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 // [spec:pgorm:req:python.cancellation]
 /// The data side of a COPY FROM: `write` each chunk, then `finish`, or
 /// `abort` to send `CopyFail`.
@@ -450,7 +450,7 @@ impl OutState {
     }
 }
 
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 // [spec:pgorm:req:python.cancellation]
 /// The data side of a COPY TO. The end of the data frees the connection or
 /// transaction; closing before it discards the connection.

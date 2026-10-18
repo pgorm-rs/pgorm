@@ -442,7 +442,8 @@ The builders are immutable, like the other statements, and take a table
 without an alias. `delimiter`, `quote` and `escape` take a one-character
 string. A COPY TO reads a `Table`, or a built `Select`, `Insert`, `Update`,
 `Delete` or `Merge`: a column subset is a `Select`, and a write is a source
-only with a RETURNING list, which the server checks (`0A000`). COPY takes no
+only with a RETURNING list, so `CopyTo` raises `ConstructionError` for one
+without, as Rust refuses to make it a source. COPY takes no
 bind parameters, so `inspect()` returns the Rust rendering with every value
 written inline and empty `params`. A COPY statement is not a query, and
 `execute` and the `fetch_*` terminals refuse it.

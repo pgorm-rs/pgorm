@@ -305,7 +305,7 @@ impl State {
     /// statement JavaScript runs as the COPY settles finds it free. A COPY
     /// whose connection is discarded ends the whole transaction, nothing in
     /// it committed, as an aborted statement does.
-    // [spec:pgorm:req:napi.copy]
+    // [spec:pgorm:req:napi.copy+1]
     fn after_copy(
         &self,
         settle: Settle,
@@ -693,7 +693,7 @@ fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `transactionCopyIn(transaction, copy, abort)`: a COPY FROM in the
 /// transaction, holding its lock as a statement does until the COPY ends.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let copy = Box::new(copy_from_at(&mut cx, 1)?);
@@ -717,7 +717,7 @@ fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `transactionCopyOut(transaction, copy, abort)`: a COPY TO in the
 /// transaction, which refuses other work until the stream ends or closes.
-// [spec:pgorm:req:napi.copy]
+// [spec:pgorm:req:napi.copy+1]
 fn transaction_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let copy = Box::new(copy_to_at(&mut cx, 1)?);

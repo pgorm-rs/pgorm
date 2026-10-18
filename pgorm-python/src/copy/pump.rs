@@ -59,7 +59,7 @@ where
 /// Write each chunk into `sink` until `Finish` completes the COPY with its
 /// row count. Every sender gone first answers `None`, having dropped the
 /// sink, which aborts the COPY.
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 pub(crate) async fn drive_in(
     mut sink: CopyInSink<'_>,
     messages: &mut mpsc::Receiver<Message>,
@@ -82,7 +82,7 @@ pub(crate) async fn drive_in(
 
 /// Forward each chunk of `stream` until it ends, answering how; `None` once
 /// nobody reads, with the stream dropped part way.
-// [spec:pgorm:req:python.copy]
+// [spec:pgorm:req:python.copy+1]
 pub(crate) async fn drive_out(
     mut stream: CopyOutStream<'_>,
     pieces: &mpsc::Sender<Piece>,
