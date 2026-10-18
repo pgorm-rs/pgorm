@@ -1568,6 +1568,21 @@ children (
                     }
                 )
             }
+
+            {
+                id codegen-enum-array-expanded
+                title "The expanded codegen writer's enum-array column compiles"
+                kind @fix
+                deps (sql-domains)
+                log (
+                    {
+                        at 2026-10-18T21:52:40.128816Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-domains (2fa97891). pgorm-codegen's expanded writer emits ColumnType::Array(Arc::new(Mood::db_type())) for an enum-array column; db_type() returns a ColumnDef, so that is an Arc<ColumnDef> where Arc<ColumnType> is needed and the generated code does not compile (confirmed on the output). The domain path avoids it with .get_column_type().clone(). Emit the column type for an enum array the same way, add a golden fixture with an enum-array column for the expanded writer, and compile it in the test."
+                    }
+                )
+            }
         )
     }
 
@@ -9321,6 +9336,36 @@ children (
                     }
                 )
             }
+
+            {
+                id column-default-parens
+                title "A column DEFAULT that is an operator expression renders parenthesised, so CREATE TABLE accepts it"
+                kind @fix
+                deps (sql-domains)
+                log (
+                    {
+                        at 2026-10-18T21:52:40.048769Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by sql-domains (2fa97891). CREATE TABLE's column DEFAULT renders an operator expression bare, so ColumnDef::default(Expr::val(true).and(Expr::val(false))) renders DEFAULT TRUE AND FALSE, which PostgreSQL refuses (42601: a column DEFAULT takes b_expr, not a_expr). The domain builder parenthesises its default for the same reason. Parenthesise an operator expression in every DEFAULT position (column definition, ALTER COLUMN SET DEFAULT, the domain builder already does), hold it to the oracle, and test it live."
+                    }
+                )
+            }
+
+            {
+                id inline-window-over-named
+                title "An inline window builds on a named one, OVER (\"w\" ORDER BY ..), from Rust, Python and JavaScript"
+                kind @feat
+                deps (select-named-windows)
+                log (
+                    {
+                        at 2026-10-18T21:52:40.429965Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by select-named-windows (e5df312c). PostgreSQL accepts an inline window built on a named one, OVER (\"w\" ORDER BY ..), with the same restrictions as a named window extending another (no PARTITION BY, no ORDER BY over one the base has, no base with a frame). ExtendedWindow could feed expr_window and the bindings' over() so this is expressible, held by check_windows. Also update query.build.window, whose text still says the method \"declares a named window in place\" without mentioning appending or ExtendedWindow."
+                    }
+                )
+            }
         )
     }
 
@@ -12362,6 +12407,96 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-select-set-operations (e4152e18). pgorm-python's create_view, create_recursive_view, create_materialized_view and create_table_as (src/schema/view.rs) take query.inner.clone() instead of query.embedded()?, so a view body with a tie limit and no ORDER BY reaches the server, while pgorm-napi's view builders refuse it as they read the query. Use embedded() so the check runs, and add a test per builder."
+            }
+        )
+    }
+
+    {
+        id copy-source-tie-check
+        title "A COPY TO over a SELECT runs the tie-limit and window checks before anything is sent, in Rust and JavaScript as in Python"
+        kind @fix
+        deps (copy-to-source-returning select-named-windows)
+        log (
+            {
+                at 2026-10-18T21:52:40.199972Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by copy-to-source-returning (dc4d1192). pgorm-napi's COPY TO source does not run the tie-limit check on a Select (Python's CopyTo does, through query.inspect()), and Rust's copy_out does not either, so a COPY over a SELECT with limit_with_ties and no ORDER BY reaches the server (42601), against sql.ast.select.tie-limit's requirement that executors and the JavaScript builders check first. select-named-windows has since added check_windows to the same paths. Call args::embedded on the Select in napi's source(), and run check_tie_limit and check_windows on a SELECT source in Rust's copy_out (or when the CopySource is built), with tests in all three languages."
+            }
+        )
+    }
+
+    {
+        id sql-error-check-not-null
+        title "Check and not-null violations reach the caller as typed SqlError classes, as unique and foreign-key ones do"
+        kind @feat
+        deps (sql-domains)
+        log (
+            {
+                at 2026-10-18T21:52:40.273723Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-domains (2fa97891). pgorm's SqlError classifies only unique (23505) and foreign-key (23503) violations; a CHECK violation (23514) and a NOT NULL violation (23502), which domains, CHECK constraints and NOT NULL columns raise routinely, arrive as Error::Postgres carrying the SQLSTATE. Add typed classes for them (and decide on exclusion violations, 23P01, which WITHOUT OVERLAPS keys raise), carrying the constraint and column names the server reports, in error.model / error.model.sql-class, and give the bindings' error classes the same."
+            }
+        )
+    }
+
+    {
+        id domain-enum-predicates
+        title "Predicates and keyset cursors on a column whose domain is over an enum cast to the enum, so the server has an operator for them"
+        kind @fix
+        deps (sql-domains)
+        log (
+            {
+                at 2026-10-18T21:52:40.355509Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-domains (2fa97891). PostgreSQL has no operator at all on a domain over an enum, not even d = d (42883), so every predicate and keyset cursor comparison on such a column fails at the server unless the column is cast to the enum; this is recorded in entity.traits.column.enum-cast but not handled. Make the ORM's value predicates (eq and friends, membership, between) and cursor bounds cast a domain-over-enum column to its enum, as save_as casts work for enums today, with live tests."
+            }
+        )
+    }
+
+    {
+        id python-column-collation
+        title "Python's ColumnDef names a collation, as Rust's column definitions do"
+        kind @feat
+        deps (sql-domains)
+        log (
+            {
+                at 2026-10-18T21:52:40.505628Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-domains (2fa97891). pgorm-python's ColumnDef cannot name a collation (Rust's column definitions can, sql.ast.expr.collate's column position), so CreateDomain.collate is the only place Python can name one. Add a collate option to Python's column definitions (and check pgorm-napi's), with stubs, parity cases and a live test."
+            }
+        )
+    }
+
+    {
+        id statement-cache-after-ddl
+        title "A pool can drop its connections' prepared statements after DDL, so a changed domain default or column type is not served from a stale plan"
+        kind @feat
+        deps (sql-domains)
+        log (
+            {
+                at 2026-10-18T21:52:40.57799Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-domains (2fa97891). After ALTER DOMAIN .. SET DEFAULT, a prepared INSERT keeps writing the default it was planned with, and pgorm caches prepared statements per pooled connection, so connections that already ran the insert keep writing the old default while fresh ones write the new (recorded in sql.ddl.domain with a live test and in the migration README). The same holds for other DDL that changes what a plan depends on. Decide the remedy: a pool method that marks every connection's statement cache stale (cleared on next checkout), DISCARD ALL / DEALLOCATE on checkout after DDL, or documenting that migrations should run before the pool serves traffic. The lead's lean is a pool method, called by pgorm-migration's runner after it applies migrations."
+            }
+        )
+    }
+
+    {
+        id napi-domain-entity-test
+        title "pgorm-napi's live suite reads and writes a registered entity whose column is a domain"
+        kind @test
+        deps (sql-domains)
+        log (
+            {
+                at 2026-10-18T21:52:40.650617Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-domains (2fa97891). The domain column path in pgorm-napi's registered entities is covered only by a Rust unit test; the live suite has no registered entity whose column is a domain. Add one to the application-binding crate and a live test reading and writing it in Node and Deno, including an array of a domain."
             }
         )
     }
