@@ -769,6 +769,41 @@ a schema is made of, in the builder conventions the statements above use.
 > `commentOnTable` and `commentOnColumn` its `COMMENT ON`, the text a literal
 > pgorm-query escapes.
 
+> [spec:pgorm:req:napi.schema-views]
+> Views, materialized views and tables created from a query MUST be built
+> through pgorm-query's builders for them (`sql.ddl.view`,
+> `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each named as a
+> table is, under the contract `napi.schema` gives every DDL builder. Each
+> body is a `Select` the module built, and nothing else is taken: it renders
+> through pgorm-query's own rendering with every value written as an escaped
+> literal, because a definition is stored as SQL text and binds nothing.
+>
+> - `createView(name, query)` takes `orReplace`, `columns(names)`, which
+>   appends, `checkOption("local" | "cascaded")`, `securityBarrier` and
+>   `securityInvoker`.
+> - `createRecursiveView(name, columns, query)` names one column or a
+>   non-empty list of them, an empty list being refused, since PostgreSQL
+>   refuses a recursive view without columns. It takes the same methods
+>   except `checkOption`, which the grammar refuses on a recursive view and
+>   the builder therefore does not have.
+> - `createMaterializedView(name, query)` and `createTableAs(name, query)`
+>   take `ifNotExists`, `columns(names)` and `withNoData`. Neither has
+>   `orReplace`, which PostgreSQL 18 has for neither, and a view has no
+>   `ifNotExists`, which PostgreSQL does not have for one.
+> - `refreshMaterializedView(name, { concurrently, withNoData })` takes at
+>   most one of the two: PostgreSQL refuses them together, pgorm-query holds
+>   them in one slot, and asking for both MUST be refused with a
+>   `ConstructionError` rather than one of them dropped.
+> - `dropView` and `dropMaterializedView` take one or more relations and `{
+>   ifExists, behavior }`.
+>
+> What only the server knows it refuses, by SQLSTATE, as a `DatabaseError`:
+> a check option on a view that cannot be updated (`0A000`), a row a check
+> option refuses (`44000`), an `OR REPLACE` that moves or drops a column
+> (`42P16`), a materialized view read before it is populated (`55000`), a
+> concurrent refresh without a unique index (`55000`) or of an unpopulated
+> view (`0A000`), and a drop of the other kind (`42809`).
+
 ## Pipelines
 
 JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as

@@ -8,6 +8,7 @@ mod merge;
 mod pipeline;
 mod schema;
 mod select;
+mod views;
 mod windows;
 mod writes;
 
@@ -183,12 +184,12 @@ fn window_and_range_family_matches_its_golden_file() {
 // [spec:pgorm:req:napi.schema-indexes/test]
 // [spec:pgorm:req:napi.schema-types/test]
 // [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:napi.schema-views/test]
 #[test]
 fn schema_family_matches_its_golden_file() {
-    check(
-        include_str!("../../../tests/parity/schema.json"),
-        schema::cases(),
-    );
+    let mut cases = schema::cases();
+    cases.extend(views::cases());
+    check(include_str!("../../../tests/parity/schema.json"), cases);
 }
 
 // [spec:pgorm:req:napi.pipeline/test]

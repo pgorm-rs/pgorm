@@ -138,5 +138,45 @@
   "comment-on-column": {
     "sql": "COMMENT ON COLUMN \"app\".\"booking\".\"note\" IS E'it''s a \\\\ note\nover two lines'",
     "values": []
+  },
+  "create-view": {
+    "sql": "CREATE VIEW \"app\".\"large_room\" AS SELECT \"id\", \"room\" FROM \"app\".\"booking\" WHERE \"room\" > 10 AND \"note\" <> E'it\\'s'",
+    "values": []
+  },
+  "create-view-options": {
+    "sql": "CREATE OR REPLACE VIEW \"app\".\"large_room\" (\"booking\", \"room_no\") WITH (security_barrier, security_invoker) AS SELECT \"id\", \"room\" FROM \"app\".\"booking\" WHERE \"room\" > 10 AND \"note\" <> E'it\\'s' WITH CASCADED CHECK OPTION",
+    "values": []
+  },
+  "create-recursive-view": {
+    "sql": "CREATE OR REPLACE RECURSIVE VIEW \"counter\" (\"n\") WITH (security_barrier) AS SELECT \"id\" AS \"n\" FROM \"app\".\"booking\" UNION ALL (SELECT \"n\" + 1 FROM \"counter\" WHERE \"n\" < 5)",
+    "values": []
+  },
+  "drop-views": {
+    "sql": "DROP VIEW IF EXISTS \"large_room\", \"app\".\"other\" CASCADE",
+    "values": []
+  },
+  "create-materialized-view": {
+    "sql": "CREATE MATERIALIZED VIEW IF NOT EXISTS \"app\".\"room_total\" (\"booking\", \"room_no\") AS SELECT \"id\", \"room\" FROM \"app\".\"booking\" WHERE \"room\" > 10 AND \"note\" <> E'it\\'s' WITH NO DATA",
+    "values": []
+  },
+  "refresh-materialized-view": {
+    "sql": "REFRESH MATERIALIZED VIEW \"app\".\"room_total\"",
+    "values": []
+  },
+  "refresh-materialized-view-concurrently": {
+    "sql": "REFRESH MATERIALIZED VIEW CONCURRENTLY \"app\".\"room_total\"",
+    "values": []
+  },
+  "refresh-materialized-view-no-data": {
+    "sql": "REFRESH MATERIALIZED VIEW \"app\".\"room_total\" WITH NO DATA",
+    "values": []
+  },
+  "drop-materialized-views": {
+    "sql": "DROP MATERIALIZED VIEW \"app\".\"room_total\", \"other\" RESTRICT",
+    "values": []
+  },
+  "create-table-as": {
+    "sql": "CREATE TABLE IF NOT EXISTS \"large_copy\" (\"booking\") AS SELECT \"id\", \"room\" FROM \"app\".\"booking\" WHERE \"room\" > 10 AND \"note\" <> E'it\\'s' WITH NO DATA",
+    "values": []
   }
 }

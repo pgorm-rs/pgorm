@@ -5,18 +5,22 @@ table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
 `pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` / `AS RANGE` and extension
 statements (`pgorm-query/src/extension.rs`), sequence statements
-(`pgorm-query/src/sequence/`), `COMMENT ON` statements
+(`pgorm-query/src/sequence/`), view and materialized view statements
+(`pgorm-query/src/view/`) and `CREATE TABLE AS`
+(`pgorm-query/src/table/create_as.rs`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
 implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+8]
+> [spec:pgorm:req:sql.ddl+9]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
-> (`create`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
+> (`create`/`create_as`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
 > `Sequence` (`create`/`alter`/`drop`/`rename`),
+> `View` (`create`/`create_recursive`/`drop`),
+> `MaterializedView` (`create`/`refresh`/`drop`),
 > `Extension` (`create`/`drop`) and `Comment` (`on_table`/`on_column`).
 >
 > The render surface a statement exposes MUST follow from what it binds, not
@@ -35,10 +39,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > that pair is for inspection and the inlined rendering is what a caller
 > executes; both the `build` doc and the `Display` doc MUST say so.
 >
-> Every other DDL statement — table, index, foreign-key, sequence, comment,
-> extension, `DROP TYPE` — has no placeholder-emitting entry point at all: its renderer is
+> Every other DDL statement — table, index, foreign-key, sequence, view,
+> materialized view, `CREATE TABLE AS`, comment, extension, `DROP TYPE` — has
+> no placeholder-emitting entry point at all: its renderer is
 > `pub(crate)` and its only public route is `Display` over a `String` sink, so
-> a value it carries (a column `DEFAULT`, a `CHECK` expression) is always
+> a value it carries (a column `DEFAULT`, a `CHECK` expression, a value in
+> the query a view wraps) is always
 > inlined as an escaped literal and there is nothing left to bind. These expose
 > `to_string()` and nothing else, delegating to the corresponding `prepare_*`
 > method on the single Postgres `QueryBuilder`. The claim they "carry no bind
@@ -1339,6 +1345,212 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > choices of the kind `[spec:pgorm:req:sql.scope+11]` rules out for tables;
 > `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
 > no table counterpart in the builder either.
+
+## Views
+
+> [spec:pgorm:req:sql.ddl.view]
+> `View` builds the statements a view takes: `create(name, body)`,
+> `create_recursive(name, column, body)` and `drop(name)`. A view is a
+> relation, so it is named as a table is — any `IntoTableName`, a bare name or
+> a `(schema, name)` pair, rendered as quoted, dot-joined identifiers — and its
+> body is a `SelectStatement` the constructor takes by value, as every
+> embedder takes what it embeds (`[spec:pgorm:req:sql.ddl.create-table+16]`).
+> Name and body are constructor arguments with no setter, because `CREATE
+> VIEW  AS` and a view without a query are syntax errors, so neither husk
+> constructs (`[dec:pgorm:invalid-states-unrepresentable]`). A view of an
+> entity's query takes the statement `QueryTrait::into_query` gives.
+>
+> - `ViewCreateStatement` MUST render `CREATE [OR REPLACE ]VIEW <name>[
+>   (<columns>)][ WITH (<options>)] AS <query>[ WITH { LOCAL | CASCADED }
+>   CHECK OPTION]`.
+> - `RecursiveViewCreateStatement` MUST render `CREATE [OR REPLACE ]RECURSIVE
+>   VIEW <name> (<columns>)[ WITH (<options>)] AS <query>`.
+> - `ViewDropStatement` MUST render `DROP VIEW [IF EXISTS ]<name>[,
+>   <name>...][ CASCADE | RESTRICT]`. `View::drop` takes the first name and
+>   `name()` appends, so the list is non-empty, and `cascade()` and
+>   `restrict()` share one `DropBehavior` slot
+>   (`[spec:pgorm:req:sql.ddl.alter-table+12]`), the last call winning.
+>   `names()` reads the list back.
+>
+> The body is the caller's query with its values inlined. PostgreSQL stores a
+> view's definition as SQL text, so a definition takes no bind parameter, and
+> the body renders through the value-inlining sink every DDL statement
+> renders through (`[spec:pgorm:req:sql.ddl+9]`): each value an escaped
+> literal, a string with a quote or a backslash in its `E''` form
+> (`[spec:pgorm:req:sql.render.string-escape+1]`). The live suite reads the
+> stored definition back with the value in it.
+>
+> Column names are `Name`s appended by `column()` and `columns()` and read
+> back by `get_columns()`. With none, no parentheses are written, because the
+> grammar has no empty column list (`42601`). They rename the query's leading
+> columns. More names than the query has columns is refused by the server
+> (`42601`), because the query's arity is not something a builder value
+> records once a `*` or a subquery is in it.
+>
+> A recursive view is PostgreSQL's shorthand for the view of a `WITH
+> RECURSIVE` query. Its body is the non-recursive term `UNION [ALL]` the
+> recursive one, which reads the view by name, and the grammar rewrites the
+> statement into that query, so the oracle reads the column names back as the
+> common table expression's. The column list is what that query's rows are
+> called, and the grammar refuses a recursive view without one (`42601`), so
+> `create_recursive` takes the first column and the list is never empty. The
+> grammar also refuses a check option on a recursive view (`0A000`, *WITH
+> CHECK OPTION not supported on recursive views*). The two forms are
+> therefore separate types, and `RecursiveViewCreateStatement` has no
+> `check_option`, which a `compile_fail` doctest holds
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Neither has `IF NOT
+> EXISTS`, a clause PostgreSQL does not have for a view (`42601`); `OR
+> REPLACE` is how a view that may already exist is defined.
+>
+> `or_replace()` writes `OR REPLACE`. The server holds the replacement to the
+> view it replaces: the new query keeps every column the view has, in place,
+> with its name and type, and may add columns after them, while a column
+> moved, dropped, renamed or retyped is refused (`42P16`). That turns on the
+> view that exists, which is the server's knowledge. A replacement also
+> replaces the view's options and check option with its own, so one it
+> leaves out is reset, as the live suite holds through `pg_class.reloptions`.
+>
+> The options are two flags, `security_barrier()` and `security_invoker()`,
+> each written only when set, in that order, inside one `WITH (...)`. An
+> unset flag is the server's default, false, which therefore has no
+> spelling.
+>
+> - `security_barrier` evaluates the view's own conditions before any a
+>   query over it supplies, so a cheap function the query passes never sees
+>   a row the view hides. The live suite holds a function that fails on the
+>   hidden row: it fails through the plain view and passes through the
+>   barrier one.
+> - `security_invoker` checks the relations the view reads against the role
+>   querying it rather than the view's owner. The live suite holds a role
+>   granted the view alone reading through the plain view and refused through
+>   the invoker one (`42501`).
+>
+> `check_option(ViewCheckOption)` sets the check option, one slot the last
+> call fills, read back by `get_check_option()`: `Local` writes `WITH LOCAL
+> CHECK OPTION` and `Cascaded` writes `WITH CASCADED CHECK OPTION`. A row that
+> an insert or update writes through the view must be one the view can see,
+> or the server refuses it (`44000`). `LOCAL` holds the row to this view's
+> condition alone, and `CASCADED` to the conditions of the views beneath it
+> as well, as the live suite holds over a view of a view. The bare `WITH
+> CHECK OPTION` means `CASCADED` and has no spelling of its own. Only an
+> automatically updatable view takes a check option — a query over one table
+> or updatable view with no aggregate, `DISTINCT`, `GROUP BY`, `HAVING`,
+> `LIMIT`, `OFFSET`, set operation or `WITH` — and which views those are is
+> the server's to judge (`0A000` otherwise).
+>
+> An entity's table may be a view. The entity is declared as any other is,
+> naming the view as its table, and reads the rows the view shows. Through
+> an automatically updatable view, its inserts, updates and deletes reach the
+> table beneath: the table's defaults and identity fill what an insert
+> leaves out, `RETURNING` reads the written row back, and a write the view's
+> condition does not reach, such as a delete of a row the view hides,
+> affects nothing. The live suite holds each of these, and a check option
+> refusing an entity's insert and update (`44000`). A write through a view
+> the server cannot update is refused there (`55000`). Nothing in an entity
+> says its table is a view, so `Schema::create_table_from_entity` over one
+> builds a table, and the view itself is created through `View::create`.
+>
+> Two spellings are not built, each a whole statement through `execute`:
+>
+> - `TEMPORARY` views, a persistence choice of the kind
+>   `[spec:pgorm:req:sql.scope+17]` rules out for tables.
+> - `ALTER VIEW`. A view's definition and options change through `OR
+>   REPLACE`. Its name, its columns' names and the default an insert through
+>   it takes change through `Table::rename`, `Table::rename_column` and
+>   `Table::alter`'s `modify_column`, whose `ALTER TABLE` PostgreSQL accepts
+>   on a view, as the live suite holds. Its owner is a role's concern, and
+>   `SET SCHEMA` has no table counterpart in the builder either.
+
+## Materialized views
+
+> [spec:pgorm:req:sql.ddl.materialized-view]
+> `MaterializedView` builds the statements a materialized view takes:
+> `create(name, body)`, `refresh(name)` and `drop(name)`. Each names the view
+> as a table is named, and the create takes its body by value and writes it
+> with its values inlined, as a view does (`[spec:pgorm:req:sql.ddl.view]`).
+>
+> - `MaterializedViewCreateStatement` MUST render `CREATE MATERIALIZED VIEW
+>   [IF NOT EXISTS ]<name>[ (<columns>)] AS <query>[ WITH NO DATA]`.
+> - `MaterializedViewRefreshStatement` MUST render `REFRESH MATERIALIZED VIEW
+>   [CONCURRENTLY ]<name>[ WITH NO DATA]`.
+> - `MaterializedViewDropStatement` MUST render `DROP MATERIALIZED VIEW [IF
+>   EXISTS ]<name>[, <name>...][ CASCADE | RESTRICT]`, its list and behavior
+>   held as a view drop holds them.
+>
+> A materialized view holds the rows its query returned when it was last
+> populated. The create runs the query and stores its rows; `with_no_data()`
+> leaves the view unpopulated instead, and the server refuses to read it
+> (`55000`) until a refresh populates it. `WITH DATA` is the default and has
+> no spelling of its own, as an unset clause writes nothing elsewhere in the
+> builder. Column names are appended by `column()` and `columns()` and read
+> back by `get_columns()`, renaming the query's leading columns, with more
+> than the query has refused (`42601`). `if_not_exists()` leaves an existing
+> relation of the name alone, its rows with it, with a notice (`42P07`).
+> PostgreSQL 18 has no `OR REPLACE` for a materialized view (`42601`), and
+> the statement has none, which a `compile_fail` doctest holds: a
+> materialized view that changes is dropped and created again.
+>
+> A refresh runs the query again and replaces the view's rows. Unqualified,
+> it holds a lock that blocks reads of the view until it commits.
+> `concurrently()` replaces the rows without blocking reads, by comparing
+> the old rows with the new, and `with_no_data()` empties the view and leaves
+> it unpopulated. PostgreSQL refuses `CONCURRENTLY` beside `WITH NO DATA`
+> (`42601`), but at execution, after the grammar has accepted the pair, so
+> the oracle cannot keep it out. The two are therefore one slot the last call
+> fills, read back by `is_concurrently()` and `is_with_no_data()`, and the
+> pair has no render (`[dec:pgorm:invalid-states-unrepresentable]`).
+>
+> What a concurrent refresh needs besides is the server's knowledge, and the
+> live suite holds each refusal: a unique index on the view over plain
+> columns with no `WHERE` (`55000` without one), which `Index::create`
+> builds over the view's name, and a view already populated (`0A000`).
+> Unlike `CREATE INDEX CONCURRENTLY` (`[spec:pgorm:req:sql.ddl.index-create+11]`),
+> a concurrent refresh runs inside a transaction block, and the live suite
+> runs one there.
+>
+> An entity's table may be a materialized view, as it may be a view, and the
+> entity reads the rows the view holds. The live suite holds an entity
+> reading a refreshed view, not seeing a row added to the table until the
+> next refresh, and refused a write, a materialized view not being
+> updatable (`42809`). This drop refuses a view and `DROP VIEW` refuses a
+> materialized view (`42809`).
+>
+> Two spellings are not built:
+>
+> - `USING <access method>`, `WITH (<storage options>)` and `TABLESPACE`,
+>   storage choices `[spec:pgorm:req:sql.scope+17]` rules out for tables.
+> - `ALTER MATERIALIZED VIEW`, whose rename and column rename
+>   `Table::rename` and `Table::rename_column` reach, as for a view.
+
+## Tables from a query
+
+> [spec:pgorm:req:sql.ddl.create-table-as]
+> `Table::create_as(name, body)` builds a `TableCreateAsStatement`, which
+> MUST render `CREATE TABLE [IF NOT EXISTS ]<name>[ (<columns>)] AS <query>[
+> WITH NO DATA]`. It creates a table whose columns are the query's, with
+> their names and types, and whose rows are the query's rows when the
+> statement runs, or none under `with_no_data()`. The names `column()` and
+> `columns()` give rename the leading columns, and `get_columns()` reads them
+> back; more than the query has are refused (`42601`). The name and the body
+> are constructor arguments, and the body is taken by value and written with
+> its values inlined, as every DDL statement writes a value
+> (`[spec:pgorm:req:sql.ddl+9]`). `if_not_exists()` leaves an existing
+> relation alone, its rows with it.
+>
+> From then on it is a table like any other, which the live suite holds: its
+> kind is `r`, a change to the table the query read does not reach it, and
+> rows inserted into the empty one are kept. Nothing ties it to the query
+> again, which is what separates it from a materialized view
+> (`[spec:pgorm:req:sql.ddl.materialized-view]`).
+>
+> Three spellings are not built:
+>
+> - `TEMPORARY` and `UNLOGGED`, `ON COMMIT`, `USING`, `WITH (<storage
+>   options>)` and `TABLESPACE`, ruled out for tables by
+>   `[spec:pgorm:req:sql.scope+17]`.
+> - `SELECT ... INTO`, another spelling of this same statement.
+> - `CREATE TABLE ... AS EXECUTE`, which names a prepared statement that no
+>   builder makes.
 
 ## Extensions
 

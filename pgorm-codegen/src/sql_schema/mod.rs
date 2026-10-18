@@ -269,7 +269,13 @@ fn statement_kind(node: &NodeEnum) -> &'static str {
         NodeEnum::CreateExtensionStmt(_) => "CREATE EXTENSION",
         NodeEnum::CreatePolicyStmt(_) => "CREATE POLICY",
         NodeEnum::CreateForeignTableStmt(_) => "CREATE FOREIGN TABLE",
+        NodeEnum::CreateTableAsStmt(create)
+            if create.objtype == pg_query::protobuf::ObjectType::ObjectMatview as i32 =>
+        {
+            "CREATE MATERIALIZED VIEW"
+        }
         NodeEnum::CreateTableAsStmt(_) => "CREATE TABLE AS",
+        NodeEnum::RefreshMatViewStmt(_) => "REFRESH MATERIALIZED VIEW",
         NodeEnum::CreateStatsStmt(_) => "CREATE STATISTICS",
         NodeEnum::CompositeTypeStmt(_) => "CREATE TYPE ... AS",
         NodeEnum::ViewStmt(_) => "CREATE VIEW",

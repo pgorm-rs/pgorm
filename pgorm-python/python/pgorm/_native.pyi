@@ -17,6 +17,12 @@ from ._schema_constraints import (
     validate_constraint as validate_constraint, alter_constraint as alter_constraint,
     drop_constraint as drop_constraint, rename_constraint as rename_constraint,
 )
+from ._schema_views import (
+    create_view as create_view, create_recursive_view as create_recursive_view,
+    drop_view as drop_view, create_materialized_view as create_materialized_view,
+    refresh_materialized_view as refresh_materialized_view,
+    drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
+)
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
 from ._pipeline_sources import SourceSelection as SourceSelection, SelectedSources as SelectedSources

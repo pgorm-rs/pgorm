@@ -491,6 +491,14 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   maxValue, startWith, cache, cycle })` — the options an identity column
   takes, `null` a bound's `NO` form — `ownedBy` and, altering, `restart`;
   `dropSequence` and `renameSequence`; `createExtension` and `dropExtension`.
+- **Views**: `createView(name, select)` with `orReplace`, `columns`,
+  `checkOption("local" | "cascaded")`, `securityBarrier` and
+  `securityInvoker`; `createRecursiveView(name, columns, select)`, which
+  takes no check option; `createMaterializedView(name, select)` and
+  `createTableAs(name, select)` with `ifNotExists`, `columns` and
+  `withNoData`; `refreshMaterializedView(name, { concurrently, withNoData })`,
+  never both; `dropView` and `dropMaterializedView`. A view's query is
+  written with its values as literals, a definition binding nothing.
 - An options object holding a key its builder does not know is a
   `TypeError`, so a misspelt option is never left out.
 

@@ -136,6 +136,52 @@ query placeholders. Python does not concatenate identifiers or values into
 DDL. Arbitrary column options, partial/expression/concurrent indexes and runtime
 foreign-key construction are not exposed. `schema_policy` records these limits.
 
+## Views, materialized views and tables from a query
+
+A view, a materialized view and `CREATE TABLE AS` wrap a `Select` in a name.
+PostgreSQL stores a view's definition as SQL text, so the query's values are
+written into it as literals by Rust's renderer, and `inspect().params` is
+empty. The name is a `p.Table` without an alias; `columns=` names the leading
+columns the query returns.
+
+```python
+account = p.Table("account", schema="app")
+active = p.Select(p.col("id"), p.col("name")).from_(account).where_(p.col("active") == True)
+view = s.create_view(p.Table("active_account", schema="app"), active, check_option="cascaded")
+snapshot = p.Table("account_snapshot", schema="app")
+statements = [
+    view,
+    s.create_materialized_view(snapshot, active, with_no_data=True),
+    s.create_index(snapshot, "id", name="account_snapshot_id").unique(),
+    s.refresh_materialized_view(snapshot),
+    s.refresh_materialized_view(snapshot, concurrently=True),
+    s.create_table_as(p.Table("account_copy", schema="app"), active, columns=["account_id"]),
+]
+```
+
+`create_view(name, query, columns=(), or_replace=False, check_option=None,
+security_barrier=False, security_invoker=False)` creates a view. Rows written
+through an automatically updatable view reach its table; with
+`check_option="local"` or `"cascaded"` a row the view would not show is
+refused (`44000`), `"cascaded"` consulting the views beneath it too.
+`or_replace=True` may add columns after the view's own and replaces its
+options. `security_barrier` evaluates the view's conditions before a caller's,
+and `security_invoker` reads the underlying tables with the querying role's
+privileges. `create_recursive_view(name, columns, query, ...)` names at least
+one column and takes no check option; since `Select` has no `UNION`, its query
+cannot yet read the view. `drop_view(name, if_exists=False, cascade=False)`
+drops a view.
+
+`create_materialized_view(name, query, columns=(), if_not_exists=False,
+with_no_data=False)` stores the query's rows, or none until a refresh;
+`refresh_materialized_view(name, concurrently=False, with_no_data=False)`
+replaces them. A concurrent refresh needs a unique index on the view and a
+populated view, and cannot be combined with `with_no_data`, which is refused
+as the statement is built. `drop_materialized_view` drops one.
+`create_table_as(name, query, columns=(), if_not_exists=False,
+with_no_data=False)` creates an ordinary table from the query's columns and,
+unless `with_no_data`, its rows.
+
 ## Registered Rust entities
 
 In an application wheel, `s.from_entity(p.entity("app.Account"))` invokes the

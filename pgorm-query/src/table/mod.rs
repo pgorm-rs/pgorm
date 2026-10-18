@@ -3,6 +3,7 @@
 //! # Usage
 //!
 //! - Table Create, see [`TableCreateStatement`]
+//! - Table Create As, see [`TableCreateAsStatement`]
 //! - Table Alter, see [`TableAlterStatement`]
 //! - Table Drop, see [`TableDropStatement`]
 //! - Table Rename, see [`TableRenameStatement`]
@@ -10,6 +11,7 @@
 //! - Constraint Rename, see [`ConstraintRenameStatement`]
 //! - Table Truncate, see [`TableTruncateStatement`]
 
+use crate::SelectStatement;
 use crate::types::{IntoName, IntoTableName};
 
 mod alter;
@@ -21,6 +23,7 @@ mod column_identity;
 mod column_not_null;
 mod constraint;
 mod create;
+mod create_as;
 mod drop;
 mod interval;
 mod key;
@@ -36,6 +39,7 @@ pub use constraint::{
     IntoConstraintDrop, NotNullConstraint, NotValid,
 };
 pub use create::*;
+pub use create_as::TableCreateAsStatement;
 pub use drop::*;
 pub use interval::*;
 pub use key::*;
@@ -43,7 +47,7 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl+8]
+// [spec:pgorm:req:sql.ddl+9]
 #[derive(Debug)]
 pub struct Table;
 
@@ -68,6 +72,22 @@ impl Table {
         T: IntoTableName,
     {
         TableCreateStatement::new(table)
+    }
+
+    /// Construct a [`TableCreateAsStatement`] over the table it creates and
+    /// the query whose columns and rows it is created with
+    // [spec:pgorm:req:sql.ddl.create-table-as]
+    pub fn create_as<T>(table: T, body: SelectStatement) -> TableCreateAsStatement
+    where
+        T: IntoTableName,
+    {
+        TableCreateAsStatement {
+            name: table.into_table_name(),
+            columns: Vec::new(),
+            body,
+            if_not_exists: false,
+            no_data: false,
+        }
     }
 
     /// Name the table a [`TableAlterStatement`] will alter.
@@ -137,7 +157,7 @@ impl Table {
 /// Dispatches to the variant's own rendering, which inlines every value as an
 /// escaped SQL literal. This is its only rendering: no table statement
 /// exposes a placeholder-emitting build, so nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+8]
+// [spec:pgorm:req:sql.ddl+9]
 impl std::fmt::Display for TableStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

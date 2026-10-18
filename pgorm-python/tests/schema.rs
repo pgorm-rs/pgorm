@@ -1,8 +1,9 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Enforcement, Expr,
-    GeneratedKind, Index, IndexOrder, IndexType, IntoName, Name, NotNullConstraint, StringLen,
-    Table, TableKey, TableName, TypeName, Values, extension::Type,
+    GeneratedKind, Index, IndexOrder, IndexType, IntoName, MaterializedView, Name,
+    NotNullConstraint, Query, SelectStatement, StringLen, Table, TableKey, TableName, TypeName,
+    Values, View, ViewCheckOption, extension::Type,
 };
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
@@ -54,7 +55,7 @@ fn programs() -> BTreeMap<&'static str, String> {
         .check(Expr::col(a("id \"x\"")).gt(0i64))
         .if_not_exists()
         .to_string();
-    BTreeMap::from([
+    [
         ("table", full),
         (
             "generated",
@@ -345,7 +346,7 @@ fn programs() -> BTreeMap<&'static str, String> {
         ),
         (
             "alter_constraint_not_enforced",
-            Table::alter(table)
+            Table::alter(table.clone())
                 .alter_constraint(a("fk \"x\""), ConstraintChange::NotEnforced)
                 .to_string(),
         ),
@@ -386,10 +387,99 @@ fn programs() -> BTreeMap<&'static str, String> {
             "enum_drop",
             Type::drop(kind).if_exists().cascade().to_string(),
         ),
+    ]
+    .into_iter()
+    .chain(views(&table))
+    .collect()
+}
+
+/// The view, materialized view and `CREATE TABLE AS` statements over one
+/// query, whose string value is written into each definition as a literal.
+fn views(table: &TableName) -> BTreeMap<&'static str, String> {
+    let query = || -> SelectStatement {
+        Query::select()
+            .column(a("id \"x\""))
+            .column(a("name"))
+            .from(table.clone())
+            .and_where(Expr::col(a("name")).ne("O'Brien \\ 雪"))
+            .take()
+    };
+    let view = TableName::SchemaTable(a("schema \"雪\"").into_name(), a("view \"雪\"").into_name());
+    BTreeMap::from([
+        (
+            "create_view",
+            View::create(view.clone(), query()).to_string(),
+        ),
+        (
+            "create_view_options",
+            View::create(view.clone(), query())
+                .columns([a("key \"x\""), a("label")])
+                .or_replace()
+                .check_option(ViewCheckOption::Local)
+                .security_barrier()
+                .security_invoker()
+                .to_string(),
+        ),
+        (
+            "create_view_cascaded",
+            View::create(view.clone(), query())
+                .check_option(ViewCheckOption::Cascaded)
+                .to_string(),
+        ),
+        (
+            "create_recursive_view",
+            View::create_recursive(view.clone(), a("key \"x\""), query())
+                .column(a("label"))
+                .or_replace()
+                .security_barrier()
+                .to_string(),
+        ),
+        (
+            "drop_view",
+            View::drop(view.clone()).if_exists().cascade().to_string(),
+        ),
+        (
+            "create_materialized_view",
+            MaterializedView::create(view.clone(), query())
+                .columns([a("key \"x\"")])
+                .if_not_exists()
+                .with_no_data()
+                .to_string(),
+        ),
+        (
+            "refresh_materialized_view",
+            MaterializedView::refresh(view.clone()).to_string(),
+        ),
+        (
+            "refresh_concurrently",
+            MaterializedView::refresh(view.clone())
+                .concurrently()
+                .to_string(),
+        ),
+        (
+            "refresh_with_no_data",
+            MaterializedView::refresh(view.clone())
+                .with_no_data()
+                .to_string(),
+        ),
+        (
+            "drop_materialized_view",
+            MaterializedView::drop(view.clone()).if_exists().to_string(),
+        ),
+        (
+            "create_table_as",
+            Table::create_as(view, query())
+                .columns([a("key \"x\""), a("label")])
+                .if_not_exists()
+                .with_no_data()
+                .to_string(),
+        ),
     ])
 }
 
 // [spec:pgorm:req:python.schema/test]
+// [spec:pgorm:req:python.schema-views/test]    every view, materialized view and CREATE TABLE AS
+// option renders as the Rust builder renders it
 #[test]
 fn ddl_matches_native_rust() -> Result<(), Box<dyn std::error::Error>> {
     Python::initialize();

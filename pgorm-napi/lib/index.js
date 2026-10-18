@@ -115,6 +115,19 @@ export {
   PendingAlterSequence,
   renameSequence,
 } from "./schema-objects.js";
+export {
+  CreateMaterializedView,
+  createMaterializedView,
+  CreateRecursiveView,
+  createRecursiveView,
+  CreateTableAs,
+  createTableAs,
+  CreateView,
+  createView,
+  dropMaterializedView,
+  dropView,
+  refreshMaterializedView,
+} from "./schema-views.js";
 export * as pipeline from "./pipeline.js";
 export {
   ConnectionError,

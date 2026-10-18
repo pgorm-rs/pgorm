@@ -421,6 +421,22 @@ children (
                         text "Stale-epoch review: same as sql.ast — the DDL rule family was rewritten wholesale by ddl-empty-builders/ddl-table-target/foreign-key-shape with by-construction guarantees and oracle-checked coverage; the drift this staleness records is that work landing after the node's Done stamp. Re-acknowledging to open a new Done epoch."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:39:51.535052Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.ddl +9: the entry-point list gains Table::create_as, View (create/create_recursive/drop) and MaterializedView (create/refresh/drop), and the no-placeholder list gains view, materialized view and CREATE TABLE AS, whose Display impls carry the inlining note and whose renderers are pub(crate) (sql-views, 19a670c7). Annotations re-pinned from +8."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T16:40:16.722761Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered at sql.ddl +9 in a docs commit of its own, the node's kind; the re-check note above rode the refactor commit that delivered query-reexports-curated."
+                        after_done true
+                    }
                 )
             }
 
@@ -8693,6 +8709,14 @@ children (
                         text "Delivered again at sql.surface +28, which adds Interval (sql.value.interval) to the register in f9db65b7; the merges of branches cut before the 2026-10-18 re-check had also restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T16:39:51.435781Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-18 at sql.surface +29: the register now records View, ViewCreateStatement, RecursiveViewCreateStatement, ViewCheckOption, ViewDropStatement, MaterializedView, MaterializedViewCreateStatement, MaterializedViewRefreshStatement, MaterializedViewDropStatement and TableCreateAsStatement (sql-views, 19a670c7), each named in lib.rs's explicit schema-statement re-exports with its module private; no glob, no new public module."
+                        after_done true
+                    }
                 )
             }
 
@@ -8856,6 +8880,15 @@ children (
                 id sql-views
                 title "pgorm builds views, materialized views and CREATE TABLE AS, from Rust, Python and JavaScript, and an entity reads and writes through a view"
                 kind @feat
+                implements {
+                    main (
+                        [spec:pgorm:req:sql.ddl.view]
+                        [spec:pgorm:req:sql.ddl.materialized-view]
+                        [spec:pgorm:req:sql.ddl.create-table-as]
+                        [spec:pgorm:req:python.schema-views]
+                        [spec:pgorm:req:napi.schema-views]
+                    )
+                }
                 deps (query-second-tier)
                 log (
                     {
@@ -8863,6 +8896,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's decision on query-second-tier (2026-10-18). Builders: CREATE [OR REPLACE] [RECURSIVE] VIEW name [(columns)] AS <SelectStatement> [WITH [CASCADED | LOCAL] CHECK OPTION] with the security_barrier and security_invoker options, DROP VIEW [IF EXISTS] .. [CASCADE | RESTRICT]; CREATE MATERIALIZED VIEW [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY] name [WITH [NO] DATA], DROP MATERIALIZED VIEW; CREATE TABLE [IF NOT EXISTS] name [(columns)] AS <SelectStatement> WITH [NO] DATA. Names and column names are quoted identifiers; the body is the caller's SelectStatement rendered with its values inlined, because a view body cannot take bind parameters (check what PostgreSQL refuses and make invalid combinations unrepresentable where the grammar forbids them: e.g. RECURSIVE needs column names, CHECK OPTION needs an auto-updatable view and is refused on RECURSIVE, REFRESH CONCURRENTLY needs a unique index and is refused WITH NO DATA, OR REPLACE may only add columns at the end). Spec: move views and materialized views off sql.scope's out-of-scope list (bump; query-second-tier re-delivers with a feat commit), new rules for the statements in sql-ddl.md, register entries in sql.surface for new exports, oracle-checked renders (libpg_query 18 grammar) and live tests on 18.6, including an entity reading from a view and writing through a simple auto-updatable one, a CHECK OPTION refusal (44000), and a concurrent refresh. Python (pgorm-python schema builders, stubs, capability manifest, parity cases) and JavaScript (pgorm-napi schema builders, .d.ts, parity goldens, Node and Deno) get the same statements, as they mirror every other DDL builder."
+                    }
+
+                    {
+                        at 2026-10-18T16:24:27.541262Z
+                        author "brendan@necessary.nu"
+                        kind @decision
+                        text "Shapes, checked against PostgreSQL 18.6 and libpg_query 18. Unrepresentable (the grammar refuses them): a recursive view without columns (42601) — View::create_recursive takes the first column; a check option on a recursive view (0A000, raised in gram.y so the oracle refuses it too) — RecursiveViewCreateStatement is its own type with no check_option; CREATE VIEW IF NOT EXISTS (42601) and CREATE OR REPLACE MATERIALIZED VIEW (42601 in 18) — no method; an empty column list — none written. REFRESH CONCURRENTLY beside WITH NO DATA is refused by the server at execution (42601) after the raw grammar accepts it, so the two are one last-wins slot. Left to the server and held by the live suite (tests/view_tests.rs): a check option on a view that is not automatically updatable (0A000), an OR REPLACE that moves, drops, renames or retypes a column (42P16; omitted options are reset), more column names than columns (42601), a concurrent refresh without a unique index (55000) or of an unpopulated view (0A000), a drop of the wrong kind (42809), RESTRICT with a dependent view (2BP01), check option violations (44000, LOCAL vs CASCADED over a view of a view). The body is the caller's SelectStatement rendered value-inlined. ALTER VIEW is not built: Table::rename, Table::rename_column and Table::alter(..).modify_column(default) reach a view (and the renames a materialized view), live-tested. Codegen already refused CREATE VIEW by name; it misnamed CREATE MATERIALIZED VIEW as CREATE TABLE AS and REFRESH as an unrecognised statement, both now named. Generating an entity from a view would need the body's column types, which DDL text without a catalog does not carry, so no codegen follow-up is filed."
                     }
                 )
             }
@@ -11744,6 +11784,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-statement-typing (6b3c7eed). Every query-expression and statement object in pgorm-python refuses truth testing (__bool__ raises), but the schema module's statements (CreateTable, CreateIndex, the DDL wrapper and the rest of src/schema) and Compiled still evaluate as true. Add the refusal to each, including whatever builders sql-views adds, extend test_boolean_conversion_fails_at_the_boundary / test_statement_truth_testing_is_rejected to cover them, and say so in SCHEMA.md. Waits on sql-views, which is editing src/schema."
+            }
+        )
+    }
+
+    {
+        id python-select-set-operations
+        title "Python's Select combines with UNION, INTERSECT and EXCEPT, with and without ALL, as JavaScript's and Rust's do"
+        kind @feat
+        deps (sql-views sql-select-extras)
+        log (
+            {
+                at 2026-10-18T16:42:47.882511Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by sql-views (19a670c7). pgorm-python's statement Select has no set operation: Rust's SelectStatement has union/intersect/except with ALL (sql.ast.select.union) and pgorm-napi's Select has union, unionAll, intersect, intersectAll and the rest, but Python reaches set operations only through the pipeline API. So create_recursive_view exists in Python but cannot build a body that reads the view (a recursive view's body is a UNION), and any statement-level UNION needs RawSQL. Give Python's Select the same set operations as Rust and JavaScript, with ORDER BY / LIMIT on the combined result as Rust allows, stubs, capability entries, parity cases against Rust, live tests including a recursive view built end to end, and python.statements' text; drop the caveat sql-views wrote into python.schema-views and SCHEMA.md. Waits on sql-select-extras, which changes the same Python Select."
             }
         )
     }

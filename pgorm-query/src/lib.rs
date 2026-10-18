@@ -324,8 +324,9 @@
 //!   no bind parameter in DDL, so their `$N` rendering is for inspection and the
 //!   inlined one is what you execute.
 //! - **Every other schema statement** — table, index, foreign-key, sequence,
-//!   comment, extension, `DROP TYPE` — binds nothing that can reach a
-//!   placeholder sink.
+//!   view, materialized view, `CREATE TABLE AS`, comment, extension, `DROP
+//!   TYPE` — binds nothing that can reach a placeholder sink: a view's query
+//!   is stored as SQL text, so its values are written into it.
 //!   The inlined rendering is the only one they have, and it is their `Display`.
 //!
 //! ```rust
@@ -646,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+29]
-// [spec:pgorm:req:sql.surface+29/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+30]
+// [spec:pgorm:req:sql.surface+30/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.
@@ -658,7 +659,7 @@
 // argument. `Expr::raw`, `SqlTemplate` and the raw `FromItem` are the escape
 // hatches that keep every one of them reachable, so the boundary is about
 // which SQL gets a type here, never about which SQL a caller can send.
-// [spec:pgorm:req:sql.scope+16]
+// [spec:pgorm:req:sql.scope+17]
 mod backend;
 mod comment;
 pub mod error;
@@ -684,6 +685,7 @@ mod value_identity;
 mod value_interval;
 mod value_range;
 mod value_range_text;
+mod view;
 
 #[doc(hidden)]
 #[cfg(feature = "tests-cfg")]
@@ -771,6 +773,7 @@ pub use sequence::{
     PendingSequenceAlter, Sequence, SequenceAlterStatement, SequenceCreateStatement,
     SequenceDropStatement, SequenceOption, SequenceOptions, SequenceRenameStatement, SequenceType,
 };
+pub use table::TableCreateAsStatement;
 pub use table::{
     AddColumnOption, Check, ColumnDef, ColumnRenameStatement, ColumnSpec, ColumnType,
     ConstraintChange, ConstraintDrop, ConstraintRenameStatement, DropBehavior, Enforcement,
@@ -779,6 +782,11 @@ pub use table::{
     NotValid, PendingTableAlter, PgInterval, Primary, StringLen, Table, TableAlterOption,
     TableAlterStatement, TableCreateStatement, TableDropOpt, TableDropStatement, TableKey,
     TableRenameStatement, TableTruncateStatement, Unique,
+};
+pub use view::{
+    MaterializedView, MaterializedViewCreateStatement, MaterializedViewDropStatement,
+    MaterializedViewRefreshStatement, RecursiveViewCreateStatement, View, ViewCheckOption,
+    ViewCreateStatement, ViewDropStatement,
 };
 
 // The PostgreSQL release the build targets.

@@ -1912,6 +1912,19 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule sql.ast.cast-shape}
     )}
+    {id sql-views, covered_rules (
+        napi.schema-views
+        python.schema-views
+        sql.ddl.create-table-as
+        sql.ddl.materialized-view
+        sql.ddl.view
+    ), covered_claims (
+        {impl_name main, rule napi.schema-views}
+        {impl_name main, rule python.schema-views}
+        {impl_name main, rule sql.ddl.create-table-as}
+        {impl_name main, rule sql.ddl.materialized-view}
+        {impl_name main, rule sql.ddl.view}
+    )}
     {id sql.ast, covered_rules (
         sql.ast
         sql.ast.build

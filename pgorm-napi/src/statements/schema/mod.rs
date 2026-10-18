@@ -1,6 +1,7 @@
 //! pgorm-query's DDL builders, from JavaScript: tables and their columns,
-//! keys and constraints, their alterations, indexes, types, sequences,
-//! extensions and comments.
+//! keys and constraints, their alterations, indexes, types, sequences, views,
+//! materialized views and tables created from a query, extensions and
+//! comments.
 //!
 //! A DDL statement takes no parameters — PostgreSQL accepts none there — so
 //! every builder here renders through pgorm-query's own `Display`, which
@@ -20,15 +21,18 @@ mod options;
 mod sequence;
 mod table;
 mod types;
+mod view;
 
 pub(super) use options::integer;
 
 use pgorm::pgorm_query::{
     ColumnDef, ColumnRenameStatement, CommentStatement, ConstraintRenameStatement,
-    IndexCreateStatement, IndexDropStatement, PendingSequenceAlter, PendingTableAlter,
-    SequenceAlterStatement, SequenceCreateStatement, SequenceDropStatement,
-    SequenceRenameStatement, TableAlterStatement, TableCreateStatement, TableDropStatement,
-    TableName, TableRenameStatement, TableTruncateStatement,
+    IndexCreateStatement, IndexDropStatement, MaterializedViewCreateStatement,
+    MaterializedViewDropStatement, MaterializedViewRefreshStatement, PendingSequenceAlter,
+    PendingTableAlter, RecursiveViewCreateStatement, SequenceAlterStatement,
+    SequenceCreateStatement, SequenceDropStatement, SequenceRenameStatement, TableAlterStatement,
+    TableCreateAsStatement, TableCreateStatement, TableDropStatement, TableName,
+    TableRenameStatement, TableTruncateStatement, ViewCreateStatement, ViewDropStatement,
     extension::{
         AttributeRenameStatement, CompositeAlterStatement, ExtensionCreateStatement,
         ExtensionDropStatement, PendingTypeAlter, TypeAlterStatement, TypeCreateStatement,
@@ -51,6 +55,7 @@ pub(super) const EXPORTS: &[&[(&str, super::Build)]] = &[
     index::EXPORTS,
     types::EXPORTS,
     sequence::EXPORTS,
+    view::EXPORTS,
 ];
 
 /// A complete DDL statement, which runs as it renders.
@@ -78,6 +83,15 @@ pub(crate) enum Ddl {
     AlterSequence(SequenceAlterStatement),
     DropSequence(SequenceDropStatement),
     RenameSequence(SequenceRenameStatement),
+    /// The four statements over a query are boxed, the query being several
+    /// times the size of any other statement here.
+    CreateView(Box<ViewCreateStatement>),
+    CreateRecursiveView(Box<RecursiveViewCreateStatement>),
+    DropView(ViewDropStatement),
+    CreateMaterializedView(Box<MaterializedViewCreateStatement>),
+    RefreshMaterializedView(MaterializedViewRefreshStatement),
+    DropMaterializedView(MaterializedViewDropStatement),
+    CreateTableAs(Box<TableCreateAsStatement>),
     CreateExtension(ExtensionCreateStatement),
     DropExtension(ExtensionDropStatement),
     Comment(CommentStatement),
@@ -107,6 +121,13 @@ impl Ddl {
             Self::AlterSequence(statement) => statement.to_string(),
             Self::DropSequence(statement) => statement.to_string(),
             Self::RenameSequence(statement) => statement.to_string(),
+            Self::CreateView(statement) => statement.to_string(),
+            Self::CreateRecursiveView(statement) => statement.to_string(),
+            Self::DropView(statement) => statement.to_string(),
+            Self::CreateMaterializedView(statement) => statement.to_string(),
+            Self::RefreshMaterializedView(statement) => statement.to_string(),
+            Self::DropMaterializedView(statement) => statement.to_string(),
+            Self::CreateTableAs(statement) => statement.to_string(),
             Self::CreateExtension(statement) => statement.to_string(),
             Self::DropExtension(statement) => statement.to_string(),
             Self::Comment(statement) => statement.to_string(),

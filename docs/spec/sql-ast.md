@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+29]
+> [spec:pgorm:req:sql.surface+30]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -162,7 +162,15 @@ today, including panicking edges and deliberate failsafes.
 > `WindowFunction`, what `OVER` may follow (`sql.ast.window-statement`); and
 > `JsonTable`, `JsonTableBehavior`, `JsonTableColumn`, `JsonValueColumn`,
 > `JsonQueryColumn`, `JsonExistsColumn` and `JsonNestedColumns`: `JSON_TABLE`,
-> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`); and
+> its `ON ERROR`, and its columns of each kind (`sql.ast.json-table`);
+> `View`, `ViewCreateStatement`, `RecursiveViewCreateStatement`,
+> `ViewCheckOption` and `ViewDropStatement`: the view statements, the
+> recursive form that takes no check option, and which views a check option
+> consults (`sql.ddl.view`); `MaterializedView`,
+> `MaterializedViewCreateStatement`, `MaterializedViewRefreshStatement` and
+> `MaterializedViewDropStatement`, the materialized view statements
+> (`sql.ddl.materialized-view`); `TableCreateAsStatement`, a table created
+> from a query (`sql.ddl.create-table-as`); and
 > `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
 > item leaves the list with the state it described: `Frame` went when a
 > frame's bounds stopped being one enum, the frame builder replacing it
@@ -210,7 +218,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+16]
+> [spec:pgorm:req:sql.scope+17]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -227,8 +235,12 @@ today, including panicking edges and deliberate failsafes.
 > the builder is a defect in this rule, not a silent no. Some boundaries are
 > recorded beside the construct they bound rather than here: `CONCURRENTLY`
 > (`sql.ddl.index-create`), a range type's `CANONICAL` (`sql.ddl.type-range`),
-> a sequence's persistence, owner and schema (`sql.ddl.sequence`), and syntax
-> only PostgreSQL 19 parses (`sql.target`).
+> a sequence's persistence, owner and schema (`sql.ddl.sequence`), a view's
+> persistence and `ALTER VIEW` (`sql.ddl.view`), a materialized view's
+> storage and `ALTER MATERIALIZED VIEW` (`sql.ddl.materialized-view`),
+> `CREATE TABLE AS`'s persistence and storage, `SELECT INTO` and `EXECUTE`
+> (`sql.ddl.create-table-as`), and syntax only PostgreSQL 19 parses
+> (`sql.target`).
 >
 > Three tests decide which verdict an entry gets. *Does the ORM need it to do
 > its job?* — the builder exists to render the statements an entity layer
@@ -242,15 +254,6 @@ today, including panicking edges and deliberate failsafes.
 >
 > **Deferred** — worth building, not built:
 >
-> - **Views, materialized views and `CREATE TABLE AS`.** Each wraps a
->   `SelectStatement` in a name, and hand-writing that name and its column
->   names is the quoting the builders exist to remove; a view's body cannot
->   take bind parameters, so it renders with its values inlined. Refreshing a
->   materialized view is a statement an application issues on a schedule.
->   Closing it takes the three create statements, `REFRESH MATERIALIZED VIEW`
->   and the drops, with the grammar's refusals made unrepresentable, and a
->   live test of an entity reading a view and writing through an updatable
->   one (`sql-views`).
 > - **`FETCH FIRST … WITH TIES`, `GROUP BY DISTINCT`, `SIMILAR TO`, `WITH
 >   ORDINALITY` / `ROWS FROM`, and `TABLESAMPLE`.** Clauses on statements the
 >   builder already has, each with a value or an identifier to carry: a limit

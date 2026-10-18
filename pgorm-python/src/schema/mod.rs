@@ -8,6 +8,7 @@ mod index;
 mod statement;
 mod table;
 mod types;
+mod view;
 
 pub(crate) use capabilities::operations as capabilities;
 pub use column::PyColumnDef;
@@ -50,5 +51,12 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(table::alter_constraint, module)?)?;
     module.add_function(wrap_pyfunction!(table::drop_constraint, module)?)?;
     module.add_function(wrap_pyfunction!(table::rename_constraint, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_recursive_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::drop_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_materialized_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::refresh_materialized_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::drop_materialized_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_table_as, module)?)?;
     Ok(())
 }
