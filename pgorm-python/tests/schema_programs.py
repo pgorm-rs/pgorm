@@ -66,6 +66,18 @@ def programs(p):
         "enum_rename": p.rename_enum(kind, 'new "x"'),
         "enum_drop": p.drop_enum(kind, if_exists=True, cascade=True),
         **views(p, table),
+        **schemas(p),
+    }
+
+
+def schemas(p):
+    name = 'schema "雪"'
+    return {
+        "create_schema": p.create_schema(name),
+        "create_schema_if_not_exists": p.create_schema(p.Identifier(name), if_not_exists=True),
+        "drop_schema": p.drop_schema(name),
+        "drop_schemas": p.drop_schema(name, "archive", p.Identifier('Old "x"'), if_exists=True, cascade=True),
+        "rename_schema": p.rename_schema(name, 'renamed "雪"'),
     }
 
 

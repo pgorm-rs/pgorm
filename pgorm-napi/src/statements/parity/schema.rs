@@ -6,7 +6,7 @@ use std::{str::FromStr, sync::Arc};
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Deferrability, Enforcement,
     Expr, ForeignKeyAction, ForeignKeyCreateStatement, Func, GeneratedKind, IdentityGeneration,
-    Index, IndexColumn, IndexOrder, IndexType, NotNullConstraint, Sequence, SequenceOption,
+    Index, IndexColumn, IndexOrder, IndexType, NotNullConstraint, Schema, Sequence, SequenceOption,
     SequenceType, SimpleExpr, StringLen, Table, TableKey, TableName, TypeName, Unique, Values,
     extension::{Extension, RangeDefinition, Type, TypeRef},
 };
@@ -449,6 +449,27 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
                 .if_exists()
                 .restrict()
                 .to_owned()),
+        ),
+        ("create-schema", ddl(Schema::create(n("app")))),
+        (
+            "create-schema-if-not-exists",
+            ddl(Schema::create(n("App \"x\"")).if_not_exists().to_owned()),
+        ),
+        (
+            "drop-schema",
+            ddl(Schema::drop(n("app")).restrict().to_owned()),
+        ),
+        (
+            "drop-schemas",
+            ddl(Schema::drop(n("app"))
+                .name(n("archive"))
+                .if_exists()
+                .cascade()
+                .to_owned()),
+        ),
+        (
+            "rename-schema",
+            ddl(Schema::rename(n("app"), n("App \"x\""))),
         ),
         (
             "comment-on-table",

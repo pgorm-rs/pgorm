@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+32]
+> [spec:pgorm:req:sql.surface+33]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -170,7 +170,9 @@ today, including panicking edges and deliberate failsafes.
 > `MaterializedViewCreateStatement`, `MaterializedViewRefreshStatement` and
 > `MaterializedViewDropStatement`, the materialized view statements
 > (`sql.ddl.materialized-view`); `TableCreateAsStatement`, a table created
-> from a query (`sql.ddl.create-table-as`);
+> from a query (`sql.ddl.create-table-as`); `Schema`,
+> `SchemaCreateStatement`, `SchemaDropStatement` and `SchemaRenameStatement`,
+> the statements that create, drop and rename a schema (`sql.ddl.schema`);
 > `CopyFromStatement` and `CopyToStatement`, the two COPY statements;
 > `CopyFormat` and `CopyDelimitedFormat`, the sealed traits a statement's
 > format type implements, and `CopyText`, `CopyCsv` and `CopyBinary`, the
@@ -228,7 +230,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+19]
+> [spec:pgorm:req:sql.scope+20]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -251,7 +253,8 @@ today, including panicking edges and deliberate failsafes.
 > persistence and `ALTER VIEW` (`sql.ddl.view`), a materialized view's
 > storage and `ALTER MATERIALIZED VIEW` (`sql.ddl.materialized-view`),
 > `CREATE TABLE AS`'s persistence and storage, `SELECT INTO` and `EXECUTE`
-> (`sql.ddl.create-table-as`), COPY TO's column list (`sql.ast.copy`), and
+> (`sql.ddl.create-table-as`), a schema's `AUTHORIZATION`, owner and element
+> list (`sql.ddl.schema`), COPY TO's column list (`sql.ast.copy`), and
 > syntax only PostgreSQL 19 parses (`sql.target`).
 >
 > Three tests decide which verdict an entry gets. *Does the ORM need it to do
@@ -271,11 +274,6 @@ today, including panicking edges and deliberate failsafes.
 >   an entity has a column; codegen refuses a schema that uses one. Closing it
 >   takes the statements and codegen reading a domain column as its base type
 >   (`sql-domains`).
-> - **`CREATE SCHEMA` and `DROP SCHEMA`.** Tables, types and sequences can be
->   schema-qualified, and the schema they name has no typed statement;
->   unlike a database, a schema belongs to one database and is created inside
->   a transaction. Closing it takes the two statements, with `IF [NOT] EXISTS`
->   and `CASCADE` / `RESTRICT` (`sql-schemas`).
 > - **`LISTEN`.** `NOTIFY` is a statement `execute` already sends (or
 >   `pg_notify(..)` an expression), but a notification arrives on the
 >   connection that listened, which the pool keeps out of reach. Closing it

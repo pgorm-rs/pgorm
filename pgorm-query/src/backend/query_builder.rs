@@ -40,6 +40,8 @@ mod merge;
 mod range;
 #[path = "query_builder_returning.rs"]
 mod returning;
+#[path = "query_builder_schema.rs"]
+mod schema;
 #[path = "query_builder_sequence.rs"]
 mod sequence;
 #[path = "query_builder_subscript.rs"]

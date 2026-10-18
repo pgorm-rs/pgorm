@@ -110,12 +110,15 @@ export {
   createExtension,
   createIndex,
   CreateIndex,
+  createSchema,
   createSequence,
   CreateSequence,
   dropExtension,
   dropIndex,
+  dropSchema,
   dropSequence,
   PendingAlterSequence,
+  renameSchema,
   renameSequence,
 } from "./schema-objects.js";
 export {

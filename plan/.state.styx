@@ -1232,6 +1232,8 @@ impl_evidence (
         generative.ci
     ), covered_claims (
         {impl_name main, rule generative.ci}
+    ), rule_versions_seen (
+        {id generative.ci, version 0}
     )}
     {id generative.compile, covered_rules (
         generative.compile-suite
@@ -1928,6 +1930,15 @@ impl_evidence (
         sql.ast.cast-shape
     ), covered_claims (
         {impl_name main, rule sql.ast.cast-shape}
+    )}
+    {id sql-schemas, covered_rules (
+        napi.schema-schemas
+        python.schema-schemas
+        sql.ddl.schema
+    ), covered_claims (
+        {impl_name main, rule napi.schema-schemas}
+        {impl_name main, rule python.schema-schemas}
+        {impl_name main, rule sql.ddl.schema}
     )}
     {id sql-select-extras, covered_rules (
         exec.tie-limit

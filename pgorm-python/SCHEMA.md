@@ -121,7 +121,8 @@ array_column = s.ColumnDef("moods", s.DataType(mood).array())
 `rename_enum_value`, `rename_enum` and `drop_enum` preserve quoted type names
 and escaped labels. Empty labels are valid; labels must contain no NUL and fit
 PostgreSQL's 63-byte limit. Creating a named column does not create its type.
-Create schemas explicitly before their objects, for example with `p.RawSQL`.
+Create schemas explicitly before their objects, with `s.create_schema`
+([below](#schemas)).
 
 Rust's PostgreSQL driver caches type definitions on physical connections.
 After changing existing enum labels or renaming a type, close and recreate
@@ -141,6 +142,31 @@ Like SQL expressions and statements, every `pgorm.schema` object — `DataType`,
 `Compiled` an inspection returns raise `ConstructionError` on Python truth
 testing, so `if statement:` or `statement or fallback` fails where it is written
 rather than reading every statement as true.
+
+## Schemas
+
+A schema is the namespace a `p.Table(..., schema=...)`, a `p.TypeName` or a
+sequence is qualified by. It is named by one identifier, a `str` or a
+`p.Identifier`, quoted, and never qualified itself.
+
+```python
+statements = [
+    s.create_schema("billing", if_not_exists=True),
+    s.create_table(p.Table("invoice", schema="billing")).column(s.ColumnDef("id", "integer")),
+    s.rename_schema("billing", "ledger"),
+    s.drop_schema("ledger", "archive", if_exists=True, cascade=True),
+]
+```
+
+`create_schema(name, if_not_exists=False)` creates one; a schema that exists
+is refused (`42P06`) unless `if_not_exists`, and PostgreSQL keeps names
+starting `pg_` for itself (`42939`). `drop_schema(name, *names,
+if_exists=False, cascade=False)` drops every schema it names. A schema that
+holds anything is refused (`2BP01`) unless `cascade=True`, which drops what it
+holds as well; a missing one is refused (`3F000`) unless `if_exists`.
+`rename_schema(name, new_name)` renames one, its contents moving with it; it
+has no `if_exists`, PostgreSQL having none for it. `AUTHORIZATION` and `OWNER
+TO`, which name a role, are not built.
 
 ## Views, materialized views and tables from a query
 

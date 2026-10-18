@@ -24,6 +24,7 @@ from .._native import (
     drop_view as drop_view, create_materialized_view as create_materialized_view,
     refresh_materialized_view as refresh_materialized_view,
     drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
+    create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
 )
 
 create_table = CreateTable
@@ -41,4 +42,5 @@ __all__ = [
     "rename_enum_value", "drop_enum",
     "create_view", "create_recursive_view", "drop_view", "create_materialized_view",
     "refresh_materialized_view", "drop_materialized_view", "create_table_as",
+    "create_schema", "drop_schema", "rename_schema",
 ]

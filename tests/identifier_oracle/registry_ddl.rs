@@ -3,7 +3,7 @@
 
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, Comment, ConstraintChange, ConstraintDrop, Enforcement, Expr,
-    ForeignKey, Index, IndexColumn, IndexType, MaterializedView, NotNullConstraint, Query,
+    ForeignKey, Index, IndexColumn, IndexType, MaterializedView, NotNullConstraint, Query, Schema,
     SelectStatement, Sequence, SequenceOption, Table, TableForeignKey, TableKey, TypeName, View,
     extension::{Extension, RangeDefinition, Type},
 };
@@ -1438,6 +1438,42 @@ pub fn sites() -> Vec<Site> {
             kinds: &["CreateTableAsStmt.into.col_names[0]"],
             policy: Quoted,
             render: |n| sql(Table::create_as(fixed("t"), body()).column(n_(n))),
+        },
+        // -- SCHEMA --------------------------------------------------------
+        Site {
+            id: "ddl/create-schema.name",
+            api: "Schema::create(Name)",
+            kinds: &["CreateSchemaStmt.schemaname"],
+            policy: Quoted,
+            render: |n| sql(&Schema::create(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-schema.name",
+            api: "Schema::drop(Name)",
+            kinds: &["DropStmt.objects[0]"],
+            policy: Quoted,
+            render: |n| sql(&Schema::drop(n_(n))),
+        },
+        Site {
+            id: "ddl/drop-schema.further-name",
+            api: "SchemaDropStatement::name(Name)",
+            kinds: &["DropStmt.objects[1]"],
+            policy: Quoted,
+            render: |n| sql(Schema::drop(fixed("s")).name(n_(n))),
+        },
+        Site {
+            id: "ddl/rename-schema.from",
+            api: "Schema::rename(Name, to)",
+            kinds: &["RenameStmt.subname"],
+            policy: Quoted,
+            render: |n| sql(&Schema::rename(n_(n), fixed("s"))),
+        },
+        Site {
+            id: "ddl/rename-schema.to",
+            api: "Schema::rename(from, Name)",
+            kinds: &["RenameStmt.newname"],
+            policy: Quoted,
+            render: |n| sql(&Schema::rename(fixed("s"), n_(n))),
         },
         // -- EXTENSION -----------------------------------------------------
         Site {

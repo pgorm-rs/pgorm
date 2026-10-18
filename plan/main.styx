@@ -463,6 +463,14 @@ children (
                         text "Delivered at sql.ddl +9 in a docs commit of its own, the node's kind; the re-check note above rode the refactor commit that delivered query-reexports-curated."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T18:41:35.689952Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.ddl +10: Schema (create/drop/rename) joins the entry-point helpers and schema statements the no-placeholder list; every_ddl_entry_point_is_reachable reaches all three."
+                        after_done true
+                    }
                 )
             }
 
@@ -8798,6 +8806,14 @@ children (
                         text "Re-delivered at sql.surface+30: the register and pgorm-query's exports agree both ways, the three new names each with their rule."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T18:41:17.237095Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.surface +31: Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement are re-exported by name from lib.rs and recorded in the register with sql.ddl.schema."
+                        after_done true
+                    }
                 )
             }
 
@@ -9041,6 +9057,9 @@ children (
                 id sql-schemas
                 title "pgorm builds CREATE SCHEMA and DROP SCHEMA from Rust, Python and JavaScript"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ddl.schema] [spec:pgorm:req:python.schema-schemas] [spec:pgorm:req:napi.schema-schemas])
+                }
                 deps (query-second-tier sql-views python-schema-truth-testing)
                 log (
                     {

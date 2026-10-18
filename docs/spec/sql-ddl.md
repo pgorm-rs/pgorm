@@ -5,7 +5,8 @@ table create/alter/drop/rename/truncate (`pgorm-query/src/table/`), index and
 foreign key statements (`pgorm-query/src/index/`,
 `pgorm-query/src/foreign_key/`), `CREATE TYPE ... AS ENUM` / `AS (...)` / `AS RANGE` and extension
 statements (`pgorm-query/src/extension.rs`), sequence statements
-(`pgorm-query/src/sequence/`), view and materialized view statements
+(`pgorm-query/src/sequence/`), schema statements (`pgorm-query/src/schema.rs`),
+view and materialized view statements
 (`pgorm-query/src/view/`) and `CREATE TABLE AS`
 (`pgorm-query/src/table/create_as.rs`), `COMMENT ON` statements
 (`pgorm-query/src/comment.rs`), and the rendering contract
@@ -13,11 +14,12 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+9]
+> [spec:pgorm:req:sql.ddl+10]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`create_as`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
 > `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
+> `Schema` (`create`/`drop`/`rename`),
 > `Sequence` (`create`/`alter`/`drop`/`rename`),
 > `View` (`create`/`create_recursive`/`drop`),
 > `MaterializedView` (`create`/`refresh`/`drop`),
@@ -39,8 +41,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > that pair is for inspection and the inlined rendering is what a caller
 > executes; both the `build` doc and the `Display` doc MUST say so.
 >
-> Every other DDL statement — table, index, foreign-key, sequence, view,
-> materialized view, `CREATE TABLE AS`, comment, extension, `DROP TYPE` — has
+> Every other DDL statement — schema, table, index, foreign-key, sequence,
+> view, materialized view, `CREATE TABLE AS`, comment, extension, `DROP TYPE` —
+> has
 > no placeholder-emitting entry point at all: its renderer is
 > `pub(crate)` and its only public route is `Display` over a `String` sink, so
 > a value it carries (a column `DEFAULT`, a `CHECK` expression, a value in
@@ -1551,6 +1554,46 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > - `SELECT ... INTO`, another spelling of this same statement.
 > - `CREATE TABLE ... AS EXECUTE`, which names a prepared statement that no
 >   builder makes.
+
+## Schemas
+
+> [spec:pgorm:req:sql.ddl.schema]
+> `Schema` builds the statements a schema takes: `create(name)`, `drop(name)`
+> and `rename(from, to)`. A schema is named by one identifier, so every name
+> is an `IntoName` rendered as a quoted identifier, never a `(schema, name)`
+> pair: schemas do not nest, and the grammar refuses a qualified schema name.
+>
+> - `SchemaCreateStatement` MUST render `CREATE SCHEMA [IF NOT EXISTS ]<name>`.
+> - `SchemaDropStatement` MUST render `DROP SCHEMA [IF EXISTS ]<name>[,
+>   <name>...][ CASCADE| RESTRICT]`. `Schema::drop` takes the first name and
+>   `name()` appends, so the list is non-empty; `cascade()` and `restrict()`
+>   share one `DropBehavior` slot, the last call winning.
+> - `SchemaRenameStatement` MUST render `ALTER SCHEMA <name> RENAME TO <new>`.
+>   PostgreSQL's grammar has no `IF EXISTS` for it (`42601`), so the statement
+>   MUST NOT offer one (`[dec:pgorm:invalid-states-unrepresentable]`).
+>
+> Every statement renders through `Display` alone: a schema statement carries
+> names and nothing to bind (`[spec:pgorm:req:sql.ddl+10]`). A schema is
+> created inside a transaction and undone with it, as the rest of the DDL is.
+>
+> What the server refuses, no builder value can see, and the live suite holds
+> each refusal by SQLSTATE: a create of a schema that exists (`42P06`, a
+> notice under `IF NOT EXISTS`); a name starting `pg_`, which PostgreSQL
+> reserves for its own schemas, as a created schema or a rename's new name
+> (`42939`); a rename onto a name already taken (`42P06`); a drop or rename
+> of a schema that does not exist (`3F000`, the drop's a notice under `IF
+> EXISTS`); and a drop of a schema that holds anything, under `RESTRICT`
+> said or unsaid (`2BP01`), where `CASCADE` drops what it holds. The suite
+> builds a table, an enum type and a sequence inside a schema the builder
+> created, each qualified by the schema's name, and an entity whose
+> `schema_name` names that schema reads and writes its table there.
+>
+> Three spellings are not built. `AUTHORIZATION` and `ALTER SCHEMA … OWNER
+> TO` name a role, which `[spec:pgorm:req:sql.scope+18]` rules out with
+> privileges. The schema-element list — `CREATE SCHEMA s CREATE TABLE …` —
+> creates objects every builder here already creates qualified by the
+> schema's name, and PostgreSQL refuses it beside `IF NOT EXISTS` (`0A000`),
+> the clause a migration reaches for.
 
 ## Extensions
 

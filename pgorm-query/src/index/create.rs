@@ -315,7 +315,7 @@ impl ConditionalStatement for IndexCreateStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+9]
+// [spec:pgorm:req:sql.ddl+10]
 impl std::fmt::Display for IndexCreateStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

@@ -479,13 +479,14 @@ builders, and runs through `execute`:
 
 ```js
 import {
-  alterTable, col, ColumnDef, createIndex, createSequence, createTable, createType, DataType,
-  Table, TypeName, Value,
+  alterTable, col, ColumnDef, createIndex, createSchema, createSequence, createTable, createType,
+  DataType, Table, TypeName, Value,
 } from "@necessary/pgorm";
 
 const mood = new TypeName("mood", { schema: "app" });
 const booking = new Table("booking", { schema: "app" });
 
+await pool.execute(createSchema("app", { ifNotExists: true }));
 await pool.execute(createType(mood).values(["calm", "tense"]));
 await pool.execute(
   createTable(booking)
@@ -508,6 +509,11 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   label, a comment — is written as pgorm-query's escaped literal, and
   `inspect()` gives `{ sql, values: [] }`. Names are identifiers, quoted.
   Nothing runs until a terminal runs it.
+- **Schemas**: `createSchema(name, { ifNotExists })`, `dropSchema(names, {
+  ifExists, behavior })` over one name or several, and `renameSchema(name,
+  newName)`. A schema is named by one string, never a `Table`. A drop of a
+  schema that holds anything is refused (`2BP01`) unless its behavior is
+  `"cascade"`.
 - **Tables**: `createTable(table)` with `column`, `primaryKey` (one; a later
   call replaces it), `unique`, `foreignKey` and `check`. A key takes `name`,
   `include`, `deferrability` and PostgreSQL 18's `withoutOverlaps` (its period
