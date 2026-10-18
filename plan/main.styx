@@ -5213,6 +5213,14 @@ children (
                         text "Re-checked 2026-10-18 against security.sqlmap.profiles at +3 (seen at +0; there was never a +1: 40dd9e51 added the exemption-evidence rules without bumping; +2 (77528abb) made the runner apply every declared setting and refuse timeouts that don't nest, fixing a hard-coded --time-sec 1; +3 (ac5b4d5a) the identifiers profile and exemption ceilings). The code meets it: profiles.json declares every setting, which reaches sqlmap's flags, the container and fixture role's statement timeout and the per-scan deadline; bad or non-nesting profiles are refused before sqlmap is fetched; fresh state per case; full schedules 117 and exempts 93, identifiers 28/38, smoke 3, matching the README; exemption evidence is checked field by field and exempt pairs never count as passes; PostgreSQL is 18.6 by digest. The sqlmap pin is a commit tarball re-verified by sha256, a fork-style pin. Gaps, filed separately: Python is pinned exactly to 3.14.4 (pins.json, the runner's equality check, sqlmap-run.yml, README), against the operator's 2026-10-09 rule against exact pins, missed by the sweep that moved generative CI to 3.14; the HTTP adapter and result interpreter hard-code the test parameter as input instead of reading the case's field; the detected-exempt-pair check cannot fire in a normal run because exempt pairs are never scanned; lock_timeout, --union-cols and -v are fixed in code rather than declared in the profile; the rule's \"both run noninteractively\" predates the third profile."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T14:25:17.193477Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule versions (security.sqlmap.profiles +3), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
                 )
             }
 
@@ -5283,6 +5291,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 against security.sqlmap.ci at +1 (seen at +0; v1 added the identifiers job). The code meets it: smoke on relevant pull requests, full and identifiers weekly and on dispatch, each its own job with its own deadline, check name and artifact, all through the one reusable workflow (harness then verdict); artifacts uploaded on failure, kept 14 days, an empty upload an error; separate status files and a not-run status when the report is missing or the build failed; outside the pre-commit check budget; contents: read, no credentials persisted, no secrets. GitHub shows the weekly run executing, the latest on 2026-10-12 passing (2026-10-05 failed and was fixed). Minor: cancel-in-progress would kill a running full scan if the workflow is dispatched again; the fork pull-request policy is documented, not enforced by branch protection; the node's title still says smoke and full."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T14:25:17.306877Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at the current rule version (security.sqlmap.ci +1), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
                 )

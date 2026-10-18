@@ -2127,8 +2127,6 @@ impl_evidence (
         security.sqlmap.ci
     ), covered_claims (
         {impl_name main, rule security.sqlmap.ci}
-    ), rule_versions_seen (
-        {id security.sqlmap.ci, version 0}
     )}
     {id sqlmap.fixtures, covered_rules (
         security.sqlmap
@@ -2153,11 +2151,6 @@ impl_evidence (
         {impl_name main, rule security.sqlmap.execution}
         {impl_name main, rule security.sqlmap.pin}
         {impl_name main, rule security.sqlmap.profiles}
-    ), rule_versions_seen (
-        {id security.sqlmap.artifacts, version 0}
-        {id security.sqlmap.execution, version 0}
-        {id security.sqlmap.pin, version 0}
-        {id security.sqlmap.profiles, version 0}
     )}
     {id sqlmap.verdict, covered_rules (
         security.sqlmap.outcomes
