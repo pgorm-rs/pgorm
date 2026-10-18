@@ -4,7 +4,7 @@ use crate::{
     backend::QueryBuilder,
     expr::*,
     prepare::*,
-    query::{OrderedStatement, RowLimit, condition::*, select_expr::*},
+    query::{NamedWindow, OrderedStatement, RowLimit, condition::*, select_expr::*},
     types::*,
     value::*,
 };
@@ -31,7 +31,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select+4]
+// [spec:pgorm:def:sql.ast.select+5]
 // [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
@@ -49,7 +49,7 @@ pub struct SelectStatement {
     pub(crate) limit: Option<RowLimit>,
     pub(crate) offset: Option<Value>,
     pub(crate) lock: Option<LockClause>,
-    pub(crate) window: Option<(Name, WindowStatement)>,
+    pub(crate) windows: Vec<NamedWindow>,
 }
 
 /// List of distinct keywords that can be used in select statement
@@ -87,7 +87,7 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select+4]
+// [spec:pgorm:def:sql.ast.select+5]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LockClause {
     pub(crate) r#type: LockType,
@@ -142,7 +142,7 @@ impl SelectStatement {
             limit: self.limit.take(),
             offset: self.offset.take(),
             lock: self.lock.take(),
-            window: self.window.take(),
+            windows: std::mem::take(&mut self.windows),
         }
     }
 
@@ -577,7 +577,7 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+6]
+    // [spec:pgorm:def:sql.ast.window-statement+7]
     pub fn expr_window<F>(&mut self, func: F, window: WindowStatement) -> &mut Self
     where
         F: WindowFunction,
@@ -611,7 +611,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+6]
+    // [spec:pgorm:def:sql.ast.window-statement+7]
     pub fn expr_window_as<F, A>(&mut self, func: F, window: WindowStatement, alias: A) -> &mut Self
     where
         F: WindowFunction,
@@ -646,7 +646,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+6]
+    // [spec:pgorm:def:sql.ast.window-statement+7]
     pub fn expr_window_name<F, W>(&mut self, func: F, window: W) -> &mut Self
     where
         F: WindowFunction,
@@ -678,7 +678,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+6]
+    // [spec:pgorm:def:sql.ast.window-statement+7]
     pub fn expr_window_name_as<F, W, A>(&mut self, func: F, window: W, alias: A) -> &mut Self
     where
         F: WindowFunction,
@@ -1851,32 +1851,6 @@ impl SelectStatement {
         unions: T,
     ) -> &mut Self {
         self.unions.extend(unions);
-        self
-    }
-
-    /// WINDOW
-    ///
-    /// # Examples:
-    ///
-    /// ```
-    /// use pgorm_query::{tests_cfg::*, *};
-    ///
-    /// let query = Query::select()
-    ///     .from(Char::Table)
-    ///     .expr_window_name_as(Func::count(Expr::col(Char::Id)), Name::runtime("w"), Name::runtime("C"))
-    ///     .window(Name::runtime("w"), WindowStatement::partition_by(Char::FontSize))
-    ///     .to_owned();
-    ///
-    /// assert_eq!(
-    ///     query.to_string(),
-    ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
-    /// );
-    /// ```
-    pub fn window<A>(&mut self, name: A, window: WindowStatement) -> &mut Self
-    where
-        A: IntoName,
-    {
-        self.window = Some((name.into_name(), window));
         self
     }
 }

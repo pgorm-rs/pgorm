@@ -1,15 +1,86 @@
-//! A window's frame: its mode, its bounds, and the `EXCLUDE` tail. Every
-//! frame reaching here is one the grammar admits (`sql.ast.window-statement`),
-//! so each part writes what it holds without a guard.
+//! Windows: a SELECT's WINDOW clause, the parenthesised specification after
+//! `OVER` and after `AS` in that clause, and a frame's mode, bounds and
+//! `EXCLUDE` tail. Every frame reaching here is one the grammar admits
+//! (`sql.ast.window-statement`), so each part writes what it holds without a
+//! guard.
 
 use super::*;
-use crate::query::FrameBound;
+use crate::query::{FrameBound, NamedWindow};
 
 impl QueryBuilder {
+    /// Translate a WINDOW clause, ` WINDOW "a" AS ( … ), "b" AS ( … )`, its
+    /// entries in the order the statement holds them, or nothing when it
+    /// names no window.
+    // [spec:pgorm:req:sql.render.window+6]
+    pub(super) fn prepare_window_clause(&self, windows: &[NamedWindow], sql: &mut dyn SqlWriter) {
+        windows.iter().fold(true, |first, entry| {
+            write!(sql, "{}", if first { " WINDOW " } else { ", " }).unwrap();
+            entry.name.prepare(sql.as_writer());
+            write!(sql, " AS ").unwrap();
+            match &entry.definition {
+                WindowDefinition::Spec(window) => self.prepare_window_spec(window, sql),
+                WindowDefinition::Extended(window) => self.prepare_extended_window(window, sql),
+            }
+            false
+        });
+    }
+
+    /// Translate a [`WindowStatement`] into the parenthesized window
+    /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
+    // [spec:pgorm:req:sql.render.window+6]
+    pub(super) fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
+        write!(sql, "( ").unwrap();
+        if !window.partition_by.is_empty() {
+            write!(sql, "PARTITION BY ").unwrap();
+            window.partition_by.iter().fold(true, |first, expr| {
+                if !first {
+                    write!(sql, ", ").unwrap()
+                }
+                self.prepare_simple_expr(expr, sql);
+                false
+            });
+        }
+        self.prepare_window_tail(&window.order_by, window.frame.as_ref(), sql);
+    }
+
+    /// Translate an [`ExtendedWindow`] into `( "base" … )`: the base's name
+    /// where a window of its own writes its PARTITION BY, which it copies.
+    // [spec:pgorm:req:sql.render.window+6]
+    fn prepare_extended_window(&self, window: &ExtendedWindow, sql: &mut dyn SqlWriter) {
+        write!(sql, "( ").unwrap();
+        window.base.prepare(sql.as_writer());
+        self.prepare_window_tail(&window.order_by, window.frame.as_ref(), sql);
+    }
+
+    /// The part of a window specification both kinds share: ` ORDER BY …`,
+    /// the frame, and the closing ` )`.
+    // [spec:pgorm:req:sql.render.window+6]
+    fn prepare_window_tail(
+        &self,
+        order_by: &[OrderExpr],
+        frame: Option<&FrameClause>,
+        sql: &mut dyn SqlWriter,
+    ) {
+        if !order_by.is_empty() {
+            write!(sql, " ORDER BY ").unwrap();
+            order_by.iter().fold(true, |first, expr| {
+                if !first {
+                    write!(sql, ", ").unwrap()
+                }
+                self.prepare_order_expr(expr, sql);
+                false
+            });
+        }
+        if let Some(frame) = frame {
+            self.prepare_frame_clause(frame, sql);
+        }
+        write!(sql, " )").unwrap();
+    }
+
     /// Translate a [`FrameClause`] into ` <mode> <start>` or ` <mode> BETWEEN
     /// <start> AND <end>`, then ` EXCLUDE …` when an exclusion is set.
-    // [spec:pgorm:req:sql.render.window+5]
-    pub(super) fn prepare_frame_clause(&self, frame: &FrameClause, sql: &mut dyn SqlWriter) {
+    // [spec:pgorm:req:sql.render.window+6]
+    fn prepare_frame_clause(&self, frame: &FrameClause, sql: &mut dyn SqlWriter) {
         match frame.r#type {
             FrameType::Range => write!(sql, " RANGE ").unwrap(),
             FrameType::Rows => write!(sql, " ROWS ").unwrap(),
@@ -31,7 +102,7 @@ impl QueryBuilder {
     /// Translate one frame bound. An offset renders through the expression
     /// path — a value as a placeholder or an inline literal, anything else as
     /// itself — and needs no parentheses, because the keyword after it ends it.
-    // [spec:pgorm:req:sql.render.window+5] (frame bounds)
+    // [spec:pgorm:req:sql.render.window+6] (frame bounds)
     fn prepare_frame_bound(&self, bound: &FrameBound, sql: &mut dyn SqlWriter) {
         match bound {
             FrameBound::UnboundedPreceding => write!(sql, "UNBOUNDED PRECEDING").unwrap(),

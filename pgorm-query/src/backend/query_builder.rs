@@ -88,7 +88,7 @@ impl QueryBuilder {
         };
     }
 
-    // [spec:pgorm:req:sql.render.select-order+5] (order expressions: ASC/DESC, NULLS, Order::Field)
+    // [spec:pgorm:req:sql.render.select-order+6] (order expressions: ASC/DESC, NULLS, Order::Field)
     fn prepare_order_expr(&self, order_expr: &OrderExpr, sql: &mut dyn SqlWriter) {
         if !matches!(order_expr.order, Order::Field(_)) {
             self.prepare_simple_expr(&order_expr.expr, sql);
@@ -224,7 +224,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.select-order+5]
+    // [spec:pgorm:req:sql.render.select-order+6]
     // [spec:pgorm:sem:query.build.with.attach+1]
     pub(crate) fn prepare_select_statement(
         &self,
@@ -280,12 +280,7 @@ impl QueryBuilder {
 
         self.prepare_condition(&select.having, "HAVING", sql);
 
-        if let Some((name, query)) = &select.window {
-            write!(sql, " WINDOW ").unwrap();
-            name.prepare(sql.as_writer());
-            write!(sql, " AS ").unwrap();
-            self.prepare_window_spec(query, sql);
-        }
+        self.prepare_window_clause(&select.windows, sql);
 
         if !select.unions.is_empty() {
             select.unions.iter().for_each(|(union_type, query)| {
@@ -590,7 +585,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SelectExpr`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+5] (OVER attachment: named reference, inline spec, alias)
+    // [spec:pgorm:req:sql.render.window+6] (OVER attachment: named reference, inline spec, alias)
     fn prepare_select_expr(&self, select_expr: &SelectExpr, sql: &mut dyn SqlWriter) {
         self.prepare_simple_expr(&select_expr.expr, sql);
         match &select_expr.window {
@@ -1328,45 +1323,6 @@ impl QueryBuilder {
     fn prepare_condition_where(&self, condition: &Condition, sql: &mut dyn SqlWriter) {
         let simple_expr = condition.to_simple_expr();
         self.prepare_simple_expr(&simple_expr, sql);
-    }
-
-    /// Translate a [`WindowStatement`] into the parenthesized window
-    /// specification PostgreSQL requires after `OVER` and after `WINDOW n AS`.
-    // [spec:pgorm:req:sql.render.window+5]
-    fn prepare_window_spec(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
-        write!(sql, "( ").unwrap();
-        self.prepare_window_statement(window, sql);
-        write!(sql, " )").unwrap();
-    }
-
-    /// Translate [`WindowStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.render.window+5]
-    fn prepare_window_statement(&self, window: &WindowStatement, sql: &mut dyn SqlWriter) {
-        if !window.partition_by.is_empty() {
-            write!(sql, "PARTITION BY ").unwrap();
-            window.partition_by.iter().fold(true, |first, expr| {
-                if !first {
-                    write!(sql, ", ").unwrap()
-                }
-                self.prepare_simple_expr(expr, sql);
-                false
-            });
-        }
-
-        if !window.order_by.is_empty() {
-            write!(sql, " ORDER BY ").unwrap();
-            window.order_by.iter().fold(true, |first, expr| {
-                if !first {
-                    write!(sql, ", ").unwrap()
-                }
-                self.prepare_order_expr(expr, sql);
-                false
-            });
-        }
-
-        if let Some(frame) = &window.frame {
-            self.prepare_frame_clause(frame, sql);
-        }
     }
 
     /// Translate a binary expr to SQL.

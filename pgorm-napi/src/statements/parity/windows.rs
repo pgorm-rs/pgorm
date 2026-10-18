@@ -3,9 +3,9 @@
 use std::ops::Bound;
 
 use pgorm::pgorm_query::{
-    ArrayType, BinOper, Expr, FrameClause, FrameExclusion, FrameType, FromItem, Func, Multirange,
-    NamedTable, Order, OverStatement, Query, Range, RangeType, SelectStatement, SimpleExpr,
-    TableName, TypeName, Value, Values, WindowStatement,
+    ArrayType, BinOper, Expr, ExtendedWindow, FrameClause, FrameExclusion, FrameType, FromItem,
+    Func, Multirange, NamedTable, Order, OverStatement, Query, Range, RangeType, SelectStatement,
+    SimpleExpr, TableName, TypeName, Value, Values, WindowStatement,
 };
 
 use super::n;
@@ -187,9 +187,39 @@ fn ranges() -> (String, Values) {
         .build()
 }
 
+/// A WINDOW clause of three entries, each extended window built on the one
+/// before it.
+fn clause_entries() -> (String, Values) {
+    let mut by_kind = WindowStatement::default();
+    by_kind.add_partition_by(at!("kind"));
+    Query::select()
+        .expr_window_name(Func::sum(at!("weight")), n("running"))
+        .expr_window_name_as(
+            named!("rank", Vec::<SimpleExpr>::new()),
+            n("ordered"),
+            n("rank"),
+        )
+        .from(reading!())
+        .window(n("by_kind"), by_kind)
+        .window(
+            n("ordered"),
+            ExtendedWindow::new(n("by_kind"))
+                .order_by_expr(at!("at"), Order::Asc)
+                .to_owned(),
+        )
+        .window(
+            n("running"),
+            ExtendedWindow::new(n("ordered"))
+                .frame(FrameType::Rows.preceding(1i64).and_current_row())
+                .to_owned(),
+        )
+        .build()
+}
+
 pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
     vec![
         ("window-inline-and-named", inline_and_named()),
+        ("window-clause-entries", clause_entries()),
         ("window-frames", frames()),
         ("window-functions", functions()),
         ("window-json-aggregates", json_aggregates()),

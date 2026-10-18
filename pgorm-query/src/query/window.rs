@@ -32,7 +32,7 @@ pub trait OverStatement {
 /// # Reference
 ///
 /// <https://www.postgresql.org/docs/current/tutorial-window.html>
-// [spec:pgorm:def:sql.ast.window-statement+6]
+// [spec:pgorm:def:sql.ast.window-statement+7]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct WindowStatement {
     pub(crate) partition_by: Vec<SimpleExpr>,
@@ -43,7 +43,7 @@ pub struct WindowStatement {
 /// What `OVER` may follow: a function call, or one of SQL/JSON's two
 /// aggregates, which are calls in the grammar but carry clauses a
 /// [`FunctionCall`] cannot. Sealed, because the grammar fixes the set.
-// [spec:pgorm:def:sql.ast.window-statement+6]
+// [spec:pgorm:def:sql.ast.window-statement+7]
 pub trait WindowFunction: Into<SimpleExpr> + sealed::Sealed {}
 
 mod sealed {
@@ -123,7 +123,7 @@ impl WindowStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+6]
+    // [spec:pgorm:def:sql.ast.window-statement+7]
     pub fn frame<F>(&mut self, frame: F) -> &mut Self
     where
         F: Into<FrameClause>,

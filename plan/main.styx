@@ -9100,12 +9100,20 @@ children (
                 title "A SELECT's WINDOW clause holds every named window, from Rust, Python and JavaScript"
                 kind @fix
                 deps (sql-select-extras python-select-set-operations)
+                sealed true
                 log (
                     {
                         at 2026-10-18T16:22:56.441121Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by python-statement-typing (6b3c7eed). PostgreSQL's WINDOW clause takes a list of named windows, but pgorm-query's SelectStatement holds window: Option<..>, so a second .window(name, spec) call silently replaces the first and a query that refers to the dropped name fails at the server (42704) instead of when it is built; python.statements +4 currently documents the replacement. Make the clause a list (keeping names unique: refuse or make unrepresentable a duplicate name, which PostgreSQL rejects with 42P20), render every entry, let a named window reference an earlier one as PostgreSQL allows (WINDOW w2 AS (w1 ORDER BY ..)) if the builder can express it, and give Python and JavaScript the same; update sql.ast.window-statement / sql.render.window and python.statements, with oracle-checked renders and live tests. Waits on sql-select-extras, which changes the same SELECT builder in three languages."
+                    }
+
+                    {
+                        at 2026-10-18T20:35:11.610602Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

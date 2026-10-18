@@ -17,8 +17,9 @@ use futures::StreamExt;
 use common::bakery_chain::{Bakery, Cake, bakery, cake, create_tables};
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    CommonTableExpression, Condition, Func, Order, OrderedStatement, Query, RecursiveWithClause,
-    SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
+    CommonTableExpression, Condition, Expr, ExtendedWindow, Func, Order, OrderedStatement, Query,
+    RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
+    error::Error as QueryError,
 };
 use pgorm::{
     Error, SelectGetableTuple, SelectModel, Selector, SelectorRaw, alias, entity::prelude::*,
@@ -442,6 +443,84 @@ pub async fn window_clause_ranks_rows_per_bakery() -> Result<(), Error> {
         "the rank restarts with each partition"
     );
     assert_eq!(ranked[0].name, "Alpha Torte");
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq, FromQueryResult)]
+struct PricedCake {
+    name: String,
+    rank: i64,
+    cakes: i64,
+}
+
+// [spec:pgorm:sem:query.build.window/test]    `window` appends to the WINDOW clause, a window
+// extending an earlier entry among them, and a clause PostgreSQL refuses is refused unsent
+#[pgorm_macros::test]
+pub async fn window_clause_holds_every_named_window() -> Result<(), Error> {
+    let ctx = TestContext::new("window_clause_holds_every_named_window").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let (per_bakery, by_price) = (alias("per_bakery"), alias("by_price"));
+    let priced = || {
+        Cake::find()
+            .select([cake::Column::Name])
+            .window_expr_as(Func::named(alias("rank")), by_price, alias("rank"))
+            .window_expr_as(
+                Func::count(Expr::col(cake::Column::Id)),
+                per_bakery,
+                alias("cakes"),
+            )
+            .window(
+                per_bakery,
+                WindowStatement::partition_by(cake::Column::BakeryId),
+            )
+    };
+    let ranked = priced()
+        .window(
+            by_price,
+            ExtendedWindow::new(per_bakery)
+                .order_by(cake::Column::Price, Order::Desc)
+                .to_owned(),
+        )
+        .order_by_asc(cake::Column::BakeryId)
+        .order_by_desc(cake::Column::Price)
+        .into_model::<PricedCake>()
+        .all(&db)
+        .await?;
+    assert_eq!(
+        ranked
+            .iter()
+            .map(|cake| (cake.name.as_str(), cake.rank, cake.cakes))
+            .collect::<Vec<_>>(),
+        [
+            ("Alpha Torte", 1, 3),
+            ("Alpha Tart", 2, 3),
+            ("Alpha Bun", 3, 3),
+            ("Beta Gateau", 1, 3),
+            ("Beta Slice", 2, 3),
+            ("Beta Bun", 3, 3),
+        ],
+        "each window is read: the rank by the extended window, the count by its base"
+    );
+
+    let refused = priced()
+        .window(per_bakery, WindowStatement::new())
+        .into_model::<PricedCake>()
+        .all(&db)
+        .await
+        .expect_err("two windows of one name");
+    assert!(
+        matches!(
+            &refused,
+            Error::QueryBuilder(QueryError::WindowRedefined { name }) if name == "per_bakery"
+        ),
+        "{refused:?}"
+    );
 
     drop(db);
     ctx.delete().await;

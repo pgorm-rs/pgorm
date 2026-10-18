@@ -9,7 +9,7 @@
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
-import type { Window, Windowed } from "./windows.d.ts";
+import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 /** A table, schema-qualified and aliased when the options say. Its names are identifiers, quoted. */
@@ -104,8 +104,13 @@ export declare class Select extends Builder {
   ): Select;
   /** The statement's WITH clause, replacing any it had. */
   with(clause: With): Select;
-  /** The statement's named window, which `over(name)` reads; the last call wins. */
-  window(name: string, window: Window): Select;
+  /**
+   * An entry appended to the WINDOW clause, which `over(name)` reads: a
+   * `Window`, or an `ExtendedWindow` built on an entry appended before it.
+   * A clause PostgreSQL refuses is refused when the statement is inspected,
+   * run or read into another.
+   */
+  window(name: string, window: Window | ExtendedWindow): Select;
   /** This query as a FROM item, `(SELECT ..) AS "alias"`. */
   as(alias: string): FromItem;
 }

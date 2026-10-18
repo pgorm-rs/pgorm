@@ -48,7 +48,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
     def side(self, table):
         return p.Select(p.col("n")).from_(table)
 
-    # [spec:pgorm:req:python.statements+6/test]    each of the six operators, its ALL form keeping
+    # [spec:pgorm:req:python.statements+7/test]    each of the six operators, its ALL form keeping
     # duplicates and the other removing them
     async def test_each_operation_combines_the_rows(self):
         left, right = self.side(self.left), self.side(self.right)
@@ -61,7 +61,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
                     bool(combined)
         self.assertEqual(await self.numbers(left), LEFT)
 
-    # [spec:pgorm:req:python.statements+6/test]    the receiver's ORDER BY and limits bound the
+    # [spec:pgorm:req:python.statements+7/test]    the receiver's ORDER BY and limits bound the
     # combined rows whenever they were set, an arm's own stay inside its parentheses, and bound
     # values number across the arms
     async def test_order_and_limits_cover_combined_rows(self):
@@ -81,7 +81,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([value.value for value in compiled.params], [1, 4])
         self.assertEqual(await self.numbers(filtered), [1, 2, 3, 3, 3, 3, 3])
 
-    # [spec:pgorm:req:python.statements+6/test]    an ordering of the combined rows names a result
+    # [spec:pgorm:req:python.statements+7/test]    an ordering of the combined rows names a result
     # column: the server refuses a qualified column of the first arm and any other expression
     async def test_combined_order_names_result_columns(self):
         aliased = self.left.as_("l")
@@ -95,7 +95,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, sqlstate)
         self.assertEqual(await self.numbers(qualified.order_by(p.col("n").asc())), [1, 2, 3, 4])
 
-    # [spec:pgorm:req:python.statements+6/test]    the receiver's WITH clause precedes the whole
+    # [spec:pgorm:req:python.statements+7/test]    the receiver's WITH clause precedes the whole
     # statement, so every arm reads it
     async def test_with_clause_reaches_every_arm(self):
         shared = p.Table("shared")
@@ -105,7 +105,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(combined.inspect().sql.startswith('WITH "shared" AS (SELECT "n" FROM'))
         self.assertEqual(await self.numbers(combined), [1, 3])
 
-    # [spec:pgorm:req:python.statements+6/test]    arms are written in call order, so PostgreSQL's
+    # [spec:pgorm:req:python.statements+7/test]    arms are written in call order, so PostgreSQL's
     # precedence groups them: INTERSECT binds tighter than UNION, and a combined arm keeps its own
     # grouping
     async def test_intersect_binds_tighter_than_union(self):

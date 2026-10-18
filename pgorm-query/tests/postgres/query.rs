@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+3/test]
-// [spec:pgorm:def:sql.ast.select+4/test]
+// [spec:pgorm:def:sql.ast.select+5/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
 fn select_1() {
@@ -942,7 +942,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+5/test]
+// [spec:pgorm:req:sql.render.select-order+6/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -2855,7 +2855,7 @@ fn a_with_clause_has_one_place_to_live() {
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
 // [spec:pgorm:req:sql.render.oracle+2/test]
-// [spec:pgorm:req:sql.render.select-order+5/test]
+// [spec:pgorm:req:sql.render.select-order+6/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {

@@ -28,6 +28,7 @@ mod tie_limit;
 mod traits;
 mod update;
 mod window;
+mod window_clause;
 mod with;
 
 pub use case::*;
@@ -47,10 +48,12 @@ pub use table_sample::{SampleMethod, TableSample};
 pub use traits::*;
 pub use update::*;
 pub use window::*;
+pub use window_clause::{ExtendedWindow, WindowDefinition};
 
 pub(crate) use frame::FrameBound;
 pub(crate) use grouping::GroupingKind;
 pub(crate) use tie_limit::RowLimit;
+pub(crate) use window_clause::NamedWindow;
 pub use with::*;
 
 /// Shorthand for constructing any table query

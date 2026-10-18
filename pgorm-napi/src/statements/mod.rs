@@ -34,10 +34,10 @@ mod write;
 
 use neon::{prelude::*, types::Finalize};
 use pgorm::pgorm_query::{
-    AnyWithClause, ColumnType, Condition, ConflictUpdate, FrameClause, FromItem, FunctionCall,
-    GroupingElement, JsonInput, JsonTableColumn, MergeStatement, NamedTable, NullOrdering,
-    OnConflict, Order, PendingMerge, Query, SelectStatement, SimpleExpr, Value, Values,
-    WindowStatement,
+    AnyWithClause, ColumnType, Condition, ConflictUpdate, ExtendedWindow, FrameClause, FromItem,
+    FunctionCall, GroupingElement, JsonInput, JsonTableColumn, MergeStatement, NamedTable,
+    NullOrdering, OnConflict, Order, PendingMerge, Query, SelectStatement, SimpleExpr, Value,
+    Values, WindowStatement,
 };
 
 use crate::{codec::Codec, rows, values::Tagged};
@@ -97,6 +97,8 @@ pub(crate) enum Node {
     JsonDefault(Value),
     JsonTableColumn(JsonTableColumn),
     Window(WindowStatement),
+    /// A window built on an earlier entry of a WINDOW clause.
+    ExtendedWindow(ExtendedWindow),
     FrameStart(window::Start),
     Frame(FrameClause),
     Windowed(window::Windowed),
@@ -142,6 +144,7 @@ impl Node {
             Self::JsonDefault(_) => "a JSON DEFAULT",
             Self::JsonTableColumn(_) => "a JSON_TABLE column",
             Self::Window(_) => "a Window",
+            Self::ExtendedWindow(_) => "an ExtendedWindow",
             Self::FrameStart(_) => "a frame's start",
             Self::Frame(_) => "a frame",
             Self::Windowed(_) => "a windowed call",
@@ -198,14 +201,16 @@ const MAX_PARAMETERS: usize = 65_535;
 
 /// The SQL and values a statement node builds, through the same validated
 /// state whether it is inspected or run. A node that is no complete
-/// statement is refused, and so is a SELECT whose tie limit PostgreSQL's
-/// grammar would refuse: rendering writes it regardless, and the ORDER BY it
-/// needs may arrive after the limit, so this is the first point it is final.
+/// statement is refused, and so is a SELECT whose tie limit or WINDOW
+/// clause PostgreSQL would refuse: rendering writes either regardless, and
+/// the ORDER BY or window entry they turn on may arrive later, so this is
+/// the first point the statement is final.
 // [spec:pgorm:req:napi.statements]
 // [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.windows+1]
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
-        Node::Select(select) => match select.check_tie_limit() {
+        Node::Select(select) => match args::checked(select) {
             Ok(()) => select.build(),
             Err(error) => return refuse(cx, error.to_string()),
         },

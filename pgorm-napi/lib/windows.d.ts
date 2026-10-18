@@ -19,6 +19,19 @@ export declare class Window {
   frame(frame: Frame | FramePrecedingStart | FrameCurrentRowStart): Window;
 }
 
+/**
+ * A window built on an earlier entry of a SELECT's WINDOW clause, named
+ * `base`: it copies the base's PARTITION BY and any ORDER BY, and adds an
+ * ORDER BY and a frame. It has no `partitionBy`, which PostgreSQL refuses
+ * there. Every method returns a new window.
+ */
+export declare class ExtendedWindow {
+  constructor(base: string);
+  orderBy(...orderings: OrderBy[]): ExtendedWindow;
+  /** The frame, replacing any: a whole frame, or a preceding or current-row start standing alone. */
+  frame(frame: Frame | FramePrecedingStart | FrameCurrentRowStart): ExtendedWindow;
+}
+
 /** The rows EXCLUDE removes, relative to the current row's peers. */
 export type FrameExclusion = "currentRow" | "group" | "ties" | "noOthers";
 

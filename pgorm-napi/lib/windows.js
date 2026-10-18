@@ -39,6 +39,36 @@ export class Window extends Handle {
   }
 }
 
+/**
+ * A window built on an earlier entry of a SELECT's WINDOW clause, named
+ * `base`: it copies the base's PARTITION BY and any ORDER BY, and adds an
+ * ORDER BY and a frame. It has no `partitionBy`, which PostgreSQL refuses
+ * there. Every method returns a new window.
+ */
+export class ExtendedWindow extends Handle {
+  /**
+   * @param {string} base
+   * @param {symbol} [token]
+   */
+  constructor(base, token) {
+    super(token === TRUSTED ? base : native.extendedWindowNew(base));
+  }
+
+  /** @param {...import("./expressions.js").OrderBy} orderings */
+  orderBy(...orderings) {
+    return new ExtendedWindow(native.extendedWindowOrderBy(arg(this), args(orderings)), TRUSTED);
+  }
+
+  /**
+   * The frame, replacing any: a `Frame`, or a preceding or current-row start standing alone.
+   *
+   * @param {Frame | FramePrecedingStart | FrameCurrentRowStart} frame
+   */
+  frame(frame) {
+    return new ExtendedWindow(native.extendedWindowFrame(arg(this), arg(frame)), TRUSTED);
+  }
+}
+
 /** A whole frame: a mode, a start, an end and an optional EXCLUDE. */
 export class Frame extends Handle {
   /**
