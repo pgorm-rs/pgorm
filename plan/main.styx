@@ -1492,6 +1492,14 @@ children (
                         text "Re-checked 2026-10-18 at codegen.entity.types +8, codegen.entity.compact.attrs +8 and codegen.entity.types.unsupported +8 (sql-domains, d5d22226): a domain column is a field of its base's Rust type with the domain spelled in its column definition by both writers; an array of a domain over an array is refused by name."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:16:50.306876Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked at codegen.entity.types +9 and codegen.entity.expanded +4 (codegen-enum-array-expanded, 9a8a6c61): an enum inside an array or a domain is spelled <Enum>::db_type().get_column_type().clone() by both writers, an enum column itself <Enum>::db_type(); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
                 )
             }
 
