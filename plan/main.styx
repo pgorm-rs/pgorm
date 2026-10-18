@@ -11985,12 +11985,20 @@ children (
         title "Interval, Range and Multirange serialize with serde, so generated entities with serde derives compile for those columns"
         kind @fix
         deps (codegen-interval-columns)
+        sealed true
         log (
             {
                 at 2026-10-18T17:34:03.512306Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by codegen-interval-columns (17cd4eca). pgorm-codegen with with_serde set to anything but none emits serde derives on the entity model, which do not compile for an Interval, Range or Multirange field because pgorm_query::Interval and the range types have no serde impls (the built-in range columns already had this gap before intervals). Add Serialize/Deserialize for Interval (the three fields, lossless), Range and Multirange (bounds with inclusivity, and empty), behind the crate's existing serde feature gating, decide the representation and record it in the value rules, and add a codegen test generating with each with_serde mode over interval, range and multirange columns and compiling the result."
+            }
+
+            {
+                at 2026-10-18T19:16:24.718286Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -1469,6 +1469,7 @@ dependencies = [
  "pgvector",
  "postgres-types",
  "rust_decimal",
+ "serde",
  "serde_json",
  "uuid",
 ]

@@ -625,7 +625,7 @@ impl_into_active_value!(crate::prelude::Interval);
 #[cfg_attr(docsrs, doc(cfg(feature = "with-uuid")))]
 impl_into_active_value!(crate::prelude::Uuid);
 
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 impl_into_active_value!(crate::prelude::Range<i32>);
 impl_into_active_value!(crate::prelude::Range<i64>);
 impl_into_active_value!(crate::prelude::Range<crate::prelude::Decimal>);

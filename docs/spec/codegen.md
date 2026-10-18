@@ -460,7 +460,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `#[pgorm(...)]` field metadata of the compact format has no expanded
 > counterpart because `Column` / `PrimaryKey` are spelled out explicitly.
 
-> [spec:pgorm:sem:codegen.entity.imports+2]
+> [spec:pgorm:sem:codegen.entity.imports+3]
 > `gen_import` builds the per-file import block: always
 > `use pgorm::entity::prelude::*;`, followed by the serde import selected
 > by `WithSerde` — `use serde::Serialize;` for `Serialize`,
@@ -472,9 +472,9 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > deduplicated in first-use column order, and `gen_import_range_types` with
 > one `use super::pgorm_range_types::<RangeName>;` per distinct range or
 > multirange type a schema created, the same way. The same `gen_import` block —
-> without enum imports — heads `pgorm_active_enums.rs`
-> (`codegen.entity.enums`), and the prelude import alone heads
-> `pgorm_range_types.rs`; in every file the imports sit directly below
+> without enum or range imports — heads `pgorm_active_enums.rs`
+> (`codegen.entity.enums`) and `pgorm_range_types.rs`, whose newtypes carry
+> the serde derives (`codegen.entity.serde`); in every file the imports sit directly below
 > the `write_doc_comment` header required by `codegen.entity.files`.
 
 ## Type mapping
@@ -629,7 +629,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Serde
 
-> [spec:pgorm:def:codegen.entity.serde]
+> [spec:pgorm:def:codegen.entity.serde+1]
 > `WithSerde` has four variants parsed from the strings `none`,
 > `serialize`, `deserialize`, `both` (anything else is a
 > `TransformError("Unsupported enum variant '...'")`). It contributes both
@@ -637,8 +637,21 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `use serde::Serialize;` and the `Serialize` derive; `Deserialize` the
 > mirror image; `Both` adds `use serde::{Deserialize, Serialize};` and both
 > derives; `None` adds nothing. The same derives are appended to generated
-> active enums, and the same import is emitted at the top of
-> `pgorm_active_enums.rs`.
+> active enums and to the newtype of each range type a schema created, and
+> the same import is emitted at the top of `pgorm_active_enums.rs` and of
+> `pgorm_range_types.rs`: a Model serializing a field of one of those types
+> needs the type to serialize too.
+>
+> The output compiles under every variant whatever the columns, because
+> every type a generated field can hold serializes under pgorm's `with-json`
+> feature: `Interval`, `Range` and `Multirange` through pgorm-query's `serde`
+> feature (`[spec:pgorm:def:sql.value.interval+2]`,
+> `[spec:pgorm:def:sql.value.range+5]`), and `Decimal` and the jiff and uuid
+> types through their own crates'. `tests/serde_values_tests.rs` holds this
+> with an entity of interval, built-in range, multirange and created range
+> columns — nullable, qualified and as arrays — generated and compiled under
+> each variant, its rows written and read back through JSON by the variants
+> that derive each half.
 
 > [spec:pgorm:sem:codegen.entity.serde.skip]
 > Two flags add field-level serde attributes, and both are effective only
@@ -650,7 +663,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > gets `#[serde(skip)]`, not `#[serde(skip_deserializing)]`. With
 > `WithSerde::None` both flags are inert.
 
-> [spec:pgorm:sem:codegen.entity.serde.derives]
+> [spec:pgorm:sem:codegen.entity.serde.derives+1]
 > `WithSerde::extra_derive` is the single producer of the serde derive
 > fragment: an empty stream for `None`, otherwise a leading-comma fragment
 > (`, Serialize`, `, Deserialize`, or `, Serialize, Deserialize` for
@@ -660,7 +673,11 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > `Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize`
 > (pinned by `tests/compact_with_serde/cake_both.rs`). The same fragment is
 > appended to generated active enums after their base derives and optional
-> `Copy` (`codegen.entity.enums`). The fragment and the serde import
+> `Copy` (`codegen.entity.enums`), and to each range newtype after
+> `DeriveCreatedRange` (`codegen.entity.types`), so a newtype over a
+> `Range<i32>` derives exactly
+> `Clone, Debug, PartialEq, Eq, DeriveCreatedRange, Serialize, Deserialize`
+> under `Both`. The fragment and the serde import
 > (`codegen.entity.imports`) always travel together, both derived from the
 > one `WithSerde` value in the context.
 

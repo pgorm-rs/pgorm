@@ -22,7 +22,7 @@ use crate::{
 /// `CREATE TYPE ... AS RANGE` has a name only its schema knows, so it has no
 /// variant here; a value of one over one of these subtypes still binds and
 /// decodes, because the wire format of a range is its subtype's.
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RangeType {
     /// `int4range` / `int4multirange`, over `integer` (`i32`).
@@ -41,7 +41,7 @@ pub enum RangeType {
 
 impl RangeType {
     /// The catalogue name of the range type: `int4range`, `tstzrange`, ...
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     pub fn range_type_name(self) -> &'static str {
         match self {
             Self::Int4 => "int4range",
@@ -55,7 +55,7 @@ impl RangeType {
 
     /// The catalogue name of the multirange over the range type:
     /// `int4multirange`, `tstzmultirange`, ...
-    // [spec:pgorm:def:sql.value.range+4]
+    // [spec:pgorm:def:sql.value.range+5]
     pub fn multirange_type_name(self) -> &'static str {
         match self {
             Self::Int4 => "int4multirange",
@@ -100,8 +100,16 @@ impl RangeType {
 /// );
 /// assert!(Range::<i32>::Empty.is_empty());
 /// ```
-// [spec:pgorm:def:sql.value.range+4]
+///
+/// Under the `serde` feature it serializes in serde's own enum form, each
+/// bound as serde writes any `Bound`: `"Empty"`, or
+/// `{"Bounds":{"lower":{"Included":1},"upper":"Unbounded"}}` in JSON. A
+/// present bound is always an object holding its value, so no value the
+/// subtype serializes to — `null` included — can be read as no bound.
+// [spec:pgorm:def:sql.value.range+5]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum Range<T> {
     /// The range containing no value.
     Empty,
@@ -209,8 +217,12 @@ impl<T> From<ops::RangeFull> for Range<T> {
 /// multirange sorted, with overlapping and adjacent ranges merged and empty
 /// ones dropped, so `{[5,8), [1,3), [2,4), empty}` reads back as
 /// `{[1,4),[5,8)}`; the list here is the one written, in the order written.
-// [spec:pgorm:def:sql.value.range+4]
+///
+/// Under the `serde` feature it serializes as that list of ranges, a JSON
+/// array, in the order written and with any empty range kept.
+// [spec:pgorm:def:sql.value.range+5]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Multirange<T>(Vec<Range<T>>);
 
 impl<T> Multirange<T> {
@@ -262,7 +274,7 @@ impl<T> IntoIterator for Multirange<T> {
 /// Sealed, as every [`RangeSubtype`] is, because the answer it gives is one of
 /// PostgreSQL's built-in range types and the set of those is closed: a type
 /// with no built-in range would have to name one it is not.
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 pub trait RangeElement: RangeSubtype {
     /// The built-in range type over this subtype.
     fn range_type() -> RangeType;
@@ -315,7 +327,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 impl<T> From<Range<T>> for Value
 where
     T: RangeElement,
@@ -334,7 +346,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 impl<T> ValueType for Range<T>
 where
     T: RangeElement,
@@ -365,7 +377,7 @@ impl<T> NotU8 for Range<T> where T: RangeElement {}
 // [spec:pgorm:def:sql.value.array+6]
 impl<T> NotU8 for Multirange<T> where T: RangeElement {}
 
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 impl<T> From<Multirange<T>> for Value
 where
     T: RangeElement,
@@ -384,7 +396,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.value.range+4]
+// [spec:pgorm:def:sql.value.range+5]
 impl<T> ValueType for Multirange<T>
 where
     T: RangeElement,
@@ -416,7 +428,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn std_ranges_spell_their_bounds() {
         use Bound::{Excluded, Included, Unbounded};
@@ -429,7 +441,7 @@ mod tests {
         assert_eq!(Range::<i32>::from(..), Range::new(Unbounded, Unbounded));
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn the_empty_range_is_not_every_value() {
         let empty = Range::<i32>::Empty;
@@ -442,7 +454,7 @@ mod tests {
         assert_ne!(Value::from(empty), Value::from(everything));
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn a_range_round_trips_through_value() {
         let range = Range::from(Decimal::new(150, 2)..Decimal::new(3, 0));
@@ -467,7 +479,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn a_range_of_another_subtype_is_a_mismatch() {
         let value = Value::from(Range::from(1i64..2));
@@ -479,7 +491,7 @@ mod tests {
         assert!(<Range<i32> as ValueType>::try_from(empty).is_err());
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn a_null_bound_is_no_bound() {
         let value = Value::Range(
@@ -495,7 +507,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn a_typed_null_keeps_its_range_type() {
         assert_eq!(
@@ -517,7 +529,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn a_multirange_round_trips_through_value() {
         let multirange: Multirange<i32> = [Range::from(5..8), Range::Empty, Range::from(1..3)]
@@ -574,7 +586,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:def:sql.value.range+4/test]
+    // [spec:pgorm:def:sql.value.range+5/test]
     #[test]
     fn each_subtype_names_its_range_type() {
         assert_eq!(
@@ -614,5 +626,108 @@ mod tests {
             ArrayType::Range(RangeType::Int4)
         );
         assert_eq!(<Range<i32>>::type_name(), "Range<i32>");
+    }
+
+    // [spec:pgorm:def:sql.value.range+5/test]
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_writes_a_range_in_enum_form() -> Result<(), serde_json::Error> {
+        use Bound::{Excluded, Unbounded};
+
+        for (range, json) in [
+            (Range::<i32>::Empty, r#""Empty""#),
+            (
+                Range::from(1..5),
+                r#"{"Bounds":{"lower":{"Included":1},"upper":{"Excluded":5}}}"#,
+            ),
+            (
+                Range::from(1..=5),
+                r#"{"Bounds":{"lower":{"Included":1},"upper":{"Included":5}}}"#,
+            ),
+            (
+                Range::new(Excluded(1), Unbounded),
+                r#"{"Bounds":{"lower":{"Excluded":1},"upper":"Unbounded"}}"#,
+            ),
+            (
+                Range::from(..=5),
+                r#"{"Bounds":{"lower":"Unbounded","upper":{"Included":5}}}"#,
+            ),
+            (
+                Range::from(..),
+                r#"{"Bounds":{"lower":"Unbounded","upper":"Unbounded"}}"#,
+            ),
+        ] {
+            assert_eq!(serde_json::to_string(&range)?, json);
+            assert_eq!(serde_json::from_str::<Range<i32>>(json)?, range);
+        }
+        // SQL NULL, the empty range and every value are three values.
+        assert_eq!(serde_json::to_string(&None::<Range<i32>>)?, "null");
+        assert_eq!(
+            serde_json::from_str::<Option<Range<i32>>>(r#""Empty""#)?,
+            Some(Range::Empty)
+        );
+        Ok(())
+    }
+
+    // [spec:pgorm:def:sql.value.range+5/test]
+    #[cfg(feature = "serde")]
+    #[test]
+    fn a_bound_value_never_reads_as_unbounded() -> Result<(), serde_json::Error> {
+        use Bound::{Excluded, Included, Unbounded};
+
+        // serde_json writes a non-finite float as `null`; the bound around it
+        // is still an object, so reading it back fails instead of widening
+        // `[0,Infinity)` to `[0,)`.
+        let infinite = Range::new(Included(0.0f64), Excluded(f64::INFINITY));
+        let text = serde_json::to_string(&infinite)?;
+        assert_eq!(
+            text,
+            r#"{"Bounds":{"lower":{"Included":0.0},"upper":{"Excluded":null}}}"#
+        );
+        assert!(serde_json::from_str::<Range<f64>>(&text).is_err());
+
+        let nullable: Range<Option<i32>> = Range::new(Included(None), Unbounded);
+        let text = serde_json::to_string(&nullable)?;
+        assert_eq!(serde_json::from_str::<Range<Option<i32>>>(&text)?, nullable);
+
+        // A text bound holding range syntax is only its value.
+        let syntax = Range::new(Included("[a,b)".to_owned()), Excluded(r#"" \"#.to_owned()));
+        let text = serde_json::to_string(&syntax)?;
+        assert_eq!(serde_json::from_str::<Range<String>>(&text)?, syntax);
+
+        for text in [
+            r#""empty""#,
+            r#"{"Bounds":{"lower":"Unbounded"}}"#,
+            r#"{"Bounds":{"lower":"Unbounded","upper":"Unbounded","x":1}}"#,
+            r#"{"Bounds":{"lower":null,"upper":"Unbounded"}}"#,
+            r#"{"Bounds":{"lower":1,"upper":"Unbounded"}}"#,
+            r#""[1,5)""#,
+        ] {
+            assert!(serde_json::from_str::<Range<i32>>(text).is_err(), "{text}");
+        }
+        Ok(())
+    }
+
+    // [spec:pgorm:def:sql.value.range+5/test]
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_writes_a_multirange_as_its_list() -> Result<(), serde_json::Error> {
+        let multirange: Multirange<i32> = [Range::from(5..8), Range::Empty, Range::from(1..3)]
+            .into_iter()
+            .collect();
+        let json = concat!(
+            r#"[{"Bounds":{"lower":{"Included":5},"upper":{"Excluded":8}}},"#,
+            r#""Empty","#,
+            r#"{"Bounds":{"lower":{"Included":1},"upper":{"Excluded":3}}}]"#,
+        );
+        assert_eq!(serde_json::to_string(&multirange)?, json);
+        assert_eq!(serde_json::from_str::<Multirange<i32>>(json)?, multirange);
+        assert_eq!(serde_json::to_string(&Multirange::<i32>::default())?, "[]");
+        assert_eq!(
+            serde_json::from_str::<Multirange<i32>>("[]")?,
+            Multirange::default()
+        );
+        assert!(serde_json::from_str::<Multirange<i32>>(r#""Empty""#).is_err());
+        Ok(())
     }
 }

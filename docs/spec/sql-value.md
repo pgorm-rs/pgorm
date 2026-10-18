@@ -188,7 +188,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Ranges
 
-> [spec:pgorm:def:sql.value.range+4]
+> [spec:pgorm:def:sql.value.range+5]
 > A range value is `Range<T>`, an enum of two shapes: `Empty`, and
 > `Bounds { lower, upper }` with each bound a `std::ops::Bound<T>` —
 > `Included`, `Excluded` or `Unbounded`. The empty range is a value of its
@@ -264,6 +264,30 @@ including panic semantics and quirks inherited from sea-query.
 > built-in still binds against a placeholder the server types as such a
 > range over its subtype, because the wire format of a range is its
 > subtype's, and a row of one decodes through `Range<T>`.
+>
+> Under pgorm-query's `serde` feature, which pgorm's `with-json` turns on,
+> `Range<T>` and `Multirange<T>` implement `Serialize` and `Deserialize`
+> wherever `T` does, in the form serde gives the types' own shapes, so every
+> serde format can carry them. The empty range is the unit variant `Empty`
+> (`"Empty"` in JSON), and a range of bounds the struct variant `Bounds` with
+> its `lower` and `upper` fields, each written as serde writes any
+> `std::ops::Bound`: `"Unbounded"`, `{"Included":v}` or `{"Excluded":v}`. So
+> `[1,5)` is `{"Bounds":{"lower":{"Included":1},"upper":{"Excluded":5}}}`,
+> and `(,)` is `{"Bounds":{"lower":"Unbounded","upper":"Unbounded"}}`,
+> distinct from `"Empty"` and from the `null` of an absent `Option<Range<T>>`.
+> A multirange is its list of ranges, a JSON array, in the order written and
+> with an empty range kept. A bound's value is `T`'s own serde form — a
+> `Decimal` as rust_decimal writes it, exact text under `with-json`, and a
+> jiff value as its ISO text. Deserializing refuses a missing or an unknown
+> field of `Bounds`. A present bound is always an object holding its value,
+> so no value of `T` reads as no bound. The Python binding's snapshot writes
+> no bound as `null` beside a bracket string, which is unambiguous there only
+> because no snapshot payload is `null`; serde_json writes a non-finite float
+> as `null`, so that form would read `[0,Infinity)` back as `[0,)`, where
+> this one fails to deserialize it. The newtype codegen generates for a range
+> type a schema created derives the same serde traits under `with_serde`
+> (`[spec:pgorm:def:codegen.entity.serde+1]`), a newtype struct, which JSON
+> writes as the range it holds.
 >
 > The Python binding carries the six and their multiranges
 > (`[spec:pgorm:req:python.values+2]`). A range is `pgorm.Range(lower, upper,
@@ -417,7 +441,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Intervals
 
-> [spec:pgorm:def:sql.value.interval+1]
+> [spec:pgorm:def:sql.value.interval+2]
 > `Interval` is PostgreSQL's `interval` as a value: the public fields
 > `months: i32`, `days: i32` and `microseconds: i64`, each with its own sign,
 > built by `Interval::new(months, days, microseconds)` or `Default`, which is
@@ -458,6 +482,21 @@ including panic semantics and quirks inherited from sea-query.
 > crate. There is no `ToSql`: its signature names `bytes`' `BytesMut`, which
 > pgorm-query does not depend on, and its one writer, `ValueHolder`, writes
 > `to_binary` (`[spec:pgorm:req:exec.cursor.binding-interval]`).
+>
+> Under pgorm-query's `serde` feature, which pgorm's `with-json` turns on,
+> `Interval` implements `Serialize` and `Deserialize` as a struct of its three
+> fields by name: `{"months":1,"days":-2,"microseconds":3000004}` in JSON.
+> Each field is the integer it holds, never a duration string or float
+> seconds, so every triple serializes losslessly and the infinities as the
+> extreme triples they are. Deserializing reads exactly those three fields: a
+> missing one, an unknown one (`hours`) or a value outside its field's width
+> is an error, never a zero, a dropped unit or a wrapped number. The keys are
+> the ones the Python binding's snapshot writes (`[spec:pgorm:req:python.value-tags]`),
+> each value the number it is rather than the decimal text a snapshot writes
+> for every integer. A Model deriving serde over an `Interval` field —
+> `ActiveModelTrait::from_json`'s (`[spec:pgorm:req:entity.active-model.json+3]`),
+> or one codegen generates (`[spec:pgorm:def:codegen.entity.serde+1]`) — so
+> compiles and round-trips.
 >
 > The Python binding carries it as `pgorm.Interval`
 > (`[spec:pgorm:req:python.values+3]`), and the JavaScript binding as its

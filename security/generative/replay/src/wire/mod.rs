@@ -340,7 +340,7 @@ impl Tagged {
                 .map_or(Json::Null, |range| range_payload(range)),
             // Each field its own decimal text, as `wire.INTERVAL_FIELDS`
             // names them; none is folded into another.
-            // [spec:pgorm:def:sql.value.interval+1]
+            // [spec:pgorm:def:sql.value.interval+2]
             Value::Interval(value) => json!(value.as_ref().map(|value| json!({
                 "months": value.months.to_string(),
                 "days": value.days.to_string(),
