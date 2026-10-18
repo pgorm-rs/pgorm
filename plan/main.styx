@@ -5099,6 +5099,14 @@ children (
                         text "Delivered again at the current rule version (pipeline.select-sources +4), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:34:41.269366Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at pipeline.select-sources +4: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
                 )
             }
 
@@ -5828,6 +5836,14 @@ children (
                         text "Delivered again at the current rule version (python.expressions +1), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T15:34:41.550105Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at python.expressions +1: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
+                        after_done true
+                    }
                 )
             }
 
@@ -5875,6 +5891,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at the current rule version (python.statements +3), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:34:41.460589Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at python.statements +3: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
                 )
@@ -6094,6 +6118,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Delivered again at the current rule version (python.entities +2), on the re-check recorded above; the earlier re-check commit carried a non-delivery type, so it did not refresh the node's evidence."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:34:41.37431Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at python.entities +2: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
                 )
@@ -8532,6 +8564,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @decision
                         text "Operator 2026-10-18, asked why sql.scope rules views out (its reason: CREATE VIEW is one keyword around a SelectStatement the caller has, matview refresh and storage are schema-ownership decisions, and pgorm only needs to read views) after the lead argued the reason inverts: hand-writing CREATE VIEW means the caller quotes the view and column names, the body cannot take bind parameters so the query must be rendered with values inlined, REFRESH MATERIALIZED VIEW is a statement applications issue on a schedule, pgorm already builds sequences, composite and range types and extensions, and no test shows an entity reading a view. Asked \"Do you want views and materialized views built?\": \"yes.\" So views and materialized views leave sql.scope's out-of-scope list and are built: CREATE [OR REPLACE] [RECURSIVE] VIEW with column names, WITH CASCADED/LOCAL CHECK OPTION and the security_barrier / security_invoker options, DROP VIEW; CREATE MATERIALIZED VIEW .. WITH [NO] DATA, REFRESH MATERIALIZED VIEW [CONCURRENTLY], DROP MATERIALIZED VIEW; live tests of an entity reading a view and writing through a simple updatable one. CREATE TABLE AS, which the lead had proposed ruling out only by analogy with views, is built with them. Filed as sql-views. The rest of the sql.scope verdicts are still the operator's to give."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T15:34:41.640649Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Delivered again at sql.scope +15: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
                     }
                 )

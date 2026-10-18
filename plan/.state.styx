@@ -1755,8 +1755,6 @@ impl_evidence (
         pipeline.select-sources
     ), covered_claims (
         {impl_name main, rule pipeline.select-sources}
-    ), rule_versions_seen (
-        {id pipeline.select-sources, version 3}
     )}
     {id python.acceptance, covered_rules (
         python.acceptance
@@ -1790,8 +1788,6 @@ impl_evidence (
         python.entities
     ), covered_claims (
         {impl_name main, rule python.entities}
-    ), rule_versions_seen (
-        {id python.entities, version 0}
     )}
     {id python.expressions, covered_rules (
         python.delegation
@@ -1803,11 +1799,6 @@ impl_evidence (
         {impl_name main, rule python.expressions}
         {impl_name main, rule python.input-boundaries}
         {impl_name main, rule python.ownership}
-    ), rule_versions_seen (
-        {id python.delegation, version 1}
-        {id python.expressions, version 0}
-        {id python.input-boundaries, version 0}
-        {id python.ownership, version 0}
     )}
     {id python.graph, covered_rules (
         python.graph
@@ -1879,9 +1870,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.raw}
         {impl_name main, rule python.statements}
-    ), rule_versions_seen (
-        {id python.raw, version 0}
-        {id python.statements, version 0}
     )}
     {id python.transactions, covered_rules (
         python.cancellation
@@ -1916,8 +1904,6 @@ impl_evidence (
         sql.scope
     ), covered_claims (
         {impl_name main, rule sql.scope}
-    ), rule_versions_seen (
-        {id sql.scope, version 0}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape
