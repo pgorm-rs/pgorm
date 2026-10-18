@@ -62,7 +62,7 @@ impl PyTable {
         )
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    // [spec:pgorm:req:python.statements+6]
     /// This table read through `TABLESAMPLE`, a `FromItem` qualified by the
     /// table's alias, or by its unqualified name: `method` draws each row
     /// (or page) with probability `percentage` out of 100, and `repeatable`

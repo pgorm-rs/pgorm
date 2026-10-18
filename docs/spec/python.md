@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+5]
+> [spec:pgorm:req:python.statements+6]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -162,6 +162,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > refused (`sql.ast.select.table-function`); and a table's `tablesample`, a
 > `SampleMethod`, a percentage and an optional seed, both bound
 > (`sql.ast.select.table-sample`).
+> A SELECT MUST combine with another `Select` through `union`, `union_all`,
+> `intersect`, `intersect_all`, `except_` and `except_all`, Rust's `union`
+> with each of the six `UnionType`s (`sql.ast.select.union`): the other
+> statement is read into this one as a parenthesised arm, its tie limit
+> checked as it is read, and anything but a `Select` is a `TypeError`. The
+> arms are written in call order after the receiver's HAVING and WINDOW
+> clauses, so PostgreSQL's precedence groups them, `INTERSECT` binding
+> tighter than `UNION` and `EXCEPT`; the receiver's ORDER BY, row limit and
+> OFFSET, whenever they were set, order and bound the combined rows, and its
+> WITH clause precedes every arm.
 > A SELECT's FROM list and joins MUST take a FROM item that is not a named
 > table: `JSON_TABLE`, lowered into `Func::json_table` with each column kind's
 > own clauses and behaviours as the Rust builder types them, its first column
@@ -257,7 +267,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `ConstructionError` on Python truth testing, as a query expression does,
 > and so MUST `Compiled`, which every inspection returns.
 
-> [spec:pgorm:req:python.schema-views]
+> [spec:pgorm:req:python.schema-views+1]
 > `pgorm.schema` MUST build views, materialized views and `CREATE TABLE AS`
 > through pgorm-query's builders (`sql.ddl.view`,
 > `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each a function
@@ -282,9 +292,11 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > a recursive view without columns, and a refresh both concurrent and with no
 > data, which PostgreSQL refuses together (`42601`). The capability manifest
 > lists each function as a `schema.` operation needing no registration.
-> `Select` has no set operation, so a recursive view built from Python has a
-> query that does not read the view: the `UNION` that joins a non-recursive
-> term to one reading the view has no Python spelling yet.
+> A recursive view's query MUST be able to read the view: `union` or
+> `union_all` joins a non-recursive term to an arm reading it
+> (`python.statements`), by its bare name, the name of the `WITH RECURSIVE`
+> query PostgreSQL defines the view as, a schema-qualified name looking for
+> a relation that does not exist yet (`42P01`).
 
 > [spec:pgorm:req:python.schema-schemas]
 > `pgorm.schema` MUST build the statements over a schema through

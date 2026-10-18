@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement};
+use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement, UnionType};
 use pyo3::{prelude::*, types::PyTuple};
 
 use super::{
@@ -30,7 +30,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+5]
+// [spec:pgorm:req:python.statements+6]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -47,13 +47,26 @@ impl PySelect {
             .map_err(|error| ConstructionError::new_err(error.to_string()))
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    // [spec:pgorm:req:python.statements+6]
     /// The statement as another builder reads it — a CTE body, a subquery.
     /// Nothing can order it once it is embedded, so its tie limit is checked
     /// as it is read rather than left to the server.
     pub(crate) fn embedded(&self) -> PyResult<SelectStatement> {
         self.check_tie_limit()?;
         Ok(self.inner.clone())
+    }
+
+    // [spec:pgorm:req:python.statements+6]
+    /// Append `other` as a parenthesised set-operation arm, as Rust's `union`
+    /// does for every operator. The receiver's ORDER BY, row limit and OFFSET
+    /// render after the last arm, so they order and bound the combined rows
+    /// whenever they were set; the arm keeps its own inside its parentheses.
+    /// Arms render flat in call order, so PostgreSQL's precedence regroups an
+    /// `INTERSECT` after a `UNION` or `EXCEPT` with the arm before it.
+    fn combined(&self, operation: UnionType, other: &PySelect) -> PyResult<Self> {
+        let mut next = self.clone();
+        next.inner.union(operation, other.embedded()?);
+        Ok(next)
     }
 }
 
@@ -113,7 +126,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    // [spec:pgorm:req:python.statements+6]
     /// Append to the GROUP BY list, in call order: an expression is a set of
     /// one, and a `GroupingElement` is `()`, a parenthesised set, `ROLLUP`,
     /// `CUBE` or `GROUPING SETS`.
@@ -129,7 +142,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    // [spec:pgorm:req:python.statements+6]
     /// `GROUP BY DISTINCT`: each grouping set the list names more than once
     /// is grouped once. It quantifies the whole list, and renders nothing
     /// while there is no GROUP BY.
@@ -163,7 +176,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    // [spec:pgorm:req:python.statements+6]
     /// `FETCH FIRST n ROWS WITH TIES`: the first `count` rows and every row
     /// tied with the last of them on the ORDER BY, in `limit`'s slot. It
     /// needs an ORDER BY, which may come later in the chain, so the check is
@@ -207,7 +220,40 @@ impl PySelect {
         next
     }
 
-    // [spec:pgorm:req:python.statements+5]
+    /// `UNION`: the rows of either query, each distinct row once.
+    fn union(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::Distinct, &other)
+    }
+
+    /// `UNION ALL`: the rows of both queries, duplicates kept.
+    fn union_all(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::All, &other)
+    }
+
+    /// `INTERSECT`: the distinct rows both queries return.
+    fn intersect(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::Intersect, &other)
+    }
+
+    /// `INTERSECT ALL`: a row as many times as the query returning it less
+    /// often does.
+    fn intersect_all(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::IntersectAll, &other)
+    }
+
+    /// `EXCEPT`, named with a trailing underscore because `except` is a
+    /// Python keyword: the distinct rows of this query that `other` lacks.
+    fn except_(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::Except, &other)
+    }
+
+    /// `EXCEPT ALL`: a row as many times as this query returns it beyond the
+    /// times `other` does.
+    fn except_all(&self, other: PyRef<'_, PySelect>) -> PyResult<Self> {
+        self.combined(UnionType::ExceptAll, &other)
+    }
+
+    // [spec:pgorm:req:python.statements+6]
     /// Every execution path renders through this method, so the tie-limit
     /// check Rust leaves to the caller is made here, before any SQL exists.
     pub fn inspect(&self) -> PyResult<Compiled> {

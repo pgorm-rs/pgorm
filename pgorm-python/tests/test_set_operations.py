@@ -1,0 +1,120 @@
+"""A SELECT combined with another by UNION, INTERSECT and EXCEPT, each with
+its ALL form, against PostgreSQL through the installed wheel."""
+
+import os
+import unittest
+from uuid import uuid4
+
+import pgorm as p
+
+LEFT = [1, 1, 2, 3, 3, 3]
+RIGHT = [1, 3, 3, 4]
+EXPECTED = {
+    "union": [1, 2, 3, 4],
+    "union_all": [1, 1, 1, 2, 3, 3, 3, 3, 3, 4],
+    "intersect": [1, 3],
+    "intersect_all": [1, 3, 3],
+    "except_": [2],
+    "except_all": [1, 2, 3],
+}
+
+
+def quoted(name):
+    return '"' + name.replace('"', '""') + '"'
+
+
+class SetOperationTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        self.context = self.pool.connection()
+        self.connection = await self.context.__aenter__()
+        suffix = uuid4().hex[:8]
+        self.left = p.Table(f'Sets "left" {suffix}')
+        self.right = p.Table(f"Sets right {suffix}")
+        for table, numbers in ((self.left, LEFT), (self.right, RIGHT)):
+            await self.connection.execute(p.RawSQL(f"CREATE TEMP TABLE {quoted(table.name)} (n int NOT NULL)"))
+            insert = p.Insert(table).columns("n")
+            for number in numbers:
+                insert = insert.values(p.Value(number, "i32"))
+            await self.connection.execute(insert)
+
+    async def asyncTearDown(self):
+        await self.context.__aexit__(None, None, None)
+        await self.pool.close()
+
+    async def numbers(self, query):
+        return [row["n"] for row in await self.connection.fetch_all(query)]
+
+    def side(self, table):
+        return p.Select(p.col("n")).from_(table)
+
+    # [spec:pgorm:req:python.statements+6/test]    each of the six operators, its ALL form keeping
+    # duplicates and the other removing them
+    async def test_each_operation_combines_the_rows(self):
+        left, right = self.side(self.left), self.side(self.right)
+        for name, expected in EXPECTED.items():
+            with self.subTest(operation=name):
+                p.require_capability("select." + name)
+                combined = getattr(left, name)(right).order_by(p.col("n").asc())
+                self.assertEqual(await self.numbers(combined), expected)
+                with self.assertRaises(p.ConstructionError):
+                    bool(combined)
+        self.assertEqual(await self.numbers(left), LEFT)
+
+    # [spec:pgorm:req:python.statements+6/test]    the receiver's ORDER BY and limits bound the
+    # combined rows whenever they were set, an arm's own stay inside its parentheses, and bound
+    # values number across the arms
+    async def test_order_and_limits_cover_combined_rows(self):
+        left, right = self.side(self.left), self.side(self.right)
+        ascending, descending = p.col("n").asc(), p.col("n").desc()
+        self.assertEqual(await self.numbers(left.order_by(descending).limit(2).union(right)), [4, 3])
+        arm = right.order_by(descending).limit(1)
+        self.assertEqual(await self.numbers(left.union_all(arm).order_by(ascending)), [*LEFT, 4])
+        self.assertEqual(await self.numbers(left.union(right).order_by(ascending).limit(2).offset(1)), [2, 3])
+        tied = left.union_all(right).order_by(descending).limit_with_ties(2)
+        self.assertEqual(await self.numbers(tied), [4, 3, 3, 3, 3, 3])
+
+        filtered = left.where_(p.col("n") > 1).union_all(right.where_(p.col("n") < 4)).order_by(ascending)
+        compiled = filtered.inspect()
+        self.assertIn('WHERE "n" > $1 UNION ALL (SELECT "n" FROM', compiled.sql)
+        self.assertIn('WHERE "n" < $2) ORDER BY "n" ASC', compiled.sql)
+        self.assertEqual([value.value for value in compiled.params], [1, 4])
+        self.assertEqual(await self.numbers(filtered), [1, 2, 3, 3, 3, 3, 3])
+
+    # [spec:pgorm:req:python.statements+6/test]    an ordering of the combined rows names a result
+    # column: the server refuses a qualified column of the first arm and any other expression
+    async def test_combined_order_names_result_columns(self):
+        aliased = self.left.as_("l")
+        qualified = p.Select(aliased.col("n")).from_(aliased).union(self.side(self.right))
+        for query, sqlstate in (
+            (qualified.order_by(aliased.col("n").asc()), "42P01"),
+            (self.side(self.left).union(self.side(self.right)).order_by((p.col("n") + 1).asc()), "0A000"),
+        ):
+            with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
+                await self.connection.fetch_all(query)
+            self.assertEqual(refused.exception.sqlstate, sqlstate)
+        self.assertEqual(await self.numbers(qualified.order_by(p.col("n").asc())), [1, 2, 3, 4])
+
+    # [spec:pgorm:req:python.statements+6/test]    the receiver's WITH clause precedes the whole
+    # statement, so every arm reads it
+    async def test_with_clause_reaches_every_arm(self):
+        shared = p.Table("shared")
+        above = p.Select(p.col("n")).from_(shared).where_(p.col("n") > 2)
+        below = p.Select(p.col("n")).from_(shared).where_(p.col("n") < 2)
+        combined = above.union(below).with_(p.With("shared", self.side(self.left))).order_by(p.col("n").asc())
+        self.assertTrue(combined.inspect().sql.startswith('WITH "shared" AS (SELECT "n" FROM'))
+        self.assertEqual(await self.numbers(combined), [1, 3])
+
+    # [spec:pgorm:req:python.statements+6/test]    arms are written in call order, so PostgreSQL's
+    # precedence groups them: INTERSECT binds tighter than UNION, and a combined arm keeps its own
+    # grouping
+    async def test_intersect_binds_tighter_than_union(self):
+        one, two, three = (p.Select(p.literal(number).as_("n")) for number in (1, 2, 3))
+        chained = one.union(two).intersect(three)
+        self.assertEqual(chained.inspect().sql, 'SELECT 1 AS "n" UNION (SELECT 2 AS "n") INTERSECT (SELECT 3 AS "n")')
+        self.assertEqual(await self.numbers(chained), [1])
+        self.assertEqual(await self.numbers(three.intersect(one.union(three))), [3])
+
+
+if __name__ == "__main__":
+    unittest.main()

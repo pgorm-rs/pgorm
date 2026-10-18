@@ -20,6 +20,7 @@ async def invalid(connection: p.Connection) -> None:
     s.create_table(p.Table("t")).column("raw SQL")  # expected-error: arg-type
     p.select(p.literal(1)).limit("3")  # expected-error: arg-type
     p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
+    p.select(p.literal(1)).union(p.RawSQL("SELECT 2"))  # expected-error: arg-type
     p.GroupingElement.sets()  # expected-error: call-arg
     p.Table("t").tablesample("bernoulli", 10)  # expected-error: arg-type
     p.TableFunction(p.Table("t"))  # expected-error: arg-type

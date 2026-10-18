@@ -173,6 +173,30 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         ("select.with_", "pgorm_query::SelectStatement::with"),
         (
+            "select.union",
+            "pgorm_query::SelectStatement::union, UnionType::Distinct",
+        ),
+        (
+            "select.union_all",
+            "pgorm_query::SelectStatement::union, UnionType::All",
+        ),
+        (
+            "select.intersect",
+            "pgorm_query::SelectStatement::union, UnionType::Intersect",
+        ),
+        (
+            "select.intersect_all",
+            "pgorm_query::SelectStatement::union, UnionType::IntersectAll",
+        ),
+        (
+            "select.except_",
+            "pgorm_query::SelectStatement::union, UnionType::Except",
+        ),
+        (
+            "select.except_all",
+            "pgorm_query::SelectStatement::union, UnionType::ExceptAll",
+        ),
+        (
             "with",
             "pgorm_query::WithClause::{new, cte}, CommonTableExpression::new",
         ),

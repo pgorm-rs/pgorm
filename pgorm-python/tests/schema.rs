@@ -506,7 +506,7 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
 }
 
 // [spec:pgorm:req:python.schema+1/test]
-// [spec:pgorm:req:python.schema-views/test]    every view, materialized view and CREATE TABLE AS
+// [spec:pgorm:req:python.schema-views+1/test]    every view, materialized view and CREATE TABLE AS
 // option renders as the Rust builder renders it
 // [spec:pgorm:req:python.schema-schemas/test]    every schema create, drop and rename renders as
 // the Rust builder renders it
