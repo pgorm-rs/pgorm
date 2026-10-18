@@ -12514,6 +12514,13 @@ children (
                 kind @note
                 text "Found by sql-domains (2fa97891). After ALTER DOMAIN .. SET DEFAULT, a prepared INSERT keeps writing the default it was planned with, and pgorm caches prepared statements per pooled connection, so connections that already ran the insert keep writing the old default while fresh ones write the new (recorded in sql.ddl.domain with a live test and in the migration README). The same holds for other DDL that changes what a plan depends on. Decide the remedy: a pool method that marks every connection's statement cache stale (cleared on next checkout), DISCARD ALL / DEALLOCATE on checkout after DDL, or documenting that migrations should run before the pool serves traffic. The lead's lean is a pool method, called by pgorm-migration's runner after it applies migrations."
             }
+
+            {
+                at 2026-10-18T22:37:52.194914Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-19, offered a pool method that clears every connection's cached prepared statements, called by the migration runner after it applies migrations, or documenting that migrations run before the pool serves traffic: \"the pool should clear.\" So: a DatabasePool method that marks every connection's statement cache stale (connections checked out at the time clear theirs on return or next checkout, idle ones before they are next lent), with the same on InstrumentedPool and in the Python and JavaScript pools; pgorm-migration's runner calls it after applying migrations; document it beside the domain-default hazard in sql.ddl.domain and the migration README, and test live that after ALTER DOMAIN .. SET DEFAULT and a clear, a connection that already ran the insert writes the new default."
+            }
         )
     }
 
