@@ -323,7 +323,7 @@ fn enum_columns_are_cast_at_the_sql_boundary() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.cast-shape+1/test]    the entity layer's casts — the
+// [spec:pgorm:req:sql.ast.cast-shape+2/test]    the entity layer's casts — the
 // enum defaults on read and write, `ActiveEnum::as_enum`, and a derived
 // `select_as` / `save_as` override — are each the one `AsEnum` node, with the
 // quoted-or-verbatim choice carried in its `TypeName`

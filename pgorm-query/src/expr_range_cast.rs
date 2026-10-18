@@ -40,7 +40,7 @@ impl Expr {
     /// );
     /// ```
     // [spec:pgorm:def:sql.value.created-range+1]
-    // [spec:pgorm:req:sql.ast.cast-shape+1]
+    // [spec:pgorm:req:sql.ast.cast-shape+2]
     pub fn as_range(self, type_name: TypeName) -> SimpleExpr {
         let operand = match SimpleExpr::from(self) {
             SimpleExpr::Value(Value::Range(_, range)) => SimpleExpr::Value(Value::String(

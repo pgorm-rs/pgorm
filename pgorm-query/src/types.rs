@@ -213,7 +213,7 @@ pub trait IntoColumnRef {
 /// quoted-or-verbatim question answered inside the type rather than by
 /// picking a different node.
 // [spec:pgorm:def:sql.types.type-name+8]
-// [spec:pgorm:req:sql.ast.cast-shape+1]
+// [spec:pgorm:req:sql.ast.cast-shape+2]
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeName {
     pub schema: Option<Name>,

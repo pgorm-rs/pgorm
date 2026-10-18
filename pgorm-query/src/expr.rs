@@ -54,7 +54,7 @@ pub enum SimpleExpr {
     Template(SqlTemplate),
     Keyword(Keyword),
     /// THE cast: `CAST(operand AS type)`, and the only node shape a cast has.
-    // [spec:pgorm:req:sql.ast.cast-shape+1]
+    // [spec:pgorm:req:sql.ast.cast-shape+2]
     AsEnum(Box<TypeName>, Box<SimpleExpr>),
     /// The searched `CASE`, whose arms each test a condition.
     Case(Box<CaseStatement>),
@@ -1365,7 +1365,7 @@ impl Expr {
     /// Cast to a structured [`TypeName`] — schema qualification and array
     /// suffix included. Every cast spelling funnels here, and the node it
     /// builds is the only shape a cast has.
-    // [spec:pgorm:req:sql.ast.cast-shape+1]
+    // [spec:pgorm:req:sql.ast.cast-shape+2]
     pub fn cast_as_type(self, type_name: TypeName) -> SimpleExpr {
         SimpleExpr::AsEnum(Box::new(type_name), Box::new(self.into()))
     }
@@ -1382,7 +1382,7 @@ impl Expr {
     ///
     /// The verbatim text rides in the [`TypeName`], so this builds the same
     /// node as every other cast.
-    // [spec:pgorm:req:sql.ast.cast-shape+1]
+    // [spec:pgorm:req:sql.ast.cast-shape+2]
     pub fn cast_as_raw(self, type_expr: &'static str) -> SimpleExpr {
         self.cast_as_type(TypeName::raw(type_expr))
     }

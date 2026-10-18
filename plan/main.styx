@@ -284,6 +284,14 @@ children (
                                 text "Probe: checking whether the note write itself is what fails lint."
                                 after_done true
                             }
+
+                            {
+                                at 2026-10-18T14:09:12.018449Z
+                                author "brendan@necessary.nu"
+                                kind @note
+                                text "Re-checked 2026-10-18 against sql.ast.cast-shape at +1, the node having been marked done at +0 (v1 added as_range and the entity layer's created-range casts). The code meets the rule: one node, SimpleExpr::AsEnum(Box<TypeName>, Box<SimpleExpr>); Function has no Cast variant; as_enum, cast_as, cast_as_type (on Expr and on SimpleExpr), cast_as_raw, as_range, the entity layer's enum and created-range casts, ActiveEnum::as_enum, CreatedRange::into_expr and the derive's select_as/save_as all build it; verbatim text is a private field of TypeName; one render arm; source_read_cast and codegen match the one shape. The rule text was wrong in one place: it said verbatim type text is reachable only through cast_as_raw, but TypeName::raw is public and called directly (with cast_as_type, and in DDL through ColumnType::Named). Safety holds through the &'static str bound, so the rule (+2) now names TypeName::raw's callers as the finite list and lists SimpleExpr's spellings; every pinned site was re-read and re-pinned. Still open, filed separately: the structural test every_cast_spelling_builds_one_node_shape and entity_layer_casts_build_the_one_cast_node were not extended for v1, so as_range and the created-range casts are held only by CAST( render goldens."
+                                after_done true
+                            }
                         )
                     }
 

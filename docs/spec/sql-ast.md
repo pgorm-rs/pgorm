@@ -1382,11 +1382,12 @@ today, including panicking edges and deliberate failsafes.
 
 ## Casts
 
-> [spec:pgorm:req:sql.ast.cast-shape+1]
+> [spec:pgorm:req:sql.ast.cast-shape+2]
 > A cast has exactly ONE node shape: `SimpleExpr::AsEnum(TypeName, operand)`.
-> Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`,
-> `as_range` (`[spec:pgorm:def:sql.value.created-range]`), the entity layer's
-> enum and created-range casts, and the `cast_as_raw` escape hatch — builds
+> Every spelling that produces one — `as_enum`, `cast_as`, `cast_as_type`
+> (on `Expr` and on `SimpleExpr`), `as_range`
+> (`[spec:pgorm:def:sql.value.created-range]`), the entity layer's enum and
+> created-range casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
 > the `TypeName` (`[spec:pgorm:def:sql.types.type-name+8]`), never by choosing
@@ -1400,9 +1401,10 @@ today, including panicking edges and deliberate failsafes.
 > was silently dropped, so the graph and pipeline decoded the column's stored
 > type instead of its cast one — a defect no test of either shape alone could
 > have found. And raw text in expression position is an injection site by
-> construction; confining verbatim type text to one field of `TypeName`,
-> reachable only through `cast_as_raw`, makes the places that can emit an
-> unescaped type name a finite list that inspection can enumerate.
+> construction; confining verbatim type text to one field of `TypeName`, set
+> only by `TypeName::raw` and only from a `&'static str`, makes the places that
+> can emit an unescaped type name a finite list that inspection can enumerate:
+> the callers of `TypeName::raw`, `cast_as_raw` among them.
 
 ## Function calls
 
