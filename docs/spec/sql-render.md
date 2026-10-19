@@ -469,13 +469,26 @@ an ideal Postgres renderer would emit.
 > which the grammar refuses (`sql.ast.select.tie-limit`,
 > `sql.render.oracle`).
 
-> [spec:pgorm:req:sql.render.table-function]
+> [spec:pgorm:req:sql.render.table-function+2]
 > A `FromItem::TableFunction` MUST render each call as a function call does
 > in FROM — its name, then its arguments parenthesised — comma-separated
 > inside `ROWS FROM (` … `)` when it is a `ROWS FROM`; then
 > ` WITH ORDINALITY` when it numbers its rows; then ` AS "alias"`, and the
 > column names parenthesised directly after the alias, `AS "t"("a", "b")`,
-> when it names them. The calls' arguments are bound as any argument is.
+> when it names them. The calls' arguments are bound as any argument is. A
+> call's column definition list renders as `sql.render.column-definitions`
+> says.
+
+> [spec:pgorm:req:sql.render.column-definitions]
+> A column definition list MUST render parenthesised, each column its quoted
+> name, a space and its type as a column definition writes it
+> (`sql.render.ddl.types`), comma-separated: `("a" integer, "b" text[])`. A
+> `TableFunction` of one call whose list stands in the alias — no
+> `ROWS FROM` asked for, no ordinal column and no column names — renders it
+> directly after the alias, `JSON_TO_RECORD($1) AS "t"("a" integer)`; any
+> other renders as a `ROWS FROM`, each call with a list followed by ` AS `
+> and its list inside the `ROWS FROM (` … `)`,
+> `ROWS FROM (JSON_TO_RECORD($1) AS ("a" integer), GENERATE_SERIES(1, 2))`.
 
 > [spec:pgorm:req:sql.render.table-sample]
 > A `FromItem::TableSample` MUST render the sampled table as a named table

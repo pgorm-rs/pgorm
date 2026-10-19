@@ -299,7 +299,7 @@ fn similar_to_takes_like_patterns() -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.expressions+2/test]
-// [spec:pgorm:req:sql.ast.select.table-function/test]    `call` reaches the set-returning
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    `call` reaches the set-returning
 // constructors at their arities, and no other
 #[test]
 fn set_returning_calls_use_rust_constructors() -> PyResult<()> {

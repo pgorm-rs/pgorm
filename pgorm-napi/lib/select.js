@@ -1,7 +1,7 @@
 // @ts-check
 
 // SELECT, the tables and other items it reads, and common table expressions.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";

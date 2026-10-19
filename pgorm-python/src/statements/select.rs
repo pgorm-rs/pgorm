@@ -30,7 +30,7 @@ impl Join {
     }
 }
 
-// [spec:pgorm:req:python.statements+9]
+// [spec:pgorm:req:python.statements+10]
 /// An immutable runtime SELECT backed by a real Rust SelectStatement.
 #[pyclass(name = "Select", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -39,7 +39,7 @@ pub struct PySelect {
 }
 
 impl PySelect {
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// Refuse a tie limit, and a WINDOW clause or a reference to one, that
     /// PostgreSQL would refuse, with Rust's `check_tie_limit` and
     /// `check_windows`, which rendering leaves to its caller.
@@ -50,7 +50,7 @@ impl PySelect {
             .map_err(|error| ConstructionError::new_err(error.to_string()))
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// The statement as another builder reads it — a CTE body, a subquery.
     /// Nothing can order it or declare its windows once it is embedded, so
     /// both are checked as it is read rather than left to the server.
@@ -59,7 +59,7 @@ impl PySelect {
         Ok(self.inner.clone())
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// Append `other` as a parenthesised set-operation arm, as Rust's `union`
     /// does for every operator. The receiver's ORDER BY, row limit and OFFSET
     /// render after the last arm, so they order and bound the combined rows
@@ -130,7 +130,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// Append to the GROUP BY list, in call order: an expression is a set of
     /// one, and a `GroupingElement` is `()`, a parenthesised set, `ROLLUP`,
     /// `CUBE` or `GROUPING SETS`.
@@ -146,7 +146,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// `GROUP BY DISTINCT`: each grouping set the list names more than once
     /// is grouped once. It quantifies the whole list, and renders nothing
     /// while there is no GROUP BY.
@@ -180,7 +180,7 @@ impl PySelect {
         Ok(next)
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// `FETCH FIRST n ROWS WITH TIES`: the first `count` rows and every row
     /// tied with the last of them on the ORDER BY, in `limit`'s slot. It
     /// needs an ORDER BY, which may come later in the chain, so the check is
@@ -207,7 +207,7 @@ impl PySelect {
         next
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// Append a named window to the WINDOW clause, `name AS (..)`, which an
     /// item's `over(name)` reads: a `Window`, or an `ExtendedWindow` built on
     /// an entry appended before it. A clause PostgreSQL refuses is refused
@@ -260,7 +260,7 @@ impl PySelect {
         self.combined(UnionType::ExceptAll, &other)
     }
 
-    // [spec:pgorm:req:python.statements+9]
+    // [spec:pgorm:req:python.statements+10]
     /// Every execution path renders through this method, so the tie-limit
     /// and window checks Rust leaves to the caller are made here, before any
     /// SQL exists.

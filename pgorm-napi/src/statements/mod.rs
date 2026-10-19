@@ -206,7 +206,7 @@ const MAX_PARAMETERS: usize = 65_535;
 /// the ORDER BY or window entry they turn on may arrive later, so this is
 /// the first point the statement is final.
 // [spec:pgorm:req:napi.statements]
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 // [spec:pgorm:req:napi.windows+2]
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {

@@ -3,6 +3,9 @@ from ._expressions import Expr, Condition
 from ._query_types import AliasedExpr, Compiled, Identifier, OrderBy
 from ._merge import With
 from ._windows import ExtendedWindow, Window, WindowedExpr
+from ._native import TypeName
+from ._ranges import CreatedRange, CreatedMultirange
+from ._schema import BuiltinType, DataType
 
 class Table:
     def __init__(self, name: str | Identifier, *, schema: str | Identifier | None = ...,
@@ -38,6 +41,9 @@ class TableFunction:
     def and_(self, /, call: Expr) -> TableFunction: ...
     def with_ordinality(self, /) -> TableFunction: ...
     def columns(self, /, *names: str | Identifier) -> TableFunction: ...
+    def column_definition(
+        self, /, name: str | Identifier, data_type: DataType | BuiltinType | TypeName | CreatedRange | CreatedMultirange
+    ) -> TableFunction: ...
     def alias(self, /, name: str | Identifier) -> FromItem: ...
 
 class GroupingElement:

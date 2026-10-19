@@ -11,6 +11,7 @@ import {
   col,
   ConstructionError,
   cube,
+  DataType,
   DatabaseError,
   exists,
   type Expr,
@@ -22,6 +23,7 @@ import {
   select,
   Table,
   tableFunction,
+  Value,
   With,
 } from "../lib/index.js";
 import { scratchDatabase } from "./support.ts";
@@ -90,7 +92,7 @@ const ranked = select(score.col("player"), score.col("score")).from(score);
 const byScore = score.col("score").desc();
 const unordered = ranked.limitWithTies(2);
 
-// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.select+2/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]
 test("a tie limit keeps every row tied with the last one counted, in LIMIT's slot", async () => {
   const tied = ranked.orderBy(byScore).limitWithTies(2);
@@ -107,7 +109,7 @@ test("a tie limit keeps every row tied with the last one counted, in LIMIT's slo
   }
 });
 
-// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.select+2/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]
 test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect() and every run before it is sent", async () => {
   const skipping = ranked.orderBy(byScore).limitWithTies(2).lock("update", { wait: "skipLocked" });
@@ -144,7 +146,7 @@ test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect
   }
 });
 
-// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.select+2/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit/test]
 test("a refused tie limit cannot be read into another statement, where nothing could still order it", async () => {
   for (
@@ -166,7 +168,7 @@ test("a refused tie limit cannot be read into another statement, where nothing c
   ]);
 });
 
-// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.select+2/test]
 // [spec:pgorm:req:sql.ast.select.group-distinct/test]
 // [spec:pgorm:def:sql.ast.select.grouping/test]
 test("GROUP BY DISTINCT groups each grouping set its elements reach once", async () => {
@@ -199,7 +201,7 @@ test("GROUP BY DISTINCT groups each grouping set its elements reach once", async
   }
 });
 
-// [spec:pgorm:req:napi.expressions+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to/test]
 test("SIMILAR TO matches a whole string against its pattern, the pattern bound and its escape honoured", async () => {
   const words = async (predicate: Expr) =>
@@ -218,9 +220,9 @@ test("SIMILAR TO matches a whole string against its pattern, the pattern bound a
   assert.throws(() => word.col("w").notSimilarTo(1 as never), refused(/pattern is a string/));
 });
 
-// [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
-// [spec:pgorm:req:sql.ast.select.table-function/test]
+// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("unnest WITH ORDINALITY numbers each element, reading a column of the item before it", async () => {
   const letters = tableFunction(call("unnest", bind(["x", "y", "z"]).cast("text", { array: true })), {
     alias: "t",
@@ -240,9 +242,9 @@ test("unnest WITH ORDINALITY numbers each element, reading a column of the item 
   assert.deepStrictEqual(rows, [{ id: 1n, tag: "x", n: 1n }, { id: 1n, tag: "y", n: 2n }, { id: 2n, tag: "z", n: 1n }]);
 });
 
-// [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
-// [spec:pgorm:req:sql.ast.select.table-function/test]
+// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("ROWS FROM reads its calls side by side, padding the shorter with NULL", async () => {
   const zipped = tableFunction(
     [
@@ -276,7 +278,63 @@ test("ROWS FROM reads its calls side by side, padding the shorter with NULL", as
   }
 });
 
-// [spec:pgorm:req:napi.select+1/test]
+// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]
+test("a call returning record reads through its column definitions, alone or inside ROWS FROM", async () => {
+  const one = tableFunction({
+    call: call("json_to_record", new Value({ a: 7, tags: ["x", "y"] }, "json")),
+    columnDefinitions: [["a", "integer"], ["tags", new DataType("text").array()], ["missing", "text"]],
+  }, { alias: "r" });
+  const query = select(one.star()).from(one);
+  assert.equal(
+    query.inspect().sql,
+    'SELECT "r".* FROM JSON_TO_RECORD($1) AS "r"("a" integer, "tags" text[], "missing" text)',
+  );
+  assert.deepStrictEqual(await pool().query(query), [{ a: 7, tags: ["x", "y"], missing: null }]);
+
+  const zipped = tableFunction([
+    { call: call("jsonb_to_recordset", new Value([{ b: "x" }, { b: "y" }], "json")), columnDefinitions: [["b", "text"]] },
+    call("generate_series", int8(10), int8(12)),
+  ], { alias: "z", ordinality: true, columns: ["b", "s", "n"] });
+  const rows = await pool().query(select(zipped.star()).from(zipped).orderBy(zipped.col("n").asc()));
+  assert.deepStrictEqual(rows, [
+    { b: "x", s: 10n, n: 1n },
+    { b: "y", s: 11n, n: 2n },
+    { b: null, s: 12n, n: 3n },
+  ]);
+  const numbered = tableFunction({ call: call("json_to_record", new Value({ a: 1 }, "json")), columnDefinitions: [["a", "integer"]] }, {
+    alias: "o",
+    ordinality: true,
+  });
+  assert.equal(
+    select().from(numbered).inspect().sql,
+    'SELECT * FROM ROWS FROM (JSON_TO_RECORD($1) AS ("a" integer)) WITH ORDINALITY AS "o"',
+  );
+  assert.deepStrictEqual(await pool().query(select().from(numbered)), [{ a: 1, ordinality: 1n }]);
+
+  const bare = tableFunction(call("json_to_record", new Value({ a: 1 }, "json")), { alias: "b" });
+  await assert.rejects(pool().query(select().from(bare)), sqlstate("42601"));
+  const typed = tableFunction({ call: call("generate_series", int8(1), int8(2)), columnDefinitions: [["a", "bigint"]] }, {
+    alias: "g",
+  });
+  await assert.rejects(pool().query(select().from(typed)), sqlstate("42601"));
+  for (
+    const [build, reason] of [
+      [() => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [] as never }, { alias: "t" }), /at least one column/],
+      [
+        () => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [["a"] as never] }, { alias: "t" }),
+        /\[name, type\] pair/,
+      ],
+      [() => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [["", "text"]] }, { alias: "t" }), /identifier/],
+      [() => call("json_to_record"), /no "json_to_record" taking 0 argument/],
+    ] as const
+  ) {
+    assert.throws(build, refused(reason));
+  }
+});
+
+// [spec:pgorm:req:napi.select+2/test]
 // [spec:pgorm:req:sql.ast.select.table-sample/test]
 test("TABLESAMPLE draws a bound share of a table's rows, the same sample again for the same seed", async () => {
   const ids = async (sample: ReturnType<Table["tablesample"]>) =>

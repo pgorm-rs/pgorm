@@ -244,9 +244,9 @@ fn range_functions(sql: &str) -> Vec<serde_json::Value> {
     parsed_nodes(sql, "RangeFunction")
 }
 
-// [spec:pgorm:req:sql.ast.select.table-function/test]    `WITH ORDINALITY` on one call, with
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    `WITH ORDINALITY` on one call, with
 // column names in the alias
-// [spec:pgorm:req:sql.render.table-function/test]
+// [spec:pgorm:req:sql.render.table-function+2/test]
 #[test]
 fn ordinality_numbers_one_function() {
     let sql = Query::select()
@@ -272,9 +272,9 @@ fn ordinality_numbers_one_function() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.table-function/test]    `ROWS FROM` over several calls, a lone
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    `ROWS FROM` over several calls, a lone
 // `rows_from`, and the plain call that `alias` returns as `FromItem::FunctionCall`
-// [spec:pgorm:req:sql.render.table-function/test]
+// [spec:pgorm:req:sql.render.table-function+2/test]
 #[test]
 fn rows_from_zips_several_functions() {
     let sql = Query::select()
@@ -313,6 +313,166 @@ fn rows_from_zips_several_functions() {
         FromItem::FunctionCall(series(1, 2), Name::runtime("t"))
     );
     assert_eq!(plain.qualifier().to_string(), "t");
+}
+
+fn record(document: &str) -> FunctionCall {
+    Func::json_to_record(Expr::val(document))
+}
+
+/// The names of a parsed column definition list, in order.
+fn defined(list: &serde_json::Value) -> Vec<String> {
+    list.as_array()
+        .map(|columns| {
+            columns
+                .iter()
+                .map(|column| {
+                    column["ColumnDef"]["colname"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]    a lone call returning `record` takes
+// its column definition list in the alias, each column a name and any `ColumnType`, and stays a
+// `TableFunction` rather than a plain function call
+// [spec:pgorm:req:sql.render.column-definitions/test]
+#[test]
+fn lone_record_call_defines_columns_in_alias() {
+    let item = TableFunction::new(record(r#"{"a": 1}"#))
+        .column_definition(Name::runtime("a"), ColumnType::Integer)
+        .column_definition(
+            Name::runtime("tags"),
+            ColumnType::Array(std::sync::Arc::new(ColumnType::Text)),
+        )
+        .alias(Name::runtime("t"));
+    assert!(matches!(item, FromItem::TableFunction(..)), "{item:?}");
+    let query = Query::select().column(Asterisk).from(item).take();
+    let sql = query.to_string();
+    assert_eq!(
+        sql,
+        r#"SELECT * FROM JSON_TO_RECORD('{"a": 1}') AS "t"("a" integer, "tags" text[])"#
+    );
+    let functions = range_functions(&sql);
+    assert_eq!(functions[0]["is_rowsfrom"].as_bool(), Some(false));
+    assert_eq!(defined(&functions[0]["coldeflist"]), ["a", "tags"]);
+    assert_eq!(
+        query.build(),
+        (
+            r#"SELECT * FROM JSON_TO_RECORD($1) AS "t"("a" integer, "tags" text[])"#.to_owned(),
+            Values(vec![r#"{"a": 1}"#.into()])
+        )
+    );
+
+    for (call, name) in [
+        (Func::jsonb_to_record(Expr::val("{}")), "JSONB_TO_RECORD"),
+        (
+            Func::json_to_recordset(Expr::val("[]")),
+            "JSON_TO_RECORDSET",
+        ),
+        (
+            Func::jsonb_to_recordset(Expr::val("[]")),
+            "JSONB_TO_RECORDSET",
+        ),
+    ] {
+        let sql = Query::select()
+            .column(Asterisk)
+            .from(
+                TableFunction::new(call)
+                    .column_definition(Name::runtime("a"), ColumnType::Integer)
+                    .alias(Name::runtime("t")),
+            )
+            .to_string();
+        assert!(sql.contains(&format!(r#"FROM {name}("#)), "{sql}");
+        assert_eq!(defined(&range_functions(&sql)[0]["coldeflist"]), ["a"]);
+    }
+}
+
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]    each call of a `ROWS FROM` carries its
+// own list, a definition going to the call added last
+// [spec:pgorm:req:sql.render.column-definitions/test]
+#[test]
+fn rows_from_carries_each_call_definition_list() {
+    let sql = Query::select()
+        .column(Asterisk)
+        .from(
+            TableFunction::new(record(r#"{"a": 1}"#))
+                .column_definition(Name::runtime("a"), ColumnType::Integer)
+                .and(series(1, 2))
+                .and(Func::jsonb_to_recordset(Expr::val("[]")))
+                .column_definition(Name::runtime("b"), ColumnType::Text)
+                .column_definition(Name::runtime("c"), ColumnType::Boolean)
+                .with_ordinality()
+                .columns(["x", "y", "z"].map(Name::runtime))
+                .alias(Name::runtime("t")),
+        )
+        .to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"SELECT * FROM ROWS FROM (JSON_TO_RECORD('{"a": 1}') AS ("a" integer),"#,
+            r#"generate_series(1, 2), JSONB_TO_RECORDSET('[]') AS ("b" text, "c" bool))"#,
+            r#"WITH ORDINALITY AS "t"("x", "y", "z")"#,
+        ]
+        .join(" ")
+    );
+    let function = &range_functions(&sql)[0];
+    assert_eq!(function["is_rowsfrom"].as_bool(), Some(true));
+    assert_eq!(function["ordinality"].as_bool(), Some(true));
+    assert!(defined(&function["coldeflist"]).is_empty());
+    let lists: Vec<Vec<String>> = function["functions"]
+        .as_array()
+        .expect("the calls")
+        .iter()
+        .map(|call| defined(&call["List"]["items"][1]["List"]["items"]))
+        .collect();
+    assert_eq!(
+        lists,
+        [
+            vec!["a".to_owned()],
+            vec![],
+            vec!["b".to_owned(), "c".to_owned()]
+        ]
+    );
+}
+
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]    a lone call's list beside an ordinal
+// column or column names, which the alias cannot hold, is written as the `ROWS FROM` that means it
+// [spec:pgorm:req:sql.render.column-definitions/test]
+#[test]
+fn ordinality_or_names_force_rows_from() {
+    let defined_call = || {
+        TableFunction::new(record("{}")).column_definition(Name::runtime("a"), ColumnType::Integer)
+    };
+    let render = |function: TableFunction| {
+        Query::select()
+            .column(Asterisk)
+            .from(function.alias(Name::runtime("t")))
+            .to_string()
+    };
+    let numbered = render(defined_call().with_ordinality());
+    assert_eq!(
+        numbered,
+        r#"SELECT * FROM ROWS FROM (JSON_TO_RECORD('{}') AS ("a" integer)) WITH ORDINALITY AS "t""#
+    );
+    let renamed = render(defined_call().columns([Name::runtime("x")]));
+    assert_eq!(
+        renamed,
+        r#"SELECT * FROM ROWS FROM (JSON_TO_RECORD('{}') AS ("a" integer)) AS "t"("x")"#
+    );
+    for sql in [numbered, renamed] {
+        let function = &range_functions(&sql)[0];
+        assert_eq!(function["is_rowsfrom"].as_bool(), Some(true), "{sql}");
+        assert!(defined(&function["coldeflist"]).is_empty(), "{sql}");
+    }
+    // Without one, the lone call keeps its list in the alias.
+    assert_eq!(
+        render(defined_call()),
+        r#"SELECT * FROM JSON_TO_RECORD('{}') AS "t"("a" integer)"#
+    );
 }
 
 // [spec:pgorm:req:sql.ast.select.table-sample/test]    both methods, an alias and a schema on the
@@ -393,9 +553,9 @@ fn tablesample_binds_percentage_and_seed() {
     assert_eq!(realiased.qualifier().to_string(), "s");
 }
 
-// [spec:pgorm:req:sql.ast.select.table-function/test]    the set-returning constructors, their
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    the set-returning constructors, their
 // arguments bound
-// [spec:pgorm:def:sql.ast.func+10/test]
+// [spec:pgorm:def:sql.ast.func+11/test]
 #[test]
 fn set_returning_constructors_bind_arguments() {
     let (sql, values) = Query::select()

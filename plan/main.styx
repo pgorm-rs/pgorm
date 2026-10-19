@@ -9399,6 +9399,9 @@ children (
                 id table-function-column-defs
                 title "A record-returning function in FROM and ROWS FROM takes a column definition list, from Rust, Python and JavaScript"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ast.select.column-definitions] [spec:pgorm:req:sql.render.column-definitions])
+                }
                 deps (sql-select-extras sql-domains)
                 log (
                     {
@@ -9406,6 +9409,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's decision on query-second-tier (2026-10-18). A function returning record (json_to_record, jsonb_to_recordset, a user function declared RETURNS record or SETOF record) is unusable in FROM without a column definition list: SELECT * FROM json_to_record($1) AS t(a int, b text), and inside ROWS FROM each such call carries its own AS (a int, b text). Extend TableFunction (sql.ast.select.table-function) so a call can carry a column definition list of (name, ColumnType) pairs, render it in both positions, and refuse what PostgreSQL refuses (a definition list on a function that does not return record, 42601/42804; WITH ORDINALITY combined with a definition list on a lone function call outside ROWS FROM, which the grammar rejects: check on 18.6). Oracle-checked renders, live tests with json_to_record and jsonb_to_recordset, Python and JavaScript reach it. Also record in sql.scope's out-of-scope list the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME (they need tsm_system_rows / tsm_system_time installed; raw SQL reaches them), and bump sql.scope. Waits on sql-domains, which is editing sql.scope."
+                    }
+
+                    {
+                        at 2026-10-18T23:07:39.507984Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }

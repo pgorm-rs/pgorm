@@ -71,7 +71,7 @@ fn project<'cx>(
 }
 
 /// `selectNew(items)`: `SELECT items`, or `SELECT *` when there are none.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = Query::select();
     if list(cx, 0)?.is_empty() {
@@ -107,7 +107,7 @@ fn select_from(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `selectJoin(select, kind, item, on, lateral)`: a join, `on` absent for a
 /// cross join. `lateral` applies to a subquery, which may then read the
 /// columns of the items before it.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_join(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let kind = choice(
@@ -152,7 +152,7 @@ fn select_where(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `selectGroupBy(select, items)`: each item added to the GROUP BY list in
 /// order, an expression or a grouping element, after any already there.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_group_by(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     for item in list(cx, 1)? {
@@ -165,7 +165,7 @@ fn select_group_by(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `selectGroupByDistinct(select)`: `GROUP BY DISTINCT`, each grouping set
 /// the list reaches more than once grouped once. It quantifies the whole
 /// list, whichever call adds to it, and renders nothing without one.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_group_by_distinct(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     select.group_by_distinct();
@@ -201,7 +201,7 @@ fn select_order_by(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// replacing a plain limit as one replaces it, and needs its count; whether
 /// the statement can take one is checked as it is built, since its ORDER BY
 /// may come later.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_limit(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let clause = choice(cx, 1, "the clause", &["limit", "withTies", "offset"])?;
@@ -229,7 +229,7 @@ fn select_distinct(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `selectSetOperation(select, operation, other)`: `UNION`, `INTERSECT` or
 /// `EXCEPT`, each with its `ALL` form, of this query's rows and `other`'s.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_set_operation(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let operation = choice(
@@ -261,7 +261,7 @@ fn select_set_operation(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `selectLock(select, strength, of, behavior)`: `FOR UPDATE` and the other
 /// row-locking strengths, optionally `OF` some of the statement's items and
 /// with `NOWAIT` or `SKIP LOCKED`.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn select_lock(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut select = receiver(cx)?;
     let strength = match choice(

@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+9]
+> [spec:pgorm:req:python.statements+10]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -158,8 +158,14 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > since nothing can order it after (`sql.ast.select.tie-limit`); a
 > `TableFunction` FROM item over function calls, `ROWS FROM` over several,
 > `WITH ORDINALITY` and its column names, the calls built by `call`, whose
-> vocabulary reaches `generate_series` and `unnest`, and any other expression
-> refused (`sql.ast.select.table-function`); and a table's `tablesample`, a
+> vocabulary reaches `generate_series` and `unnest` and the record-returning
+> `json_to_record`, `jsonb_to_record`, `json_to_recordset` and
+> `jsonb_to_recordset`, and any other expression refused
+> (`sql.ast.select.table-function`); `column_definition(name, type)`
+> appending to the column definition list of the call added last, its type a
+> `DataType` or what one is built from, lowered into Rust's
+> `column_definition` (`sql.ast.select.column-definitions`); and a table's
+> `tablesample`, a
 > `SampleMethod`, a percentage and an optional seed, both bound
 > (`sql.ast.select.table-sample`).
 > A SELECT MUST combine with another `Select` through `union`, `union_all`,

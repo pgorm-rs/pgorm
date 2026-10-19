@@ -13,7 +13,7 @@ mod uuid;
 ///
 /// A cast is not one of them: `CAST` is [`SimpleExpr::AsEnum`], so matching a
 /// `FunctionCall` never has to account for a cast.
-// [spec:pgorm:def:sql.ast.func+10]
+// [spec:pgorm:def:sql.ast.func+11]
 // [spec:pgorm:req:sql.ast.cast-shape+2]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Function {
@@ -53,13 +53,21 @@ pub enum Function {
     GenerateSeries,
     /// `UNNEST`, a set-returning function.
     Unnest,
+    /// `JSON_TO_RECORD`, a function returning `record`.
+    JsonToRecord,
+    /// `JSONB_TO_RECORD`, a function returning `record`.
+    JsonbToRecord,
+    /// `JSON_TO_RECORDSET`, a set-returning function of `record`s.
+    JsonToRecordset,
+    /// `JSONB_TO_RECORDSET`, a set-returning function of `record`s.
+    JsonbToRecordset,
     Any,
     Some,
     All,
 }
 
 /// Function call.
-// [spec:pgorm:def:sql.ast.func+10]
+// [spec:pgorm:def:sql.ast.func+11]
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionCall {
     pub(crate) func: Function,
@@ -73,7 +81,7 @@ pub struct FunctionCall {
 }
 
 /// The two clauses PostgreSQL admits after an aggregate's argument list.
-// [spec:pgorm:def:sql.ast.func+10]
+// [spec:pgorm:def:sql.ast.func+11]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub(crate) struct AggregateMods {
     pub(crate) within_group: Vec<OrderExpr>,
@@ -98,7 +106,7 @@ impl FunctionCall {
     /// Whether the call is its function and arguments alone: no argument
     /// modifier (`DISTINCT`) and no aggregate clause (`WITHIN GROUP`,
     /// `FILTER`), so a reader holding the two has read the whole call.
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn is_plain(&self) -> bool {
         self.aggregate.is_none() && self.mods.iter().all(|m| !m.distinct)
     }
@@ -170,7 +178,7 @@ impl FunctionCall {
     ///     r#"SELECT SUM("size_w") FILTER (WHERE "font_size" > 12 AND "ascii" = TRUE) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn filter<C>(mut self, condition: C) -> Self
     where
         C: IntoCondition,
@@ -200,7 +208,7 @@ impl FunctionCall {
     ///
     /// Repeated calls accumulate, for the hypothetical-set aggregates that
     /// rank against several columns at once.
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn within_group<T>(self, col: T, order: Order) -> Self
     where
         T: IntoColumnRef,
@@ -225,7 +233,7 @@ impl FunctionCall {
     ///     r#"SELECT PERCENTILE_DISC(0.9) WITHIN GROUP (ORDER BY "size_w" * 2 DESC) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn within_group_expr<T>(mut self, expr: T, order: Order) -> Self
     where
         T: Into<SimpleExpr>,
@@ -270,7 +278,7 @@ impl FunctionCall {
 }
 
 /// Function call helper.
-// [spec:pgorm:def:sql.ast.func+10]
+// [spec:pgorm:def:sql.ast.func+11]
 #[derive(Debug, Clone)]
 pub struct Func;
 
@@ -451,7 +459,7 @@ impl Func {
     ///     r#"SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "size_w" ASC) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn percentile_cont<T>(fraction: T) -> FunctionCall
     where
         T: Into<SimpleExpr>,
@@ -475,7 +483,7 @@ impl Func {
     ///     r#"SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY "size_w" ASC) FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.func+10]
+    // [spec:pgorm:def:sql.ast.func+11]
     pub fn percentile_disc<T>(fraction: T) -> FunctionCall
     where
         T: Into<SimpleExpr>,

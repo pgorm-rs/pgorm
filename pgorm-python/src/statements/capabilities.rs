@@ -17,6 +17,10 @@ pub(crate) fn operations() -> Map<String, Value> {
             "table_function",
             "pgorm_query::TableFunction::{new, rows_from, and, with_ordinality, columns}",
         ),
+        (
+            "table_function.column_definition",
+            "pgorm_query::TableFunction::column_definition",
+        ),
         ("table_function.alias", "pgorm_query::TableFunction::alias"),
         (
             "grouping_element",

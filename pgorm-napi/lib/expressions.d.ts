@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+2]
+// [spec:pgorm:req:napi.expressions+3]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -187,7 +187,11 @@ export type FunctionName =
   | "uuid_extract_timestamp"
   | "uuid_extract_version"
   | "generate_series"
-  | "unnest";
+  | "unnest"
+  | "json_to_record"
+  | "jsonb_to_record"
+  | "json_to_recordset"
+  | "jsonb_to_recordset";
 
 /**
  * A call to one of the functions pgorm-query has a constructor for; another
@@ -199,6 +203,10 @@ export type FunctionName =
  * overloads are chosen by argument type and a parameter has none, so a bound
  * argument needs its type: `bind(1).cast("int4")`, or an array cast with
  * `{ array: true }`; a column or a typed expression already has one.
+ *
+ * `json_to_record`, `jsonb_to_record`, `json_to_recordset` and
+ * `jsonb_to_recordset` (one document each) return `record`, read by
+ * `tableFunction` through the column definition list a `RecordCall` gives.
  */
 export declare function call(name: FunctionName, ...operands: Operand[]): Expr;
 /** `(a, b, ..)`, at least one item. */

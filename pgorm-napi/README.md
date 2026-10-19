@@ -274,9 +274,11 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   an `escape`, `startsWith`/`endsWith`/`containsText` (text, not patterns),
   `cast`, `collate`, `at`/`slice`, `caseWhen(..).when(..).else(..)`,
   `caseOf(x).when(..)`, `call` for the functions pgorm-query constructs
-  (`uuidv7` and its shift among them, and the set-returning `generate_series`
+  (`uuidv7` and its shift among them, the set-returning `generate_series`
   and `unnest`, whose overloads need a bound argument typed:
-  `bind(1).cast("int8")`), `exists` and `scalar`.
+  `bind(1).cast("int8")`, and the record-returning `json_to_record`,
+  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`
+  and `scalar`.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
@@ -286,7 +288,9 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   `lock("update", { of, wait })`, `with`, and `as(alias)` to read a query as
   a FROM item.
   `tableFunction(calls, { alias, ordinality, columns, rowsFrom })` reads
-  set-returning calls as one — `ROWS FROM` over several — and
+  set-returning calls as one — `ROWS FROM` over several — a call returning
+  `record` (`json_to_record` and its kin) given as `{ call, columnDefinitions:
+  [["a", "integer"], ..] }`, the columns that type it, and
   `table.tablesample("bernoulli" | "system", percentage, { repeatable })`
   samples a table. `new With(name, query, { columns, materialized }).cte(..)`
   and `With.recursive(name, query, { search, cycle })` are its common table

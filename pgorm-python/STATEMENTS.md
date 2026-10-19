@@ -114,6 +114,30 @@ names the columns in the alias, the ordinal last, and `.alias(name)` finishes
 it as the `FromItem` that `from_` and the joins take. A function in FROM may
 read the columns of the items before it.
 
+A function returning `record` — `call("json_to_record", ..)`,
+`jsonb_to_record`, `json_to_recordset`, `jsonb_to_recordset` — has no columns
+until `.column_definition(name, type)` defines them, one call each, appended
+to the list of the call added last; the type is a `pgorm.schema.DataType` or
+what one is built from (`"integer"`, a `TypeName`). A lone call writes the list in its
+alias, `JSON_TO_RECORD($1) AS "r"("a" integer)`; beside `.with_ordinality()`
+or `.columns(..)`, which PostgreSQL does not accept there, and in a
+`ROWS FROM` of several, each call carries its own,
+`ROWS FROM (JSON_TO_RECORD($1) AS ("a" integer)) WITH ORDINALITY AS "r"`.
+Which function returns `record` is the server's to know, so a record call
+without a list, or a list on another function, is its refusal (`42601`).
+
+```python
+from pgorm import TableFunction, Value, call, select
+
+order = (
+    TableFunction(call("json_to_record", Value.json({"id": 1, "total": "9.50"})))
+    .column_definition("id", "integer")
+    .column_definition("total", "numeric")
+    .alias("o")
+)
+totals = select(order.col("id"), order.col("total")).from_(order)
+```
+
 ```python
 from pgorm import SampleMethod, Table, TableFunction, call, select
 

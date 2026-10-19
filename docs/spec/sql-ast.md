@@ -237,7 +237,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Scope
 
-> [spec:pgorm:req:sql.scope+22]
+> [spec:pgorm:req:sql.scope+23]
 > pgorm-query models the PostgreSQL a data-access layer writes, not the whole
 > of PostgreSQL, and the boundary MUST be written down rather than discovered.
 > A construct outside the builder is still reachable — `Expr::raw` and
@@ -322,6 +322,12 @@ today, including panicking edges and deliberate failsafes.
 >   UPDATE` / `FOR SHARE`, which is built (`sql.render.locking`); a table lock
 >   is a statement with a table name and a mode, sent through `execute` inside
 >   the transaction it must belong to.
+> - **The extension `TABLESAMPLE` methods** (`SYSTEM_ROWS`, `SYSTEM_TIME`).
+>   Each exists only once its extension, `tsm_system_rows` or
+>   `tsm_system_time`, is installed, and draws by a row count or a time
+>   budget rather than a percentage, so no ORM path depends on one;
+>   `SampleMethod` builds the two every server has
+>   (`sql.ast.select.table-sample`), and `FromItem::Template` reaches these.
 
 ## Target release
 
@@ -475,7 +481,7 @@ today, including panicking edges and deliberate failsafes.
 > `ConditionHolder`, so multi-part conditions built with `Condition::all`/`any`
 > render as chained `AND`/`OR` in the ON clause.
 
-> [spec:pgorm:req:sql.ast.select.table-function]
+> [spec:pgorm:req:sql.ast.select.table-function+2]
 > A set-returning function in FROM is a `TableFunction`, PostgreSQL's
 > `func_table`: one call, built by `TableFunction::new(call)`, or
 > `ROWS FROM (..)`, built by `TableFunction::rows_from(call)`, to which
@@ -489,15 +495,15 @@ today, including panicking edges and deliberate failsafes.
 > numbering the rows from 1, and `columns(names)` names the relation's columns
 > in its alias, `AS "t"("a", "b")`, the ordinal column last, replacing any
 > names given before. Fewer names leave the remaining columns their own; more
-> than the relation has is the server's refusal (`42P10`). A record-returning
-> call that needs a column definition list (`AS (a int)`) is not built:
-> `FromItem::Template` reaches it.
+> than the relation has is the server's refusal (`42P10`). A call returning
+> `record` takes a column definition list
+> (`sql.ast.select.column-definitions`).
 >
 > `alias(name)` finishes it as `FromItem::TableFunction`, which `from`, the
 > joins and every other FROM position take, as `JsonTable::alias` does. A
-> single call with neither an ordinal nor column names is returned as the
-> `FromItem::FunctionCall` that `from_function` builds, so `f(..) AS "t"` has
-> one representation however it was spelled.
+> single call with no ordinal, no column names and no column definitions is
+> returned as the `FromItem::FunctionCall` that `from_function` builds, so
+> `f(..) AS "t"` has one representation however it was spelled.
 >
 > The call is any `FunctionCall`. `Func::generate_series(start, stop)`,
 > `Func::generate_series_step(start, stop, step)` and `Func::unnest(array)`
@@ -509,6 +515,36 @@ today, including panicking edges and deliberate failsafes.
 > anywhere a placeholder has no context
 > (`[spec:pgorm:sem:sql.render.placeholder-typing+1]`); the constructors add
 > no cast of their own. A zero step is the server's refusal (`22023`).
+
+> [spec:pgorm:req:sql.ast.select.column-definitions]
+> A function returning `record` — `json_to_record`, `jsonb_to_record`,
+> `json_to_recordset` and `jsonb_to_recordset`, whose `Func` constructors
+> make `Function::JsonToRecord` and its three kin, or a function declared
+> `RETURNS record` or `SETOF record`, called by `Func::named` — has no
+> columns of its own, so PostgreSQL reads it in FROM only with a column
+> definition list naming and typing them. `TableFunction::column_definition(name,
+> column_type)` appends one column, a name and any `ColumnType`, to the list
+> of the call added last, each call of a `ROWS FROM` carrying its own; a list
+> is non-empty by construction, since a call has none until a column is
+> defined. The JSON functions read each column from the object's key of its
+> name, NULL where the object has none, and a value the column's type cannot
+> take is the server's refusal (`22P02`).
+>
+> A lone call writes its list in the alias, `f(..) AS "t"("a" integer)`.
+> PostgreSQL refuses that spelling beside `WITH ORDINALITY` (`42601`), and
+> the alias's place for column names is the list's, so a lone call with a
+> definition list and an ordinal column or column names is written as the
+> one spelling that means it, `ROWS FROM (f(..) AS ("a" integer))`, its
+> ordinal and names following as any `ROWS FROM`'s do — as a second call
+> makes it `ROWS FROM` because the grammar has no other spelling. Inside
+> `ROWS FROM` each call's list follows it, `g(..) AS ("b" text)`.
+>
+> Which function returns `record` is the server's to know, so the builder
+> refuses nothing here, and these are the server's refusals: a call
+> returning `record` without a list, and a list on a call returning
+> anything else (both `42601`); two columns of one name (`42701`); and
+> columns the function's rows do not match, which a `LANGUAGE sql` function
+> reports as `42P13` and a PL/pgSQL one as `42804` when it returns a row.
 
 > [spec:pgorm:req:sql.ast.select.table-sample]
 > A table read through `TABLESAMPLE` is a `TableSample`:
@@ -1715,7 +1751,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Function calls
 
-> [spec:pgorm:def:sql.ast.func+10]
+> [spec:pgorm:def:sql.ast.func+11]
 > `FunctionCall` pairs a `Function` selector with argument expressions and
 > per-argument modifiers (`FuncArgMod { distinct }`); `arg` appends one
 > argument, `args` replaces the argument list. `get_func()` and `get_args()`
@@ -1733,7 +1769,11 @@ today, including panicking edges and deliberate failsafes.
 > optional `regconfig` OID prepended as first argument), `ts_rank`,
 > `ts_rank_cd`; array/subquery comparators `any`, `some`, `all`; the
 > set-returning `generate_series`, `generate_series_step` and `unnest`
-> (`sql.ast.select.table-function`); and PostgreSQL 18's UUID family, below.
+> (`sql.ast.select.table-function`); the record-returning `json_to_record`,
+> `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`, which a
+> column definition list gives their columns
+> (`sql.ast.select.column-definitions`); and PostgreSQL 18's UUID family,
+> below.
 >
 > The UUID family is `uuidv4()`, `uuidv7()`, `uuidv7_shifted(shift)`,
 > `uuid_extract_timestamp(u)` and `uuid_extract_version(u)` (`func_uuid.rs`),

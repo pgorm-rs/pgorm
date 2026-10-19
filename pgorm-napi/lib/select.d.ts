@@ -5,11 +5,12 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
+import type { BuiltinType, DataType } from "./json.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 /** A table, schema-qualified and aliased when the options say. Its names are identifiers, quoted. */
@@ -163,13 +164,29 @@ export interface TableFunctionOptions {
 }
 
 /**
+ * A call to a function returning `record`, `json_to_record` and its kin among
+ * them, with the column definition list that gives its columns: each a name
+ * and a type, at least one.
+ */
+export interface RecordCall {
+  readonly call: Expr;
+  readonly columnDefinitions: readonly [ColumnDefinition, ...ColumnDefinition[]];
+}
+
+/** A column of a {@link RecordCall}: its name and its type. */
+export type ColumnDefinition = readonly [name: string, type: DataType | BuiltinType];
+
+/**
  * Set-returning calls as a FROM item: `f(..) AS alias`, or `ROWS FROM (f(..),
  * g(..))` over several, which reads them side by side and pads the shorter
  * ones with NULLs. Each call is one {@link call} made, `generate_series` and
- * `unnest` among them; any other expression is a {@link ConstructionError}.
+ * `unnest` among them, or a {@link RecordCall}; any other expression is a
+ * {@link ConstructionError}. A lone record call writes its list in the alias,
+ * `AS "t"("a" integer)`, and beside `ordinality` or `columns`, or among
+ * several calls, each call carries its own inside `ROWS FROM (..)`.
  */
 export declare function tableFunction(
-  calls: Expr | readonly [Expr, ...Expr[]],
+  calls: Expr | RecordCall | readonly [Expr | RecordCall, ...(Expr | RecordCall)[]],
   options: TableFunctionOptions,
 ): FromItem;
 

@@ -6,6 +6,7 @@ import unittest
 from uuid import uuid4
 
 import pgorm as p
+from pgorm import schema as s
 
 G = p.GroupingElement
 T = p.TableFunction
@@ -24,7 +25,7 @@ def text_array(values):
     return p.bind(p.Value.array("text", values)).cast(p.TypeName("text"), array=True)
 
 
-# [spec:pgorm:req:python.statements+9/test]
+# [spec:pgorm:req:python.statements+10/test]
 # [spec:pgorm:req:python.expressions+2/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -144,7 +145,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
                          [("Ann",), ("Bob",), ("Cy",)])
         self.assertEqual(await names(name.similar_to(p.LikePattern("' OR 1=1 --"))), [])
 
-    # [spec:pgorm:req:sql.ast.select.table-function/test]    UNNEST numbered WITH ORDINALITY,
+    # [spec:pgorm:req:sql.ast.select.table-function+2/test]    UNNEST numbered WITH ORDINALITY,
     # its columns named, beside the row it reads
     async def test_unnest_with_ordinality_numbers_positions(self):
         tags = T(p.call("unnest", self.s("tags"))).with_ordinality().columns("tag", "n").alias("u")
@@ -157,7 +158,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         plain = T(p.call("unnest", text_array(["a", "b"]))).alias("u")
         self.assertEqual(await self.rows(p.Select(plain.star()).from_(plain)), [("a",), ("b",)])
 
-    # [spec:pgorm:req:sql.ast.select.table-function/test]    ROWS FROM reads its calls side by
+    # [spec:pgorm:req:sql.ast.select.table-function+2/test]    ROWS FROM reads its calls side by
     # side, padding the shorter with NULL
     async def test_rows_from_pads_shorter_functions_with_null(self):
         zipped = (T.rows_from(p.call("generate_series", int4(1), int4(2)))
@@ -172,7 +173,40 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
                   .order_by(self.s("id").asc()))
         self.assertEqual(await self.rows(joined), [(1, "a"), (2, "b"), (3, "c")])
 
-    # [spec:pgorm:req:sql.ast.select.table-function/test]    a bound argument gives the server no
+    # [spec:pgorm:req:python.statements+10/test]    a call returning record reads through the
+    # columns its definition list gives, a lone call's list in the alias, each call of a ROWS FROM
+    # with its own, and the server refuses a missing list or one on another function
+    # [spec:pgorm:req:sql.ast.select.column-definitions/test]
+    async def test_record_calls_read_through_column_definitions(self):
+        p.require_capability("table_function.column_definition")
+        one = (T(p.call("json_to_record", p.Value.json({"a": 7, "tags": ["x"]})))
+               .column_definition("a", "integer").column_definition("tags", s.DataType("text").array())
+               .column_definition("missing", s.DataType("varchar", length=3)).alias("r"))
+        query = p.Select(one.star()).from_(one)
+        self.assertEqual(query.inspect().sql,
+                         'SELECT "r".* FROM JSON_TO_RECORD($1) AS "r"("a" integer, "tags" text[], '
+                         '"missing" varchar(3))')
+        self.assertEqual(await self.rows(query), [(7, ["x"], None)])
+        zipped = (T(p.call("jsonb_to_recordset", p.Value.json([{"a": 2}, {"a": 1}])))
+                  .column_definition("a", "integer")
+                  .and_(p.call("generate_series", int4(10), int4(12)))
+                  .with_ordinality().columns("a", "s", "n").alias("z"))
+        self.assertIn("ROWS FROM (JSONB_TO_RECORDSET($1) AS (\"a\" integer), GENERATE_SERIES(",
+                      zipped_sql := p.Select(zipped.star()).from_(zipped).inspect().sql)
+        self.assertTrue(zipped_sql.endswith('WITH ORDINALITY AS "z"("a", "s", "n")'), zipped_sql)
+        self.assertEqual(await self.rows(p.Select(zipped.star()).from_(zipped)),
+                         [(2, 10, 1), (1, 11, 2), (None, 12, 3)])
+        for item, sqlstate in (
+            (T(p.call("json_to_record", p.Value.json({"a": 1}))).alias("r"), "42601"),
+            (T(p.call("generate_series", int4(1), int4(2))).column_definition("a", "integer").alias("g"), "42601"),
+        ):
+            with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
+                await self.connection.fetch_all(p.Select(item.star()).from_(item))
+            self.assertEqual(refused.exception.sqlstate, sqlstate)
+        with self.assertRaises(p.ConstructionError):
+            T(p.call("json_to_record", p.Value.json({}))).column_definition("", "integer")
+
+    # [spec:pgorm:req:sql.ast.select.table-function+2/test]    a bound argument gives the server no
     # overload to choose, so the caller casts it; nothing is guessed for it
     async def test_set_returning_calls_need_typed_arguments(self):
         untyped = T(p.call("generate_series", 1, 2)).alias("g")

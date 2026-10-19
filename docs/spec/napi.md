@@ -430,7 +430,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+2]
+> [spec:pgorm:req:napi.expressions+3]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -459,18 +459,23 @@ SQL text running a built statement.
 > without its shift among them — and another name or count is a
 > `ConstructionError`: the name selects a constructor and never reaches SQL;
 > `generate_series`, with or without its step, and `unnest` are the
-> set-returning ones a `tableFunction` reads.
+> set-returning ones a `tableFunction` reads, and `json_to_record`,
+> `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset` the
+> record-returning ones it reads through a column definition list.
 > A cast names its type by identifier or `TypeName`; `collate` names a
 > collation, schema-qualifiable; `at` and `slice` subscript an array; a
 > searched or simple `CASE` exists only once it has an arm; `exists` and
 > `scalar` take a `Select`.
 
-> [spec:pgorm:req:napi.select+1]
+> [spec:pgorm:req:napi.select+2]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of
 > expressions and aliased expressions, `*` until one is given; FROM items —
 > a `Table`, schema-qualified and aliased, or a `FromItem`, which is always
 > aliased, a subquery among them, a `tableFunction` over calls — `ROWS FROM`
-> over several, `WITH ORDINALITY`, column names — and a table's
+> over several, `WITH ORDINALITY`, column names, and a call returning
+> `record` given as `{ call, columnDefinitions }`, its non-empty list of
+> `[name, type]` pairs lowered into pgorm-query's `column_definition`
+> (`sql.ast.select.column-definitions`) — and a table's
 > `tablesample` by `"bernoulli"` or `"system"` with a bound percentage and
 > optional seed (`sql.ast.select.table-function`,
 > `sql.ast.select.table-sample`) —; inner, left, right and full joins on a

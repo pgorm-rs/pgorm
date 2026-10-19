@@ -2257,6 +2257,13 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id table-function-column-defs, covered_rules (
+        sql.ast.select.column-definitions
+        sql.render.column-definitions
+    ), covered_claims (
+        {impl_name main, rule sql.ast.select.column-definitions}
+        {impl_name main, rule sql.render.column-definitions}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

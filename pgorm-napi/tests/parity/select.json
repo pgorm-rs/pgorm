@@ -119,6 +119,10 @@
     "sql": "SELECT \"a\".\"id\", \"t\".\"tag\", \"t\".\"position\" FROM \"app\".\"account\" AS \"a\" CROSS JOIN UNNEST(\"a\".\"tags\") WITH ORDINALITY AS \"t\"(\"tag\", \"position\")",
     "values": []
   },
+  "record-functions": {
+    "sql": "SELECT \"o\".*, \"z\".* FROM \"t\" CROSS JOIN JSON_TO_RECORD(\"doc\") AS \"o\"(\"a\" integer, \"tags\" text[]) CROSS JOIN ROWS FROM (JSONB_TO_RECORDSET(\"docs\") AS (\"b\" text), GENERATE_SERIES($1, $2)) WITH ORDINALITY AS \"z\"",
+    "values": [["i64","1"], ["i64","2"]]
+  },
   "rows-from": {
     "sql": "SELECT \"r\".*, \"s\".\"s\" FROM ROWS FROM (GENERATE_SERIES($1, $2, $3), UNNEST($4)) WITH ORDINALITY AS \"r\"(\"x\", \"y\", \"n\") CROSS JOIN ROWS FROM (GENERATE_SERIES($5, $6)) AS \"s\"",
     "values": [["i64","10"], ["i64","1"], ["i64","-3"], ["array","[a,b,c]"], ["i64","1"], ["i64","2"]]
