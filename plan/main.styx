@@ -13293,6 +13293,7 @@ children (
         title "CopyRowStream's models are tested with enum and JSON fields, not only plain scalars"
         kind @test
         deps (copy-binary-rows)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.600263Z
@@ -13306,6 +13307,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:19:01.914388Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -608,3 +608,140 @@ async fn copy_rows_models_in_a_transaction() -> Result<(), Error> {
     ctx.delete().await;
     Ok(())
 }
+
+/// A model of enum and JSON fields: an enum in a schema of its own, an enum
+/// reached through a domain over it, an array of an enum, and two
+/// `FromJsonQueryResult` structs, one in `jsonb` and one, nullable, in `json`.
+mod entry {
+    use pgorm::FromJsonQueryResult;
+    use pgorm::entity::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+    #[pgorm(
+        rs_type = "String",
+        db_type = "Enum",
+        enum_name = "phase",
+        schema_name = "audit"
+    )]
+    pub enum Phase {
+        #[pgorm(string_value = "open")]
+        Open,
+        #[pgorm(string_value = "closed")]
+        Closed,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+    #[pgorm(rs_type = "String", db_type = "Enum", enum_name = "tone")]
+    pub enum Tone {
+        #[pgorm(string_value = "calm")]
+        Calm,
+        #[pgorm(string_value = "loud")]
+        Loud,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+    pub struct Detail {
+        pub label: String,
+        pub weight: f64,
+        pub tags: Vec<String>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(schema_name = "audit", table_name = "entry")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub phase: Phase,
+        pub tone: Tone,
+        pub phases: Vec<Phase>,
+        pub detail: Detail,
+        pub extra: Option<Detail>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+fn entries() -> Vec<entry::Model> {
+    use entry::{Detail, Model, Phase, Tone};
+    let detail = |label: &str, weight: f64, tags: &[&str]| Detail {
+        label: label.to_owned(),
+        weight,
+        tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
+    };
+    vec![
+        Model {
+            id: 1,
+            phase: Phase::Open,
+            tone: Tone::Calm,
+            phases: vec![Phase::Open, Phase::Closed],
+            detail: detail("it's \"quoted\" ü", -2.5, &["a", "b,c"]),
+            extra: Some(detail("", 0.0, &[])),
+        },
+        Model {
+            id: 2,
+            phase: Phase::Closed,
+            tone: Tone::Loud,
+            phases: Vec::new(),
+            detail: detail("plain", 1e300, &["x"]),
+            extra: None,
+        },
+    ]
+}
+
+// [spec:pgorm:req:conn.copy.rows/test]    models with enum and JSON fields: a schema's enum, an enum through a domain, an enum array, JSON structs
+#[pgorm_macros::test]
+async fn copy_rows_models_with_enum_and_json() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_rows_models_enum_json").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(
+        "CREATE SCHEMA audit;
+         CREATE TYPE audit.phase AS ENUM ('open', 'closed');
+         CREATE TYPE tone AS ENUM ('calm', 'loud');
+         CREATE DOMAIN audit.tone_d AS tone CHECK (VALUE IS NOT NULL);
+         CREATE TABLE audit.entry (
+             id int PRIMARY KEY, phase audit.phase NOT NULL, tone audit.tone_d NOT NULL,
+             phases audit.phase[] NOT NULL, detail jsonb NOT NULL, extra json
+         )",
+    )
+    .await?;
+    let table = (n("audit"), n("entry"));
+
+    let models = entries();
+    let mut sink = db
+        .copy_in_rows(&CopyFromStatement::new(table.clone(), CopyBinary))
+        .await?;
+    for model in &models {
+        sink.send_model(model).await?;
+    }
+    assert_eq!(sink.finish().await?, 2);
+
+    // The server stored what the ORM reads back, so the COPY wrote each
+    // field in its column's own form.
+    let found = entry::Entity::find()
+        .order_by_asc(entry::Column::Id)
+        .all(&db)
+        .await?;
+    assert_eq!(found, models);
+
+    // The columns are described by the types the values travel in: the
+    // domain by the enum it is over.
+    let stream = db
+        .copy_out_rows(&CopyToStatement::new(table, CopyBinary))
+        .await?;
+    let types: Vec<&str> = stream
+        .columns()
+        .iter()
+        .map(|column| column.type_().name())
+        .collect();
+    assert_eq!(types, ["int4", "phase", "tone", "_phase", "jsonb", "json"]);
+    let read: Vec<entry::Model> = stream.models::<entry::Entity>().try_collect().await?;
+    assert_eq!(read, models);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
