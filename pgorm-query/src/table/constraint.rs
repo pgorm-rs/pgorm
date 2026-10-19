@@ -35,7 +35,7 @@ use super::{Check, IntoCheck};
 ///     r#"ALTER TABLE "glyph" ADD CONSTRAINT "glyph_aspect_present" NOT NULL "aspect" NOT VALID"#,
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
 pub struct NotNullConstraint {
     pub(crate) column: Name,
@@ -158,7 +158,7 @@ impl Enforcement {
 /// it is refused there (`42809`). Where those kinds differ by release, the
 /// variant says so: the builder cannot tell a `CHECK`'s name from a foreign
 /// key's, so no target can rule the difference out by type.
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintChange {
     /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
@@ -183,7 +183,7 @@ pub enum ConstraintChange {
 
 impl ConstraintChange {
     /// The words this change is written with, after the constraint's name.
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub(crate) fn clause(self) -> &'static str {
         match self {
             Self::Inherit => "INHERIT",
@@ -197,7 +197,7 @@ impl ConstraintChange {
 /// What a drop does to the objects that depend on what it drops: `RESTRICT`,
 /// refusing the drop while any does (`2BP01`), which is PostgreSQL's default,
 /// or `CASCADE`, dropping them with it.
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DropBehavior {
     /// `RESTRICT`: refuse the drop while anything depends on it.
@@ -251,7 +251,7 @@ impl DropBehavior {
 /// notice), a key another table's foreign key depends on unless the drop
 /// cascades to it (`2BP01`), a constraint a table inherited from its parent
 /// (`42P16`), and the `NOT NULL` of a primary-key column (`42P16`).
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
 pub struct ConstraintDrop {
     pub(crate) name: Name,
@@ -318,7 +318,7 @@ impl ConstraintDrop {
 /// [`ConstraintDrop`] already built: what
 /// [`TableAlterStatement::drop_constraint`](crate::TableAlterStatement::drop_constraint)
 /// takes.
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 pub trait IntoConstraintDrop {
     /// The drop.
     fn into_constraint_drop(self) -> ConstraintDrop;
@@ -388,7 +388,7 @@ where
 ///
 /// A `NOT ENFORCED` constraint is never valid, whatever it says, and
 /// `VALIDATE CONSTRAINT` refuses it (`55000`).
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
 pub struct NotValid<C> {
     pub(crate) constraint: C,
@@ -405,7 +405,7 @@ impl TableForeignKey {
     /// Add this key `NOT VALID`, leaving the rows already there unchecked:
     /// what [`add_foreign_key`](crate::TableAlterStatement::add_foreign_key)
     /// takes, and nothing that creates a table does ([`NotValid`]).
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub fn not_valid(self) -> NotValid<Self> {
         NotValid { constraint: self }
     }
@@ -416,7 +416,7 @@ impl Check {
     /// unchecked: what [`add_check`](crate::TableAlterStatement::add_check)
     /// takes, and nothing that creates a table or a column does
     /// ([`NotValid`]).
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub fn not_valid(self) -> NotValid<Self> {
         NotValid { constraint: self }
     }
@@ -426,7 +426,7 @@ impl Check {
 /// anything that converts into the constraint, which is checked against the
 /// rows already there, or the constraint wrapped in [`NotValid`], which is
 /// not.
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 pub trait IntoAddedConstraint<C> {
     /// The constraint, and whether it is added `NOT VALID`.
     fn into_added_constraint(self) -> (C, bool);

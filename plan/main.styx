@@ -9437,12 +9437,27 @@ children (
                 title "The doc-hidden SchemaStatement wrapper goes, so Schema means only a database schema"
                 kind @refactor
                 deps (sql-schemas)
+                sealed true
                 log (
                     {
                         at 2026-10-18T19:21:24.056875Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-schemas (f767aea9). pgorm-query's doc-hidden SchemaStatement (wrapping table, index and foreign-key statements; one of the five statement-dispatch wrappers sql.surface lists as residue no builder produces and no renderer takes) now reads as \"a CREATE/DROP SCHEMA statement\" beside the new Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement. Delete it (and, if nothing reads them, the other four dispatch wrappers sql.surface names as residue), update sql.surface's residue paragraph and the test-surface residue list, and bump sql.surface."
+                    }
+
+                    {
+                        at 2026-10-19T08:14:27.198674Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T08:16:33.152329Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

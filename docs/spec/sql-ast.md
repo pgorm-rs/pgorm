@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+35]
+> [spec:pgorm:req:sql.surface+36]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -75,12 +75,10 @@ today, including panicking edges and deliberate failsafes.
 > pgorm-query's namespace and was the only path by which `pgorm_query::Write`
 > could be written. An item that narrowing would merely turn into dead code is
 > instead exported `#[doc(hidden)]`, so the rendered documentation is the
-> curated list while the item stays reachable: the statement-dispatch wrappers
-> `QueryStatement`, `TableStatement`, `IndexStatement`, `ForeignKeyStatement`
-> and `SchemaStatement`, which no builder produces and no renderer takes; the
-> `SelectDistinct` flag, whose `All` variant no builder sets; and the
-> `Token`/`Tokenizer` lexer behind `inject_parameters`, whose classification
-> accessors only the conformance suite calls. Each of those MUST be named
+> curated list while the item stays reachable: the `SelectDistinct` flag,
+> whose `All` variant no builder sets, and the `Token`/`Tokenizer` lexer behind
+> `inject_parameters`, whose classification accessors only the conformance
+> suite calls. Each of those MUST be named
 > individually in `lib.rs` rather than left to a glob, so the residue is a list
 > a later pass can work through rather than a category.
 >
@@ -197,9 +195,14 @@ today, including panicking edges and deliberate failsafes.
 > index kind it screened the standalone renderer from did
 > (`sql.ddl.index-create`), and `IndexConstraint` when the key a
 > column could also declare did, `TableKey` replacing it
-> (`sql.ddl.create-table`), and `ForeignKeyDropStatement` when the drop named
+> (`sql.ddl.create-table`), `ForeignKeyDropStatement` when the drop named
 > for one constraint kind did, `ConstraintDrop` replacing it
-> (`sql.ddl.alter-table`). What the list and `extension` held when this rule
+> (`sql.ddl.alter-table`), and the statement-dispatch wrappers
+> `QueryStatement`, `TableStatement`, `IndexStatement`, `ForeignKeyStatement`
+> and `SchemaStatement`, once residue, when it was settled that no builder
+> produced them, no renderer took them and nothing read them, nothing
+> replacing them: each statement is built and rendered as itself, and they
+> MUST NOT return (`sql.ddl`). What the list and `extension` held when this rule
 > was first written has no entry, being the baseline the record counts from;
 > everything either has exported since is recorded here.
 

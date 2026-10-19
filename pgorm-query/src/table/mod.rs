@@ -47,23 +47,9 @@ pub use rename::*;
 pub use truncate::*;
 
 /// Helper for constructing any table statement
-// [spec:pgorm:req:sql.ddl+11]
+// [spec:pgorm:req:sql.ddl+12]
 #[derive(Debug)]
 pub struct Table;
-
-/// All available types of table statement
-// Boxing a variant would change the public shape of a DDL statement enum callers match on.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
-pub enum TableStatement {
-    Create(TableCreateStatement),
-    Alter(TableAlterStatement),
-    Drop(TableDropStatement),
-    Rename(TableRenameStatement),
-    RenameColumn(ColumnRenameStatement),
-    RenameConstraint(ConstraintRenameStatement),
-    Truncate(TableTruncateStatement),
-}
 
 impl Table {
     /// Construct table [`TableCreateStatement`] over the table it creates
@@ -131,7 +117,7 @@ impl Table {
 
     /// Construct constraint [`ConstraintRenameStatement`] over a table and two
     /// constraint names
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub fn rename_constraint<T, F, R>(
         table: T,
         from_name: F,
@@ -151,23 +137,5 @@ impl Table {
         T: IntoTableName,
     {
         TableTruncateStatement::new(table)
-    }
-}
-
-/// Dispatches to the variant's own rendering, which inlines every value as an
-/// escaped SQL literal. This is its only rendering: no table statement
-/// exposes a placeholder-emitting build, so nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+11]
-impl std::fmt::Display for TableStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Create(stat) => stat.fmt(f),
-            Self::Alter(stat) => stat.fmt(f),
-            Self::Drop(stat) => stat.fmt(f),
-            Self::Rename(stat) => stat.fmt(f),
-            Self::RenameColumn(stat) => stat.fmt(f),
-            Self::RenameConstraint(stat) => stat.fmt(f),
-            Self::Truncate(stat) => stat.fmt(f),
-        }
     }
 }

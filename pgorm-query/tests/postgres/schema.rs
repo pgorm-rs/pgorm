@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_query_eq};
 use pgorm_query::extension::{Extension, Type};
 
-// [spec:pgorm:req:sql.ddl+11/test]    the whole DDL surface is reachable through the six
+// [spec:pgorm:req:sql.ddl+12/test]    the whole DDL surface is reachable through the six
 // entry-point helpers
 #[test]
 fn every_ddl_entry_point_is_reachable() {
@@ -132,7 +132,7 @@ fn every_ddl_entry_point_is_reachable() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+11/test]    table, index, foreign-key and comment statements render
+// [spec:pgorm:req:sql.ddl+12/test]    table, index, foreign-key and comment statements render
 // through their `Display`, which delegates to the corresponding `prepare_*` method on the single
 // Postgres `QueryBuilder`
 #[test]
@@ -175,69 +175,7 @@ fn ddl_statements_render_through_display() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+11/test]    `TableStatement` is an enum wrapper dispatching to the same
-// builders
-#[test]
-fn table_statement_wrapper_dispatches() {
-    let statements = [
-        TableStatement::Create(
-            Table::create(Glyph::Table)
-                .col(ColumnDef::new(Glyph::Id).integer())
-                .to_owned(),
-        ),
-        TableStatement::Alter(Table::alter(Glyph::Table).drop_column(Glyph::Id).to_owned()),
-        TableStatement::Drop(Table::drop(Glyph::Table)),
-        TableStatement::Rename(Table::rename(Glyph::Table, Name::runtime("g"))),
-        TableStatement::Truncate(Table::truncate(Glyph::Table)),
-    ];
-
-    let expected = [
-        r#"CREATE TABLE "glyph" ( "id" integer )"#,
-        r#"ALTER TABLE "glyph" DROP COLUMN "id""#,
-        r#"DROP TABLE "glyph""#,
-        r#"ALTER TABLE "glyph" RENAME TO "g""#,
-        r#"TRUNCATE TABLE "glyph""#,
-    ];
-
-    for (statement, expected) in statements.iter().zip(expected) {
-        assert_eq!(statement.to_string(), expected);
-    }
-
-    // `IndexStatement`, `ForeignKeyStatement` and `SchemaStatement` wrap the same
-    // builders; the wrapped statement renders exactly as it does on its own.
-    let schema_statements = [
-        SchemaStatement::TableStatement(TableStatement::Drop(Table::drop(Glyph::Table))),
-        SchemaStatement::IndexStatement(IndexStatement::Drop(Index::drop(Name::runtime("idx")))),
-        SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Create(
-            ForeignKey::create(Char::Table, Char::FontId, Font::Table, Font::Id)
-                .name(Name::runtime("fk"))
-                .to_owned(),
-        )),
-    ];
-
-    let rendered: Vec<String> = schema_statements
-        .iter()
-        .map(|statement| match statement {
-            SchemaStatement::TableStatement(inner) => inner.to_string(),
-            SchemaStatement::IndexStatement(IndexStatement::Create(inner)) => inner.to_string(),
-            SchemaStatement::IndexStatement(IndexStatement::Drop(inner)) => inner.to_string(),
-            SchemaStatement::ForeignKeyStatement(ForeignKeyStatement::Create(inner)) => {
-                inner.to_string()
-            }
-        })
-        .collect();
-
-    assert_eq!(
-        rendered,
-        vec![
-            r#"DROP TABLE "glyph""#.to_owned(),
-            r#"DROP INDEX "idx""#.to_owned(),
-            r#"ALTER TABLE "character" ADD CONSTRAINT "fk" FOREIGN KEY ("font_id") REFERENCES "font" ("id")"#.to_owned(),
-        ]
-    );
-}
-
-// [spec:pgorm:req:sql.ddl+11/test]    identifiers render double-quoted, with embedded quotes doubled
+// [spec:pgorm:req:sql.ddl+12/test]    identifiers render double-quoted, with embedded quotes doubled
 #[test]
 fn ddl_identifiers_are_double_quoted() {
     assert_eq!(
@@ -260,7 +198,7 @@ fn ddl_identifiers_are_double_quoted() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl+11/test]    index and constraint names are idens, so an embedded
+// [spec:pgorm:req:sql.ddl+12/test]    index and constraint names are idens, so an embedded
 // quote is doubled at every site that writes one
 #[test]
 fn ddl_index_and_constraint_names_escape_quotes() {

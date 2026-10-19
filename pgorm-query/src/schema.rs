@@ -1,10 +1,6 @@
-//! `CREATE SCHEMA`, `DROP SCHEMA` and `ALTER SCHEMA ... RENAME TO`, and the
-//! [`SchemaStatement`] wrapper over the table, index and foreign-key
-//! statements.
+//! `CREATE SCHEMA`, `DROP SCHEMA` and `ALTER SCHEMA ... RENAME TO`.
 
-use crate::{
-    DropBehavior, ForeignKeyStatement, IndexStatement, IntoName, Name, QueryBuilder, TableStatement,
-};
+use crate::{DropBehavior, IntoName, Name, QueryBuilder};
 
 /// Helper for constructing any statement over a schema, the namespace a
 /// table, type or sequence is qualified by
@@ -212,7 +208,7 @@ macro_rules! impl_schema_display {
         $(
             /// Renders the statement, its only rendering: a schema statement
             /// carries names and nothing to bind, so there is no `build`.
-            // [spec:pgorm:req:sql.ddl+11]
+            // [spec:pgorm:req:sql.ddl+12]
             impl std::fmt::Display for $struct_name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     let mut sql = String::with_capacity(64);
@@ -229,13 +225,3 @@ impl_schema_display!(
     SchemaDropStatement => prepare_schema_drop_statement,
     SchemaRenameStatement => prepare_schema_rename_statement,
 );
-
-/// One of the table, index or foreign-key statements, whichever it holds.
-// Boxing a variant would change the public shape of a DDL statement enum callers match on.
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
-pub enum SchemaStatement {
-    TableStatement(TableStatement),
-    IndexStatement(IndexStatement),
-    ForeignKeyStatement(ForeignKeyStatement),
-}

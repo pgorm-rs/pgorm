@@ -647,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+35]
-// [spec:pgorm:req:sql.surface+35/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+36]
+// [spec:pgorm:req:sql.surface+36/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.
@@ -823,16 +823,6 @@ pub use template::SqlTemplate;
 // The statement-dispatch wrappers: no builder produces one and no renderer
 // takes one, so they exist only to be matched on by a caller that already has
 // the inner statement.
-#[doc(hidden)]
-pub use foreign_key::ForeignKeyStatement;
-#[doc(hidden)]
-pub use index::IndexStatement;
-#[doc(hidden)]
-pub use query::QueryStatement;
-#[doc(hidden)]
-pub use schema::SchemaStatement;
-#[doc(hidden)]
-pub use table::TableStatement;
 // The SELECT distinct flag: `distinct`/`distinct_on` are how a caller sets it,
 // and `SelectDistinct::All` has no builder at all.
 #[doc(hidden)]

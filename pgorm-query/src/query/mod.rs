@@ -61,15 +61,6 @@ pub use with::*;
 #[derive(Debug, Clone)]
 pub struct Query;
 
-/// All available types of table query
-#[derive(Debug, Clone)]
-pub enum QueryStatement {
-    Select(SelectStatement),
-    Insert(InsertStatement),
-    Update(UpdateStatement),
-    Delete(DeleteStatement),
-}
-
 // [spec:pgorm:req:sql.ast+3]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SubQueryStatement {

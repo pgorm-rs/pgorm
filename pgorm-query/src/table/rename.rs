@@ -50,7 +50,7 @@ impl TableRenameStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+11]
+// [spec:pgorm:req:sql.ddl+12]
 impl std::fmt::Display for TableRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
@@ -90,7 +90,7 @@ impl std::fmt::Display for TableRenameStatement {
 ///     r#"ALTER TABLE "font" RENAME COLUMN "new_col" TO "new_column""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
 pub struct ColumnRenameStatement {
     pub(crate) table: TableName,
@@ -117,7 +117,7 @@ impl ColumnRenameStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+11]
+// [spec:pgorm:req:sql.ddl+12]
 impl std::fmt::Display for ColumnRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);
@@ -165,7 +165,7 @@ impl std::fmt::Display for ColumnRenameStatement {
 /// constraints holds (`42710`); a constraint the table inherited is renamed
 /// only through the parent, whose rename reaches every child's copy (`42P16`
 /// on the child).
-// [spec:pgorm:req:sql.ddl.alter-table+12]
+// [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
 pub struct ConstraintRenameStatement {
     pub(crate) table: TableName,
@@ -193,7 +193,7 @@ impl ConstraintRenameStatement {
 /// Renders the statement with every value inlined as an escaped SQL literal.
 /// This is its only rendering: it exposes no placeholder-emitting build, so
 /// nothing here is left to bind.
-// [spec:pgorm:req:sql.ddl+11]
+// [spec:pgorm:req:sql.ddl+12]
 impl std::fmt::Display for ConstraintRenameStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sql = String::with_capacity(256);

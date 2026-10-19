@@ -293,7 +293,7 @@ macro_rules! impl_sequence_display {
             /// Renders the statement with every value inlined as an SQL
             /// literal. This is its only rendering: a sequence statement
             /// carries integers and names and nothing to bind.
-            // [spec:pgorm:req:sql.ddl+11]
+            // [spec:pgorm:req:sql.ddl+12]
             impl std::fmt::Display for $struct_name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     let mut sql = String::with_capacity(128);

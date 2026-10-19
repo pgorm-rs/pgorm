@@ -1557,7 +1557,7 @@ impl QueryBuilder {
         .unwrap()
     }
 
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub(crate) fn prepare_table_alter_statement(
         &self,
         alter: &TableAlterStatement,
@@ -1629,7 +1629,7 @@ impl QueryBuilder {
                                 column_def.name.prepare(sql.as_writer());
                                 write!(sql, " SET NOT NULL").unwrap()
                             }
-                            // [spec:pgorm:req:sql.ddl.alter-table+12]
+                            // [spec:pgorm:req:sql.ddl.alter-table+13]
                             ColumnSpec::NotNull { name, no_inherit } => {
                                 let mut constraint =
                                     NotNullConstraint::new(column_def.name.clone());
@@ -1645,7 +1645,7 @@ impl QueryBuilder {
                             }
                             // A modified column's CHECK is a constraint the
                             // table gains, which ALTER TABLE spells as an ADD.
-                            // [spec:pgorm:req:sql.ddl.alter-table+12]
+                            // [spec:pgorm:req:sql.ddl.alter-table+13]
                             ColumnSpec::Check(check) => {
                                 write!(sql, "ADD ").unwrap();
                                 self.prepare_check_constraint(check, sql);
@@ -1688,7 +1688,7 @@ impl QueryBuilder {
                     );
                     self.prepare_not_valid(*not_valid, sql);
                 }
-                // [spec:pgorm:req:sql.ddl.alter-table+12]
+                // [spec:pgorm:req:sql.ddl.alter-table+13]
                 TableAlterOption::AddPrimaryKey(key) => {
                     write!(sql, "ADD ").unwrap();
                     self.prepare_table_key("PRIMARY KEY", key, sql);
@@ -1735,7 +1735,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`ColumnRenameStatement`] into SQL statement.
-    // [spec:pgorm:req:sql.ddl.alter-table+12]
+    // [spec:pgorm:req:sql.ddl.alter-table+13]
     pub(crate) fn prepare_column_rename_statement(
         &self,
         rename: &ColumnRenameStatement,

@@ -1082,6 +1082,7 @@ assertions (
     {id lock-of-table-names, kind @complete, author "brendan@necessary.nu", at 2026-10-19T07:44:55.74759Z}
     {id like-escape-off, kind @complete, author "brendan@necessary.nu", at 2026-10-19T07:57:31.911135Z}
     {id column-default-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-19T08:10:00.524269Z}
+    {id schema-statement-wrapper, kind @complete, author "brendan@necessary.nu", at 2026-10-19T08:16:33.152329Z}
 )
 
 impl_evidence (
