@@ -23,9 +23,11 @@ EXEMPT = {
     p.Record, p.Field, p.EntityModel, p.ActiveModel, p.ActiveValue, p.ActiveState,
     p.Change, p.Upserted, ModelRecord, PoolStatus, views.ModelView, views.ActiveView,
     version_views.Change, version_views.Inserted, version_views.Updated,
-    # Pools, connections, transactions, streams and the native handles under
-    # them: live resources, not SQL, and true as any open resource is.
-    p.Pool, p.Connection, p.Transaction, p.ResultStream, p.CopyOutStream, p.CopyRowStream,
+    # Pools, connections, transactions and the private native handles under
+    # them and under the streams: live resources, not SQL, and true as any
+    # open resource is. The streams themselves refuse, since a stream's truth
+    # would say nothing of whether rows remain.
+    p.Pool, p.Connection, p.Transaction,
     _native._Pool, _native._Connection, _native._Transaction, _native._Stream,
     _native._CopyIn, _native._CopyOut, _native._Listener,
     # Registrations and declarations: they name what a query reads and are
@@ -36,13 +38,15 @@ EXEMPT = {
 
 # Refusing classes only a registered application or a live server can build:
 # registered_entities.py, registered_graphs.py, registered_sources.py,
-# registered_schema.py and test_listen.py truth-test their instances.
+# registered_schema.py, test_listen.py, test_streams.py and test_copy.py
+# truth-test their instances.
 BUILT_ELSEWHERE = {
     p.EntityColumn, p.EntityQuery, p.EntityUpdate, p.EntityUpdateMany, p.EntityInsert,
     p.EntityInsertMany, p.GraphQuery, p.GraphCursor, pl.SelectedSources, s.EntitySchema,
     views.QueryView, graph_views.GraphQueryView, graph_views.GraphCursorView,
     version_views.UpdateView, version_views.UpdateManyView, version_views.InsertView,
-    version_views.InsertManyView, p.Notification, p.Listener,
+    version_views.InsertManyView, p.Notification, p.Listener, p.ResultStream,
+    p.CopyOutStream, p.CopyRowStream,
 }
 
 
@@ -106,7 +110,7 @@ def other_samples():
 
 
 class TruthTesting(unittest.TestCase):
-    # [spec:pgorm:req:python.truth-testing/test]
+    # [spec:pgorm:req:python.truth-testing+1/test]
     def test_every_query_class_refuses_truth_testing(self):
         samples = statement_samples() + expression_samples() + other_samples()
         for sample in samples:
@@ -123,7 +127,7 @@ class TruthTesting(unittest.TestCase):
             with self.subTest(kind=kind):
                 self.assertIn("__bool__", vars(kind))
 
-    # [spec:pgorm:req:python.truth-testing/test]
+    # [spec:pgorm:req:python.truth-testing+1/test]
     def test_exempt_values_keep_python_truth(self):
         self.assertTrue(p.Value(0))
         self.assertTrue(p.Identifier("id"))

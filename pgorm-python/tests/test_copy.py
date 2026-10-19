@@ -158,6 +158,16 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         out = await collect(await self.pool.copy_out(p.CopyTo(query, "csv").header().force_quote("name")))
         self.assertEqual(out, b'id,name\n1,"alpha"\n2,"beta"\n3,"gamma, quoted"\n4,"delta"\n')
 
+    # [spec:pgorm:req:python.truth-testing+1/test]    a stream's truth would not say whether data remains
+    async def test_copy_out_stream_refuses_truth_testing(self):
+        await self.pool.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), b"1\talpha\n")
+        stream = await self.pool.copy_out(p.CopyTo(self.items, "text"))
+        with self.assertRaises(p.ConstructionError):
+            bool(stream)
+        self.assertEqual(await collect(stream), b"1\talpha\tnone\t7\n")
+        with self.assertRaises(p.ConstructionError):
+            bool(stream)
+
     # [spec:pgorm:req:python.copy+2/test]    binary out of one table is binary into another
     async def test_binary_round_trip_between_tables(self):
         await self.pool.copy_in(
@@ -566,6 +576,16 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rows[0][1:4], (True, -7, 9_000_000_000))
         self.assertEqual(rows[0][18], "loud")
         self.assertIsNone(rows[0][20])
+
+    # [spec:pgorm:req:python.truth-testing+1/test]    a stream's truth would not say whether rows remain
+    async def test_copy_row_stream_refuses_truth_testing(self):
+        await self.pool.copy_in_rows(p.CopyFrom(self.rows, "binary").columns("id", "name"), [(1, "a")])
+        stream = await self.pool.copy_out_rows(p.CopyTo(self.rows, "binary"))
+        with self.assertRaises(p.ConstructionError):
+            bool(stream)
+        self.assertEqual(await rows_of(stream), [(1, "a", 7)])
+        with self.assertRaises(p.ConstructionError):
+            bool(stream)
 
     # [spec:pgorm:req:python.copy.rows/test]    a row of the wrong width or type raises a construction error that aborts the COPY
     async def test_wrong_width_or_type_aborts_copy(self):

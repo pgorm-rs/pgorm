@@ -13339,6 +13339,7 @@ children (
         title "Python's async streams agree on truth testing"
         kind @fix
         deps (python-truth-testing-rest)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:41.181398Z
@@ -13352,6 +13353,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:03:32.39233Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -20,7 +20,7 @@ impl PyConflict {
         }
     }
 
-    // [spec:pgorm:req:python.truth-testing]
+    // [spec:pgorm:req:python.truth-testing+1]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "conflict clauses cannot be tested as Python booleans",

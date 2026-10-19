@@ -71,7 +71,7 @@ impl PyFrameType {
         })
     }
 
-    // [spec:pgorm:req:python.truth-testing]
+    // [spec:pgorm:req:python.truth-testing+1]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "window frames cannot be tested as Python booleans",

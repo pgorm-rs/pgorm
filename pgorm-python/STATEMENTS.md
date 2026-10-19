@@ -604,8 +604,10 @@ part a statement is built from — `Table`, `FromItem`, `TableFunction`,
 `Window`, `ExtendedWindow` and the frame classes, `CopyFrom` and `CopyTo`, and
 the enums naming a join kind, a sample method, a frame mode or an exclusion —
 raise `ConstructionError` on Python truth testing, as SQL expressions do.
-Values, records, pools, connections, transactions and streams keep Python's
-truth; `tests/test_truth_testing.py` lists every exempt class with the reason.
+Values, records, pools, connections and transactions keep Python's truth;
+`tests/test_truth_testing.py` lists every exempt class with the reason. The
+streams — `ResultStream`, `CopyOutStream`, `CopyRowStream` and `Listener` —
+refuse it too, since a stream's truth would say nothing of whether rows remain.
 
 The extension's Rust `statements::compile` entry point uses exactly these same
 validated builders for execution preparation. It accepts native statements,
