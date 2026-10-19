@@ -74,7 +74,7 @@ async fn generated_kinds(
 
 /// Each kind lands in the catalog as itself: the column written `STORED` is
 /// stored and the one written `VIRTUAL` virtual, and both compute from the row.
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    each kind reaches the catalog as
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    each kind reaches the catalog as
 // written, so neither column's kind is the server's default
 #[pgorm_macros::test]
 async fn each_kind_reaches_the_catalog() -> Result<(), Error> {
@@ -219,7 +219,7 @@ async fn entity_generated_columns_compute_on_write() -> Result<(), Error> {
 /// the rule records: a virtual column takes no index, key or user-defined type,
 /// and neither kind takes a volatile expression, another generated column, or
 /// a `DEFAULT` beside it. A stored column takes the key a virtual one cannot.
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    the refusals around each kind,
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    the refusals around each kind,
 // by SQLSTATE
 #[pgorm_macros::test]
 async fn server_refusals_around_generated_columns() -> Result<(), Error> {

@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_eq_unparsed};
 
 // [spec:pgorm:req:sql.ddl.create-table+16/test]
-// [spec:pgorm:req:sql.ddl.column-def+12/test]
+// [spec:pgorm:req:sql.ddl.column-def+13/test]
 #[test]
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
 fn create_1() {
@@ -629,7 +629,7 @@ fn alter_embeds_its_foreign_key_by_value() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    a generated column writes its kind
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    a generated column writes its kind
 // whichever it is, so neither render leans on the server's default, which 17 and
 // 18 disagree about
 #[test]
@@ -698,7 +698,7 @@ fn expression_actions_render_on_their_own() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    a column's NOT NULL is one
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    a column's NOT NULL is one
 // constraint: named or kept from children where it first stands, never twice
 #[test]
 fn column_not_null_is_one_constraint() {
@@ -1007,7 +1007,7 @@ fn not_valid_and_no_inherit_render_where_taken() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    both identity forms render, and
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    both identity forms render, and
 // the ALWAYS/BY DEFAULT choice is the only thing that differs between them
 #[test]
 fn identity_column_spells_both_generations() {
@@ -1035,7 +1035,7 @@ fn identity_column_spells_both_generations() {
     assert_eq!(IdentityGeneration::ByDefault.keyword(), "BY DEFAULT");
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    identity is a clause of the
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    identity is a clause of the
 // column, so it renders in insertion order among the other specs
 #[test]
 fn identity_renders_in_insertion_order() {
@@ -1054,7 +1054,7 @@ fn identity_renders_in_insertion_order() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    the two `ALTER TABLE` positions:
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    the two `ALTER TABLE` positions:
 // a new column carries the clause, an existing one takes the ADD GENERATED action
 #[test]
 fn identity_alters_both_ways() {
@@ -1073,7 +1073,7 @@ fn identity_alters_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    identity and the serial family
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    identity and the serial family
 // are two spellings of one idea, and asking for both renders SQL the grammar
 // takes but the server refuses — the boundary this rule documents rather than types
 #[test]
@@ -1095,4 +1095,45 @@ fn identity_with_serial_is_a_documented_boundary() {
     // The grammar has no objection; only a server with a catalog does. That is
     // why the refusal cannot live in the oracle, and lives in the live suite.
     crate::oracle::assert_parses(&both);
+}
+
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    an operator expression is a column's DEFAULT
+// parenthesised, in CREATE TABLE and ADD COLUMN alike, and any other expression bare, while
+// SET DEFAULT, which reads the full expression grammar, takes it bare
+#[test]
+fn operator_defaults_are_parenthesised() {
+    let both = || SimpleExpr::from(Expr::val(true)).and(Expr::val(false).into());
+    assert_eq!(
+        Table::create(Glyph::Table)
+            .col(ColumnDef::new(Glyph::Id).boolean().default(both()))
+            .col(
+                ColumnDef::new(Glyph::Aspect)
+                    .integer()
+                    .default(SimpleExpr::from(Expr::val(1)).add(2)),
+            )
+            .col(ColumnDef::new(Glyph::Image).text().default("x"))
+            .to_string(),
+        [
+            r#"CREATE TABLE "glyph" ( "id" bool DEFAULT (TRUE AND FALSE),"#,
+            r#""aspect" integer DEFAULT (1 + 2),"#,
+            r#""image" text DEFAULT 'x' )"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .add_column(
+                ColumnDef::new(Glyph::Id)
+                    .boolean()
+                    .default(Expr::val(2).between(1, 3)),
+            )
+            .to_string(),
+        r#"ALTER TABLE "glyph" ADD COLUMN "id" bool DEFAULT (2 BETWEEN 1 AND 3)"#
+    );
+    assert_eq!(
+        Table::alter(Glyph::Table)
+            .modify_column(ColumnDef::new(Glyph::Id).default(both()))
+            .to_string(),
+        r#"ALTER TABLE "glyph" ALTER COLUMN "id" SET DEFAULT TRUE AND FALSE"#
+    );
 }

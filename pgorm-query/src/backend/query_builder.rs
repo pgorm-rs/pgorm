@@ -1440,7 +1440,7 @@ impl QueryBuilder {
     /// spells it, then every spec that has a spelling of its own. The type is
     /// a callback because `CREATE TABLE` and `ALTER TABLE ADD COLUMN` write it
     /// differently; everything around it is the same in both.
-    // [spec:pgorm:req:sql.ddl.column-def+12]
+    // [spec:pgorm:req:sql.ddl.column-def+13]
     fn prepare_column_def_parts<F>(
         &self,
         column_def: &ColumnDef,
@@ -1653,7 +1653,7 @@ impl QueryBuilder {
                             ColumnSpec::Generated { .. } => {}
                             // `ALTER TABLE` spells identity as an action on the
                             // column, not as a clause of it.
-                            // [spec:pgorm:req:sql.ddl.column-def+12]
+                            // [spec:pgorm:req:sql.ddl.column-def+13]
                             ColumnSpec::Identity(generation, options) => {
                                 write!(sql, "ALTER COLUMN ").unwrap();
                                 column_def.name.prepare(sql.as_writer());
@@ -1822,7 +1822,7 @@ impl QueryBuilder {
             }
             ColumnSpec::Default(value) => {
                 write!(sql, "DEFAULT ").unwrap();
-                self.prepare_simple_expr(value, sql);
+                self.prepare_default_operand(value, sql);
             }
             // The serial family carries auto-increment in the column's type,
             // rendered by `prepare_column_auto_increment`; there is no
@@ -1830,7 +1830,7 @@ impl QueryBuilder {
             ColumnSpec::AutoIncrement => {}
             ColumnSpec::Check(check) => self.prepare_check_constraint(check, sql),
             ColumnSpec::Generated { expr, kind } => self.prepare_generated_column(expr, *kind, sql),
-            // [spec:pgorm:req:sql.ddl.column-def+12]
+            // [spec:pgorm:req:sql.ddl.column-def+13]
             ColumnSpec::Identity(generation, options) => {
                 write!(sql, "GENERATED {} AS IDENTITY", generation.keyword()).unwrap();
                 self.prepare_identity_options(options.as_ref(), sql);

@@ -260,7 +260,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+12]
+> [spec:pgorm:req:sql.ddl.column-def+13]
 > `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
 > and an ordered list of `ColumnSpec`s (`Null`, `NotNull { name, no_inherit }`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `Check(Check)`, `Generated { expr, kind }`,
@@ -292,6 +292,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
+>
+> A column definition's `DEFAULT` sits where PostgreSQL's grammar reads a
+> `b_expr`, which has no logical operator, `IS`, `BETWEEN`, `IN` or `LIKE`
+> (`42601` at the operator), in `CREATE TABLE` and `ADD COLUMN` alike. So a
+> `Unary`, `Binary`, `Raw`, `Template` or `LikePattern` default MUST render
+> parenthesised, `DEFAULT (TRUE AND FALSE)`, and any other expression bare,
+> as `CREATE DOMAIN`'s default does (`sql.ddl.domain`). `ALTER COLUMN ... SET
+> DEFAULT` reads the full expression grammar and renders its expression bare.
 >
 > A column's `NOT NULL` is a catalog constraint in PostgreSQL 18 — a
 > `pg_constraint` row of kind `n`, recorded under the name the column gives it

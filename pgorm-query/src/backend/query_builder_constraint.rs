@@ -6,7 +6,7 @@ use super::*;
 impl QueryBuilder {
     /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: a column's not-null
     /// constraint, the clause `CREATE TABLE` and `ADD COLUMN` write it with.
-    // [spec:pgorm:req:sql.ddl.column-def+12]
+    // [spec:pgorm:req:sql.ddl.column-def+13]
     pub(crate) fn prepare_not_null(
         &self,
         name: Option<&Name>,

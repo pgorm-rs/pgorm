@@ -73,7 +73,7 @@ async fn not_nulls(db: &DatabaseConnection, table: &str) -> Result<Vec<Recorded>
 /// where the column said so. A column that set its `NOT NULL` several times
 /// is created with the one constraint its last name gave, which a second
 /// clause naming it differently would have been refused for.
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    every spelling of a column's NOT
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    every spelling of a column's NOT
 // NULL is one pg_constraint row, under its own name or a derived one, and a
 // table-level NOT VALID in CREATE TABLE is created valid
 #[pgorm_macros::test]
@@ -225,7 +225,7 @@ async fn not_valid_not_null_waits_for_validation() -> Result<(), Error> {
 /// takes it.
 // [spec:pgorm:req:sql.ddl.alter-table+12/test]    ALTER CONSTRAINT INHERIT and NO
 // INHERIT move a NOT NULL to and from an inheriting table
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    a NO INHERIT NOT NULL does not
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    a NO INHERIT NOT NULL does not
 // reach a child table
 #[pgorm_macros::test]
 async fn no_inherit_keeps_not_null_from_children() -> Result<(), Error> {
@@ -304,7 +304,7 @@ async fn no_inherit_keeps_not_null_from_children() -> Result<(), Error> {
 /// whether the table is partitioned — and it refuses each by name.
 // [spec:pgorm:req:sql.ddl.alter-table+12/test]    the refusals around adding,
 // validating and altering a NOT NULL, by SQLSTATE
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    NO INHERIT on a partitioned
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    NO INHERIT on a partitioned
 // table is refused, and DROP NOT NULL drops a constraint whatever its name
 #[pgorm_macros::test]
 async fn not_null_refusals_by_sqlstate() -> Result<(), Error> {

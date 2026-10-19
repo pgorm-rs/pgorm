@@ -9,8 +9,8 @@ impl QueryBuilder {
     /// The kind is written whichever it is: PostgreSQL 17 refuses a generated
     /// column without `STORED`, and 18 reads one without either keyword as
     /// `VIRTUAL`, so leaving it to the server would make the column's kind
-    /// depend on the release (`[spec:pgorm:req:sql.ddl.column-def+12]`).
-    // [spec:pgorm:req:sql.ddl.column-def+12]
+    /// depend on the release (`[spec:pgorm:req:sql.ddl.column-def+13]`).
+    // [spec:pgorm:req:sql.ddl.column-def+13]
     pub(crate) fn prepare_generated_column(
         &self,
         gen_: &SimpleExpr,

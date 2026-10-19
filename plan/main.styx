@@ -9459,12 +9459,27 @@ children (
                 title "A column DEFAULT that is an operator expression renders parenthesised, so CREATE TABLE accepts it"
                 kind @fix
                 deps (sql-domains)
+                sealed true
                 log (
                     {
                         at 2026-10-18T21:52:40.048769Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-domains (2fa97891). CREATE TABLE's column DEFAULT renders an operator expression bare, so ColumnDef::default(Expr::val(true).and(Expr::val(false))) renders DEFAULT TRUE AND FALSE, which PostgreSQL refuses (42601: a column DEFAULT takes b_expr, not a_expr). The domain builder parenthesises its default for the same reason. Parenthesise an operator expression in every DEFAULT position (column definition, ALTER COLUMN SET DEFAULT, the domain builder already does), hold it to the oracle, and test it live."
+                    }
+
+                    {
+                        at 2026-10-19T08:05:53.866937Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T08:10:00.524269Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
