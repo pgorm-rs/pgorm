@@ -22,6 +22,14 @@ async def invalid(connection: p.Connection) -> None:
     p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
     await connection.copy_in_rows(p.CopyFrom(p.Table("t"), "text"), [[1]])  # expected-error: arg-type
     await connection.copy_out_rows(p.CopyTo(p.Table("t"), "csv"))  # expected-error: arg-type
+    p.CopyFrom(p.Table("t"), "text").quote("'")  # expected-error: misc
+    p.CopyFrom(p.Table("t"), "binary").header()  # expected-error: misc
+    p.CopyTo(p.Table("t"), "binary").null_string("")  # expected-error: misc
+    p.CopyFrom(p.Table("t"), "csv").force_quote_all()  # expected-error: attr-defined
+    p.CopyTo(p.Table("t"), "csv").freeze()  # expected-error: attr-defined
+    p.CopyFrom(p.Table("t"), "yaml")  # expected-error: type-var
+    await connection.copy_in(p.CopyFrom(p.Table("t"), "text"), "1\tone\n")  # expected-error: arg-type
+    await connection.copy_in(p.CopyTo(p.Table("t"), "text"), b"")  # expected-error: arg-type
     p.select(p.literal(1)).union(p.RawSQL("SELECT 2"))  # expected-error: arg-type
     p.select(p.literal(1)).window("w", p.col("id"))  # expected-error: arg-type
     p.ExtendedWindow("w").partition_by(p.col("id"))  # expected-error: attr-defined

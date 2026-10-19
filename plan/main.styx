@@ -12792,12 +12792,27 @@ children (
         title "Python's invalid-typing and direct-builder parity checks cover COPY"
         kind @test
         deps (conn-copy)
+        sealed true
         log (
             {
                 at 2026-10-18T18:24:03.450531Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b), whose Python half skipped these to avoid colliding with the typing work then in flight. Add COPY cases to pgorm-python/tests/public_types_invalid.py (a wrong-format option, e.g. quote on text or header on binary, a COPY TO option on COPY FROM, a str passed to copy_in) so mypy --strict holds the per-format stubs, and COPY statements to the direct-builder parity suite against the Rust builders."
+            }
+
+            {
+                at 2026-10-19T10:39:39.97908Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T10:48:39.938347Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

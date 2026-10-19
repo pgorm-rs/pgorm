@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 
 use pgorm::pgorm_query::{
-    BinOper, Condition, Expr, IntoNamedTable, JoinType, MatchedAction, MergeInsert, MergeUpdate,
-    Name, NullOrdering, Order, Query, ReturningRow, SimpleExpr, Value, Values,
+    BinOper, Condition, CopyBinary, CopyCsv, CopyFromStatement, CopySource, CopyText,
+    CopyToStatement, Expr, IntoNamedTable, JoinType, MatchedAction, MergeInsert, MergeUpdate, Name,
+    NullOrdering, Order, Query, ReturningRow, SimpleExpr, Value, Values,
 };
 use pgorm_python::values::PyValue;
 use pyo3::prelude::*;
@@ -213,7 +214,70 @@ fn programs(report: &Json, run: &Json) -> TestResult<Programs> {
             .order_by(Name::runtime("id"), Order::Asc)
             .build(),
     );
+    copy_programs(&mut programs, schema, text(report, "events")?, literal)?;
     Ok(programs)
+}
+
+/// The COPY cases, each way in each format: over the events table, a SELECT
+/// of it and a DELETE's RETURNING list. COPY binds nothing, so each renders
+/// through `Display` with no parameters, a SELECT's or a DELETE's bound
+/// values written inline.
+fn copy_programs(programs: &mut Programs, schema: &str, events: &str, literal: bool) -> TestResult {
+    let table = || (Name::runtime(schema), Name::runtime(events));
+    let columns = || ["id", "account_id", "kind", "points"].map(Name::runtime);
+    let mut copy = |name, statement: String| {
+        programs.insert(name, (statement, Values(Vec::new())));
+    };
+    copy(
+        "copy_from_csv",
+        CopyFromStatement::new(table(), CopyCsv)
+            .columns(columns())
+            .header()
+            .delimiter(';')
+            .to_string(),
+    );
+    copy(
+        "copy_from_text",
+        CopyFromStatement::new(table(), CopyText)
+            .columns(columns())
+            .null_string("NULL")
+            .to_string(),
+    );
+    let points = Query::select()
+        .columns([Name::runtime("id"), Name::runtime("kind")])
+        .from(table().into_named_table())
+        .and_where(Expr::col(Name::runtime("points")).gte(operand(7i64, literal)))
+        .order_by(Name::runtime("id"), Order::Asc)
+        .to_owned();
+    copy(
+        "copy_to_csv",
+        CopyToStatement::new(points, CopyCsv)
+            .header()
+            .force_quote([Name::runtime("kind")])
+            .to_string(),
+    );
+    let moved = Query::delete()
+        .from_table(table().into_named_table())
+        .and_where(Expr::col(Name::runtime("id")).gte(operand(20i64, literal)))
+        .returning(Query::returning().columns(columns()))
+        .to_owned();
+    copy(
+        "copy_to_binary",
+        CopyToStatement::new(CopySource::try_from(moved)?, CopyBinary).to_string(),
+    );
+    copy(
+        "copy_from_binary",
+        CopyFromStatement::new(table(), CopyBinary)
+            .columns(columns())
+            .to_string(),
+    );
+    copy(
+        "copy_to_text",
+        CopyToStatement::new(table(), CopyText)
+            .null_string("-")
+            .to_string(),
+    );
+    Ok(())
 }
 
 fn snapshots(values: Values) -> TestResult<Json> {
@@ -249,7 +313,7 @@ fn installed_query_evidence_matches_rust_builders() -> TestResult {
         assert_eq!(run["threshold"], if variant == 0 { 0 } else { 15 });
         assert_eq!(
             run["verified"],
-            json!({"inserted_accounts":3,"inserted_events":3,"selected":3-variant,"updated_visits":15+variant,"deleted":[1,0],"missing":true,"merged":4})
+            json!({"inserted_accounts":3,"inserted_events":3,"selected":3-variant,"updated_visits":15+variant,"deleted":[1,0],"missing":true,"merged":4,"copied":{"csv":2,"text":1,"binary":3}})
         );
         let expected = programs(&report, run)?;
         assert_eq!(
