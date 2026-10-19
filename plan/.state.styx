@@ -2294,6 +2294,11 @@ impl_evidence (
         {impl_name main, rule sql.ast.select.column-definitions}
         {impl_name main, rule sql.render.column-definitions}
     )}
+    {id python-truth-testing-rest, covered_rules (
+        python.truth-testing
+    ), covered_claims (
+        {impl_name main, rule python.truth-testing}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

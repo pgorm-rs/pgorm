@@ -55,6 +55,16 @@ pub enum Direction {
     Desc,
 }
 
+#[pymethods]
+impl Direction {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "sort directions cannot be tested as Python booleans",
+        ))
+    }
+}
+
 impl Direction {
     pub fn rust_order(&self) -> Order {
         match self {
@@ -70,6 +80,15 @@ impl Direction {
 pub enum Nulls {
     First,
     Last,
+}
+
+#[pymethods]
+impl Nulls {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "NULL orderings cannot be tested as Python booleans",
+        ))
+    }
 }
 
 impl Nulls {

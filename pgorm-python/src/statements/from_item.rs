@@ -42,6 +42,13 @@ impl PyFromItem {
     fn __repr__(&self) -> String {
         format!("FromItem(alias={:?})", self.alias())
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "FROM items cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// The FROM item a `Table` or `FromItem` argument stands for.

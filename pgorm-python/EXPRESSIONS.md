@@ -71,8 +71,9 @@ the left. These lower to the corresponding Rust `BinOper` through
 Combine expressions with `&`, `|` and `~`. Parenthesize comparisons because
 Python's operator precedence still applies. SQL expressions, conditions,
 projection aliases, orderings, `format_json`'s `JsonInput`, `window_function`'s
-`WindowFunction` and a windowed call raise `ConstructionError` on Python truth
-testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
+`WindowFunction`, a windowed call, a `LikePattern`, `Direction`, `Nulls` and
+the SQL/JSON kinds, behaviours, defaults and `JSON_TABLE` columns raise
+`ConstructionError` on Python truth testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
 tests cannot compose SQL.
 
 `Condition.all(*terms)` and `Condition.any(*terms)` invoke Rust's `Condition`

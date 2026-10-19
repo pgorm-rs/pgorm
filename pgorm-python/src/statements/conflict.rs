@@ -19,6 +19,13 @@ impl PyConflict {
             inner: OnConflict::do_nothing(),
         }
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "conflict clauses cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// A nonempty conflict target, before choosing its action.
@@ -84,6 +91,12 @@ impl PyConflictTarget {
                 .value(PyIdentifier::new(column)?.name(), coerce(value)?.inner),
         })
     }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "conflict targets cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// A nonempty Rust DO UPDATE assignment set, with optional update predicate.
@@ -117,6 +130,12 @@ impl PyConflictUpdate {
         Ok(Self {
             inner: self.inner.clone().cond_where(common::condition(predicate)?),
         })
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "conflict clauses cannot be tested as Python booleans",
+        ))
     }
 }
 

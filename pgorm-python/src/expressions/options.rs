@@ -47,6 +47,13 @@ impl LikePattern {
     fn __repr__(&self) -> &'static str {
         "LikePattern(...)"
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "LIKE patterns cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// A projection expression with a separate, validated output identifier.

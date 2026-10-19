@@ -5,7 +5,7 @@ use super::{
     from_item::PyFromItem,
     table_sample::{PySampleMethod, sample},
 };
-use crate::{expressions::PyExpr, identifiers::PyIdentifier};
+use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
 /// A runtime table name and optional alias, owned by Rust's NamedTable.
 #[pyclass(name = "Table", module = "pgorm", frozen, from_py_object)]
@@ -99,5 +99,12 @@ impl PyTable {
             self.schema(),
             self.alias()
         )
+    }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL tables cannot be tested as Python booleans",
+        ))
     }
 }

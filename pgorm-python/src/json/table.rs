@@ -28,6 +28,16 @@ pub enum PyJsonTableBehavior {
     Empty,
 }
 
+#[pymethods]
+impl PyJsonTableBehavior {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
+    }
+}
+
 // [spec:pgorm:req:python.statements+10]
 /// One column of a `JSON_TABLE`, built by one of five static constructors,
 /// each taking only the clauses PostgreSQL admits for that kind of column.
@@ -187,6 +197,12 @@ impl PyJsonTableColumn {
 
     fn __repr__(&self) -> &'static str {
         "JsonTableColumn(...)"
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "JSON_TABLE columns cannot be tested as Python booleans",
+        ))
     }
 }
 

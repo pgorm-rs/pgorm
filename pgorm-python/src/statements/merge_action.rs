@@ -6,7 +6,7 @@
 use pgorm::pgorm_query::{MatchedAction, MergeInsert, MergeUpdate, NotMatchedAction, Overriding};
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
-use crate::{expressions::coerce, identifiers::PyIdentifier};
+use crate::{errors::ConstructionError, expressions::coerce, identifiers::PyIdentifier};
 
 /// What a matched or not-matched-by-source arm does besides an update.
 #[pyclass(name = "MatchedAction", module = "pgorm", eq, from_py_object)]
@@ -14,6 +14,16 @@ use crate::{expressions::coerce, identifiers::PyIdentifier};
 pub enum PyMatchedAction {
     Delete,
     DoNothing,
+}
+
+#[pymethods]
+impl PyMatchedAction {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "MERGE actions cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// What a not-matched arm does besides an insert of values.
@@ -24,12 +34,30 @@ pub enum PyNotMatchedAction {
     DoNothing,
 }
 
+#[pymethods]
+impl PyNotMatchedAction {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "MERGE actions cannot be tested as Python booleans",
+        ))
+    }
+}
+
 /// What an inserted row's identity columns do with a supplied value.
 #[pyclass(name = "Overriding", module = "pgorm", eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PyOverriding {
     SystemValue,
     UserValue,
+}
+
+#[pymethods]
+impl PyOverriding {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "OVERRIDING clauses cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// `UPDATE SET column = value, ..` for a target row.
@@ -59,6 +87,12 @@ impl PyMergeUpdate {
 
     fn __repr__(&self) -> &'static str {
         "MergeUpdate(...)"
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "MERGE actions cannot be tested as Python booleans",
+        ))
     }
 }
 
@@ -100,6 +134,12 @@ impl PyMergeInsert {
 
     fn __repr__(&self) -> &'static str {
         "MergeInsert(...)"
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "MERGE actions cannot be tested as Python booleans",
+        ))
     }
 }
 
