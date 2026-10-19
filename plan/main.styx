@@ -239,6 +239,14 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped sql.render.window+6 (prepare_window_clause writes every entry in order, an extended window's ( \"base\" ORDER BY .. frame ), all in query_builder_window.rs) and sql.render.select-order+6 (the WINDOW clause with each further entry after a comma); sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T07:48:02.086366Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.render.locking +1 (lock-of-table-names, 910d34cb): OF renders its names comma-separated, each a quoted unqualified identifier."
+                        after_done true
+                    }
                 )
             }
 
@@ -390,6 +398,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at sql.ast.keywords +6 (sql-domains, d5d22226): Keyword gains Value, rendering VALUE, built by Expr::domain_value()."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T07:48:01.963656Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.select +6 (lock-of-table-names, 910d34cb): a LockClause's OF list holds unqualified Names, each the name a FROM item answers to, so a FROM item's source has no construction there."
                         after_done true
                     }
                 )
