@@ -7,7 +7,7 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 use super::{merge::PyMerge, select::PySelect};
 use crate::{expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// One common table expression. Its body is a SELECT, or a MERGE, whose rows
 /// are those its RETURNING list yields.
 fn expression(

@@ -6,7 +6,7 @@ use pyo3::{prelude::*, types::PyTuple};
 
 use crate::{errors::ConstructionError, expressions::PyExpr};
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// One GROUP BY item that is not a bare expression: `()`, a parenthesised
 /// set, `ROLLUP`, `CUBE` or `GROUPING SETS`, each built by the Rust
 /// constructor of the same name. `sets` takes its first element, so the

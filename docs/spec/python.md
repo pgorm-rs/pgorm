@@ -141,7 +141,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Queries for applications
 
-> [spec:pgorm:req:python.statements+7]
+> [spec:pgorm:req:python.statements+10]
 > The runtime statement API MUST support SELECT projection, nested filters,
 > joins and aliases, grouping/HAVING, ordering, limits and offsets, and
 > INSERT/UPDATE/DELETE with supported guards, conflict handling and RETURNING.
@@ -158,8 +158,14 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > since nothing can order it after (`sql.ast.select.tie-limit`); a
 > `TableFunction` FROM item over function calls, `ROWS FROM` over several,
 > `WITH ORDINALITY` and its column names, the calls built by `call`, whose
-> vocabulary reaches `generate_series` and `unnest`, and any other expression
-> refused (`sql.ast.select.table-function`); and a table's `tablesample`, a
+> vocabulary reaches `generate_series` and `unnest` and the record-returning
+> `json_to_record`, `jsonb_to_record`, `json_to_recordset` and
+> `jsonb_to_recordset`, and any other expression refused
+> (`sql.ast.select.table-function`); `column_definition(name, type)`
+> appending to the column definition list of the call added last, its type a
+> `DataType` or what one is built from, lowered into Rust's
+> `column_definition` (`sql.ast.select.column-definitions`); and a table's
+> `tablesample`, a
 > `SampleMethod`, a percentage and an optional seed, both bound
 > (`sql.ast.select.table-sample`).
 > A SELECT MUST combine with another `Select` through `union`, `union_all`,
@@ -168,17 +174,20 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > statement is read into this one as a parenthesised arm, its tie limit
 > checked as it is read, and anything but a `Select` is a `TypeError`. The
 > arms are written in call order after the receiver's HAVING and WINDOW
-> clauses, so PostgreSQL's precedence groups them, `INTERSECT` binding
-> tighter than `UNION` and `EXCEPT`; the receiver's ORDER BY, row limit and
-> OFFSET, whenever they were set, order and bound the combined rows, and its
-> WITH clause precedes every arm.
+> clauses and combine in call order, as Rust's do: `a.union(b).intersect(c)`
+> is `(a UNION b) INTERSECT c`, everything before an `INTERSECT` that follows
+> a `UNION` or `EXCEPT` parenthesised so PostgreSQL's precedence cannot
+> regroup it; the receiver's ORDER BY, row limit and OFFSET, whenever they
+> were set, order and bound the combined rows, and its WITH clause precedes
+> every arm.
 > A SELECT's FROM list and joins MUST take a FROM item that is not a named
 > table: `JSON_TABLE`, lowered into `Func::json_table` with each column kind's
 > own clauses and behaviours as the Rust builder types them, its first column
 > and its alias required so an empty column list or an unnamed item cannot be
 > built. A SELECT item MUST be able to call a function over a window, inline or
 > named in the statement's WINDOW clause, lowered into `WindowStatement` and
-> the `expr_window` family. The WINDOW clause MUST hold every window
+> the `expr_window` family; an inline window may be an `ExtendedWindow(base)`
+> built on an entry of the clause, `OVER ( "base" ORDER BY … )`. The WINDOW clause MUST hold every window
 > `window(name, window)` declares, in call order, as Rust's
 > `SelectStatement::window` appends them: a `Window`, or an
 > `ExtendedWindow(base)`, lowered into Rust's `ExtendedWindow`, which builds
@@ -186,8 +195,10 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > (`sql.ast.window-statement`); anything else declared is a `TypeError`. A
 > clause PostgreSQL refuses — a name declared twice, an extended window whose
 > base is no earlier entry, has a frame, or already orders its rows when it
-> adds an ORDER BY — and an item over a name the clause does not declare are
-> refused by Rust's `check_windows`, as a `ConstructionError`, where the tie
+> adds an ORDER BY — an item over a name the clause does not declare, and an
+> item over an inline `ExtendedWindow` whose base no entry declares, has a
+> frame, or already orders its rows when it adds an ORDER BY are refused by
+> Rust's `check_windows`, as a `ConstructionError`, where the tie
 > limit is checked: when the statement is inspected or executed, and as a
 > method reads it into another statement.
 > `OVER` MUST attach only to what Rust's `WindowFunction` admits — a function

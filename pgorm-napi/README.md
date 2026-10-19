@@ -285,17 +285,23 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   an `escape`, `startsWith`/`endsWith`/`containsText` (text, not patterns),
   `cast`, `collate`, `at`/`slice`, `caseWhen(..).when(..).else(..)`,
   `caseOf(x).when(..)`, `call` for the functions pgorm-query constructs
-  (`uuidv7` and its shift among them, and the set-returning `generate_series`
+  (`uuidv7` and its shift among them, the set-returning `generate_series`
   and `unnest`, whose overloads need a bound argument typed:
-  `bind(1).cast("int8")`), `exists` and `scalar`.
+  `bind(1).cast("int8")`, and the record-returning `json_to_record`,
+  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`
+  and `scalar`.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
   (`null` removes), `limitWithTies` (`FETCH FIRST n ROWS WITH TIES`, in
-  LIMIT's slot), `distinct`, `union` .. `exceptAll`, `lock("update", { of,
-  wait })`, `with`, and `as(alias)` to read a query as a FROM item.
+  LIMIT's slot), `distinct`, `union` .. `exceptAll` (a chain combines in
+  call order: `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`),
+  `lock("update", { of, wait })`, `with`, and `as(alias)` to read a query as
+  a FROM item.
   `tableFunction(calls, { alias, ordinality, columns, rowsFrom })` reads
-  set-returning calls as one — `ROWS FROM` over several — and
+  set-returning calls as one — `ROWS FROM` over several — a call returning
+  `record` (`json_to_record` and its kin) given as `{ call, columnDefinitions:
+  [["a", "integer"], ..] }`, the columns that type it, and
   `table.tablesample("bernoulli" | "system", percentage, { repeatable })`
   samples a table. `new With(name, query, { columns, materialized }).cte(..)`
   and `With.recursive(name, query, { search, cycle })` are its common table
@@ -418,18 +424,20 @@ await pool.query(select().from(new Table("booking"))
   `.value`, `.query`, `.exists` and `.nested`, each with its own options. It
   needs a column and an alias, and is implicitly LATERAL, so `join(items,
   bind(true), { kind: "left" })` keeps a row whose document yields nothing.
-- **Windows**: `expr.over(window | name)` on a function call or a JSON
-  aggregate; `new Window().partitionBy(..).orderBy(..).frame(..)`; frames from
+- **Windows**: `expr.over(window | extended | name)` on a function call or a
+  JSON aggregate; `new Window().partitionBy(..).orderBy(..).frame(..)`; frames from
   `FrameType.rows`, `.range` or `.groups` offer only the ends that may follow
   their start; `windowFunction(name, ..)` for `row_number`, `rank`, `lag` and
   the others, usable only with `over`. Each `select.window(name, window)`
   appends an entry to the WINDOW clause, and `new ExtendedWindow(base)` builds
   one on an earlier entry, copying its partitioning and any ordering and
-  adding `orderBy(..)` and `frame(..)`. A clause PostgreSQL refuses — a name
+  adding `orderBy(..)` and `frame(..)`; given to `over`, it is written inline,
+  `OVER ("base" ..)`, on any entry. A clause PostgreSQL refuses — a name
   declared twice, an extended window whose base is no earlier entry, has a
-  frame, or already orders its rows when it adds an ORDER BY — and an
-  `over(name)` no entry declares are a `ConstructionError` when the statement
-  is inspected, run or read into another.
+  frame, or already orders its rows when it adds an ORDER BY — an
+  `over(name)` no entry declares, and an inline extended window over a base
+  it could not extend as an entry are a `ConstructionError` when the
+  statement is inspected, run or read into another.
 - **Ranges**: `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`)
   over ranges, multiranges and arrays. A range binds as a `Value` naming its
   kind — a built-in one or a `CreatedRange` — never inferred.

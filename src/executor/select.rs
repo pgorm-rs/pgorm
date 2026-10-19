@@ -28,7 +28,7 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// [`SelectStatement`] both still reach it.
 // [spec:pgorm:sem:query.build.modifiers+9]
 // [spec:pgorm:req:exec.tie-limit]
-// [spec:pgorm:def:sql.ast.window-statement+7]
+// [spec:pgorm:def:sql.ast.window-statement+8]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(

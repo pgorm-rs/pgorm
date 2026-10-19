@@ -201,6 +201,10 @@ pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExp
             Func::generate_series_step(start.clone(), stop.clone(), step.clone())
         }
         ("unnest", [array]) => Func::unnest(array.clone()),
+        ("json_to_record", [json]) => Func::json_to_record(json.clone()),
+        ("jsonb_to_record", [jsonb]) => Func::jsonb_to_record(jsonb.clone()),
+        ("json_to_recordset", [json]) => Func::json_to_recordset(json.clone()),
+        ("jsonb_to_recordset", [jsonb]) => Func::jsonb_to_recordset(jsonb.clone()),
         _ => {
             return Err(crate::UnsupportedCapabilityError::new_err(
                 "unsupported function or argument count",

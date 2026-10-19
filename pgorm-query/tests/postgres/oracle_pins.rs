@@ -15,7 +15,7 @@ use pgorm_query::extension::{Extension, Type};
 // between the bound value and the keyword, so the offset reads as an offset
 // rather than as trailing junk after a numeric literal.
 // [spec:pgorm:req:sql.render.oracle+2/test]
-// [spec:pgorm:req:sql.render.window+6/test]
+// [spec:pgorm:req:sql.render.window+7/test]
 #[test]
 fn window_frame_offset_renders_spaced() {
     let sql = Query::select()
@@ -39,8 +39,8 @@ fn window_frame_offset_renders_spaced() {
 // rejection it used to be pinned to is proved by the `compile_fail` doctest on
 // `SelectStatement::expr_window`.
 // [spec:pgorm:req:sql.render.oracle+2/test]
-// [spec:pgorm:def:sql.ast.window-statement+7/test]
-// [spec:pgorm:req:sql.render.window+6/test]
+// [spec:pgorm:def:sql.ast.window-statement+8/test]
+// [spec:pgorm:req:sql.render.window+7/test]
 #[test]
 fn over_attaches_only_to_function_calls() {
     let sql = Query::select()

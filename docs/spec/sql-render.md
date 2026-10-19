@@ -406,11 +406,12 @@ an ideal Postgres renderer would emit.
 
 ## SELECT
 
-> [spec:pgorm:req:sql.render.select-order+6]
+> [spec:pgorm:req:sql.render.select-order+7]
 > `prepare_select_statement` MUST emit clauses in exactly this order: the
 > statement's carried WITH clause when it has one (`query.build.with`), rendered
 > through the same `prepare_with_clause` the three write statements use and
-> therefore already ending in a separating space;
+> therefore already ending in a separating space; one `(` for each set
+> operation arm that regroups the chain before it (`sql.ast.select.union`);
 > `SELECT`; optional distinct (`ALL`, `DISTINCT`, or `DISTINCT ON (col, …)`);
 > the comma-separated select expressions; ` FROM ` with comma-separated table
 > references (omitted entirely when no from-table); one space-separated join
@@ -431,7 +432,15 @@ an ideal Postgres renderer would emit.
 > ordering instead renders a `CASE WHEN expr=v0 THEN 0 WHEN expr=v1 THEN 1 …
 > ELSE n END` expression with the values inlined, emulating MySQL
 > `FIELD()`-style ordering. Unions render as ` UNION (…)`, ` UNION ALL (…)`,
-> ` INTERSECT (…)`, or ` EXCEPT (…)` with the sub-select parenthesized.
+> ` INTERSECT (…)`, ` INTERSECT ALL (…)`, ` EXCEPT (…)` or ` EXCEPT ALL (…)`
+> with the sub-select parenthesized. An `INTERSECT` or `INTERSECT ALL` arm
+> that follows a `UNION` or `EXCEPT` arm of either form is preceded by a `)`
+> closing one of the parentheses opened before `SELECT`, so
+> `a.union(b).intersect(c)` renders `(SELECT … UNION (…)) INTERSECT (…)`:
+> PostgreSQL's grammar takes a parenthesised set operation as an operand, and
+> the WITH clause stays outside it, ahead of the whole statement. The ORDER
+> BY, row limit, OFFSET and locking tail follow the last arm, outside every
+> parenthesis, and so apply to the combined result as before.
 
 > [spec:pgorm:req:sql.render.joins+2]
 > Join types MUST render as `JOIN`, `CROSS JOIN`, `INNER JOIN`, `LEFT JOIN`,
@@ -460,13 +469,26 @@ an ideal Postgres renderer would emit.
 > which the grammar refuses (`sql.ast.select.tie-limit`,
 > `sql.render.oracle`).
 
-> [spec:pgorm:req:sql.render.table-function]
+> [spec:pgorm:req:sql.render.table-function+2]
 > A `FromItem::TableFunction` MUST render each call as a function call does
 > in FROM — its name, then its arguments parenthesised — comma-separated
 > inside `ROWS FROM (` … `)` when it is a `ROWS FROM`; then
 > ` WITH ORDINALITY` when it numbers its rows; then ` AS "alias"`, and the
 > column names parenthesised directly after the alias, `AS "t"("a", "b")`,
-> when it names them. The calls' arguments are bound as any argument is.
+> when it names them. The calls' arguments are bound as any argument is. A
+> call's column definition list renders as `sql.render.column-definitions`
+> says.
+
+> [spec:pgorm:req:sql.render.column-definitions]
+> A column definition list MUST render parenthesised, each column its quoted
+> name, a space and its type as a column definition writes it
+> (`sql.render.ddl.types`), comma-separated: `("a" integer, "b" text[])`. A
+> `TableFunction` of one call whose list stands in the alias — no
+> `ROWS FROM` asked for, no ordinal column and no column names — renders it
+> directly after the alias, `JSON_TO_RECORD($1) AS "t"("a" integer)`; any
+> other renders as a `ROWS FROM`, each call with a list followed by ` AS `
+> and its list inside the `ROWS FROM (` … `)`,
+> `ROWS FROM (JSON_TO_RECORD($1) AS ("a" integer), GENERATE_SERIES(1, 2))`.
 
 > [spec:pgorm:req:sql.render.table-sample]
 > A `FromItem::TableSample` MUST render the sampled table as a named table
@@ -475,13 +497,14 @@ an ideal Postgres renderer would emit.
 > ` TABLESAMPLE SYSTEM (`, the percentage as a parameter, and `)`; then, when
 > seeded, ` REPEATABLE (`, the seed as a parameter, and `)`.
 
-> [spec:pgorm:req:sql.render.window+6]
+> [spec:pgorm:req:sql.render.window+7]
 > A window specification is never emitted bare: `prepare_window_spec` wraps a
 > `WindowStatement` in `( ` … ` )` (note the spaces inside the parentheses),
 > `prepare_extended_window` wraps an `ExtendedWindow` the same way, and they
 > are the only ways a specification reaches the sink. Both spelling sites
-> therefore agree — an inline windowed projection renders ` OVER ( … )` and a
-> WINDOW clause entry renders `"name" AS ( … )` — and an empty specification
+> therefore agree, for either kind of window — an inline windowed projection
+> renders ` OVER ( … )`, ` OVER ( "base" ORDER BY … )` when it is built on a
+> declared window, and a WINDOW clause entry renders `"name" AS ( … )` — and an empty specification
 > renders as the legal `(  )`. `prepare_window_clause` writes the clause:
 > ` WINDOW ` and its entries in the order the statement holds them, separated
 > by `, `, or nothing when it declares no window. An extended window writes

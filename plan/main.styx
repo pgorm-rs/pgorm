@@ -239,6 +239,22 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped sql.render.window+6 (prepare_window_clause writes every entry in order, an extended window's ( \"base\" ORDER BY .. frame ), all in query_builder_window.rs) and sql.render.select-order+6 (the WINDOW clause with each further entry after a comma); sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:36:49.88187Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped sql.render.select-order+7: one ( per regrouping arm after the WITH clause and before SELECT, and the ) that closes it before that arm's operator; set-operation rendering moved to query_builder_set_operation.rs; sites re-pinned and the renderer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:22.288312Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped sql.render.window+7: an inline window built on a declared one renders OVER ( \"base\" ORDER BY .. ) through prepare_extended_window; sites re-pinned and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -390,6 +406,30 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at sql.ast.keywords +6 (sql-domains, d5d22226): Keyword gains Value, rendering VALUE, built by Expr::domain_value()."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T22:36:49.745426Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped sql.ast.select.union+2: a chain of set operations means what it reads in call order, an INTERSECT arm after a UNION or EXCEPT arm parenthesising everything before it; site re-pinned and the renderer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:22.146738Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped sql.ast.window-statement+8: WindowSelectType gains Extended, expr_window/expr_window_as take any WindowDefinition, and check_windows holds an inline extended window to an extended entry's refusals with any entry as its base, the error's window None; sites re-pinned and the code matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:04:53.532307Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.ast.func+11: Function gains JsonToRecord, JsonbToRecord, JsonToRecordset and JsonbToRecordset with their Func constructors, read through a column definition list; sites re-pinned and the code matches."
                         after_done true
                     }
                 )
@@ -652,6 +692,15 @@ children (
                         [spec:pgorm:req:query.loader.table-ref-limitation]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T23:06:22.423711Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) reworded query.build.window+2: QuerySelect::window appends a WindowStatement or an ExtendedWindow to the WINDOW clause, held to check_windows by every terminal; the code was already so, and the four references are pinned."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -6187,6 +6236,38 @@ children (
                         text "select-named-windows (d4f6c3e3) bumped python.statements+7: Select.window appends to the WINDOW clause, ExtendedWindow(base) lowers into Rust's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError where the tie limit is checked; sites re-pinned, the binding matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:36:50.016024Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "set-operation-grouping (a5a85e10) bumped python.statements+8: Select's set operations combine in call order as Rust's do, a.union(b).intersect(c) being (a UNION b) INTERSECT c; sites re-pinned, the binding matches, and test_set_operations holds every operator pair live."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T22:37:36.41601Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "python.statements+8 evidence: test_chains_combine_in_call_order and test_intersect_after_union_groups_the_union (pgorm-python/tests/test_set_operations.py) pass against PostgreSQL 18.6, with the full suite and checks/typing.py."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:59.129114Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped python.statements+9: over() takes an ExtendedWindow inline, built on any entry of the WINDOW clause and refused by check_windows as an extended entry is; sites re-pinned, test_inline_window_builds_on_a_named_one and window_clause_matches_rust_builders pass."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:05:27.315995Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped python.statements+10: TableFunction.column_definition(name, type) and call()'s json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset; sites re-pinned, test_record_calls_read_through_column_definitions passes with the full suite and checks/typing.py."
+                        after_done true
+                    }
                 )
             }
 
@@ -8908,6 +8989,14 @@ children (
                         text "Operator 2026-10-18, on the two constructs sql-select-extras found in neither sql.scope's lists nor the builder: column definition lists for record-returning functions in FROM / ROWS FROM (json_to_record(..) AS (a int, b text)), which those functions need to be usable at all, recommended built; and the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME, which need tsm_system_rows / tsm_system_time installed, recommended ruled out: \"as you recommend\". Filed as table-function-column-defs, which also records the extension methods as out of scope in sql.scope."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:05:27.191311Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.scope+23 per the operator's decision: the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME join the out-of-scope list (they need tsm_system_rows / tsm_system_time installed; FromItem::Template reaches them). Column definition lists, the other construct of that decision, are built. Sites re-pinned."
+                        after_done true
+                    }
                 )
             }
 
@@ -9235,6 +9324,14 @@ children (
                         kind @note
                         text "Scope, per the operator's sql.scope verdict (2026-10-18, on query-second-tier) and sql.scope +16's deferred entry. FETCH FIRST n ROWS WITH TIES (requires ORDER BY: make a tie limit without an order unrepresentable or refused before rendering; check what PostgreSQL refuses, e.g. WITH TIES with OFFSET is fine, without ORDER BY is 42601/2201W); GROUP BY DISTINCT over the grouping sets sql.ast.select.grouping builds; SIMILAR TO and NOT SIMILAR TO with an optional ESCAPE, bound like LIKE's pattern; WITH ORDINALITY on a set-returning function in FROM and ROWS FROM (f(..), g(..)) WITH ORDINALITY with a column alias list; TABLESAMPLE BERNOULLI | SYSTEM (percentage) [REPEATABLE (seed)] on a table in FROM, the percentage and seed bound. Oracle-checked renders on the 18 grammar, live tests on 18.6, each construct's entry graduated from sql.scope's deferred list (bump; query-second-tier re-delivers with a feat commit), sql.surface register entries for new exports, and Python and JavaScript reach each with stubs / .d.ts, capability entries and parity cases. Waits on python-statement-typing, which changes the same Python statement stubs."
                     }
+
+                    {
+                        at 2026-10-19T08:05:27.021072Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.ast.select.table-function+2 (a call returning record takes a column definition list, sql.ast.select.column-definitions; alias returns FromItem::FunctionCall only for a call without one) and sql.render.table-function+2 (a call's list renders per sql.render.column-definitions); previously unpinned sites pinned and the code matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -9366,6 +9463,13 @@ children (
                         kind @decision
                         text "Operator 2026-10-18, offered either making chained set operations group in call order (the lead's recommendation: the builder parenthesizes what came before when a tighter-binding operator follows, changing the rendered SQL of affected queries) or keeping PostgreSQL's precedence and documenting it: \"as you recommend\". So the builders group left to right in Rust, Python and JavaScript."
                     }
+
+                    {
+                        at 2026-10-18T22:36:40.246465Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -9388,6 +9492,9 @@ children (
                 id table-function-column-defs
                 title "A record-returning function in FROM and ROWS FROM takes a column definition list, from Rust, Python and JavaScript"
                 kind @feat
+                implements {
+                    main ([spec:pgorm:req:sql.ast.select.column-definitions] [spec:pgorm:req:sql.render.column-definitions])
+                }
                 deps (sql-select-extras sql-domains)
                 log (
                     {
@@ -9395,6 +9502,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's decision on query-second-tier (2026-10-18). A function returning record (json_to_record, jsonb_to_recordset, a user function declared RETURNS record or SETOF record) is unusable in FROM without a column definition list: SELECT * FROM json_to_record($1) AS t(a int, b text), and inside ROWS FROM each such call carries its own AS (a int, b text). Extend TableFunction (sql.ast.select.table-function) so a call can carry a column definition list of (name, ColumnType) pairs, render it in both positions, and refuse what PostgreSQL refuses (a definition list on a function that does not return record, 42601/42804; WITH ORDINALITY combined with a definition list on a lone function call outside ROWS FROM, which the grammar rejects: check on 18.6). Oracle-checked renders, live tests with json_to_record and jsonb_to_recordset, Python and JavaScript reach it. Also record in sql.scope's out-of-scope list the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME (they need tsm_system_rows / tsm_system_time installed; raw SQL reaches them), and bump sql.scope. Waits on sql-domains, which is editing sql.scope."
+                    }
+
+                    {
+                        at 2026-10-18T23:07:39.507984Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
                     }
                 )
             }
@@ -9425,6 +9539,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by select-named-windows (e5df312c). PostgreSQL accepts an inline window built on a named one, OVER (\"w\" ORDER BY ..), with the same restrictions as a named window extending another (no PARTITION BY, no ORDER BY over one the base has, no base with a frame). ExtendedWindow could feed expr_window and the bindings' over() so this is expressible, held by check_windows. Also update query.build.window, whose text still says the method \"declares a named window in place\" without mentioning appending or ExtendedWindow."
+                    }
+
+                    {
+                        at 2026-10-18T22:38:13.651239Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T22:59:11.487034Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -11863,6 +11991,22 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "select-named-windows (d4f6c3e3) bumped napi.windows+1: select.window appends to the WINDOW clause, new ExtendedWindow(base) builds pgorm-query's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError in compile and embedded; the sites written before the bump re-read and pinned at +1, the binding matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:06:59.238316Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "inline-window-over-named (a08d6a4d) bumped napi.windows+2: over() takes an ExtendedWindow inline, refused by check_windows as an extended entry is; sites re-pinned, windows.test.ts and the window-inline-extended parity case pass in Node and Deno."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:05:27.436116Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped napi.select+2 (tableFunction takes { call, columnDefinitions }, a non-empty list of [name, type] pairs) and napi.expressions+3 (call() reaches json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset); sites re-pinned, select-extras.test.ts and the record-functions parity case pass in Node and Deno."
                         after_done true
                     }
                 )

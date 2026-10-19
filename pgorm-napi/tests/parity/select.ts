@@ -2,8 +2,8 @@
 // with the JavaScript API, and `select.json` holds the SQL and values it must
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
-// [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
+// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
 
 import {
   bind,
@@ -14,6 +14,7 @@ import {
   col,
   Condition,
   cube,
+  DataType,
   Decimal,
   exists,
   groupingSet,
@@ -248,6 +249,17 @@ export const cases: Record<string, () => Builder> = {
     });
     const single = tableFunction(call("generate_series", 1, 2), { alias: "s", rowsFrom: true });
     return select(zipped.star(), single.col("s")).from(zipped).crossJoin(single);
+  },
+  "record-functions": () => {
+    const one = tableFunction({
+      call: call("json_to_record", col("doc")),
+      columnDefinitions: [["a", "integer"], ["tags", new DataType("text").array()]],
+    }, { alias: "o" });
+    const zipped = tableFunction(
+      [{ call: call("jsonb_to_recordset", col("docs")), columnDefinitions: [["b", "text"]] }, call("generate_series", 1, 2)],
+      { alias: "z", ordinality: true },
+    );
+    return select(one.star(), zipped.star()).from(new Table("t")).crossJoin(one).crossJoin(zipped);
   },
   "tablesample": () => {
     const sampled = account.tablesample("system", 12.5, { repeatable: 42 });

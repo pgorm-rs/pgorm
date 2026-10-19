@@ -1,10 +1,12 @@
 use crate::{
     AnyWithClause, FunctionCall, GroupingElement, IntoSubQueryStatement, QueryStatementBuilder,
-    SubQueryStatement, WindowFunction, WindowStatement,
+    SubQueryStatement, WindowFunction,
     backend::QueryBuilder,
     expr::*,
     prepare::*,
-    query::{NamedWindow, OrderedStatement, RowLimit, condition::*, select_expr::*},
+    query::{
+        NamedWindow, OrderedStatement, RowLimit, WindowDefinition, condition::*, select_expr::*,
+    },
     types::*,
     value::*,
 };
@@ -542,7 +544,12 @@ impl SelectStatement {
         self
     }
 
-    /// Select column with window function.
+    /// Select column with window function, over a window written inline: a
+    /// [`WindowStatement`](crate::WindowStatement), or an
+    /// [`ExtendedWindow`](crate::ExtendedWindow) built on an entry of the
+    /// statement's WINDOW clause, `OVER ( "base" ORDER BY … )`, which
+    /// [`check_windows`](Self::check_windows) holds to what a named window
+    /// extending that entry is held to.
     ///
     /// # Examples
     ///
@@ -561,6 +568,27 @@ impl SelectStatement {
     ///     query.to_string(),
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) FROM "character""#
     /// );
+    ///
+    /// let query = Query::select()
+    ///     .from(Char::Table)
+    ///     .expr_window(
+    ///         Func::count(Expr::col(Char::Id)),
+    ///         ExtendedWindow::new(Name::runtime("by_size"))
+    ///             .order_by(Char::Id, Order::Asc)
+    ///             .to_owned(),
+    ///     )
+    ///     .window(Name::runtime("by_size"), WindowStatement::partition_by(Char::FontSize))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     [
+    ///         r#"SELECT COUNT("id") OVER ( "by_size" ORDER BY "id" ASC ) FROM "character""#,
+    ///         r#"WINDOW "by_size" AS ( PARTITION BY "font_size" )"#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// assert_eq!(query.check_windows(), Ok(()));
     /// ```
     ///
     /// PostgreSQL admits `OVER` only after a function call — a
@@ -577,15 +605,16 @@ impl SelectStatement {
     ///         WindowStatement::partition_by(Char::FontSize),
     ///     );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
-    pub fn expr_window<F>(&mut self, func: F, window: WindowStatement) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+8]
+    pub fn expr_window<F, W>(&mut self, func: F, window: W) -> &mut Self
     where
         F: WindowFunction,
+        W: Into<WindowDefinition>,
     {
         self.expr(SelectExpr {
             expr: func.into(),
             alias: None,
-            window: Some(WindowSelectType::Query(window)),
+            window: Some(WindowSelectType::from(window.into())),
         });
         self
     }
@@ -611,16 +640,17 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER ( PARTITION BY "font_size" ) AS "C" FROM "character""#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
-    pub fn expr_window_as<F, A>(&mut self, func: F, window: WindowStatement, alias: A) -> &mut Self
+    // [spec:pgorm:def:sql.ast.window-statement+8]
+    pub fn expr_window_as<F, W, A>(&mut self, func: F, window: W, alias: A) -> &mut Self
     where
         F: WindowFunction,
+        W: Into<WindowDefinition>,
         A: IntoName,
     {
         self.expr(SelectExpr {
             expr: func.into(),
             alias: Some(alias.into_name()),
-            window: Some(WindowSelectType::Query(window)),
+            window: Some(WindowSelectType::from(window.into())),
         });
         self
     }
@@ -646,7 +676,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn expr_window_name<F, W>(&mut self, func: F, window: W) -> &mut Self
     where
         F: WindowFunction,
@@ -678,7 +708,7 @@ impl SelectStatement {
     ///     r#"SELECT COUNT("id") OVER "w" AS "C" FROM "character" WINDOW "w" AS ( PARTITION BY "font_size" )"#
     /// );
     /// ```
-    // [spec:pgorm:def:sql.ast.window-statement+7]
+    // [spec:pgorm:def:sql.ast.window-statement+8]
     pub fn expr_window_name_as<F, W, A>(&mut self, func: F, window: W, alias: A) -> &mut Self
     where
         F: WindowFunction,
@@ -1788,6 +1818,11 @@ impl SelectStatement {
 
     /// Union with another SelectStatement that must have the same selected fields.
     ///
+    /// A chain of set operations groups in call order: each arm combines
+    /// everything appended before it with its own query. Where PostgreSQL's
+    /// precedence would read the flat chain otherwise — `INTERSECT` binds
+    /// tighter than `UNION` and `EXCEPT` — the arms before are parenthesised.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1809,8 +1844,25 @@ impl SelectStatement {
     ///     query.to_string(),
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 UNION ALL (SELECT "character" FROM "character" WHERE "font_id" = 4)"#
     /// );
+    ///
+    /// let font = |id: i32| {
+    ///     Query::select()
+    ///         .column(Char::Character)
+    ///         .from(Char::Table)
+    ///         .and_where(Expr::col(Char::FontId).eq(id))
+    ///         .to_owned()
+    /// };
+    /// let query = font(1)
+    ///     .union(UnionType::Distinct, font(2))
+    ///     .union(UnionType::Intersect, font(3))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"(SELECT "character" FROM "character" WHERE "font_id" = 1 UNION (SELECT "character" FROM "character" WHERE "font_id" = 2)) INTERSECT (SELECT "character" FROM "character" WHERE "font_id" = 3)"#
+    /// );
     /// ```
-    // [spec:pgorm:sem:sql.ast.select.union+1]
+    // [spec:pgorm:sem:sql.ast.select.union+2]
     pub fn union(&mut self, union_type: UnionType, query: SelectStatement) -> &mut Self {
         self.unions.push((union_type, query));
         self

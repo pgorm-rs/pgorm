@@ -6,9 +6,9 @@ fn counted() -> FunctionCall {
     Func::count(Expr::col(Char::Id))
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    PARTITION BY accumulates from all four entry
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    PARTITION BY accumulates from all four entry
 // points
-// [spec:pgorm:req:sql.render.window+6/test]    an inline window renders ` OVER ( … )`
+// [spec:pgorm:req:sql.render.window+7/test]    an inline window renders ` OVER ( … )`
 #[test]
 fn window_1() {
     assert_eq!(
@@ -40,9 +40,9 @@ fn window_1() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    ORDER BY comes from the shared
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    ORDER BY comes from the shared
 // `OrderedStatement` trait
-// [spec:pgorm:req:sql.render.window+6/test]    ` PARTITION BY … ORDER BY …`
+// [spec:pgorm:req:sql.render.window+7/test]    ` PARTITION BY … ORDER BY …`
 #[test]
 fn window_2() {
     assert_eq!(
@@ -87,9 +87,9 @@ fn window_2() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    a lone start is a whole frame, and
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    a lone start is a whole frame, and
 // `and_*` gives one an end, for either frame type
-// [spec:pgorm:req:sql.render.window+6/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
+// [spec:pgorm:req:sql.render.window+7/test]    ` RANGE `/` ROWS ` then `BETWEEN start AND end` or
 // the start bound alone
 #[test]
 fn window_3() {
@@ -158,7 +158,7 @@ fn window_3() {
     );
 }
 
-// [spec:pgorm:req:sql.render.window+6/test]    a bounded offset renders the value, a space, then
+// [spec:pgorm:req:sql.render.window+7/test]    a bounded offset renders the value, a space, then
 // the keyword
 #[test]
 fn window_4() {
@@ -203,7 +203,7 @@ fn window_4() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    all three frame modes render, GROUPS
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    all three frame modes render, GROUPS
 // included, and an offset means the same to the renderer in each
 #[test]
 fn every_frame_mode_renders_its_keyword() {
@@ -237,9 +237,9 @@ fn every_frame_mode_renders_its_keyword() {
     }
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    `WindowSelectType::Name` references a window
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    `WindowSelectType::Name` references a window
 // declared at statement level with `SelectStatement::window`
-// [spec:pgorm:req:sql.render.window+6/test]    a named reference renders ` OVER "name"` and its
+// [spec:pgorm:req:sql.render.window+7/test]    a named reference renders ` OVER "name"` and its
 // declaration ` WINDOW "name" AS ( … )`
 #[test]
 fn window_5() {
@@ -296,9 +296,9 @@ fn named(name: &str) -> Name {
     Name::runtime(name)
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    the WINDOW clause holds every named window,
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    the WINDOW clause holds every named window,
 // each call appending one
-// [spec:pgorm:req:sql.render.window+6/test]    ` WINDOW "a" AS ( … ), "b" AS ( … )` in call order
+// [spec:pgorm:req:sql.render.window+7/test]    ` WINDOW "a" AS ( … ), "b" AS ( … )` in call order
 #[test]
 fn every_named_window_renders_in_call_order() {
     let query = Query::select()
@@ -330,9 +330,9 @@ fn every_named_window_renders_in_call_order() {
     std::assert_eq!(query.check_windows(), Ok(()));
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    an extended window names an earlier entry and
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    an extended window names an earlier entry and
 // adds an ORDER BY and a frame
-// [spec:pgorm:req:sql.render.window+6/test]    `( "base" ORDER BY … <frame> )`, the base where a
+// [spec:pgorm:req:sql.render.window+7/test]    `( "base" ORDER BY … <frame> )`, the base where a
 // window of its own writes its PARTITION BY
 #[test]
 fn extended_window_renders_its_base_first() {
@@ -420,7 +420,7 @@ fn extending(base: &str) -> ExtendedWindow {
     ExtendedWindow::new(named(base))
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    `check_windows` refuses each clause PostgreSQL
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    `check_windows` refuses each clause PostgreSQL
 // refuses, every one of which parses
 #[test]
 fn check_windows_refuses_what_postgres_refuses() {
@@ -429,7 +429,7 @@ fn check_windows_refuses_what_postgres_refuses() {
         crate::oracle::assert_parses(&query.to_string());
         query.check_windows().expect_err("a refused clause")
     };
-    let pair = |window: &str, base: &str| (window.to_owned(), base.to_owned());
+    let pair = |window: &str, base: &str| (Some(window.to_owned()), base.to_owned());
 
     std::assert_eq!(
         refused(vec![("w", by_size()), ("w", ordered_by_id())]),
@@ -548,7 +548,7 @@ fn check_windows_refuses_what_postgres_refuses() {
     }
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    window names are compared as the text they
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    window names are compared as the text they
 // render, case-exactly, whichever types minted them
 #[test]
 fn window_names_compare_by_their_text() {
@@ -577,7 +577,156 @@ fn window_names_compare_by_their_text() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    each refusal says what PostgreSQL would
+/// The window each windowed call reads, as the parser read it: the base an
+/// inline window names ("" for none) and how many ORDER BY items it adds.
+fn inline_windows(sql: &str) -> Vec<(String, usize)> {
+    parsed_nodes(sql, "FuncCall")
+        .iter()
+        .filter_map(|call| call.get("over"))
+        .map(|over| {
+            let refname = over["refname"].as_str().unwrap_or_default().to_owned();
+            let orders = over["order_clause"].as_array().map_or(0, Vec::len);
+            (refname, orders)
+        })
+        .collect()
+}
+
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    an inline window can build on an entry of the
+// WINDOW clause, through either inline constructor, with or without an alias
+// [spec:pgorm:req:sql.render.window+7/test]    ` OVER ( "base" ORDER BY … <frame> )`, written as
+// an extended entry is
+#[test]
+fn inline_window_builds_on_a_named_one() {
+    let query = Query::select()
+        .from(Char::Table)
+        .expr_window(
+            counted(),
+            extending("parts")
+                .order_by(Char::Id, Order::Asc)
+                .frame(FrameType::Rows.unbounded_preceding())
+                .to_owned(),
+        )
+        .expr_window_as(
+            Func::max(Expr::col(Char::Id)),
+            extending("ordered"),
+            named("top"),
+        )
+        .window(
+            named("parts"),
+            WindowStatement::partition_by(Char::FontSize),
+        )
+        .window(
+            named("ordered"),
+            WindowStatement::new()
+                .order_by(Char::SizeW, Order::Desc)
+                .take(),
+        )
+        .take();
+    let sql = query.to_string();
+    assert_eq!(
+        sql,
+        [
+            r#"SELECT COUNT("id") OVER ( "parts" ORDER BY "id" ASC ROWS UNBOUNDED PRECEDING ),"#,
+            r#"MAX("id") OVER ( "ordered" ) AS "top" FROM "character""#,
+            r#"WINDOW "parts" AS ( PARTITION BY "font_size" ),"#,
+            r#""ordered" AS (  ORDER BY "size_w" DESC )"#,
+        ]
+        .join(" ")
+    );
+    std::assert_eq!(
+        inline_windows(&sql),
+        [("parts".to_owned(), 1), ("ordered".to_owned(), 0)]
+    );
+    std::assert_eq!(query.check_windows(), Ok(()));
+}
+
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    `check_windows` holds an inline window to
+// what an extended entry is held to, its base any entry of the clause
+#[test]
+fn check_windows_refuses_inline_bases_postgres_refuses() {
+    let over = |window: ExtendedWindow, windows: Vec<(&str, WindowDefinition)>| {
+        let mut query = Query::select();
+        query.from(Char::Table).expr_window(counted(), window);
+        for (name, definition) in windows {
+            query.window(named(name), definition);
+        }
+        crate::oracle::assert_parses(&query.to_string());
+        query.check_windows()
+    };
+    let refused = |window, windows| over(window, windows).expect_err("a refused window");
+    let ordered = || extending("v").order_by(Char::SizeW, Order::Asc).to_owned();
+
+    std::assert_eq!(
+        refused(extending("v"), vec![("u", by_size())]),
+        Error::WindowBaseUndefined {
+            window: None,
+            base: "v".to_owned()
+        }
+    );
+    std::assert_eq!(
+        refused(
+            extending("v"),
+            vec![(
+                "v",
+                WindowStatement::new()
+                    .frame(FrameType::Rows.current_row())
+                    .take()
+                    .into()
+            )]
+        ),
+        Error::WindowFrameCopied {
+            window: None,
+            base: "v".to_owned()
+        }
+    );
+    std::assert_eq!(
+        refused(ordered(), vec![("v", ordered_by_id())]),
+        Error::WindowOrderOverridden {
+            window: None,
+            base: "v".to_owned()
+        }
+    );
+    // An ORDER BY copied down to the base orders it as its own does.
+    std::assert_eq!(
+        refused(
+            ordered(),
+            vec![("u", ordered_by_id()), ("v", extending("u").into())]
+        ),
+        Error::WindowOrderOverridden {
+            window: None,
+            base: "v".to_owned()
+        }
+    );
+    // The inline window's base may be any entry: the clause precedes it, so
+    // none is later than it.
+    std::assert_eq!(
+        over(ordered(), vec![("v", by_size()), ("w", by_size())]),
+        Ok(())
+    );
+    std::assert_eq!(
+        over(
+            extending("v")
+                .frame(FrameType::Rows.current_row())
+                .to_owned(),
+            vec![("v", ordered_by_id())]
+        ),
+        Ok(())
+    );
+    // An entry's refusal still comes first, naming the entry.
+    std::assert_eq!(
+        refused(
+            extending("v"),
+            vec![("v", by_size()), ("w", extending("x").into())]
+        ),
+        Error::WindowBaseUndefined {
+            window: Some("w".to_owned()),
+            base: "x".to_owned()
+        }
+    );
+}
+
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    each refusal says what PostgreSQL would, an
+// inline window's naming only its base
 #[test]
 fn window_refusals_name_the_windows() {
     let (w, v) = (|| "w".to_owned(), || "v".to_owned());
@@ -585,15 +734,27 @@ fn window_refusals_name_the_windows() {
         Error::WindowRedefined { name: w() },
         Error::WindowUndefined { name: w() },
         Error::WindowBaseUndefined {
-            window: w(),
+            window: Some(w()),
             base: v(),
         },
         Error::WindowFrameCopied {
-            window: w(),
+            window: Some(w()),
             base: v(),
         },
         Error::WindowOrderOverridden {
-            window: w(),
+            window: Some(w()),
+            base: v(),
+        },
+        Error::WindowBaseUndefined {
+            window: None,
+            base: v(),
+        },
+        Error::WindowFrameCopied {
+            window: None,
+            base: v(),
+        },
+        Error::WindowOrderOverridden {
+            window: None,
             base: v(),
         },
     ]
@@ -606,6 +767,9 @@ fn window_refusals_name_the_windows() {
             r#"window "w" extends "v", which no earlier entry of the WINDOW clause declares"#,
             r#"window "w" cannot extend "v", which has a frame"#,
             r#"window "w" cannot add an ORDER BY to "v", which already orders its rows"#,
+            r#"the window after OVER extends "v", which the WINDOW clause does not declare"#,
+            r#"the window after OVER cannot extend "v", which has a frame"#,
+            r#"the window after OVER cannot add an ORDER BY to "v", which already orders its rows"#,
         ]
     );
 }
@@ -619,7 +783,7 @@ fn take_moves_the_window_clause() {
     assert!(!query.to_string().contains("WINDOW"));
 }
 
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    `take()` moves the contents out and leaves the
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    `take()` moves the contents out and leaves the
 // builder empty
 #[test]
 fn window_7() {
@@ -632,9 +796,9 @@ fn window_7() {
     assert_ne!(taken, WindowStatement::new());
 }
 
-// [spec:pgorm:req:sql.render.select-order+6/test]    WINDOW sits with HAVING, ahead of the tail
+// [spec:pgorm:req:sql.render.select-order+7/test]    WINDOW sits with HAVING, ahead of the tail
 // clauses that apply to the whole result
-// [spec:pgorm:req:sql.render.window+6/test]
+// [spec:pgorm:req:sql.render.window+7/test]
 #[test]
 fn window_clause_precedes_order_limit_lock() {
     assert_eq!(
@@ -678,7 +842,7 @@ fn window_clause_precedes_order_limit_lock() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+6/test]    a named window belongs to its own query level,
+// [spec:pgorm:req:sql.render.select-order+7/test]    a named window belongs to its own query level,
 // so it is written before the set operation
 #[test]
 fn window_clause_precedes_union() {

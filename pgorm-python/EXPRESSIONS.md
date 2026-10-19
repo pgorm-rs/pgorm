@@ -114,7 +114,9 @@ escape is a backslash.
 `lower`, `upper`, `abs`, `char_length`, `count`, `count_distinct`, `sum`, `avg`,
 `min`, `max`, `round`, `coalesce`, `random`, `gen_random_uuid`, and PostgreSQL
 18's `uuidv4`, `uuidv7`, `uuid_extract_timestamp` and `uuid_extract_version`,
-and the set-returning `generate_series` and `unnest` a `TableFunction` reads
+the set-returning `generate_series` and `unnest` a `TableFunction` reads, and
+the record-returning `json_to_record`, `jsonb_to_record`, `json_to_recordset`
+and `jsonb_to_recordset` it reads through a column definition list
 (see [STATEMENTS.md](STATEMENTS.md#table-functions-and-samples)).
 `round` accepts one or two arguments, `coalesce` one or more, `random`,
 `gen_random_uuid` and `uuidv4` none, `uuidv7` none or one (the `interval` its

@@ -6,8 +6,8 @@
 
 use neon::prelude::*;
 use pgorm::pgorm_query::{
-    ColumnRef, Expr, FromItem, FunctionCall, NamedTable, SampleMethod, SimpleExpr, TableFunction,
-    TableName, TableSample,
+    ColumnRef, ColumnType, Expr, FromItem, FunctionCall, Name, NamedTable, SampleMethod,
+    SimpleExpr, TableFunction, TableName, TableSample,
 };
 
 use super::{
@@ -29,7 +29,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 ];
 
 /// `tableNew(name, schema, alias)`.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn table_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let schema = arg(cx, 1);
@@ -94,7 +94,7 @@ fn table_star(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `fromSubquery(select, alias)`: `(SELECT ..) AS "alias"`.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn from_subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
     let select = select_at(cx, 0)?;
     let alias = name_at(cx, 1)?;
@@ -115,7 +115,7 @@ fn sample_number(cx: &mut FunctionContext, index: usize, what: &str) -> NeonResu
 /// `TABLESAMPLE BERNOULLI` or `SYSTEM`, its percentage and optional
 /// `REPEATABLE` seed bound. The table keeps its schema and alias, the name
 /// the item answers to.
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 fn table_sample(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Table(table) = this(cx, 0)? else {
         return refuse(cx, "only a Table is sampled");
@@ -149,18 +149,56 @@ fn table_call<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<
     }
 }
 
-/// `tableFunction(calls, alias, ordinality, columns, rowsFrom)`: at least one
-/// set-returning call as an aliased FROM item — `ROWS FROM (..)` when there
-/// are several or `rowsFrom` says, numbered `WITH ORDINALITY` when asked,
-/// its columns named in the alias.
-// [spec:pgorm:req:napi.select+1]
+/// The column definition list `value` holds, `[[name, type], ..]`: each
+/// column an identifier and a type as `DataType` arguments take one, at least
+/// one of them, since a call without a list has none to give.
+// [spec:pgorm:req:napi.select+2]
+fn column_definitions<'cx>(
+    cx: &mut Cx<'cx>,
+    value: Handle<'cx, JsValue>,
+) -> NeonResult<Vec<(Name, ColumnType)>> {
+    let mut definitions = Vec::new();
+    for column in items(cx, value)? {
+        let pair = items(cx, column)?;
+        let [column_name, column_type] = pair.as_slice() else {
+            return refuse(cx, "a column definition is a [name, type] pair");
+        };
+        let column_name = name(cx, *column_name)?;
+        definitions.push((
+            column_name,
+            super::data_type::column_type(cx, *column_type)?,
+        ));
+    }
+    if definitions.is_empty() {
+        return refuse(cx, "a column definition list names at least one column");
+    }
+    Ok(definitions)
+}
+
+/// `tableFunction(calls, alias, ordinality, columns, rowsFrom, definitions)`:
+/// at least one set-returning call as an aliased FROM item — `ROWS FROM (..)`
+/// when there are several or `rowsFrom` says, numbered `WITH ORDINALITY` when
+/// asked, its columns named in the alias — each call with the column
+/// definition list `definitions` holds for it, if any.
+// [spec:pgorm:req:napi.select+2]
 fn table_function(cx: &mut FunctionContext) -> NeonResult<Node> {
+    let definitions = arg(cx, 5);
+    let definitions = if absent(cx, definitions) {
+        Vec::new()
+    } else {
+        items(cx, definitions)?
+    };
     let mut calls = Vec::new();
-    for value in list(cx, 0)? {
-        calls.push(table_call(cx, value)?);
+    for (at, value) in list(cx, 0)?.into_iter().enumerate() {
+        let call = table_call(cx, value)?;
+        let defined = match definitions.get(at) {
+            Some(list) if !absent(cx, *list) => column_definitions(cx, *list)?,
+            _ => Vec::new(),
+        };
+        calls.push((call, defined));
     }
     let mut calls = calls.into_iter();
-    let Some(first) = calls.next() else {
+    let Some((first, first_defined)) = calls.next() else {
         return refuse(cx, "a table function reads at least one call");
     };
     let alias = arg(cx, 1);
@@ -176,8 +214,14 @@ fn table_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     } else {
         TableFunction::new(first)
     };
-    for call in calls {
+    for (column_name, column_type) in first_defined {
+        function = function.column_definition(column_name, column_type);
+    }
+    for (call, defined) in calls {
         function = function.and(call);
+        for (column_name, column_type) in defined {
+            function = function.column_definition(column_name, column_type);
+        }
     }
     if flag(cx, 2)? {
         function = function.with_ordinality();

@@ -468,7 +468,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+2]
+> [spec:pgorm:req:napi.expressions+3]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -497,18 +497,23 @@ SQL text running a built statement.
 > without its shift among them — and another name or count is a
 > `ConstructionError`: the name selects a constructor and never reaches SQL;
 > `generate_series`, with or without its step, and `unnest` are the
-> set-returning ones a `tableFunction` reads.
+> set-returning ones a `tableFunction` reads, and `json_to_record`,
+> `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset` the
+> record-returning ones it reads through a column definition list.
 > A cast names its type by identifier or `TypeName`; `collate` names a
 > collation, schema-qualifiable; `at` and `slice` subscript an array; a
 > searched or simple `CASE` exists only once it has an arm; `exists` and
 > `scalar` take a `Select`.
 
-> [spec:pgorm:req:napi.select+1]
+> [spec:pgorm:req:napi.select+2]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of
 > expressions and aliased expressions, `*` until one is given; FROM items —
 > a `Table`, schema-qualified and aliased, or a `FromItem`, which is always
 > aliased, a subquery among them, a `tableFunction` over calls — `ROWS FROM`
-> over several, `WITH ORDINALITY`, column names — and a table's
+> over several, `WITH ORDINALITY`, column names, and a call returning
+> `record` given as `{ call, columnDefinitions }`, its non-empty list of
+> `[name, type]` pairs lowered into pgorm-query's `column_definition`
+> (`sql.ast.select.column-definitions`) — and a table's
 > `tablesample` by `"bernoulli"` or `"system"` with a bound percentage and
 > optional seed (`sql.ast.select.table-function`,
 > `sql.ast.select.table-sample`) —; inner, left, right and full joins on a
@@ -601,12 +606,13 @@ SQL text running a built statement.
 > its paths written as escaped literals and its PASSING values bound. Its
 > `onError` is `"error"` or `"empty"`.
 
-> [spec:pgorm:req:napi.windows+1]
+> [spec:pgorm:req:napi.windows+2]
 > `over` MUST attach a window only to what pgorm-query's `WindowFunction`
 > admits — a function call, or `jsonArrayAgg` or `jsonObjectAgg` — and
 > anything else is a `ConstructionError`; the call under it is a projection
-> item, named with `as`. Its window is a `Window`, written inline, or the name
-> of one the SELECT's WINDOW clause declares. `window(name, window)` MUST
+> item, named with `as`. Its window is a `Window` or an `ExtendedWindow(base)`
+> built on an entry of the SELECT's WINDOW clause, written inline, or the
+> name of one the clause declares. `window(name, window)` MUST
 > append an entry, the clause holding every one in call order as
 > pgorm-query's `SelectStatement::window` does: a `Window`, or an
 > `ExtendedWindow(base)`, which builds pgorm-query's `ExtendedWindow` on an
@@ -614,8 +620,10 @@ SQL text running a built statement.
 > (`sql.ast.window-statement`); anything else is a `ConstructionError`. A
 > clause PostgreSQL refuses — a name declared twice, an extended window whose
 > base is no earlier entry, has a frame, or already orders its rows when it
-> adds an ORDER BY — and a call over a name the clause does not declare are
-> refused by pgorm-query's `check_windows`, as a `ConstructionError`, where
+> adds an ORDER BY — a call over a name the clause does not declare, and one
+> over an inline `ExtendedWindow` whose base no entry declares, has a frame,
+> or already orders its rows when it adds an ORDER BY are refused by
+> pgorm-query's `check_windows`, as a `ConstructionError`, where
 > the tie limit is checked: by `inspect()` and every run, and by a method
 > reading the statement into another as it is called. A `Window`
 > builds pgorm-query's `WindowStatement` with PARTITION BY, ORDER BY and a

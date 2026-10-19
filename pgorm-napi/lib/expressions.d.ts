@@ -5,11 +5,11 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+2]
+// [spec:pgorm:req:napi.expressions+3]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
-import type { Window, Windowed } from "./windows.d.ts";
+import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
 
 /** The SQL and the bound values a builder makes, exactly as running it would. */
 export interface Compiled {
@@ -109,10 +109,11 @@ export declare class Expr extends Builder {
   /** An array slice, `a[lower:upper]`; `null` leaves that end open. */
   slice(lower: Operand | null, upper: Operand | null): Expr;
   /**
-   * This call over a window, inline or named by the statement; only a function
-   * call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   * This call over a window, inline or named by the statement; an inline
+   * `ExtendedWindow` builds on an entry the statement declares. Only a
+   * function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
    */
-  over(window: Window | string): Windowed;
+  over(window: Window | ExtendedWindow | string): Windowed;
   /** A projection naming its output column. */
   as(alias: string): Aliased;
   asc(options?: { readonly nulls?: Nulls }): OrderBy;
@@ -186,7 +187,11 @@ export type FunctionName =
   | "uuid_extract_timestamp"
   | "uuid_extract_version"
   | "generate_series"
-  | "unnest";
+  | "unnest"
+  | "json_to_record"
+  | "jsonb_to_record"
+  | "json_to_recordset"
+  | "jsonb_to_recordset";
 
 /**
  * A call to one of the functions pgorm-query has a constructor for; another
@@ -198,6 +203,10 @@ export type FunctionName =
  * overloads are chosen by argument type and a parameter has none, so a bound
  * argument needs its type: `bind(1).cast("int4")`, or an array cast with
  * `{ array: true }`; a column or a typed expression already has one.
+ *
+ * `json_to_record`, `jsonb_to_record`, `json_to_recordset` and
+ * `jsonb_to_recordset` (one document each) return `record`, read by
+ * `tableFunction` through the column definition list a `RecordCall` gives.
  */
 export declare function call(name: FunctionName, ...operands: Operand[]): Expr;
 /** `(a, b, ..)`, at least one item. */

@@ -1,5 +1,5 @@
 use super::*;
-use crate::oracle::assert_eq;
+use crate::oracle::{assert_eq, assert_query_eq, parsed_nodes};
 
 // [spec:pgorm:req:sql.ast+3/test]
 // [spec:pgorm:def:sql.ast.select+5/test]
@@ -942,7 +942,7 @@ fn select_55() {
     );
 }
 
-// [spec:pgorm:req:sql.render.select-order+6/test]
+// [spec:pgorm:req:sql.render.select-order+7/test]
 #[test]
 fn select_56() {
     assert_eq!(
@@ -1915,7 +1915,7 @@ fn select_custom_operator() {
     );
 }
 
-// [spec:pgorm:sem:sql.ast.select.union+1/test]
+// [spec:pgorm:sem:sql.ast.select.union+2/test]
 #[test]
 fn union_1() {
     assert_eq!(
@@ -1940,6 +1940,185 @@ fn union_1() {
             r#"LEFT JOIN "font" ON "character"."font_id" = "font"."id" ORDER BY "font"."id" ASC)"#
         ]
         .join(" ")
+    );
+}
+
+const SET_OPERATIONS: [UnionType; 6] = [
+    UnionType::Distinct,
+    UnionType::All,
+    UnionType::Intersect,
+    UnionType::IntersectAll,
+    UnionType::Except,
+    UnionType::ExceptAll,
+];
+
+fn arm(table: &str) -> SelectStatement {
+    Query::select()
+        .column(Name::runtime("v"))
+        .from(Name::runtime(table))
+        .take()
+}
+
+/// A set operation as the parse tree records it on a `SelectStmt`: its `op`
+/// and whether it keeps duplicates.
+fn parsed_operation(union: UnionType) -> (i64, bool) {
+    use pg_query::protobuf::SetOperation;
+    let (op, all) = match union {
+        UnionType::Distinct => (SetOperation::SetopUnion, false),
+        UnionType::All => (SetOperation::SetopUnion, true),
+        UnionType::Intersect => (SetOperation::SetopIntersect, false),
+        UnionType::IntersectAll => (SetOperation::SetopIntersect, true),
+        UnionType::Except => (SetOperation::SetopExcept, false),
+        UnionType::ExceptAll => (SetOperation::SetopExcept, true),
+    };
+    (op as i64, all)
+}
+
+/// The set operation a parsed `SelectStmt` performs, and its left and right
+/// operands.
+fn operation_of(node: &serde_json::Value) -> ((i64, bool), &serde_json::Value, &serde_json::Value) {
+    let op = node["op"]
+        .as_i64()
+        .unwrap_or_else(|| panic!("no op in {node:#}"));
+    let all = node["all"].as_bool().unwrap_or(false);
+    ((op, all), &node["larg"], &node["rarg"])
+}
+
+/// The tables a set operation's leaves read, left to right.
+fn tables(node: &serde_json::Value) -> Vec<String> {
+    match node["from_clause"][0]["RangeVar"]["relname"].as_str() {
+        Some(name) if node.get("larg").is_none() => vec![name.to_owned()],
+        _ => {
+            let mut found = tables(&node["larg"]);
+            found.extend(tables(&node["rarg"]));
+            found
+        }
+    }
+}
+
+// [spec:pgorm:sem:sql.ast.select.union+2/test]    for every pair of operators, the server's parser
+// reads the chain a op1 b op2 c as (a op1 b) op2 c, and only an INTERSECT after a UNION or EXCEPT
+// adds a parenthesis
+// [spec:pgorm:req:sql.render.select-order+7/test]
+#[test]
+fn chained_set_operations_parse_in_call_order() {
+    for first in SET_OPERATIONS {
+        for second in SET_OPERATIONS {
+            let sql = arm("a")
+                .union(first, arm("b"))
+                .union(second, arm("c"))
+                .to_string();
+            let regrouped = matches!(second, UnionType::Intersect | UnionType::IntersectAll)
+                && !matches!(first, UnionType::Intersect | UnionType::IntersectAll);
+            assert_eq!(
+                sql.starts_with('('),
+                regrouped,
+                "{first:?} then {second:?}: {sql}"
+            );
+
+            let statements = parsed_nodes(&sql, "SelectStmt");
+            let (outer, left, right) = operation_of(&statements[0]);
+            assert_eq!(outer, parsed_operation(second), "{sql}");
+            assert_eq!(tables(right), ["c"], "{sql}");
+            let (inner, a, b) = operation_of(left);
+            assert_eq!(inner, parsed_operation(first), "{sql}");
+            assert_eq!(
+                (tables(a), tables(b)),
+                (vec!["a".to_owned()], vec!["b".to_owned()])
+            );
+        }
+    }
+}
+
+// [spec:pgorm:sem:sql.ast.select.union+2/test]    a grouped prefix is one operand, so a longer
+// chain closes one parenthesis per INTERSECT that follows a UNION or EXCEPT, and none elsewhere
+// [spec:pgorm:req:sql.render.select-order+7/test]
+#[test]
+fn a_long_chain_groups_each_regrouping_arm() {
+    let chain = arm("a")
+        .union(UnionType::Distinct, arm("b"))
+        .union(UnionType::Intersect, arm("c"))
+        .union(UnionType::IntersectAll, arm("d"))
+        .union(UnionType::ExceptAll, arm("e"))
+        .union(UnionType::Intersect, arm("f"))
+        .to_string();
+    assert_query_eq(
+        &chain,
+        &[
+            r#"((SELECT "v" FROM "a" UNION (SELECT "v" FROM "b"))"#,
+            r#"INTERSECT (SELECT "v" FROM "c") INTERSECT ALL (SELECT "v" FROM "d")"#,
+            r#"EXCEPT ALL (SELECT "v" FROM "e"))"#,
+            r#"INTERSECT (SELECT "v" FROM "f")"#,
+        ]
+        .join(" "),
+    );
+
+    let statements = parsed_nodes(&chain, "SelectStmt");
+    let (last, rest, f) = operation_of(&statements[0]);
+    assert_eq!(last, parsed_operation(UnionType::Intersect));
+    assert_eq!(tables(f), ["f"]);
+    let (except, rest, e) = operation_of(rest);
+    assert_eq!(except, parsed_operation(UnionType::ExceptAll));
+    assert_eq!(tables(e), ["e"]);
+    let (intersect_all, rest, d) = operation_of(rest);
+    assert_eq!(intersect_all, parsed_operation(UnionType::IntersectAll));
+    assert_eq!(tables(d), ["d"]);
+    let (intersect, rest, c) = operation_of(rest);
+    assert_eq!(intersect, parsed_operation(UnionType::Intersect));
+    assert_eq!(tables(c), ["c"]);
+    assert_eq!(tables(rest), ["a", "b"]);
+
+    // UNION and EXCEPT after anything, and INTERSECT after INTERSECT, already
+    // read left to right, so such a chain renders flat.
+    assert_eq!(
+        arm("a")
+            .union(UnionType::Intersect, arm("b"))
+            .union(UnionType::IntersectAll, arm("c"))
+            .union(UnionType::All, arm("d"))
+            .union(UnionType::Except, arm("e"))
+            .to_string(),
+        [
+            r#"SELECT "v" FROM "a" INTERSECT (SELECT "v" FROM "b")"#,
+            r#"INTERSECT ALL (SELECT "v" FROM "c") UNION ALL (SELECT "v" FROM "d")"#,
+            r#"EXCEPT (SELECT "v" FROM "e")"#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.render.select-order+7/test]    the WITH clause stays ahead of the opened
+// parentheses, the receiver's ORDER BY and limit follow the last arm, and an arm keeps its own
+// chain, ORDER BY and LIMIT inside its parentheses
+#[test]
+fn grouping_leaves_with_and_the_tail_outside() {
+    let inner = arm("c")
+        .union(UnionType::Except, arm("d"))
+        .union(UnionType::Intersect, arm("e"))
+        .order_by(Name::runtime("v"), Order::Desc)
+        .limit(2)
+        .take();
+    let sql = arm("a")
+        .union(UnionType::All, arm("b"))
+        .union(UnionType::IntersectAll, inner)
+        .with(WithClause::new(CommonTableExpression::new(
+            Name::runtime("a"),
+            arm("source"),
+        )))
+        .order_by(Name::runtime("v"), Order::Asc)
+        .limit(5)
+        .offset(1)
+        .take()
+        .to_string();
+    assert_query_eq(
+        &sql,
+        &[
+            r#"WITH "a" AS (SELECT "v" FROM "source")"#,
+            r#"(SELECT "v" FROM "a" UNION ALL (SELECT "v" FROM "b"))"#,
+            r#"INTERSECT ALL ((SELECT "v" FROM "c" EXCEPT (SELECT "v" FROM "d"))"#,
+            r#"INTERSECT (SELECT "v" FROM "e") ORDER BY "v" DESC LIMIT 2)"#,
+            r#"ORDER BY "v" ASC LIMIT 5 OFFSET 1"#,
+        ]
+        .join(" "),
     );
 }
 
@@ -2856,7 +3035,7 @@ fn a_with_clause_has_one_place_to_live() {
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
 // [spec:pgorm:req:sql.render.oracle+2/test]
-// [spec:pgorm:req:sql.render.select-order+6/test]
+// [spec:pgorm:req:sql.render.select-order+7/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {
     let inner = || {

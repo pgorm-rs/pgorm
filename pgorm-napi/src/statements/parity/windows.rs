@@ -216,10 +216,34 @@ fn clause_entries() -> (String, Values) {
         .build()
 }
 
+/// Inline windows built on an entry of the WINDOW clause, one ordering and
+/// framing it, one copying it bare under an alias.
+fn inline_extended() -> (String, Values) {
+    let mut by_kind = WindowStatement::default();
+    by_kind.add_partition_by(at!("kind"));
+    Query::select()
+        .expr_window(
+            Func::sum(at!("weight")),
+            ExtendedWindow::new(n("by_kind"))
+                .order_by_expr(at!("at"), Order::Asc)
+                .frame(FrameType::Rows.preceding(1i64).and_current_row())
+                .to_owned(),
+        )
+        .expr_window_as(
+            named!("rank", Vec::<SimpleExpr>::new()),
+            ExtendedWindow::new(n("by_kind")),
+            n("rank"),
+        )
+        .from(reading!())
+        .window(n("by_kind"), by_kind)
+        .build()
+}
+
 pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
     vec![
         ("window-inline-and-named", inline_and_named()),
         ("window-clause-entries", clause_entries()),
+        ("window-inline-extended", inline_extended()),
         ("window-frames", frames()),
         ("window-functions", functions()),
         ("window-json-aggregates", json_aggregates()),

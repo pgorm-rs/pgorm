@@ -211,7 +211,7 @@ impl PyFrameFollowing {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// An `OVER` window: PARTITION BY, ORDER BY and a frame, owned by Rust's
 /// `WindowStatement`.
 #[pyclass(name = "Window", module = "pgorm", frozen, from_py_object)]
@@ -274,11 +274,12 @@ fn frame_clause(frame: &Bound<'_, PyAny>) -> PyResult<FrameClause> {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
-/// A window built on an earlier entry of a SELECT's WINDOW clause, owned by
-/// Rust's `ExtendedWindow`: it copies the base's PARTITION BY and any ORDER
-/// BY, and adds an ORDER BY and a frame. It has no `partition_by`, because
-/// PostgreSQL refuses one there.
+// [spec:pgorm:req:python.statements+10]
+/// A window built on an entry of a SELECT's WINDOW clause, owned by Rust's
+/// `ExtendedWindow`: it copies the base's PARTITION BY and any ORDER BY, and
+/// adds an ORDER BY and a frame. Declared with `Select.window` it builds on
+/// an earlier entry; written inline after `over` it builds on any. It has no
+/// `partition_by`, because PostgreSQL refuses one there.
 #[pyclass(name = "ExtendedWindow", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyExtendedWindow {
@@ -319,7 +320,7 @@ impl PyExtendedWindow {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// What `Select.window` declares a name as: a `Window`, or an
 /// `ExtendedWindow` built on an earlier entry. Anything else is a
 /// `TypeError`, as an argument of the wrong class is.
@@ -360,10 +361,13 @@ impl WindowCall {
         }
     }
 
-    /// This call over a `Window`, or over the window a statement names.
+    /// This call over a `Window` or an `ExtendedWindow` written inline, or
+    /// over the window a statement names.
     pub(crate) fn over(self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowedExpr> {
         let over = if let Ok(window) = window.extract::<PyRef<'_, PyWindow>>() {
-            Over::Inline(window.inner.clone())
+            Over::Inline(window.inner.clone().into())
+        } else if let Ok(window) = window.extract::<PyRef<'_, PyExtendedWindow>>() {
+            Over::Inline(window.inner.clone().into())
         } else {
             Over::Named(PyIdentifier::new(window)?.name())
         };
@@ -381,15 +385,16 @@ fn not_windowed() -> PyErr {
     )
 }
 
-/// The window a call runs over: one written inline, or the name of the one
-/// the statement declares with `Select.window`.
+/// The window a call runs over: one written inline, which may build on an
+/// entry of the statement's WINDOW clause, or the name of the one the
+/// statement declares with `Select.window`.
 #[derive(Clone, Debug)]
 enum Over {
-    Inline(WindowStatement),
+    Inline(WindowDefinition),
     Named(Name),
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// A function call under `OVER`, a SELECT item built by `over`.
 #[pyclass(name = "WindowedExpr", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -444,7 +449,7 @@ impl PyWindowedExpr {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// A function PostgreSQL computes only over a window, built by
 /// `window_function`. Its one method is `over`, so it cannot stand in a query
 /// without its window (`42809`).

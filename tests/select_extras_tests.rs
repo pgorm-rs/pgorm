@@ -20,8 +20,9 @@ use pgorm::{
     entity::prelude::*,
 };
 use pgorm_query::{
-    Expr, Func, GroupingElement, LikeExpr, LockBehavior, LockType, Name, Order, OrderedStatement,
-    Query, SampleMethod, SelectStatement, TableFunction, TableSample, error::Error as QueryError,
+    ColumnType, Expr, Func, GroupingElement, LikeExpr, LockBehavior, LockType, Name, Order,
+    OrderedStatement, Query, SampleMethod, SelectStatement, TableFunction, TableSample,
+    error::Error as QueryError,
 };
 use pretty_assertions::assert_eq;
 use std::num::NonZeroU64;
@@ -73,6 +74,8 @@ async fn main() -> Result<(), Error> {
     similar_to_matches_bound_patterns(&db).await?;
     ordinality_numbers_a_function_rows(&db).await?;
     rows_from_pads_the_shorter_function(&db).await?;
+    a_record_call_reads_through_its_definitions(&db).await?;
+    the_server_refuses_what_definitions_cannot_see(&db).await?;
     tablesample_draws_by_a_bound_percentage(&db).await?;
 
     drop(db);
@@ -318,9 +321,9 @@ async fn similar_to_matches_bound_patterns(db: &DatabaseConnection) -> Result<()
     Ok(())
 }
 
-// [spec:pgorm:req:sql.ast.select.table-function/test]    against a live server: `WITH ORDINALITY`
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    against a live server: `WITH ORDINALITY`
 // numbers an array's elements in order, under the column names the alias gives
-// [spec:pgorm:req:sql.render.table-function/test]
+// [spec:pgorm:req:sql.render.table-function+2/test]
 async fn ordinality_numbers_a_function_rows(db: &DatabaseConnection) -> Result<(), Error> {
     let numbered = Query::select()
         .expr(col("v"))
@@ -371,9 +374,9 @@ async fn ordinality_numbers_a_function_rows(db: &DatabaseConnection) -> Result<(
     Ok(())
 }
 
-// [spec:pgorm:req:sql.ast.select.table-function/test]    against a live server: `ROWS FROM` reads
+// [spec:pgorm:req:sql.ast.select.table-function+2/test]    against a live server: `ROWS FROM` reads
 // its calls side by side and pads the one that runs out with NULLs
-// [spec:pgorm:req:sql.render.table-function/test]
+// [spec:pgorm:req:sql.render.table-function+2/test]
 async fn rows_from_pads_the_shorter_function(db: &DatabaseConnection) -> Result<(), Error> {
     let zipped = Query::select()
         .expr(col("x"))
@@ -395,6 +398,136 @@ async fn rows_from_pads_the_shorter_function(db: &DatabaseConnection) -> Result<
             (None, "c".to_owned(), 3)
         ]
     );
+
+    Ok(())
+}
+
+/// A bound JSON document, which the record functions' one signature types
+/// `json` or `jsonb`.
+fn document(value: serde_json::Value) -> pgorm_query::SimpleExpr {
+    Expr::val(value).into()
+}
+
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]    against a live server:
+// `json_to_record` and `jsonb_to_recordset` read a bound document through the columns their lists
+// define, a missing key reading NULL, a lone list moved into `ROWS FROM` beside an ordinal, and
+// each call of a `ROWS FROM` through its own list
+// [spec:pgorm:req:sql.render.column-definitions/test]
+async fn a_record_call_reads_through_its_definitions(db: &DatabaseConnection) -> Result<(), Error> {
+    let one = Query::select()
+        .expr(col("a"))
+        .expr(col("b"))
+        .expr(col("tags"))
+        .from(
+            TableFunction::new(Func::json_to_record(document(
+                serde_json::json!({"a": 7, "b": "seven", "tags": ["x", "y"]}),
+            )))
+            .column_definition(Name::runtime("a"), ColumnType::Integer)
+            .column_definition(Name::runtime("b"), ColumnType::Text)
+            .column_definition(
+                Name::runtime("tags"),
+                ColumnType::Array(std::sync::Arc::new(ColumnType::Text)),
+            )
+            .alias(Name::runtime("t")),
+        )
+        .take();
+    assert_eq!(
+        rows::<(i32, String, Vec<String>)>(db, one).await?,
+        [(7, "seven".to_owned(), vec!["x".to_owned(), "y".to_owned()])]
+    );
+
+    let numbered = Query::select()
+        .expr(col("a"))
+        .expr(col("missing"))
+        .expr(col("ordinality"))
+        .from(
+            TableFunction::new(Func::jsonb_to_recordset(document(
+                serde_json::json!([{"a": 2}, {"a": 1}, {"a": 3}]),
+            )))
+            .column_definition(Name::runtime("a"), ColumnType::Integer)
+            .column_definition(Name::runtime("missing"), ColumnType::Text)
+            .with_ordinality()
+            .alias(Name::runtime("t")),
+        )
+        .take();
+    assert!(
+        numbered
+            .to_string()
+            .contains("ROWS FROM (JSONB_TO_RECORDSET("),
+        "{numbered}"
+    );
+    assert_eq!(
+        rows::<(i32, Option<String>, i64)>(db, numbered).await?,
+        [(2, None, 1), (1, None, 2), (3, None, 3)]
+    );
+
+    let zipped = Query::select()
+        .expr(col("a"))
+        .expr(col("b"))
+        .expr(col("s"))
+        .from(
+            TableFunction::new(Func::json_to_recordset(document(
+                serde_json::json!([{"a": 1}, {"a": 2}]),
+            )))
+            .column_definition(Name::runtime("a"), ColumnType::Integer)
+            .and(Func::jsonb_to_recordset(document(
+                serde_json::json!([{"b": "x"}, {"b": "y"}, {"b": "z"}]),
+            )))
+            .column_definition(Name::runtime("b"), ColumnType::Text)
+            .and(Func::generate_series(int(10), int(11)))
+            .columns(["a", "b", "s"].map(Name::runtime))
+            .alias(Name::runtime("t")),
+        )
+        .take();
+    assert_eq!(
+        rows::<(Option<i32>, String, Option<i32>)>(db, zipped).await?,
+        [
+            (Some(1), "x".to_owned(), Some(10)),
+            (Some(2), "y".to_owned(), Some(11)),
+            (None, "z".to_owned(), None)
+        ]
+    );
+
+    Ok(())
+}
+
+// [spec:pgorm:req:sql.ast.select.column-definitions/test]    against a live server: which function
+// returns `record` is the server's to know, so a missing list, a list on another function and two
+// columns of one name are its refusals
+async fn the_server_refuses_what_definitions_cannot_see(
+    db: &DatabaseConnection,
+) -> Result<(), Error> {
+    let read = |function: TableFunction| {
+        Query::select()
+            .expr(Expr::val(1))
+            .from(function.alias(Name::runtime("t")))
+            .take()
+    };
+    let record = || Func::json_to_record(document(serde_json::json!({"a": 1})));
+    let refusals = [
+        (read(TableFunction::new(record())), SqlState::SYNTAX_ERROR),
+        (
+            read(
+                TableFunction::new(Func::generate_series(int(1), int(2)))
+                    .column_definition(Name::runtime("a"), ColumnType::Integer),
+            ),
+            SqlState::SYNTAX_ERROR,
+        ),
+        (
+            read(
+                TableFunction::new(record())
+                    .column_definition(Name::runtime("a"), ColumnType::Integer)
+                    .column_definition(Name::runtime("a"), ColumnType::Text),
+            ),
+            SqlState::DUPLICATE_COLUMN,
+        ),
+    ];
+    for (query, state) in refusals {
+        let refused = rows::<i32>(db, query.clone())
+            .await
+            .expect_err("the server refuses it");
+        assert_eq!(sql_state(&refused), Some(&state), "{query}");
+    }
 
     Ok(())
 }

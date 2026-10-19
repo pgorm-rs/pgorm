@@ -132,8 +132,8 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
     }
 }
 
-// [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
+// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -169,7 +169,7 @@ fn json_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.windows+1/test]
+// [spec:pgorm:req:napi.windows+2/test]
 // [spec:pgorm:req:napi.ranges/test]
 #[test]
 fn window_and_range_family_matches_its_golden_file() {

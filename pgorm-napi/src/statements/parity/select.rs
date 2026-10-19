@@ -1,10 +1,10 @@
 //! The SELECT family's cases, built with pgorm-query directly.
 
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use pgorm::pgorm_query::{
-    ArrayType, Asterisk, BinOper, ColumnRef, CommonTableExpression, Condition, Cycle, Expr,
-    FromItem, Func, GroupingElement, JoinType, LikeExpr, LockBehavior, LockType, NamedTable,
+    ArrayType, Asterisk, BinOper, ColumnRef, ColumnType, CommonTableExpression, Condition, Cycle,
+    Expr, FromItem, Func, GroupingElement, JoinType, LikeExpr, LockBehavior, LockType, NamedTable,
     NullOrdering, Order, Query, RecursiveWithClause, SampleMethod, Search, SearchOrder,
     SelectStatement, SimpleExpr, SubQueryStatement, Subscript, TableFunction, TableName,
     TableSample, TypeName, UnionType, Value, Values, WithClause,
@@ -500,6 +500,27 @@ fn rows_from() -> SelectStatement {
         .to_owned()
 }
 
+/// Calls returning `record`, a lone one with its list in the alias and one
+/// carrying its own inside a `ROWS FROM` numbered `WITH ORDINALITY`.
+fn record_functions() -> SelectStatement {
+    let one = TableFunction::new(Func::json_to_record(col!("doc")))
+        .column_definition(n("a"), ColumnType::Integer)
+        .column_definition(n("tags"), ColumnType::Array(Arc::new(ColumnType::Text)))
+        .alias(n("o"));
+    let zipped = TableFunction::new(Func::jsonb_to_recordset(col!("docs")))
+        .column_definition(n("b"), ColumnType::Text)
+        .and(Func::generate_series(1i64, 2i64))
+        .with_ordinality()
+        .alias(n("z"));
+    Query::select()
+        .expr(Expr::col(ColumnRef::TableAsterisk(n("o"))))
+        .expr(Expr::col(ColumnRef::TableAsterisk(n("z"))))
+        .from(table!("t"))
+        .cross_join(one)
+        .cross_join(zipped)
+        .to_owned()
+}
+
 fn tablesample() -> SelectStatement {
     let events = TableSample::new(
         NamedTable::from(TableName::Table(n("event"))),
@@ -603,6 +624,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
             table_function_ordinality().build(),
         ),
         ("rows-from", rows_from().build()),
+        ("record-functions", record_functions().build()),
         ("tablesample", tablesample().build()),
         (
             "expression-inspect",

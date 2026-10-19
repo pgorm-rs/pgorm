@@ -38,6 +38,8 @@ const SEED: &str = "
     INSERT INTO lhs (v) VALUES (1), (1), (1), (2), (2), (3);
     CREATE TABLE rhs (v int);
     INSERT INTO rhs (v) VALUES (1), (1), (2);
+    CREATE TABLE third (v int);
+    INSERT INTO third (v) VALUES (1), (2), (2), (4);
 ";
 
 #[pgorm_macros::test]
@@ -51,6 +53,7 @@ async fn main() -> Result<(), Error> {
     at_time_zone_shifts_the_clock(&db).await?;
     a_groups_frame_reaches_whole_peer_groups(&db).await?;
     the_all_set_operations_keep_the_duplicates(&db).await?;
+    chained_set_operations_combine_in_call_order(&db).await?;
 
     drop(db);
     ctx.delete().await;
@@ -75,7 +78,7 @@ fn counting(sample: &str) -> SelectStatement {
 /// and `IS NOT DISTINCT FROM` finds exactly them — so the operator is not a
 /// verbose spelling of the comparison it sits beside.
 // [spec:pgorm:req:sql.ast.expr.operators+5/test]
-// [spec:pgorm:req:sql.scope+22/test]
+// [spec:pgorm:req:sql.scope+23/test]
 async fn distinct_from_answers_where_equality_says_unknown(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -128,7 +131,7 @@ async fn distinct_from_answers_where_equality_says_unknown(
 /// run over the same reversed pair, so a dropped keyword shows up as the two
 /// answers agreeing.
 // [spec:pgorm:req:sql.ast.expr.operators+5/test]
-// [spec:pgorm:req:sql.scope+22/test]
+// [spec:pgorm:req:sql.scope+23/test]
 async fn symmetric_between_sorts_the_bounds_it_is_given(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -176,7 +179,7 @@ async fn symmetric_between_sorts_the_bounds_it_is_given(
 /// shape, same operator, identity answer — so a clause the server ignored
 /// would leave both answers at midnight.
 // [spec:pgorm:req:sql.ast.expr.operators+5/test]
-// [spec:pgorm:req:sql.scope+22/test]
+// [spec:pgorm:req:sql.scope+23/test]
 async fn at_time_zone_shifts_the_clock(db: &DatabaseConnection) -> Result<(), Error> {
     let read_in = |zone: &str| {
         let local = Expr::col(Name::runtime("at_local")).at_time_zone("UTC");
@@ -203,8 +206,8 @@ async fn at_time_zone_shifts_the_clock(db: &DatabaseConnection) -> Result<(), Er
 /// `ROWS` counts rows, `RANGE` counts values within a distance, and `GROUPS`
 /// counts peer groups — three different answers from one offset, which is what
 /// makes `GROUPS` a mode rather than a spelling of one of the other two.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]
-// [spec:pgorm:req:sql.scope+22/test]
+// [spec:pgorm:def:sql.ast.window-statement+8/test]
+// [spec:pgorm:req:sql.scope+23/test]
 async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Result<(), Error> {
     let framed = |r#type: FrameType| {
         WindowStatement::new()
@@ -251,7 +254,7 @@ async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Re
 /// `INTERSECT ALL` and `EXCEPT ALL` the middle four answers would be
 /// unreachable from the builder at all.
 // [spec:pgorm:sem:query.build.union+1/test]
-// [spec:pgorm:req:sql.scope+22/test]
+// [spec:pgorm:req:sql.scope+23/test]
 async fn the_all_set_operations_keep_the_duplicates(db: &DatabaseConnection) -> Result<(), Error> {
     let bag = |table: &str| {
         Query::select()
@@ -296,6 +299,95 @@ async fn the_all_set_operations_keep_the_duplicates(db: &DatabaseConnection) -> 
         3,
         "EXCEPT ALL: one 1 and one 2 survive the subtraction, and the 3"
     );
+
+    Ok(())
+}
+
+/// `op` over two bags of values, as PostgreSQL computes it: the plain forms
+/// yield each qualifying value once, the `ALL` forms by multiplicity.
+fn combine(op: UnionType, left: &[i32], right: &[i32]) -> Vec<i32> {
+    use std::collections::BTreeMap;
+    let count = |bag: &[i32]| {
+        bag.iter().fold(BTreeMap::new(), |mut counts, v| {
+            *counts.entry(*v).or_insert(0usize) += 1;
+            counts
+        })
+    };
+    let (l, r) = (count(left), count(right));
+    let times = |v: &i32| -> usize {
+        let (a, b) = (
+            l.get(v).copied().unwrap_or(0),
+            r.get(v).copied().unwrap_or(0),
+        );
+        match op {
+            UnionType::Distinct => usize::from(a + b > 0),
+            UnionType::All => a + b,
+            UnionType::Intersect => usize::from(a > 0 && b > 0),
+            UnionType::IntersectAll => a.min(b),
+            UnionType::Except => usize::from(a > 0 && b == 0),
+            UnionType::ExceptAll => a.saturating_sub(b),
+        }
+    };
+    let mut values: Vec<i32> = l.keys().chain(r.keys()).copied().collect();
+    values.sort_unstable();
+    values.dedup();
+    values
+        .iter()
+        .flat_map(|v| std::iter::repeat_n(*v, times(v)))
+        .collect()
+}
+
+/// Every pair of set operations chained over three bags reads in call order,
+/// `(lhs op1 rhs) op2 third`, which the server is asked and a model of the six
+/// operations computes. Where the flat chain would mean something else — an
+/// INTERSECT after a UNION or EXCEPT — the bags are chosen so the two readings
+/// differ, so a chain that rendered flat fails here.
+// [spec:pgorm:sem:sql.ast.select.union+2/test]
+async fn chained_set_operations_combine_in_call_order(
+    db: &DatabaseConnection,
+) -> Result<(), Error> {
+    let operations = [
+        UnionType::Distinct,
+        UnionType::All,
+        UnionType::Intersect,
+        UnionType::IntersectAll,
+        UnionType::Except,
+        UnionType::ExceptAll,
+    ];
+    let bag = |table: &str| {
+        Query::select()
+            .column(Name::runtime("v"))
+            .from(Name::runtime(table))
+            .take()
+    };
+    let (lhs, rhs, third) = ([1, 1, 1, 2, 2, 3], [1, 1, 2], [1, 2, 2, 4]);
+    let intersects = |op| matches!(op, UnionType::Intersect | UnionType::IntersectAll);
+
+    for first in operations {
+        for second in operations {
+            let sql = bag("lhs")
+                .union(first, bag("rhs"))
+                .union(second, bag("third"))
+                .order_by(Name::runtime("v"), Order::Asc)
+                .to_string();
+            let rows: Vec<i32> = db
+                .query_all(sql.as_str(), &[])
+                .await?
+                .iter()
+                .map(|row| row.get(0))
+                .collect();
+            let in_call_order = combine(second, &combine(first, &lhs, &rhs), &third);
+            assert_eq!(rows, in_call_order, "{first:?} then {second:?}: {sql}");
+
+            if intersects(second) && !intersects(first) {
+                let flat = combine(first, &lhs, &combine(second, &rhs, &third));
+                assert_ne!(
+                    flat, in_call_order,
+                    "{first:?} then {second:?} discriminates"
+                );
+            }
+        }
+    }
 
     Ok(())
 }

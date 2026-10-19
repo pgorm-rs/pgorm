@@ -5,11 +5,12 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.select+1]
+// [spec:pgorm:req:napi.select+2]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
+import type { BuiltinType, DataType } from "./json.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 
 /** A table, schema-qualified and aliased when the options say. Its names are identifiers, quoted. */
@@ -91,11 +92,23 @@ export declare class Select extends Builder {
   limitWithTies(count: number | bigint): Select;
   offset(count: number | bigint | null): Select;
   distinct(): Select;
+  /**
+   * `UNION`, with `other` as a parenthesised arm. A chain of set operations
+   * combines in call order: each takes everything before it as its left
+   * operand, so `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`, the
+   * union parenthesised because PostgreSQL binds `INTERSECT` tighter. The
+   * receiver's ORDER BY and limits order and bound the combined rows.
+   */
   union(other: Select): Select;
+  /** `UNION ALL`, combining in call order as {@link Select.union} does. */
   unionAll(other: Select): Select;
+  /** `INTERSECT`, combining in call order as {@link Select.union} does. */
   intersect(other: Select): Select;
+  /** `INTERSECT ALL`, combining in call order as {@link Select.union} does. */
   intersectAll(other: Select): Select;
+  /** `EXCEPT`, combining in call order as {@link Select.union} does. */
   except(other: Select): Select;
+  /** `EXCEPT ALL`, combining in call order as {@link Select.union} does. */
   exceptAll(other: Select): Select;
   /** Lock the rows read: `FOR UPDATE` and the weaker strengths, `OF` some items, without waiting. */
   lock(
@@ -151,13 +164,29 @@ export interface TableFunctionOptions {
 }
 
 /**
+ * A call to a function returning `record`, `json_to_record` and its kin among
+ * them, with the column definition list that gives its columns: each a name
+ * and a type, at least one.
+ */
+export interface RecordCall {
+  readonly call: Expr;
+  readonly columnDefinitions: readonly [ColumnDefinition, ...ColumnDefinition[]];
+}
+
+/** A column of a {@link RecordCall}: its name and its type. */
+export type ColumnDefinition = readonly [name: string, type: DataType | BuiltinType];
+
+/**
  * Set-returning calls as a FROM item: `f(..) AS alias`, or `ROWS FROM (f(..),
  * g(..))` over several, which reads them side by side and pads the shorter
  * ones with NULLs. Each call is one {@link call} made, `generate_series` and
- * `unnest` among them; any other expression is a {@link ConstructionError}.
+ * `unnest` among them, or a {@link RecordCall}; any other expression is a
+ * {@link ConstructionError}. A lone record call writes its list in the alias,
+ * `AS "t"("a" integer)`, and beside `ordinality` or `columns`, or among
+ * several calls, each call carries its own inside `ROWS FROM (..)`.
  */
 export declare function tableFunction(
-  calls: Expr | readonly [Expr, ...Expr[]],
+  calls: Expr | RecordCall | readonly [Expr | RecordCall, ...(Expr | RecordCall)[]],
   options: TableFunctionOptions,
 ): FromItem;
 

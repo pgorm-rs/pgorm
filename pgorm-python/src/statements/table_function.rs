@@ -5,7 +5,9 @@ use pgorm::pgorm_query::{FunctionCall, SimpleExpr, TableFunction};
 use pyo3::{prelude::*, types::PyTuple};
 
 use super::from_item::PyFromItem;
-use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
+use crate::{
+    errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier, schema::PyDataType,
+};
 
 /// The call an expression holds; anything else cannot stand in FROM.
 fn function_call(value: &Bound<'_, PyAny>) -> PyResult<FunctionCall> {
@@ -18,12 +20,13 @@ fn function_call(value: &Bound<'_, PyAny>) -> PyResult<FunctionCall> {
     }
 }
 
-// [spec:pgorm:req:python.statements+7]
+// [spec:pgorm:req:python.statements+10]
 /// A function in FROM: one call, or several read side by side under
 /// `ROWS FROM (..)`, the shorter padded with NULLs; `with_ordinality` adds a
-/// final `bigint` column numbering the rows from 1, and `columns` names the
-/// columns in the alias. `alias` finishes it as the `FromItem` that `from_`
-/// and the joins take.
+/// final `bigint` column numbering the rows from 1, `columns` names the
+/// columns in the alias, and `column_definition` defines a column of the
+/// `record` the call added last returns. `alias` finishes it as the
+/// `FromItem` that `from_` and the joins take.
 #[pyclass(name = "TableFunction", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyTableFunction {
@@ -72,6 +75,22 @@ impl PyTableFunction {
             .collect::<PyResult<Vec<_>>>()?;
         Ok(Self {
             inner: self.inner.clone().columns(names),
+        })
+    }
+
+    /// Define a column, its name and type, of the `record` the call added
+    /// last returns, as Rust's `column_definition` does: a lone call writes
+    /// the list in its alias, and each call of a `ROWS FROM` carries its own.
+    fn column_definition(
+        &self,
+        name: &Bound<'_, PyAny>,
+        data_type: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: self.inner.clone().column_definition(
+                PyIdentifier::new(name)?.name(),
+                PyDataType::coerce(data_type)?.inner,
+            ),
         })
     }
 

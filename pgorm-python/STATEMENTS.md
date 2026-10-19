@@ -114,6 +114,30 @@ names the columns in the alias, the ordinal last, and `.alias(name)` finishes
 it as the `FromItem` that `from_` and the joins take. A function in FROM may
 read the columns of the items before it.
 
+A function returning `record` — `call("json_to_record", ..)`,
+`jsonb_to_record`, `json_to_recordset`, `jsonb_to_recordset` — has no columns
+until `.column_definition(name, type)` defines them, one call each, appended
+to the list of the call added last; the type is a `pgorm.schema.DataType` or
+what one is built from (`"integer"`, a `TypeName`). A lone call writes the list in its
+alias, `JSON_TO_RECORD($1) AS "r"("a" integer)`; beside `.with_ordinality()`
+or `.columns(..)`, which PostgreSQL does not accept there, and in a
+`ROWS FROM` of several, each call carries its own,
+`ROWS FROM (JSON_TO_RECORD($1) AS ("a" integer)) WITH ORDINALITY AS "r"`.
+Which function returns `record` is the server's to know, so a record call
+without a list, or a list on another function, is its refusal (`42601`).
+
+```python
+from pgorm import TableFunction, Value, call, select
+
+order = (
+    TableFunction(call("json_to_record", Value.json({"id": 1, "total": "9.50"})))
+    .column_definition("id", "integer")
+    .column_definition("total", "numeric")
+    .alias("o")
+)
+totals = select(order.col("id"), order.col("total")).from_(order)
+```
+
 ```python
 from pgorm import SampleMethod, Table, TableFunction, call, select
 
@@ -171,11 +195,15 @@ WITH clause precedes the whole statement, so every arm reads its
 expressions, while its WHERE, GROUP BY, HAVING, DISTINCT and WINDOW belong to
 the first arm alone.
 
-Arms are written in call order, each parenthesised, so PostgreSQL's
-precedence groups them: `INTERSECT` binds tighter than `UNION` and `EXCEPT`,
-which group from the left. `a.union(b).intersect(c)` is
-`a UNION (b INTERSECT c)`; to intersect the union, make it the arm, as in
-`c.intersect(a.union(b))`. A recursive view's query is a set operation whose
+Arms are written in call order, each parenthesised, and a chain combines in
+the order it reads: each operation takes everything before it as its left
+operand, so `a.union(b).intersect(c)` is `(a UNION b) INTERSECT c`.
+PostgreSQL's own precedence differs in one place — `INTERSECT` binds tighter
+than `UNION` and `EXCEPT` — so an `INTERSECT` that follows a `UNION` or
+`EXCEPT` parenthesises what came before it, rendering
+`(SELECT … UNION (SELECT …)) INTERSECT (SELECT …)`; every other chain renders
+flat. To combine with a combination, make it the arm, as in
+`a.union(b.intersect(c))`. A recursive view's query is a set operation whose
 arm reads the view; see
 [SCHEMA.md](SCHEMA.md#views-materialized-views-and-tables-from-a-query).
 
@@ -213,7 +241,11 @@ identifiers, quoted case-exactly like every other.
 An entry may build on an earlier one: `ExtendedWindow(base)` is
 `"name" AS ("base" ..)`, which copies the base's PARTITION BY and any ORDER BY
 it has and adds `.order_by(*orderings)` and `.frame(frame)`. It has no
-`partition_by`, because PostgreSQL refuses one there.
+`partition_by`, because PostgreSQL refuses one there. `over` takes one inline
+too, `OVER ("base" ..)`, built on any entry the statement declares, so a
+single item can order or frame a shared partitioning without an entry of its
+own: `call("sum", reading.col("weight")).over(ExtendedWindow("by_kind")
+.order_by(reading.col("at").asc()))`.
 
 ```python
 from pgorm import ExtendedWindow, FrameType, Table, Window, call, select
@@ -236,8 +268,10 @@ What PostgreSQL refuses of a clause depends on its other entries, so
 operation's arm, a CTE body) raise `ConstructionError` for it, through Rust's
 `check_windows`: a name declared twice, an extended window whose base is no
 earlier entry, has a frame, or already orders its rows when it adds an ORDER
-BY, and an `over(name)` no entry declares. `.window` takes a `Window` or an
-`ExtendedWindow`; anything else raises `TypeError`.
+BY, an `over(name)` no entry declares, and an inline `ExtendedWindow` whose
+base no entry declares, has a frame, or already orders its rows when it adds
+an ORDER BY. `.window` takes a `Window` or an `ExtendedWindow`; anything else
+raises `TypeError`.
 
 PostgreSQL writes `OVER` only after a function call, and Rust's
 `expr_window` takes only a `WindowFunction`: a `FunctionCall` or one of the

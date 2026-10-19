@@ -17,14 +17,15 @@ use futures::StreamExt;
 use common::bakery_chain::{Bakery, Cake, bakery, cake, create_tables};
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    CommonTableExpression, Condition, Expr, ExtendedWindow, Func, Order, OrderedStatement, Query,
-    RecursiveWithClause, SelectStatement, SimpleExpr, UnionType, WindowStatement, WithClause,
-    error::Error as QueryError,
+    CommonTableExpression, Condition, Expr, ExtendedWindow, FrameType, Func, Order,
+    OrderedStatement, Query, RecursiveWithClause, SelectStatement, SimpleExpr, UnionType,
+    WindowStatement, WithClause, error::Error as QueryError,
 };
 use pgorm::{
     Error, SelectGetableTuple, SelectModel, Selector, SelectorRaw, alias, entity::prelude::*,
 };
 use pretty_assertions::assert_eq;
+use tokio_postgres::error::SqlState;
 
 async fn seed(db: &impl ConnectionTrait) -> Result<(i32, i32), Error> {
     let alpha = bakery::ActiveModel {
@@ -411,7 +412,7 @@ struct RankedCake {
     rank: i64,
 }
 
-// [spec:pgorm:sem:query.build.window/test]    a named window declaration and the projection that
+// [spec:pgorm:sem:query.build.window+2/test]    a named window declaration and the projection that
 // refers to it, both reachable as ORM combinators
 #[pgorm_macros::test]
 pub async fn window_clause_ranks_rows_per_bakery() -> Result<(), Error> {
@@ -456,7 +457,7 @@ struct PricedCake {
     cakes: i64,
 }
 
-// [spec:pgorm:sem:query.build.window/test]    `window` appends to the WINDOW clause, a window
+// [spec:pgorm:sem:query.build.window+2/test]    `window` appends to the WINDOW clause, a window
 // extending an earlier entry among them, and a clause PostgreSQL refuses is refused unsent
 #[pgorm_macros::test]
 pub async fn window_clause_holds_every_named_window() -> Result<(), Error> {
@@ -518,6 +519,130 @@ pub async fn window_clause_holds_every_named_window() -> Result<(), Error> {
         matches!(
             &refused,
             Error::QueryBuilder(QueryError::WindowRedefined { name }) if name == "per_bakery"
+        ),
+        "{refused:?}"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    against a live server: an inline window built
+// on a named one copies its partition, and each inline refusal `check_windows` makes is one the
+// server makes, with the code it names
+#[pgorm_macros::test]
+pub async fn inline_window_builds_on_a_named_one() -> Result<(), Error> {
+    let ctx = TestContext::new("inline_window_builds_on_a_named_one").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+    seed(&db).await?;
+
+    let per_bakery = alias("per_bakery");
+    let by_price = || {
+        ExtendedWindow::new(per_bakery)
+            .order_by(cake::Column::Price, Order::Desc)
+            .to_owned()
+    };
+    let mut priced = Cake::find().select([cake::Column::Name]);
+    QuerySelect::query(&mut priced)
+        .expr_window_as(Func::named(alias("rank")), by_price(), alias("rank"))
+        .expr_window_name_as(
+            Func::count(Expr::col(cake::Column::Id)),
+            per_bakery,
+            alias("cakes"),
+        );
+    let ranked = priced
+        .window(
+            per_bakery,
+            WindowStatement::partition_by(cake::Column::BakeryId),
+        )
+        .order_by_asc(cake::Column::BakeryId)
+        .order_by_desc(cake::Column::Price)
+        .into_model::<PricedCake>()
+        .all(&db)
+        .await?;
+    assert_eq!(
+        ranked
+            .iter()
+            .map(|cake| (cake.name.as_str(), cake.rank, cake.cakes))
+            .collect::<Vec<_>>(),
+        [
+            ("Alpha Torte", 1, 3),
+            ("Alpha Tart", 2, 3),
+            ("Alpha Bun", 3, 3),
+            ("Beta Gateau", 1, 3),
+            ("Beta Slice", 2, 3),
+            ("Beta Bun", 3, 3),
+        ],
+        "the inline window ranks within the partition it copies"
+    );
+
+    let counted = |inline: ExtendedWindow, base: WindowStatement| {
+        Query::select()
+            .expr_window(Func::count(Expr::col(cake::Column::Id)), inline)
+            .from(cake::Entity)
+            .window(per_bakery, base)
+            .to_owned()
+    };
+    let ordered = || {
+        WindowStatement::new()
+            .order_by(cake::Column::Id, Order::Asc)
+            .to_owned()
+    };
+    let refusals = [
+        (
+            counted(ExtendedWindow::new(alias("nowhere")), ordered()),
+            QueryError::WindowBaseUndefined {
+                window: None,
+                base: "nowhere".to_owned(),
+            },
+            SqlState::UNDEFINED_OBJECT,
+        ),
+        (
+            counted(
+                ExtendedWindow::new(per_bakery),
+                ordered().frame(FrameType::Rows.current_row()).to_owned(),
+            ),
+            QueryError::WindowFrameCopied {
+                window: None,
+                base: "per_bakery".to_owned(),
+            },
+            SqlState::WINDOWING_ERROR,
+        ),
+        (
+            counted(by_price(), ordered()),
+            QueryError::WindowOrderOverridden {
+                window: None,
+                base: "per_bakery".to_owned(),
+            },
+            SqlState::WINDOWING_ERROR,
+        ),
+    ];
+    for (query, refusal, state) in refusals {
+        assert_eq!(query.check_windows(), Err(refusal));
+        let sent = db
+            .query_all(query.to_string().as_str(), &[])
+            .await
+            .expect_err("the server refuses it too");
+        match &sent {
+            Error::Postgres(error) => assert_eq!(error.code(), Some(&state), "{error}"),
+            other => panic!("expected the server's refusal, got {other:?}"),
+        }
+    }
+
+    let mut unsent = Cake::find().select([cake::Column::Name]);
+    QuerySelect::query(&mut unsent).expr_window(Func::named(alias("rank")), by_price());
+    let refused = unsent
+        .into_model::<RankedCake>()
+        .all(&db)
+        .await
+        .expect_err("an inline window over an undeclared base");
+    assert!(
+        matches!(
+            &refused,
+            Error::QueryBuilder(QueryError::WindowBaseUndefined { window: None, base })
+                if base == "per_bakery"
         ),
         "{refused:?}"
     );

@@ -320,7 +320,7 @@ fn is_json_wraps_itself_and_an_operator_operand() {
 }
 
 // OVER follows a JSON aggregate as it follows a call, after its FILTER.
-// [spec:pgorm:def:sql.ast.window-statement+7/test]    the JSON aggregates are window functions
+// [spec:pgorm:def:sql.ast.window-statement+8/test]    the JSON aggregates are window functions
 #[test]
 fn a_json_aggregate_takes_a_window() {
     assert_eq!(

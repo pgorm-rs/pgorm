@@ -3,7 +3,7 @@
 // Expressions over pgorm-query's builders. An operand that is not an
 // expression is a value, bound as a parameter: nothing a caller passes becomes
 // SQL text, and an identifier is quoted wherever it appears.
-// [spec:pgorm:req:napi.expressions+2]
+// [spec:pgorm:req:napi.expressions+3]
 
 import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -60,10 +60,11 @@ export class Expr extends Predicate {
   }
 
   /**
-   * This call over a `Window`, or over the window the statement names; only
-   * a function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   * This call over a `Window` or an `ExtendedWindow` written inline, or over
+   * the window the statement names; only a function call or `jsonArrayAgg` /
+   * `jsonObjectAgg` takes one.
    *
-   * @param {import("./windows.js").Window | string} window
+   * @param {import("./windows.js").Window | import("./windows.js").ExtendedWindow | string} window
    */
   over(window) {
     return new Windowed(native.exprOver(arg(this), arg(window)), TRUSTED);
