@@ -343,11 +343,7 @@ fn locks() -> SelectStatement {
             FromItem::Table(event()),
             qualified!("a", "id").eq(qualified!("e", "account_id")),
         )
-        .lock_with_tables_behavior(
-            LockType::Update,
-            [NamedTable::from(TableName::Table(n("a")))],
-            LockBehavior::SkipLocked,
-        )
+        .lock_with_tables_behavior(LockType::Update, [n("a")], LockBehavior::SkipLocked)
         .to_owned()
 }
 
@@ -515,10 +511,7 @@ fn tablesample() -> SelectStatement {
             FromItem::from(events),
             qualified!("a", "id").eq(qualified!("event", "account_id")),
         )
-        .lock_with_tables(
-            LockType::Share,
-            [NamedTable::from(TableName::Table(n("a")))],
-        )
+        .lock_with_tables(LockType::Share, [n("a")])
         .to_owned()
 }
 

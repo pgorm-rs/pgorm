@@ -9315,12 +9315,27 @@ children (
                 title "FOR UPDATE OF names only the tables and aliases PostgreSQL accepts there"
                 kind @fix
                 deps (sql-select-extras)
+                sealed true
                 log (
                     {
                         at 2026-10-18T18:24:02.897376Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa); predates it. A locking clause's OF list (FOR UPDATE OF ..) renders any FromItem, so an aliased table written as its source, a subquery, a table function or a TABLESAMPLE there produces SQL the server refuses: OF takes table names or aliases only. Narrow what OF accepts to a table name or alias reference so the refused shapes cannot be built, check the server's refusals on 18.6 (42P01 for a name not in FROM, 0A000 for locking a function or VALUES), and give the bindings the same."
+                    }
+
+                    {
+                        at 2026-10-18T23:11:28.104192Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T07:44:55.74759Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

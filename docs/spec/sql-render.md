@@ -446,10 +446,11 @@ an ideal Postgres renderer would emit.
 > it was never constructed by any builder and rendered `unimplemented!()`, and
 > it MUST NOT return without a renderer.
 
-> [spec:pgorm:sem:sql.render.locking]
+> [spec:pgorm:sem:sql.render.locking+1]
 > A lock clause renders as `FOR ` plus `UPDATE`, `NO KEY UPDATE`, `SHARE`, or
-> `KEY SHARE`; then ` OF ` with comma-separated quoted table refs when tables
-> are named; then optionally ` NOWAIT` or ` SKIP LOCKED`.
+> `KEY SHARE`; then ` OF ` with its names, comma-separated and each a quoted
+> unqualified identifier, when it names any; then optionally ` NOWAIT` or
+> ` SKIP LOCKED`.
 
 > [spec:pgorm:req:sql.render.tie-limit]
 > A tie limit MUST render ` FETCH FIRST $N ROWS WITH TIES` in the place

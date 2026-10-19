@@ -211,17 +211,3 @@ pub(super) fn from_item<'cx>(
         None => refuse(cx, "a FROM item is a Table or a FromItem"),
     }
 }
-
-/// The name a locking clause's `OF` gives an item: its qualifier, the alias
-/// it answers to in the statement, which PostgreSQL requires unqualified.
-pub(super) fn lock_target<'cx>(
-    cx: &mut Cx<'cx>,
-    value: Handle<'cx, JsValue>,
-) -> NeonResult<NamedTable> {
-    let item = from_item(cx, value)?;
-    let qualifier = match &item {
-        FromItem::Table(table) => table.qualifier().clone(),
-        other => other.qualifier().clone(),
-    };
-    Ok(NamedTable::from(TableName::Table(qualifier)))
-}

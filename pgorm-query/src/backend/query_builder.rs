@@ -555,7 +555,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`LockType`] into SQL statement.
-    // [spec:pgorm:sem:sql.render.locking]
+    // [spec:pgorm:sem:sql.render.locking+1]
     fn prepare_select_lock(&self, lock: &LockClause, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -570,11 +570,11 @@ impl QueryBuilder {
         .unwrap();
         if !lock.tables.is_empty() {
             write!(sql, " OF ").unwrap();
-            lock.tables.iter().fold(true, |first, from_item| {
+            lock.tables.iter().fold(true, |first, name| {
                 if !first {
                     write!(sql, ", ").unwrap();
                 }
-                self.prepare_from_item(from_item, sql);
+                name.prepare(sql.as_writer());
                 false
             });
         }

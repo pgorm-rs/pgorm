@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::assert_eq;
 
 // [spec:pgorm:req:sql.ast+3/test]
-// [spec:pgorm:def:sql.ast.select+5/test]
+// [spec:pgorm:def:sql.ast.select+6/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
 fn select_1() {
@@ -3113,7 +3113,7 @@ fn empty_list_stays_an_array_parameter() {
     );
 }
 
-// [spec:pgorm:sem:sql.render.locking/test]    the four lock types
+// [spec:pgorm:sem:sql.render.locking+1/test]    the four lock types
 #[test]
 fn locking_1() {
     let locked = |lock: LockType| {
@@ -3160,7 +3160,7 @@ fn locking_1() {
     );
 }
 
-// [spec:pgorm:sem:sql.render.locking/test]    ` OF ` names the locked tables, comma-separated
+// [spec:pgorm:sem:sql.render.locking+1/test]    ` OF ` names the locked tables, comma-separated
 // and quoted, and the behaviour follows
 #[test]
 fn locking_2() {
@@ -3171,7 +3171,7 @@ fn locking_2() {
             .from(Char::Table)
             .lock_with_tables(
                 LockType::Update,
-                [Glyph::Table.into_from_item(), Char::Table.into_from_item()]
+                [Glyph::Table.into_name(), Char::Table.into_name()]
             )
             .to_string(),
         r#"SELECT "id" FROM "glyph", "character" FOR UPDATE OF "glyph", "character""#
@@ -3205,4 +3205,54 @@ fn locking_2() {
             .to_string(),
         r#"SELECT "id" FROM "glyph" FOR SHARE"#
     );
+}
+
+// [spec:pgorm:def:sql.ast.select+6/test]    OF holds names, each the one a FROM item answers
+// to, and the grammar reads each as an unqualified relation name
+// [spec:pgorm:sem:sql.render.locking+1/test]
+#[test]
+fn lock_of_names_what_items_answer_to() {
+    let sub = FromItem::SubQuery(
+        Query::select().column(Font::Id).from(Font::Table).take(),
+        Name::runtime("q"),
+    );
+    let sql = Query::select()
+        .column(Asterisk)
+        .from(Glyph::Table.into_named_table().alias(Name::runtime("g")))
+        .from(sub)
+        .from(Char::Table)
+        .lock_with_tables(
+            LockType::NoKeyUpdate,
+            [
+                Name::runtime("g"),
+                Name::runtime("q"),
+                Char::Table.into_name(),
+            ],
+        )
+        .to_string();
+    assert_eq!(
+        sql,
+        r#"SELECT * FROM "glyph" AS "g", (SELECT "id" FROM "font") AS "q", "character" FOR NO KEY UPDATE OF "g", "q", "character""#
+    );
+
+    let locked: Vec<serde_json::Value> = crate::oracle::parsed_nodes(&sql, "LockingClause")
+        .into_iter()
+        .flat_map(|clause| {
+            clause["locked_rels"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+        })
+        .collect();
+    let names: Vec<(&str, bool)> = locked
+        .iter()
+        .map(|rel| {
+            let rel = &rel["RangeVar"];
+            (
+                rel["relname"].as_str().unwrap_or_default(),
+                rel["schemaname"].as_str().unwrap_or_default().is_empty(),
+            )
+        })
+        .collect();
+    assert_eq!(names, [("g", true), ("q", true), ("character", true)]);
 }

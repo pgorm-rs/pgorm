@@ -610,7 +610,7 @@ fn window_refusals_name_the_windows() {
     );
 }
 
-// [spec:pgorm:def:sql.ast.select+5/test]    `take()` moves the WINDOW clause out with the rest
+// [spec:pgorm:def:sql.ast.select+6/test]    `take()` moves the WINDOW clause out with the rest
 #[test]
 fn take_moves_the_window_clause() {
     let mut query = declaring(vec![("w", by_size())]);

@@ -377,7 +377,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+5]
+> [spec:pgorm:def:sql.ast.select+6]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
 > WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
 > pays one pointer — `query.build.with` records why the clause lives on the
@@ -400,10 +400,20 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.group-distinct`).
 >
 > A `LockClause` pairs a `LockType` (`Update`, `NoKeyUpdate`, `Share`,
-> `KeyShare`) with an optional table list and optional `LockBehavior` (`Nowait`,
+> `KeyShare`) with an optional `OF` list and optional `LockBehavior` (`Nowait`,
 > `SkipLocked`); `lock`, `lock_with_tables`, `lock_with_behavior`,
 > `lock_with_tables_behavior`, `lock_shared` (FOR SHARE) and `lock_exclusive`
-> (FOR UPDATE) each overwrite the whole clause, so the last call wins.
+> (FOR UPDATE) each overwrite the whole clause, so the last call wins. The
+> `OF` list holds names, each an `IntoName`: the name a FROM item answers to,
+> its alias or an unaliased table's own name. PostgreSQL's `OF` takes
+> unqualified relation names and nothing else, refusing a schema-qualified one
+> (`42601`), so a FROM item's source — an aliased table, a subquery, a
+> function call, a sample — has no construction there
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Which item a name refers to
+> is the server's to check: a name no FROM item answers to, an aliased table's
+> own name among them, is `42P01`, and one naming a function, a table
+> function, a join or a common table expression, which hold no rows to lock,
+> is `0A000`; a subquery's name locks the rows it reads.
 > Structural-control helpers `conditions(bool, then, else)`, `apply_if(Option, f)`
 > and `apply(f)` let callers branch while chaining.
 

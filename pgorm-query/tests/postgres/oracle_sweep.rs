@@ -226,7 +226,7 @@ fn sweep_join_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    set operations and row locking
-// [spec:pgorm:sem:sql.render.locking/test]
+// [spec:pgorm:sem:sql.render.locking+1/test]
 #[test]
 fn sweep_union_and_locking_shapes() {
     let unions = [
