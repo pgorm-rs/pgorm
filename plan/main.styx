@@ -535,6 +535,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.ddl +11 and sql.ddl.column-types +6 (sql-domains, d5d22226): the entry points name Domain (create/alter/drop) and the no-placeholder list the domain statements; prepare_column_type spells Domain, CreatedRange and CreatedMultirange by name and schema through TypeName's part policy."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:13:59.8487Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ddl.column-def +13 (column-default-parens, 92497302): a column definition's DEFAULT reads a b_expr, so an operator expression renders parenthesised in CREATE TABLE and ADD COLUMN, while ALTER COLUMN SET DEFAULT keeps it bare."
+                        after_done true
+                    }
                 )
             }
 
