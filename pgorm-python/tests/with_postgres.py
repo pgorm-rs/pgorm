@@ -15,6 +15,11 @@ import uuid
 
 IMAGE = "postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
 
+# How long the server may take to accept connections, and then to turn TLS on.
+# A ready server ends the wait at once; a heavily loaded machine can take
+# minutes to start a container. PGORM_TEST_READY_SECONDS replaces the bound.
+READY_SECONDS = float(os.environ.get("PGORM_TEST_READY_SECONDS", "180"))
+
 
 def run(*command, input=None):
     return subprocess.run(command, input=input, text=True, check=True, capture_output=True).stdout.strip()
@@ -51,7 +56,7 @@ def enable_tls(name, root):
               "ALTER SYSTEM SET ssl_cert_file = 'server.crt';\n"
               "ALTER SYSTEM SET ssl_key_file = 'server.key';\n"
               "SELECT pg_reload_conf();\n")
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + READY_SECONDS
     while run("docker", "exec", name, "psql", "-At", "-U", "postgres", "-d", "pgorm_python", "-c", "SHOW ssl") != "on":
         if time.monotonic() >= deadline:
             raise RuntimeError("PostgreSQL TLS configuration did not become active")
@@ -69,7 +74,7 @@ def fixture():
             "--label", "pgorm.python.tests=true", "-e", "POSTGRES_PASSWORD=pgorm-python-test",
             "-e", "POSTGRES_DB=pgorm_python", "-p", "127.0.0.1::5432", IMAGE)
         try:
-            deadline = time.monotonic() + 45
+            deadline = time.monotonic() + READY_SECONDS
             while True:
                 ready = subprocess.run(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1",
                                         "-U", "postgres", "-d", "pgorm_python"], capture_output=True)

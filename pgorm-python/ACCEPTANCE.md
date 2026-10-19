@@ -29,9 +29,11 @@ PGORM_TEST_PG_BIN=/path/to/postgresql/bin \
 
 The PostgreSQL 18 wrapper creates a disposable cluster and CA, supplies
 `PGORM_TEST_DSN` and `PGORM_TEST_CA`, and removes its cluster afterward. The
-Docker-based `tests/with_postgres.py` wrapper accepts the same command. An
-existing test database can supply those variables directly; it must allow
-creation and deletion of the test schemas and tables.
+Docker-based `tests/with_postgres.py` wrapper accepts the same command; it
+waits up to 180 seconds for its container to accept connections, or
+`PGORM_TEST_READY_SECONDS` if set. An existing test database can supply
+those variables directly; it must allow creation and deletion of the test
+schemas and tables.
 
 `target/python-acceptance/summary.json` reports success only after every phase
 passes. It records hashes of the phase reports; the directory retains package
