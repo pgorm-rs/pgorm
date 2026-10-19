@@ -1690,6 +1690,14 @@ children (
                         kind @decision
                         text "Operator decision: revive minimal. The up-only philosophy stays (it was the fork's deliberate simplification — no down/fresh/refresh/reset). Delete the fully-dead manager.rs (SchemaManager) and schema.rs outright rather than reviving them; fix the broken test target to the current MigratorTrait surface; fix the pgorm-cli migration template's generated migration so it matches the up-only trait (template ships todo!() in a down() that the trait doesn't have). Options rejected: full SeaORM-style revival (contradicts the advertised simplification), retiring the crate (working runner, real feature)."
                     }
+
+                    {
+                        at 2026-10-19T09:32:15.820818Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "migration.up (+3): up clears the pool's statement caches once a batch that applied a migration commits, added by statement-cache-after-ddl (conn.pool.statement-cache.clear, 2adf99d1)."
+                        after_done true
+                    }
                 )
             }
 
