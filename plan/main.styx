@@ -9352,6 +9352,14 @@ children (
                         kind @decision
                         text "Shapes, checked against PostgreSQL 18.6 and libpg_query 18. Unrepresentable (the grammar refuses them): a recursive view without columns (42601) — View::create_recursive takes the first column; a check option on a recursive view (0A000, raised in gram.y so the oracle refuses it too) — RecursiveViewCreateStatement is its own type with no check_option; CREATE VIEW IF NOT EXISTS (42601) and CREATE OR REPLACE MATERIALIZED VIEW (42601 in 18) — no method; an empty column list — none written. REFRESH CONCURRENTLY beside WITH NO DATA is refused by the server at execution (42601) after the raw grammar accepts it, so the two are one last-wins slot. Left to the server and held by the live suite (tests/view_tests.rs): a check option on a view that is not automatically updatable (0A000), an OR REPLACE that moves, drops, renames or retypes a column (42P16; omitted options are reset), more column names than columns (42601), a concurrent refresh without a unique index (55000) or of an unpopulated view (0A000), a drop of the wrong kind (42809), RESTRICT with a dependent view (2BP01), check option violations (44000, LOCAL vs CASCADED over a view of a view). The body is the caller's SelectStatement rendered value-inlined. ALTER VIEW is not built: Table::rename, Table::rename_column and Table::alter(..).modify_column(default) reach a view (and the renames a materialized view), live-tested. Codegen already refused CREATE VIEW by name; it misnamed CREATE MATERIALIZED VIEW as CREATE TABLE AS and REFRESH as an unrecognised statement, both now named. Generating an entity from a view would need the body's column types, which DDL text without a catalog does not carry, so no codegen follow-up is filed."
                     }
+
+                    {
+                        at 2026-10-19T10:42:32.027716Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.ddl.view, sql.ddl.materialized-view and sql.ddl.create-table-as moved to +1 in rust-view-body-check (a049f54f): the Rust constructors now return a Result and refuse a body whose tie limit or WINDOW clause the grammar refuses, every annotation re-pinned."
+                        after_done true
+                    }
                 )
             }
 
