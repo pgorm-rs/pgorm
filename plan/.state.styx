@@ -1250,8 +1250,6 @@ impl_evidence (
         query.graph.cursor
     ), covered_claims (
         {impl_name main, rule query.graph.cursor}
-    ), rule_versions_seen (
-        {id query.graph.cursor, version 2}
     )}
     {id decide.migration, covered_rules (
         migration.name

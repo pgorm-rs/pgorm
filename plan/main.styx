@@ -5467,6 +5467,15 @@ children (
                     main ([spec:pgorm:sem:query.graph.cursor])
                 }
                 deps (core)
+                log (
+                    {
+                        at 2026-10-19T13:37:20.504678Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "query.graph.cursor +3 (graph-cursor-enum-tiebreak, 32ab45e8): each tiebreak a graph installs carries the casts of its typed primary-key column (Tiebreak in src/query/graph.rs), so the root's key, a joined slot's or the ordered slot's own key whose domain is over an enum is compared as the enum in a whole-keyset boundary."
+                        after_done true
+                    }
+                )
             }
 
             {
