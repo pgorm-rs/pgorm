@@ -2,7 +2,7 @@ use super::*;
 use crate::oracle::{assert_eq, assert_query_eq, parsed_nodes};
 
 // [spec:pgorm:req:sql.ast+3/test]
-// [spec:pgorm:def:sql.ast.select+5/test]
+// [spec:pgorm:def:sql.ast.select+6/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
 fn select_1() {
@@ -1826,7 +1826,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()
@@ -3289,99 +3289,5 @@ fn empty_list_stays_an_array_parameter() {
             .and_where(Expr::col(Glyph::Aspect).ne_all(Vec::<i32>::new()))
             .to_string(),
         r#"SELECT "id" FROM "glyph" WHERE "aspect" <> ALL(ARRAY []::int4[])"#
-    );
-}
-
-// [spec:pgorm:sem:sql.render.locking/test]    the four lock types
-#[test]
-fn locking_1() {
-    let locked = |lock: LockType| {
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock(lock)
-            .to_string()
-    };
-
-    assert_eq!(
-        locked(LockType::Update),
-        r#"SELECT "id" FROM "glyph" FOR UPDATE"#
-    );
-    assert_eq!(
-        locked(LockType::NoKeyUpdate),
-        r#"SELECT "id" FROM "glyph" FOR NO KEY UPDATE"#
-    );
-    assert_eq!(
-        locked(LockType::Share),
-        r#"SELECT "id" FROM "glyph" FOR SHARE"#
-    );
-    assert_eq!(
-        locked(LockType::KeyShare),
-        r#"SELECT "id" FROM "glyph" FOR KEY SHARE"#
-    );
-
-    // The named shorthands.
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock_exclusive()
-            .to_string(),
-        r#"SELECT "id" FROM "glyph" FOR UPDATE"#
-    );
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock_shared()
-            .to_string(),
-        r#"SELECT "id" FROM "glyph" FOR SHARE"#
-    );
-}
-
-// [spec:pgorm:sem:sql.render.locking/test]    ` OF ` names the locked tables, comma-separated
-// and quoted, and the behaviour follows
-#[test]
-fn locking_2() {
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .from(Char::Table)
-            .lock_with_tables(
-                LockType::Update,
-                [Glyph::Table.into_from_item(), Char::Table.into_from_item()]
-            )
-            .to_string(),
-        r#"SELECT "id" FROM "glyph", "character" FOR UPDATE OF "glyph", "character""#
-    );
-
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
-            .to_string(),
-        r#"SELECT "id" FROM "glyph" FOR UPDATE NOWAIT"#
-    );
-
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock_with_tables_behavior(LockType::Share, [Glyph::Table], LockBehavior::SkipLocked)
-            .to_string(),
-        r#"SELECT "id" FROM "glyph" FOR SHARE OF "glyph" SKIP LOCKED"#
-    );
-
-    // The clause is overwritten wholesale — the last call wins.
-    assert_eq!(
-        Query::select()
-            .column(Glyph::Id)
-            .from(Glyph::Table)
-            .lock_with_behavior(LockType::Update, LockBehavior::Nowait)
-            .lock_shared()
-            .to_string(),
-        r#"SELECT "id" FROM "glyph" FOR SHARE"#
     );
 }

@@ -1,4 +1,5 @@
-//! `CREATE DOMAIN`, `ALTER DOMAIN` and `DROP DOMAIN`.
+//! `CREATE DOMAIN`, `ALTER DOMAIN` and `DROP DOMAIN`, and the `b_expr` operand
+//! rule a domain's default shares with a column definition's.
 
 use super::*;
 use crate::domain::DomainAlterAction;
@@ -20,7 +21,7 @@ impl QueryBuilder {
         }
         if let Some(default) = &create.default {
             write!(sql, " DEFAULT ").unwrap();
-            self.prepare_domain_default(default, sql);
+            self.prepare_default_operand(default, sql);
         }
         match create.not_null {
             Some(true) => write!(sql, " NOT NULL").unwrap(),
@@ -116,13 +117,17 @@ impl QueryBuilder {
         write!(sql, ")").unwrap();
     }
 
-    /// A `CREATE DOMAIN`'s default, which the grammar reads as a `b_expr`:
+    /// A default where the grammar reads a `b_expr` — a column definition's
+    /// `DEFAULT`, in `CREATE TABLE` and `ADD COLUMN`, and `CREATE DOMAIN`'s:
     /// the expression narrower than every other operand, with no logical
     /// operator, `IS`, `BETWEEN`, `IN` or `LIKE` (`42601` at the operator).
     /// An operator expression is parenthesised so that it is an operand there
-    /// whatever its operator; anything else is one already. `ALTER DOMAIN ...
-    /// SET DEFAULT` reads the full `a_expr` and needs none of this.
-    fn prepare_domain_default(&self, default: &SimpleExpr, sql: &mut dyn SqlWriter) {
+    /// whatever its operator; anything else is one already. `ALTER COLUMN ...
+    /// SET DEFAULT` and `ALTER DOMAIN ... SET DEFAULT` read the full `a_expr`
+    /// and need none of this.
+    // [spec:pgorm:req:sql.ddl.column-def+13]
+    // [spec:pgorm:req:sql.ddl.domain]
+    pub(crate) fn prepare_default_operand(&self, default: &SimpleExpr, sql: &mut dyn SqlWriter) {
         let operand = !matches!(
             default,
             SimpleExpr::Unary(..)

@@ -3,21 +3,21 @@
 //! PostgreSQL's grammar will not take one.
 
 use crate::{
-    LockBehavior, SelectStatement, Value,
+    LockBehavior, SelectStatement,
     error::{Error, Result},
 };
 
 /// A SELECT's row limit. The two forms share one slot because PostgreSQL's
 /// grammar takes a `LIMIT` or a `FETCH FIRST`, never both, so setting either
 /// replaces the other.
-// [spec:pgorm:req:sql.ast.select.tie-limit]
+// [spec:pgorm:req:sql.ast.select.tie-limit+1]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RowLimit {
     /// `LIMIT n`: at most `n` rows.
-    Count(Value),
+    Count(u64),
     /// `FETCH FIRST n ROWS WITH TIES`: the first `n` rows and every further
     /// row equal to the `n`-th on the ORDER BY keys.
-    WithTies(Value),
+    WithTies(u64),
 }
 
 impl SelectStatement {
@@ -51,18 +51,55 @@ impl SelectStatement {
     /// );
     /// assert_eq!(query.check_tie_limit(), Ok(()));
     /// ```
-    // [spec:pgorm:req:sql.ast.select.tie-limit]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
     pub fn limit_with_ties(&mut self, count: u64) -> &mut Self {
-        self.limit = Some(RowLimit::WithTies(count.into()));
+        self.limit = Some(RowLimit::WithTies(count));
         self
     }
 
     /// Whether the row limit is a tie limit, which counts rows only up to
     /// the ties of the last: a caller that pages or narrows the result by
     /// row count reads this before replacing the limit.
-    // [spec:pgorm:req:sql.ast.select.tie-limit]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
     pub fn has_tie_limit(&self) -> bool {
         matches!(self.limit, Some(RowLimit::WithTies(_)))
+    }
+
+    /// Narrow the row limit to at most one row, for a reader that asks for
+    /// the first: `LIMIT 1`, or `LIMIT 0` where the limit already counts no
+    /// row. A tie limit narrows the same way, to a plain `LIMIT`: the first
+    /// row it returns is the first row of the order, and one of zero returns
+    /// none. OFFSET is kept.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let mut query = Query::select();
+    /// query.column(Glyph::Image).from(Glyph::Table);
+    /// assert_eq!(
+    ///     query.clone().narrow_limit_to_one().to_string(),
+    ///     r#"SELECT "image" FROM "glyph" LIMIT 1"#
+    /// );
+    ///
+    /// query.order_by(Glyph::Aspect, Order::Desc).limit_with_ties(3);
+    /// assert_eq!(
+    ///     query.clone().narrow_limit_to_one().to_string(),
+    ///     r#"SELECT "image" FROM "glyph" ORDER BY "aspect" DESC LIMIT 1"#
+    /// );
+    ///
+    /// query.limit(0);
+    /// assert_eq!(
+    ///     query.narrow_limit_to_one().to_string(),
+    ///     r#"SELECT "image" FROM "glyph" ORDER BY "aspect" DESC LIMIT 0"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
+    pub fn narrow_limit_to_one(&mut self) -> &mut Self {
+        let none = matches!(self.limit, Some(RowLimit::Count(0) | RowLimit::WithTies(0)));
+        self.limit = Some(RowLimit::Count(if none { 0 } else { 1 }));
+        self
     }
 
     /// Refuse a tie limit PostgreSQL's grammar would refuse (`42601`): one on
@@ -92,7 +129,7 @@ impl SelectStatement {
     /// query.lock_with_behavior(LockType::Update, LockBehavior::SkipLocked);
     /// assert_eq!(query.check_tie_limit(), Err(Error::TiesWithSkipLocked));
     /// ```
-    // [spec:pgorm:req:sql.ast.select.tie-limit]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
     pub fn check_tie_limit(&self) -> Result<()> {
         if !self.has_tie_limit() {
             Ok(())

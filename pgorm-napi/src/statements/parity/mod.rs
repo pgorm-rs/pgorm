@@ -133,7 +133,7 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
 }
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+3/test]
+// [spec:pgorm:req:napi.expressions+4/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(

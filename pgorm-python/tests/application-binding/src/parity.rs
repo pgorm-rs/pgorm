@@ -51,12 +51,11 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
                 kwargs.set_item("terminal", terminal)?;
                 let inspected = query.call_method("inspect", (), Some(&kwargs))?;
                 let native = inspected.extract::<PyRef<'_, Compiled>>()?;
-                let expected = if terminal == "all" {
-                    rust.clone()
-                } else {
-                    rust.clone().limit(1)
+                let mut expected = rust.clone();
+                if terminal != "all" {
+                    QueryTrait::query(&mut expected).narrow_limit_to_one();
                 }
-                .build();
+                let expected = expected.build();
                 assert_eq!(native.sql, expected.0, "{method}/{terminal}");
                 assert_eq!(native.values, expected.1, "{method}/{terminal}");
             }

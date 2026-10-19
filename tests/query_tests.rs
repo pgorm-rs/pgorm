@@ -8,7 +8,7 @@ pub use pgorm::{ConnectionTrait, Error, QueryFilter, QueryOrder, QuerySelect, se
 
 // Run the test locally:
 // DATABASE_URL=postgres://postgres:postgres@127.0.0.1:54329 cargo test --test query_tests
-// [spec:pgorm:sem:exec.crud.select+3/test]    `one` fails with RecordNotFound on
+// [spec:pgorm:sem:exec.crud.select+4/test]    `one` fails with RecordNotFound on
 // zero rows where `one_opt` reports `None` — pgorm's deliberate difference
 #[pgorm_macros::test]
 pub async fn find_one_with_no_result() {
@@ -51,7 +51,7 @@ pub async fn find_one_with_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+3/test]    the same split on a filtered select
+// [spec:pgorm:sem:exec.crud.select+4/test]    the same split on a filtered select
 #[pgorm_macros::test]
 pub async fn find_by_id_with_no_result() {
     let ctx = TestContext::new("find_by_id_with_no_result").await;
@@ -93,6 +93,52 @@ pub async fn find_by_id_with_result() {
     ctx.delete().await;
 }
 
+// [spec:pgorm:sem:exec.crud.select+4/test]    `one` and `one_opt` narrow a row limit to one row
+// and never widen it: a limit of zero, plain or tied, reads no row
+// [spec:pgorm:req:exec.tie-limit+1/test]
+#[pgorm_macros::test]
+pub async fn one_never_widens_a_row_limit() -> Result<(), Error> {
+    use pgorm::QueryTrait;
+
+    let ctx = TestContext::new("one_never_widens_a_row_limit").await;
+    create_tables(&ctx.db).await?;
+    let db = ctx.db.get().await?;
+
+    for name in ["SeaSide Bakery", "Top Bakery"] {
+        bakery::ActiveModel {
+            name: set(name),
+            profit_margin: set(10.0),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await?;
+    }
+    let by_margin = || Bakery::find().order_by_asc(bakery::Column::ProfitMargin);
+    let tied = |count| {
+        let mut query = by_margin();
+        QueryTrait::query(&mut query).limit_with_ties(count);
+        query
+    };
+
+    assert_eq!(by_margin().limit(0).one_opt(&db).await?, None);
+    assert!(matches!(
+        by_margin().limit(0).one(&db).await,
+        Err(Error::RecordNotFound)
+    ));
+    assert_eq!(tied(0).one_opt(&db).await?, None);
+    assert!(matches!(tied(0).one(&db).await, Err(Error::RecordNotFound)));
+
+    // Both rows tie on the margin, so the tie limit alone returns two, which
+    // `query_opt` would refuse: narrowed, one row is read.
+    assert_eq!(tied(1).all(&db).await?.len(), 2);
+    assert!(tied(1).one_opt(&db).await?.is_some());
+    assert_eq!(by_margin().limit(5).one(&db).await?.profit_margin, 10.0);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 #[pgorm_macros::test]
 pub async fn find_all_with_no_result() {
     let ctx = TestContext::new("find_all_with_no_result").await;
@@ -106,7 +152,7 @@ pub async fn find_all_with_no_result() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+3/test]    `all` decodes every returned row
+// [spec:pgorm:sem:exec.crud.select+4/test]    `all` decodes every returned row
 #[pgorm_macros::test]
 pub async fn find_all_with_result() {
     let ctx = TestContext::new("find_all_with_result").await;
@@ -271,7 +317,7 @@ pub async fn char_literal_round_trips_through_server() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+3/test]    `all` aborts on the first decode
+// [spec:pgorm:sem:exec.crud.select+4/test]    `all` aborts on the first decode
 // error instead of yielding a partial result set
 #[pgorm_macros::test]
 pub async fn select_only_exclude_option_fields() {
@@ -332,7 +378,7 @@ pub async fn select_only_exclude_option_fields() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:exec.crud.select+3/test]    `SelectorRaw::one` / `one_opt`
+// [spec:pgorm:sem:exec.crud.select+4/test]    `SelectorRaw::one` / `one_opt`
 // execute the statement exactly as written, with no `LIMIT` injected
 // [spec:pgorm:def:exec.crud+1/test]    `Select::from_raw_sql` and
 // `SelectorRaw::into_model` re-targeting the decoded type

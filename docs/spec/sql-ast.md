@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+35]
+> [spec:pgorm:req:sql.surface+36]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -75,12 +75,10 @@ today, including panicking edges and deliberate failsafes.
 > pgorm-query's namespace and was the only path by which `pgorm_query::Write`
 > could be written. An item that narrowing would merely turn into dead code is
 > instead exported `#[doc(hidden)]`, so the rendered documentation is the
-> curated list while the item stays reachable: the statement-dispatch wrappers
-> `QueryStatement`, `TableStatement`, `IndexStatement`, `ForeignKeyStatement`
-> and `SchemaStatement`, which no builder produces and no renderer takes; the
-> `SelectDistinct` flag, whose `All` variant no builder sets; and the
-> `Token`/`Tokenizer` lexer behind `inject_parameters`, whose classification
-> accessors only the conformance suite calls. Each of those MUST be named
+> curated list while the item stays reachable: the `SelectDistinct` flag,
+> whose `All` variant no builder sets, and the `Token`/`Tokenizer` lexer behind
+> `inject_parameters`, whose classification accessors only the conformance
+> suite calls. Each of those MUST be named
 > individually in `lib.rs` rather than left to a glob, so the residue is a list
 > a later pass can work through rather than a category.
 >
@@ -197,9 +195,14 @@ today, including panicking edges and deliberate failsafes.
 > index kind it screened the standalone renderer from did
 > (`sql.ddl.index-create`), and `IndexConstraint` when the key a
 > column could also declare did, `TableKey` replacing it
-> (`sql.ddl.create-table`), and `ForeignKeyDropStatement` when the drop named
+> (`sql.ddl.create-table`), `ForeignKeyDropStatement` when the drop named
 > for one constraint kind did, `ConstraintDrop` replacing it
-> (`sql.ddl.alter-table`). What the list and `extension` held when this rule
+> (`sql.ddl.alter-table`), and the statement-dispatch wrappers
+> `QueryStatement`, `TableStatement`, `IndexStatement`, `ForeignKeyStatement`
+> and `SchemaStatement`, once residue, when it was settled that no builder
+> produced them, no renderer took them and nothing read them, nothing
+> replacing them: each statement is built and rendered as itself, and they
+> MUST NOT return (`sql.ddl`). What the list and `extension` held when this rule
 > was first written has no entry, being the baseline the record counts from;
 > everything either has exported since is recorded here.
 
@@ -383,7 +386,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## SELECT statements
 
-> [spec:pgorm:def:sql.ast.select+5]
+> [spec:pgorm:def:sql.ast.select+6]
 > `SelectStatement` is the SELECT AST node. It accumulates: an optional carried
 > WITH clause (`Option<Box<AnyWithClause>>`, boxed so a clause-less statement
 > pays one pointer — `query.build.with` records why the clause lives on the
@@ -406,10 +409,20 @@ today, including panicking edges and deliberate failsafes.
 > (`sql.ast.select.group-distinct`).
 >
 > A `LockClause` pairs a `LockType` (`Update`, `NoKeyUpdate`, `Share`,
-> `KeyShare`) with an optional table list and optional `LockBehavior` (`Nowait`,
+> `KeyShare`) with an optional `OF` list and optional `LockBehavior` (`Nowait`,
 > `SkipLocked`); `lock`, `lock_with_tables`, `lock_with_behavior`,
 > `lock_with_tables_behavior`, `lock_shared` (FOR SHARE) and `lock_exclusive`
-> (FOR UPDATE) each overwrite the whole clause, so the last call wins.
+> (FOR UPDATE) each overwrite the whole clause, so the last call wins. The
+> `OF` list holds names, each an `IntoName`: the name a FROM item answers to,
+> its alias or an unaliased table's own name. PostgreSQL's `OF` takes
+> unqualified relation names and nothing else, refusing a schema-qualified one
+> (`42601`), so a FROM item's source — an aliased table, a subquery, a
+> function call, a sample — has no construction there
+> (`[dec:pgorm:invalid-states-unrepresentable]`). Which item a name refers to
+> is the server's to check: a name no FROM item answers to, an aliased table's
+> own name among them, is `42P01`, and one naming a function, a table
+> function, a join or a common table expression, which hold no rows to lock,
+> is `0A000`; a subquery's name locks the rows it reads.
 > Structural-control helpers `conditions(bool, then, else)`, `apply_if(Option, f)`
 > and `apply(f)` let callers branch while chaining.
 
@@ -574,7 +587,7 @@ today, including panicking edges and deliberate failsafes.
 > the type cannot tell from a table's, and sampling one is the server's
 > refusal (`0A000`).
 
-> [spec:pgorm:req:sql.ast.select.tie-limit]
+> [spec:pgorm:req:sql.ast.select.tie-limit+1]
 > `limit_with_ties(count)` sets a tie limit, `FETCH FIRST count ROWS WITH
 > TIES`: the first `count` rows in the statement's ORDER BY and every further
 > row equal to the last of them on all its keys. It shares one slot with
@@ -582,6 +595,12 @@ today, including panicking edges and deliberate failsafes.
 > — so either replaces the other and `reset_limit` removes either;
 > `has_tie_limit` says which is set. OFFSET composes with it as with `LIMIT`.
 > The count is bound, which the server types `bigint`.
+>
+> `narrow_limit_to_one` narrows the slot to at most one row for a reader that
+> asks for the first, and never widens it: a statement whose limit counts no
+> row — `LIMIT 0`, or a tie limit of zero, which returns no row — gets
+> `LIMIT 0`, and any other gets `LIMIT 1`, a tie limit included, since the
+> first row a tie limit returns is the first row of the order. OFFSET is kept.
 >
 > The grammar refuses a tie limit in two places (`42601`): on a statement with
 > no ORDER BY, since the ties are measured on the order, and beside
@@ -846,7 +865,7 @@ today, including panicking edges and deliberate failsafes.
 > corresponding function call. JSON field, path and key-existence access is
 > `sql.ast.expr.json`.
 
-> [spec:pgorm:req:sql.ast.expr.similar-to]
+> [spec:pgorm:req:sql.ast.expr.similar-to+1]
 > `similar_to(pattern)` and `not_similar_to(pattern)`, on `Expr` and on
 > `SimpleExpr`, build `SIMILAR TO` and `NOT SIMILAR TO`
 > (`BinOper::SimilarTo`, `BinOper::NotSimilarTo`): whether the whole string
@@ -854,12 +873,15 @@ today, including panicking edges and deliberate failsafes.
 > and `_` with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes
 > added. The pattern is any `IntoLikeExpr`, the operand LIKE takes, held as
 > `SimpleExpr::LikePattern`: it is bound, which the server types `text`, and a
-> `LikeExpr` carries the one-character `ESCAPE` the grammar admits only as a
-> pattern's tail, written as an inline constant. The default escape is a
-> backslash. An escape of more than one character, the server's refusal
-> (`22025`), has no construction, `LikeExpr::escape` taking a `char`, and
-> `ESCAPE ''`, which turns escaping off, is not built for SIMILAR TO, as it is
-> not for LIKE. Both operators are of the LIKE family the renderer ranks by
+> `LikeExpr` carries the `ESCAPE` the grammar admits only as a pattern's tail.
+> The default escape is a backslash; `LikeExpr::escape(c)` replaces it with
+> one character, written as an inline constant, and `LikeExpr::no_escape()`
+> turns escaping off, `ESCAPE ''`, so every character of the pattern, a
+> backslash included, is itself or a wildcard. Both hold for LIKE and ILIKE as
+> for SIMILAR TO, the server accepting the empty escape for all three. An
+> escape of more than one character, the server's refusal (`22025`), has no
+> construction: `escape` takes a `char` and `no_escape` nothing. Both
+> operators are of the LIKE family the renderer ranks by
 > (`sql.render.precedence`), where the grammar ranks `SIMILAR`.
 
 > [spec:pgorm:req:sql.ast.expr.in+1]

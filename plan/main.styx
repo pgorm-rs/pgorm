@@ -255,6 +255,22 @@ children (
                         text "inline-window-over-named (a08d6a4d) bumped sql.render.window+7: an inline window built on a declared one renders OVER ( \"base\" ORDER BY .. ) through prepare_extended_window; sites re-pinned and the renderer matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T07:48:02.086366Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.render.locking +1 (lock-of-table-names, 910d34cb): OF renders its names comma-separated, each a quoted unqualified identifier."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:05:24.460419Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.render.operators +7 (like-escape-off, 760105c0): a pattern's ESCAPE tail renders as an inline constant, or ESCAPE '' when escaping is off."
+                        after_done true
+                    }
                 )
             }
 
@@ -426,6 +442,14 @@ children (
                     }
 
                     {
+                        at 2026-10-19T07:48:01.963656Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.select +6 (lock-of-table-names, 910d34cb): a LockClause's OF list holds unqualified Names, each the name a FROM item answers to, so a FROM item's source has no construction there."
+                        after_done true
+                    }
+
+                    {
                         at 2026-10-19T08:04:53.532307Z
                         author "brendan@necessary.nu"
                         kind @note
@@ -549,6 +573,22 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at sql.ddl +11 and sql.ddl.column-types +6 (sql-domains, d5d22226): the entry points name Domain (create/alter/drop) and the no-placeholder list the domain statements; prepare_column_type spells Domain, CreatedRange and CreatedMultirange by name and schema through TypeName's part policy."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:13:59.8487Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ddl.column-def +13 (column-default-parens, 92497302): a column definition's DEFAULT reads a b_expr, so an operator expression renders parenthesised in CREATE TABLE and ADD COLUMN, while ALTER COLUMN SET DEFAULT keeps it bare."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:20:08.605466Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ddl +12 and sql.ddl.alter-table +13 (schema-statement-wrapper, db3d326a): no wrapper enum stands over a family's statements, ForeignKey's one entry point is create, and the rename statements are no longer said to be carried by TableStatement."
                         after_done true
                     }
                 )
@@ -735,6 +775,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at exec.decode.array +2 (sql-domains, d5d22226): every Vec<T> decode reads an array of a domain as an array of the type the domain is over."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:11:03.708975Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at exec.crud.select +4 (select-one-zero-limit, cfadc574): Selector::one and one_opt narrow the row limit with narrow_limit_to_one and never widen it, so a query limited to no row reads none."
                         after_done true
                     }
                 )
@@ -9109,6 +9157,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.surface +34 (sql-domains, d5d22226): the register records Domain, DomainCreateStatement, PendingDomainAlter, DomainAlterStatement, DomainDropStatement, DomainCheck and IntoDomainCheck, lib.rs exports them in its schema-statement group, and test-surface passes."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:19:52.065737Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.surface +36 (schema-statement-wrapper, db3d326a): the five statement-dispatch wrappers are deleted and named in the departures; the doc-hidden residue is SelectDistinct, Token and Tokenizer, and test-surface's residue and baseline lists agree."
+                        after_done true
+                    }
                 )
             }
 
@@ -9326,6 +9382,22 @@ children (
                     }
 
                     {
+                        at 2026-10-18T23:10:22.577411Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.select.tie-limit +1 and exec.tie-limit +1 (select-one-zero-limit, cfadc574): narrow_limit_to_one narrows a tie limit to a plain LIMIT of at most one row, a tie limit of zero to LIMIT 0; every site re-read and re-pinned."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:04:57.045751Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.expr.similar-to +1 (like-escape-off, 760105c0): LikeExpr::no_escape renders ESCAPE '' for LIKE, ILIKE and SIMILAR TO; every site re-read and re-pinned."
+                        after_done true
+                    }
+
+                    {
                         at 2026-10-19T08:05:27.021072Z
                         author "brendan@necessary.nu"
                         kind @note
@@ -9411,6 +9483,13 @@ children (
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa); predates it. Select::one() / one_opt() narrow any row limit to LIMIT 1, so a statement built with limit(0), or a tie limit of 0, still returns a row through one(). Keep the smaller of the caller's limit and 1 (a limit of 0 returns no row; one() then reports no row as it does for an empty result), decide what one() does over a tie limit (it currently narrows to LIMIT 1; check that is still right), and cover it with live tests in Rust and the bindings that expose one()."
                     }
+
+                    {
+                        at 2026-10-18T22:57:45.040473Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -9426,6 +9505,20 @@ children (
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa); predates it. A locking clause's OF list (FOR UPDATE OF ..) renders any FromItem, so an aliased table written as its source, a subquery, a table function or a TABLESAMPLE there produces SQL the server refuses: OF takes table names or aliases only. Narrow what OF accepts to a table name or alias reference so the refused shapes cannot be built, check the server's refusals on 18.6 (42P01 for a name not in FROM, 0A000 for locking a function or VALUES), and give the bindings the same."
                     }
+
+                    {
+                        at 2026-10-18T23:11:28.104192Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T07:44:55.74759Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -9440,6 +9533,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa). LikeExpr::escape takes a char, so ESCAPE '' (escaping turned off, which PostgreSQL accepts for LIKE and SIMILAR TO) has no spelling, while a multi-character escape stays unrepresentable as it should. Add a way to say \"no escape character\", render ESCAPE '', hold it to the oracle, test it live, and give Python and JavaScript the same."
+                    }
+
+                    {
+                        at 2026-10-19T07:48:30.583827Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T07:57:31.911135Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -9485,6 +9592,20 @@ children (
                         kind @note
                         text "Found by sql-schemas (f767aea9). pgorm-query's doc-hidden SchemaStatement (wrapping table, index and foreign-key statements; one of the five statement-dispatch wrappers sql.surface lists as residue no builder produces and no renderer takes) now reads as \"a CREATE/DROP SCHEMA statement\" beside the new Schema, SchemaCreateStatement, SchemaDropStatement and SchemaRenameStatement. Delete it (and, if nothing reads them, the other four dispatch wrappers sql.surface names as residue), update sql.surface's residue paragraph and the test-surface residue list, and bump sql.surface."
                     }
+
+                    {
+                        at 2026-10-19T08:14:27.198674Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T08:16:33.152329Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -9524,6 +9645,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-domains (2fa97891). CREATE TABLE's column DEFAULT renders an operator expression bare, so ColumnDef::default(Expr::val(true).and(Expr::val(false))) renders DEFAULT TRUE AND FALSE, which PostgreSQL refuses (42601: a column DEFAULT takes b_expr, not a_expr). The domain builder parenthesises its default for the same reason. Parenthesise an operator expression in every DEFAULT position (column definition, ALTER COLUMN SET DEFAULT, the domain builder already does), hold it to the oracle, and test it live."
+                    }
+
+                    {
+                        at 2026-10-19T08:05:53.866937Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T08:10:00.524269Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -12003,6 +12138,14 @@ children (
                     }
 
                     {
+                        at 2026-10-19T08:04:57.234941Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at napi.expressions +3 (like-escape-off, 760105c0): like, ilike, similarTo and their negations take an escape of one character or the empty string, which turns escaping off; every site re-read and re-pinned."
+                        after_done true
+                    }
+
+                    {
                         at 2026-10-19T08:05:27.436116Z
                         author "brendan@necessary.nu"
                         kind @note
@@ -12092,6 +12235,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "napi.entity-reads +1 (domain-enum-predicates, 47aa595c): a registered entity's column whose domain is over an enum compares as the enum, the column and the label each cast to it, through ColumnTrait."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T23:10:22.672935Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at napi.entity-reads +1 (select-one-zero-limit, cfadc574): one and oneOpt narrow the row limit to one row as Rust does, a limit of zero staying zero; inspect and a live test in both runtimes hold it."
                         after_done true
                     }
                 )

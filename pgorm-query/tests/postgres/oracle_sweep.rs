@@ -226,7 +226,7 @@ fn sweep_join_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    set operations and row locking
-// [spec:pgorm:sem:sql.render.locking/test]
+// [spec:pgorm:sem:sql.render.locking+1/test]
 #[test]
 fn sweep_union_and_locking_shapes() {
     let unions = [
@@ -545,7 +545,7 @@ fn sweep_merge_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    table DDL
 // [spec:pgorm:req:sql.ddl.create-table+16/test]
-// [spec:pgorm:req:sql.ddl.alter-table+12/test]
+// [spec:pgorm:req:sql.ddl.alter-table+13/test]
 #[test]
 fn sweep_table_ddl_shapes() {
     sweep([
@@ -886,7 +886,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [

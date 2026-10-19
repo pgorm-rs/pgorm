@@ -19,13 +19,6 @@ use crate::types::{IntoName, IntoTableName};
 #[derive(Debug, Clone)]
 pub struct Index;
 
-/// All available types of index statement
-#[derive(Debug, Clone)]
-pub enum IndexStatement {
-    Create(IndexCreateStatement),
-    Drop(IndexDropStatement),
-}
-
 impl Index {
     /// Construct index [`IndexCreateStatement`] over its table and first column
     pub fn create<T, C>(table: T, col: C) -> IndexCreateStatement

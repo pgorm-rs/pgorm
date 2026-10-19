@@ -55,6 +55,11 @@ fn cases() -> Vec<(&'static str, (String, Values))> {
             built(&account::Entity::find().filter(account::Column::Mood.eq(account::Mood::Busy))),
         ),
         ("find-one", built(&account::Entity::find().limit(1))),
+        ("find-one-limit-zero", {
+            let mut query = account::Entity::find().limit(0);
+            QueryTrait::query(&mut query).narrow_limit_to_one();
+            built(&query)
+        }),
         (
             "find-composite",
             built(
@@ -144,7 +149,7 @@ fn pipelines() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:napi.entity-reads+1/test]
+// [spec:pgorm:req:napi.entity-reads+2/test]
 // [spec:pgorm:req:napi.entity-graphs/test]
 // [spec:pgorm:req:napi.pipeline-sources/test]
 #[test]

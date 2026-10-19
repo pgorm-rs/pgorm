@@ -763,11 +763,22 @@ pub enum Keyword {
     Value,
 }
 
-/// Like Expression
+/// A `LIKE`, `ILIKE` or `SIMILAR TO` pattern, with the `ESCAPE` tail the
+/// grammar admits only there.
+// [spec:pgorm:req:sql.ast.expr.similar-to+1]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LikeExpr {
     pub(crate) pattern: String,
-    pub(crate) escape: Option<char>,
+    pub(crate) escape: Option<LikeEscape>,
+}
+
+/// What a pattern's `ESCAPE` holds: one character, or nothing, which turns
+/// escaping off. PostgreSQL refuses anything longer (`22025`), so nothing
+/// longer has a spelling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LikeEscape {
+    Char(char),
+    Off,
 }
 
 pub trait IntoLikeExpr {
@@ -1035,10 +1046,36 @@ impl LikeExpr {
         }
     }
 
+    /// Escape with `c`, `ESCAPE 'c'`, in place of the default backslash.
     pub fn escape(self, c: char) -> Self {
         Self {
             pattern: self.pattern,
-            escape: Some(c),
+            escape: Some(LikeEscape::Char(c)),
+        }
+    }
+
+    /// Turn escaping off, `ESCAPE ''`: every character of the pattern, a
+    /// backslash included, is then literal or a wildcard.
+    ///
+    /// ```
+    /// use pgorm_query::{*, tests_cfg::*};
+    ///
+    /// let query = Query::select()
+    ///     .column(Glyph::Image)
+    ///     .from(Glyph::Table)
+    ///     .and_where(Expr::col(Glyph::Image).like(LikeExpr::new(r"a").no_escape()))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "image" FROM "glyph" WHERE "image" LIKE E'a\b' ESCAPE ''"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ast.expr.similar-to+1]
+    pub fn no_escape(self) -> Self {
+        Self {
+            pattern: self.pattern,
+            escape: Some(LikeEscape::Off),
         }
     }
 }

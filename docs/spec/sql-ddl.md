@@ -15,11 +15,11 @@ implemented by the Postgres `QueryBuilder`
 (`pgorm-query/src/backend/query_builder.rs`). All rules describe current
 behaviour, including the leftovers from the multi-backend ancestry.
 
-> [spec:pgorm:req:sql.ddl+11]
+> [spec:pgorm:req:sql.ddl+12]
 > The DDL surface MUST be reachable through the entry-point helpers: `Table`
 > (`create`/`create_as`/`alter`/`drop`/`rename`/`rename_column`/`truncate`), `Index`
 > (`create`/`drop`),
-> `ForeignKey` (`create`/`drop`), `Type` (`create`/`alter`/`drop`),
+> `ForeignKey` (`create`), `Type` (`create`/`alter`/`drop`),
 > `Domain` (`create`/`alter`/`drop`),
 > `Schema` (`create`/`drop`/`rename`),
 > `Sequence` (`create`/`alter`/`drop`/`rename`),
@@ -68,10 +68,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > double-quoted (quote character `"`, embedded quotes doubled); no identifier
 > is interpolated raw between quote characters. Index and constraint names are
 > held as `Name` and accepted as `IntoName`, so a runtime name minted by
-> `Name::runtime` escapes like any other. `TableStatement` is an
-> enum wrapper whose `Display` dispatches to the variant's own; `IndexStatement`,
-> `ForeignKeyStatement` and `SchemaStatement` are plain wrapper enums whose
-> variants render through the same builders.
+> `Name::runtime` escapes like any other.
+>
+> No enum stands over a family's statements to dispatch among them: each
+> statement is built by its entry-point helper and rendered as itself, so
+> `Schema` names only a database schema (`sql.ddl.schema`). The
+> `TableStatement`, `IndexStatement`, `ForeignKeyStatement`, `SchemaStatement`
+> and `QueryStatement` wrappers, which nothing built or read, are gone and
+> MUST NOT return (`sql.surface`).
 
 ## Tables
 
@@ -260,7 +264,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > forbidden. Unlike an empty alter or a missing target, there is no unparseable
 > render here for a type to prevent.
 
-> [spec:pgorm:req:sql.ddl.column-def+12]
+> [spec:pgorm:req:sql.ddl.column-def+13]
 > `ColumnDef` holds a name, an optional `ColumnType`, an optional `Collation`
 > and an ordered list of `ColumnSpec`s (`Null`, `NotNull { name, no_inherit }`, `Default(SimpleExpr)`, `AutoIncrement`,
 > `Check(Check)`, `Generated { expr, kind }`,
@@ -292,6 +296,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
+>
+> A column definition's `DEFAULT` sits where PostgreSQL's grammar reads a
+> `b_expr`, which has no logical operator, `IS`, `BETWEEN`, `IN` or `LIKE`
+> (`42601` at the operator), in `CREATE TABLE` and `ADD COLUMN` alike. So a
+> `Unary`, `Binary`, `Raw`, `Template` or `LikePattern` default MUST render
+> parenthesised, `DEFAULT (TRUE AND FALSE)`, and any other expression bare,
+> as `CREATE DOMAIN`'s default does (`sql.ddl.domain`). `ALTER COLUMN ... SET
+> DEFAULT` reads the full expression grammar and renders its expression bare.
 >
 > A column's `NOT NULL` is a catalog constraint in PostgreSQL 18 — a
 > `pg_constraint` row of kind `n`, recorded under the name the column gives it
@@ -468,7 +480,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Multirange(t)`→ its multirange (`int4multirange` through
 > `tstzmultirange`).
 
-> [spec:pgorm:req:sql.ddl.alter-table+12]
+> [spec:pgorm:req:sql.ddl.alter-table+13]
 > `TableAlterStatement` names one table and collects `TableAlterOption`s:
 > `AddColumn` (with an `if_not_exists` flag), `ModifyColumn`, `DropColumn`,
 > `AddForeignKey`, `DropConstraint`, `AddPrimaryKey`, `AddUnique`,
@@ -561,9 +573,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > A column rename is NOT one of those options. PostgreSQL admits `RENAME` only
 > as the sole action of an `ALTER TABLE`, so it is a statement of its own:
 > `Table::rename_column(table, from, to)` builds a `ColumnRenameStatement`
-> rendering `ALTER TABLE <table> RENAME COLUMN "a" TO "b"`, and
-> `TableStatement::RenameColumn` carries it. A rename listed beside an
-> `ADD COLUMN` therefore does not construct
+> rendering `ALTER TABLE <table> RENAME COLUMN "a" TO "b"`. A rename listed
+> beside an `ADD COLUMN` therefore does not construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). All three names are
 > constructor arguments and none has a setter: PostgreSQL rejects the render
 > that omits any of them, so the partly-named rename does not construct
@@ -641,8 +652,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > A constraint rename is a statement of its own for the reason a column's is:
 > `Table::rename_constraint(table, from, to)` builds a
 > `ConstraintRenameStatement` rendering `ALTER TABLE <table> RENAME CONSTRAINT
-> "a" TO "b"`, carried by `TableStatement::RenameConstraint`, with all three
-> names constructor arguments and no setter. PostgreSQL refuses `RENAME
+> "a" TO "b"`, with all three names constructor arguments and no setter. PostgreSQL refuses `RENAME
 > CONSTRAINT` beside another action (`42601`), so one listed beside `ADD`
 > does not construct. It renames a constraint of any kind, a `NOT NULL`
 > included, and the live suite holds what it does: a primary or unique key's

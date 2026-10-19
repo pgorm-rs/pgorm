@@ -3,7 +3,7 @@
 // A registered entity's reads: its columns as expressions whose
 // comparisons are the column's own `ColumnTrait` methods, and its
 // `Select<E>` with Rust's terminals.
-// [spec:pgorm:req:napi.entity-reads+1]
+// [spec:pgorm:req:napi.entity-reads+2]
 
 import { arg, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";

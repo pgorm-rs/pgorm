@@ -468,7 +468,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+3]
+> [spec:pgorm:req:napi.expressions+4]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -489,7 +489,8 @@ SQL text running a built statement.
 > pgorm-query method of that meaning, and `Condition.all` and `Condition.any`
 > pgorm-query's `Condition`, empty ones true and false. `like`, `ilike`,
 > `similarTo` and their negations take a pattern string, bound, and an
-> optional one-character escape (`sql.ast.expr.similar-to`); `startsWith`,
+> optional escape of one character, or the empty string, which turns escaping
+> off (`sql.ast.expr.similar-to`); `startsWith`,
 > `endsWith` and `containsText` read their argument as
 > text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
 > `_` match themselves. `call` reaches only the functions pgorm-query has a
@@ -1126,11 +1127,12 @@ the ones compiled in.
 > its state unknown — and a failure from PostgreSQL anywhere in its causes is
 > the error `napi.errors` classifies.
 
-> [spec:pgorm:req:napi.entity-reads+1]
+> [spec:pgorm:req:napi.entity-reads+2]
 > `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
 > and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
 > `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
-> adding the `LIMIT 1` Rust adds, and `one` finding no row a `DecodeError`.
+> narrowing the row limit to one row as Rust does, and `one` finding no row a
+> `DecodeError`.
 > `inspect(terminal)` gives the SQL and values the terminal sends. `col(name)`
 > is the column as the entity's `ColumnTrait` names it, and its comparisons
 > MUST be that trait's methods, a value converted to the column's declared

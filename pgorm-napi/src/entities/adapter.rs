@@ -324,7 +324,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:napi.entity-reads+1]
+// [spec:pgorm:req:napi.entity-reads+2]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -355,7 +355,7 @@ where
     fn compile(&self, read: Read) -> (String, Values) {
         let mut query = self.query.clone();
         if read != Read::All {
-            query = query.limit(1);
+            QueryTrait::query(&mut query).narrow_limit_to_one();
         }
         query.build()
     }

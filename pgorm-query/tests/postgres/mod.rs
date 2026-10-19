@@ -17,6 +17,7 @@ mod grouping;
 mod index;
 mod interval;
 mod json_table;
+mod locking;
 mod merge;
 mod oracle;
 mod oracle_pins;

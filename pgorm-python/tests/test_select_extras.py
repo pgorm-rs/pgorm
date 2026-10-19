@@ -65,7 +65,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     def ranked(self):
         return p.Select(self.s("id")).from_(self.scores).order_by(self.s("score").desc())
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit/test]    the tied rows come back beyond the count
+    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tied rows come back beyond the count
     async def test_tie_limit_keeps_rows_tied_with_last(self):
         ids = lambda rows: sorted(row[0] for row in rows)
         self.assertEqual(ids(await self.rows(self.ranked().limit_with_ties(2))), [1, 2, 3])
@@ -76,7 +76,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         later = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2).order_by(self.s("score").desc())
         self.assertEqual(ids(await self.rows(later)), [1, 2, 3])
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit/test]    refused before any SQL is sent: the
+    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    refused before any SQL is sent: the
     # transaction the refused statement was offered to is still usable
     async def test_unordered_tie_limit_refused_before_sending(self):
         unordered = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2)
@@ -91,7 +91,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
                         await terminal(unordered)
             self.assertEqual(len(await self.rows(self.ranked().limit_with_ties(2), tx)), 3)
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit/test]    a CTE body or subquery cannot be ordered
+    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    a CTE body or subquery cannot be ordered
     # once read, so a tie limit is checked as it is read
     async def test_embedded_tie_limit_is_checked_when_read(self):
         unordered = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2)
@@ -128,7 +128,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         mixed = p.Select(a, b).from_(pairs).group_by(a, G.set(a, b)).order_by(b.asc())
         self.assertEqual(await self.rows(mixed), [(1, 2), (1, 3)])
 
-    # [spec:pgorm:req:sql.ast.expr.similar-to/test]    a whole-string match, the default
+    # [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    a whole-string match, the default
     # backslash escape and a chosen one
     async def test_similar_to_matches_whole_strings(self):
         def names(predicate):
@@ -144,6 +144,21 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await names(name.not_similar_to(p.LikePattern("%!%", escape="!"))),
                          [("Ann",), ("Bob",), ("Cy",)])
         self.assertEqual(await names(name.similar_to(p.LikePattern("' OR 1=1 --"))), [])
+
+    # [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    an empty escape turns escaping off for
+    # LIKE, ILIKE and SIMILAR TO, a backslash then matching itself
+    async def test_empty_escape_turns_escaping_off(self):
+        def text(value):
+            return p.bind(value).cast(p.TypeName("text"))
+
+        off = p.LikePattern("a\\b", escape="")
+        answers = await self.rows(p.Select(
+            text("a\\b").like(p.LikePattern("a\\b")).as_("plain"),
+            text("a\\b").like(off).as_("off"),
+            text("A\\B").ilike(off).as_("folded"),
+            text("a\\b").similar_to(off).as_("similar"),
+            text("50%").not_like(p.LikePattern("50\\%", escape="")).as_("percent")))
+        self.assertEqual(answers, [(False, True, True, True, True)])
 
     # [spec:pgorm:req:sql.ast.select.table-function+2/test]    UNNEST numbered WITH ORDINALITY,
     # its columns named, beside the row it reads

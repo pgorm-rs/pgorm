@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+3]
+// [spec:pgorm:req:napi.expressions+4]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -82,7 +82,7 @@ export declare class Expr extends Builder {
   isNotIn(source: readonly Operand[] | Select): Expr;
   between(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
   notBetween(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
-  /** A pattern match; the pattern is bound, and `escape` is one character. */
+  /** A pattern match; the pattern is bound, and `escape` is one character, or `""` to turn escaping off. */
   like(pattern: string, options?: { readonly escape?: string }): Expr;
   notLike(pattern: string, options?: { readonly escape?: string }): Expr;
   ilike(pattern: string, options?: { readonly escape?: string }): Expr;
@@ -91,7 +91,7 @@ export declare class Expr extends Builder {
    * `SIMILAR TO`: whether the whole string matches a pattern in SQL's
    * regular-expression dialect — LIKE's `%` and `_` with `|`, `*`, `+`, `?`,
    * repetition, grouping and bracket classes. Bound as LIKE's pattern is, with
-   * the same one-character `escape`. A bound left operand needs its type, as
+   * the same `escape`. A bound left operand needs its type, as
    * the server cannot infer both sides from the operator alone.
    */
   similarTo(pattern: string, options?: { readonly escape?: string }): Expr;

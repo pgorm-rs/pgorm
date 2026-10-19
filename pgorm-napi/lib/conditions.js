@@ -2,7 +2,7 @@
 
 // Conditions and CASE: boolean combinations of predicates, and the two forms
 // of `CASE`, which exist only once they have an arm.
-// [spec:pgorm:req:napi.expressions+3]
+// [spec:pgorm:req:napi.expressions+4]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";

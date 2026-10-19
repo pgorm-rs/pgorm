@@ -15,6 +15,10 @@
     "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\" LIMIT $1",
     "values": [["u64","1"]]
   },
+  "find-one-limit-zero": {
+    "sql": "SELECT \"accounts\".\"id\", \"accounts\".\"display name\", \"accounts\".\"note\", \"accounts\".\"version\", CAST(\"accounts\".\"mood\" AS text) FROM \"napi_entities\".\"accounts\" LIMIT $1",
+    "values": [["u64","0"]]
+  },
   "find-composite": {
     "sql": "SELECT \"memberships\".\"account_id\", \"memberships\".\"team\", \"memberships\".\"role\" FROM \"napi_entities\".\"memberships\" WHERE \"memberships\".\"account_id\" = $1 AND \"memberships\".\"team\" = $2",
     "values": [["i32","1"], ["text","red"]]

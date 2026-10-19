@@ -275,9 +275,11 @@ fn select_lock(cx: &mut FunctionContext) -> NeonResult<Node> {
         "share" => LockType::Share,
         _ => LockType::KeyShare,
     };
+    // `OF` names each item by its qualifier, the name it answers to in the
+    // statement, which PostgreSQL requires unqualified.
     let mut tables = Vec::new();
     for item in list(cx, 2)? {
-        tables.push(table::lock_target(cx, item)?);
+        tables.push(table::from_item(cx, item)?.qualifier().clone());
     }
     let behavior = arg(cx, 3);
     let behavior = if super::args::absent(cx, behavior) {

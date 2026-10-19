@@ -33,7 +33,7 @@ use inherent::inherent;
 ///     r#"SELECT "character", "font"."name" FROM "character" LEFT JOIN "font" ON "character"."font_id" = "font"."id" WHERE "size_w" IN (3, 4) AND "character" LIKE 'A%'"#
 /// );
 /// ```
-// [spec:pgorm:def:sql.ast.select+5]
+// [spec:pgorm:def:sql.ast.select+6]
 // [spec:pgorm:def:query.build.with+2]
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SelectStatement {
@@ -89,11 +89,13 @@ pub enum LockBehavior {
     SkipLocked,
 }
 
-// [spec:pgorm:def:sql.ast.select+5]
+/// A locking clause: its strength, the names its `OF` list locks (none
+/// locking every relation the statement reads), and how it waits.
+// [spec:pgorm:def:sql.ast.select+6]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LockClause {
     pub(crate) r#type: LockType,
-    pub(crate) tables: Vec<FromItem>,
+    pub(crate) tables: Vec<Name>,
     pub(crate) behavior: Option<LockBehavior>,
 }
 
@@ -1605,7 +1607,7 @@ impl SelectStatement {
     /// );
     /// ```
     pub fn limit(&mut self, limit: u64) -> &mut Self {
-        self.limit = Some(RowLimit::Count(limit.into()));
+        self.limit = Some(RowLimit::Count(limit));
         self
     }
 
@@ -1673,7 +1675,14 @@ impl SelectStatement {
         self
     }
 
-    /// Row locking with tables (if supported).
+    /// Row locking of the FROM items `OF` names.
+    ///
+    /// Each name is the one a FROM item answers to — its alias, or an
+    /// unaliased table's own name — and is unqualified, because `OF` holds
+    /// nothing else: PostgreSQL refuses a schema-qualified name there
+    /// (`42601`), and its grammar reads no FROM item's source in the list.
+    /// Which item a name refers to is the server's to check (`42P01` when
+    /// none answers to it, `0A000` when it holds no rows to lock).
     ///
     /// # Examples
     ///
@@ -1683,23 +1692,37 @@ impl SelectStatement {
     /// let query = Query::select()
     ///     .column(Char::Character)
     ///     .from(Char::Table)
+    ///     .from(Glyph::Table.into_named_table().alias(Name::runtime("g")))
     ///     .and_where(Expr::col(Char::FontId).eq(5))
-    ///     .lock_with_tables(LockType::Update, [Glyph::Table])
+    ///     .lock_with_tables(LockType::Update, [Name::runtime("g")])
     ///     .to_owned();
     ///
     /// assert_eq!(
     ///     query.to_string(),
-    ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE OF "glyph""#
+    ///     r#"SELECT "character" FROM "character", "glyph" AS "g" WHERE "font_id" = 5 FOR UPDATE OF "g""#
     /// );
     /// ```
+    ///
+    /// A FROM item's source is not a name, so it has no place in the list:
+    ///
+    /// ```compile_fail,E0277
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let aliased = Glyph::Table.into_named_table().alias(Name::runtime("g"));
+    /// Query::select()
+    ///     .column(Glyph::Id)
+    ///     .from(aliased.clone())
+    ///     .lock_with_tables(LockType::Update, [aliased]);
+    /// ```
+    // [spec:pgorm:def:sql.ast.select+6]
     pub fn lock_with_tables<T, I>(&mut self, r#type: LockType, tables: I) -> &mut Self
     where
-        T: IntoFromItem,
+        T: IntoName,
         I: IntoIterator<Item = T>,
     {
         self.lock = Some(LockClause {
             r#type,
-            tables: tables.into_iter().map(|t| t.into_from_item()).collect(),
+            tables: tables.into_iter().map(IntoName::into_name).collect(),
             behavior: None,
         });
         self
@@ -1733,7 +1756,9 @@ impl SelectStatement {
         self
     }
 
-    /// Row locking with tables and behavior (if supported).
+    /// Row locking of the FROM items `OF` names, as
+    /// [`lock_with_tables`](Self::lock_with_tables) takes them, waiting as
+    /// `behavior` says.
     ///
     /// # Examples
     ///
@@ -1752,6 +1777,7 @@ impl SelectStatement {
     ///     r#"SELECT "character" FROM "character" WHERE "font_id" = 5 FOR UPDATE OF "glyph" NOWAIT"#
     /// );
     /// ```
+    // [spec:pgorm:def:sql.ast.select+6]
     pub fn lock_with_tables_behavior<T, I>(
         &mut self,
         r#type: LockType,
@@ -1759,12 +1785,12 @@ impl SelectStatement {
         behavior: LockBehavior,
     ) -> &mut Self
     where
-        T: IntoFromItem,
+        T: IntoName,
         I: IntoIterator<Item = T>,
     {
         self.lock = Some(LockClause {
             r#type,
-            tables: tables.into_iter().map(|t| t.into_from_item()).collect(),
+            tables: tables.into_iter().map(IntoName::into_name).collect(),
             behavior: Some(behavior),
         });
         self

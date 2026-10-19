@@ -38,7 +38,7 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 | `literal(value)` | `SimpleExpr::Constant`; rendered by Rust as a literal |
 | `TypeName(name, schema=...)` | identifier-only Rust `TypeName` |
 | `expr.cast(type_name, array=False)` | `SimpleExpr::cast_as_type` |
-| `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape` |
+| `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape`; `escape=""` is `no_escape` |
 | `expr.as_(name)` | owned projection expression plus validated `Name` |
 | `expr.asc()` / `expr.desc()` | owned expression plus Rust `Order` |
 | `OrderBy(expr, Direction.Asc, nulls=Nulls.First)` | typed direction and `NullOrdering` |
@@ -104,7 +104,9 @@ use PostgreSQL string functions and ordinary Rust value expressions.
 
 For pattern semantics, use `expr.like(LikePattern(...))`, `not_like`, `ilike`
 or `not_ilike`. The pattern and optional single-character ESCAPE clause
-are handled by Rust's `LikeExpr`; a plain string is rejected at this boundary.
+are handled by Rust's `LikeExpr`; `escape=""` turns escaping off, `ESCAPE ''`,
+so a backslash in the pattern is itself. A plain string is rejected at this
+boundary.
 `similar_to` and `not_similar_to` take the same `LikePattern` for `SIMILAR TO`,
 a whole-string match in SQL's regular-expression dialect (LIKE's `%` and `_`
 with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes); its default

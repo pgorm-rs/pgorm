@@ -176,9 +176,9 @@ async fn a_nondeterministic_collation_equates_distinct_bytes(
 /// the query, beside a column declared with a linguistic collation that holds
 /// the same values; retyping the second through `ALTER TABLE` moves it to
 /// `"C"` as well.
-// [spec:pgorm:req:sql.ddl.column-def+12/test]    against a live server: a column compares by the
+// [spec:pgorm:req:sql.ddl.column-def+13/test]    against a live server: a column compares by the
 // collation it was declared with
-// [spec:pgorm:req:sql.ddl.alter-table+12/test]    the retype carries the collation
+// [spec:pgorm:req:sql.ddl.alter-table+13/test]    the retype carries the collation
 // [spec:pgorm:req:sql.scope+23/test]
 async fn a_collated_column_compares_by_its_collation(
     db: &DatabaseConnection,

@@ -42,7 +42,7 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
                             .into_query()
                     };
                     if terminal == "one_opt" {
-                        rust.limit(1);
+                        rust.narrow_limit_to_one();
                     }
                     assert_eq!(
                         (native.sql, native.values),
