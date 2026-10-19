@@ -13363,4 +13363,19 @@ children (
             }
         )
     }
+
+    {
+        id python-listen-header-duplicate
+        title "python.listen's rule header appears once, so its body does not begin with a copy of it"
+        kind @docs
+        deps (conn-listen)
+        log (
+            {
+                at 2026-10-19T13:19:30.485935Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-stream-truth-testing (0ace12e8). In docs/spec/python.md the python.listen rule's marker line is written twice in a row, and nspec reads the second as the first line of the rule's body. Removing it changes the body, so the rule takes a bump, its owner (conn-listen) is re-covered, and its annotations are re-pinned."
+            }
+        )
+    }
 )
