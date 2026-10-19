@@ -12819,6 +12819,14 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-10-19T13:44:02.535714Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "conn.copy.rows is now +1 (value-decode-created-ranges, 9c8f2da5): a range type a schema created over a RangeSubtype reads as the String of its text form, and that String writes back through copy_in_rows; created multiranges and other subtypes stay Error::Type."
+                after_done true
+            }
         )
     }
 
