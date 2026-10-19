@@ -247,6 +247,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.render.locking +1 (lock-of-table-names, 910d34cb): OF renders its names comma-separated, each a quoted unqualified identifier."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:05:24.460419Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.render.operators +7 (like-escape-off, 760105c0): a pattern's ESCAPE tail renders as an inline constant, or ESCAPE '' when escaping is off."
+                        after_done true
+                    }
                 )
             }
 
