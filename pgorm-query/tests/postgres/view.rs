@@ -49,11 +49,11 @@ fn active_accounts() -> SelectStatement {
 const ACTIVE_ACCOUNTS: &str =
     r#"SELECT "id", "name" FROM "account" WHERE "active" = TRUE AND "name" <> E'it\'s'"#;
 
-// [spec:pgorm:req:sql.ddl.view/test]    the name and the body are all a view needs, and the
+// [spec:pgorm:req:sql.ddl.view+1/test]    the name and the body are all a view needs, and the
 // body's values are written into it as literals, there being nothing to bind them to
 #[test]
-fn a_view_writes_its_body_with_values_inlined() {
-    let sql = View::create(n("active_account"), active_accounts()).to_string();
+fn a_view_writes_its_body_with_values_inlined() -> error::Result<()> {
+    let sql = View::create(n("active_account"), active_accounts())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE VIEW "active_account" AS {ACTIVE_ACCOUNTS}"#)
@@ -75,13 +75,14 @@ fn a_view_writes_its_body_with_values_inlined() {
             .collect::<Vec<_>>(),
         ["it's"]
     );
+    Ok(())
 }
 
-// [spec:pgorm:req:sql.ddl.view/test]    every clause of a plain view, read back by the grammar
+// [spec:pgorm:req:sql.ddl.view+1/test]    every clause of a plain view, read back by the grammar
 // as the clause it was written as
 #[test]
-fn every_view_clause_renders_in_one_order() {
-    let sql = View::create((n("app"), n("active_account")), active_accounts())
+fn every_view_clause_renders_in_one_order() -> error::Result<()> {
+    let sql = View::create((n("app"), n("active_account")), active_accounts())?
         .check_option(ViewCheckOption::Local)
         .security_invoker()
         .columns([n("account_id"), n("account_name")])
@@ -112,19 +113,20 @@ fn every_view_clause_renders_in_one_order() {
         ParsedCheckOption::LocalCheckOption as i32
     );
 
-    let one_option = View::create(n("v"), Query::select().expr(1).take())
+    let one_option = View::create(n("v"), Query::select().expr(1).take())?
         .security_invoker()
         .to_string();
     assert_eq!(
         one_option,
         r#"CREATE VIEW "v" WITH (security_invoker) AS SELECT 1"#
     );
+    Ok(())
 }
 
-// [spec:pgorm:req:sql.ddl.view/test]    the check option is one slot, LOCAL or CASCADED, the
+// [spec:pgorm:req:sql.ddl.view+1/test]    the check option is one slot, LOCAL or CASCADED, the
 // later replacing the earlier
 #[test]
-fn a_check_option_is_local_or_cascaded() {
+fn a_check_option_is_local_or_cascaded() -> error::Result<()> {
     let view = || View::create(n("v"), Query::select().expr(1).take());
     for (option, words, parsed) in [
         (
@@ -138,7 +140,7 @@ fn a_check_option_is_local_or_cascaded() {
             ParsedCheckOption::CascadedCheckOption,
         ),
     ] {
-        let sql = view()
+        let sql = view()?
             .check_option(ViewCheckOption::Local)
             .check_option(ViewCheckOption::Cascaded)
             .check_option(option)
@@ -151,11 +153,12 @@ fn a_check_option_is_local_or_cascaded() {
             statement(&sql, "ViewStmt")["with_check_option"],
             parsed as i32
         );
-        let mut built = view();
+        let mut built = view()?;
         built.check_option(option);
         assert_eq!(built.get_check_option(), Some(option));
     }
-    assert_eq!(view().get_check_option(), None);
+    assert_eq!(view()?.get_check_option(), None);
+    Ok(())
 }
 
 /// `SELECT 1 UNION ALL SELECT "n" + 1 FROM "counter" WHERE "n" < 3`, which
@@ -174,11 +177,11 @@ fn counting() -> SelectStatement {
         .take()
 }
 
-// [spec:pgorm:req:sql.ddl.view/test]    a recursive view always names its columns, which the
+// [spec:pgorm:req:sql.ddl.view+1/test]    a recursive view always names its columns, which the
 // grammar turns into the WITH RECURSIVE query it defines the view as
 #[test]
-fn a_recursive_view_names_its_columns() {
-    let sql = View::create_recursive((n("app"), n("counter")), n("n"), counting())
+fn a_recursive_view_names_its_columns() -> error::Result<()> {
+    let sql = View::create_recursive((n("app"), n("counter")), n("n"), counting())?
         .column(n("depth"))
         .columns([n("path")])
         .or_replace()
@@ -202,13 +205,14 @@ fn a_recursive_view_names_its_columns() {
     assert_eq!(cte["ctename"], "counter");
     assert_eq!(strings(&cte["aliascolnames"]), ["n", "depth", "path"]);
 
-    let mut plain = View::create_recursive(n("counter"), n("n"), counting());
+    let mut plain = View::create_recursive(n("counter"), n("n"), counting())?;
     assert_eq!(plain.get_columns(), [n("n")]);
     plain.column(n("m"));
     assert_eq!(plain.get_columns().len(), 2);
+    Ok(())
 }
 
-// [spec:pgorm:req:sql.ddl.view/test]    what the grammar refuses the builder has no method or
+// [spec:pgorm:req:sql.ddl.view+1/test]    what the grammar refuses the builder has no method or
 // constructor for: a recursive view without columns or with a check option, and a view IF
 // NOT EXISTS
 #[test]
@@ -225,7 +229,7 @@ fn the_grammar_refuses_what_a_view_cannot_build() {
     assert_rejected(r#"CREATE VIEW "v" () AS SELECT 1"#);
 }
 
-// [spec:pgorm:req:sql.ddl.view/test]    a view drop names every view it drops, and one behavior
+// [spec:pgorm:req:sql.ddl.view+1/test]    a view drop names every view it drops, and one behavior
 #[test]
 fn a_view_drop_names_one_or_more_views() {
     assert_eq!(View::drop(n("a")).to_string(), r#"DROP VIEW "a""#);
@@ -247,11 +251,11 @@ fn a_view_drop_names_one_or_more_views() {
     assert_eq!(sql, r#"DROP VIEW "a" CASCADE"#);
 }
 
-// [spec:pgorm:req:sql.ddl.materialized-view/test]    every clause of a materialized view,
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    every clause of a materialized view,
 // read back as the CREATE TABLE AS the grammar holds it as
 #[test]
-fn a_materialized_view_is_created_empty_or_full() {
-    let sql = MaterializedView::create(n("active_account"), active_accounts()).to_string();
+fn a_materialized_view_is_created_empty_or_full() -> error::Result<()> {
+    let sql = MaterializedView::create(n("active_account"), active_accounts())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE MATERIALIZED VIEW "active_account" AS {ACTIVE_ACCOUNTS}"#)
@@ -262,7 +266,7 @@ fn a_materialized_view_is_created_empty_or_full() {
     assert_eq!(create["into"]["skip_data"], false);
 
     let mut statement_ =
-        MaterializedView::create((n("app"), n("active_account")), active_accounts());
+        MaterializedView::create((n("app"), n("active_account")), active_accounts())?;
     statement_
         .with_no_data()
         .columns([n("account_id")])
@@ -290,9 +294,10 @@ fn a_materialized_view_is_created_empty_or_full() {
     assert_eq!(create["into"]["skip_data"], true);
 
     assert_rejected(r#"CREATE OR REPLACE MATERIALIZED VIEW "m" AS SELECT 1"#);
+    Ok(())
 }
 
-// [spec:pgorm:req:sql.ddl.materialized-view/test]    CONCURRENTLY and WITH NO DATA are one
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    CONCURRENTLY and WITH NO DATA are one
 // choice, the later winning, so the pair the server refuses (42601) and the grammar
 // accepts has no render
 #[test]
@@ -332,7 +337,7 @@ fn a_refresh_is_concurrent_or_empty_never_both() {
     crate::oracle::assert_parses(r#"REFRESH MATERIALIZED VIEW CONCURRENTLY "m" WITH NO DATA"#);
 }
 
-// [spec:pgorm:req:sql.ddl.materialized-view/test]    a materialized view drop is a drop of
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    a materialized view drop is a drop of
 // its own kind
 #[test]
 fn a_materialized_view_drop_names_its_kind() {
@@ -346,11 +351,11 @@ fn a_materialized_view_drop_names_its_kind() {
     assert_eq!(read["behavior"], DropBehavior::DropCascade as i32);
 }
 
-// [spec:pgorm:req:sql.ddl.create-table-as/test]    CREATE TABLE AS takes the query's columns,
+// [spec:pgorm:req:sql.ddl.create-table-as+1/test]    CREATE TABLE AS takes the query's columns,
 // renamed or not, and its rows or none
 #[test]
-fn a_table_is_created_from_a_query() {
-    let sql = Table::create_as(n("account_copy"), active_accounts()).to_string();
+fn a_table_is_created_from_a_query() -> error::Result<()> {
+    let sql = Table::create_as(n("account_copy"), active_accounts())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE TABLE "account_copy" AS {ACTIVE_ACCOUNTS}"#)
@@ -359,7 +364,7 @@ fn a_table_is_created_from_a_query() {
     assert_eq!(create["objtype"], ObjectType::ObjectTable as i32);
     assert_eq!(create["into"]["rel"]["relname"], "account_copy");
 
-    let mut statement_ = Table::create_as((n("app"), n("account_copy")), active_accounts());
+    let mut statement_ = Table::create_as((n("app"), n("account_copy")), active_accounts())?;
     statement_
         .column(n("account_id"))
         .with_no_data()
@@ -377,4 +382,85 @@ fn a_table_is_created_from_a_query() {
     assert_eq!(create["if_not_exists"], true);
     assert_eq!(strings(&create["into"]["col_names"]), ["account_id"]);
     assert_eq!(create["into"]["skip_data"], true);
+    Ok(())
+}
+
+/// Hold `create` to the checks a stored definition's query passes as it is
+/// taken: a tie limit with no ORDER BY, one beside SKIP LOCKED, and a
+/// projection over a window no WINDOW clause declares are each refused with
+/// pgorm-query's error, and the same queries ordered, unlocked and declared
+/// construct and render after `AS`.
+fn assert_body_checked<S: ToString>(create: impl Fn(SelectStatement) -> error::Result<S>) {
+    let tied = Query::select()
+        .column(n("id"))
+        .from(n("account"))
+        .limit_with_ties(2)
+        .take();
+    assert_eq!(
+        create(tied.clone()).err(),
+        Some(error::Error::TiesWithoutOrder)
+    );
+    let ordered = tied.clone().order_by(n("id"), Order::Asc).take();
+    let skipping = ordered
+        .clone()
+        .lock_with_behavior(LockType::Update, LockBehavior::SkipLocked)
+        .take();
+    assert_eq!(
+        create(skipping).err(),
+        Some(error::Error::TiesWithSkipLocked)
+    );
+
+    let windowed = Query::select()
+        .expr_window_name(Func::count(Expr::col(n("id"))), n("w"))
+        .from(n("account"))
+        .take();
+    assert_eq!(
+        create(windowed.clone()).err(),
+        Some(error::Error::WindowUndefined {
+            name: "w".to_owned()
+        })
+    );
+    let declared = windowed
+        .clone()
+        .window(n("w"), WindowStatement::partition_by(n("name")))
+        .take();
+
+    for body in [ordered, declared] {
+        let rendered = format!("AS {body}");
+        let sql = create(body)
+            .expect("a query the grammar takes constructs")
+            .to_string();
+        assert!(sql.contains(&rendered), "{sql}");
+    }
+}
+
+// [spec:pgorm:req:sql.ddl.view+1/test]    both view constructors refuse a body whose tie limit
+// or WINDOW clause the grammar refuses, before any statement exists
+#[test]
+fn a_view_refuses_a_body_the_grammar_refuses() {
+    assert_body_checked(|body| View::create(n("v"), body));
+    assert_body_checked(|body| View::create_recursive(n("v"), n("c"), body));
+
+    // The parser refuses the unordered tie limit inside a definition as it
+    // does on its own (`42601`), which is what the check stands in for.
+    let tied = Query::select()
+        .column(n("id"))
+        .from(n("account"))
+        .limit_with_ties(2)
+        .take();
+    assert_rejected(&format!(r#"CREATE VIEW "v" AS {tied}"#));
+}
+
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    a materialized view's constructor
+// refuses the body a view's refuses
+#[test]
+fn a_materialized_view_refuses_a_refused_body() {
+    assert_body_checked(|body| MaterializedView::create(n("m"), body));
+}
+
+// [spec:pgorm:req:sql.ddl.create-table-as+1/test]    CREATE TABLE AS refuses the body a view's
+// constructor refuses
+#[test]
+fn create_table_as_refuses_a_refused_body() {
+    assert_body_checked(|body| Table::create_as(n("t"), body));
 }

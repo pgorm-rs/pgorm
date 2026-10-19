@@ -3,6 +3,7 @@
 
 use crate::{
     DropBehavior, IntoName, IntoTableName, Name, QueryBuilder, SelectStatement, TableName,
+    error::Result,
 };
 
 mod materialized;
@@ -18,23 +19,55 @@ pub use materialized::{
 /// A view is a relation, so it is named as a table is: a bare name or a
 /// `(schema, name)` pair, each part a quoted identifier. Its body is a
 /// [`SelectStatement`], taken by value as every embedder takes what it embeds,
-/// and written with its values inlined: a view's definition is stored as SQL
-/// and cannot take bind parameters.
-// [spec:pgorm:req:sql.ddl.view]
+/// refused by the constructor when PostgreSQL's grammar would refuse its tie
+/// limit or WINDOW clause, and written with its values inlined: a view's
+/// definition is stored as SQL and cannot take bind parameters.
+// [spec:pgorm:req:sql.ddl.view+1]
 #[derive(Debug, Clone, Copy)]
 pub struct View;
 
+/// Take the query a stored definition is written from — a view's, a
+/// materialized view's, a `CREATE TABLE AS`'s — refusing a tie limit
+/// ([`check_tie_limit`](SelectStatement::check_tie_limit)) and a WINDOW
+/// clause, or a reference to one
+/// ([`check_windows`](SelectStatement::check_windows)), that PostgreSQL's
+/// grammar refuses.
+///
+/// The constructor is the one boundary every body passes: rendering is
+/// infallible, and a DDL statement reaches the server as the text it renders,
+/// through no executor that could check it first. The body has no setter, so
+/// the query checked here is the one that renders. A `SELECT` nested in it is
+/// the server's to refuse, as it is for the two checks on their own.
+// [spec:pgorm:req:sql.ddl.view+1]
+pub(crate) fn definition_body(body: SelectStatement) -> Result<SelectStatement> {
+    body.check_tie_limit()?;
+    body.check_windows()?;
+    Ok(body)
+}
+
 impl View {
     /// Construct a [`ViewCreateStatement`] over the view it creates and the
-    /// query it stands for
-    pub fn create<T>(name: T, body: SelectStatement) -> ViewCreateStatement
+    /// query it stands for.
+    ///
+    /// # Errors
+    ///
+    /// The query's tie limit or WINDOW clause, when PostgreSQL's grammar
+    /// refuses it: [`Error::TiesWithoutOrder`](crate::error::Error::TiesWithoutOrder),
+    /// [`Error::TiesWithSkipLocked`](crate::error::Error::TiesWithSkipLocked)
+    /// or one of the window refusals
+    /// [`check_windows`](SelectStatement::check_windows) names.
+    pub fn create<T>(name: T, body: SelectStatement) -> Result<ViewCreateStatement>
     where
         T: IntoTableName,
     {
-        ViewCreateStatement {
-            definition: ViewDefinition::new(name.into_table_name(), Vec::new(), body),
+        Ok(ViewCreateStatement {
+            definition: ViewDefinition::new(
+                name.into_table_name(),
+                Vec::new(),
+                definition_body(body)?,
+            ),
             check_option: None,
-        }
+        })
     }
 
     /// Construct a [`RecursiveViewCreateStatement`] over the view, its first
@@ -44,18 +77,27 @@ impl View {
     /// PostgreSQL refuses a recursive view without one (`42601`), so the first
     /// column is an argument and [`column`](RecursiveViewCreateStatement::column)
     /// appends the rest.
+    ///
+    /// # Errors
+    ///
+    /// The query's tie limit or WINDOW clause, when PostgreSQL's grammar
+    /// refuses it, as for [`create`](Self::create).
     pub fn create_recursive<T, C>(
         name: T,
         column: C,
         body: SelectStatement,
-    ) -> RecursiveViewCreateStatement
+    ) -> Result<RecursiveViewCreateStatement>
     where
         T: IntoTableName,
         C: IntoName,
     {
-        RecursiveViewCreateStatement {
-            definition: ViewDefinition::new(name.into_table_name(), vec![column.into_name()], body),
-        }
+        Ok(RecursiveViewCreateStatement {
+            definition: ViewDefinition::new(
+                name.into_table_name(),
+                vec![column.into_name()],
+                definition_body(body)?,
+            ),
+        })
     }
 
     /// Construct a [`ViewDropStatement`] over the first view it drops
@@ -102,7 +144,7 @@ impl ViewDefinition {
 /// view's own condition alone; `CASCADED` to the condition of every view it
 /// reads from as well, whatever their own option says. The bare `WITH CHECK
 /// OPTION` is `CASCADED`, so it has no spelling of its own here.
-// [spec:pgorm:req:sql.ddl.view]
+// [spec:pgorm:req:sql.ddl.view+1]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ViewCheckOption {
     /// `WITH LOCAL CHECK OPTION`: this view's condition alone.
@@ -134,7 +176,8 @@ impl ViewCheckOption {
 /// ```compile_fail,E0599
 /// use pgorm_query::*;
 ///
-/// View::create(Name::runtime("v"), Query::select().expr(1).take()).if_not_exists();
+/// View::create(Name::runtime("v"), Query::select().expr(1).take())?.if_not_exists();
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
 ///
 /// # Examples
@@ -149,7 +192,7 @@ impl ViewCheckOption {
 ///         .from(Name::runtime("account"))
 ///         .and_where(Expr::col(Name::runtime("status")).eq("active"))
 ///         .take(),
-/// )
+/// )?
 /// .or_replace()
 /// .check_option(ViewCheckOption::Cascaded)
 /// .to_owned();
@@ -163,8 +206,9 @@ impl ViewCheckOption {
 ///     ]
 ///     .join(" ")
 /// );
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
-// [spec:pgorm:req:sql.ddl.view]
+// [spec:pgorm:req:sql.ddl.view+1]
 #[derive(Debug, Clone)]
 pub struct ViewCreateStatement {
     pub(crate) definition: ViewDefinition,
@@ -183,8 +227,9 @@ pub struct ViewCreateStatement {
 /// ```compile_fail,E0599
 /// use pgorm_query::*;
 ///
-/// View::create_recursive(Name::runtime("v"), Name::runtime("n"), Query::select().expr(1).take())
+/// View::create_recursive(Name::runtime("v"), Name::runtime("n"), Query::select().expr(1).take())?
 ///     .check_option(ViewCheckOption::Local);
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
 ///
 /// # Examples
@@ -207,8 +252,7 @@ pub struct ViewCreateStatement {
 ///                 .take(),
 ///         )
 ///         .take(),
-/// )
-/// .to_owned();
+/// )?;
 ///
 /// assert_eq!(
 ///     view.to_string(),
@@ -218,8 +262,9 @@ pub struct ViewCreateStatement {
 ///     ]
 ///     .join(" ")
 /// );
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
-// [spec:pgorm:req:sql.ddl.view]
+// [spec:pgorm:req:sql.ddl.view+1]
 #[derive(Debug, Clone)]
 pub struct RecursiveViewCreateStatement {
     pub(crate) definition: ViewDefinition,
@@ -391,7 +436,7 @@ pub(crate) use relation_drop_methods;
 ///     r#"DROP VIEW IF EXISTS "a", "app"."b" CASCADE"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.view]
+// [spec:pgorm:req:sql.ddl.view+1]
 #[derive(Debug, Clone)]
 pub struct ViewDropStatement {
     pub(crate) relations: RelationDrop,

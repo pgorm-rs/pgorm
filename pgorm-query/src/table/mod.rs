@@ -12,6 +12,7 @@
 //! - Table Truncate, see [`TableTruncateStatement`]
 
 use crate::SelectStatement;
+use crate::error::Result;
 use crate::types::{IntoName, IntoTableName};
 
 mod alter;
@@ -61,19 +62,24 @@ impl Table {
     }
 
     /// Construct a [`TableCreateAsStatement`] over the table it creates and
-    /// the query whose columns and rows it is created with
-    // [spec:pgorm:req:sql.ddl.create-table-as]
-    pub fn create_as<T>(table: T, body: SelectStatement) -> TableCreateAsStatement
+    /// the query whose columns and rows it is created with.
+    ///
+    /// # Errors
+    ///
+    /// The query's tie limit or WINDOW clause, when PostgreSQL's grammar
+    /// refuses it, as for [`View::create`](crate::View::create).
+    // [spec:pgorm:req:sql.ddl.create-table-as+1]
+    pub fn create_as<T>(table: T, body: SelectStatement) -> Result<TableCreateAsStatement>
     where
         T: IntoTableName,
     {
-        TableCreateAsStatement {
+        Ok(TableCreateAsStatement {
             name: table.into_table_name(),
             columns: Vec::new(),
-            body,
+            body: crate::view::definition_body(body)?,
             if_not_exists: false,
             no_data: false,
-        }
+        })
     }
 
     /// Name the table a [`TableAlterStatement`] will alter.

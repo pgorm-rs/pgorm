@@ -2,6 +2,9 @@
 //! refresh and drops a materialized view takes, and `CREATE TABLE AS`. Each
 //! body is the `Select` builder's statement, written by pgorm-query with its
 //! values inlined: a definition is stored as SQL text and binds nothing.
+//! The body is read as an embedded `Select` is, its tie limit and WINDOW
+//! clause checked, and pgorm-query's constructor runs the same checks, its
+//! refusal reaching JavaScript as the same error.
 
 use neon::prelude::*;
 use pgorm::pgorm_query::{DropBehavior, MaterializedView, Table, View, ViewCheckOption};
@@ -73,7 +76,10 @@ macro_rules! on_view {
 fn create_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     let body = select_at(cx, 1)?;
-    Ok(Ddl::CreateView(Box::new(View::create(name, body))).into())
+    match View::create(name, body) {
+        Ok(view) => Ok(Ddl::CreateView(Box::new(view)).into()),
+        Err(error) => refuse(cx, error.to_string()),
+    }
 }
 
 /// `ddlCreateRecursiveView(name, columns, select)`: the column list is what
@@ -84,7 +90,10 @@ fn create_recursive_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let listed = arg(cx, 1);
     let (first, rest) = columns(cx, listed, "a recursive view's column list")?;
     let body = select_at(cx, 2)?;
-    let mut view = View::create_recursive(name, first, body);
+    let mut view = match View::create_recursive(name, first, body) {
+        Ok(view) => view,
+        Err(error) => return refuse(cx, error.to_string()),
+    };
     view.columns(rest);
     Ok(Ddl::CreateRecursiveView(Box::new(view)).into())
 }
@@ -209,7 +218,10 @@ fn drop_view(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn create_materialized_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     let body = select_at(cx, 1)?;
-    Ok(Ddl::CreateMaterializedView(Box::new(MaterializedView::create(name, body))).into())
+    match MaterializedView::create(name, body) {
+        Ok(create) => Ok(Ddl::CreateMaterializedView(Box::new(create)).into()),
+        Err(error) => refuse(cx, error.to_string()),
+    }
 }
 
 fn relation_if_not_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
@@ -298,5 +310,8 @@ fn drop_materialized_view(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn create_table_as(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     let body = select_at(cx, 1)?;
-    Ok(Ddl::CreateTableAs(Box::new(Table::create_as(name, body))).into())
+    match Table::create_as(name, body) {
+        Ok(create) => Ok(Ddl::CreateTableAs(Box::new(create)).into()),
+        Err(error) => refuse(cx, error.to_string()),
+    }
 }

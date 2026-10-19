@@ -55,6 +55,10 @@ fn counting() -> SelectStatement {
         .to_owned()
 }
 
+/// Why pgorm-query's constructors take every body here: none has a tie limit
+/// or a window for the definition check to refuse.
+const BODY_TAKEN: &str = "the body has nothing the definition check refuses";
+
 fn app(name: &str) -> TableName {
     TableName::SchemaTable(n("app"), n(name))
 }
@@ -64,11 +68,12 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
     vec![
         (
             "create-view",
-            ddl(View::create(app("large_room"), large_rooms())),
+            ddl(View::create(app("large_room"), large_rooms()).expect(BODY_TAKEN)),
         ),
         (
             "create-view-options",
             ddl(View::create(app("large_room"), large_rooms())
+                .expect(BODY_TAKEN)
                 .or_replace()
                 .columns([n("booking"), n("room_no")])
                 .check_option(ViewCheckOption::Local)
@@ -81,6 +86,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
             "create-recursive-view",
             ddl(
                 View::create_recursive(TableName::Table(n("counter")), n("n"), counting())
+                    .expect(BODY_TAKEN)
                     .or_replace()
                     .security_barrier()
                     .to_owned(),
@@ -97,6 +103,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         (
             "create-materialized-view",
             ddl(MaterializedView::create(app("room_total"), large_rooms())
+                .expect(BODY_TAKEN)
                 .if_not_exists()
                 .columns([n("booking"), n("room_no")])
                 .with_no_data()
@@ -129,6 +136,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
             "create-table-as",
             ddl(
                 Table::create_as(TableName::Table(n("large_copy")), large_rooms())
+                    .expect(BODY_TAKEN)
                     .if_not_exists()
                     .columns([n("booking")])
                     .with_no_data()
