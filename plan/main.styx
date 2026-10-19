@@ -271,6 +271,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.render.operators +7 (like-escape-off, 760105c0): a pattern's ESCAPE tail renders as an inline constant, or ESCAPE '' when escaping is off."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T13:36:54.368904Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.render.subquery +5 (in-subquery-enum-shapes, a4b9cbd2): a SimpleExpr::SubQuery's operator prefix includes ARRAY, rendered directly before the parenthesized sub-statement."
+                        after_done true
+                    }
                 )
             }
 
@@ -454,6 +462,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "table-function-column-defs (9ad413aa) bumped sql.ast.func+11: Function gains JsonToRecord, JsonbToRecord, JsonToRecordset and JsonbToRecordset with their Func constructors, read through a column definition list; sites re-pinned and the code matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T13:36:54.257129Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "sql.ast.expr +7 (in-subquery-enum-shapes, a4b9cbd2): Expr::array wraps a SELECT in ARRAY(..) (SubQueryOper::Array), the subquery's one column as one array value that can be cast and compared with = ANY."
                         after_done true
                     }
                 )
@@ -713,6 +729,14 @@ children (
                         text "entity.traits.column.enum-cast +9 (domain-enum-remaining, a3c07659): a column whose domain is over an enum is compared as the enum in in_subquery / not_in_subquery (the subquery's one plain projection cast with it), max and min, relation joins (ColumnPairs records each side's enum when named by entity columns), the loader's key predicate, belongs_to_tbl_alias and the pipeline's operators and min / max; a foreign key between such columns is the server's refusal (42804)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T13:36:54.149169Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "entity.traits.column.enum-cast +10 (in-subquery-enum-shapes, a4b9cbd2): in_subquery / not_in_subquery on a column whose domain is over an enum compare a `*`, a table's `*` or a windowed projection through `= ANY(CAST(ARRAY(..) AS e[]))` / `<> ALL(..)`, the server still refusing a subquery wider than one column (42601); several projections stay as written, refused with 42601."
+                        after_done true
+                    }
                 )
             }
 
@@ -830,6 +854,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "exec.cursor.keyset +6 (domain-enum-predicates, 47aa595c): an order column whose domain is over an enum is cast to the enum in each boundary comparison, its boundary value to the enum in place of save_as, while ORDER BY keeps the bare column, which sorts as the enum does."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T13:36:54.025864Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "exec.cursor.keyset +7 (graph-cursor-enum-tiebreak, 32ab45e8): every keyset column carries its boundary casts, a graph's tiebreak included, so a tiebreak key whose domain is over an enum is compared as the enum in a whole-keyset boundary; only entries set through set_secondary_order_by bind bare."
                         after_done true
                     }
                 )
