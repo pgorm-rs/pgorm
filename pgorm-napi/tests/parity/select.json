@@ -24,7 +24,7 @@
     "values": [["i64","1"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","1"]]
   },
   "patterns": {
-    "sql": "SELECT * FROM \"t\" WHERE \"a\" LIKE $1 OR \"b\" NOT LIKE $2 ESCAPE E'\\\\' OR (\"c\" ILIKE $3) OR (\"d\" NOT ILIKE $4 ESCAPE '!') OR STARTS_WITH(\"e\", $5) OR \"right\"(\"f\", CHAR_LENGTH($6)) = $7 OR strpos(\"g\", $8) > 0",
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" LIKE $1 OR \"b\" NOT LIKE $2 ESCAPE E'\\\\' OR \"c\" ILIKE $3 OR \"d\" NOT ILIKE $4 ESCAPE '!' OR STARTS_WITH(\"e\", $5) OR \"right\"(\"f\", CHAR_LENGTH($6)) = $7 OR strpos(\"g\", $8) > 0",
     "values": [["text","A%"], ["text","50\\%%"], ["text","x_y"], ["text","%z"], ["text","50%_"], ["text","O'Brien"], ["text","O'Brien"], ["text","\\"]]
   },
   "casts-collations-subscripts": {

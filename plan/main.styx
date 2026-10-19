@@ -13249,6 +13249,7 @@ children (
         title "LIKE and ILIKE render alike under AND: both parenthesised or neither"
         kind @fix
         deps (like-escape-off)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.05557Z
@@ -13262,6 +13263,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:15:58.738564Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

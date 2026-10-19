@@ -260,7 +260,7 @@ fn no_escape_renders_an_empty_escape() {
     let (sql, values) = query.build();
     assert_eq!(
         sql,
-        r#"SELECT "character" FROM "character" WHERE "character" LIKE $1 ESCAPE '' AND ("character" ILIKE $2 ESCAPE '') AND "character" SIMILAR TO $3 ESCAPE ''"#
+        r#"SELECT "character" FROM "character" WHERE "character" LIKE $1 ESCAPE '' AND "character" ILIKE $2 ESCAPE '' AND "character" SIMILAR TO $3 ESCAPE ''"#
     );
     assert_eq!(values.0, vec![r"a\%".into(); 3]);
 
@@ -297,7 +297,7 @@ fn no_escape_renders_an_empty_escape() {
 
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    SIMILAR TO ranks with LIKE: bare under the
 // logical operators and NOT, an arithmetic operand bare inside it
-// [spec:pgorm:def:sql.render.precedence+9/test]
+// [spec:pgorm:def:sql.render.precedence+10/test]
 #[test]
 fn similar_to_sits_in_the_like_family() {
     let sql = Query::select()
@@ -314,6 +314,69 @@ fn similar_to_sits_in_the_like_family() {
     assert_eq!(
         sql,
         r#"SELECT "character" FROM "character" WHERE ("character" SIMILAR TO 'a%' OR "character" NOT SIMILAR TO 'b%') AND "size_w" + 1 SIMILAR TO '1%' AND (NOT "font_id" SIMILAR TO '2%')"#
+    );
+}
+
+/// A WHERE clause as the grammar grouped it: a boolean node as its operator
+/// over its arguments, an operator expression as its operator name, followed
+/// by its left operand when that is an operator expression too.
+fn grouping(node: &serde_json::Value) -> String {
+    if let Some(boolean) = node.get("BoolExpr") {
+        let operator = match boolean["boolop"].as_i64() {
+            Some(1) => "AND",
+            Some(2) => "OR",
+            Some(3) => "NOT",
+            other => panic!("no boolean operator {other:?}"),
+        };
+        let args: Vec<String> = boolean["args"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(grouping)
+            .collect();
+        format!("{operator}({})", args.join(", "))
+    } else if let Some(operation) = node.get("AExpr") {
+        let name = operation["name"][0]["String"]["sval"]
+            .as_str()
+            .unwrap_or_default();
+        match operation
+            .get("lexpr")
+            .filter(|left| left.get("AExpr").is_some())
+        {
+            Some(left) => format!("{name}({})", grouping(left)),
+            None => name.to_owned(),
+        }
+    } else {
+        "_".to_owned()
+    }
+}
+
+// [spec:pgorm:def:sql.render.precedence+10/test]    ILIKE and NOT ILIKE rank with LIKE: bare under
+// the logical operators and NOT, ESCAPE tail included, an arithmetic operand bare inside them,
+// and the grammar groups the bare render as the condition was built
+#[test]
+fn ilike_sits_in_the_like_family() {
+    let sql = Query::select()
+        .column(Char::Character)
+        .from(Char::Table)
+        .cond_where(
+            Condition::any()
+                .add(Expr::col(Char::Character).ilike("a%"))
+                .add(Expr::col(Char::Character).not_ilike(LikeExpr::new("b!%").escape('!'))),
+        )
+        .and_where(Expr::col(Char::Character).like("c%"))
+        .and_where(Expr::expr(Expr::col(Char::SizeW).add(1)).ilike("1%"))
+        .and_where(Expr::col(Char::FontId).ilike("2%").not())
+        .and_where(Expr::col(Char::FontId).not_ilike("3%").not())
+        .to_string();
+    assert_eq!(
+        sql,
+        r#"SELECT "character" FROM "character" WHERE ("character" ILIKE 'a%' OR "character" NOT ILIKE 'b!%' ESCAPE '!') AND "character" LIKE 'c%' AND "size_w" + 1 ILIKE '1%' AND (NOT "font_id" ILIKE '2%') AND (NOT "font_id" NOT ILIKE '3%')"#
+    );
+    let select = select_stmt(&sql);
+    assert_eq!(
+        grouping(&select["where_clause"]),
+        "AND(OR(~~*, !~~*), ~~, ~~*(+), NOT(~~*), NOT(!~~*))"
     );
 }
 

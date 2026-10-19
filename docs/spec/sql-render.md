@@ -327,7 +327,7 @@ an ideal Postgres renderer would emit.
 > escape character as an inline constant, or ` ESCAPE ''` when escaping is
 > off — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+9]
+> [spec:pgorm:def:sql.render.precedence+10]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -349,8 +349,9 @@ an ideal Postgres renderer would emit.
 > operator is logical (`AND`/`OR`/`NOT`). Each of those families is the whole
 > family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
 > `SYMMETRIC` forms, and IS is `IS`, `IS NOT`, `IS DISTINCT FROM` and
-> `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `SIMILAR TO` and
-> `NOT SIMILAR TO`, which the grammar ranks together — a new operator added to
+> `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `ILIKE`,
+> `NOT ILIKE`, `SIMILAR TO` and `NOT SIMILAR TO`, which the grammar ranks
+> together at one level — a new operator added to
 > one of these lexemes but not to its `Oper` predicate is the failure mode
 > this clause exists to name.
 > The Postgres-specific extension also
