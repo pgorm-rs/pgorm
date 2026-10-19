@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{Name, NullOrdering, Order};
+use pgorm::pgorm_query::{Collation, IntoCollation, Name, NullOrdering, Order};
 use pyo3::prelude::*;
 
 use crate::errors::ConstructionError;
@@ -45,6 +45,20 @@ pub(crate) fn validate_name(name: &str) -> PyResult<()> {
     } else {
         Ok(())
     }
+}
+
+/// A collation named by `name`, qualified by `schema` when one is given, each
+/// an identifier: what `Expr.collate`, `ColumnDef.collate` and
+/// `CreateDomain.collate` take, so the three refuse the same names.
+pub(crate) fn collation(
+    name: &Bound<'_, PyAny>,
+    schema: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Collation> {
+    let name = PyIdentifier::new(name)?.name();
+    Ok(match schema {
+        Some(schema) => (PyIdentifier::new(schema)?.name(), name).into_collation(),
+        None => name.into_collation(),
+    })
 }
 
 /// Typed SQL ordering direction.

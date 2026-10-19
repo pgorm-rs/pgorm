@@ -130,6 +130,20 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > API. Python truth testing of a query expression MUST raise an error instead
 > of evaluating it as a local boolean or silently dropping part of a predicate.
 
+> [spec:pgorm:req:python.expr-collate]
+> `Expr.collate(name, *, schema)` MUST put an expression under a collation
+> through Rust's `Expr::collate` (`sql.ast.expr.collate`), the name and the
+> schema each an identifier, a `str` or an `Identifier`, refused as
+> `ColumnDef.collate` refuses them (`python.schema-collation`): written
+> `(expr COLLATE "name")`, the schema first when one is given. It answers an
+> `Expr`, so the collated value goes on to be compared, and `asc()` or
+> `desc()` over it writes the clause into the sort key, which is where
+> PostgreSQL's grammar reads an `ORDER BY`'s collation. A name that is not an
+> identifier MUST be refused with `ConstructionError` before anything is
+> built. What only the server knows it refuses by SQLSTATE, as a
+> `DatabaseError`: a collation that does not exist (`42704`) and a collation
+> on a type without one (`42804`).
+
 > [spec:pgorm:req:python.ownership]
 > Python query objects MUST have documented reuse, cloning and consumption
 > semantics. Reusing one expression in two queries MUST NOT mutate the other

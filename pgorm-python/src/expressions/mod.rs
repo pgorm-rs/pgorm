@@ -12,7 +12,7 @@ use pyo3::{basic::CompareOp, prelude::*};
 
 use crate::{
     errors::ConstructionError,
-    identifiers::{Direction, Nulls, PyIdentifier},
+    identifiers::{Direction, Nulls, PyIdentifier, collation},
     values::PyTypeName,
 };
 pub(crate) use capabilities::operations as capabilities;
@@ -150,6 +150,20 @@ impl PyExpr {
                 .clone()
                 .cast_as_type(if array { name.array() } else { name }),
         )
+    }
+    /// `(expr COLLATE "name")`: this expression under a collation, through
+    /// Rust's `Expr::collate`. It stays an operand, so it goes on to be
+    /// compared, and `asc` or `desc` over it writes the clause into the sort
+    /// key, where PostgreSQL reads an `ORDER BY`'s collation.
+    // [spec:pgorm:req:python.expr-collate]
+    #[pyo3(signature = (name, *, schema=None))]
+    fn collate(
+        &self,
+        name: &Bound<'_, PyAny>,
+        schema: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let collated = Expr::expr(self.inner.clone()).collate(collation(name, schema)?);
+        Ok(Self::from_rust(collated.into()))
     }
     fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<AliasedExpr> {
         Ok(AliasedExpr {

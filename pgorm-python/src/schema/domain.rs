@@ -3,13 +3,15 @@
 //! `TypeName`.
 
 use super::{
-    column::collation,
     enums::type_ref,
     statement::{PyDDL, Statement},
     types::PyDataType,
 };
 use crate::{
-    errors::ConstructionError, expressions, expressions::Compiled, identifiers::PyIdentifier,
+    errors::ConstructionError,
+    expressions,
+    expressions::Compiled,
+    identifiers::{PyIdentifier, collation},
 };
 use pgorm::pgorm_query::{
     ConstraintDrop, Domain, DomainAlterStatement, DomainCheck, DomainCreateStatement,

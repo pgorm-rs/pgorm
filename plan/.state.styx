@@ -2300,6 +2300,11 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule python.truth-testing}
     )}
+    {id python-expr-collate, covered_rules (
+        python.expr-collate
+    ), covered_claims (
+        {impl_name main, rule python.expr-collate}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

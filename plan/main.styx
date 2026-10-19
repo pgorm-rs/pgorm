@@ -13022,6 +13022,9 @@ children (
         id python-expr-collate
         title "Python expressions take a COLLATE, as Rust's and JavaScript's do"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:python.expr-collate])
+        }
         deps (python-column-collation)
         log (
             {
@@ -13029,6 +13032,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-column-collation (d962207a). sql.ast.expr.collate exists in Rust (expression, ORDER BY and column positions) and pgorm-napi has col().collate(), but Python expressions cannot be collated: a column's collation and a domain's are the only places Python can name one. Add Expr.collate(name, schema=) (and the ORDER BY position if it is separate), with stubs, capability entries, parity cases and a live test."
+            }
+
+            {
+                at 2026-10-19T10:49:20.42321Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

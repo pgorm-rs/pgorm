@@ -352,3 +352,49 @@ fn set_returning_calls_use_rust_constructors() -> PyResult<()> {
         Ok(())
     })
 }
+
+// [spec:pgorm:req:python.expr-collate/test]    bare and schema-qualified, compared, and as
+// an ORDER BY key; a name that is not an identifier is refused
+#[test]
+fn collations_lower_into_rust_collate() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let name = || Expr::col(Name::runtime("name"));
+        parity(
+            py,
+            &globals,
+            "p.col('name').collate('C')",
+            name().collate(Name::runtime("C")).into(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('name').collate(p.Identifier('C \"x\"'), schema='pg_catalog') < 'b'",
+            name()
+                .collate((Name::runtime("pg_catalog"), Name::runtime("C \"x\"")))
+                .lt("b"),
+        )?;
+        let source = "p.col('name').collate('C').desc().expr";
+        let ordered = py.eval(&CString::new(source)?, Some(&globals), None)?;
+        assert_eq!(
+            ordered.extract::<PyRef<'_, PyExpr>>()?.inner,
+            name().collate(Name::runtime("C")).into()
+        );
+        for source in [
+            "p.col('name').collate('')",
+            "p.col('name').collate('C', schema='')",
+            "p.col('name').collate(1)",
+            "p.col('name').collate('雪' * 22)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        Ok(())
+    })
+}

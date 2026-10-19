@@ -160,6 +160,23 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
             text("50%").not_like(p.LikePattern("50\\%", escape="")).as_("percent")))
         self.assertEqual(answers, [(False, True, True, True, True)])
 
+    # [spec:pgorm:req:python.expr-collate/test]    "C" orders and compares bytewise in both
+    # positions, and the server refuses a collation it lacks or a type without one
+    async def test_collated_expressions_compare_and_sort(self):
+        p.require_capability("expr.collate")
+        words = T(p.call("unnest", text_array(["b", "a", "B", "A"]))).columns("word").alias("w")
+        word = p.col("word")
+        ordered = p.select(word).from_(words).order_by(word.collate("C").asc())
+        self.assertIn('ORDER BY ("word" COLLATE "C") ASC', ordered.inspect().sql)
+        self.assertEqual(await self.rows(ordered), [("A",), ("B",), ("a",), ("b",)])
+        below = p.select(word).from_(words).where_(word.collate("POSIX", schema="pg_catalog") < "a")
+        self.assertEqual(sorted(await self.rows(below)), [("A",), ("B",)])
+        for collated, sqlstate in ((word.collate("no such collation"), "42704"),
+                                   (p.literal(1).collate("C"), "42804")):
+            with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as raised:
+                await self.rows(p.select(collated).from_(words))
+            self.assertEqual(raised.exception.sqlstate, sqlstate)
+
     # [spec:pgorm:req:sql.ast.select.table-function+2/test]    UNNEST numbered WITH ORDINALITY,
     # its columns named, beside the row it reads
     async def test_unnest_with_ordinality_numbers_positions(self):
