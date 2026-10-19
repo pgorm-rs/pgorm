@@ -11,16 +11,13 @@ use jiff::{
 use pgorm::pgorm_query::{ArrayType, Multirange, Range, RangeType, Value};
 use postgres_protocol::types::{self as wire, RangeBound};
 use pyo3::PyResult;
-use tokio_postgres::{
-    Row,
-    types::{FromSql, Kind, Type},
-};
+use tokio_postgres::types::{FromSql, Kind, Type};
 
 use uuid::Uuid;
 
 use super::{
     codecs::ExactDecimal,
-    decode::{read, typed},
+    decode::{Field, read, typed},
 };
 use crate::{
     errors::DecodeError,
@@ -140,7 +137,8 @@ fn built_in(ty: &Type) -> bool {
 /// `None` for a column of any other type. A range type a schema created reads
 /// as its own kind, named as the column's type is, whatever its subtype.
 // [spec:pgorm:req:python.results]
-pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult<Option<PyValue>> {
+pub(super) fn value(field: Field<'_>, ty: &Type, array: bool) -> PyResult<Option<PyValue>> {
+    let index = field.index();
     let (subtype, multi) = match ty.kind() {
         Kind::Range(subtype) => (subtype, false),
         Kind::Multirange(subtype) => (subtype, true),
@@ -153,7 +151,7 @@ pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult
                  does not hold"
             )));
         }
-        return created(row, index, ty, subtype, multi).map(Some);
+        return created(field, ty, subtype, multi).map(Some);
     }
     let Some(range) = range_type(subtype) else {
         return Err(DecodeError::new_err(format!(
@@ -163,15 +161,11 @@ pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult
     macro_rules! decode {
         ($rust:ty, $bound:expr) => {
             if multi {
-                typed::<MultirangeCodec<$rust>>(
-                    row,
-                    index,
-                    array,
-                    ArrayType::Multirange(range),
-                    |v| Value::Multirange(range, v.map(|v| Box::new(v.0.map($bound)))),
-                )
+                typed::<MultirangeCodec<$rust>>(field, array, ArrayType::Multirange(range), |v| {
+                    Value::Multirange(range, v.map(|v| Box::new(v.0.map($bound))))
+                })
             } else {
-                typed::<RangeCodec<$rust>>(row, index, array, ArrayType::Range(range), |v| {
+                typed::<RangeCodec<$rust>>(field, array, ArrayType::Range(range), |v| {
                     Value::Range(range, v.map(|v| Box::new(v.0.map($bound))))
                 })
             }
@@ -196,15 +190,16 @@ pub(super) fn value(row: &Row, index: usize, ty: &Type, array: bool) -> PyResult
 /// its subtype's Rust type, through the subtype's own codec, and held as the
 /// text form that type's values travel as, tagged with the type's name.
 // [spec:pgorm:req:python.results]
-fn created(row: &Row, index: usize, ty: &Type, subtype: &Type, multi: bool) -> PyResult<PyValue> {
+fn created(field: Field<'_>, ty: &Type, subtype: &Type, multi: bool) -> PyResult<PyValue> {
+    let index = field.index();
     macro_rules! text {
         ($rust:ty, $kind:ident, $bound:expr) => {
             (
                 ArrayType::$kind,
                 if multi {
-                    read::<MultirangeCodec<$rust>>(row, index)?.map(|v| v.0.map($bound).to_string())
+                    read::<MultirangeCodec<$rust>>(field)?.map(|v| v.0.map($bound).to_string())
                 } else {
-                    read::<RangeCodec<$rust>>(row, index)?.map(|v| v.0.map($bound).to_string())
+                    read::<RangeCodec<$rust>>(field)?.map(|v| v.0.map($bound).to_string())
                 },
             )
         };

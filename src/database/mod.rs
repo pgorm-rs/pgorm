@@ -1,11 +1,13 @@
 mod connection;
 mod copy;
+mod copy_rows;
 mod db_connection;
 mod lifecycle;
 mod listen;
 
 pub use connection::*;
 pub use copy::{CopyInSink, CopyOutStream, CopyTrait};
+pub use copy_rows::{CopyColumn, CopyRowDecoder, CopyRowEncoder, CopyRowSink, CopyRowStream};
 pub use db_connection::*;
 pub use listen::{Listener, Notifications, connect_listener, notify};
 
@@ -16,7 +18,7 @@ pub use tokio_postgres::Notification;
 
 /// The chunk type COPY's data travels in, both ways, re-exported so writing a
 /// [`CopyInSink`] needs no direct dependency on `bytes`.
-// [spec:pgorm:req:conn.copy]
+// [spec:pgorm:req:conn.copy+1]
 pub use bytes::Bytes;
 pub use tokio_postgres::{Config, IsolationLevel};
 

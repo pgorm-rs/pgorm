@@ -14,9 +14,11 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:napi.copy.rows]
 
 import type { Builder, Predicate } from "./expressions.d.ts";
+import type { Param, PlainValue } from "./index.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { TableRef } from "./schema.d.ts";
 import type { Select } from "./select.d.ts";
@@ -139,5 +141,31 @@ export declare class CopyOutStream implements AsyncIterableIterator<Uint8Array>,
   return(): Promise<IteratorResult<Uint8Array, undefined>>;
   close(): Promise<void>;
   [Symbol.asyncIterator](): AsyncIterableIterator<Uint8Array>;
+  [Symbol.asyncDispose](): Promise<void>;
+}
+
+/**
+ * What `copyInRows` writes: rows, each an array of its columns' values in
+ * the order the server describes the statement's columns, from an iterable
+ * or async iterable.
+ */
+export type CopyRows = Iterable<readonly Param[]> | AsyncIterable<readonly Param[]>;
+
+/**
+ * A binary COPY TO's rows as an async iterator of arrays of values, one row
+ * per pull, each field decoded by its column's type as a result column of
+ * that type is. `columns` names the columns each row holds. It holds what the
+ * COPY runs on until its end, which frees it, or until `close()`, `return()`
+ * or a failed pull — a field that does not decode among them, a
+ * `DecodeError` — which discard the connection if data remained.
+ */
+export declare class CopyRowStream implements AsyncIterableIterator<PlainValue[]>, AsyncDisposable {
+  private constructor();
+  readonly columns: readonly string[];
+  readonly closed: boolean;
+  next(): Promise<IteratorResult<PlainValue[], undefined>>;
+  return(): Promise<IteratorResult<PlainValue[], undefined>>;
+  close(): Promise<void>;
+  [Symbol.asyncIterator](): AsyncIterableIterator<PlainValue[]>;
   [Symbol.asyncDispose](): Promise<void>;
 }

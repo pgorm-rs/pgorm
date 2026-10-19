@@ -1,6 +1,6 @@
 // The COPY family's parity cases, held to `copy.json` as `select.ts`'s are to
 // theirs. A COPY binds nothing, so every case's values are empty.
-// [spec:pgorm:req:napi.copy+1/test]
+// [spec:pgorm:req:napi.copy+2/test]
 
 import { type Builder, col, copyFrom, copyTo, deleteFrom, insert, select, Table } from "../../lib/index.js";
 

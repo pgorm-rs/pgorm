@@ -64,7 +64,7 @@ mod to;
 
 pub(crate) use from::CopyFrom;
 pub use from::PyCopyFrom;
-pub(crate) use pump::{Message, Piece, drive_in, drive_out, open_in, open_out};
+pub(crate) use pump::{Columns, Message, Piece, Unopened, drive_in, drive_out, open_in, open_out};
 pub(crate) use to::CopyTo;
 pub use to::PyCopyTo;
 
@@ -146,7 +146,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.capabilities]
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
+// [spec:pgorm:req:python.copy.rows]
 pub(crate) fn capabilities() -> Map<String, Value> {
     let builders = [
         (
@@ -230,6 +231,22 @@ pub(crate) fn capabilities() -> Map<String, Value> {
             "transaction.copy_out",
             "pgorm::CopyTrait::copy_out for DatabaseTransaction, CopyOutStream",
         ),
+        (
+            "connection.copy_in_rows",
+            "pgorm::CopyTrait::{copy_in_columns, copy_in} for DatabaseConnection, CopyRowEncoder",
+        ),
+        (
+            "connection.copy_out_rows",
+            "pgorm::CopyTrait::{copy_out_columns, copy_out} for DatabaseConnection, CopyRowDecoder",
+        ),
+        (
+            "transaction.copy_in_rows",
+            "pgorm::CopyTrait::{copy_in_columns, copy_in} for DatabaseTransaction, CopyRowEncoder",
+        ),
+        (
+            "transaction.copy_out_rows",
+            "pgorm::CopyTrait::{copy_out_columns, copy_out} for DatabaseTransaction, CopyRowDecoder",
+        ),
     ]
     .into_iter()
     .map(|(name, api)| {
@@ -252,6 +269,7 @@ pub(crate) fn policy() -> Value {
         "copy_out_chunks": "bytes joined from received CopyData messages up to 64 KiB; no row boundary is promised",
         "copy_out_buffering": "at most 4 chunks queued; an unread stream holds the server back",
         "ownership": "the copy reserves its connection or transaction until it ends; COPY TO's end releases it, an early close discards it",
-        "cancellation": "before finish aborts the COPY; during finish discards the connection or transaction with the outcome unknown"
+        "cancellation": "before finish aborts the COPY; during finish discards the connection or transaction with the outcome unknown",
+        "rows": "binary COPY only; the columns are described by the server before the COPY starts, each value read as a parameter is and decoded as a result column is; a row of another width or a value its column's type does not take raises a construction error and aborts the COPY"
     })
 }

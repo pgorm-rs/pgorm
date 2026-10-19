@@ -127,7 +127,7 @@ from .runtime import Connection, Pool, PoolStatus, connect
 from .results import Record, Field, ResultStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 from .transactions import Transaction, TransactionMode, IsolationLevel
-from .copy import CopyOutStream, CopySource
+from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
 select = Select
@@ -252,6 +252,8 @@ __all__ = [
     "CopyFrom",
     "CopyTo",
     "CopyOutStream",
+    "CopyRows",
+    "CopyRowStream",
     "CopySource",
     "Listener",
     "Notification",

@@ -20,6 +20,8 @@ async def invalid(connection: p.Connection) -> None:
     s.create_table(p.Table("t")).column("raw SQL")  # expected-error: arg-type
     p.select(p.literal(1)).limit("3")  # expected-error: arg-type
     p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
+    await connection.copy_in_rows(p.CopyFrom(p.Table("t"), "text"), [[1]])  # expected-error: arg-type
+    await connection.copy_out_rows(p.CopyTo(p.Table("t"), "csv"))  # expected-error: arg-type
     p.select(p.literal(1)).union(p.RawSQL("SELECT 2"))  # expected-error: arg-type
     p.select(p.literal(1)).window("w", p.col("id"))  # expected-error: arg-type
     p.ExtendedWindow("w").partition_by(p.col("id"))  # expected-error: attr-defined

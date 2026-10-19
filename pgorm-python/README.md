@@ -103,8 +103,9 @@ PostgreSQL decoding limits and cancellation behavior.
 
 `CopyFrom` and `CopyTo` build COPY statements: `copy_in` streams bytes from a
 sync or async source into a table, and `copy_out` streams a table's or a
-query's data out as `bytes`. See [COPY](STATEMENTS.md#copy) for the formats,
-chunking, abort and cancellation behaviour.
+query's data out as `bytes`; in the binary format `copy_in_rows` and
+`copy_out_rows` carry rows of values instead. See [COPY](STATEMENTS.md#copy)
+for the formats, chunking, abort and cancellation behaviour.
 
 `pool.listener()` opens a dedicated connection that receives `LISTEN`
 notifications as an async iterator, and `notify` on a pool, connection or

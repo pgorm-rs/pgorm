@@ -7,7 +7,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from . import _native
-from .copy import CopyOutStream, CopySource, copy_in
+from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource, copy_in, copy_in_rows
 from .results import Query, Record
 
 if TYPE_CHECKING:
@@ -67,6 +67,16 @@ class Transaction:
     async def copy_out(self, statement: _native.CopyTo[Any]) -> CopyOutStream:
         """Open a COPY TO; closing it before its end discards the transaction."""
         return CopyOutStream(await _native._copy_out(self._native, statement), None)
+
+    async def copy_in_rows(
+        self, statement: _native.CopyFrom[Literal["binary"]], rows: CopyRows
+    ) -> int:
+        """Run a binary COPY FROM of rows inside this transaction; see ``Connection.copy_in_rows``."""
+        return await copy_in_rows(self._native, statement, rows)
+
+    async def copy_out_rows(self, statement: _native.CopyTo[Literal["binary"]]) -> CopyRowStream:
+        """Open a binary COPY TO of rows; closing it before its end discards the transaction."""
+        return CopyRowStream(await _native._copy_out(self._native, statement, True), None)
 
     async def notify(self, channel: str, payload: str) -> None:
         """Send a notification delivered when this transaction commits, never if it rolls back."""

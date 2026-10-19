@@ -786,6 +786,7 @@ assertions (
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
     {id constraint-drop-rename, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:25:32.290402Z}
     {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
+    {id copy-source-tie-check, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:11:08.642586Z}
     {id copy-to-source-returning, kind @complete, author "brendan@necessary.nu", at 2026-10-18T20:23:14.97164Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
     {id coverage-obligations-unreached, kind @complete, author "brendan@necessary.nu", at 2026-09-17T13:16:51.406337Z}
@@ -1206,6 +1207,17 @@ impl_evidence (
         {impl_name main, rule conn.listen}
         {impl_name main, rule napi.listen}
         {impl_name main, rule python.listen}
+    )}
+    {id copy-binary-rows, covered_rules (
+        conn.copy.rows
+        napi.copy.rows
+        python.copy.rows
+        sql.ast.copy.parts
+    ), covered_claims (
+        {impl_name main, rule conn.copy.rows}
+        {impl_name main, rule napi.copy.rows}
+        {impl_name main, rule python.copy.rows}
+        {impl_name main, rule sql.ast.copy.parts}
     )}
     {id core, covered_rules (
         query.graph

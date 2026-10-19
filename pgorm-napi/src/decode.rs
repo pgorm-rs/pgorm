@@ -14,8 +14,11 @@ use jiff::{
     Timestamp,
     civil::{Date, DateTime, Time},
 };
-use pgorm::pgorm_query::{
-    ArrayType, Interval, IpNetwork, MacAddress, Multirange, Range, RangeType, Value, Vector,
+use pgorm::{
+    CopyColumn,
+    pgorm_query::{
+        ArrayType, Interval, IpNetwork, MacAddress, Multirange, Range, RangeType, Value, Vector,
+    },
 };
 use postgres_protocol::types::{self as wire, RangeBound};
 use rust_decimal::Decimal;
@@ -83,6 +86,18 @@ fn column(row: &Row, index: usize) -> Result<Tagged, Failure> {
     decode(column.type_(), raw.0).map_err(|error| {
         Failure::Decode(format!(
             "column {:?} of type `{}` cannot be decoded: {error}",
+            column.name(),
+            column.type_()
+        ))
+    })
+}
+
+/// One field of a COPY of rows, read as a result column of its type is.
+// [spec:pgorm:req:napi.copy.rows]
+pub(crate) fn field(column: &CopyColumn, raw: Option<&[u8]>) -> Result<Tagged, Failure> {
+    decode(column.type_(), raw).map_err(|error| {
+        Failure::Decode(format!(
+            "COPY column {:?} of type `{}` cannot be decoded: {error}",
             column.name(),
             column.type_()
         ))

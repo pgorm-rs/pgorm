@@ -5,7 +5,7 @@ use super::{
     work::{Output, Work},
 };
 use crate::{
-    copy::{CopyFrom, CopyTo, Message, Piece},
+    copy::{Columns, CopyFrom, CopyTo, Message, Piece, Unopened},
     execution::Database,
 };
 use futures_util::future::BoxFuture;
@@ -32,14 +32,16 @@ pub(super) enum Command {
     },
     CopyIn {
         statement: CopyFrom,
+        rows: Option<Columns>,
         messages: mpsc::Receiver<Message>,
-        opened: oneshot::Sender<Result<(), Error>>,
+        opened: oneshot::Sender<Result<(), Unopened>>,
         reply: oneshot::Sender<Result<Option<u64>, Error>>,
     },
     CopyOut {
         statement: CopyTo,
+        rows: Option<Columns>,
         pieces: mpsc::Sender<Piece>,
-        opened: oneshot::Sender<Result<(), Error>>,
+        opened: oneshot::Sender<Result<(), Unopened>>,
     },
 }
 
@@ -95,32 +97,37 @@ pub(super) fn serve<'a>(
                         return Completion::discarded();
                     }
                 }
-                // [spec:pgorm:req:python.copy+1]
+                // [spec:pgorm:req:python.copy+2]
                 Command::CopyIn {
                     statement,
+                    rows,
                     mut messages,
                     opened,
                     reply,
                 } => {
-                    let result = tokio::select! {
+                    let ran = tokio::select! {
                         _ = state.abandoned.cancelled() => return Completion::discarded(),
-                        result = super::copy::run_in(&mut tx, &statement, &mut messages, opened) => result,
+                        ran = super::copy::run_in(&mut tx, &statement, rows.as_ref(), &mut messages, opened) => ran,
                     };
-                    let Some(result) = result else {
-                        return Completion::discarded();
-                    };
-                    if reply.send(result).is_err() {
-                        return Completion::discarded();
+                    match ran {
+                        super::copy::RanIn::Lost => return Completion::discarded(),
+                        super::copy::RanIn::Undescribed => {}
+                        super::copy::RanIn::Ran(result) => {
+                            if reply.send(result).is_err() {
+                                return Completion::discarded();
+                            }
+                        }
                     }
                 }
                 Command::CopyOut {
                     statement,
+                    rows,
                     pieces,
                     opened,
                 } => {
                     let known = tokio::select! {
                         _ = state.abandoned.cancelled() => return Completion::discarded(),
-                        known = super::copy::run_out(&mut tx, &statement, &pieces, opened) => known,
+                        known = super::copy::run_out(&mut tx, &statement, rows.as_ref(), &pieces, opened) => known,
                     };
                     if !known {
                         return Completion::discarded();

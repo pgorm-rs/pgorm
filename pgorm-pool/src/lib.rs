@@ -575,7 +575,7 @@ impl ClientWrapper {
     /// tokio-postgres leaves an answer behind that the next request would read
     /// as its own. Pass a prepared [`Statement`]: preparing is a request of its
     /// own, and a statement refused there leaves the connection intact.
-    // [spec:pgorm:req:conn.copy]
+    // [spec:pgorm:req:conn.copy+1]
     pub async fn copy_in<T, U>(&self, statement: &T) -> Result<CopyInSink<U>, Error>
     where
         T: ?Sized + ToStatement,

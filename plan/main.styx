@@ -12441,6 +12441,14 @@ children (
         id copy-binary-rows
         title "Binary COPY reads and writes rows of pgorm Values, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main (
+                [spec:pgorm:req:conn.copy.rows]
+                [spec:pgorm:def:sql.ast.copy.parts]
+                [spec:pgorm:req:napi.copy.rows]
+                [spec:pgorm:req:python.copy.rows]
+            )
+        }
         deps (conn-copy)
         log (
             {
@@ -12448,6 +12456,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b), which built COPY at the byte level only. Binary COPY's format is a header, then per row a field count and each field as length plus the type's binary send form, then a trailer; pgorm already writes and reads every Value's binary form for bind and decode. Add a typed row writer over a CopyInSink<CopyBinary> (rows of Values, each column's type checked against the statement's columns) and a typed reader over a CopyOutStream<CopyBinary> decoding into Values or a model, with the bindings' equivalents (Python rows of values, JavaScript arrays), live round trips over every value kind, and refusals for a row of the wrong width or type."
+            }
+
+            {
+                at 2026-10-18T22:26:22.20178Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
@@ -12522,6 +12537,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by copy-to-source-returning (dc4d1192). pgorm-napi's COPY TO source does not run the tie-limit check on a Select (Python's CopyTo does, through query.inspect()), and Rust's copy_out does not either, so a COPY over a SELECT with limit_with_ties and no ORDER BY reaches the server (42601), against sql.ast.select.tie-limit's requirement that executors and the JavaScript builders check first. select-named-windows has since added check_windows to the same paths. Call args::embedded on the Select in napi's source(), and run check_tie_limit and check_windows on a SELECT source in Rust's copy_out (or when the CopySource is built), with tests in all three languages."
+            }
+
+            {
+                at 2026-10-18T22:11:08.642586Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

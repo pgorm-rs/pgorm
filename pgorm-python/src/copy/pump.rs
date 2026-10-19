@@ -1,8 +1,10 @@
 //! The data flow between a native COPY handle and the task that owns the
 //! connection or transaction the sink or stream borrows.
 
+use std::sync::{Arc, OnceLock};
+
 use futures_util::{SinkExt, StreamExt};
-use pgorm::{Bytes, CopyInSink, CopyOutStream, CopyTrait, Error};
+use pgorm::{Bytes, CopyColumn, CopyInSink, CopyOutStream, CopyTrait, Error};
 use tokio::sync::mpsc;
 
 use super::{CopyFrom, CopyTo};
@@ -28,38 +30,84 @@ pub(crate) enum Piece {
     End(Box<(Result<(), Error>, Option<Operation>)>),
 }
 
+/// The columns a COPY of rows carries: described by the task owning the
+/// connection before it starts the COPY, and read by the handle that encodes
+/// or decodes the rows.
+pub(crate) type Columns = Arc<OnceLock<Vec<CopyColumn>>>;
+
+/// Why a COPY did not start.
+#[derive(Debug)]
+pub(crate) enum Unopened {
+    /// The server refused the COPY at its start.
+    Refused(Error),
+    /// The server refused the description a COPY of rows starts with: a
+    /// statement of its own, which leaves the connection as any failed
+    /// statement does.
+    Undescribed(Error),
+}
+
+impl Unopened {
+    pub(crate) fn into_error(self) -> Error {
+        match self {
+            Self::Refused(error) | Self::Undescribed(error) => error,
+        }
+    }
+}
+
+// [spec:pgorm:req:python.copy.rows]
 pub(crate) async fn open_in<'a, C>(
     db: &'a mut C,
     statement: &CopyFrom,
-) -> Result<CopyInSink<'a>, Error>
+    rows: Option<&Columns>,
+) -> Result<CopyInSink<'a>, Unopened>
 where
     C: CopyTrait + Send,
 {
+    if let Some(rows) = rows {
+        let columns = match statement {
+            CopyFrom::Text(statement) => db.copy_in_columns(statement).await,
+            CopyFrom::Csv(statement) => db.copy_in_columns(statement).await,
+            CopyFrom::Binary(statement) => db.copy_in_columns(statement).await,
+        };
+        let _ = rows.set(columns.map_err(Unopened::Undescribed)?);
+    }
     match statement {
         CopyFrom::Text(statement) => db.copy_in(statement).await,
         CopyFrom::Csv(statement) => db.copy_in(statement).await,
         CopyFrom::Binary(statement) => db.copy_in(statement).await,
     }
+    .map_err(Unopened::Refused)
 }
 
+// [spec:pgorm:req:python.copy.rows]
 pub(crate) async fn open_out<'a, C>(
     db: &'a mut C,
     statement: &CopyTo,
-) -> Result<CopyOutStream<'a>, Error>
+    rows: Option<&Columns>,
+) -> Result<CopyOutStream<'a>, Unopened>
 where
     C: CopyTrait + Send,
 {
+    if let Some(rows) = rows {
+        let columns = match statement {
+            CopyTo::Text(statement) => db.copy_out_columns(statement).await,
+            CopyTo::Csv(statement) => db.copy_out_columns(statement).await,
+            CopyTo::Binary(statement) => db.copy_out_columns(statement).await,
+        };
+        let _ = rows.set(columns.map_err(Unopened::Undescribed)?);
+    }
     match statement {
         CopyTo::Text(statement) => db.copy_out(statement).await,
         CopyTo::Csv(statement) => db.copy_out(statement).await,
         CopyTo::Binary(statement) => db.copy_out(statement).await,
     }
+    .map_err(Unopened::Refused)
 }
 
 /// Write each chunk into `sink` until `Finish` completes the COPY with its
 /// row count. Every sender gone first answers `None`, having dropped the
 /// sink, which aborts the COPY.
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
 pub(crate) async fn drive_in(
     mut sink: CopyInSink<'_>,
     messages: &mut mpsc::Receiver<Message>,
@@ -82,7 +130,7 @@ pub(crate) async fn drive_in(
 
 /// Forward each chunk of `stream` until it ends, answering how; `None` once
 /// nobody reads, with the stream dropped part way.
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
 pub(crate) async fn drive_out(
     mut stream: CopyOutStream<'_>,
     pieces: &mpsc::Sender<Piece>,

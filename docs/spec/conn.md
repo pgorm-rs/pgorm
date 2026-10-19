@@ -642,7 +642,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## COPY
 
-> [spec:pgorm:req:conn.copy]
+> [spec:pgorm:req:conn.copy+1]
 > `CopyTrait` is COPY's data flow on a connection: `copy_in(&mut self,
 > &CopyFromStatement<F>)` starts `COPY … FROM STDIN` and returns a
 > `CopyInSink<'_>`, and `copy_out(&mut self, &CopyToStatement<F>)` starts `COPY
@@ -666,6 +666,12 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > the same way. The exclusive borrow makes each a compile error, and is why
 > `CopyTrait` is a trait of its own rather than two more `ConnectionTrait`
 > methods, which borrow shared and which `&DatabaseConnection` implements.
+>
+> `copy_out` MUST run `CopyToStatement::check_source` before anything is
+> sent, so a `SELECT` source whose tie limit or WINDOW clause the grammar
+> refuses (`sql.ast.copy`) is the `Error::QueryBuilder` naming it, as on every
+> path that sends a `SELECT` (`exec.tie-limit`), and the connection is not
+> touched.
 >
 > The statement is sent as its one rendering (`sql.render.copy`) and is
 > prepared afresh, never through the statement cache
@@ -720,6 +726,69 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > answered by one `ReadyForQuery` whether or not it starts, and a refused one
 > leaves the connection as it was.
 
+> [spec:pgorm:req:conn.copy.rows]
+> Binary COPY carries rows of pgorm `Value`s, each field in its value's
+> binary form, the form a parameter is bound in and a result column decoded
+> from. The format sends no column types — a header, then each row as its
+> field count and each field as its length, `-1` for NULL, and its type's
+> binary send form, then a trailer — so a row's columns are learned from the
+> server, which knows them exactly. `CopyTrait::copy_in_columns` and
+> `copy_out_columns` MUST describe a statement's columns, in order, each a
+> `CopyColumn` holding its name and its `Type`, by preparing a statement and
+> running nothing: for a COPY FROM, a `SELECT` of its column list from its
+> table, or with no list `SELECT *`, less the columns the catalog's
+> `attgenerated` marks generated, which COPY leaves out in both directions;
+> for a COPY TO, its table read the same way, or its source statement, a
+> write included, which is prepared and not run. A COPY TO's source is checked
+> first, as `copy_out` checks it. The server describes a domain column by the
+> type the domain is over, whose form its values travel in, and checks the
+> domain's constraint as it reads them. A table or column the server refuses
+> is refused by the description, before any COPY starts, and leaves the
+> connection as it was. The statements' parts are read through pgorm-query's
+> getters (`sql.ast.copy.parts`).
+>
+> `copy_in_rows(&CopyFromStatement<CopyBinary>)` and
+> `copy_out_rows(&CopyToStatement<CopyBinary>)` are provided by `CopyTrait`
+> over the descriptions and `copy_in` and `copy_out`, so they take only a
+> binary statement, borrow as those do, and a COPY refused at its start
+> behaves as `conn.copy` says. `CopyRowSink::send` writes a row, one value
+> for each column in order. A row of another width, and a value its column's
+> type does not take — the check `ValueHolder` makes of a parameter
+> (`exec.cursor.binding-accepts`) — MUST be refused with `Error::Type` naming
+> the COPY's columns or the column, with nothing of the row written, and the
+> sink goes on taking rows. `send_model` writes a model's value for each of the
+> COPY's columns by name, refusing a column its entity lacks. `finish`
+> writes the trailer and returns the row count; a row the server refuses is
+> reported there, and a sink dropped unfinished aborts the COPY, as for
+> bytes.
+>
+> `CopyRowStream` is a `Stream` of rows, each a `Vec<Value>` whose fields are
+> decoded by their column's type through the driver's codec for it, the one
+> pgorm's `TryGetable` uses, into the variant that type reads as: `"char"` as
+> `TinyInt`, `oid` as `Unsigned`, the text types and an enum's label as
+> `String`, a built-in range or multirange as `Range` or `Multirange`, an
+> array as an `Array` of its element's variant, and every other type pgorm
+> binds as its own variant. A type no `Value` holds — a geometric type, a
+> range type a schema created — and a field that does not decode are an
+> `Error::Type` naming the column. Data that is not the format — no
+> signature, a header flag the format does not define, a row whose field
+> count is not the COPY's, data ending before the trailer or going on after
+> it — is an `Error::Query`. Either ends the stream as its last item.
+> `models::<E>()` reads each row into a model of `E` through its
+> `ActiveModel`, setting each column the entity has from the field of its
+> name: a column the entity lacks is left unread, and a model column the
+> COPY lacks is `Error::AttrNotSet`.
+>
+> `CopyRowEncoder` and `CopyRowDecoder` are the format's two sides over a
+> list of columns, for a caller that moves the bytes itself, as the bindings
+> do with their own values. The encoder writes the header, a row of any
+> `ToSql` values checked as `send` checks one, leaving its output as it was
+> when it refuses, and the trailer. The decoder takes the data in chunks
+> split anywhere and yields each row's fields, or their values, once the
+> whole row has arrived. The metrics wrappers delegate the descriptions
+> unreported: what they report is the COPY's start (`metric.layer.copy`).
+
+## LISTEN and NOTIFY
 ## LISTEN and NOTIFY
 
 > [spec:pgorm:req:conn.listen]

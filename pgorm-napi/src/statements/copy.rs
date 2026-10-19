@@ -21,7 +21,7 @@ use pgorm::pgorm_query::{
 
 use super::{
     Node,
-    args::{arg, choice, node, predicate_at, refuse, this},
+    args::{arg, choice, embedded, node, predicate_at, refuse, this},
     schema::{get, integer, names, object, pick, relation, text},
     write,
 };
@@ -69,7 +69,7 @@ pub(crate) enum CopyTo {
 }
 
 /// The COPY one JavaScript builder owns.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 #[derive(Debug, Clone)]
 pub(crate) enum CopyStatement {
     CopyFrom(CopyFrom),
@@ -108,7 +108,7 @@ impl CopyStatement {
     /// The SQL the statement runs as, which `inspect()` gives with no
     /// values. A value written into it as a literal cannot carry NUL, which
     /// the protocol's NUL-terminated statement text cannot hold.
-    // [spec:pgorm:req:napi.copy+1]
+    // [spec:pgorm:req:napi.copy+2]
     pub(crate) fn sql<'cx>(&self, cx: &mut Cx<'cx>) -> NeonResult<String> {
         let sql = self.rendered();
         if sql.contains('\0') {
@@ -247,7 +247,7 @@ macro_rules! apply {
 }
 
 /// `copyFromNew(table, format)`: COPY into `table` from the client.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = arg(cx, 0);
     let table = relation(cx, table)?;
@@ -261,10 +261,12 @@ fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// What a COPY TO reads: a table, named as a schema statement names one, or
 /// the rows of a `Select`, or of an INSERT, UPDATE, DELETE or MERGE through
-/// its `RETURNING` list. A write the binding would refuse to run is refused
-/// here as well, and so is one with no `RETURNING` list, as pgorm-query's
-/// conversion into a `CopySource` refuses it.
-// [spec:pgorm:req:napi.copy+1]
+/// its `RETURNING` list. A `Select` is final once read here, so its tie limit
+/// and WINDOW clause are checked as any statement reading one checks them. A
+/// write the binding would refuse to run is refused here as well, and so is
+/// one with no `RETURNING` list, as pgorm-query's conversion into a
+/// `CopySource` refuses it.
+// [spec:pgorm:req:napi.copy+2]
 fn source<'cx>(
     cx: &mut FunctionContext<'cx>,
     value: Handle<'cx, JsValue>,
@@ -279,7 +281,7 @@ fn source<'cx>(
         return refuse(cx, reason);
     }
     let write = match statement {
-        Node::Select(select) => return Ok(select.into_copy_source()),
+        Node::Select(select) => return Ok(embedded(cx, select)?.into_copy_source()),
         Node::Insert(insert) => CopySource::try_from(insert.inner),
         Node::Update(update) => CopySource::try_from(update.inner),
         Node::Delete(delete) => CopySource::try_from(delete.inner),
@@ -305,7 +307,7 @@ fn source<'cx>(
 
 /// `copyToNew(source, format)`: COPY a table's rows, or a statement's, to
 /// the client.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_to_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let source = source(cx, value)?;

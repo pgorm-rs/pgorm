@@ -59,7 +59,7 @@ where
     CopySource::try_from(write).map_err(|error| ConstructionError::new_err(error.to_string()))
 }
 
-// [spec:pgorm:req:python.copy+1]
+// [spec:pgorm:req:python.copy+2]
 /// `COPY { table | (query) } TO STDOUT` in a format chosen at construction.
 #[pyclass(name = "CopyTo", module = "pgorm", frozen, generic, from_py_object)]
 #[derive(Clone, Debug)]

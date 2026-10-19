@@ -34,7 +34,7 @@ use neon::{
     prelude::*,
     types::{Finalize, JsUint8Array, buffer::TypedArray},
 };
-use pgorm::{CopyInSink, CopyOutStream, CopyTrait};
+use pgorm::{CopyInSink, CopyOutStream, CopyRowDecoder, CopyRowEncoder, CopyTrait};
 use tokio::sync::{Mutex, Semaphore, TryAcquireError, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -45,8 +45,13 @@ use super::{
 use crate::{
     errors::{Failure, Redactions, failure},
     settle,
-    statements::{CopyFrom, CopyTo, copy_from_at, copy_to_at},
+    statements::{CopyFrom, CopyTo},
 };
+
+mod rows;
+
+use rows::RowsIn;
+pub(crate) use rows::{copy_from_rows_at, copy_to_rows_at};
 
 pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("poolCopyIn", pool_copy_in)?;
@@ -61,6 +66,9 @@ pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("copyOutNext", copy_out_next)?;
     cx.export_function("copyOutClose", copy_out_close)?;
     cx.export_function("copyOutClosed", copy_out_closed)?;
+    cx.export_function("copyRowsEncode", rows::copy_rows_encode)?;
+    cx.export_function("copyRowsNext", rows::copy_rows_next)?;
+    cx.export_function("copyRowsColumns", rows::copy_rows_columns)?;
     Ok(())
 }
 
@@ -233,6 +241,8 @@ pub(crate) struct InState {
     /// The source failed: abandon the COPY with `CopyFail`.
     abandon: CancellationToken,
     ending: Ending,
+    /// Set for `copyInRows`, whose rows JavaScript encodes as it writes them.
+    rows: Option<RowsIn>,
 }
 
 impl fmt::Debug for InState {
@@ -254,13 +264,14 @@ impl fmt::Debug for InLink {
 }
 
 impl InState {
-    pub(crate) fn channel() -> (Arc<Self>, InLink, Release) {
+    pub(crate) fn channel(rows: bool) -> (Arc<Self>, InLink, Release) {
         let (data, messages) = mpsc::unbounded_channel();
         let state = Arc::new(Self {
             data,
             budget: Arc::new(Semaphore::new(BUDGET)),
             abandon: CancellationToken::new(),
             ending: Ending::default(),
+            rows: rows.then(RowsIn::default),
         });
         let release = Release {
             released: state.ending.released.clone(),
@@ -302,7 +313,7 @@ where
 /// Run a `COPY … FROM STDIN` on `db`: open it, report the opening on
 /// `opened`, feed it what JavaScript writes and finish it when JavaScript
 /// says, returning whether `db`'s connection is kept.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 pub(crate) async fn copy_in<C>(
     db: &mut C,
     copy: &CopyFrom,
@@ -320,6 +331,29 @@ where
     } = link;
     let stopped = stop.fired();
     tokio::pin!(stopped);
+    if let Some(rows) = &state.rows {
+        let described = tokio::select! {
+            biased;
+            failure = &mut stopped => {
+                let _ = opened.send(Err(failure));
+                return Settle::Discard;
+            }
+            described = rows::describe_in(db, copy) => described,
+        };
+        match described {
+            Ok(columns) => {
+                let _ = rows.encoder.set(CopyRowEncoder::new(columns));
+            }
+            // A description refused is a statement refused before the COPY
+            // starts, which leaves the connection as any failed statement.
+            Err(error) => {
+                let failure = failure(&error, secrets);
+                let settle = kept(&failure);
+                let _ = opened.send(Err(failure));
+                return settle;
+            }
+        }
+    }
     let sink = tokio::select! {
         biased;
         failure = &mut stopped => {
@@ -475,15 +509,15 @@ where
     })
 }
 
-/// `poolCopyIn(pool, copy, abort)`: a COPY FROM on a connection the pool
+/// `poolCopyIn(pool, copy, abort, rows)`: a COPY FROM on a connection the pool
 /// lends it alone, returned when the COPY finishes or is abandoned and
 /// discarded when it is cut off.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn pool_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let pool = cx.argument::<JsBox<PoolHandle>>(0)?.0.clone();
-    let copy = copy_from_at(&mut cx, 1)?;
+    let (copy, rows) = copy_from_rows_at(&mut cx, 1, 3)?;
     let abort = abort_argument(&mut cx, 2)?;
-    let (state, link, release) = InState::channel();
+    let (state, link, release) = InState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let session = async move {
         let _release = release;
@@ -503,18 +537,18 @@ fn pool_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     opening(&mut cx, state, session, receive, CopyInHandle)
 }
 
-/// `connectionCopyIn(connection, copy, abort)`: a COPY FROM holding the
+/// `connectionCopyIn(connection, copy, abort, rows)`: a COPY FROM holding the
 /// connection, which refuses other work until it ends.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn connection_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
-    let copy = copy_from_at(&mut cx, 1)?;
+    let (copy, rows) = copy_from_rows_at(&mut cx, 1, 3)?;
     let abort = abort_argument(&mut cx, 2)?;
     let operation = match Operation::begin(connection) {
         Ok(operation) => operation,
         Err(failure) => return settle::rejected(&mut cx, failure),
     };
-    let (state, link, release) = InState::channel();
+    let (state, link, release) = InState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let session = async move {
         let _release = release;
@@ -553,7 +587,7 @@ fn permits(length: usize) -> u32 {
 /// `copyInWrite(copyIn, chunk)`: queue a copy of `chunk` for the COPY, and
 /// `true`; or `false`, queuing nothing, while the budget is spent. Throws
 /// once the COPY has ended.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_in_write(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let state = in_state(&mut cx)?;
     let chunk = cx.argument::<JsUint8Array>(1)?;
@@ -597,9 +631,15 @@ fn copy_in_ready(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `copyInFinish(copyIn)`: complete the COPY and resolve with the rows it
 /// wrote, once its connection is free again. A row the server refused is
 /// reported here.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_in_finish(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
+    if let Some(rows) = &state.rows {
+        let mut tail = BytesMut::new();
+        rows.head(&mut tail);
+        CopyRowEncoder::trailer(&mut tail);
+        let _ = state.data.send(InMessage::Data(tail.freeze(), 0));
+    }
     let (reply, receive) = oneshot::channel();
     let sent = state.data.send(InMessage::Finish(reply)).is_ok();
     let work = async move {
@@ -615,7 +655,7 @@ fn copy_in_finish(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `copyInAbort(copyIn)`: abandon the COPY because its source failed, and
 /// resolve once its connection is free again: outside a transaction nothing
 /// was written; inside one, the transaction is aborted.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_in_abort(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
     state.abandon.cancel();
@@ -631,7 +671,7 @@ fn copy_in_abort(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// transaction closing — so that `copyIn` stops waiting on its source. In
 /// flight for the COPY's whole length, it holds the event loop as the COPY
 /// does.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 // [spec:pgorm:req:napi.cancellation]
 fn copy_in_ended(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
@@ -657,6 +697,9 @@ pub(crate) struct OutState {
     close: CancellationToken,
     finished: AtomicBool,
     ending: Ending,
+    /// Set for `copyOutRows`: the decoder over the columns its session
+    /// describes before the COPY starts.
+    rows: Option<SyncMutex<Option<CopyRowDecoder>>>,
 }
 
 impl fmt::Debug for OutState {
@@ -678,7 +721,7 @@ impl fmt::Debug for OutLink {
 }
 
 impl OutState {
-    pub(crate) fn channel() -> (Arc<Self>, OutLink, Release) {
+    pub(crate) fn channel(rows: bool) -> (Arc<Self>, OutLink, Release) {
         let (pulls, receiver) = mpsc::unbounded_channel();
         let state = Arc::new(Self {
             pulls,
@@ -686,6 +729,7 @@ impl OutState {
             close: CancellationToken::new(),
             finished: AtomicBool::new(false),
             ending: Ending::default(),
+            rows: rows.then(|| SyncMutex::new(None)),
         });
         let release = Release {
             released: state.ending.released.clone(),
@@ -770,7 +814,7 @@ async fn gather(
 /// `opened`, and answer each pull with the data that has arrived, returning
 /// whether `db`'s connection is kept: at the end, or after a failure the
 /// server reported, and not when the stream closes before its end.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 pub(crate) async fn copy_out<C>(
     db: &mut C,
     copy: &CopyTo,
@@ -785,6 +829,28 @@ where
     let OutLink { mut pulls, state } = link;
     let stopped = stop.fired();
     tokio::pin!(stopped);
+    if let Some(rows) = &state.rows {
+        let described = tokio::select! {
+            biased;
+            failure = &mut stopped => {
+                let _ = opened.send(Err(failure));
+                return Settle::Discard;
+            }
+            described = rows::describe_out(db, copy) => described,
+        };
+        match described {
+            Ok(columns) => {
+                *rows.lock().unwrap_or_else(PoisonError::into_inner) =
+                    Some(CopyRowDecoder::new(columns));
+            }
+            Err(error) => {
+                let failure = failure(&error, secrets);
+                let settle = kept(&failure);
+                let _ = opened.send(Err(failure));
+                return settle;
+            }
+        }
+    }
     let stream = tokio::select! {
         biased;
         failure = &mut stopped => {
@@ -855,14 +921,14 @@ where
     }
 }
 
-/// `poolCopyOut(pool, copy, abort)`: a COPY TO on a connection of its own,
+/// `poolCopyOut(pool, copy, abort, rows)`: a COPY TO on a connection of its own,
 /// returned to the pool at its end and discarded if it closes before.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn pool_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let pool = cx.argument::<JsBox<PoolHandle>>(0)?.0.clone();
-    let copy = copy_to_at(&mut cx, 1)?;
+    let (copy, rows) = copy_to_rows_at(&mut cx, 1, 3)?;
     let abort = abort_argument(&mut cx, 2)?;
-    let (state, link, release) = OutState::channel();
+    let (state, link, release) = OutState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let session = async move {
         let _release = release;
@@ -882,18 +948,18 @@ fn pool_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     opening(&mut cx, state, session, receive, CopyOutHandle)
 }
 
-/// `connectionCopyOut(connection, copy, abort)`: a COPY TO holding the
+/// `connectionCopyOut(connection, copy, abort, rows)`: a COPY TO holding the
 /// connection, which refuses other work until the stream ends or closes.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn connection_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
-    let copy = copy_to_at(&mut cx, 1)?;
+    let (copy, rows) = copy_to_rows_at(&mut cx, 1, 3)?;
     let abort = abort_argument(&mut cx, 2)?;
     let operation = match Operation::begin(connection) {
         Ok(operation) => operation,
         Err(failure) => return settle::rejected(&mut cx, failure),
     };
-    let (state, link, release) = OutState::channel();
+    let (state, link, release) = OutState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let session = async move {
         let _release = release;
@@ -921,7 +987,7 @@ fn out_state(cx: &mut FunctionContext) -> NeonResult<Arc<OutState>> {
 /// `copyOutNext(stream, abort)`: the next piece of data as a `Uint8Array`,
 /// or `null` at the end, which resolves once the connection is free again.
 /// One pull runs at a time.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_out_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = out_state(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
@@ -970,7 +1036,7 @@ fn chunk_to_js<'cx>(cx: &mut Cx<'cx>, chunk: Option<Bytes>) -> JsResult<'cx, JsV
 
 /// `copyOutClose(stream)`: end the stream, discarding its connection if data
 /// remained, and resolve once it is released.
-// [spec:pgorm:req:napi.copy+1]
+// [spec:pgorm:req:napi.copy+2]
 fn copy_out_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = out_state(&mut cx)?;
     state.close.cancel();

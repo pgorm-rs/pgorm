@@ -17,53 +17,94 @@ use crate::{
     values::{PyTypeName, PyValue},
 };
 
-pub(super) fn read<T: for<'a> FromSql<'a>>(row: &Row, index: usize) -> PyResult<Option<T>> {
-    row.try_get(index).map_err(|_| DecodeError::new_err(format!(
-        "column {index} cannot be decoded without loss; its PostgreSQL type or value is unsupported"
-    )))
+/// Where a column's value is read from: a result row, or one field of a
+/// binary COPY's row, its bytes and the type the server describes for it.
+/// Both read through the same codecs, so a COPY's value is the value a query
+/// of the same column gives.
+#[derive(Clone, Copy)]
+pub(crate) enum Field<'a> {
+    Row(&'a Row, usize),
+    Copy {
+        ty: &'a Type,
+        raw: Option<&'a [u8]>,
+        index: usize,
+    },
+}
+
+impl Field<'_> {
+    fn ty(&self) -> &Type {
+        match self {
+            Self::Row(row, index) => row.columns()[*index].type_(),
+            Self::Copy { ty, .. } => ty,
+        }
+    }
+
+    pub(super) fn index(&self) -> usize {
+        match self {
+            Self::Row(_, index) | Self::Copy { index, .. } => *index,
+        }
+    }
+}
+
+pub(super) fn read<T: for<'a> FromSql<'a>>(field: Field<'_>) -> PyResult<Option<T>> {
+    let refused = || {
+        DecodeError::new_err(format!(
+            "column {} cannot be decoded without loss; its PostgreSQL type or value is unsupported",
+            field.index()
+        ))
+    };
+    match field {
+        Field::Row(row, index) => row.try_get(index).map_err(|_| refused()),
+        Field::Copy { ty, raw, .. } => {
+            if !<Option<T> as FromSql>::accepts(ty) {
+                return Err(refused());
+            }
+            <Option<T> as FromSql>::from_sql_nullable(ty, raw).map_err(|_| refused())
+        }
+    }
 }
 
 pub(super) fn typed<T: for<'a> FromSql<'a>>(
-    row: &Row,
-    index: usize,
+    field: Field<'_>,
     array: bool,
     kind: ArrayType,
     convert: impl Fn(Option<T>) -> Value,
 ) -> PyResult<Value> {
     if array {
-        let values = read::<CheckedArray<T>>(row, index)?
+        let values = read::<CheckedArray<T>>(field)?
             .map(|values| Box::new(values.0.into_iter().map(convert).collect()));
         Ok(Value::Array(kind, values))
     } else {
-        read::<T>(row, index).map(convert)
+        read::<T>(field).map(convert)
     }
 }
 
 // [spec:pgorm:req:python.results]
 // [spec:pgorm:req:python.value-tags]
-pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
-    let declared = row.columns()[index].type_();
+pub(crate) fn value(field: Field<'_>) -> PyResult<PyValue> {
+    let index = field.index();
+    let declared = field.ty();
     let (ty, array) = match declared.kind() {
         Kind::Array(member) => (member, true),
         _ => (declared, false),
     };
     macro_rules! scalar {
         ($rust:ty, $variant:ident) => {
-            typed::<$rust>(row, index, array, ArrayType::$variant, Value::$variant)
+            typed::<$rust>(field, array, ArrayType::$variant, Value::$variant)
         };
     }
     macro_rules! boxed {
         ($rust:ty, $variant:ident) => {
-            typed::<$rust>(row, index, array, ArrayType::$variant, |v| {
+            typed::<$rust>(field, array, ArrayType::$variant, |v| {
                 Value::$variant(v.map(Box::new))
             })
         };
     }
-    if let Some(value) = super::ranges::value(row, index, ty, array)? {
+    if let Some(value) = super::ranges::value(field, ty, array)? {
         return Ok(value);
     }
     if matches!(ty.kind(), Kind::Enum(_)) {
-        let inner = typed::<EnumLabel>(row, index, array, ArrayType::String, |v| {
+        let inner = typed::<EnumLabel>(field, array, ArrayType::String, |v| {
             Value::String(v.map(|v| Box::new(v.0)))
         })?;
         return Ok(PyValue::from_enum(
@@ -86,7 +127,7 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
         Type::FLOAT8 => scalar!(f64, Double),
         Type::TEXT | Type::VARCHAR | Type::BPCHAR | Type::NAME => boxed!(String, String),
         Type::BYTEA => boxed!(Vec<u8>, Bytes),
-        Type::JSON | Type::JSONB => typed::<ExactJson>(row, index, array, ArrayType::Json, |v| {
+        Type::JSON | Type::JSONB => typed::<ExactJson>(field, array, ArrayType::Json, |v| {
             Value::Json(v.map(|v| Box::new(v.0)))
         }),
         Type::UUID => boxed!(Uuid, Uuid),
@@ -96,13 +137,13 @@ pub(super) fn value(row: &Row, index: usize) -> PyResult<PyValue> {
         Type::TIME => boxed!(Time, Time),
         Type::TIMESTAMP => boxed!(DateTime, DateTime),
         Type::TIMESTAMPTZ => boxed!(Timestamp, DateTimeWithTimeZone),
-        Type::NUMERIC => typed::<ExactDecimal>(row, index, array, ArrayType::Decimal, |v| {
+        Type::NUMERIC => typed::<ExactDecimal>(field, array, ArrayType::Decimal, |v| {
             Value::Decimal(v.map(|v| Box::new(v.0)))
         }),
-        Type::INET | Type::CIDR => typed::<Inet>(row, index, array, ArrayType::IpNetwork, |v| {
+        Type::INET | Type::CIDR => typed::<Inet>(field, array, ArrayType::IpNetwork, |v| {
             Value::IpNetwork(v.map(|v| Box::new(v.0)))
         }),
-        Type::MACADDR => typed::<Mac>(row, index, array, ArrayType::MacAddress, |v| {
+        Type::MACADDR => typed::<Mac>(field, array, ArrayType::MacAddress, |v| {
             Value::MacAddress(v.map(|v| Box::new(v.0)))
         }),
         // [spec:pgorm:req:python.values+4]
