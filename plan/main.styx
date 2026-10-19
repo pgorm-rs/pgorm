@@ -271,6 +271,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.render.operators +7 (like-escape-off, 760105c0): a pattern's ESCAPE tail renders as an inline constant, or ESCAPE '' when escaping is off."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T13:20:35.498187Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "like-ilike-render-parens (26b39edf) bumped sql.render.precedence+10: the LIKE family is LIKE, NOT LIKE, ILIKE, NOT ILIKE, SIMILAR TO and NOT SIMILAR TO, so ILIKE renders bare under AND/OR/NOT as LIKE does (Oper::is_like gained ILike/NotILike); every site re-read and re-pinned, and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
