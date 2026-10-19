@@ -13081,6 +13081,13 @@ children (
                 kind @note
                 text "Found repeatedly while merging (e.g. exec.cursor.keyset+5 cited in paginate.md, entity.md and graph.md after it moved to +6; error.model.sql-class+3 in paginate.md; sql.scope+11 and +17 in sql-ddl.md). Rule text that cites another rule with a +N pin goes stale whenever the cited rule is bumped, and fixing the number edits the citing rule's body, which by nspec's convention bumps it too, so the numbers are left wrong. Replace version-pinned citations inside rule prose with unpinned ones ([spec:pgorm:req:x.y] without +N) across docs/spec, in one pass, as a wording-only change that does not change any rule's effect (the operator allowed wording-only fixes without a bump on 2026-10-09 for a typo; confirm the same applies here before relying on it, or bump each touched rule and re-cover its owner). Optionally add a spec check that refuses a pinned citation in prose."
             }
+
+            {
+                at 2026-10-19T12:38:41.290124Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Another, found by statement-cache-after-ddl (039d67f0): docs/spec/sql-ddl.md cites conn.pool.statement-cache+2 inside another rule's body, left unbumped so as not to re-stale that rule."
+            }
         )
     }
 
@@ -13105,6 +13112,231 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+        )
+    }
+
+    {
+        id graph-cursor-enum-tiebreak
+        title "A graph cursor's tiebreak on a joined slot's key casts a domain over an enum, as the ordered keys do"
+        kind @fix
+        deps (domain-enum-remaining)
+        log (
+            {
+                at 2026-10-19T12:38:38.610946Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by domain-enum-remaining (596d21c2). A graph cursor completes a joined slot's continuation key with that slot's primary key (Tiebreaks) and binds the tiebreak bare. A slot keyed by a domain over an enum (the tests' `temper`) would fail with 42883 under cursor_by, since there is no operator for the domain against text. Thread the key column's save_as cast through Tiebreaks (exec.cursor.keyset, query.graph.cursor) and test cursor_by live over such a key."
+            }
+        )
+    }
+
+    {
+        id pipeline-untyped-enum-casts
+        title "Pipeline comparisons on an enum, or a domain over one, cast it where the pipeline does not know the column's type"
+        kind @fix
+        deps (domain-enum-remaining)
+        log (
+            {
+                at 2026-10-19T12:38:38.80905Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by domain-enum-remaining (596d21c2). The Rust pipeline casts a typed column's comparisons (typed_cast in src/pipeline/sources.rs), but `col(table, column)` and alias tokens carry no column type, and neither do the Python and JavaScript pipelines, so comparing such a column with a bound string fails with 42883. A fix needs the column's type at those points (from the bindings' entity registrations, or named by the caller) and an enum-capable cast, since CastType is a closed set. Settle where the type comes from before building."
+            }
+        )
+    }
+
+    {
+        id schema-fk-domain-enum
+        title "create_table_from_entity stops emitting a foreign key PostgreSQL refuses over a domain over an enum"
+        kind @fix
+        deps (domain-enum-remaining)
+        log (
+            {
+                at 2026-10-19T12:38:39.0283Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by domain-enum-remaining (596d21c2). For a declared belongs_to over columns whose type is a domain over an enum, create_table_from_entity emits a REFERENCES that PostgreSQL refuses with 42804 (incompatible types), both between two such columns and between one and its enum. This is documented, not handled. Either refuse it when generating, with an error naming the relation, or leave the constraint out with a note; codegen could say the same of a schema it reads. Test live."
+            }
+        )
+    }
+
+    {
+        id in-subquery-enum-shapes
+        title "Subquery membership on a domain over an enum casts every subquery shape, not only a single plain projection"
+        kind @fix
+        deps (domain-enum-remaining)
+        log (
+            {
+                at 2026-10-19T12:38:39.203057Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by domain-enum-remaining (596d21c2). in_subquery / not_in_subquery cast the column and the subquery's one projected expression to the enum (compared_subquery in src/entity/column_def.rs), but leave three shapes as written, and those still fail with 42883: several projected expressions, a windowed projection, and `*`. Handling them needs a column-alias list on FromItem::SubQuery in pgorm-query, so that the subquery can be wrapped and its column cast by name."
+            }
+        )
+    }
+
+    {
+        id statement-cache-cross-process
+        title "A statement-cache clear reaches every process using the database, and connections held across it"
+        kind @feat
+        deps (statement-cache-after-ddl)
+        log (
+            {
+                at 2026-10-19T12:38:39.385516Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by statement-cache-after-ddl (039d67f0). clear_statement_caches reaches only the calling process's pool, so after a migration other replicas' pools on the same database keep statements planned against the old schema. A connection checked out for the application's life (a Rust DatabaseConnection, a Python or JavaScript Connection) never sees a clear either, by the operator's design. RecyclingMethod::Custom(\"DISCARD ALL\"), which conn.pool.statement-cache.invalidate calls out of reach, could reuse the same recycle-time clear. One design for the cross-process part is a NOTIFY on a channel each pool listens to through a dedicated listener connection; whether pgorm should open that connection itself is the operator's call."
+            }
+        )
+    }
+
+    {
+        id oracle-shim-parenthesised
+        title "The render oracle's assert_eq shim checks a render that begins with a parenthesis"
+        kind @test
+        deps (set-operation-grouping)
+        log (
+            {
+                at 2026-10-19T12:38:39.560831Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by set-operation-grouping (2dab5aaa). The oracle's assert_eq! shim parse-checks only renders that begin with a statement keyword, so a grouped set operation's render, which begins with `(`, skips the grammar check unless the test calls assert_query_eq directly, as the new tests do. Make the shim recognise a leading parenthesis. That changes sql.render.oracle's text: a bump, and re-pinning its 49 sites."
+            }
+        )
+    }
+
+    {
+        id python-datatype-export
+        title "Python's DataType is importable from pgorm itself, beside the builders that take one"
+        kind @feat
+        deps (table-function-column-defs)
+        log (
+            {
+                at 2026-10-19T12:38:39.733456Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by table-function-column-defs (2dab5aaa). TableFunction.column_definition takes a DataType, but DataType is only at pgorm.schema.DataType, not top-level pgorm, which is easy to trip over. Export it from pgorm (stubs, capabilities, docs), keeping pgorm.schema.DataType the same object."
+            }
+        )
+    }
+
+    {
+        id napi-schema-statement-name
+        title "pgorm-napi's DDL builder base is not called SchemaStatement, so schema means only a database schema there too"
+        kind @refactor
+        deps (schema-statement-wrapper)
+        log (
+            {
+                at 2026-10-19T12:38:39.897126Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by schema-statement-wrapper (289e49b1). That node deleted pgorm-query's SchemaStatement so that 'schema' means only a database schema. pgorm-napi has its own JavaScript SchemaStatement class, the base of its DDL builders in lib/schema.d.ts, with the same clash beside its CREATE SCHEMA builders. Rename it (a breaking change to the JavaScript typings) or record why it stays."
+            }
+        )
+    }
+
+    {
+        id like-ilike-render-parens
+        title "LIKE and ILIKE render alike under AND: both parenthesised or neither"
+        kind @fix
+        deps (like-escape-off)
+        log (
+            {
+                at 2026-10-19T12:38:40.05557Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by like-escape-off (289e49b1). The renderer wraps ILIKE and NOT ILIKE in parentheses under AND (`... AND (\"c\" ILIKE $2 ESCAPE '')`) but leaves LIKE bare. Both are valid SQL, but the difference has no reason behind it. Find where ILIKE is treated as needing parentheses (sql.render.parens, sql.render.precedence), make the two consistent, and update the goldens; like-escape-off's test records today's output."
+            }
+        )
+    }
+
+    {
+        id copy-generated-column-refusal
+        title "A COPY FROM naming a generated column is refused before it starts, keeping the connection"
+        kind @fix
+        deps (copy-binary-rows)
+        log (
+            {
+                at 2026-10-19T12:38:40.232561Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by copy-binary-rows (004ad54a). A COPY FROM whose column list names a generated column is refused by the server at its start, and a refused COPY FROM closes its connection (conn.copy). The columns are described before a row COPY starts, but through a prepared SELECT, which does not say whether a column is generated; refusing first needs a catalogue read (pg_attribute.attgenerated) or the entity's declaration. Decide whether plain copy_in should check too."
+            }
+        )
+    }
+
+    {
+        id value-decode-created-ranges
+        title "The Rust Value decode reads a range type a schema created, as the bindings already do"
+        kind @feat
+        deps (copy-binary-rows)
+        log (
+            {
+                at 2026-10-19T12:38:40.431565Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by copy-binary-rows (004ad54a). Decoding into pgorm Values refuses range types made with CREATE TYPE .. AS RANGE (and the geometric types), so copy_out_rows and other Value decodes in Rust cannot read them. The Python and JavaScript bindings decode created ranges themselves, so only Rust is affected. Decode a created range by its subtype, with live tests through copy_out_rows and a raw query; the geometric types are a separate question."
+            }
+        )
+    }
+
+    {
+        id copy-row-models-coverage
+        title "CopyRowStream's models are tested with enum and JSON fields, not only plain scalars"
+        kind @test
+        deps (copy-binary-rows)
+        log (
+            {
+                at 2026-10-19T12:38:40.600263Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by copy-binary-rows (004ad54a). CopyRowStream::models decodes COPY rows into models, but its tests use only plain scalar fields. Add live cases with an ActiveEnum field (a schema-qualified enum and a domain over one among them) and a JSON-struct field."
+            }
+        )
+    }
+
+    {
+        id view-check-rule-callers
+        title "The tie-limit and window rules name the view constructors among the places their checks run"
+        kind @docs
+        deps (rust-view-body-check)
+        log (
+            {
+                at 2026-10-19T12:38:40.801421Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by rust-view-body-check (77650f0c). sql.ast.select.tie-limit+1 and sql.ast.window-statement+8 list the executors and the Python and JavaScript builders as the callers of check_tie_limit and check_windows, and say a caller of pgorm-query alone who skips the check reaches the server. For view, materialized view and CREATE TABLE AS bodies that no longer holds: the Rust constructors run both checks. Update both rules, which means bumping them, re-covering their owners and re-pinning their annotations; this could ride with spec-prose-unversioned-refs if that pass bumps them anyway."
+            }
+        )
+    }
+
+    {
+        id view-check-dedup
+        title "The view-body and COPY-source checks run once, through one shared helper"
+        kind @refactor
+        deps (rust-view-body-check)
+        log (
+            {
+                at 2026-10-19T12:38:40.983035Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by rust-view-body-check (77650f0c). Python's embedded() and pgorm-napi's select_at still run check_tie_limit and check_windows before calling the view and CREATE TABLE AS constructors, which now run them too, so the constructors' refusal is unreachable from the bindings. One side's check can go for those four builders, keeping the bindings' error types. CopyToStatement::check_source makes the same two calls as definition_body in pgorm-query/src/view/mod.rs; one helper could serve both."
+            }
+        )
+    }
+
+    {
+        id python-stream-truth-testing
+        title "Python's async streams agree on truth testing"
+        kind @fix
+        deps (python-truth-testing-rest)
+        log (
+            {
+                at 2026-10-19T12:38:41.181398Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-truth-testing-rest (5a276b21). Listener refuses truth testing (python.listen requires it), but ResultStream, CopyOutStream and CopyRowStream keep Python's default truth and are exempt in test_truth_testing.py as streams. Pick one rule for all four (refusing is the consistent choice, since a stream's truth says nothing about whether rows remain) and update the rules, stubs and test."
             }
         )
     }
