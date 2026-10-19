@@ -183,6 +183,29 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.insert(self.table).columns("id", "qty").values(6, 60))
         self.assertEqual(await self.quantities(), [(2, 3), (6, 60)])
 
+    # [spec:pgorm:req:python.connections+2/test]    clear_statement_caches makes the connection
+    # that already ran an insert prepare it again, its old statement closed on the server, and
+    # write the domain's new default
+    # [spec:pgorm:req:conn.pool.statement-cache.clear/test]    from Python
+    async def test_a_cleared_pool_writes_the_new_default(self):
+        await self.create()
+
+        def insert(row):
+            return p.insert(self.table).columns("id").values(row).returning(p.col("qty"))
+
+        prepared = p.RawSQL(
+            "SELECT count(*)::integer AS n FROM pg_prepared_statements WHERE statement LIKE $1",
+            ["INSERT INTO%"],
+        )
+        self.assertEqual((await self.pool.fetch_one(insert(1)))["qty"], 7)
+        await self.pool.execute(s.set_domain_default(self.domain, 9))
+        self.assertEqual((await self.pool.fetch_one(insert(2)))["qty"], 7)
+        self.assertEqual((await self.pool.fetch_one(prepared))["n"], 1)
+
+        self.pool.clear_statement_caches()
+        self.assertEqual((await self.pool.fetch_one(prepared))["n"], 0)
+        self.assertEqual((await self.pool.fetch_one(insert(3)))["qty"], 9)
+
     # [spec:pgorm:req:python.schema-domains/test]    a rename keeps the column typed with the
     # domain, a drop is refused under RESTRICT while a column uses it, and CASCADE drops the
     # column with it

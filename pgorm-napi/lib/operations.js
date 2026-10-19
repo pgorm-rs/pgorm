@@ -1,7 +1,8 @@
 // @ts-check
 
 // What the connection classes share: the addon they call, the abort tokens an
-// `AbortSignal` fires, and how a row's values become an object.
+// `AbortSignal` fires, how a row's values become an object, and how a
+// callback's transaction ends.
 // [spec:pgorm:req:napi.cancellation]
 
 /** @type {any} */
@@ -18,6 +19,9 @@ export function installConnections(addon) {
 
 /** Marks a construction from a handle the addon made. */
 export const TRUSTED = Symbol("pgorm-napi native handle");
+
+/** Ends a transaction at once, discarding its connection. */
+export const ABORT = Symbol("abort");
 
 /**
  * @param {unknown} signal
@@ -80,3 +84,34 @@ export function queryOptions(options) {
   return { tagged, signal: signalOf(signal) };
 }
 
+/**
+ * Run `use` in `transaction`: committed when `use` resolves, rolled back when
+ * it throws, whose error then stands whatever the rollback does. A commit
+ * that fails ends the transaction and discards its connection.
+ *
+ * @template T
+ * @param {import("./connections.js").Transaction} transaction
+ * @param {(transaction: import("./connections.js").Transaction) => Promise<T>} use
+ * @returns {Promise<T>}
+ */
+export async function scoped(transaction, use) {
+  let result;
+  try {
+    result = await use(transaction);
+  } catch (error) {
+    try {
+      await transaction.close();
+    } catch {
+      // The callback's error stands; a cleanup that failed discarded the
+      // connection.
+    }
+    throw error;
+  }
+  try {
+    await transaction.commit();
+  } catch (error) {
+    await transaction[ABORT]();
+    throw error;
+  }
+  return result;
+}

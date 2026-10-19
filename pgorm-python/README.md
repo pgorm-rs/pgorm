@@ -169,7 +169,10 @@ yields a pool that trusts nothing, or one that skips verification. Pass
 `sslmode=disable` in the DSN for an explicitly plaintext connection. TLS
 verification never falls back to plaintext. Pool sizing, connect/acquisition
 deadlines, statement-cache bounds and verified/fast recycling are keyword
-options on `Pool`.
+options on `Pool`. After DDL that a cached plan does not see, such as a
+domain's changed default, `pool.clear_statement_caches()` makes every
+connection prepare its statements again: an idle one before it is next lent,
+and one checked out at the time once it is returned and lent again.
 
 Closing a pool rejects waiters and cancels operations on its checked-out
 connections. Closing a connection releases it. If an operation is cancelled

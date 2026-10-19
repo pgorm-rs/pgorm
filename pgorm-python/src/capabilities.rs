@@ -75,6 +75,7 @@ fn manifest() -> Value {
             "pool": {"rust_api": "pgorm::connect_with", "features": ["runtime-tokio"]},
             "pool.acquire": {"rust_api": "pgorm::DatabasePool::get", "features": ["runtime-tokio"]},
             "pool.close": {"rust_api": "pgorm::DatabasePool::close", "features": ["runtime-tokio"]},
+            "pool.clear_statement_caches": {"rust_api": "pgorm::DatabasePool::clear_statement_caches", "features": ["runtime-tokio"]},
             "connection.ping": {"rust_api": "pgorm::ConnectionTrait::query_one", "features": ["runtime-tokio"]},
             "connection.close": {"rust_api": "pgorm::DatabaseConnection::drop", "features": ["runtime-tokio"]},
             "pool.listener": {"rust_api": "pgorm::DatabasePool::listener", "features": ["runtime-tokio"]},

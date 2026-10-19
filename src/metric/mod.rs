@@ -1,10 +1,11 @@
 mod fingerprint;
+mod pool;
 
 pub use fingerprint::{QueryContext, QueryFingerprint};
+pub use pool::InstrumentedPool;
 
 use crate::{
-    ConnectionTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, Error, SqlText,
-    TransactionTrait,
+    ConnectionTrait, DatabaseConnection, DatabaseTransaction, Error, SqlText, TransactionTrait,
 };
 use async_trait::async_trait;
 use fingerprint::FingerprintSuffix;
@@ -218,61 +219,8 @@ impl MetricsCollector for LoggingMetrics {
     }
 }
 
-/// A connection pool wrapper that produces instrumented connections
-// [spec:pgorm:def:metric.layer+1]    pool wrapper
-#[derive(Debug, Clone)]
-pub struct InstrumentedPool<M: MetricsCollector> {
-    pool: DatabasePool,
-    metrics: M,
-}
-
-impl<M: MetricsCollector> InstrumentedPool<M> {
-    /// Create a new instrumented pool
-    pub fn new(pool: DatabasePool, metrics: M) -> Self {
-        Self { pool, metrics }
-    }
-
-    /// Get an instrumented connection from the pool
-    pub async fn get(&self) -> Result<InstrumentedConnection<M>, Error> {
-        let start = Instant::now();
-        let result = self.pool.get().await;
-        let elapsed = start.elapsed();
-
-        match result {
-            Ok(conn) => {
-                self.metrics.record_connection_acquired(elapsed).await;
-                Ok(InstrumentedConnection::new(conn, self.metrics.clone()))
-            }
-            Err(e) => {
-                self.metrics.record_connection_error(elapsed, &e).await;
-                Err(e)
-            }
-        }
-    }
-
-    /// Get the pool tag
-    pub fn tag(&self) -> std::sync::Arc<String> {
-        self.pool.tag()
-    }
-
-    /// Get the pool status
-    pub fn status(&self) -> deadpool::Status {
-        self.pool.status()
-    }
-
-    /// Get a reference to the underlying pool
-    pub fn inner(&self) -> &DatabasePool {
-        &self.pool
-    }
-
-    /// Get a reference to the metrics collector
-    pub fn metrics(&self) -> &M {
-        &self.metrics
-    }
-}
-
 /// A connection wrapper that instruments all database operations
-// [spec:pgorm:def:metric.layer+1]    connection wrapper
+// [spec:pgorm:def:metric.layer+2]    connection wrapper
 #[derive(Debug)]
 pub struct InstrumentedConnection<M: MetricsCollector> {
     connection: DatabaseConnection,

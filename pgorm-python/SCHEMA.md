@@ -222,7 +222,9 @@ refused whether it is written to a column of the domain or already there when
 has is refused (`42710`), and a missing domain or constraint (`42704`) unless
 the drop says `if_exists`. An insert the connection prepared before
 `set_domain_default` or `drop_domain_default` keeps the default it was planned
-with: PostgreSQL's plan cache does not track a domain's default.
+with: PostgreSQL's plan cache does not track a domain's default. Call
+`pool.clear_statement_caches()` after the change, and each connection prepares
+the insert again before it is next lent.
 
 ## Views, materialized views and tables from a query
 

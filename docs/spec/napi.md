@@ -242,7 +242,7 @@ A `Pool` holds the connections, a `Connection` is one of them checked out, a
 statement's rows over one. Each is a JavaScript object over a boxed native
 handle, and each is released by being closed.
 
-> [spec:pgorm:req:napi.connections]
+> [spec:pgorm:req:napi.connections+2]
 > A `Pool` MUST be built from a connection string and options — TLS mode, CA,
 > size, connect and acquire timeouts, statement-cache size and recycling — by
 > a constructor that sends nothing and throws a `ConstructionError` for an
@@ -252,6 +252,9 @@ handle, and each is released by being closed.
 > store, with no silent fallback to plaintext; only `sslmode=disable` or
 > `tls: "disable"` connects in plaintext. A pool lends a `Connection` with
 > `acquire`, and runs a statement of its own on a connection lent to it alone.
+> `clearStatementCaches()` marks every connection's cached statements stale
+> as `conn.pool.statement-cache.clear` describes; it sends nothing, returns
+> nothing, and is refused by no state of the pool.
 >
 > Each handle — pool, connection, transaction, stream — MUST be closable
 > explicitly, by `close()` or `await using`, and what it holds MUST be

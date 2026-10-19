@@ -1610,7 +1610,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Domains
 
-> [spec:pgorm:req:sql.ddl.domain]
+> [spec:pgorm:req:sql.ddl.domain+2]
 > `Domain` builds the statements a domain takes: `create(name, base)`,
 > `alter(name)` and `drop(name)`. A domain is a type, so each name is an
 > `IntoTypeRef` — a bare name or a `(schema, name)` pair — rendered as
@@ -1691,8 +1691,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > pooled connection and reuses it — while the same statement prepared after
 > it, or sent unprepared, writes the new one. A check or a `NOT NULL` added at
 > the same point holds at once, being tested as each value is written; the
-> suite holds both on 18.6. A migration that changes a domain's default runs
-> before the connections that insert through it are opened, or replaces them.
+> suite holds both on 18.6. `DatabasePool::clear_statement_caches`
+> (`conn.pool.statement-cache.clear`) is the remedy: after it, a connection
+> that already ran the insert prepares it again once it is next lent and
+> writes the new default, which the suite holds too. pgorm-migration's `up`
+> calls it once a batch that applied a migration commits (`migration.up`), so
+> a default a migration changed reaches the pool's connections with nothing
+> further asked of the application; DDL run any other way is followed by the
+> call.
 >
 > Three spellings are not built. `ALTER DOMAIN … SET SCHEMA` the builder has
 > for no table, sequence or type either, and `OWNER TO` is a role change,

@@ -2277,6 +2277,11 @@ impl_evidence (
         {id security.sqlmap.runner-tests, version 0}
         {id security.sqlmap.verdict, version 0}
     )}
+    {id statement-cache-after-ddl, covered_rules (
+        conn.pool.statement-cache.clear
+    ), covered_claims (
+        {impl_name main, rule conn.pool.statement-cache.clear}
+    )}
     {id statement-interval-value, covered_rules (
         exec.cursor.binding-interval
         exec.decode.interval

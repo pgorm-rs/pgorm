@@ -162,7 +162,7 @@ let conn = instrumented.get().await?;                          // record_connect
 let rows = conn.query_all("SELECT * FROM users", &[]).await?;  // record_query_success("query_all", ..)
 ```
 
-`InstrumentedPool<M>` forwards `tag()` and `status()` to the wrapped pool and exposes `inner()` / `metrics()` to reach the `DatabasePool` and the collector. `get()` times pool acquisition, reporting `record_connection_acquired` on success — returning an `InstrumentedConnection<M>` that holds a clone of the collector — or `record_connection_error` on failure.
+`InstrumentedPool<M>` forwards `tag()`, `status()` and `clear_statement_caches()` to the wrapped pool and exposes `inner()` / `metrics()` to reach the `DatabasePool` and the collector. `get()` times pool acquisition, reporting `record_connection_acquired` on success — returning an `InstrumentedConnection<M>` that holds a clone of the collector — or `record_connection_error` on failure.
 
 Because `get()` clones the collector for every connection, keep collectors cheap to clone (refcounted handles, not owned state).
 

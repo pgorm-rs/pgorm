@@ -127,7 +127,7 @@ pub trait MigratorTrait: Send {
     /// The hash is spelled out here rather than taken from `DefaultHasher`
     /// because the key has to agree between processes that need not share a
     /// compiler version, let alone a `HashMap` seed.
-    // [spec:pgorm:sem:migration.up+2]
+    // [spec:pgorm:sem:migration.up+3]
     fn lock_key() -> i64 {
         const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
         const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -148,7 +148,7 @@ pub trait MigratorTrait: Send {
     /// `pg_advisory_xact_lock` is released at end of transaction: taken in
     /// autocommit it would be surrendered before the caller's next statement,
     /// which is the shape of the bug rather than the fix.
-    // [spec:pgorm:sem:migration.up+2]
+    // [spec:pgorm:sem:migration.up+3]
     async fn lock(db: &DatabaseTransaction<'_>) -> Result<(), Error> {
         let key = Self::lock_key();
         db.execute("SELECT pg_advisory_xact_lock($1)", &[&key])
@@ -197,7 +197,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of migrations with status
-    // [spec:pgorm:sem:migration.up+2]    pending set difference + missing-file detection
+    // [spec:pgorm:sem:migration.up+3]    pending set difference + missing-file detection
     // [spec:pgorm:req:migration.checksum+1]    recorded digests are checked on every read
     // [spec:pgorm:req:migration.read-only]    status is computed from a read alone
     async fn get_migration_with_status(
@@ -407,15 +407,25 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
-    /// Apply pending migrations
-    // [spec:pgorm:sem:migration.up+2]
+    /// Apply pending migrations, then clear the pool's cached statements if the
+    /// committed batch applied any
+    // [spec:pgorm:sem:migration.up+3]
     async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), Error> {
         tracing::debug!("Applying migrations");
-        exec_with_connection::<'_, _>(db, move |manager| {
+        let applied = exec_with_connection(&db, move |manager| {
             tracing::debug!("Exec up");
             Box::pin(async move { exec_up::<Self>(manager, steps).await })
         })
-        .await
+        .await?;
+
+        // The pool's connections may hold statements planned against the schema
+        // the batch changed, and PostgreSQL does not re-plan every such change:
+        // an insert prepared before a domain's default changed keeps the old one.
+        // [spec:pgorm:req:conn.pool.statement-cache.clear]    the runner clears after a batch commits
+        if applied > 0 {
+            db.clear_statement_caches();
+        }
+        Ok(())
     }
 }
 
@@ -508,21 +518,23 @@ impl ReadableLedger {
     }
 }
 
-// [spec:pgorm:sem:migration.up+2]    one connection, one transaction for the whole batch
-async fn exec_with_connection<'c, F>(db: DatabasePool, f: F) -> Result<(), Error>
+// [spec:pgorm:sem:migration.up+3]    one connection, one transaction for the whole batch
+async fn exec_with_connection<T, F>(db: &DatabasePool, f: F) -> Result<T, Error>
 where
     F: for<'b> Fn(
         &'b DatabaseTransaction<'_>,
-    ) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'b>>,
+    ) -> Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'b>>,
 {
     let mut conn = db.get().await?;
     let transaction = conn.begin().await?;
-    f(&transaction).await?;
-    transaction.commit().await
+    let outcome = f(&transaction).await?;
+    transaction.commit().await?;
+    Ok(outcome)
 }
 
-// [spec:pgorm:sem:migration.up+2]    lock, then declaration-order application, step bound, ledger append
-async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<(), Error>
+/// Applies the pending migrations inside `db`, answering how many it applied.
+// [spec:pgorm:sem:migration.up+3]    lock, then declaration-order application, step bound, ledger append
+async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<usize, Error>
 where
     M: MigratorTrait + ?Sized,
 {
@@ -554,6 +566,7 @@ where
         info!("No pending migrations");
     }
 
+    let mut applied = 0;
     for Migration { migration, .. } in migrations {
         if let Some(steps) = steps.as_mut() {
             if steps == &0 {
@@ -577,9 +590,10 @@ where
         .table_name(M::migration_table_name())
         .exec(db)
         .await?;
+        applied += 1;
     }
 
-    Ok(())
+    Ok(applied)
 }
 
 trait QueryTable {

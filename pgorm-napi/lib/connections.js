@@ -3,7 +3,7 @@
 // Pools, connections and transactions. Each holds a native handle and
 // releases what it holds when closed — `close()`, `await using`, the end of a
 // callback — never by waiting for garbage collection.
-// [spec:pgorm:req:napi.connections]
+// [spec:pgorm:req:napi.connections+2]
 // [spec:pgorm:req:napi.results]
 // [spec:pgorm:req:napi.transactions]
 // [spec:pgorm:req:napi.copy+2]
@@ -12,14 +12,11 @@
 import { statementArgs } from "./builder.js";
 import { COPY, CopyRunner } from "./copy.js";
 import { Listener, LISTENER, listenerOptions, notifyJob } from "./listen.js";
-import { abortable, native, queryOptions, row, signalOf, TRUSTED } from "./operations.js";
+import { ABORT, abortable, native, queryOptions, row, scoped, signalOf, TRUSTED } from "./operations.js";
 import { RowStream } from "./streams.js";
 
 /** The statement runner each class implements, keyed privately. */
 const RUN = Symbol("run");
-
-/** Ends a transaction at once, discarding its connection. */
-const ABORT = Symbol("abort");
 
 /** The job runner each class implements, keyed privately. */
 const JOB = Symbol("job");
@@ -208,6 +205,10 @@ export class Pool extends Queryable {
     return native.poolStatus(this.#native);
   }
 
+  clearStatementCaches() {
+    native.poolClearStatementCaches(this.#native);
+  }
+
   /**
    * A connection of the caller's own until it closes it.
    *
@@ -363,38 +364,6 @@ export async function connect(dsn, options = {}) {
     throw error;
   }
   return pool;
-}
-
-/**
- * Run `use` in `transaction`: committed when `use` resolves, rolled back when
- * it throws, whose error then stands whatever the rollback does. A commit
- * that fails ends the transaction and discards its connection.
- *
- * @template T
- * @param {Transaction} transaction
- * @param {(transaction: Transaction) => Promise<T>} use
- * @returns {Promise<T>}
- */
-async function scoped(transaction, use) {
-  let result;
-  try {
-    result = await use(transaction);
-  } catch (error) {
-    try {
-      await transaction.close();
-    } catch {
-      // The callback's error stands; a cleanup that failed discarded the
-      // connection.
-    }
-    throw error;
-  }
-  try {
-    await transaction.commit();
-  } catch (error) {
-    await transaction[ABORT]();
-    throw error;
-  }
-  return result;
 }
 
 /** One connection checked out of a pool; one operation at a time. */
