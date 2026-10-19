@@ -9,7 +9,7 @@ use pgorm_migration::prelude::*;
 /// A fresh database has nothing applied; `up` installs the tracking table and
 /// runs every pending migration in order.
 // [spec:pgorm:def:migration.runner+3/test]
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 // [spec:pgorm:sem:migration.name+3/test]    asserted names are file stems
 // [spec:pgorm:req:migration.ledger-upgrade+1/test]    the fresh-install half: the legacy name is never created
 // [spec:pgorm:def:macros.derive+3/test]    `DeriveMigrationName` names each migration after the file stem
@@ -61,7 +61,7 @@ async fn fresh_install_applies_all_pending() -> Result<(), Error> {
 
 /// Re-running `up` on an already-migrated database is a no-op: no migration is
 /// re-applied and no extra ledger row is written.
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 #[tokio::test]
 async fn repeated_up_is_idempotent() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_idempotent").await;
@@ -88,7 +88,7 @@ async fn repeated_up_is_idempotent() -> Result<(), Error> {
 /// `steps` bounds how many pending migrations are applied, and `status` reports
 /// the split without altering it.
 // [spec:pgorm:def:migration.runner+3/test]
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 #[tokio::test]
 async fn stepped_up_reports_status() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_status").await;
@@ -142,7 +142,7 @@ async fn migration_table_name_is_overridable() -> Result<(), Error> {
 
 /// The whole `up` run shares one transaction, so a failing migration rolls back
 /// every migration in the run along with the ledger rows.
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 // [spec:pgorm:req:migration.up-only/test]    no rollback path other than the transaction
 #[tokio::test]
 async fn failed_migration_rolls_back_the_run() -> Result<(), Error> {
@@ -203,7 +203,7 @@ async fn duplicate_migration_names_are_rejected() -> Result<(), Error> {
 
 /// The advisory key is a stable function of the ledger's name: it does not move
 /// between builds, and two migrators with different ledgers do not contend.
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 #[test]
 fn lock_key_is_derived_from_the_ledger_name() {
     assert_eq!(
@@ -218,7 +218,7 @@ fn lock_key_is_derived_from_the_ledger_name() {
 
 /// Two runners racing one fresh database both succeed: the loser waits on the
 /// advisory lock, then recomputes the pending set and finds nothing to do.
-// [spec:pgorm:sem:migration.up+2/test]
+// [spec:pgorm:sem:migration.up+3/test]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn concurrent_runners_queue_on_the_advisory_lock() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_concurrent").await;
@@ -636,6 +636,54 @@ async fn a_read_never_widens_a_pre_checksum_ledger() -> Result<(), Error> {
     assert!(Checksummed::get_pending_migrations(&conn).await?.is_empty());
 
     assert!(!has_column(db, "pgorm_migrations", "checksum").await?);
+    drop(conn);
+
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A batch that changes a domain's default reaches a connection that already
+/// prepared an insert through it: once the batch commits, the runner has the
+/// pool clear its statements, and the insert is prepared again and writes the
+/// new default. A run that applies nothing leaves prepared statements alone.
+// [spec:pgorm:sem:migration.up+3/test]    a committed batch that applied a migration clears the
+// pool's statement caches, and a run that applied nothing does not
+// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    the runner clears after the DDL it applied
+#[tokio::test]
+async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
+    use common::migrator::domain_default::{Created, Defaulted};
+
+    const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
+    const PREPARED: &str = "SELECT count(*) FROM pg_prepared_statements \
+                            WHERE statement = 'INSERT INTO line (id) VALUES ($1) RETURNING qty'";
+    const BACKEND: &str = "SELECT pg_backend_pid()";
+
+    let ctx = TestContext::new("pgorm_migration_clears_statements").await;
+    let db = &ctx.db;
+
+    Created::up(db.clone(), None).await?;
+    let conn = db.get().await?;
+    let backend: i32 = conn.query_one(BACKEND, &[]).await?.get(0);
+    assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
+    drop(conn);
+
+    Created::up(db.clone(), None).await?;
+    let conn = db.get().await?;
+    assert_eq!(
+        conn.query_one(BACKEND, &[]).await?.get::<_, i32>(0),
+        backend
+    );
+    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
+    drop(conn);
+
+    Defaulted::up(db.clone(), None).await?;
+    let conn = db.get().await?;
+    assert_eq!(
+        conn.query_one(BACKEND, &[]).await?.get::<_, i32>(0),
+        backend
+    );
+    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 0);
+    assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
     drop(conn);
 
     ctx.delete().await;

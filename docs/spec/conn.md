@@ -139,15 +139,18 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Connection lifecycle in pgorm-pool
 
-> [spec:pgorm:sem:conn.pool.lifecycle]
+> [spec:pgorm:sem:conn.pool.lifecycle+2]
 > `Manager::create` connects via `tokio_postgres`, spawns the connection
 > driver future onto a tokio task, and hands out a `ClientWrapper` owning the
 > client, the task's `JoinHandle`, and a fresh per-connection
 > `StatementCache`; the cache is registered with the manager's
-> `StatementCaches` registry. Dropping a `ClientWrapper` aborts its connection
-> task. `Manager::recycle` rejects clients whose `is_closed()` is true and
-> otherwise runs the recycling method's query, if any; `detach` unregisters
-> the connection's statement cache.
+> `StatementCaches` registry, current with every clear asked of it so far.
+> Dropping a `ClientWrapper` aborts its connection task. `Manager::recycle`
+> rejects clients whose `is_closed()` is true; otherwise it clears the
+> connection's statement cache if a clear has been asked for since the cache
+> was last cleared (`conn.pool.statement-cache.clear`), then runs the
+> recycling method's query, if any. `detach` unregisters the connection's
+> statement cache.
 
 > [spec:pgorm:sem:conn.pool.recycle]
 > `RecyclingMethod` selects the health check run on reuse: `Fast` (the
@@ -159,14 +162,17 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > intentionally omits `DEALLOCATE ALL`/`DISCARD PLANS` so cached prepared
 > statements survive recycling; `Custom(sql)` runs caller-provided SQL.
 
-> [spec:pgorm:sem:conn.pool.statement-cache+2]
+> [spec:pgorm:sem:conn.pool.statement-cache+3]
 > Each `ClientWrapper` carries an `Arc<StatementCache>` keyed by `(query text,
 > parameter types)`. `prepare_cached` / `prepare_typed_cached` return the
 > cached `tokio_postgres::Statement` on hit and prepare-then-insert on miss.
 > `Transaction`s, nested transactions, and savepoints created through the
 > wrapper share the owning client's cache. The manager-level `StatementCaches`
 > holds weak references to every live cache and supports `clear()` and
-> `remove(query, types)` across all pooled connections.
+> `remove(query, types)` across all pooled connections, at once and whether
+> or not a connection is checked out, and `clear_before_reuse()`, which clears
+> each cache before its connection is next lent
+> (`conn.pool.statement-cache.clear`).
 >
 > The cache is on the ordinary execution path, not beside it, and it is the
 > whole of that path: each of `ConnectionTrait`'s six statement methods
@@ -179,10 +185,12 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > forwards, and what a caller reaching past `ConnectionTrait` gets.
 >
 > A cached statement outlives the call that prepared it. That is the point, and
-> two things follow from it: the cache is capacity-bounded
-> (`conn.pool.statement-cache.bound`), because the key space is not, and a
-> cached plan can be invalidated by DDL under it
-> (`conn.pool.statement-cache.invalidate`).
+> three things follow from it: the cache is capacity-bounded
+> (`conn.pool.statement-cache.bound`), because the key space is not; a cached
+> plan can be invalidated by DDL under it
+> (`conn.pool.statement-cache.invalidate`); and DDL can change what a plan
+> was built from without invalidating it, which a pool-wide clear answers
+> (`conn.pool.statement-cache.clear`).
 
 > [spec:pgorm:req:conn.pool.statement-cache.bound+1]
 > A `StatementCache` MUST be bounded. Its key space is the SQL text, and one
@@ -311,6 +319,47 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > which is not retried. `connect` and its two sibling shorthands recycle with
 > `Fast` (`conn.pool`), so they cannot reach it; a caller who passes such a
 > method to `connect_with` should pair it with `StatementCacheSize::Disabled`.
+
+> [spec:pgorm:req:conn.pool.statement-cache.clear]
+> `DatabasePool::clear_statement_caches()` MUST drop every pooled
+> connection's cached prepared statements, so that each statement is prepared
+> again the next time a connection runs it. It is for DDL that changes what a
+> plan was built from without PostgreSQL re-planning it — a domain's changed
+> default is one (`sql.ddl.domain`) — and it spares the one `0A000` failure
+> per connection that a changed result type otherwise costs
+> (`conn.pool.statement-cache.invalidate`).
+>
+> It MUST NOT clear a cache in place. It advances a generation held by the
+> pool's `StatementCaches` (`StatementCaches::clear_before_reuse` in
+> pgorm-pool), and each connection records the generation its cache was last
+> cleared at — the current one when the connection is created, its cache then
+> being empty. `Manager::recycle` (`conn.pool.lifecycle`), which runs while
+> the pool holds a connection idle and before it lends it, clears the cache of
+> a connection whose generation is behind and records the current one. An idle
+> connection is therefore cleared before it is next lent, and a connection
+> checked out when the call is made keeps its statements until it is returned
+> and is cleared before it is lent again: a caller holding one across the DDL
+> returns it and takes another to see the change. Clearing in place, as
+> `StatementCaches::clear` does, races the owner of a checked-out connection,
+> because a statement whose preparation is in flight lands in the cache after
+> the clear has passed it, planned against the schema the DDL replaced. An
+> idle connection has nothing in flight.
+>
+> The server-side statements MUST be deallocated, not only forgotten: a cached
+> entry is a live prepared statement on the server, and one the client drops
+> without closing stays there until the connection closes. Dropping a
+> `tokio_postgres::Statement`'s last handle sends its `Close`, so clearing the
+> map is the deallocation, deferred only for a statement a caller's `Row`
+> still holds (`conn.pool.statement-cache.bound`), and the `Close` is queued
+> ahead of the connection's next request.
+>
+> The call sends nothing, cannot fail, and does not wait. Generations only
+> advance, so a connection behind by several clears is cleared once, and one
+> created after the call is not cleared at all. `InstrumentedPool` forwards it
+> to the pool it wraps (`metric.layer`); the Python and JavaScript pools expose
+> it as `clear_statement_caches()` and `clearStatementCaches()`
+> (`python.connections`, `napi.connections`); and pgorm-migration's `up`
+> calls it once a batch that applied a migration commits (`migration.up`).
 
 ## Statement execution surface
 

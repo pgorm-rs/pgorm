@@ -59,5 +59,15 @@ check added (`NOT VALID` or not), validated, renamed or dropped, or the
 domain renamed — and `Domain::drop(..)` is refused while a column has the
 type unless it `cascade()`s. A changed default reaches only statements
 prepared after it: PostgreSQL's plan cache keeps the default an insert was
-planned with, so a migration that changes one runs before the application
-opens the connections that insert through it.
+planned with, and pgorm prepares each statement once per pooled connection.
+`up` answers this itself: once a batch that applied a migration commits, it
+calls `clear_statement_caches()` on the pool it was given, and each of that
+pool's connections prepares its statements again before it is next lent. A
+connection the application held checked out across the run keeps its old
+statements until it is returned, and another pool on the same database is not
+the runner's to clear. DDL applied any other way is followed by the same call:
+
+```rust,ignore
+pool.get().await?.batch_execute("ALTER DOMAIN quantity SET DEFAULT 2").await?;
+pool.clear_statement_caches();
+```

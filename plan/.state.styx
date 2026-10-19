@@ -1472,12 +1472,6 @@ impl_evidence (
         {impl_name main, rule napi.results}
         {impl_name main, rule napi.streams}
         {impl_name main, rule napi.transactions}
-    ), rule_versions_seen (
-        {id napi.cancellation, version 0}
-        {id napi.connections, version 0}
-        {id napi.results, version 0}
-        {id napi.streams, version 0}
-        {id napi.transactions, version 0}
     )}
     {id napi-entities, covered_rules (
         napi.application
@@ -1909,10 +1903,6 @@ impl_evidence (
         {impl_name main, rule python.connections}
         {impl_name main, rule python.errors}
         {impl_name main, rule python.runtime}
-    ), rule_versions_seen (
-        {id python.connections, version 0}
-        {id python.errors, version 0}
-        {id python.runtime, version 0}
     )}
     {id python.schema, covered_rules (
         python.schema
@@ -2279,6 +2269,11 @@ impl_evidence (
         {impl_name main, rule exec.decode.interval}
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
+    )}
+    {id statement-cache-after-ddl, covered_rules (
+        conn.pool.statement-cache.clear
+    ), covered_claims (
+        {impl_name main, rule conn.pool.statement-cache.clear}
     )}
 )
 

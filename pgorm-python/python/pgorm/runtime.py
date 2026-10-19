@@ -22,7 +22,7 @@ class PoolStatus(NamedTuple):
 
 
 # [spec:pgorm:req:python.runtime]
-# [spec:pgorm:req:python.connections]
+# [spec:pgorm:req:python.connections+2]
 class Pool:
     """A pool owned by the asyncio loop running at construction.
 
@@ -72,6 +72,13 @@ class Pool:
 
     def status(self) -> PoolStatus:
         return PoolStatus(*self._native.status())
+
+    def clear_statement_caches(self) -> None:
+        """Drop every connection's cached prepared statements, so each statement
+        is prepared again: an idle connection's before it is next lent, and a
+        checked-out one's before it is lent again after its return. Call it after
+        DDL a cached plan does not see, such as a domain's changed default."""
+        self._native.clear_statement_caches()
 
     async def acquire(self) -> "Connection":
         """Check out a connection, with a cancellable acquisition deadline."""

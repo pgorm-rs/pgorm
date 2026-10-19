@@ -55,7 +55,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > told. The old table name survives in exactly one place — as
 > `LEGACY_LEDGER_TABLE`, the name adoption looks for.
 
-> [spec:pgorm:sem:migration.up+2]
+> [spec:pgorm:sem:migration.up+3]
 > `up(db, steps)` acquires one pooled connection, opens one transaction, and
 > runs the entire batch inside it before committing. The transaction's first
 > statement is `SELECT pg_advisory_xact_lock($key)`, where `$key` is
@@ -69,6 +69,16 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > shared `&DatabaseTransaction`. After each successful `up` it inserts a ledger row
 > whose `version` is the migration's name, whose `applied_at` is the current
 > Unix time in seconds, and whose `checksum` is that migration's `checksum()`.
+>
+> Once the batch commits, and only if it applied at least one migration, `up`
+> clears the statement caches of the pool it was given
+> (`conn.pool.statement-cache.clear`). The batch may have changed what a
+> statement the pool's connections had already prepared was planned with, and
+> PostgreSQL does not re-plan every such change: an insert prepared before a
+> migration changed a domain's default keeps writing the old one
+> (`sql.ddl.domain`). A run that applied nothing changed no schema but perhaps
+> the ledger's own, and a batch that rolled back changed nothing, so neither
+> clears, and re-running `up` stays a no-op.
 >
 > The lock makes concurrent runners queue instead of collide. Without it the
 > loser of a race fails on whatever it happened to hit first — a duplicate

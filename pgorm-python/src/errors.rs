@@ -40,7 +40,7 @@ impl Redactions {
 }
 
 // [spec:pgorm:req:python.errors+1]
-// [spec:pgorm:req:python.connections]
+// [spec:pgorm:req:python.connections+2]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
     loop {

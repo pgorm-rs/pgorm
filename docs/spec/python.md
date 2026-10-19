@@ -392,12 +392,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > MUST define interpreter, thread and event-loop ownership; unsupported
 > cross-owner use MUST raise a documented error rather than deadlock or panic.
 
-> [spec:pgorm:req:python.connections]
+> [spec:pgorm:req:python.connections+2]
 > Connection construction MUST expose supported pgorm pool, connection and TLS
 > configuration, including certificate verification, without a silent plaintext
 > fallback. Pools and checked-out resources MUST support explicit asynchronous
 > close/context-manager lifecycles. Queries MUST route through pgorm's normal
-> execution and statement-cache machinery. Credentials MUST be redacted from
+> execution and statement-cache machinery, and a pool MUST expose
+> `clear_statement_caches()`, a synchronous call that marks every connection's
+> cached statements stale as `conn.pool.statement-cache.clear` describes and
+> refuses nothing, since it sends nothing. Credentials MUST be redacted from
 > representations, exceptions and default diagnostic logs.
 
 > [spec:pgorm:req:python.transactions]

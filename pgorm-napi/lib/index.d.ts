@@ -410,7 +410,7 @@ export declare class Value {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.connections]
+// [spec:pgorm:req:napi.connections+2]
 /** How a {@link Pool} connects. Durations are in milliseconds. */
 export interface PoolOptions {
   /**
@@ -563,6 +563,13 @@ export declare class Pool extends Queryable implements AsyncDisposable {
   constructor(dsn: string, options?: PoolOptions);
   readonly closed: boolean;
   status(): PoolStatus;
+  /**
+   * Drop every connection's cached prepared statements, so each statement is
+   * prepared again: an idle connection's before it is next lent, and a
+   * checked-out one's before it is lent again after its return. Call it after
+   * DDL a cached plan does not see, such as a domain's changed default.
+   */
+  clearStatementCaches(): void;
   /** A connection of the caller's own until it closes it. */
   acquire(options?: OperationOptions): Promise<Connection>;
   /** Run `use` with a connection, closed when it settles. */

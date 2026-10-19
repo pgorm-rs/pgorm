@@ -4,7 +4,7 @@ use super::*;
 use crate::domain::DomainAlterAction;
 
 impl QueryBuilder {
-    // [spec:pgorm:req:sql.ddl.domain]
+    // [spec:pgorm:req:sql.ddl.domain+2]
     pub(crate) fn prepare_domain_create_statement(
         &self,
         create: &DomainCreateStatement,
@@ -33,7 +33,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.domain]
+    // [spec:pgorm:req:sql.ddl.domain+2]
     pub(crate) fn prepare_domain_alter_statement(
         &self,
         alter: &DomainAlterStatement,
@@ -72,7 +72,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.domain]
+    // [spec:pgorm:req:sql.ddl.domain+2]
     pub(crate) fn prepare_domain_drop_statement(
         &self,
         drop: &DomainDropStatement,
@@ -87,7 +87,7 @@ impl QueryBuilder {
     /// `DROP <kind> [IF EXISTS ]<type>[, <type>...]`: what a drop of types
     /// named as types are writes before its behavior, a domain's and an enum
     /// or composite type's alike.
-    // [spec:pgorm:req:sql.ddl.domain]
+    // [spec:pgorm:req:sql.ddl.domain+2]
     // [spec:pgorm:req:sql.ddl.type-alter-drop+7]
     pub(super) fn prepare_type_names_drop<'a>(
         &self,

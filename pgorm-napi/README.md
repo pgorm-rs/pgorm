@@ -120,7 +120,11 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
   also pings. TLS is `verify-full` — certificate and host name checked against
   `ca` or the platform's trust store — unless the string says
   `sslmode=disable` or `tls` is `"disable"`, and never falls back to plaintext.
-  A statement run on a pool takes a connection for itself alone.
+  A statement run on a pool takes a connection for itself alone. After DDL
+  that a cached plan does not see, such as a domain's changed default,
+  `pool.clearStatementCaches()` makes every connection prepare its statements
+  again: an idle one before it is next lent, one checked out at the time once
+  it is returned and lent again.
 - **`Connection`** (from `pool.acquire()`) is the caller's until closed, and
   runs one operation at a time; another meanwhile is a `LifecycleError`, not a
   queue.

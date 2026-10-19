@@ -12628,6 +12628,9 @@ children (
         id statement-cache-after-ddl
         title "A pool can drop its connections' prepared statements after DDL, so a changed domain default or column type is not served from a stale plan"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:conn.pool.statement-cache.clear])
+        }
         deps (sql-domains)
         log (
             {

@@ -1099,7 +1099,7 @@ impl QueryBuilder {
             Keyword::CurrentDate => write!(sql, "CURRENT_DATE").unwrap(),
             Keyword::CurrentTime => write!(sql, "CURRENT_TIME").unwrap(),
             Keyword::CurrentTimestamp => write!(sql, "CURRENT_TIMESTAMP").unwrap(),
-            // [spec:pgorm:req:sql.ddl.domain]
+            // [spec:pgorm:req:sql.ddl.domain+2]
             Keyword::Value => write!(sql, "VALUE").unwrap(),
         }
     }

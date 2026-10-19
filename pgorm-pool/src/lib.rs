@@ -35,7 +35,7 @@ use std::{
     pin::Pin,
     sync::{
         Arc, Mutex, RwLock, Weak,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 
@@ -178,17 +178,16 @@ impl fmt::Debug for Manager {
     }
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle]    create/recycle/detach
+// [spec:pgorm:sem:conn.pool.lifecycle+2]    create/recycle/detach
 impl managed::Manager for Manager {
     type Type = ClientWrapper;
     type Error = Error;
 
     async fn create(&self) -> Result<ClientWrapper, Error> {
         let (client, conn_task) = self.connect.connect(&self.pg_config).await?;
-        let client_wrapper =
+        let mut client_wrapper =
             ClientWrapper::with_cache_size(client, conn_task, self.config.statement_cache);
-        self.statement_caches
-            .attach(&client_wrapper.statement_cache);
+        self.statement_caches.attach(&mut client_wrapper);
         Ok(client_wrapper)
     }
 
@@ -197,6 +196,7 @@ impl managed::Manager for Manager {
             tracing::warn!(target: "deadpool.postgres", "Connection could not be recycled: Connection closed");
             return Err(RecycleError::message("Connection closed"));
         }
+        self.statement_caches.bring_up_to_date(client);
         match self.config.recycling_method.query() {
             Some(sql) => match client.simple_query(sql).await {
                 Ok(_) => Ok(()),
@@ -285,15 +285,21 @@ where
 
 /// Structure holding a reference to all [`StatementCache`]s and providing
 /// access for clearing all caches and removing single statements from them.
-// [spec:pgorm:sem:conn.pool.statement-cache+2]    manager-level registry
+// [spec:pgorm:sem:conn.pool.statement-cache+3]    manager-level registry
 #[derive(Default, Debug)]
 pub struct StatementCaches {
     caches: Mutex<Vec<Weak<StatementCache>>>,
+    /// Counts [`StatementCaches::clear_before_reuse`] calls. A connection whose
+    /// cache was last cleared at an older count is cleared before it is lent.
+    generation: AtomicU64,
 }
 
 impl StatementCaches {
-    fn attach(&self, cache: &Arc<StatementCache>) {
-        let cache = Arc::downgrade(cache);
+    /// Registers a newly created connection's cache. The cache is empty, so it
+    /// is current with every clear asked for so far.
+    fn attach(&self, client: &mut ClientWrapper) {
+        client.cache_generation = self.generation.load(Ordering::Acquire);
+        let cache = Arc::downgrade(&client.statement_cache);
         self.caches.lock().unwrap().push(cache);
     }
 
@@ -304,12 +310,47 @@ impl StatementCaches {
 
     /// Clears [`StatementCache`] of all connections which were handed out by a
     /// [`Manager`].
+    ///
+    /// Every cache is cleared at once, including those of connections that are
+    /// checked out and running statements. A statement whose preparation was
+    /// already in flight can land in a cache after the clear has passed it, so
+    /// after DDL prefer [`StatementCaches::clear_before_reuse`].
     pub fn clear(&self) {
         let caches = self.caches.lock().unwrap();
         for cache in caches.iter() {
             if let Some(cache) = cache.upgrade() {
                 cache.clear();
             }
+        }
+    }
+
+    /// Marks the [`StatementCache`] of every connection handed out so far as
+    /// stale: an idle connection's is cleared before the pool next lends it,
+    /// and one checked out at the time keeps its statements until it is
+    /// returned and is cleared before it is lent again.
+    ///
+    /// A cleared statement is closed on the server when its last handle drops,
+    /// which for a statement no `Row` still holds is the clear itself, so the
+    /// server-side prepared statements are deallocated rather than left until
+    /// the connection closes.
+    ///
+    /// Call it after DDL that changes what a cached plan depends on: PostgreSQL
+    /// re-plans most such changes itself, but not a domain's default.
+    // [spec:pgorm:req:conn.pool.statement-cache.clear]    bump the generation
+    pub fn clear_before_reuse(&self) {
+        let _ = self.generation.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Clears `client`'s cache if a [`StatementCaches::clear_before_reuse`]
+    /// has been asked for since it was last cleared. Called only while the
+    /// pool holds the connection idle, so no statement of its owner's can be
+    /// mid-preparation.
+    // [spec:pgorm:req:conn.pool.statement-cache.clear]    an idle connection catches up before it is lent
+    fn bring_up_to_date(&self, client: &mut ClientWrapper) {
+        let current = self.generation.load(Ordering::Acquire);
+        if client.cache_generation != current {
+            client.statement_cache.clear();
+            client.cache_generation = current;
         }
     }
 
@@ -361,7 +402,7 @@ struct StatementCacheKey<'a> {
 /// Normally, you probably want to use the [`ClientWrapper::prepare_cached()`]
 /// and [`ClientWrapper::prepare_typed_cached()`] methods instead (or the
 /// similar ones on [`Transaction`]).
-// [spec:pgorm:sem:conn.pool.statement-cache+2]
+// [spec:pgorm:sem:conn.pool.statement-cache+3]
 pub struct StatementCache {
     map: RwLock<HashMap<StatementCacheKey<'static>, Statement>>,
     size: AtomicUsize,
@@ -504,6 +545,10 @@ pub struct ClientWrapper {
 
     /// [`StatementCache`] of this client.
     pub statement_cache: Arc<StatementCache>,
+
+    /// The [`StatementCaches`] generation this client's cache was last
+    /// cleared at.
+    cache_generation: u64,
 }
 
 impl ClientWrapper {
@@ -528,6 +573,7 @@ impl ClientWrapper {
             client,
             conn_task,
             statement_cache: Arc::new(StatementCache::new(cache_size)),
+            cache_generation: 0,
         }
     }
 
@@ -603,7 +649,7 @@ impl DerefMut for ClientWrapper {
     }
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle]    connection task abort on drop
+// [spec:pgorm:sem:conn.pool.lifecycle+2]    connection task abort on drop
 impl Drop for ClientWrapper {
     fn drop(&mut self) {
         self.conn_task.abort()

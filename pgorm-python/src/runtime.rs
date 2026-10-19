@@ -103,7 +103,7 @@ fn running_loop(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 }
 
 // [spec:pgorm:req:python.runtime]
-// [spec:pgorm:req:python.connections]
+// [spec:pgorm:req:python.connections+2]
 #[derive(Debug)]
 #[pyclass(name = "_Pool", module = "pgorm._native", frozen)]
 pub(crate) struct NativePool {
@@ -206,6 +206,15 @@ impl NativePool {
     #[pyo3(signature = (capacity=1024))]
     fn listener<'py>(&self, py: Python<'py>, capacity: usize) -> PyResult<Bound<'py, PyAny>> {
         crate::listen::open(py, self.state.clone(), capacity)
+    }
+
+    /// Mark every connection's cached prepared statements stale, as
+    /// `DatabasePool::clear_statement_caches` does. Nothing is sent, so a
+    /// closed pool or another event loop is no reason to refuse it.
+    // [spec:pgorm:req:python.connections+2]
+    // [spec:pgorm:req:conn.pool.statement-cache.clear]
+    fn clear_statement_caches(&self) {
+        self.state.pool.clear_statement_caches();
     }
 
     fn status(&self, py: Python<'_>) -> PyResult<(usize, usize, usize, usize)> {

@@ -7,14 +7,15 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Collector contract
 
-> [spec:pgorm:def:metric.layer+1]
+> [spec:pgorm:def:metric.layer+2]
 > The metrics layer consists of a `MetricsCollector` trait (`Clone + Send +
 > Sync + 'static`) and three wrappers parameterized by it:
 > `InstrumentedPool<M>` (wrapping `DatabasePool`), `InstrumentedConnection<M>`
 > (wrapping `DatabaseConnection`), and `InstrumentedTransaction<'a, M>`
 > (wrapping `DatabaseTransaction<'a>`). Each wrapper exposes `inner()` and
 > `metrics()` accessors to reach the wrapped value and the collector; the pool
-> wrapper also forwards `tag()` and `status()`. Two further public types are
+> wrapper also forwards `tag()`, `status()` and `clear_statement_caches()`
+> (`conn.pool.statement-cache.clear`). Two further public types are
 > the argument the query hooks take rather than machinery of their own:
 > `QueryContext<'a>` and `QueryFingerprint`, both defined by
 > `metric.fingerprint`.
