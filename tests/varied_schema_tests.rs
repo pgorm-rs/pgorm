@@ -303,7 +303,7 @@ async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
 // [spec:pgorm:req:entity.traits.entity-name+2/test]    finds, filters,
 // ordering, pagination, keyset cursors and the schema-qualified enum's value
 // predicates all address tenant_a.item
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]
 // [spec:pgorm:sem:exec.cursor.keyset+6/test]
 #[pgorm_macros::test]
 async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
@@ -442,7 +442,7 @@ async fn graph_reads_span_schemas() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+7/test]    loaders ride the graph
+// [spec:pgorm:sem:query.loader.batching+8/test]    loaders ride the graph
 // across the schema boundary and through a qualified junction
 #[pgorm_macros::test]
 async fn loaders_work_across_qualified_schemas() -> Result<(), Error> {

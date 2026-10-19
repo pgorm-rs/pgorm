@@ -66,6 +66,18 @@ macro_rules! bind_func_no_params {
     };
 }
 
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+macro_rules! bind_compared_aggregate {
+    ( $func: ident ) => {
+        /// See also SeaQuery's method with same name. A column whose domain is
+        /// over an enum is aggregated as the enum, PostgreSQL resolving the
+        /// aggregate for the enum and not for the domain.
+        fn $func(&self) -> SimpleExpr {
+            compared_column(self, Expr::col((self.entity_name(), *self))).$func()
+        }
+    };
+}
+
 macro_rules! bind_vec_func {
     ( $func: ident ) => {
         #[allow(missing_docs)]
@@ -81,12 +93,16 @@ macro_rules! bind_vec_func {
     };
 }
 
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 macro_rules! bind_subquery_func {
     ( $func: ident ) => {
+        /// Membership in what a subquery projects. A column whose domain is
+        /// over an enum is compared as the enum, and so is the subquery's one
+        /// projected expression.
         #[allow(clippy::wrong_self_convention)]
-        #[allow(missing_docs)]
         fn $func(&self, s: SelectStatement) -> SimpleExpr {
-            Expr::col((self.entity_name(), *self)).$func(s)
+            compared_column(self, Expr::col((self.entity_name(), *self)))
+                .$func(compared_subquery(self, s))
         }
     };
 }
@@ -161,7 +177,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// enum column compared against another column of the same enum type needs
     /// no cast, and a column whose domain is over an enum is cast to the enum,
     /// either side, PostgreSQL resolving no operator for the domain.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     fn eq_col<C>(&self, other: C) -> SimpleExpr
     where
         C: ColumnTrait,
@@ -366,8 +382,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
         Expr::col((self.entity_name(), *self)).like(pattern)
     }
 
-    bind_func_no_params!(max);
-    bind_func_no_params!(min);
+    bind_compared_aggregate!(max);
+    bind_compared_aggregate!(min);
     bind_func_no_params!(sum);
     bind_func_no_params!(count);
     bind_func_no_params!(is_null);
@@ -462,7 +478,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// driver reports such a multirange as a simple type with no subtype to
     /// read its binary form by, so it is read as its text, which the
     /// newtype's `FromStr` parses.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     // [spec:pgorm:def:sql.value.created-range+2]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
@@ -491,7 +507,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column that overrides `save_as` with a cast of its own — what
     /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
         self.save_enum_array_as(val)
     }
@@ -501,7 +517,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
     /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
     /// columns without a `save_as` attribute.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
@@ -517,7 +533,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column of a range type a schema created takes its value through
     /// [`Expr::as_range`]: a range is written as its text form and cast to the
     /// type by name, there being no cast to it from a built-in range type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     // [spec:pgorm:def:sql.value.created-range+2]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {

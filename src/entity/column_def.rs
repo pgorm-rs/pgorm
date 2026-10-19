@@ -1,7 +1,7 @@
 //! Column-type introspection and [`ColumnDef`] construction.
 
 use super::*;
-use pgorm_query::{GeneratedKind, IdentityGeneration};
+use pgorm_query::{ColumnRef, GeneratedKind, IdentityGeneration, SelectExpr};
 
 /// pgorm's utility methods that act on [ColumnType]
 pub trait ColumnTypeTrait {
@@ -75,7 +75,7 @@ fn qualified(name: &Name, schema: &Option<Name>) -> pgorm_query::TypeName {
 /// value written to its column becomes; over an enum array the domain is the
 /// array type, so its name carries no `[]`. A comparison takes
 /// [`compared_enum`] instead.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     match col_type {
         ColumnType::Enum { name, schema, .. } => Some(qualified(name, schema)),
@@ -95,7 +95,7 @@ pub(crate) fn enum_type_name(col_type: &ColumnType) -> Option<pgorm_query::TypeN
 /// d*), so the column and every value compared with it are cast to the enum.
 /// A domain over an array of an enum is `None`: array comparison resolves for
 /// it, as it does for every other domain's base.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn compared_enum(col_type: &ColumnType) -> Option<pgorm_query::TypeName> {
     let ColumnType::Domain { base, .. } = col_type else {
         return None;
@@ -108,7 +108,7 @@ pub(crate) fn compared_enum(col_type: &ColumnType) -> Option<pgorm_query::TypeNa
 
 /// A column as a comparison operand: cast to the enum when its domain is
 /// over one ([`compared_enum`]), itself otherwise.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn compared_column<C: ColumnTrait>(col: &C, expr: Expr) -> Expr {
     match compared_enum(col.def().get_column_type()) {
         Some(enum_type) => Expr::expr(expr.cast_as_type(enum_type)),
@@ -119,7 +119,7 @@ pub(crate) fn compared_column<C: ColumnTrait>(col: &C, expr: Expr) -> Expr {
 /// A value compared with a column: cast to the enum when the column's domain
 /// is over one, so it meets the column cast the same way, and through the
 /// column's [`save_as`](ColumnTrait::save_as) otherwise.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn compared_value<C: ColumnTrait>(col: &C, val: Expr) -> SimpleExpr {
     match compared_enum(col.def().get_column_type()) {
         Some(enum_type) => val.cast_as_type(enum_type),
@@ -130,7 +130,7 @@ pub(crate) fn compared_value<C: ColumnTrait>(col: &C, val: Expr) -> SimpleExpr {
 /// The array counterpart of [`compared_value`], for the one-array operand of
 /// `= ANY` and `<> ALL`: the enum's array, or the column's
 /// [`save_array_as`](ColumnTrait::save_array_as).
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn compared_array<C: ColumnTrait>(col: &C, val: Expr) -> SimpleExpr {
     match compared_enum(col.def().get_column_type()) {
         Some(enum_type) => val.cast_as_type(enum_type.array()),
@@ -138,9 +138,48 @@ pub(crate) fn compared_array<C: ColumnTrait>(col: &C, val: Expr) -> SimpleExpr {
     }
 }
 
+/// A subquery a column's membership is tested against: when the column's
+/// domain is over an enum, its one projected expression cast to the enum,
+/// under the alias it had.
+///
+/// The cast is needed even where the subquery projects a column of the same
+/// domain, as the column cast to the enum and the domain resolve no operator
+/// either (`42883`, *operator does not exist: e = d*). A projection that is not
+/// one plain expression is left as written: several (a row the column cannot
+/// equal), `*`, whose cast is not SQL, or a window function's, which
+/// pgorm-query pairs with its `OVER` so that it cannot be cast in place.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+pub(crate) fn compared_subquery<C: ColumnTrait>(
+    col: &C,
+    mut query: SelectStatement,
+) -> SelectStatement {
+    let Some(enum_type) = compared_enum(col.def().get_column_type()) else {
+        return query;
+    };
+    let [projected] = query.selects() else {
+        return query;
+    };
+    let plain = projected.window().is_none()
+        && !matches!(
+            projected.expr(),
+            SimpleExpr::Column(ColumnRef::Asterisk | ColumnRef::TableAsterisk(_))
+        );
+    if !plain {
+        return query;
+    }
+    let cast = projected.expr().clone().cast_as_type(enum_type);
+    let projected = match &projected.alias {
+        Some(alias) => SelectExpr::new_as(cast, Name::clone(alias)),
+        None => SelectExpr::new(cast),
+    };
+    query.clear_selects();
+    query.expr(projected);
+    query
+}
+
 /// Whether a column holds an array, under any domains it is typed with: what
 /// decides whether an enum column is read as `text` or `text[]`.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 pub(crate) fn holds_array(col_type: &ColumnType) -> bool {
     match col_type {
         ColumnType::Array(_) => true,
@@ -341,11 +380,11 @@ where
 mod tests {
     use crate::{ColumnTrait, EntityTrait};
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]    every
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    every
     // value-position operand passes through `save_as` — between, if_null and
     // the array membership forms included — for the derive-generated override
     // and the enum default alike
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]    a
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a
     // schema-qualified enum type reaches every rendering qualified: the value
     // cast, the array cast, the CREATE TABLE column type and CREATE TYPE
     #[test]
@@ -455,7 +494,83 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]    a column whose
+    /// A table whose `mood` column's domain is over an enum through a further
+    /// domain.
+    #[cfg(feature = "macros")]
+    mod moody {
+        use crate as pgorm;
+        use crate::entity::prelude::*;
+        use crate::pgorm_query::Name;
+
+        #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+        pub struct Entity;
+
+        impl EntityName for Entity {
+            fn table_name(&self) -> &str {
+                "moody"
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+        pub struct Model {
+            pub id: i32,
+            pub mood: String,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+        pub enum Column {
+            Id,
+            Mood,
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+        pub enum PrimaryKey {
+            Id,
+        }
+
+        impl PrimaryKeyTrait for PrimaryKey {
+            type ValueType = i32;
+
+            fn auto_increment() -> bool {
+                false
+            }
+        }
+
+        #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+        pub enum Relation {}
+
+        /// `custom.mood`, under `app.temper`, under `app.calm_temper`.
+        impl ColumnTrait for Column {
+            type EntityName = Entity;
+
+            fn def(&self) -> ColumnDef {
+                let domain = |name: &str, base: ColumnType| ColumnType::Domain {
+                    name: Name::runtime(name),
+                    schema: Some(Name::runtime("app")),
+                    base: Arc::new(base),
+                };
+                match self {
+                    Self::Id => ColumnType::Integer.def(),
+                    Self::Mood => domain(
+                        "calm_temper",
+                        domain(
+                            "temper",
+                            ColumnType::Enum {
+                                name: Name::runtime("mood"),
+                                schema: Some(Name::runtime("custom")),
+                                variants: vec![Name::runtime("calm"), Name::runtime("busy")],
+                            },
+                        ),
+                    )
+                    .def(),
+                }
+            }
+        }
+
+        impl ActiveModelBehavior for ActiveModel {}
+    }
+
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a column whose
     // domain is over an enum compares as the enum: every predicate form casts
     // the column and its value operands to the enum, an array operand to its
     // array, while a value written to the column is still cast to the domain
@@ -464,79 +579,6 @@ mod tests {
     fn domain_enum_column_compares_as_enum() {
         use crate::{QueryFilter, QueryTrait};
         use pgorm_query::{Expr, Query};
-
-        mod moody {
-            use crate as pgorm;
-            use crate::entity::prelude::*;
-            use crate::pgorm_query::Name;
-
-            #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
-            pub struct Entity;
-
-            impl EntityName for Entity {
-                fn table_name(&self) -> &str {
-                    "moody"
-                }
-            }
-
-            #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
-            pub struct Model {
-                pub id: i32,
-                pub mood: String,
-            }
-
-            #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
-            pub enum Column {
-                Id,
-                Mood,
-            }
-
-            #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
-            pub enum PrimaryKey {
-                Id,
-            }
-
-            impl PrimaryKeyTrait for PrimaryKey {
-                type ValueType = i32;
-
-                fn auto_increment() -> bool {
-                    false
-                }
-            }
-
-            #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-            pub enum Relation {}
-
-            /// `custom.mood`, under `app.temper`, under `app.calm_temper`.
-            impl ColumnTrait for Column {
-                type EntityName = Entity;
-
-                fn def(&self) -> ColumnDef {
-                    let domain = |name: &str, base: ColumnType| ColumnType::Domain {
-                        name: Name::runtime(name),
-                        schema: Some(Name::runtime("app")),
-                        base: Arc::new(base),
-                    };
-                    match self {
-                        Self::Id => ColumnType::Integer.def(),
-                        Self::Mood => domain(
-                            "calm_temper",
-                            domain(
-                                "temper",
-                                ColumnType::Enum {
-                                    name: Name::runtime("mood"),
-                                    schema: Some(Name::runtime("custom")),
-                                    variants: vec![Name::runtime("calm"), Name::runtime("busy")],
-                                },
-                            ),
-                        )
-                        .def(),
-                    }
-                }
-            }
-
-            impl ActiveModelBehavior for ActiveModel {}
-        }
 
         use moody::Column::{Id, Mood};
         let condition = |filter: pgorm_query::SimpleExpr| {
@@ -590,6 +632,120 @@ mod tests {
                 .values_panic([Mood.save_as(Expr::val("calm"))])
                 .to_string(),
             r#"INSERT INTO "moody" ("mood") VALUES (CAST('calm' AS app.calm_temper))"#
+        );
+    }
+
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a column whose
+    // domain is over an enum is compared as the enum in subquery membership,
+    // the subquery's one plain projection cast with it and any other shape
+    // left as written, aggregated as the enum by max and min but not by count,
+    // and cast on its side of a relation's join, reversal included, while a
+    // pair of plain columns joins bare
+    // [spec:pgorm:sem:query.build.join+5/test]    each side of a pair whose
+    // column's domain is over an enum is cast, and its record follows rev()
+    #[test]
+    #[cfg(feature = "macros")]
+    fn domain_enum_subqueries_joins_and_extrema_cast() {
+        use crate::{JoinType, QueryFilter, QuerySelect, QueryTrait, RelationDef};
+        use pgorm_query::{Asterisk, Expr, Query, alias};
+
+        use moody::Column::{Id, Mood};
+        let condition = |filter: pgorm_query::SimpleExpr| {
+            moody::Entity::find()
+                .filter(filter)
+                .as_query()
+                .to_string()
+                .split_once("WHERE ")
+                .expect("a WHERE clause")
+                .1
+                .to_owned()
+        };
+        let column = r#"CAST("moody"."mood" AS custom.mood)"#;
+        let moods = || Query::select().column(Mood).from(moody::Entity).to_owned();
+        assert_eq!(
+            condition(Mood.in_subquery(moods())),
+            format!(r#"{column} IN (SELECT CAST("mood" AS custom.mood) FROM "moody")"#)
+        );
+        assert_eq!(
+            condition(
+                Mood.not_in_subquery(
+                    Query::select()
+                        .expr_as(Expr::col(Mood), alias("m"))
+                        .from(moody::Entity)
+                        .to_owned()
+                )
+            ),
+            format!(r#"{column} NOT IN (SELECT CAST("mood" AS custom.mood) AS "m" FROM "moody")"#)
+        );
+        assert_eq!(
+            condition(
+                Mood.in_subquery(
+                    Query::select()
+                        .column(Asterisk)
+                        .from(moody::Entity)
+                        .to_owned()
+                )
+            ),
+            format!(r#"{column} IN (SELECT * FROM "moody")"#)
+        );
+        assert_eq!(
+            condition(
+                Mood.in_subquery(
+                    Query::select()
+                        .columns([Id, Mood])
+                        .from(moody::Entity)
+                        .to_owned()
+                )
+            ),
+            format!(r#"{column} IN (SELECT "id", "mood" FROM "moody")"#)
+        );
+        assert_eq!(
+            condition(Id.in_subquery(Query::select().column(Id).from(moody::Entity).to_owned())),
+            r#""moody"."id" IN (SELECT "id" FROM "moody")"#
+        );
+
+        let extrema = moody::Entity::find()
+            .select_only()
+            .expr(Mood.max())
+            .expr(Mood.min())
+            .expr(Mood.count())
+            .as_query()
+            .to_string();
+        assert_eq!(
+            extrema,
+            format!(r#"SELECT MAX({column}), MIN({column}), COUNT("moody"."mood") FROM "moody""#)
+        );
+
+        let joined = |rel: RelationDef| {
+            moody::Entity::find()
+                .select_only()
+                .column(Id)
+                .join_as(JoinType::InnerJoin, rel, alias("other"))
+                .as_query()
+                .to_string()
+                .split_once(" ON ")
+                .expect("an ON clause")
+                .1
+                .to_owned()
+        };
+        let other = r#"CAST("other"."mood" AS custom.mood)"#;
+        let both: RelationDef = moody::Entity::belongs_to(moody::Entity)
+            .columns(Mood, Mood)
+            .and_columns(Id, Id)
+            .into();
+        assert_eq!(
+            joined(both),
+            format!(r#"{column} = {other} AND "moody"."id" = "other"."id""#)
+        );
+        let crossed = || -> RelationDef {
+            moody::Entity::belongs_to(moody::Entity)
+                .columns(Mood, Id)
+                .into()
+        };
+        assert_eq!(joined(crossed()), format!(r#"{column} = "other"."id""#));
+        assert_eq!(
+            joined(crossed().rev()),
+            format!(r#""moody"."id" = {other}"#)
         );
     }
 }

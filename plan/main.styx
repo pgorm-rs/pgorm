@@ -705,6 +705,14 @@ children (
                         text "entity.traits.column.enum-cast +8 (domain-enum-predicates, 47aa595c): a column whose domain is over an enum compares as the enum, every ColumnTrait comparison casting the column and its value operands (an array operand to the enum's array) to the enum in place of save_as, the column-taking and expression-taking forms included."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:48:10.15365Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "entity.traits.column.enum-cast +9 (domain-enum-remaining, a3c07659): a column whose domain is over an enum is compared as the enum in in_subquery / not_in_subquery (the subquery's one plain projection cast with it), max and min, relation joins (ColumnPairs records each side's enum when named by entity columns), the loader's key predicate, belongs_to_tbl_alias and the pipeline's operators and min / max; a foreign key between such columns is the server's refusal (42804)."
+                        after_done true
+                    }
                 )
             }
 
@@ -738,6 +746,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "inline-window-over-named (a08d6a4d) reworded query.build.window+2: QuerySelect::window appends a WindowStatement or an ExtendedWindow to the WINDOW clause, held to check_windows by every terminal; the code was already so, and the four references are pinned."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:48:10.27816Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "query.build.join +5 and query.loader.batching +8 (domain-enum-remaining, a3c07659): a join pair's side whose column's domain is over an enum is cast to the enum, and the loader's batch predicate casts such a key column and each value bound against it, a composite key written as tuples of the cast values rather than through in_tuples."
                         after_done true
                     }
                 )
@@ -12981,6 +12997,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by domain-enum-predicates (f7862633), checked on 18.6. After the ORM's value predicates and keyset cursors learned to cast a domain-over-enum column to its enum, these still fail with 42883 (no operator / function on the domain): in_subquery / not_in_subquery, where the column is compared with a subquery of the same domain (dmood = dmood); relation joins on such columns; max / min (function max(dmood) does not exist). Pipeline (PRQL) comparisons on such a column are untested. Cast both sides to the enum in subquery membership and join conditions, cast the argument of max / min (and decide which other aggregates need it), check the pipeline's comparisons, and add a domain-enum filter assertion to pgorm-python's generated_application.py (the StockLine entity over the cheerful domain), with live tests."
+            }
+
+            {
+                at 2026-10-19T08:40:19.506203Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

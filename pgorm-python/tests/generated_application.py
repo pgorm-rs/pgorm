@@ -280,6 +280,16 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
                 app.StockLine.col("small") > 10
             ).one(connection)
             self.assertEqual(found.codes, ["X", "YZ"])
+            # The mood column's domain is over an enum, which PostgreSQL
+            # compares only once both sides are cast to the enum.
+            glad = await app.StockLine.find().filter(
+                app.StockLine.col("mood") == "glad"
+            ).all(connection)
+            self.assertEqual([line.id for line in glad], [1])
+            calmer = await app.StockLine.find().filter(
+                app.StockLine.col("mood") < "glad"
+            ).all(connection)
+            self.assertEqual(calmer, [])
             with self.assertRaises(p.DatabaseError) as refused:
                 await active.set_id(2).set_small(150).insert(connection)
             self.assertEqual(refused.exception.sqlstate, "23514")

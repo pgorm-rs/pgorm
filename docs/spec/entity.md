@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+8]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -196,6 +196,40 @@ explicit limitations.
 > either side, and `eq_expr` casts its own. A domain over an array of an enum
 > compares as the domain, PostgreSQL's array comparisons resolving for it, and
 > an array of such a domain compares as that array, its value cast to it.
+>
+> The same holds wherever pgorm writes a comparison with such a column.
+> `in_subquery` / `not_in_subquery` cast the column, and the subquery's one
+> projected expression under the alias it had: the enum resolves no operator
+> with the domain either (`42883`, *operator does not exist: e = d*), so a
+> subquery projecting the same domain needs the cast as much as the column
+> does. A subquery whose projection is not one plain expression — several,
+> `*`, or a window function's, which pgorm-query pairs with its `OVER` — is
+> left as written. `max` and `min` aggregate the column cast to the enum and
+> yield the enum, PostgreSQL resolving neither for the domain (`42883`,
+> *function max(d) does not exist*); `count` resolves for the domain and keeps
+> the bare column, and `sum` resolves for no enum at all. A relation's join
+> condition casts each side whose column is so typed (`query.build.join`): a
+> `ColumnPairs` named by entity columns, as `RelationBuilder::columns` and
+> `and_columns` name them, records at construction the enum each side
+> compares as, and `rev()` swaps the records with the pairs; one named by
+> bare names (`ColumnPairs::new`, `and`, `push`) has no column type to read,
+> records none, and joins bare. The loader's batch predicate casts such a key
+> column and its values (`query.loader.batching`), and
+> `belongs_to_tbl_alias`, which scopes `find_linked` to one model, compares
+> each key column as `belongs_to` does. PostgreSQL implements no foreign key
+> between columns of such a domain (`42804`, *incompatible types*), so the
+> `REFERENCES` `create_table_from_entity` writes for a relation over them is
+> refused: such a relation is a join with no key behind it.
+>
+> A pipeline's entity column so typed carries the enum it compares as
+> (`pipeline.qualify`), and each `ExprOps` operator applied to it — the
+> comparisons, `in_array`, its operand and each member, `coalesce` and
+> `is_null` among them — casts every side that carries one, as the `min` and
+> `max` aggregates cast their argument; sorting, grouping, projecting and
+> `count` keep the bare column. Only an
+> entity column carries the type: a column named by `col(table, column)`, or
+> an alias token naming such a column's projection, compares as the domain,
+> which the server refuses (`42883`).
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
 > `save_as`, but under a column whose domain is over an enum, where it is cast

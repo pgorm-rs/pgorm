@@ -220,14 +220,15 @@ is what `EntityTrait::find()` produces.
 Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 `join.rs`).
 
-> [spec:pgorm:sem:query.build.join+4]
+> [spec:pgorm:sem:query.build.join+5]
 > `QuerySelect::join(join_type, rel)` joins `rel.to_tbl`;
 > `join_rev` joins `rel.from_tbl`; `join_as` / `join_as_rev` first re-alias
 > the joined table with a caller-supplied identifier. The ON condition is
 > computed by `join_condition(rel)`: each side's identifier is
 > `FromItem::qualifier()` — the bound alias if there is one, otherwise the bare
 > table identifier; each `(from, to)` pair of `rel.columns` becomes one
-> `from.col = to.col` equality under `Condition::all()` or
+> `from.col = to.col` equality, a side whose column's domain is over an enum
+> cast to the enum (`entity.traits.column.enum-cast`), under `Condition::all()` or
 > `Condition::any()` according to `rel.condition_type`, a period pair adding
 > `from.p && to.p` among them, so a temporal relation joins each row whose
 > period overlaps (`[spec:pgorm:def:entity.relation.def+10]`); and any
@@ -547,14 +548,14 @@ what makes it total over partially-set models.
 > `via` junction or if the target relation is not `HasOne`. An empty input
 > slice short-circuits to an empty result without querying.
 
-> [spec:pgorm:sem:query.loader.batching+7]
+> [spec:pgorm:sem:query.loader.batching+8]
 > Every loader operation issues one graph read (`[spec:pgorm:def:query.graph]`),
 > built the same way: the caller's target selector is re-rooted as the graph and
 > the input entity's own table is joined back as the single `Req` slot
 > (`[spec:pgorm:sem:query.graph.slots+1]`) under an internal alias, walking the
 > relation backwards because the root is the target rather than the input. The
 > relation therefore reaches SQL through the graph's one edge walker and the
-> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+4]`), whole: its
+> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+5]`), whole: its
 > column pairs, its authored `on_condition` — receiving its two identifiers in
 > the roles it was written with, `RelationDef::rev` itself re-swapping them
 > whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+10]`) — and
@@ -585,7 +586,11 @@ what makes it total over partially-set models.
 > `col IN (v1, v2, ...)` over the flattened values; composite keys become a
 > tuple expression `(a, b, ...) IN ((..), (..))` via `in_tuples`;
 > `prepare_condition` is likewise fallible, propagating the same qualification
-> error.
+> error. A key column whose domain is over an enum, as the input entity's own
+> column definition says, is compared as the enum
+> (`entity.traits.column.enum-cast`): the column is cast to it, and so is each
+> value bound against it, a composite key holding one being written as tuples
+> of the cast values rather than through `in_tuples`.
 >
 > Keys are not deduplicated: duplicate key values across input models are
 > repeated verbatim in the IN list (the dedup is an acknowledged TODO in

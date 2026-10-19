@@ -366,7 +366,7 @@ where
             rel_type: self.rel_type,
             from_tbl: self.from_tbl,
             to_tbl: self.to_tbl,
-            columns: ColumnPairs::new(from, to),
+            columns: ColumnPairs::of_columns(from, to),
             is_owner: self.is_owner,
             on_delete: self.on_delete,
             on_update: self.on_update,
@@ -404,13 +404,13 @@ where
 
     /// Replace the columns the relation joins on with this single pair.
     pub fn columns(mut self, from: E::Column, to: R::Column) -> Self {
-        self.columns = ColumnPairs::new(from, to);
+        self.columns = ColumnPairs::of_columns(from, to);
         self
     }
 
     /// Join on a further pair of columns, as a composite key requires.
     pub fn and_columns(mut self, from: E::Column, to: R::Column) -> Self {
-        self.columns.push(from, to);
+        self.columns.push_columns(from, to);
         self
     }
 

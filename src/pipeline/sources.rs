@@ -99,7 +99,7 @@ fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index:
         let alias = source_column_alias(index, column.as_str());
         let node = adapter::ident_in(vec![qualifier.to_owned()], SqlName::to_string(&column));
         let node = match source_read_cast(&column) {
-            Some(cast) => read_cast(node, &cast),
+            Some(cast) => typed_cast(node, &cast),
             None => node,
         };
         nodes.push(adapter::aliased(node, alias));
@@ -121,10 +121,11 @@ fn project_into<E: EntityTrait>(nodes: &mut Vec<PlExpr>, qualifier: &str, index:
 /// placeholder of a caller's making: a name the policy writes is either bare
 /// or a quoted identifier, which the lexer reads as one token, and a
 /// `TypeName::raw` type expression is program text here as on every other
-/// writer.
+/// writer. A comparison casts a column whose domain is over an enum to the
+/// enum through the same writer, for the same reason.
 // [spec:pgorm:sem:pipeline.select-sources+4]
 // [spec:pgorm:sem:query.graph.writer+4]
-fn read_cast(column: PlExpr, cast: &pgorm_query::TypeName) -> PlExpr {
+pub(super) fn typed_cast(column: PlExpr, cast: &pgorm_query::TypeName) -> PlExpr {
     adapter::assembled(
         vec![
             Piece::Text("CAST(".to_owned()),

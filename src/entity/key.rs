@@ -1,5 +1,6 @@
+use crate::entity::compared_enum;
 use crate::{ColumnTrait, EntityTrait};
-use pgorm_query::{IntoName, Name};
+use pgorm_query::{IntoName, Name, TypeName};
 
 pub use pgorm_query::{IntoBoundary, IntoKey, Key};
 
@@ -14,12 +15,36 @@ pub use pgorm_query::{IntoBoundary, IntoKey, Key};
 /// PostgreSQL 18's temporal foreign key: the two sides' periods, a range or
 /// multirange each, matched for overlap rather than equality. It is a slot of
 /// its own, never one of the pairs, so it always comes after them.
+///
+/// A pair named by entity columns, as [`RelationBuilder`](crate::RelationBuilder)
+/// names them, also records the enum each side compares as when its column's
+/// domain is over one, which a pair named by bare names cannot know.
 // [spec:pgorm:def:entity.relation.def+10]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 #[derive(Debug, Clone)]
 pub struct ColumnPairs {
     first: (Name, Name),
     rest: Vec<(Name, Name)>,
     period: Option<(Name, Name)>,
+    compared: Vec<ComparedPair>,
+}
+
+/// The enums one pair's `from` and `to` sides compare as, each `None` unless
+/// that side's column is typed with a domain over an enum.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ComparedPair {
+    pub(crate) from: Option<TypeName>,
+    pub(crate) to: Option<TypeName>,
+}
+
+impl ComparedPair {
+    fn of<F: ColumnTrait, T: ColumnTrait>(from: &F, to: &T) -> Self {
+        Self {
+            from: compared_enum(from.def().get_column_type()),
+            to: compared_enum(to.def().get_column_type()),
+        }
+    }
 }
 
 impl ColumnPairs {
@@ -33,7 +58,35 @@ impl ColumnPairs {
             first: (from.into_name(), to.into_name()),
             rest: Vec::new(),
             period: None,
+            compared: vec![ComparedPair::default()],
         }
+    }
+
+    /// [`ColumnPairs::new`] over entity columns, recording the enum each side
+    /// compares as.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+    pub(crate) fn of_columns<F, T>(from: F, to: T) -> Self
+    where
+        F: ColumnTrait,
+        T: ColumnTrait,
+    {
+        let compared = ComparedPair::of(&from, &to);
+        let mut pairs = Self::new(from, to);
+        pairs.compared = vec![compared];
+        pairs
+    }
+
+    /// [`ColumnPairs::push`] over entity columns, recording the enum each
+    /// side compares as.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+    pub(crate) fn push_columns<F, T>(&mut self, from: F, to: T)
+    where
+        F: ColumnTrait,
+        T: ColumnTrait,
+    {
+        let compared = ComparedPair::of(&from, &to);
+        self.rest.push((from.into_name(), to.into_name()));
+        self.compared.push(compared);
     }
 
     /// Extend with a further pair, as a composite key requires.
@@ -54,6 +107,7 @@ impl ColumnPairs {
         T: IntoName,
     {
         self.rest.push((from.into_name(), to.into_name()));
+        self.compared.push(ComparedPair::default());
     }
 
     /// Match `from` to `to` as periods, replacing any period pair already
@@ -79,6 +133,13 @@ impl ColumnPairs {
         std::iter::once(&self.first).chain(self.rest.iter())
     }
 
+    /// The pairs matched for equality in declaration order, each beside the
+    /// enums its sides compare as.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+    pub(crate) fn compared_pairs(&self) -> impl Iterator<Item = (&(Name, Name), &ComparedPair)> {
+        self.iter().zip(&self.compared)
+    }
+
     /// The first pair, which every set has.
     pub fn first(&self) -> &(Name, Name) {
         &self.first
@@ -97,6 +158,14 @@ impl ColumnPairs {
             first: (self.first.1, self.first.0),
             rest: self.rest.into_iter().map(|(f, t)| (t, f)).collect(),
             period: self.period.map(|(f, t)| (t, f)),
+            compared: self
+                .compared
+                .into_iter()
+                .map(|pair| ComparedPair {
+                    from: pair.to,
+                    to: pair.from,
+                })
+                .collect(),
         }
     }
 

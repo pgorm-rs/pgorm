@@ -1,3 +1,4 @@
+use crate::entity::{compared_column, compared_value};
 use crate::{
     ColumnPairs, ColumnTrait, EntityTrait, IntoKey, IntoSimpleExpr, Iterable, ModelTrait,
     PrimaryKeyToColumn, QueryTrait, RelationDef, RelationTrait,
@@ -5,7 +6,7 @@ use crate::{
 use pgorm_query::{
     AnyWithClause, ConditionType, Expr, FromItem, FunctionCall, GroupingElement, IntoCondition,
     IntoName, LockBehavior, LockType, NullOrdering, SelectExpr, SelectStatement, SimpleExpr,
-    UnionType, WindowDefinition,
+    TypeName, UnionType, WindowDefinition,
 };
 pub use pgorm_query::{Condition, ConditionalStatement, JoinType, Name, Order, OrderedStatement};
 
@@ -1093,6 +1094,10 @@ pub trait QueryFilter: Sized {
     }
 
     /// Perform a check to determine table belongs to a Model through it's name alias
+    ///
+    /// Each key column is compared as [`belongs_to`](QueryFilter::belongs_to)
+    /// compares it, under the alias instead of the entity's own name.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
     fn belongs_to_tbl_alias<M>(mut self, model: &M, tbl_alias: impl IntoName) -> Self
     where
         M: ModelTrait,
@@ -1100,14 +1105,15 @@ pub trait QueryFilter: Sized {
         let tbl_alias = tbl_alias.into_name();
         for key in <M::Entity as EntityTrait>::PrimaryKey::iter() {
             let col = key.into_column();
-            let expr = Expr::col((Name::clone(&tbl_alias), col)).eq(model.get(col));
+            let column = compared_column(&col, Expr::col((Name::clone(&tbl_alias), col)));
+            let expr = column.eq(compared_value(&col, Expr::val(model.get(col))));
             self = self.filter(expr);
         }
         self
     }
 }
 
-// [spec:pgorm:sem:query.build.join+4]
+// [spec:pgorm:sem:query.build.join+5]
 pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     // Use table alias (if any) to construct the join condition
     let from_tbl = Name::clone(rel.from_tbl.qualifier());
@@ -1129,23 +1135,39 @@ pub(crate) fn join_condition(mut rel: RelationDef) -> Condition {
     condition
 }
 
-// [spec:pgorm:sem:query.build.join+4]
+// [spec:pgorm:sem:query.build.join+5]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 fn join_tbl_on_condition(from_tbl: Name, to_tbl: Name, columns: ColumnPairs) -> Condition {
-    let period = columns.period().cloned();
     let mut cond = Condition::all();
-    for (owner_key, foreign_key) in columns {
-        cond = cond.add(
-            Expr::col((Name::clone(&from_tbl), owner_key))
-                .equals((Name::clone(&to_tbl), foreign_key)),
+    for ((owner_key, foreign_key), compared) in columns.compared_pairs() {
+        let from = compared_side(
+            Expr::col((Name::clone(&from_tbl), Name::clone(owner_key))),
+            &compared.from,
         );
+        let to = compared_side(
+            Expr::col((Name::clone(&to_tbl), Name::clone(foreign_key))),
+            &compared.to,
+        );
+        cond = cond.add(from.eq(to));
     }
     // A temporal relation's periods meet where they overlap: a row is joined
     // to every row whose period shares a moment with its own.
-    if let Some((from_period, to_period)) = period {
+    if let Some((from_period, to_period)) = columns.period().cloned() {
         cond =
             cond.add(Expr::col((from_tbl, from_period)).overlaps(Expr::col((to_tbl, to_period))));
     }
     cond
+}
+
+/// One side of a join pair as the equality compares it: cast to the enum when
+/// its column's domain is over one, which is the only way PostgreSQL compares
+/// such a column with anything.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+fn compared_side(column: Expr, enum_type: &Option<TypeName>) -> Expr {
+    match enum_type {
+        Some(enum_type) => Expr::expr(column.cast_as_type(enum_type.clone())),
+        None => column,
+    }
 }
 
 /// The full table name a [`FromItem`] contributes to a foreign key: schema
