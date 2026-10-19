@@ -1066,6 +1066,15 @@ children (
                         [spec:pgorm:def:conn.pool.generic-client]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-19T09:31:55.44266Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "conn.pool.statement-cache (+3) and conn.pool.lifecycle (+2) now name StatementCaches::clear_before_reuse and recycle's clear of a cache behind the pool's generation, which statement-cache-after-ddl added (conn.pool.statement-cache.clear, 2adf99d1)."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -1090,6 +1099,15 @@ children (
                         [spec:pgorm:sem:metric.layer.tx]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-19T09:31:55.546338Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "metric.layer (+2) lists clear_statement_caches among the methods InstrumentedPool forwards, added by statement-cache-after-ddl (2adf99d1); InstrumentedPool moved into src/metric/pool.rs, its public path unchanged."
+                        after_done true
+                    }
+                )
             }
 
             {
