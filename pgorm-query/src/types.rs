@@ -786,12 +786,15 @@ pub trait IntoLikeExpr {
 }
 
 /// SubQuery operators
+// [spec:pgorm:def:sql.ast.expr+7]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SubQueryOper {
     Exists,
     Any,
     Some,
     All,
+    /// `ARRAY(..)`: the one column a subquery yields, collected into an array.
+    Array,
 }
 
 // Impl begins

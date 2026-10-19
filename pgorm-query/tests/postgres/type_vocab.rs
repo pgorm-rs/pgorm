@@ -337,7 +337,7 @@ fn value_producing_from_item_forms_render() {
 // [spec:pgorm:def:sql.types.table-ref+6/test]    a fragment in relation position keeps its
 // non-marker text verbatim and renumbers its markers into the enclosing statement's parameter
 // space, so it composes with a statement that binds values of its own
-// [spec:pgorm:req:sql.render.subquery+4/test]
+// [spec:pgorm:req:sql.render.subquery+5/test]
 #[test]
 fn template_from_item_renumbers_into_the_enclosing_statement() {
     let fragment = SqlTemplate::from_sql(

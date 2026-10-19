@@ -403,7 +403,7 @@ impl QueryBuilder {
     }
 
     // [spec:pgorm:sem:sql.render.empty-in+1]
-    // [spec:pgorm:req:sql.render.subquery+4] (SubQuery/Tuple/Values expression arms)
+    // [spec:pgorm:req:sql.render.subquery+5] (SubQuery/Tuple/Values expression arms)
     // [spec:pgorm:req:sql.render.custom-expr+3]
     fn prepare_simple_expr(&self, simple_expr: &SimpleExpr, sql: &mut dyn SqlWriter) {
         match simple_expr {
@@ -621,7 +621,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`FromItem`] into SQL statement.
-    // [spec:pgorm:req:sql.render.subquery+4] (value-bearing from items carry mandatory aliases)
+    // [spec:pgorm:req:sql.render.subquery+5] (value-bearing from items carry mandatory aliases)
     fn prepare_from_item(&self, from_item: &FromItem, sql: &mut dyn SqlWriter) {
         match from_item {
             FromItem::Table(table) => self.prepare_named_table(table, sql),
@@ -650,7 +650,7 @@ impl QueryBuilder {
             // otherwise swallow the closing parenthesis. Each resolved value
             // re-enters through `prepare_simple_expr`, so the fragment's own
             // `$N` are renumbered into this statement's parameter space.
-            // [spec:pgorm:req:sql.render.subquery+4]
+            // [spec:pgorm:req:sql.render.subquery+5]
             FromItem::Template(template, alias) => {
                 write!(sql, "(").unwrap();
                 for segment in template.segments() {
@@ -783,6 +783,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`SubQueryOper`] into SQL statement.
+    // [spec:pgorm:req:sql.render.subquery+5]
     fn prepare_sub_query_oper(&self, oper: &SubQueryOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -792,6 +793,7 @@ impl QueryBuilder {
                 SubQueryOper::Any => "ANY",
                 SubQueryOper::Some => "SOME",
                 SubQueryOper::All => "ALL",
+                SubQueryOper::Array => "ARRAY",
             }
         )
         .unwrap();

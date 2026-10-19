@@ -118,6 +118,7 @@ fn sweep_expression_shapes() {
         SimpleExpr::Unary(UnOper::Not, Box::new(Expr::col(Glyph::Id).eq(1))),
         Expr::exists(base()),
         Expr::col(Glyph::Id).eq(Expr::any(base())),
+        Expr::array(base()),
         Expr::case(Expr::col(Glyph::Aspect).gt(1), Expr::val("big"))
             .finally(Expr::val("small"))
             .into(),

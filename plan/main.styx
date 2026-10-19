@@ -13174,6 +13174,7 @@ children (
         title "Subquery membership on a domain over an enum casts every subquery shape, not only a single plain projection"
         kind @fix
         deps (domain-enum-remaining)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.203057Z
@@ -13187,6 +13188,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:22:25.129436Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

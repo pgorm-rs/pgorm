@@ -777,7 +777,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Expressions
 
-> [spec:pgorm:def:sql.ast.expr+6]
+> [spec:pgorm:def:sql.ast.expr+7]
 > `SimpleExpr` is the expression tree node, with variants `Column(ColumnRef)`,
 > `Tuple`, `Unary(UnOper, ..)` (the only unary operator is `Not`),
 > `FunctionCall`, `Binary(lhs, BinOper, rhs)`, `SubQuery(Option<SubQueryOper>, ..)`,
@@ -803,8 +803,12 @@ today, including panicking edges and deliberate failsafes.
 > template with substitutions.
 >
 > Subquery expressions carry an optional `SubQueryOper`: `Expr::exists`,
-> `Expr::any`, `Expr::some`, and `Expr::all` wrap a `SelectStatement` in
-> `EXISTS(...)`, `ANY(...)`, `SOME(...)`, and `ALL(...)` respectively.
+> `Expr::any`, `Expr::some`, `Expr::all` and `Expr::array` wrap a
+> `SelectStatement` in `EXISTS(...)`, `ANY(...)`, `SOME(...)`, `ALL(...)` and
+> `ARRAY(...)` respectively. `ARRAY(...)` is the subquery's one column
+> collected into one array value — PostgreSQL refuses a wider subquery there
+> (`42601`), as it does under `IN` — so it can be cast and compared as a
+> value, `= ANY(ARRAY(...))` testing the membership `IN (...)` tests.
 > `From` conversions lift `Value`-convertible Rust primitives, `FunctionCall`,
 > `ColumnRef`, `Keyword`, `CaseStatement`, `SimpleCaseStatement`, each SQL/JSON
 > builder, and finished

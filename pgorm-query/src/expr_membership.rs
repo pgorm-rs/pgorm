@@ -1,5 +1,6 @@
 //! Membership predicates on [`Expr`]: `IN` lists, `= ANY`/`<> ALL` array
-//! parameters, tuple membership, and subquery membership.
+//! parameters, tuple membership, and subquery membership, a subquery's
+//! `ARRAY(..)` among them.
 
 use super::*;
 
@@ -309,5 +310,39 @@ impl Expr {
             Box::new(sel.into_sub_query_statement()),
         ));
         self.into()
+    }
+
+    /// Express an `ARRAY` sub-query expression: the subquery's one column,
+    /// collected into an array.
+    ///
+    /// PostgreSQL refuses a subquery of more than one column here (`42601`),
+    /// as it does in `IN`, so an array of it can stand where membership is
+    /// tested — `= ANY(ARRAY(..))` — and be cast as one value, which a row
+    /// set cannot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::Id).eq(Func::any(Expr::array(
+    ///         Query::select().column(Char::Id).from(Char::Table).take(),
+    ///     ))))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.to_string(),
+    ///     r#"SELECT "id" FROM "character" WHERE "id" = ANY(ARRAY(SELECT "id" FROM "character"))"#
+    /// );
+    /// ```
+    // [spec:pgorm:def:sql.ast.expr+7]
+    pub fn array(sel: SelectStatement) -> SimpleExpr {
+        SimpleExpr::SubQuery(
+            Some(SubQueryOper::Array),
+            Box::new(sel.into_sub_query_statement()),
+        )
     }
 }

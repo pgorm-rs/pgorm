@@ -529,7 +529,7 @@ bound parameter is held to.
 > paginator MUST NOT format SQL text of its own. The rendering, including
 > the newline before the closing parenthesis that keeps a trailing `--`
 > comment from swallowing it, belongs to
-> `[spec:pgorm:req:sql.render.subquery+4]`. Wrapping rather than splicing
+> `[spec:pgorm:req:sql.render.subquery+5]`. Wrapping rather than splicing
 > means `LIMIT` and `OFFSET` land outside the caller's own clauses instead
 > of colliding with them, so a raw statement that already carries
 > `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will not reorder
