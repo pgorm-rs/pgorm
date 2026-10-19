@@ -6,6 +6,7 @@ use std::error::Error as _;
 mod domain;
 #[path = "query_range.rs"]
 mod range;
+pub(crate) use range::range_from_sql;
 
 /// Defines the result of a query operation on a Model
 // [spec:pgorm:def:exec.decode+3]

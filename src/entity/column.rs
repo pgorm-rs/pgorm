@@ -479,7 +479,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// read its binary form by, so it is read as its text, which the
     /// newtype's `FromStr` parses.
     // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
-    // [spec:pgorm:def:sql.value.created-range+2]
+    // [spec:pgorm:def:sql.value.created-range+3]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
         if let ColumnType::CreatedMultirange { .. } = under_domains(self.def().get_column_type()) {
@@ -534,7 +534,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// [`Expr::as_range`]: a range is written as its text form and cast to the
     /// type by name, there being no cast to it from a built-in range type.
     // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
-    // [spec:pgorm:def:sql.value.created-range+2]
+    // [spec:pgorm:def:sql.value.created-range+3]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {
         match created_range_type_name(self.def().get_column_type()) {

@@ -150,7 +150,7 @@ fn model(id: i32) -> spans::Model {
 /// timestamp bound its microseconds.
 // [spec:pgorm:def:sql.value.range+5/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 async fn every_range_type_round_trips_through_an_entity(
     db: &DatabaseConnection,
 ) -> Result<(), Error> {
@@ -247,7 +247,7 @@ async fn a_discrete_range_comes_back_canonical(db: &DatabaseConnection) -> Resul
 /// value, which is two unbounded sides.
 // [spec:pgorm:def:sql.value.range+5/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 async fn the_empty_range_is_not_every_value(db: &DatabaseConnection) -> Result<(), Error> {
     let empty = Value::from(Range::<i32>::Empty);
     let everything = Value::from(Range::<i32>::from(..));
@@ -305,7 +305,7 @@ async fn an_infinite_bound_is_not_unbounded(db: &DatabaseConnection) -> Result<(
 /// and empty ones dropped; the empty multirange is a value of its own.
 // [spec:pgorm:def:sql.value.range+5/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 async fn a_multirange_comes_back_merged(db: &DatabaseConnection) -> Result<(), Error> {
     let written: Multirange<i32> = [
         Range::from(5..8),
@@ -347,7 +347,7 @@ async fn a_multirange_comes_back_merged(db: &DatabaseConnection) -> Result<(), E
 /// on every bound, on the empty range, and on a NULL bound, which both read
 /// as no bound.
 // [spec:pgorm:sem:sql.value.render+2/test]
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 async fn the_bound_and_inline_renderings_agree(db: &DatabaseConnection) -> Result<(), Error> {
     async fn both<T>(db: &DatabaseConnection, value: Value, cast: &'static str) -> Result<T, Error>
     where
@@ -433,7 +433,7 @@ async fn the_bound_and_inline_renderings_agree(db: &DatabaseConnection) -> Resul
 /// The containment and overlap operators take a bound range; an element
 /// beside a range is typed as the range by the server, so it is refused
 /// before it is sent unless the caller pins it to the subtype.
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 async fn the_operators_read_ranges(db: &DatabaseConnection) -> Result<(), Error> {
     let ids = |condition: SimpleExpr| {
         spans::Entity::find()
@@ -485,7 +485,7 @@ async fn the_operators_read_ranges(db: &DatabaseConnection) -> Result<(), Error>
 /// the subtype's; with no canonical function it stores bounds as written. Its
 /// multirange reaches the driver as a simple type, so it is refused both
 /// ways rather than guessed at.
-// [spec:pgorm:req:exec.cursor.binding-range+1/test]
+// [spec:pgorm:req:exec.cursor.binding-range+2/test]
 // [spec:pgorm:def:exec.decode.range+3/test]
 // [spec:pgorm:req:sql.ddl.type-range+2/test]
 async fn a_created_range_type_binds_by_its_subtype(db: &DatabaseConnection) -> Result<(), Error> {

@@ -85,7 +85,7 @@ fn read_i32(raw: &mut &[u8]) -> WireResult<i32> {
 /// The empty flag decodes to [`Range::Empty`] and nothing else: a range with
 /// no bounds is the range with no values, never the range of every value.
 // [spec:pgorm:def:exec.decode.range+3]
-fn range_from_sql<'a, T>(subtype: &Type, raw: &'a [u8]) -> WireResult<Range<T>>
+pub(crate) fn range_from_sql<'a, T>(subtype: &Type, raw: &'a [u8]) -> WireResult<Range<T>>
 where
     T: FromSql<'a>,
 {
@@ -237,7 +237,7 @@ try_getable_range_family!(jiff::Timestamp);
 // The subtypes only a range type a schema created ranges over. Their
 // multiranges are reported by tokio-postgres as simple types, and an array of
 // them is not built, so the range alone decodes.
-// [spec:pgorm:def:sql.value.created-range+2]
+// [spec:pgorm:def:sql.value.created-range+3]
 try_getable_range!(i16);
 try_getable_range!(f32);
 try_getable_range!(f64);

@@ -13271,6 +13271,7 @@ children (
         title "The Rust Value decode reads a range type a schema created, as the bindings already do"
         kind @feat
         deps (copy-binary-rows)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.431565Z
@@ -13284,6 +13285,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:42:57.820055Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

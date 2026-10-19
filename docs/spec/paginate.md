@@ -297,7 +297,7 @@ bound parameter is held to.
 > placeholder to the type the value is actually written as, and the test
 > runs unignored.
 
-> [spec:pgorm:req:exec.cursor.binding-accepts+1]
+> [spec:pgorm:req:exec.cursor.binding-accepts+2]
 > A `Value` MUST NOT be written into a placeholder whose inferred Postgres
 > type its binary representation is not the wire format of.
 > `ValueHolder::to_sql` decides this per variant and raises a `ToSql` error
@@ -331,7 +331,7 @@ bound parameter is held to.
 > | `Bool` | `bool` |
 > | `TinyInt`, `SmallInt`, `Int`, `BigInt`, `Unsigned`, `BigUnsigned` | `int2`, `int4`, `int8`, `oid`, `"char"`, `float4`, `float8`, `numeric` — converted per `[spec:pgorm:req:exec.cursor.binding-coerce+2]` |
 > | `Float`, `Double` | `float4`, `float8`, `numeric`; `int2`/`int4`/`int8` are a distinct "without loss" refusal rather than a representation mismatch |
-> | `String`, `Char` | `text`, `varchar`, `bpchar`, `name`, `xml`, `unknown`; every enum (a label is sent as its own text); and `citext`, `ltree`, `lquery`, `ltxtquery` — the text-backed extension types `postgres-types` itself names |
+> | `String`, `Char` | `text`, `varchar`, `bpchar`, `name`, `xml`, `unknown`; every enum (a label is sent as its own text); and `citext`, `ltree`, `lquery`, `ltxtquery` — the text-backed extension types `postgres-types` itself names. A `String` also binds against a range type a schema created, as the range its text spells (`[spec:pgorm:req:exec.cursor.binding-range+2]`) |
 > | `Bytes` | `bytea` |
 > | `Json` | `json`, `jsonb` |
 > | `ChronoDate` | `date` |
@@ -378,13 +378,13 @@ bound parameter is held to.
 > `bigint` would drop the months and the days. An array of intervals binds
 > through the `Array` arm, each element against the member type.
 
-> [spec:pgorm:req:exec.cursor.binding-range+1]
+> [spec:pgorm:req:exec.cursor.binding-range+2]
 > A `Value::Range` binds against a placeholder whose type is a range — the
 > built-in six, or a range type a schema created, which tokio-postgres
 > reports as a range over its subtype all the same — and a
 > `Value::Multirange` against a built-in multirange; anything else is
 > refused before the statement is sent
-> (`[spec:pgorm:req:exec.cursor.binding-accepts+1]`). A `None` payload is
+> (`[spec:pgorm:req:exec.cursor.binding-accepts+2]`). A `None` payload is
 > `NULL`. The range is written through
 > `postgres_protocol::types::range_to_sql` — the empty range as its flag byte
 > alone, otherwise a flag byte saying which sides are inclusive or unbounded
@@ -400,6 +400,20 @@ bound parameter is held to.
 > `NULL`, its length of -1 would be read by the range's receive function as
 > a length.
 >
+> A `Value::String` binds against a range type a schema created as the range
+> its text spells. Such a range's `Value` is its text form
+> (`[spec:pgorm:def:sql.value.created-range+3]`): the `Value` the newtype
+> naming it converts into and the one a binary COPY reads its column as
+> (`conn.copy.rows`). The text is read by `FromStr` on `Range<T>`, `T` the
+> `RangeSubtype` the subtype reads as, and the range is then written as a
+> `Value::Range` is, each bound against the subtype. Text that spells no
+> range of that subtype, and a subtype no `RangeSubtype` reads, are refused
+> before the statement is sent, as a mismatch naming the type. Against a
+> built-in range a `String` is a mismatch: those six have `Value::Range`. The
+> parse is pgorm's, reading the spellings the Rust type reads, where the
+> server's input function reads every spelling the type takes, which is why
+> the ORM writes a created range as its text cast to the type.
+>
 > A multirange is written as a count and then each range length-prefixed in
 > a range's own encoding, against the subtype the multirange's kind names. A
 > multirange a schema created cannot be bound in binary: tokio-postgres
@@ -407,7 +421,7 @@ bound parameter is held to.
 > multirange arrives as a simple type with no subtype to write the bounds in,
 > and guessing one would send bytes the server could read as another type. It
 > is written as its text cast to its name instead
-> (`[spec:pgorm:def:sql.value.created-range+1]`), and a `Value::Multirange`
+> (`[spec:pgorm:def:sql.value.created-range+3]`), and a `Value::Multirange`
 > against such a placeholder is still refused here.
 >
 > PostgreSQL types a placeholder beside a range column by the column: in
