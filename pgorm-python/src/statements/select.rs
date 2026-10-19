@@ -19,6 +19,16 @@ pub enum Join {
     Full,
 }
 
+#[pymethods]
+impl Join {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "join kinds cannot be tested as Python booleans",
+        ))
+    }
+}
+
 impl Join {
     fn rust_join(&self) -> JoinType {
         match self {

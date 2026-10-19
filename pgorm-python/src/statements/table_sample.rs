@@ -17,6 +17,16 @@ pub enum PySampleMethod {
     System,
 }
 
+#[pymethods]
+impl PySampleMethod {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "sample methods cannot be tested as Python booleans",
+        ))
+    }
+}
+
 impl PySampleMethod {
     fn rust(&self) -> SampleMethod {
         match self {

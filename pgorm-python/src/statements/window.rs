@@ -70,6 +70,13 @@ impl PyFrameType {
             inner: self.rust().following(coerce(offset)?.inner),
         })
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// The rows an `EXCLUDE` clause removes, relative to the current row's peers.
@@ -80,6 +87,15 @@ pub enum PyFrameExclusion {
     Group,
     Ties,
     NoOthers,
+}
+
+#[pymethods]
+impl PyFrameExclusion {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
+    }
 }
 
 impl PyFrameExclusion {
@@ -111,6 +127,12 @@ impl PyFrame {
 
     fn __repr__(&self) -> &'static str {
         "Frame(...)"
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
     }
 }
 
@@ -149,6 +171,12 @@ impl PyFramePreceding {
             inner: self.inner.clone().exclude(exclusion.rust()),
         }
     }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// A start at the current row. Any end but a preceding one may follow it,
@@ -186,6 +214,12 @@ impl PyFrameCurrentRow {
             inner: self.inner.clone().exclude(exclusion.rust()),
         }
     }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// A start after the current row. Only a following end may follow it, and
@@ -208,6 +242,12 @@ impl PyFrameFollowing {
         PyFrame {
             inner: self.inner.clone().and_unbounded_following(),
         }
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "window frames cannot be tested as Python booleans",
+        ))
     }
 }
 
@@ -254,6 +294,12 @@ impl PyWindow {
 
     fn __repr__(&self) -> &'static str {
         "Window(...)"
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "windows cannot be tested as Python booleans",
+        ))
     }
 }
 

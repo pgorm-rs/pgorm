@@ -38,6 +38,7 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 | `literal(value)` | `SimpleExpr::Constant`; rendered by Rust as a literal |
 | `TypeName(name, schema=...)` | identifier-only Rust `TypeName` |
 | `expr.cast(type_name, array=False)` | `SimpleExpr::cast_as_type` |
+| `expr.collate(name, schema=...)` | `Expr::collate`; a validated `Name`, schema-qualified when `schema` is given |
 | `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape`; `escape=""` is `no_escape` |
 | `expr.as_(name)` | owned projection expression plus validated `Name` |
 | `expr.asc()` / `expr.desc()` | owned expression plus Rust `Order` |
@@ -55,6 +56,15 @@ expression. `bind` on an enum value carries its qualified Rust cast; enum
 arrays carry the corresponding array cast. Explicit casts keep Rust's
 source-typed parameter pins, such as `$1::text`, where the renderer uses them.
 
+`expr.collate("C")` writes `("expr" COLLATE "C")`, and `schema="pg_catalog"`
+qualifies the name, both identifiers as `ColumnDef.collate` reads them, quoted
+so `C` keeps its case. The result is still an expression, so it is compared
+(`col("name").collate("C") < "b"`) or ordered: `col("name").collate("C").asc()`
+writes the clause into the sort key, which is where PostgreSQL reads an
+`ORDER BY`'s collation. An empty or overlong name raises `ConstructionError`;
+a collation the server does not have, or one on a type without collations,
+is its `DatabaseError` (`42704`, `42804`).
+
 The statement builder's ordinary parameters have no lifetime brand and are
 safe to reuse across independent statement builds: each Rust build starts
 its own parameter collection. This does not expose or extend the borrowed
@@ -71,8 +81,9 @@ the left. These lower to the corresponding Rust `BinOper` through
 Combine expressions with `&`, `|` and `~`. Parenthesize comparisons because
 Python's operator precedence still applies. SQL expressions, conditions,
 projection aliases, orderings, `format_json`'s `JsonInput`, `window_function`'s
-`WindowFunction` and a windowed call raise `ConstructionError` on Python truth
-testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
+`WindowFunction`, a windowed call, a `LikePattern`, `Direction`, `Nulls` and
+the SQL/JSON kinds, behaviours, defaults and `JSON_TABLE` columns raise
+`ConstructionError` on Python truth testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
 tests cannot compose SQL.
 
 `Condition.all(*terms)` and `Condition.any(*terms)` invoke Rust's `Condition`

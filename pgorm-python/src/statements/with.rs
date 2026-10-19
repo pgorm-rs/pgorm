@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{Asterisk, CommonTableExpression, Expr, ReturningRow, Wi
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::{merge::PyMerge, select::PySelect};
-use crate::{expressions::PyExpr, identifiers::PyIdentifier};
+use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
 // [spec:pgorm:req:python.statements+10]
 /// One common table expression. Its body is a SELECT, or a MERGE, whose rows
@@ -51,6 +51,13 @@ impl PyWith {
     fn __repr__(&self) -> String {
         format!("With(ctes={})", self.inner.ctes().count())
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "WITH clauses cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// The row as it was before the write (`Old`) or as the statement left it
@@ -81,5 +88,11 @@ impl PyReturningRow {
 
     fn star(&self) -> PyExpr {
         PyExpr::from_rust(Expr::col((self.rust(), Asterisk)).into())
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "row versions cannot be tested as Python booleans",
+        ))
     }
 }

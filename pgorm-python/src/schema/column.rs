@@ -1,6 +1,10 @@
 use super::types::PyDataType;
-use crate::{errors::ConstructionError, expressions, identifiers::PyIdentifier};
-use pgorm::pgorm_query::{Check, Collation, ColumnDef, Enforcement, GeneratedKind, IntoCollation};
+use crate::{
+    errors::ConstructionError,
+    expressions,
+    identifiers::{PyIdentifier, collation},
+};
+use pgorm::pgorm_query::{Check, ColumnDef, Enforcement, GeneratedKind};
 use pyo3::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -106,19 +110,6 @@ impl PyColumnDef {
             "column definitions cannot be tested as Python booleans",
         ))
     }
-}
-
-/// A collation named by `name`, qualified by `schema` when one is given, each
-/// an identifier: what `ColumnDef.collate` and `CreateDomain.collate` take.
-pub(super) fn collation(
-    name: &Bound<'_, PyAny>,
-    schema: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Collation> {
-    let name = PyIdentifier::new(name)?.name();
-    Ok(match schema {
-        Some(schema) => (PyIdentifier::new(schema)?.name(), name).into_collation(),
-        None => name.into_collation(),
-    })
 }
 
 /// A `CHECK` over `condition`, named, `NOT ENFORCED` and `NO INHERIT` as

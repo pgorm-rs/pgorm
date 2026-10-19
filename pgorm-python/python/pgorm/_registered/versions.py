@@ -52,6 +52,10 @@ class UpdateView(Generic[M]):
         change = await self._update.returning_change(connection)
         return Change(self._model_class(change.old), self._model_class(change.new))
 
+    # [spec:pgorm:req:python.truth-testing]
+    def __bool__(self) -> bool:
+        return bool(self._update)
+
 
 class UpdateManyView(Generic[M]):
     __slots__ = ("_update", "_model_class")
@@ -70,6 +74,9 @@ class UpdateManyView(Generic[M]):
         model = self._model_class
         return [Change(model(change.old), model(change.new)) for change in changes]
 
+    def __bool__(self) -> bool:
+        return bool(self._update)
+
 
 class InsertView(Generic[M]):
     __slots__ = ("_insert", "_model_class")
@@ -84,6 +91,9 @@ class InsertView(Generic[M]):
         row = await self._insert.returning_upsert(connection)
         return None if row is None else _upserted(row, self._model_class)
 
+    def __bool__(self) -> bool:
+        return bool(self._insert)
+
 
 class InsertManyView(Generic[M]):
     __slots__ = ("_insert", "_model_class")
@@ -97,3 +107,6 @@ class InsertManyView(Generic[M]):
     async def returning_upserts(self, connection):
         rows = await self._insert.returning_upserts(connection)
         return [_upserted(row, self._model_class) for row in rows]
+
+    def __bool__(self) -> bool:
+        return bool(self._insert)

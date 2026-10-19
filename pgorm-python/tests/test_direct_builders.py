@@ -1,6 +1,8 @@
 """Application builders in an installed wheel; emits evidence for Rust parity."""
 
+import csv
 import importlib.metadata
+import io
 import json
 import os
 from pathlib import Path
@@ -14,6 +16,11 @@ import pgorm as p
 def quoted(name):
     """Fixture DDL only; protected application queries use public builders."""
     return '"' + p.Identifier(name).name.replace('"', '""') + '"'
+
+
+async def collect(stream):
+    async with stream:
+        return b"".join([chunk async for chunk in stream])
 
 
 class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
@@ -126,8 +133,39 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
         final = p.select(p.col("id"), p.col("visits")).from_(a).order_by(p.col("id").asc())
         self.assertEqual([tuple(row.values()) for row in await pool.fetch_all(record("select_final", final))],
                          [(1, 15 + variant), (2, 20), (3, 30)])
-        run["verified"] = {"inserted_accounts": 3, "inserted_events": 3, "selected": len(expected), "updated_visits": 15 + variant, "deleted": [1, 0], "missing": True, "merged": len(merged)}
+        copied = await self.copy_cases(pool, record, operand, term, e)
+        run["verified"] = {"inserted_accounts": 3, "inserted_events": 3, "selected": len(expected), "updated_visits": 15 + variant, "deleted": [1, 0], "missing": True, "merged": len(merged), "copied": copied}
         return run
+
+    # [spec:pgorm:req:python.copy+2/test]
+    async def copy_cases(self, pool, record, operand, term, e):
+        """COPY each way in each format, over a table, a SELECT and a DELETE's RETURNING."""
+        columns = ("id", "account_id", "kind", "points")
+        rows = io.StringIO()
+        csv.writer(rows, delimiter=";", lineterminator="\n").writerows(
+            [columns, (20, 1, term, 7), (21, 2, "copied", 8)])
+        csv_in = p.CopyFrom(e, "csv").columns(*columns).header().delimiter(";")
+        copied = {"csv": await pool.copy_in(record("copy_from_csv", csv_in), rows.getvalue().encode())}
+        text_in = p.CopyFrom(e, "text").columns(*columns).null_string("NULL")
+        copied["text"] = await pool.copy_in(record("copy_from_text", text_in), b"22\tNULL\tplain\t9\n")
+        query = (p.select(p.col("id"), p.col("kind")).from_(e).where_(p.col("points") >= operand(7))
+                 .order_by(p.col("id").asc()))
+        csv_out = p.CopyTo(query, "csv").header().force_quote("kind")
+        out = await collect(await pool.copy_out(record("copy_to_csv", csv_out)))
+        quoted_term = '"' + term.replace('"', '""') + '"'
+        self.assertEqual(out.decode(), f'id,kind\n20,{quoted_term}\n21,"copied"\n22,"plain"\n')
+        moved = p.delete(e).where_(p.col("id") >= operand(20)).returning(*map(p.col, columns))
+        data = await collect(await pool.copy_out(record("copy_to_binary", p.CopyTo(moved, "binary"))))
+        binary_in = p.CopyFrom(e, "binary").columns(*columns)
+        copied["binary"] = await pool.copy_in(record("copy_from_binary", binary_in), data)
+        text_out = p.CopyTo(e, "text").null_string("-")
+        lines = (await collect(await pool.copy_out(record("copy_to_text", text_out)))).decode().splitlines()
+        escaped = term.replace("\\", "\\\\")
+        self.assertEqual(sorted(lines), [
+            "11\t1\tmerged\t0", f"12\t2\t{escaped}\t5", "13\t3\tmerged\t0",
+            f"20\t1\t{escaped}\t7", "21\t2\tcopied\t8", "22\t-\tplain\t9",
+        ])
+        return copied
 
 
 def forbid_processes(event, args):

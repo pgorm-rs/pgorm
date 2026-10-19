@@ -159,6 +159,14 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(p.ConstructionError, "reshap"):
                 changed.select_sources(selection).inspect()
 
+    # [spec:pgorm:req:python.truth-testing/test]
+    async def test_selected_sources_refuse_truth_testing(self):
+        selected = self.joined().select_sources(
+            pl.sources("app.TwoSources"), qualifiers=["accounts", "n"]
+        )
+        with self.assertRaises(p.ConstructionError):
+            bool(selected)
+
     # [spec:pgorm:req:python.pipeline/test]
     async def test_source_query_cancellation_releases_connection(self):
         await self.pool.execute(

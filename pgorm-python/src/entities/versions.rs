@@ -14,7 +14,7 @@ use super::{
     backend::{Active, Assignment, EntityBackend, VersionWrite, Versions},
 };
 use crate::{
-    errors::{InternalError, LifecycleError},
+    errors::{ConstructionError, InternalError, LifecycleError},
     execution::Target,
     expressions::PyExpr,
     statements::{condition, conflict_clause},
@@ -198,6 +198,13 @@ impl PyEntityUpdate {
         let write = VersionWrite::Change(self.active.clone());
         run(py, connection, self.entity.clone(), write, Answer::Change)
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "entity writes cannot be tested as Python booleans",
+        ))
+    }
 }
 
 // [spec:pgorm:req:python.entities+3]
@@ -253,6 +260,12 @@ impl PyEntityUpdateMany {
     ) -> PyResult<Bound<'py, PyAny>> {
         let write = VersionWrite::Changes(self.assignments.clone(), self.filter.clone());
         run(py, connection, self.entity.clone(), write, Answer::Changes)
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "entity writes cannot be tested as Python booleans",
+        ))
     }
 }
 
@@ -338,6 +351,12 @@ impl PyEntityInsert {
     ) -> PyResult<Bound<'py, PyAny>> {
         self.inner.run(py, connection, true)
     }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "entity writes cannot be tested as Python booleans",
+        ))
+    }
 }
 
 // [spec:pgorm:req:python.entities+3]
@@ -378,5 +397,11 @@ impl PyEntityInsertMany {
         connection: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         self.inner.run(py, connection, false)
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "entity writes cannot be tested as Python booleans",
+        ))
     }
 }

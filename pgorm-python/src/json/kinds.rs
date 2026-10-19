@@ -52,6 +52,16 @@ pub enum PyJsonKind {
     Object,
 }
 
+#[pymethods]
+impl PyJsonKind {
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
+    }
+}
+
 fn json_test(kind: &PyJsonKind, unique_keys: bool) -> JsonTest {
     let kind = match kind {
         PyJsonKind::Value => JsonKind::Value,
@@ -109,6 +119,15 @@ pub enum PyJsonExistsBehavior {
     Error,
 }
 
+#[pymethods]
+impl PyJsonExistsBehavior {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
+    }
+}
+
 impl PyJsonExistsBehavior {
     pub(super) fn rust(&self) -> JsonExistsBehavior {
         match self {
@@ -128,6 +147,15 @@ pub enum PyJsonValueBehavior {
     Error,
 }
 
+#[pymethods]
+impl PyJsonValueBehavior {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
+    }
+}
+
 /// `JSON_QUERY`'s `ON EMPTY` / `ON ERROR` keywords; a value is a `JsonDefault`.
 #[pyclass(name = "JsonQueryBehavior", module = "pgorm", eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -136,6 +164,15 @@ pub enum PyJsonQueryBehavior {
     Error,
     EmptyArray,
     EmptyObject,
+}
+
+#[pymethods]
+impl PyJsonQueryBehavior {
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
+    }
 }
 
 /// `DEFAULT value ON EMPTY | ON ERROR`. PostgreSQL refuses a parameter there,
@@ -164,6 +201,12 @@ impl PyJsonDefault {
 
     fn __repr__(&self) -> String {
         format!("JsonDefault({:?})", self.value)
+    }
+
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "SQL/JSON clauses cannot be tested as Python booleans",
+        ))
     }
 }
 

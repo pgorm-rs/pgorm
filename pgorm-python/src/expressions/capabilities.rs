@@ -45,6 +45,7 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("expr.between", "pgorm_query::Expr::between"),
         ("expr.not_between", "pgorm_query::Expr::not_between"),
         ("expr.cast", "pgorm_query::SimpleExpr::cast_as_type"),
+        ("expr.collate", "pgorm_query::Expr::collate"),
         ("expr.starts_with", "pgorm_query::Func::starts_with"),
         (
             "expr.contains_text",

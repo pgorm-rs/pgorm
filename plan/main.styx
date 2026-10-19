@@ -12778,6 +12778,9 @@ children (
         id python-truth-testing-rest
         title "Every remaining pgorm-python query object refuses truth testing: entity write terminals, windows, WITH, FROM items, joins, tables, conflicts, frames and MERGE actions"
         kind @fix
+        implements {
+            main ([spec:pgorm:req:python.truth-testing])
+        }
         deps (python-schema-truth-testing sql-select-extras select-named-windows)
         log (
             {
@@ -12852,6 +12855,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b), whose Python half skipped these to avoid colliding with the typing work then in flight. Add COPY cases to pgorm-python/tests/public_types_invalid.py (a wrong-format option, e.g. quote on text or header on binary, a COPY TO option on COPY FROM, a str passed to copy_in) so mypy --strict holds the per-format stubs, and COPY statements to the direct-builder parity suite against the Rust builders."
+            }
+
+            {
+                at 2026-10-19T10:39:39.97908Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T10:48:39.938347Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13071,6 +13088,9 @@ children (
         id python-expr-collate
         title "Python expressions take a COLLATE, as Rust's and JavaScript's do"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:python.expr-collate])
+        }
         deps (python-column-collation)
         log (
             {
@@ -13078,6 +13098,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-column-collation (d962207a). sql.ast.expr.collate exists in Rust (expression, ORDER BY and column positions) and pgorm-napi has col().collate(), but Python expressions cannot be collated: a column's collation and a domain's are the only places Python can name one. Add Expr.collate(name, schema=) (and the ORDER BY position if it is separate), with stubs, capability entries, parity cases and a live test."
+            }
+
+            {
+                at 2026-10-19T10:49:20.42321Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

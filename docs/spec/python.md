@@ -130,6 +130,20 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > API. Python truth testing of a query expression MUST raise an error instead
 > of evaluating it as a local boolean or silently dropping part of a predicate.
 
+> [spec:pgorm:req:python.expr-collate]
+> `Expr.collate(name, *, schema)` MUST put an expression under a collation
+> through Rust's `Expr::collate` (`sql.ast.expr.collate`), the name and the
+> schema each an identifier, a `str` or an `Identifier`, refused as
+> `ColumnDef.collate` refuses them (`python.schema-collation`): written
+> `(expr COLLATE "name")`, the schema first when one is given. It answers an
+> `Expr`, so the collated value goes on to be compared, and `asc()` or
+> `desc()` over it writes the clause into the sort key, which is where
+> PostgreSQL's grammar reads an `ORDER BY`'s collation. A name that is not an
+> identifier MUST be refused with `ConstructionError` before anything is
+> built. What only the server knows it refuses by SQLSTATE, as a
+> `DatabaseError`: a collation that does not exist (`42704`) and a collation
+> on a type without one (`42804`).
+
 > [spec:pgorm:req:python.ownership]
 > Python query objects MUST have documented reuse, cloning and consumption
 > semantics. Reusing one expression in two queries MUST NOT mutate the other
@@ -138,6 +152,22 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > scopes before executing SQL. Bindings MUST own their Rust state; they MUST
 > NOT extend borrowed lifetimes or bypass Rust typestate using unchecked casts.
 > Invalid user operations MUST follow the exception contract, not panic.
+
+> [spec:pgorm:req:python.truth-testing]
+> Every class the package defines MUST raise `ConstructionError` on Python
+> truth testing — `bool()`, `if`, `not`, `and`, `or` — so `if statement:` or
+> `statement or fallback` fails where it is written instead of reading the
+> object as true: a statement, an expression, `Compiled`, every part either
+> is built from (a table, a FROM item, a join kind, a WITH clause, a window
+> or frame, a conflict or MERGE action, a sort direction or NULL ordering, an
+> SQL/JSON clause, a pipeline and its sources), a schema object, and a
+> registered entity's or graph's queries and writes, with the views
+> generated code wraps them in. Exempt are values (`Value`, the range types,
+> `Interval`, `TypeName` and `Identifier`, compared with `==` as data), rows,
+> models and what a write answers, pools, connections, transactions and
+> streams, registrations and model declarations, and exceptions. A test MUST
+> enumerate every class the package's modules define, so a class that
+> neither refuses nor is exempt for a stated reason fails it.
 
 ## Queries for applications
 

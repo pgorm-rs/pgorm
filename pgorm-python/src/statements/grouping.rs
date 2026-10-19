@@ -109,4 +109,11 @@ impl PyGroupingElement {
     fn __repr__(&self) -> &'static str {
         "GroupingElement(...)"
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "grouping elements cannot be tested as Python booleans",
+        ))
+    }
 }

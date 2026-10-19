@@ -597,8 +597,14 @@ do.
 Rust `build()` method. It returns `Compiled.sql` and independently owned
 `Compiled.params`. More than 65,535 bound parameters raises `ConstructionError`
 before execution preparation. SQL and parameters are not combined implicitly.
-A statement, `RawSQL` and the `Compiled` that `inspect()` returns raise
-`ConstructionError` on Python truth testing, as SQL expressions do.
+A statement, `RawSQL`, the `Compiled` that `inspect()` returns and every
+part a statement is built from — `Table`, `FromItem`, `TableFunction`,
+`GroupingElement`, `With`, `ReturningRow`, the conflict and MERGE actions,
+`Window`, `ExtendedWindow` and the frame classes, `CopyFrom` and `CopyTo`, and
+the enums naming a join kind, a sample method, a frame mode or an exclusion —
+raise `ConstructionError` on Python truth testing, as SQL expressions do.
+Values, records, pools, connections, transactions and streams keep Python's
+truth; `tests/test_truth_testing.py` lists every exempt class with the reason.
 
 The extension's Rust `statements::compile` entry point uses exactly these same
 validated builders for execution preparation. It accepts native statements,

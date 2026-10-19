@@ -6,6 +6,7 @@ import unittest
 
 import pgorm as p
 from pgorm import schema as s
+from pgorm._registered.versions import InsertManyView, InsertView, UpdateManyView, UpdateView
 
 
 class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
@@ -67,6 +68,17 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             owner, _, method = terminal.rpartition(".")
             with self.subTest(terminal=terminal):
                 self.assertTrue(callable(getattr(owners[owner], method)))
+
+    # [spec:pgorm:req:python.truth-testing/test]
+    async def test_write_terminals_refuse_truth_testing(self):
+        active = self.active(1)
+        writes = [self.account.update(active), self.account.update_many(),
+                  self.account.insert(active), self.account.insert_many([active])]
+        typed = [view(write, dict) for view, write in zip(
+            (UpdateView, UpdateManyView, InsertView, InsertManyView), writes)]
+        for write in writes + typed:
+            with self.subTest(write=type(write).__name__), self.assertRaises(p.ConstructionError):
+                bool(write)
 
     # [spec:pgorm:req:python.entities+3/test]
     async def test_active_values_and_hooks_use_rust_states(self):

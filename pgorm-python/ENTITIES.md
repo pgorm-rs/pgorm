@@ -165,7 +165,8 @@ versions in `RETURNING`, so an entity whose table is called `old` or `new`
 still reports them in order. An ActiveModel of another registration raises
 `LifecycleError`. A generated module's typed views return `Change`,
 `Inserted` and `Updated` from `pgorm._registered.entities` holding its typed
-models.
+models. Like an entity query, each of these writes and the typed view over it
+raises `ConstructionError` on Python truth testing.
 
 ## Values, state and hooks
 

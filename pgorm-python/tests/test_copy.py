@@ -135,7 +135,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.pool.close(), 2)
 
     def rows(self, table=None):
-        table = table or self.items
+        table = self.items if table is None else table
         return p.select(p.col("id"), p.col("name"), p.col("note"), p.col("score")).from_(table).order_by(p.col("id").asc())
 
     async def stored(self, executor=None, table=None):

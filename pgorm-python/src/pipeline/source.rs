@@ -77,6 +77,13 @@ impl PySource {
             alias: Some(alias_name(name)?),
         })
     }
+
+    // [spec:pgorm:req:python.truth-testing]
+    fn __bool__(&self) -> PyResult<bool> {
+        Err(ConstructionError::new_err(
+            "pipeline sources cannot be tested as Python booleans",
+        ))
+    }
 }
 
 #[pyfunction]
