@@ -9029,6 +9029,14 @@ children (
                         text "Re-checked 2026-10-18 at sql.surface +34 (sql-domains, d5d22226): the register records Domain, DomainCreateStatement, PendingDomainAlter, DomainAlterStatement, DomainDropStatement, DomainCheck and IntoDomainCheck, lib.rs exports them in its schema-statement group, and test-surface passes."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:19:52.065737Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.surface +36 (schema-statement-wrapper, db3d326a): the five statement-dispatch wrappers are deleted and named in the departures; the doc-hidden residue is SelectDistinct, Token and Tokenizer, and test-surface's residue and baseline lists agree."
+                        after_done true
+                    }
                 )
             }
 
