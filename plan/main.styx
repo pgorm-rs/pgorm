@@ -617,6 +617,14 @@ children (
                         text "Re-checked 2026-10-18 at entity.traits.column.enum-cast +7 (sql-domains, d5d22226): a domain over an enum or a created range is read and written through its base's casts, to the domain's name; PostgreSQL resolves no operator for a domain over an enum (42883), so a predicate on one is the server's refusal."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-18T22:44:42.195598Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "entity.traits.column.enum-cast +8 (domain-enum-predicates, 47aa595c): a column whose domain is over an enum compares as the enum, every ColumnTrait comparison casting the column and its value operands (an array operand to the enum's array) to the enum in place of save_as, the column-taking and expression-taking forms included."
+                        after_done true
+                    }
                 )
             }
 
@@ -703,6 +711,15 @@ children (
                         [spec:pgorm:sem:exec.paginator.raw]
                     )
                 }
+                log (
+                    {
+                        at 2026-10-18T22:44:42.299384Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "exec.cursor.keyset +6 (domain-enum-predicates, 47aa595c): an order column whose domain is over an enum is cast to the enum in each boundary comparison, its boundary value to the enum in place of save_as, while ORDER BY keeps the bare column, which sorts as the enum does."
+                        after_done true
+                    }
+                )
             }
 
             {
@@ -1088,6 +1105,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "error.model +9 (conn-listen) adds Listen(ListenError) to the variants that convert in through From: a listener's refusal of a channel name past 63 bytes and the overflow that ends its notifications (conn.listen), and ListenError to the names spelled in full."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-18T22:34:50.305209Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "error.model +10 and error.model.sql-class +4 (sql-error-check-not-null, 6eba8855): SqlError adds CheckConstraintViolation (23514), NotNullConstraintViolation (23502) and ExclusionConstraintViolation (23P01), and every variant carries a ConstraintViolation with the server message and its schema, table, column, datatype and constraint names, in place of the bare message string."
                         after_done true
                     }
                 )
@@ -1567,7 +1592,6 @@ children (
                 title "Codegen reads a schema dump that creates its schemas, instead of refusing CREATE SCHEMA"
                 kind @fix
                 deps (sql-schemas sql-domains)
-                sealed true
                 log (
                     {
                         at 2026-10-18T19:21:23.94957Z
@@ -1597,7 +1621,6 @@ children (
                 title "The expanded codegen writer's enum-array column compiles"
                 kind @fix
                 deps (sql-domains)
-                sealed true
                 log (
                     {
                         at 2026-10-18T21:52:40.128816Z
@@ -6201,6 +6224,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Implemented native asyncio pool/connection handles on pyo3-async-runtimes' shared Tokio runtime, event-loop ownership, explicit close/context managers, bounded cancellable acquisition and conservative connection discard on cancelled I/O. Added Rust DatabasePool.close/is_closed and DatabaseConnection.discard as the underlying lifecycle APIs. TLS uses Rustls with verified certificate/hostname checks, configured PEM or WebPKI roots, and explicit plaintext selection. Native exceptions preserve SQLSTATE/diagnostic fields and redact connection credentials. Validation: 13 installed-wheel Python tests passed against both the dedicated fixture and a fresh disposable TLS fixture; the standalone with_postgres.py runner removed its temporary container. Two Rust integration tests passed, proving pool-close behavior and that discard ends the old backend session instead of recycling it. The current public database operation is ping; composable statements, decoding and transaction tests belong to the remaining Python leaves."
+                    }
+
+                    {
+                        at 2026-10-18T22:33:17.198049Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "python.errors +1 (sql-error-check-not-null): a constraint violation raises the DatabaseError subclass named for it (UniqueViolationError, ForeignKeyViolationError, CheckViolationError, NotNullViolationError, ExclusionViolationError) and DatabaseError carries datatype, the domain a domain constraint names."
+                        after_done true
                     }
                 )
             }
@@ -11721,6 +11752,14 @@ children (
                         kind @note
                         text "Proved on deno 2.9.5 and node 22.15.0 (macOS arm64) with Neon 1.1.2, napi-6: the same .node loads in both (lib/index.js, an ES module, requires it through node:module createRequire; Deno needs --allow-ffi and --allow-read, no --allow-net). One process-wide tokio runtime (LazyLock, never shut down) runs pgorm's work; each promise settles through the instance's shared Channel, ref'd while in flight. Both runtimes pass the same 26 tests: bound query, 100 concurrent, eight overlapping pg_sleep queries, DatabaseError with SQLSTATE (22003, 42601), ConnectionError, ConstructionError, DecodeError, TypeError, a panic on the runtime rejecting with InternalError, and twelve exit cases in fresh processes (idle load, settled, 100 concurrent, pending at script end, handled and unhandled rejection, process.exit mid-query, exit while settlements stream in x5, worker thread finish and terminate-mid-query with settlement into the torn-down instance, drop-queue held/unheld). One behavioural difference found: Neon's drop queue is an unref'd threadsafe function; with nothing else holding the loop, Node exits with its deliveries pending (0/10 delivered) while Deno delivers them first (10/10). Both exit cleanly, so it is not a hang, but no operation may rely on the drop queue to settle a promise; settle.rs settles explicitly and turns a panic into InternalError."
                     }
+
+                    {
+                        at 2026-10-18T22:33:17.408254Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "napi.errors +2 (sql-error-check-not-null): a constraint violation rejects with the DatabaseError subclass named for it (UniqueViolationError, ForeignKeyViolationError, CheckViolationError, NotNullViolationError, ExclusionViolationError) and DatabaseError carries datatype, the domain a domain constraint names."
+                        after_done true
+                    }
                 )
             }
 
@@ -11887,6 +11926,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-18T22:45:13.80964Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "napi.entity-reads +1 (domain-enum-predicates, 47aa595c): a registered entity's column whose domain is over an enum compares as the enum, the column and the label each cast to it, through ColumnTrait."
+                        after_done true
                     }
                 )
             }
@@ -12469,6 +12516,13 @@ children (
                 kind @note
                 text "Found by sql-domains (2fa97891). pgorm's SqlError classifies only unique (23505) and foreign-key (23503) violations; a CHECK violation (23514) and a NOT NULL violation (23502), which domains, CHECK constraints and NOT NULL columns raise routinely, arrive as Error::Postgres carrying the SQLSTATE. Add typed classes for them (and decide on exclusion violations, 23P01, which WITHOUT OVERLAPS keys raise), carrying the constraint and column names the server reports, in error.model / error.model.sql-class, and give the bindings' error classes the same."
             }
+
+            {
+                at 2026-10-18T22:16:29.158854Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -12483,6 +12537,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-domains (2fa97891). PostgreSQL has no operator at all on a domain over an enum, not even d = d (42883), so every predicate and keyset cursor comparison on such a column fails at the server unless the column is cast to the enum; this is recorded in entity.traits.column.enum-cast but not handled. Make the ORM's value predicates (eq and friends, membership, between) and cursor bounds cast a domain-over-enum column to its enum, as save_as casts work for enums today, with live tests."
+            }
+
+            {
+                at 2026-10-18T22:35:25.352851Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-18T22:44:09.79938Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -12535,6 +12603,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-domains (2fa97891). The domain column path in pgorm-napi's registered entities is covered only by a Rust unit test; the live suite has no registered entity whose column is a domain. Add one to the application-binding crate and a live test reading and writing it in Node and Deno, including an array of a domain."
+            }
+
+            {
+                at 2026-10-18T22:45:51.460346Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-18T22:48:59.551771Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

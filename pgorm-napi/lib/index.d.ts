@@ -70,10 +70,15 @@ export interface DatabaseErrorDetails {
   readonly schema: string | null;
   readonly table: string | null;
   readonly column: string | null;
+  /** The domain whose `CHECK` or `NOT NULL` refused a value. */
+  readonly datatype: string | null;
   readonly constraint: string | null;
 }
 
-/** PostgreSQL rejected the statement. */
+/**
+ * PostgreSQL rejected the statement. A constraint violation rejects with the
+ * subclass named for it.
+ */
 export declare class DatabaseError extends PgormError implements DatabaseErrorDetails {
   constructor(message: string, details: DatabaseErrorDetails);
   readonly sqlstate: string;
@@ -83,8 +88,27 @@ export declare class DatabaseError extends PgormError implements DatabaseErrorDe
   readonly schema: string | null;
   readonly table: string | null;
   readonly column: string | null;
+  readonly datatype: string | null;
   readonly constraint: string | null;
 }
+
+/** A duplicate key in a unique index or primary key (SQLSTATE `23505`). */
+export declare class UniqueViolationError extends DatabaseError {}
+
+/** A foreign key with no matching referenced row, or a referenced row still in use (`23503`). */
+export declare class ForeignKeyViolationError extends DatabaseError {}
+
+/** A table's or a domain's `CHECK` constraint refused a value (`23514`); a domain's is named in `datatype`. */
+export declare class CheckViolationError extends DatabaseError {}
+
+/**
+ * A null in a `NOT NULL` column, named in `column`, or in a domain that does
+ * not allow one, named in `datatype` (`23502`).
+ */
+export declare class NotNullViolationError extends DatabaseError {}
+
+/** A row conflicting with another under an exclusion constraint or a `WITHOUT OVERLAPS` key (`23P01`). */
+export declare class ExclusionViolationError extends DatabaseError {}
 
 // [spec:pgorm:req:napi.values]
 

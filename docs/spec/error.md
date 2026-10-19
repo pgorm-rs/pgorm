@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+9]
+> [spec:pgorm:def:error.model+10]
 > `Error` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -48,8 +48,9 @@ it.
 > admitting a foreign error type, as the transaction closures do.
 >
 > Every public name in this taxonomy MUST be spelled in full: `Error`,
-> `RuntimeError`, `ColumnFromStrError`, `SqlError`, `VerifyError`,
-> `ListenError`, and pgorm-query's `ValueTypeError` / `ValueTupleError`. An
+> `RuntimeError`, `ColumnFromStrError`, `SqlError` and its
+> `ConstraintViolation` payload, `VerifyError`, `ListenError`, and
+> pgorm-query's `ValueTypeError` / `ValueTupleError`. An
 > `Err`-abbreviated spelling MUST NOT
 > be reintroduced, and no alias is kept behind for a superseded one. A variant
 > name MUST NOT restate its enum: the conversion failure is `Error::Conversion`
@@ -66,16 +67,35 @@ it.
 
 ## SQLSTATE classification
 
-> [spec:pgorm:sem:error.model.sql-class+3]
-> `SqlError` classifies constraint failures:
-> `UniqueConstraintViolation(String)` for SQLSTATE `23505` and
-> `ForeignKeyConstraintViolation(String)` for SQLSTATE `23503`, each carrying
-> the server message. `Error::sql_error()` is the classifier entry point,
-> returning `None` for anything that is not one of these.
+> [spec:pgorm:sem:error.model.sql-class+4]
+> `SqlError` classifies constraint failures by SQLSTATE:
+> `UniqueConstraintViolation` for `23505` (`unique_violation`),
+> `ForeignKeyConstraintViolation` for `23503` (`foreign_key_violation`),
+> `CheckConstraintViolation` for `23514` (`check_violation`),
+> `NotNullConstraintViolation` for `23502` (`not_null_violation`) and
+> `ExclusionConstraintViolation` for `23P01` (`exclusion_violation`), which
+> PostgreSQL 18 raises for an `EXCLUDE` constraint and for a primary or
+> unique key ending `WITHOUT OVERLAPS` alike. `Error::sql_error()` is the
+> classifier entry point, returning `None` for anything that is not one of
+> these. `SqlError` is `#[non_exhaustive]`, so a further class is not a
+> breaking change to a caller's `match`.
+>
+> Every variant carries a `ConstraintViolation`, also `#[non_exhaustive]`,
+> holding the server's `message` and the names it reported with it, each an
+> `Option<String>`: `schema`, `table`, `column`, `datatype` and
+> `constraint`. Which are present depends on what refused the value, and is
+> PostgreSQL's report rather than pgorm's: a table's unique, foreign-key,
+> check or exclusion constraint names the `schema`, `table` and
+> `constraint`; a table's `NOT NULL` column names the `schema`, `table` and
+> `column` and no constraint; a domain's `CHECK` names the `schema`, the
+> domain as `datatype`, and the `constraint`; a domain's `NOT NULL` names
+> only the `schema` and the domain. A variant's `Display` is its class
+> followed by the server message (`Check Constraint Violated: <message>`).
 >
 > The classifier inspects only `Error::Postgres`, taking the driver error's
 > `as_db_error()` and matching the resulting `DbError::code()` against those
-> two SQLSTATEs; the `SqlError` payload is that same `DbError`'s `message()`.
-> An `Error::Postgres` with no server-side `DbError` (a transport or protocol
-> failure), any other SQLSTATE, and every non-`Postgres` variant all yield
-> `None`.
+> five SQLSTATEs; the `ConstraintViolation` fields are that same
+> `DbError`'s `message()`, `schema()`, `table()`, `column()`, `datatype()`
+> and `constraint()`. An `Error::Postgres` with no server-side `DbError` (a
+> transport or protocol failure), any other SQLSTATE, and every
+> non-`Postgres` variant all yield `None`.

@@ -324,7 +324,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:napi.entity-reads]
+// [spec:pgorm:req:napi.entity-reads+1]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,

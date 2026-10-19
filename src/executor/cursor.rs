@@ -1,6 +1,7 @@
 use super::QueryResult;
 use super::graph::GraphRow;
 use super::select::{ensure_select_list, refuse_tie_limit};
+use crate::entity::{compared_enum, compared_value};
 use crate::query::graph::qualified_pk_tiebreaks;
 use crate::{
     ColumnTrait, ConnectionTrait, EntityTrait, Error, FromQueryResult, IntoBoundary, IntoKey, Key,
@@ -8,7 +9,8 @@ use crate::{
     SelectProjected, SelectorTrait, Slot, SlotAt, Slots, error::query_err,
 };
 use pgorm_query::{
-    Condition, Expr, IntoValueTuple, Name, Order, SelectStatement, SimpleExpr, Value, ValueTuple,
+    Condition, Expr, IntoValueTuple, Name, Order, SelectStatement, SimpleExpr, TypeName, Value,
+    ValueTuple,
 };
 use tokio_postgres::types::{IsNull, Kind, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -46,13 +48,18 @@ impl Window {
 #[derive(Clone, Copy, Debug)]
 pub struct SelectUndecoded;
 
-/// One order column's boundary-value transform: the column's
-/// [`save_as`](ColumnTrait::save_as) cast, captured while the typed column
-/// was still in hand. The keyset itself is type-erased to identifiers, so the
-/// cast cannot be recovered later — `cursor_by` captures it at construction.
-// [spec:pgorm:sem:exec.cursor.keyset+5]
+/// One order column's boundary casts, captured while the typed column was
+/// still in hand: the value's, which is the column's
+/// [`save_as`](ColumnTrait::save_as), and the enum the column itself is cast
+/// to when its domain is over one, the value then cast to the enum too. The
+/// keyset itself is type-erased to identifiers, so neither can be recovered
+/// later — `cursor_by` captures them at construction.
+// [spec:pgorm:sem:exec.cursor.keyset+6]
 #[derive(Clone)]
-struct BoundaryCast(Arc<dyn Fn(Expr) -> SimpleExpr + Send + Sync>);
+struct BoundaryCast {
+    value: Arc<dyn Fn(Expr) -> SimpleExpr + Send + Sync>,
+    column: Option<TypeName>,
+}
 
 impl std::fmt::Debug for BoundaryCast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -61,9 +68,21 @@ impl std::fmt::Debug for BoundaryCast {
 }
 
 impl BoundaryCast {
-    /// The transform of a column with no cast: the value binds bare.
+    /// The casts of a column with none: the value binds bare and the column
+    /// compares as itself.
     fn identity() -> Self {
-        Self(Arc::new(SimpleExpr::from))
+        Self {
+            value: Arc::new(SimpleExpr::from),
+            column: None,
+        }
+    }
+
+    /// The order column as the boundary compares it.
+    fn column(&self, column: Expr) -> Expr {
+        match &self.column {
+            Some(enum_type) => Expr::expr(column.cast_as_type(enum_type.clone())),
+            None => column,
+        }
     }
 
     /// The order columns' casts, matched by identifier against the typed
@@ -74,7 +93,10 @@ impl BoundaryCast {
             .iter()
             .map(
                 |iden| match C::iter().find(|col| col.as_str() == iden.to_string()) {
-                    Some(col) => Self(Arc::new(move |val| col.save_as(val))),
+                    Some(col) => Self {
+                        value: Arc::new(move |val| compared_value(&col, val)),
+                        column: compared_enum(col.def().get_column_type()),
+                    },
                     None => Self::identity(),
                 },
             )
@@ -123,7 +145,7 @@ impl<S, K> Cursor<S, K> {
     /// Capture the order columns' [`save_as`](ColumnTrait::save_as) casts from
     /// the typed column set they were spelled from, so boundary values reach
     /// SQL under the same cast every value predicate applies.
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     fn with_boundary_casts<C: ColumnTrait>(mut self) -> Self {
         self.boundary_casts = BoundaryCast::capture::<C>(&self.order_columns);
         self
@@ -160,7 +182,7 @@ impl<S, K> Cursor<S, K> {
     ///
     /// The extended arity is not the `K` the order columns fix, so it is
     /// checked when the query is composed rather than by the compiler.
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     pub fn before_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -171,7 +193,7 @@ impl<S, K> Cursor<S, K> {
 
     /// [`Cursor::after`] over the cursor's whole sort key, secondary order
     /// columns included. See [`Cursor::before_with`].
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     pub fn after_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -185,7 +207,7 @@ impl<S, K> Cursor<S, K> {
     ///
     /// Both `ORDER BY` and the boundary comparison read this, so the row order
     /// and the keyset predicate cannot disagree about what a page boundary is.
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     fn keyset_columns(&self) -> Vec<(Name, Name)> {
         self.order_columns
             .iter()
@@ -196,7 +218,7 @@ impl<S, K> Cursor<S, K> {
             .collect()
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     fn apply_filters(&self, query: &mut SelectStatement) -> Result<(), Error> {
         let beyond = |col: Expr, v: SimpleExpr| if self.sort_asc { col.gt(v) } else { col.lt(v) };
         let short_of = |col: Expr, v: SimpleExpr| if self.sort_asc { col.lt(v) } else { col.gt(v) };
@@ -214,7 +236,7 @@ impl<S, K> Cursor<S, K> {
         Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+5]
+    // [spec:pgorm:sem:exec.cursor.keyset+6]
     fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, Error>
     where
         F: Fn(Expr, SimpleExpr) -> SimpleExpr,
@@ -256,11 +278,12 @@ impl<S, K> Cursor<S, K> {
                 disjunction.add(columns.iter().zip(values.iter()).take(n).enumerate().fold(
                     Condition::all(),
                     |conjunction, (i, (column, val))| {
-                        let val = (cast(i).0)(Expr::val(val.clone()));
+                        let val = (cast(i).value)(Expr::val(val.clone()));
+                        let column = cast(i).column(col(column));
                         conjunction.add(if i + 1 == n {
-                            f(col(column), val)
+                            f(column, val)
                         } else {
-                            col(column).eq(val)
+                            column.eq(val)
                         })
                     },
                 ))
@@ -496,7 +519,7 @@ where
     /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
     /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
     /// ```
-    // [spec:pgorm:sem:exec.cursor.keyset+5/test]
+    // [spec:pgorm:sem:exec.cursor.keyset+6/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoKey,
@@ -844,7 +867,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+5/test]    a boundary value on an enum
+    // [spec:pgorm:sem:exec.cursor.keyset+6/test]    a boundary value on an enum
     // order column binds under the column's `save_as` cast, exactly as the
     // value predicates spell it; a plain column still binds bare
     #[test]

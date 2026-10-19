@@ -1,7 +1,7 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+9]
+// [spec:pgorm:def:error.model+10]
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Postgres error
@@ -154,7 +154,7 @@ pub enum ListenError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+9]    crate-root Result alias
+// [spec:pgorm:def:error.model+10]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -166,7 +166,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+9]    Display-string equality
+// [spec:pgorm:def:error.model+10]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()
@@ -204,17 +204,81 @@ where
     Error::Json(s.to_string())
 }
 
-/// An error from unsuccessful SQL query
-// [spec:pgorm:sem:error.model.sql-class+3]
+/// A constraint violation PostgreSQL reported, classified by its SQLSTATE.
+///
+/// Every variant carries the server's message and the names it reported
+/// alongside it, in a [`ConstraintViolation`].
+// [spec:pgorm:sem:error.model.sql-class+4]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SqlError {
-    /// Error for duplicate record in unique field or primary key field
-    #[error("Unique Constraint Violated: {0}")]
-    UniqueConstraintViolation(String),
-    /// Error for Foreign key constraint
-    #[error("Foreign Key Constraint Violated: {0}")]
-    ForeignKeyConstraintViolation(String),
+    /// A duplicate key in a unique index or primary key (`23505`)
+    #[error("Unique Constraint Violated: {}", .0.message)]
+    UniqueConstraintViolation(ConstraintViolation),
+    /// A foreign key with no matching referenced row, or a referenced row
+    /// still in use (`23503`)
+    #[error("Foreign Key Constraint Violated: {}", .0.message)]
+    ForeignKeyConstraintViolation(ConstraintViolation),
+    /// A table's or a domain's `CHECK` constraint refused a value (`23514`)
+    #[error("Check Constraint Violated: {}", .0.message)]
+    CheckConstraintViolation(ConstraintViolation),
+    /// A null in a `NOT NULL` column, or in a domain that does not allow
+    /// null values (`23502`)
+    #[error("Not-Null Constraint Violated: {}", .0.message)]
+    NotNullConstraintViolation(ConstraintViolation),
+    /// A row conflicting with another under an exclusion constraint, which
+    /// includes a `WITHOUT OVERLAPS` primary key or unique key (`23P01`)
+    #[error("Exclusion Constraint Violated: {}", .0.message)]
+    ExclusionConstraintViolation(ConstraintViolation),
+}
+
+/// What PostgreSQL reported about a constraint violation: its message, and
+/// the object names the server attached to it.
+///
+/// Which names are present depends on what refused the value. A table's
+/// constraint names its `schema`, `table` and `constraint`; a table's
+/// `NOT NULL` column names its `schema`, `table` and `column` but no
+/// constraint; a domain's `CHECK` names its `schema`, the domain as
+/// `datatype`, and the `constraint`; a domain's `NOT NULL` names only the
+/// `schema` and `datatype`.
+// [spec:pgorm:sem:error.model.sql-class+4]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ConstraintViolation {
+    /// The server's primary message
+    pub message: String,
+    /// The schema of the table or domain at fault
+    pub schema: Option<String>,
+    /// The table the violated constraint or column belongs to
+    pub table: Option<String>,
+    /// The column a `NOT NULL` violation is in
+    pub column: Option<String>,
+    /// The domain whose constraint refused the value
+    pub datatype: Option<String>,
+    /// The name of the violated constraint
+    pub constraint: Option<String>,
+}
+
+impl SqlError {
+    // [spec:pgorm:sem:error.model.sql-class+4]    SQLSTATE to variant
+    fn classify(db_error: &tokio_postgres::error::DbError) -> Option<Self> {
+        let variant = match *db_error.code() {
+            SqlState::UNIQUE_VIOLATION => Self::UniqueConstraintViolation,
+            SqlState::FOREIGN_KEY_VIOLATION => Self::ForeignKeyConstraintViolation,
+            SqlState::CHECK_VIOLATION => Self::CheckConstraintViolation,
+            SqlState::NOT_NULL_VIOLATION => Self::NotNullConstraintViolation,
+            SqlState::EXCLUSION_VIOLATION => Self::ExclusionConstraintViolation,
+            _ => return None,
+        };
+        Some(variant(ConstraintViolation {
+            message: db_error.message().to_owned(),
+            schema: db_error.schema().map(str::to_owned),
+            table: db_error.table().map(str::to_owned),
+            column: db_error.column().map(str::to_owned),
+            datatype: db_error.datatype().map(str::to_owned),
+            constraint: db_error.constraint().map(str::to_owned),
+        }))
+    }
 }
 
 /// An error after which re-running the whole transaction may succeed.
@@ -253,20 +317,11 @@ impl Error {
 
     /// Classify an [`Error`] as a [`SqlError`], returning `None` when the error is
     /// not a recognised constraint violation.
-    // [spec:pgorm:sem:error.model.sql-class+3]    classifier entry point
+    // [spec:pgorm:sem:error.model.sql-class+4]    classifier entry point
     pub fn sql_error(&self) -> Option<SqlError> {
-        let db_error = match self {
-            Error::Postgres(e) => e.as_db_error()?,
-            _ => return None,
-        };
-        let code = db_error.code();
-        let message = db_error.message().to_owned();
-        if *code == SqlState::UNIQUE_VIOLATION {
-            Some(SqlError::UniqueConstraintViolation(message))
-        } else if *code == SqlState::FOREIGN_KEY_VIOLATION {
-            Some(SqlError::ForeignKeyConstraintViolation(message))
-        } else {
-            None
+        match self {
+            Error::Postgres(e) => SqlError::classify(e.as_db_error()?),
+            _ => None,
         }
     }
 }

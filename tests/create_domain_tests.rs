@@ -197,14 +197,14 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 
 /// The table an entity of domain columns creates names each domain, and the
 /// entity writes, reads and filters through them — the domain over an enum
-/// compared once cast to its enum, which is the only way PostgreSQL compares
-/// one — while each domain's check refuses what it does not hold.
+/// compared as its enum, which is the only way PostgreSQL compares one —
+/// while each domain's check refuses what it does not hold.
 // [spec:pgorm:req:sql.ddl.domain/test]    an entity whose columns are domains over an
 // integer, over an enum and an array of one creates its table with them, reads, writes and
-// filters through them, a predicate on the enum's domain refused (42883) until the column is
-// cast to the enum, and a check's refusal arrives as 23514 naming the constraint
+// filters through them, a predicate on the enum's domain comparing as the enum, and a check's
+// refusal arrives as 23514 naming the constraint
 // [spec:pgorm:def:sql.types.column-type+11/test]
-// [spec:pgorm:sem:entity.traits.column.enum-cast+7/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
@@ -248,18 +248,10 @@ async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
     assert_eq!(large.iter().map(|line| line.id).collect::<Vec<_>>(), [2]);
 
     // PostgreSQL resolves no enum operator for a domain over an enum, even
-    // between two values of the domain, so a predicate on one is refused;
-    // the column cast to its enum compares.
-    let unresolved = line::Entity::find()
-        .filter(line::Column::Mood.eq(Mood::Glad))
-        .all(&db)
-        .await
-        .expect_err("an operator over a domain over an enum");
-    refused_with(&unresolved, &SqlState::UNDEFINED_FUNCTION);
-    let as_enum =
-        |line: line::Column| Expr::expr(Expr::col((line::Entity, line)).cast_as(n("mood")));
+    // between two values of the domain, so the predicate compares the column
+    // and the value as the enum.
     let glad = line::Entity::find()
-        .filter(as_enum(line::Column::Mood).eq(Expr::val("glad").cast_as(n("mood"))))
+        .filter(line::Column::Mood.eq(Mood::Glad))
         .all(&db)
         .await?;
     assert_eq!(glad, std::slice::from_ref(&first));
@@ -287,6 +279,129 @@ async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
     let lowered = lowered.update(&db).await.expect_err("a negative quantity");
     checked_by(&lowered, "positive", "quantity");
     assert_eq!(line::Entity::find_by_id(1).one(&db).await?, first);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// The ids of the lines `filter` selects, in id order.
+async fn ids_where(
+    db: &impl ConnectionTrait,
+    filter: impl pgorm::pgorm_query::IntoCondition,
+) -> Result<Vec<i32>, Error> {
+    Ok(line::Entity::find()
+        .filter(filter)
+        .order_by_asc(line::Column::Id)
+        .all(db)
+        .await?
+        .iter()
+        .map(|line| line.id)
+        .collect())
+}
+
+/// Every value predicate on a column whose domain is over an enum compares
+/// it as the enum, the column and the value each cast to it: PostgreSQL has
+/// no operator for the domain itself. The value is compared, not written, so
+/// the domain's check does not refuse it, and a keyset cursor over the column
+/// pages by the enum's order in either direction.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]    every value predicate, the
+// column-taking and expression-taking forms and if_null cast a column whose domain is over an
+// enum, and its values, to the enum, live
+// [spec:pgorm:sem:exec.cursor.keyset+6/test]    a keyset cursor over a column whose domain is
+// over an enum pages forwards and backwards by the enum's order
+#[pgorm_macros::test]
+async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
+    use line::Column::{Id, Mood as Moods};
+
+    let ctx = TestContext::new("domain_enum_predicates").await;
+    let db = ctx.db.get().await?;
+    domains(&db).await?;
+    db.batch_execute(
+        &pgorm::Schema::new()
+            .create_table_from_entity(line::Entity)
+            .to_string(),
+    )
+    .await?;
+    for (id, mood) in [
+        (1, Mood::Calm),
+        (2, Mood::Glad),
+        (3, Mood::Calm),
+        (4, Mood::Glad),
+        (5, Mood::Calm),
+    ] {
+        written(id, 1, mood, &[]).into_active().insert(&db).await?;
+    }
+
+    assert_eq!(
+        line::Entity::find()
+            .select_only()
+            .column(Id)
+            .filter(Moods.eq(Mood::Glad))
+            .as_query()
+            .to_string(),
+        r#"SELECT "line"."id" FROM "line" WHERE CAST("line"."mood" AS mood) = CAST('glad' AS mood)"#
+    );
+    let (calm, glad) = (vec![1, 3, 5], vec![2, 4]);
+    assert_eq!(ids_where(&db, Moods.eq(Mood::Glad)).await?, glad);
+    assert_eq!(ids_where(&db, Moods.ne(Mood::Glad)).await?, calm);
+    assert_eq!(ids_where(&db, Moods.gt(Mood::Calm)).await?, glad);
+    assert_eq!(
+        ids_where(&db, Moods.gte(Mood::Calm)).await?,
+        [1, 2, 3, 4, 5]
+    );
+    assert_eq!(ids_where(&db, Moods.lt(Mood::Glad)).await?, calm);
+    assert_eq!(ids_where(&db, Moods.lte(Mood::Calm)).await?, calm);
+    assert_eq!(ids_where(&db, Moods.is_in([Mood::Glad])).await?, glad);
+    assert_eq!(ids_where(&db, Moods.is_not_in([Mood::Glad])).await?, calm);
+    assert_eq!(ids_where(&db, Moods.eq_any([Mood::Calm])).await?, calm);
+    assert_eq!(ids_where(&db, Moods.ne_all([Mood::Calm])).await?, glad);
+    assert_eq!(
+        ids_where(&db, Moods.between(Mood::Sad, Mood::Calm)).await?,
+        calm
+    );
+    assert_eq!(
+        ids_where(&db, Moods.not_between(Mood::Sad, Mood::Calm)).await?,
+        glad
+    );
+    assert_eq!(ids_where(&db, Moods.eq_col(Moods)).await?, [1, 2, 3, 4, 5]);
+    let glad_enum = Expr::val("glad").cast_as(n("mood"));
+    assert_eq!(
+        ids_where(&db, Moods.eq_expr(glad_enum.clone())).await?,
+        glad
+    );
+    assert_eq!(
+        ids_where(&db, Expr::expr(Moods.if_null(Mood::Calm)).eq(glad_enum)).await?,
+        glad
+    );
+    // The domain's check refuses 'sad' as a value written to it; compared
+    // with the column, 'sad' is an enum value that no row holds.
+    assert_eq!(
+        ids_where(&db, Moods.eq(Mood::Sad)).await?,
+        Vec::<i32>::new()
+    );
+
+    let mut cursor = line::Entity::find().cursor_by((Moods, Id));
+    let page = |models: Vec<line::Model>| models.iter().map(|line| line.id).collect::<Vec<_>>();
+    assert_eq!(page(cursor.first(2).all(&db).await?), [1, 3]);
+    assert_eq!(
+        page(cursor.after((Mood::Calm, 3)).first(2).all(&db).await?),
+        [5, 2]
+    );
+    assert_eq!(
+        page(cursor.after((Mood::Glad, 2)).first(2).all(&db).await?),
+        [4]
+    );
+    let mut backwards = line::Entity::find().cursor_by((Moods, Id));
+    assert_eq!(
+        page(backwards.before((Mood::Glad, 2)).last(2).all(&db).await?),
+        [3, 5]
+    );
+    let mut descending = line::Entity::find().cursor_by(Moods);
+    assert_eq!(
+        page(descending.desc().after(Mood::Glad).all(&db).await?).len(),
+        3
+    );
 
     drop(db);
     ctx.delete().await;

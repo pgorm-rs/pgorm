@@ -146,14 +146,19 @@ export {
 } from "./schema-views.js";
 export * as pipeline from "./pipeline.js";
 export {
+  CheckViolationError,
   ConnectionError,
   ConstructionError,
   DatabaseError,
   DecodeError,
+  ExclusionViolationError,
+  ForeignKeyViolationError,
   InternalError,
   LifecycleError,
+  NotNullViolationError,
   PgormError,
   TimeoutError,
+  UniqueViolationError,
 } from "./errors.js";
 export {
   CreatedMultirange,

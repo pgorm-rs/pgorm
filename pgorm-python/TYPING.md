@@ -87,9 +87,18 @@ raise `TypeError`; invalid supported values or builder states raise
 `UnsupportedCapabilityError`. Network/TLS setup uses `ConnectionError`, server
 errors and cardinality failures use `DatabaseError`, and failed decoding uses
 `DecodeError`. `DatabaseError` exposes optional `sqlstate`, `message`, `severity`
-and diagnostic fields such as `constraint` and `detail`. Server errors populate
-these fields; client-side cardinality failures leave them as `None`. Use
-`str(error)` for the exception text in either case.
+and the diagnostic fields `detail`, `hint`, `schema`, `table`, `column`,
+`datatype` and `constraint`. Server errors populate these fields; client-side
+cardinality failures leave them as `None`. Use `str(error)` for the exception
+text in either case.
+
+A constraint violation raises a subclass of `DatabaseError` named for it:
+`UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),
+`CheckViolationError` (`23514`), `NotNullViolationError` (`23502`) and
+`ExclusionViolationError` (`23P01`, which a `WITHOUT OVERLAPS` key raises
+too). A table's constraint is named in `constraint`, a `NOT NULL` column in
+`column`, and a domain whose `CHECK` or `NOT NULL` refused the value in
+`datatype`.
 
 Closed resources, concurrent use of a reserved connection and use from another
 event loop raise `LifecycleError`; configured deadlines raise pgorm's

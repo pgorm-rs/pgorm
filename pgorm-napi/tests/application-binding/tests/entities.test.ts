@@ -8,11 +8,13 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
 import {
+  CheckViolationError,
   Conflict,
   ConstructionError,
   DecodeError,
   entities,
   entity,
+  type EntityRecord,
   graph,
   graphs,
   LifecycleError,
@@ -33,6 +35,7 @@ function pool(): Pool {
 const Account = entity("app.Account");
 const Note = entity("app.Note");
 const Membership = entity("app.Membership");
+const Parcel = entity("app.Parcel");
 
 before(async () => {
   database = await scratchDatabase("pgorm_napi_entities");
@@ -49,6 +52,13 @@ before(async () => {
       `CREATE TABLE napi_entities.memberships (
          account_id int4, team text, role text NOT NULL, PRIMARY KEY (account_id, team)
        )`,
+      "CREATE DOMAIN napi_entities.quantity AS int4 DEFAULT 1 NOT NULL CONSTRAINT positive CHECK (VALUE > 0)",
+      "CREATE DOMAIN napi_entities.temper AS napi_entities.mood",
+      "CREATE DOMAIN napi_entities.code AS text CHECK (VALUE <> '')",
+      `CREATE TABLE napi_entities.parcels (
+         id int4 PRIMARY KEY, qty napi_entities.quantity, mood napi_entities.temper NOT NULL,
+         codes napi_entities.code[] NOT NULL
+       )`,
     ]
   ) {
     await pool().execute(sql);
@@ -56,7 +66,9 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  await pool().execute("TRUNCATE napi_entities.accounts, napi_entities.notes, napi_entities.memberships");
+  await pool().execute(
+    "TRUNCATE napi_entities.accounts, napi_entities.notes, napi_entities.memberships, napi_entities.parcels",
+  );
 });
 
 after(async () => {
@@ -82,7 +94,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 
 // [spec:pgorm:req:napi.entities/test]
 test("the module names its registrations and describes each, and refuses a name it does not register", () => {
-  assert.deepStrictEqual(entities(), ["app.Account", "app.Membership", "app.Note"]);
+  assert.deepStrictEqual(entities(), ["app.Account", "app.Membership", "app.Note", "app.Parcel"]);
   assert.deepStrictEqual(graphs(), ["app.AccountNotes", "app.AccountOnly", "app.MembershipOnly", "app.MixedNotes", "app.RequiredNotes"]);
   assert.throws(() => entity("app.Missing"), refused(/no entity is registered as "app.Missing"/));
   assert.throws(() => graph("app.Missing"), refused(/no graph is registered as "app.Missing"/));
@@ -110,7 +122,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads/test]
+// [spec:pgorm:req:napi.entity-reads+1/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());
@@ -163,6 +175,63 @@ test("an ActiveModel holds each column's state, and its writes run the applicati
   assert.equal(await Account.intoActive(inserted).delete(pool()), 1);
   assert.throws(() => Account.active().set("id", "x"), ConstructionError);
   assert.throws(() => Account.active().set("mood", "wild"), ConstructionError);
+});
+
+// [spec:pgorm:req:napi.entities/test]    a registered entity whose columns are domains, over an
+// integer, over an enum and an array of one over text, describes, reads, writes and compares
+// through them as through their base types
+// [spec:pgorm:req:napi.schema-domains/test]    a domain column reports, binds and reads as the
+// kind it is over, and a check refuses a value written to it as a CheckViolationError naming the
+// domain
+// [spec:pgorm:req:napi.entity-reads+1/test]    a column whose domain is over an enum compares as
+// the enum
+test("a registered entity's domain columns read, write and compare as the types they are over", async () => {
+  assert.deepStrictEqual(
+    Parcel.describe().columns.map((column: { name: string; kind: string | null }) => [column.name, column.kind]),
+    [["id", "i32"], ["qty", "i32"], ["mood", 'enum "napi_entities"."mood"'], ["codes", "text[]"]],
+  );
+  const rows: [number, number, string, string[]][] = [
+    [1, 5, "calm", ["A", "B"]],
+    [2, 9, "busy", []],
+    [3, 2, "calm", ["C"]],
+  ];
+  for (const [id, qty, mood, codes] of rows) {
+    await Parcel.active().set("id", id).set("qty", qty).set("mood", mood).set("codes", codes).insert(pool());
+  }
+  const byId = Parcel.col("id").asc();
+  const all = await Parcel.find().orderBy(byId).all(pool());
+  assert.deepStrictEqual(all, rows.map(([id, qty, mood, codes]) => ({ id, qty, mood, codes })));
+  const ids = (records: readonly EntityRecord[]) => records.map((record) => record.id);
+  assert.deepStrictEqual(ids(await Parcel.find().where(Parcel.col("qty").gt(4)).orderBy(byId).all(pool())), [1, 2]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(Parcel.col("mood").eq("busy")).all(pool())), [2]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(Parcel.col("mood").lt("busy")).orderBy(byId).all(pool())), [1, 3]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(Parcel.col("mood").ne("calm")).all(pool())), [2]);
+  assert.match(
+    Parcel.col("mood").eq("busy").inspect().sql,
+    /^SELECT CAST\("parcels"\."mood" AS napi_entities\.mood\) = CAST\(\$1::text AS napi_entities\.mood\)$/,
+  );
+
+  const updated = await Parcel.intoActive(all[0]).set("qty", 6).set("codes", ["Z"]).update(pool());
+  assert.deepStrictEqual(updated, { id: 1, qty: 6, mood: "calm", codes: ["Z"] });
+  const defaulted = await Parcel.active().set("id", 4).set("mood", "busy").set("codes", []).insert(pool());
+  assert.equal(defaulted.qty, 1);
+
+  const refusals: [number, string, string[], string, string][] = [
+    [0, "calm", [], "quantity", "positive"],
+    [1, "calm", ["A", ""], "code", "code_check"],
+  ];
+  for (const [qty, mood, codes, domain, constraint] of refusals) {
+    await assert.rejects(
+      Parcel.active().set("id", 5).set("qty", qty).set("mood", mood).set("codes", codes).insert(pool()),
+      (error: unknown) => {
+        assert.ok(error instanceof CheckViolationError, `expected a CheckViolationError, got ${error}`);
+        assert.equal(error.datatype, domain);
+        assert.equal(error.constraint, constraint);
+        return true;
+      },
+    );
+  }
+  assert.deepStrictEqual(ids(await Parcel.find().orderBy(byId).all(pool())), [1, 2, 3, 4]);
 });
 
 // [spec:pgorm:req:napi.entity-writes/test]

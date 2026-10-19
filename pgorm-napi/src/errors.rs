@@ -56,15 +56,16 @@ pub(crate) struct Diagnostics {
     pub(crate) schema: Option<String>,
     pub(crate) table: Option<String>,
     pub(crate) column: Option<String>,
+    pub(crate) datatype: Option<String>,
     pub(crate) constraint: Option<String>,
 }
 
 /// Why an operation failed, in the terms the JavaScript error classes carry.
-// [spec:pgorm:req:napi.errors+1]
+// [spec:pgorm:req:napi.errors+2]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Failure {
     /// PostgreSQL rejected the statement; becomes a `DatabaseError` carrying
-    /// the SQLSTATE.
+    /// the SQLSTATE, or the subclass of it a constraint violation names.
     Database(Box<Diagnostics>),
     /// The server could not be reached, or the connection broke; becomes a
     /// `ConnectionError`.
@@ -92,7 +93,15 @@ impl Failure {
     /// The class name `lib/index.js` maps the failure to.
     pub(crate) fn kind(&self) -> &'static str {
         match self {
-            Self::Database(_) => "DatabaseError",
+            // [spec:pgorm:req:napi.errors+2]    the constraint classes pgorm's SqlError names
+            Self::Database(diagnostics) => match diagnostics.sqlstate.as_str() {
+                "23505" => "UniqueViolationError",
+                "23503" => "ForeignKeyViolationError",
+                "23514" => "CheckViolationError",
+                "23502" => "NotNullViolationError",
+                "23P01" => "ExclusionViolationError",
+                _ => "DatabaseError",
+            },
             Self::Connection(_) => "ConnectionError",
             Self::Decode(_) => "DecodeError",
             Self::Construction(_) => "ConstructionError",
@@ -128,6 +137,7 @@ impl Failure {
                 ("schema", diagnostics.schema.as_ref()),
                 ("table", diagnostics.table.as_ref()),
                 ("column", diagnostics.column.as_ref()),
+                ("datatype", diagnostics.datatype.as_ref()),
                 ("constraint", diagnostics.constraint.as_ref()),
             ];
             for (name, value) in fields {
@@ -170,7 +180,7 @@ impl Failure {
 /// Classify a pgorm error. A PostgreSQL error anywhere in its cause chain
 /// decides the class, so a server's refusal during connection (a bad password,
 /// a missing database) carries its SQLSTATE like any other.
-// [spec:pgorm:req:napi.errors+1]
+// [spec:pgorm:req:napi.errors+2]
 pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
     let mut source: &(dyn std::error::Error + 'static) = error;
     loop {
@@ -242,6 +252,7 @@ fn postgres_failure(error: &tokio_postgres::Error, secrets: &Redactions) -> Fail
         schema: optional(db.schema()),
         table: optional(db.table()),
         column: optional(db.column()),
+        datatype: optional(db.datatype()),
         constraint: optional(db.constraint()),
     }))
 }
@@ -289,6 +300,7 @@ mod tests {
             schema: None,
             table: None,
             column: None,
+            datatype: None,
             constraint: None,
         }));
         assert_eq!(database.kind(), "DatabaseError");
@@ -300,6 +312,36 @@ mod tests {
             "ConstructionError"
         );
         assert_eq!(Failure::Internal("x".into()).kind(), "InternalError");
+    }
+
+    // [spec:pgorm:req:napi.errors+2/test]
+    #[test]
+    fn a_constraint_violation_names_its_own_class() {
+        let violation = |sqlstate: &str| {
+            Failure::Database(Box::new(Diagnostics {
+                sqlstate: sqlstate.into(),
+                message: "refused".into(),
+                severity: "ERROR".into(),
+                detail: None,
+                hint: None,
+                schema: None,
+                table: None,
+                column: None,
+                datatype: None,
+                constraint: None,
+            }))
+        };
+        for (sqlstate, kind) in [
+            ("23505", "UniqueViolationError"),
+            ("23503", "ForeignKeyViolationError"),
+            ("23514", "CheckViolationError"),
+            ("23502", "NotNullViolationError"),
+            ("23P01", "ExclusionViolationError"),
+            ("23000", "DatabaseError"),
+            ("23001", "DatabaseError"),
+        ] {
+            assert_eq!(violation(sqlstate).kind(), kind, "{sqlstate}");
+        }
     }
 
     #[test]

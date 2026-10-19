@@ -1,7 +1,7 @@
 // @ts-check
 
 // The error classes every failure rejects or throws with.
-// [spec:pgorm:req:napi.errors+1]
+// [spec:pgorm:req:napi.errors+2]
 
 /** The base class of every error pgorm-napi rejects with. */
 export class PgormError extends Error {}
@@ -39,9 +39,25 @@ export class DatabaseError extends PgormError {
     this.schema = details.schema;
     this.table = details.table;
     this.column = details.column;
+    this.datatype = details.datatype;
     this.constraint = details.constraint;
   }
 }
+
+/** A duplicate key in a unique index or primary key (SQLSTATE `23505`). */
+export class UniqueViolationError extends DatabaseError {}
+
+/** A foreign key with no matching referenced row, or a referenced row still in use (`23503`). */
+export class ForeignKeyViolationError extends DatabaseError {}
+
+/** A table's or a domain's `CHECK` constraint refused a value (`23514`). */
+export class CheckViolationError extends DatabaseError {}
+
+/** A null in a `NOT NULL` column, or in a domain that does not allow one (`23502`). */
+export class NotNullViolationError extends DatabaseError {}
+
+/** A row conflicting with another under an exclusion constraint or a `WITHOUT OVERLAPS` key (`23P01`). */
+export class ExclusionViolationError extends DatabaseError {}
 
 for (
   const type of [
@@ -53,6 +69,11 @@ for (
     LifecycleError,
     TimeoutError,
     DatabaseError,
+    UniqueViolationError,
+    ForeignKeyViolationError,
+    CheckViolationError,
+    NotNullViolationError,
+    ExclusionViolationError,
   ]
 ) {
   Object.defineProperty(type.prototype, "name", {
@@ -71,6 +92,11 @@ const classes = {
   LifecycleError,
   TimeoutError,
   DatabaseError,
+  UniqueViolationError,
+  ForeignKeyViolationError,
+  CheckViolationError,
+  NotNullViolationError,
+  ExclusionViolationError,
 };
 
 /**

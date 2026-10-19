@@ -237,7 +237,7 @@ fn entity_col(mut cx: FunctionContext) -> JsResult<JsValue> {
 /// `entityCompare(entity, column, operator, value)`: the column compared
 /// through its `ColumnTrait` method, the value converted to the column's
 /// declared kind and written through its `save_as`.
-// [spec:pgorm:req:napi.entity-reads]
+// [spec:pgorm:req:napi.entity-reads+1]
 fn entity_compare(mut cx: FunctionContext) -> JsResult<JsValue> {
     let entity = held!(cx, EntityHandle, 0);
     let column = text!(cx, 1);
@@ -296,7 +296,7 @@ fn count_at(cx: &mut FunctionContext, index: usize) -> NeonResult<Option<u64>> {
 
 /// `entitySelectChange(select, step, argument)`: the query with one more
 /// step — `where`, `orderBy`, `limit` or `offset` — as `Select<E>` takes it.
-// [spec:pgorm:req:napi.entity-reads]
+// [spec:pgorm:req:napi.entity-reads+1]
 fn select_change(mut cx: FunctionContext) -> JsResult<JsValue> {
     let select = held!(cx, SelectHandle, 0);
     let change = step(&mut cx)?;

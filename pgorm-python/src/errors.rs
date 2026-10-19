@@ -9,6 +9,11 @@ pyo3::create_exception!(pgorm, DecodeError, PgOrmError);
 pyo3::create_exception!(pgorm, TimeoutError, PgOrmError);
 pyo3::create_exception!(pgorm, LifecycleError, PgOrmError);
 pyo3::create_exception!(pgorm, InternalError, PgOrmError);
+pyo3::create_exception!(pgorm, UniqueViolationError, DatabaseError);
+pyo3::create_exception!(pgorm, ForeignKeyViolationError, DatabaseError);
+pyo3::create_exception!(pgorm, CheckViolationError, DatabaseError);
+pyo3::create_exception!(pgorm, NotNullViolationError, DatabaseError);
+pyo3::create_exception!(pgorm, ExclusionViolationError, DatabaseError);
 
 /// Connection secrets must never enter diagnostics, including nested causes.
 #[derive(Clone, Default)]
@@ -34,7 +39,7 @@ impl Redactions {
     }
 }
 
-// [spec:pgorm:req:python.errors]
+// [spec:pgorm:req:python.errors+1]
 // [spec:pgorm:req:python.connections]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
@@ -66,7 +71,15 @@ fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr 
         return client_error(error, secrets);
     };
     let message = secrets.apply(db.message());
-    let exception = DatabaseError::new_err(message.clone());
+    // [spec:pgorm:req:python.errors+1]    the constraint classes pgorm's SqlError names
+    let exception = match db.code().code() {
+        "23505" => UniqueViolationError::new_err(message.clone()),
+        "23503" => ForeignKeyViolationError::new_err(message.clone()),
+        "23514" => CheckViolationError::new_err(message.clone()),
+        "23502" => NotNullViolationError::new_err(message.clone()),
+        "23P01" => ExclusionViolationError::new_err(message.clone()),
+        _ => DatabaseError::new_err(message.clone()),
+    };
     let decorated = Python::attach(|py| -> PyResult<()> {
         let value = exception.value(py);
         value.setattr("sqlstate", db.code().code())?;
@@ -78,6 +91,7 @@ fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr 
             ("schema", db.schema()),
             ("table", db.table()),
             ("column", db.column()),
+            ("datatype", db.datatype()),
             ("constraint", db.constraint()),
         ] {
             value.setattr(field, content.map(|text| secrets.apply(text)))?;
@@ -123,6 +137,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "schema",
         "table",
         "column",
+        "datatype",
         "constraint",
     ] {
         database_error.setattr(field, py.None())?;
@@ -134,6 +149,23 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("TimeoutError", py.get_type::<TimeoutError>())?;
     module.add("LifecycleError", py.get_type::<LifecycleError>())?;
     module.add("InternalError", py.get_type::<InternalError>())?;
+    module.add(
+        "UniqueViolationError",
+        py.get_type::<UniqueViolationError>(),
+    )?;
+    module.add(
+        "ForeignKeyViolationError",
+        py.get_type::<ForeignKeyViolationError>(),
+    )?;
+    module.add("CheckViolationError", py.get_type::<CheckViolationError>())?;
+    module.add(
+        "NotNullViolationError",
+        py.get_type::<NotNullViolationError>(),
+    )?;
+    module.add(
+        "ExclusionViolationError",
+        py.get_type::<ExclusionViolationError>(),
+    )?;
     module.add(
         "CancelledError",
         py.import("asyncio")?.getattr("CancelledError")?,

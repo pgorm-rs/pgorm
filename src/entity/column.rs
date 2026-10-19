@@ -1,7 +1,5 @@
 use crate::{EntityName, IntoSimpleExpr, Iterable, SqlName, StaticName};
-use pgorm_query::{
-    BinOper, Expr, Func, IntoColumnRef, Name, SelectStatement, SimpleExpr, Value, ValueType,
-};
+use pgorm_query::{BinOper, Expr, Func, Name, SelectStatement, SimpleExpr, Value, ValueType};
 use std::str::FromStr;
 
 // The original `pgorm::ColumnType` enum was dropped since 0.11.0
@@ -30,8 +28,9 @@ macro_rules! bind_oper {
         where
             V: Into<Value>,
         {
-            let expr = self.save_as(Expr::val(v));
-            Expr::col((self.entity_name(), *self)).binary(BinOper::$bin_op, expr)
+            let expr = compared_value(self, Expr::val(v));
+            compared_column(self, Expr::col((self.entity_name(), *self)))
+                .binary(BinOper::$bin_op, expr)
         }
     };
 }
@@ -44,13 +43,16 @@ macro_rules! bind_oper_col {
         /// the `Expr::col` escape nor a respelling of either table. The operand
         /// is a column rather than a value, so it does not pass through
         /// `save_as`: an enum column compared against another column of the same
-        /// enum type needs no cast. See [`ColumnTrait::eq_col`] for an example.
+        /// enum type needs no cast, and a column whose domain is over an enum is
+        /// cast to the enum, either side. See [`ColumnTrait::eq_col`] for an
+        /// example.
         fn $op<C>(&self, other: C) -> SimpleExpr
         where
             C: ColumnTrait,
         {
-            Expr::col((self.entity_name(), *self))
-                .binary(BinOper::$bin_op, other.as_column_ref().into_column_ref())
+            let other_column = compared_column(&other, Expr::col(other.as_column_ref()));
+            compared_column(self, Expr::col((self.entity_name(), *self)))
+                .binary(BinOper::$bin_op, other_column)
         }
     };
 }
@@ -73,8 +75,8 @@ macro_rules! bind_vec_func {
             V: Into<Value>,
             I: IntoIterator<Item = V>,
         {
-            let v_with_enum_cast = v.into_iter().map(|v| self.save_as(Expr::val(v)));
-            Expr::col((self.entity_name(), *self)).$func(v_with_enum_cast)
+            let v_with_enum_cast = v.into_iter().map(|v| compared_value(self, Expr::val(v)));
+            compared_column(self, Expr::col((self.entity_name(), *self))).$func(v_with_enum_cast)
         }
     };
 }
@@ -157,13 +159,16 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// `Expr::col` escape nor a respelling of either table. The operand is a
     /// column rather than a value, so it does not pass through `save_as`: an
     /// enum column compared against another column of the same enum type needs
-    /// no cast.
+    /// no cast, and a column whose domain is over an enum is cast to the enum,
+    /// either side, PostgreSQL resolving no operator for the domain.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
     fn eq_col<C>(&self, other: C) -> SimpleExpr
     where
         C: ColumnTrait,
     {
-        Expr::col((self.entity_name(), *self))
-            .binary(BinOper::Equal, other.as_column_ref().into_column_ref())
+        let other_column = compared_column(&other, Expr::col(other.as_column_ref()));
+        compared_column(self, Expr::col((self.entity_name(), *self)))
+            .binary(BinOper::Equal, other_column)
     }
 
     bind_oper_col!(
@@ -198,7 +203,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// against something computed rather than against a plain column. Like
     /// `eq_col`, the operand does not pass through
     /// [`save_as`][ColumnTrait::save_as] — an expression carries whatever cast
-    /// it was built with.
+    /// it was built with. A column whose domain is over an enum is cast to the
+    /// enum, so the expression compares with it as the enum.
     ///
     /// ```
     /// use pgorm::{entity::*, pgorm_query::Expr, query::*, tests_cfg::cake};
@@ -215,7 +221,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     where
         T: Into<SimpleExpr>,
     {
-        Expr::col((self.entity_name(), *self)).binary(BinOper::Equal, other.into())
+        compared_column(self, Expr::col((self.entity_name(), *self)))
+            .binary(BinOper::Equal, other.into())
     }
 
     /// ```
@@ -233,9 +240,9 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     where
         V: Into<Value>,
     {
-        let a = self.save_as(Expr::val(a));
-        let b = self.save_as(Expr::val(b));
-        Expr::col((self.entity_name(), *self)).between(a, b)
+        let a = compared_value(self, Expr::val(a));
+        let b = compared_value(self, Expr::val(b));
+        compared_column(self, Expr::col((self.entity_name(), *self))).between(a, b)
     }
 
     /// ```
@@ -253,9 +260,9 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     where
         V: Into<Value>,
     {
-        let a = self.save_as(Expr::val(a));
-        let b = self.save_as(Expr::val(b));
-        Expr::col((self.entity_name(), *self)).not_between(a, b)
+        let a = compared_value(self, Expr::val(a));
+        let b = compared_value(self, Expr::val(b));
+        compared_column(self, Expr::col((self.entity_name(), *self))).not_between(a, b)
     }
 
     /// ```
@@ -371,8 +378,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     where
         V: Into<Value>,
     {
-        let v = self.save_as(Expr::val(v));
-        Expr::col((self.entity_name(), *self)).if_null(v)
+        let v = compared_value(self, Expr::val(v));
+        compared_column(self, Expr::col((self.entity_name(), *self))).if_null(v)
     }
 
     bind_vec_func!(is_in);
@@ -401,8 +408,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
         V: Into<Value> + ValueType,
         I: IntoIterator<Item = V>,
     {
-        let array = self.save_array_as(Expr::val(Value::array(v)));
-        Expr::col((self.entity_name(), *self)).eq(Func::any(array))
+        let array = compared_array(self, Expr::val(Value::array(v)));
+        compared_column(self, Expr::col((self.entity_name(), *self))).eq(Func::any(array))
     }
 
     /// Non-membership against one array parameter, the complement of
@@ -425,8 +432,8 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
         V: Into<Value> + ValueType,
         I: IntoIterator<Item = V>,
     {
-        let array = self.save_array_as(Expr::val(Value::array(v)));
-        Expr::col((self.entity_name(), *self)).ne(Func::all(array))
+        let array = compared_array(self, Expr::val(Value::array(v)));
+        compared_column(self, Expr::col((self.entity_name(), *self))).ne(Func::all(array))
     }
 
     bind_subquery_func!(in_subquery);
@@ -455,7 +462,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// driver reports such a multirange as a simple type with no subtype to
     /// read its binary form by, so it is read as its text, which the
     /// newtype's `FromStr` parses.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
     // [spec:pgorm:def:sql.value.created-range+2]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn select_enum_as(&self, expr: Expr) -> SimpleExpr {
@@ -484,7 +491,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column that overrides `save_as` with a cast of its own — what
     /// `#[pgorm(save_as = "…")]` generates — overrides this too, with the
     /// array spelling of the same type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
     fn save_array_as(&self, val: Expr) -> SimpleExpr {
         self.save_enum_array_as(val)
     }
@@ -494,7 +501,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// [`ColumnTrait::save_enum_as`], and like it the fallback a derived
     /// [`save_array_as`][ColumnTrait::save_array_as] override keeps for
     /// columns without a `save_as` attribute.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn save_enum_array_as(&self, val: Expr) -> SimpleExpr {
         let col_def = self.def();
@@ -510,7 +517,7 @@ pub trait ColumnTrait: StaticName + Iterable + FromStr {
     /// A column of a range type a schema created takes its value through
     /// [`Expr::as_range`]: a range is written as its text form and cast to the
     /// type by name, there being no cast to it from a built-in range type.
-    // [spec:pgorm:sem:entity.traits.column.enum-cast+7]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+8]
     // [spec:pgorm:def:sql.value.created-range+2]
     // [spec:pgorm:req:sql.ast.cast-shape+2]
     fn save_enum_as(&self, val: Expr) -> SimpleExpr {

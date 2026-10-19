@@ -8,15 +8,20 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 
 import {
+  CheckViolationError,
   ConnectionError,
   ConstructionError,
   DatabaseError,
   DecodeError,
+  ExclusionViolationError,
+  ForeignKeyViolationError,
+  NotNullViolationError,
   PgormError,
   Pool,
+  UniqueViolationError,
   version,
 } from "../lib/index.js";
-import { dsn } from "./support.ts";
+import { dsn, scratchDatabase } from "./support.ts";
 
 const pool = new Pool(dsn(), { maxSize: 16 });
 
@@ -55,7 +60,7 @@ test("queries that sleep on the server overlap rather than queue behind one anot
   assert.ok(performance.now() - started < 3000, "eight half-second queries ran concurrently");
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("an error PostgreSQL reports rejects with a DatabaseError carrying its SQLSTATE", async () => {
   const error = await scalar("SELECT $1::int + 1 AS n", [2147483647]).then(
     () => assert.fail("the overflow resolved"),
@@ -71,7 +76,89 @@ test("an error PostgreSQL reports rejects with a DatabaseError carrying its SQLS
   assert.equal(error.detail, null);
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
+test("a constraint violation rejects with the DatabaseError subclass named for it, carrying the names the server reported", async () => {
+  const database = await scratchDatabase("pgorm_napi_violations");
+  try {
+    await using scratch = new Pool(database.dsn, { maxSize: 1 });
+    for (
+      const sql of [
+        "CREATE DOMAIN positive AS int4 NOT NULL CONSTRAINT positive_check CHECK (VALUE > 0)",
+        "CREATE TABLE parent (id int4 PRIMARY KEY)",
+        `CREATE TABLE gauge (
+          id int4 PRIMARY KEY,
+          reading int4 NOT NULL CONSTRAINT reading_bounded CHECK (reading < 100),
+          level positive,
+          parent_id int4 CONSTRAINT gauge_parent REFERENCES parent,
+          span int4range,
+          CONSTRAINT gauge_apart EXCLUDE USING gist (span WITH &&)
+        )`,
+        "INSERT INTO gauge (id, reading, level, span) VALUES (1, 1, 1, '[1,5)')",
+      ]
+    ) {
+      await scratch.execute(sql);
+    }
+    const insert = "INSERT INTO gauge (id, reading, level, parent_id, span) VALUES ";
+    const classes = [
+      UniqueViolationError,
+      ForeignKeyViolationError,
+      CheckViolationError,
+      NotNullViolationError,
+      ExclusionViolationError,
+    ];
+    const cases: [string, (typeof classes)[number], string, Record<string, string>][] = [
+      [`${insert}(1, 1, 1, NULL, NULL)`, UniqueViolationError, "23505", { table: "gauge", constraint: "gauge_pkey" }],
+      [`${insert}(2, 1, 1, 9, NULL)`, ForeignKeyViolationError, "23503", { table: "gauge", constraint: "gauge_parent" }],
+      [`${insert}(2, 100, 1, NULL, NULL)`, CheckViolationError, "23514", {
+        table: "gauge",
+        constraint: "reading_bounded",
+      }],
+      [`${insert}(2, 1, 0, NULL, NULL)`, CheckViolationError, "23514", {
+        datatype: "positive",
+        constraint: "positive_check",
+      }],
+      [`${insert}(2, NULL, 1, NULL, NULL)`, NotNullViolationError, "23502", { table: "gauge", column: "reading" }],
+      ["INSERT INTO gauge (id, reading) VALUES (2, 1)", NotNullViolationError, "23502", { datatype: "positive" }],
+      [`${insert}(2, 1, 1, NULL, '[4,8)')`, ExclusionViolationError, "23P01", { table: "gauge", constraint: "gauge_apart" }],
+    ];
+    for (const [sql, expected, sqlstate, names] of cases) {
+      await assert.rejects(scratch.execute(sql), (error: unknown) => {
+        assert.ok(error instanceof expected, `${sqlstate}: ${error}`);
+        assert.ok(error instanceof DatabaseError);
+        assert.ok(error instanceof PgormError);
+        for (const other of classes) {
+          if (other !== expected) assert.ok(!(error instanceof other), `${sqlstate} is not a ${other.name}`);
+        }
+        assert.equal(error.name, expected.name);
+        assert.equal(error.sqlstate, sqlstate);
+        assert.equal(error.severity, "ERROR");
+        assert.deepStrictEqual(
+          {
+            schema: error.schema,
+            table: error.table,
+            column: error.column,
+            datatype: error.datatype,
+            constraint: error.constraint,
+          },
+          { schema: "public", table: null, column: null, datatype: null, constraint: null, ...names },
+        );
+        return true;
+      });
+    }
+    const other = await scratch.execute("SELECT 1 / 0").then(
+      () => assert.fail("the division resolved"),
+      (error: unknown) => error,
+    );
+    assert.ok(other instanceof DatabaseError);
+    assert.equal(Object.getPrototypeOf(other), DatabaseError.prototype);
+    assert.equal(other.sqlstate, "22012");
+    assert.equal(other.datatype, null);
+  } finally {
+    await database.drop();
+  }
+});
+
+// [spec:pgorm:req:napi.errors+2/test]
 test("a statement PostgreSQL cannot parse rejects with its syntax-error SQLSTATE", async () => {
   await assert.rejects(pool.query("SELEC 1"), (error: unknown) => {
     assert.ok(error instanceof DatabaseError);
@@ -80,7 +167,7 @@ test("a statement PostgreSQL cannot parse rejects with its syntax-error SQLSTATE
   });
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("an unreachable server rejects with a ConnectionError", async () => {
   await using unreachable = new Pool("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable");
   await assert.rejects(unreachable.query("SELECT 1"), (error: unknown) => {
@@ -90,7 +177,7 @@ test("an unreachable server rejects with a ConnectionError", async () => {
   });
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("a password never appears in the error its connection failure rejects with", async () => {
   await using unreachable = new Pool("postgres://pgorm:hunter2-secret@127.0.0.1:1/postgres?sslmode=disable");
   await assert.rejects(
@@ -103,7 +190,7 @@ test("a password never appears in the error its connection failure rejects with"
   );
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("a parameter with no exact int4 rejects before anything is sent", async () => {
   for (const value of [1.5, 2 ** 31, -(2 ** 31) - 1, Number.NaN, Number.POSITIVE_INFINITY, "1"]) {
     await assert.rejects(scalar("SELECT $1::int + 1 AS n", [value]), (error: unknown) => {
@@ -114,18 +201,18 @@ test("a parameter with no exact int4 rejects before anything is sent", async () 
   }
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("an unusable connection string is a ConstructionError", () => {
   assert.throws(() => new Pool("postgres://["), ConstructionError);
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("a result the binding cannot decode exactly rejects with a DecodeError", async () => {
   await assert.rejects(pool.query("SELECT 'NaN'::numeric AS n"), DecodeError);
   await assert.rejects(pool.query("SELECT point(1, 2) AS n"), DecodeError);
 });
 
-// [spec:pgorm:req:napi.errors+1/test]
+// [spec:pgorm:req:napi.errors+2/test]
 test("an argument of the wrong JavaScript type rejects with a TypeError", async () => {
   // deno-lint-ignore no-explicit-any
   await assert.rejects(pool.query(42 as any), TypeError);

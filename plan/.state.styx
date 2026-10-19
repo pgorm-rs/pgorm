@@ -765,8 +765,10 @@ assertions (
     {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}
     {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
     {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
+    {id codegen-accepts-create-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:26:07.721992Z}
     {id codegen-column-expressions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T21:50:20.383652Z}
     {id codegen-datetime-crate-option, kind @complete, author "brendan@necessary.nu", at 2026-09-14T23:54:18.092258Z}
+    {id codegen-enum-array-expanded, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:08:35.73852Z}
     {id codegen-identity-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:22.63481Z}
     {id codegen-interval-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-18T16:51:55.197502Z}
     {id codegen-junction-detection, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:03:30.231473Z}
@@ -809,6 +811,7 @@ assertions (
     {id distinct-sort-range-rows, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:40.28601Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
+    {id domain-enum-predicates, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:44:09.79938Z}
     {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
     {id empty-insert-batch, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:50:38.839369Z}
     {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}
@@ -883,6 +886,7 @@ assertions (
     {id migration-test-database-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:27.556282Z}
     {id minimal-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:31:55.569282Z}
     {id napi-addon-size, kind @complete, author "brendan@necessary.nu", at 2026-10-18T14:41:20.074691Z}
+    {id napi-domain-entity-test, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:48:59.551771Z}
     {id nested-source-from-entry, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:14.356897Z}
     {id nopanic.codegen-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:09:12.032584Z}
     {id nopanic.connect-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:44:54.028454Z}
@@ -1027,6 +1031,7 @@ assertions (
     {id set-op-keeps-deduplication, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:21:00.292691Z}
     {id settled-source-name-resolves, kind @complete, author "brendan@necessary.nu", at 2026-09-15T16:16:50.919262Z}
     {id spec, kind @complete, author "brendan@necessary.nu", at 2026-09-06T14:24:08.822493Z}
+    {id sql-error-check-not-null, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:16:29.158854Z}
     {id sql-value-json, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:29.060218Z}
     {id sql.empty-select-list, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:23:43.854243Z}
     {id sqlmap-harness-fixes, kind @complete, author "brendan@necessary.nu", at 2026-10-18T15:01:48.418142Z}
@@ -1076,8 +1081,6 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id codegen-enum-array-expanded, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:08:35.73852Z}
-    {id codegen-accepts-create-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:26:07.721992Z}
 )
 
 impl_evidence (

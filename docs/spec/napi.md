@@ -78,12 +78,18 @@ process's clean exit in both runtimes.
 > loop open, and Node.js finishes a loop with its deliveries still pending
 > where Deno delivers them first, so a promise left to it may never settle.
 
-> [spec:pgorm:req:napi.errors+1]
+> [spec:pgorm:req:napi.errors+2]
 > Failures MUST reject with instances of the module's error classes, all
 > derived from `PgormError` and `Error`: `DatabaseError` when PostgreSQL
 > reports an error, carrying its SQLSTATE as `sqlstate` with its severity and
 > optional diagnostic fields (`detail`, `hint`, `schema`, `table`, `column`,
-> `constraint`, each a string or `null`); `ConnectionError` when the server
+> `datatype`, `constraint`, each a string or `null`), and rejecting as the
+> subclass of `DatabaseError` named for a constraint violation pgorm's
+> `SqlError` classifies (`[spec:pgorm:sem:error.model.sql-class+4]`):
+> `UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),
+> `CheckViolationError` (`23514`), `NotNullViolationError` (`23502`) or
+> `ExclusionViolationError` (`23P01`), with the same fields, a domain's name
+> in `datatype`; `ConnectionError` when the server
 > cannot be reached or the connection breaks; `ConstructionError` for an
 > argument that cannot become the value pgorm sends; `DecodeError` for a result
 > that cannot become the JavaScript value asked for; `LifecycleError` for a
@@ -1080,7 +1086,7 @@ the ones compiled in.
 > its state unknown — and a failure from PostgreSQL anywhere in its causes is
 > the error `napi.errors` classifies.
 
-> [spec:pgorm:req:napi.entity-reads]
+> [spec:pgorm:req:napi.entity-reads+1]
 > `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
 > and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
 > `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
@@ -1089,7 +1095,9 @@ the ones compiled in.
 > is the column as the entity's `ColumnTrait` names it, and its comparisons
 > MUST be that trait's methods, a value converted to the column's declared
 > kind and written through the column's `save_as` — an enum's label cast to
-> its type — an expression compared as written, and `null` refused.
+> its type, and a column whose domain is over an enum compared as the enum,
+> the column and the label each cast to it — an expression compared as
+> written, and `null` refused.
 
 > [spec:pgorm:req:napi.entity-writes]
 > `active()` MUST be the entity's `ActiveModelBehavior::new`, its defaults

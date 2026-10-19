@@ -787,11 +787,20 @@ as pgorm's own `DeriveCreatedRange` does.
 
 Every failure rejects with a subclass of `PgormError`: `DatabaseError` when
 PostgreSQL refuses a statement, with its `sqlstate`, `severity` and optional
-diagnostic fields; `ConnectionError` when the server cannot be reached;
+diagnostic fields (`detail`, `hint`, `schema`, `table`, `column`, `datatype`,
+`constraint`); `ConnectionError` when the server cannot be reached;
 `ConstructionError` for an argument pgorm cannot send; `DecodeError` for a
 result that does not decode; `LifecycleError` for a handle used after it
 closed or while another operation holds it; `TimeoutError` when no connection
 frees up in time. Credentials never appear in a message.
+
+A constraint violation rejects with a subclass of `DatabaseError` named for
+it: `UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),
+`CheckViolationError` (`23514`), `NotNullViolationError` (`23502`) and
+`ExclusionViolationError` (`23P01`, which a `WITHOUT OVERLAPS` key raises
+too). A table's constraint is named in `constraint`, a `NOT NULL` column in
+`column`, and a domain whose `CHECK` or `NOT NULL` refused the value in
+`datatype`.
 
 ## Tests
 
