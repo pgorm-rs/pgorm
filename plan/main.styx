@@ -9428,6 +9428,21 @@ children (
                     }
                 )
             }
+
+            {
+                id rust-view-body-check
+                title "Rust's view and CREATE TABLE AS builders run the tie-limit and window checks on their query before anything is sent"
+                kind @fix
+                deps (python-view-body-check)
+                log (
+                    {
+                        at 2026-10-19T07:51:50.896459Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Found by python-view-body-check (d962207a). Rust's View::create, MaterializedView::create and Table::create_as never run check_tie_limit / check_windows on their SelectStatement, so a Rust caller can still send an unordered tie-limit or bad-window view body to the server (42601 / 42P20 / 42704), while Python and JavaScript refuse it when the statement is built. Run the checks when the body is taken (a fallible constructor, or in the executor before rendering the DDL), update sql.ddl.view / materialized-view / create-table-as, and test. The same gap exists for COPY TO's SELECT source, which copy-source-tie-check closes."
+                    }
+                )
+            }
         )
     }
 
@@ -12664,6 +12679,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found repeatedly while merging (e.g. exec.cursor.keyset+5 cited in paginate.md, entity.md and graph.md after it moved to +6; error.model.sql-class+3 in paginate.md; sql.scope+11 and +17 in sql-ddl.md). Rule text that cites another rule with a +N pin goes stale whenever the cited rule is bumped, and fixing the number edits the citing rule's body, which by nspec's convention bumps it too, so the numbers are left wrong. Replace version-pinned citations inside rule prose with unpinned ones ([spec:pgorm:req:x.y] without +N) across docs/spec, in one pass, as a wording-only change that does not change any rule's effect (the operator allowed wording-only fixes without a bump on 2026-10-09 for a typo; confirm the same applies here before relying on it, or bump each touched rule and re-cover its owner). Optionally add a spec check that refuses a pinned citation in prose."
+            }
+        )
+    }
+
+    {
+        id python-expr-collate
+        title "Python expressions take a COLLATE, as Rust's and JavaScript's do"
+        kind @feat
+        deps (python-column-collation)
+        log (
+            {
+                at 2026-10-19T07:51:50.788134Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-column-collation (d962207a). sql.ast.expr.collate exists in Rust (expression, ORDER BY and column positions) and pgorm-napi has col().collate(), but Python expressions cannot be collated: a column's collation and a domain's are the only places Python can name one. Add Expr.collate(name, schema=) (and the ORDER BY position if it is separate), with stubs, capability entries, parity cases and a live test."
             }
         )
     }
