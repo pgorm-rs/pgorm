@@ -40,7 +40,7 @@ an ideal Postgres renderer would emit.
 
 ## Render conformance
 
-> [spec:pgorm:req:sql.render.oracle+2]
+> [spec:pgorm:req:sql.render.oracle+3]
 > Every string `QueryBuilder` renders — through the `to_string()` path with
 > literals inlined, or through the `build()` path with `$N` placeholders — MUST
 > parse under the PostgreSQL grammar. The contract is enforced inside the test
@@ -63,9 +63,15 @@ an ideal Postgres renderer would emit.
 > and an `assert_eq!` shim — imported by a test module in place of
 > `pretty_assertions::assert_eq` — applies the oracle to any left-hand `String`
 > or `&str` that opens with a statement keyword, so the existing render
-> assertions are held to the grammar without being rewritten one by one.
-> Rendered fragments that are not whole statements are skipped by that keyword
-> test. `oracle_sweep.rs` additionally composes a matrix of builder outputs —
+> assertions are held to the grammar without being rewritten one by one. A
+> render that opens with a parenthesis is a statement when a query keyword
+> (`SELECT`, `VALUES`, `TABLE`, `WITH`) follows its opening parentheses: the
+> grammar lets a statement begin with `(` only as a parenthesised query, which
+> is how a grouped set operation's render begins
+> (`[spec:pgorm:sem:sql.ast.select.union+2]`).
+> Rendered fragments that are not whole statements — a parenthesised operand,
+> a collation, a tuple among them — are skipped by that keyword test.
+> `oracle_sweep.rs` additionally composes a matrix of builder outputs —
 > select/join/CTE/window/union/locking shapes, INSERT/UPDATE/DELETE with
 > RETURNING and ON CONFLICT, the DDL statements, the `ColumnType` and `BinOper`
 > vocabularies, and the `build()` placeholder path — and requires every

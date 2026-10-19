@@ -3034,7 +3034,7 @@ fn a_with_clause_has_one_place_to_live() {
 // [spec:pgorm:sem:query.build.with.attach+1/test]    the prefix is legal PostgreSQL at every level a
 // select can occupy — standalone, FROM subquery, union arm, CTE body, LATERAL body — which is what
 // lets the clause ride along instead of collapsing the statement into a wrapper
-// [spec:pgorm:req:sql.render.oracle+2/test]
+// [spec:pgorm:req:sql.render.oracle+3/test]
 // [spec:pgorm:req:sql.render.select-order+7/test]
 #[test]
 fn carried_with_clause_renders_at_every_nesting_level() {

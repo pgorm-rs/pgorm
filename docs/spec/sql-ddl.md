@@ -357,7 +357,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > backwards and once stood for a render no release before 18 parsed
 > (`[dec:pgorm:invalid-states-unrepresentable]`); that flag MUST NOT return.
 > pgorm targets PostgreSQL 18, the release the oracle parses with and the
-> live server runs (`[spec:pgorm:req:sql.render.oracle+2]`), so a virtual
+> live server runs (`[spec:pgorm:req:sql.render.oracle+3]`), so a virtual
 > column is no longer a render the builder has to keep from 17.
 >
 > What the server refuses around a generated column is the server's

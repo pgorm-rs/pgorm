@@ -13196,12 +13196,20 @@ children (
         title "The render oracle's assert_eq shim checks a render that begins with a parenthesis"
         kind @test
         deps (set-operation-grouping)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.560831Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by set-operation-grouping (2dab5aaa). The oracle's assert_eq! shim parse-checks only renders that begin with a statement keyword, so a grouped set operation's render, which begins with `(`, skips the grammar check unless the test calls assert_query_eq directly, as the new tests do. Make the shim recognise a leading parenthesis. That changes sql.render.oracle's text: a bump, and re-pinning its 49 sites."
+            }
+
+            {
+                at 2026-10-19T12:54:44.020549Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13247,6 +13255,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by like-escape-off (289e49b1). The renderer wraps ILIKE and NOT ILIKE in parentheses under AND (`... AND (\"c\" ILIKE $2 ESCAPE '')`) but leaves LIKE bare. Both are valid SQL, but the difference has no reason behind it. Find where ILIKE is treated as needing parentheses (sql.render.parens, sql.render.precedence), make the two consistent, and update the goldens; like-escape-off's test records today's output."
+            }
+
+            {
+                at 2026-10-19T12:40:07.816309Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
