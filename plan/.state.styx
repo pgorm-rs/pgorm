@@ -2260,6 +2260,11 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id python-column-collation, covered_rules (
+        python.schema-collation
+    ), covered_claims (
+        {impl_name main, rule python.schema-collation}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

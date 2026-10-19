@@ -142,6 +142,38 @@ fn programs() -> BTreeMap<&'static str, String> {
                 .to_string(),
         ),
         (
+            "collated",
+            Table::create(table.clone())
+                .col(
+                    ColumnDef::new_with_type(a("word \"x\""), ColumnType::Text)
+                        .not_null()
+                        .collate(a("C")),
+                )
+                .col(
+                    ColumnDef::new_with_type(a("label"), ColumnType::Text)
+                        .collate((a("pg_catalog"), a("POSIX"))),
+                )
+                .to_string(),
+        ),
+        (
+            "add_column_collated",
+            Table::alter(table.clone())
+                .add_column(
+                    ColumnDef::new_with_type(a("extra"), ColumnType::Text)
+                        .collate((a("schema \"雪\""), a("C \"x\""))),
+                )
+                .to_string(),
+        ),
+        (
+            "modify_column_collated",
+            Table::alter(table.clone())
+                .modify_column(
+                    ColumnDef::new_with_type(a("extra"), ColumnType::String(StringLen::None))
+                        .collate(a("C")),
+                )
+                .to_string(),
+        ),
+        (
             "add_primary_key",
             Table::alter(table.clone())
                 .add_primary_key((a("id \"x\""), a("name")))
@@ -620,6 +652,8 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
 }
 
 // [spec:pgorm:req:python.schema+1/test]
+// [spec:pgorm:req:python.schema-collation/test]    a column's collation, qualified or bare and a
+// later call replacing an earlier, renders as the Rust builder renders it in each position
 // [spec:pgorm:req:python.schema-views+2/test]    every view, materialized view and CREATE TABLE AS
 // option renders as the Rust builder renders it
 // [spec:pgorm:req:python.schema-schemas/test]    every schema create, drop and rename renders as
