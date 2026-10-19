@@ -19,8 +19,8 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    ColumnDef, Expr, Func, Index, MaterializedView, Name, Query, SelectStatement, Table, UnionType,
-    View, ViewCheckOption,
+    ColumnDef, Expr, Func, Index, MaterializedView, Name, Order, Query, SelectStatement, Table,
+    UnionType, View, ViewCheckOption, WindowStatement, error::Error as QueryError,
 };
 use pgorm::{ConnectionTrait, TransactionTrait, entity::prelude::*};
 use pretty_assertions::assert_eq;
@@ -139,7 +139,7 @@ async fn names(db: &DatabaseConnection, relation: &str) -> Result<Vec<String>, E
 /// its identity filling the key. The body's values — the `TRUE` and a quoted
 /// string — are written into the definition, there being no parameter a view
 /// could bind.
-// [spec:pgorm:req:sql.ddl.view/test]    an entity reads through a view and writes through a
+// [spec:pgorm:req:sql.ddl.view+1/test]    an entity reads through a view and writes through a
 // simple auto-updatable one, and the body's values are stored inlined
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_a_view() -> Result<(), Error> {
@@ -147,7 +147,7 @@ async fn an_entity_reads_and_writes_through_a_view() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     accounts(&db).await?;
 
-    let create = View::create(n("active_account"), active_accounts()).to_string();
+    let create = View::create(n("active_account"), active_accounts())?.to_string();
     assert_eq!(
         create,
         r#"CREATE VIEW "active_account" AS SELECT "id", "name", "active" FROM "account" WHERE "active" = TRUE"#
@@ -201,7 +201,7 @@ async fn an_entity_reads_and_writes_through_a_view() -> Result<(), Error> {
             .from(n("account"))
             .and_where(Expr::col(n("name")).eq("it's"))
             .take(),
-    )
+    )?
     .to_string();
     db.batch_execute(&filtered).await?;
     let row = db
@@ -223,7 +223,7 @@ async fn an_entity_reads_and_writes_through_a_view() -> Result<(), Error> {
 /// not show (`44000`), from an entity as from SQL. `LOCAL` consults the
 /// view's own condition alone and `CASCADED` every view beneath it too; and a
 /// view the server cannot update through takes no check option (`0A000`).
-// [spec:pgorm:req:sql.ddl.view/test]    a check option refuses a hidden row (44000), LOCAL
+// [spec:pgorm:req:sql.ddl.view+1/test]    a check option refuses a hidden row (44000), LOCAL
 // and CASCADED differ in the views they consult, and a view that is not updatable refuses one
 #[pgorm_macros::test]
 async fn a_check_option_refuses_rows_the_view_hides() -> Result<(), Error> {
@@ -231,7 +231,7 @@ async fn a_check_option_refuses_rows_the_view_hides() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     accounts(&db).await?;
 
-    let checked = View::create(n("checked_account"), active_accounts())
+    let checked = View::create(n("checked_account"), active_accounts())?
         .check_option(ViewCheckOption::Cascaded)
         .to_string();
     db.batch_execute(&checked).await?;
@@ -263,7 +263,7 @@ async fn a_check_option_refuses_rows_the_view_hides() -> Result<(), Error> {
 
     // Over a view with no option of its own, LOCAL holds a row to the upper
     // view's condition alone and CASCADED to the lower view's as well.
-    db.batch_execute(&View::create(n("active_account"), active_accounts()).to_string())
+    db.batch_execute(&View::create(n("active_account"), active_accounts())?.to_string())
         .await?;
     let short = || {
         Query::select()
@@ -276,7 +276,7 @@ async fn a_check_option_refuses_rows_the_view_hides() -> Result<(), Error> {
         ("short_local", ViewCheckOption::Local),
         ("short_cascaded", ViewCheckOption::Cascaded),
     ] {
-        let create = View::create(n(view), short())
+        let create = View::create(n(view), short())?
             .check_option(option)
             .to_string();
         db.batch_execute(&create).await?;
@@ -309,7 +309,7 @@ async fn a_check_option_refuses_rows_the_view_hides() -> Result<(), Error> {
             .expr(Func::count(Expr::col(n("id"))))
             .from(n("account"))
             .take(),
-    )
+    )?
     .check_option(ViewCheckOption::Local)
     .to_string();
     let not_updatable = db
@@ -338,7 +338,7 @@ async fn reloptions(db: &DatabaseConnection, relation: &str) -> Result<Vec<Strin
 /// (`42P16`), and replaces the view's options with its own; the column names
 /// rename the query's leading columns, and more names than columns are
 /// refused (`42601`).
-// [spec:pgorm:req:sql.ddl.view/test]    OR REPLACE adds columns at the end only (42P16) and
+// [spec:pgorm:req:sql.ddl.view+1/test]    OR REPLACE adds columns at the end only (42P16) and
 // resets what it leaves out; column names rename the leading columns, too many are refused
 #[pgorm_macros::test]
 async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
@@ -352,7 +352,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
             .from(n("account"))
             .take()
     };
-    let create = View::create(n("account_view"), body(&["id"]))
+    let create = View::create(n("account_view"), body(&["id"]))?
         .security_barrier()
         .check_option(ViewCheckOption::Local)
         .to_string();
@@ -362,7 +362,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
         ["security_barrier=true", "check_option=local"]
     );
 
-    let widened = View::create(n("account_view"), body(&["id", "name"]))
+    let widened = View::create(n("account_view"), body(&["id", "name"]))?
         .or_replace()
         .to_string();
     db.batch_execute(&widened).await?;
@@ -370,7 +370,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
     assert_eq!(names(&db, "account_view").await?, ["ada", "it's", "cy"]);
 
     for moved in [body(&["name", "id"]), body(&["id"])] {
-        let replaced = View::create(n("account_view"), moved)
+        let replaced = View::create(n("account_view"), moved)?
             .or_replace()
             .to_string();
         let refused = db
@@ -380,7 +380,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
         refused_with(&refused, &SqlState::INVALID_TABLE_DEFINITION);
     }
 
-    let renamed = View::create(n("renamed"), body(&["id", "name"]))
+    let renamed = View::create(n("renamed"), body(&["id", "name"]))?
         .column(n("account_id"))
         .to_string();
     db.batch_execute(&renamed).await?;
@@ -395,7 +395,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
         .map(|row| row.get(0))
         .collect();
     assert_eq!(columns, ["account_id", "name"]);
-    let too_many = View::create(n("too_many"), body(&["id"]))
+    let too_many = View::create(n("too_many"), body(&["id"]))?
         .columns([n("a"), n("b")])
         .to_string();
     let refused = db
@@ -412,7 +412,7 @@ async fn or_replace_keeps_columns_and_resets_options() -> Result<(), Error> {
 /// `security_barrier` keeps a caller's cheap function from seeing the rows
 /// the view's condition hides, and `security_invoker` checks the relations
 /// the view reads against the querying role rather than the view's owner.
-// [spec:pgorm:req:sql.ddl.view/test]    security_barrier keeps a hidden row from a caller's
+// [spec:pgorm:req:sql.ddl.view+1/test]    security_barrier keeps a hidden row from a caller's
 // function, and security_invoker reads with the querying role's privileges (42501)
 #[pgorm_macros::test]
 async fn security_options_change_what_a_view_reveals() -> Result<(), Error> {
@@ -435,9 +435,9 @@ async fn security_options_change_what_a_view_reveals() -> Result<(), Error> {
             .and_where(Expr::col(n("id")).ne(3))
             .take()
     };
-    db.batch_execute(&View::create(n("leaky"), visible()).to_string())
+    db.batch_execute(&View::create(n("leaky"), visible())?.to_string())
         .await?;
-    let barrier = View::create(n("barrier"), visible())
+    let barrier = View::create(n("barrier"), visible())?
         .security_barrier()
         .to_string();
     db.batch_execute(&barrier).await?;
@@ -460,9 +460,9 @@ async fn security_options_change_what_a_view_reveals() -> Result<(), Error> {
         "DROP ROLE IF EXISTS \"{role}\"; CREATE ROLE \"{role}\""
     ))
     .await?;
-    db.batch_execute(&View::create(n("definer"), visible()).to_string())
+    db.batch_execute(&View::create(n("definer"), visible())?.to_string())
         .await?;
-    let invoker = View::create(n("invoker"), visible())
+    let invoker = View::create(n("invoker"), visible())?
         .security_invoker()
         .to_string();
     db.batch_execute(&invoker).await?;
@@ -489,7 +489,7 @@ async fn security_options_change_what_a_view_reveals() -> Result<(), Error> {
 }
 
 /// A recursive view reads itself by the columns it names.
-// [spec:pgorm:req:sql.ddl.view/test]    a recursive view counts through its own rows
+// [spec:pgorm:req:sql.ddl.view+1/test]    a recursive view counts through its own rows
 #[pgorm_macros::test]
 async fn a_recursive_view_reads_itself() -> Result<(), Error> {
     let ctx = TestContext::new("view_recursive").await;
@@ -509,7 +509,7 @@ async fn a_recursive_view_reads_itself() -> Result<(), Error> {
                     .take(),
             )
             .take(),
-    )
+    )?
     .to_string();
     db.batch_execute(&counter).await?;
     let counted: Vec<i32> = db
@@ -541,7 +541,7 @@ async fn totals(db: &DatabaseConnection) -> Result<Vec<(bool, i64)>, Error> {
 /// the table as it was then, through an entity as through SQL, and refuses a
 /// write (`42809`). A concurrent refresh needs a unique index (`55000`) and a
 /// populated view (`0A000`), and runs inside a transaction block.
-// [spec:pgorm:req:sql.ddl.materialized-view/test]    a materialized view holds its rows until
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    a materialized view holds its rows until
 // a refresh, a concurrent refresh needs a unique index and data, and an entity reads it
 #[pgorm_macros::test]
 async fn a_materialized_view_holds_rows_until_refreshed() -> Result<(), Error> {
@@ -557,7 +557,7 @@ async fn a_materialized_view_holds_rows_until_refreshed() -> Result<(), Error> {
             .from(n("account"))
             .group_by_col(n("active"))
             .take(),
-    )
+    )?
     .columns([n("active"), n("total")])
     .with_no_data()
     .to_string();
@@ -619,7 +619,7 @@ async fn a_materialized_view_holds_rows_until_refreshed() -> Result<(), Error> {
         .expect_err("a view a refresh left unpopulated");
     refused_with(&unreadable, &SqlState::OBJECT_NOT_IN_PREREQUISITE_STATE);
 
-    let again = MaterializedView::create(n("account_total"), Query::select().expr(1).take())
+    let again = MaterializedView::create(n("account_total"), Query::select().expr(1).take())?
         .if_not_exists()
         .to_string();
     db.batch_execute(&again).await?;
@@ -640,7 +640,7 @@ async fn a_materialized_view_holds_rows_until_refreshed() -> Result<(), Error> {
 /// `CREATE TABLE AS` makes a table of the query's columns, renamed where
 /// names are given, and of its rows unless `WITH NO DATA`; the table is
 /// independent of the query from then on.
-// [spec:pgorm:req:sql.ddl.create-table-as/test]    a table created from a query, with no data
+// [spec:pgorm:req:sql.ddl.create-table-as+1/test]    a table created from a query, with no data
 // and then with it, its columns renamed, and too many names refused
 #[pgorm_macros::test]
 async fn a_table_is_created_from_a_query() -> Result<(), Error> {
@@ -648,7 +648,7 @@ async fn a_table_is_created_from_a_query() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     accounts(&db).await?;
 
-    let empty = Table::create_as(n("active_copy"), active_accounts())
+    let empty = Table::create_as(n("active_copy"), active_accounts())?
         .column(n("account_id"))
         .with_no_data()
         .to_string();
@@ -686,7 +686,7 @@ async fn a_table_is_created_from_a_query() -> Result<(), Error> {
         .collect();
     assert_eq!(copied, ["ada", "it's"]);
 
-    let full = Table::create_as(n("full_copy"), active_accounts()).to_string();
+    let full = Table::create_as(n("full_copy"), active_accounts())?.to_string();
     db.batch_execute(&full).await?;
     db.batch_execute("UPDATE account SET name = 'changed'")
         .await?;
@@ -700,13 +700,13 @@ async fn a_table_is_created_from_a_query() -> Result<(), Error> {
         .get(0);
     assert_eq!(kind, "r");
 
-    let skipped = Table::create_as(n("full_copy"), Query::select().expr(1).take())
+    let skipped = Table::create_as(n("full_copy"), Query::select().expr(1).take())?
         .if_not_exists()
         .to_string();
     db.batch_execute(&skipped).await?;
     assert_eq!(names(&db, "full_copy").await?, ["ada", "it's"]);
 
-    let too_many = Table::create_as(n("too_many"), Query::select().expr(1).take())
+    let too_many = Table::create_as(n("too_many"), Query::select().expr(1).take())?
         .columns([n("a"), n("b")])
         .to_string();
     let refused = db
@@ -720,19 +720,133 @@ async fn a_table_is_created_from_a_query() -> Result<(), Error> {
     Ok(())
 }
 
+/// A body whose tie limit or WINDOW clause PostgreSQL's grammar refuses is
+/// refused as the view, recursive view, materialized view or table over it
+/// is constructed: built and sent the way a DDL statement is sent, it comes
+/// back as pgorm-query's error, and the transaction it would have been sent
+/// in is not aborted, so nothing reached the server. Written into the same
+/// definitions by hand, the body is refused by the server with the SQLSTATE
+/// each check stands for; ordered and declared, it is one the server takes.
+// [spec:pgorm:req:sql.ddl.view+1/test]    a view's refused body is refused with nothing sent,
+// as the server refuses it, and the corrected body is taken
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    a materialized view's refused body
+// is refused with nothing sent
+// [spec:pgorm:req:sql.ddl.create-table-as+1/test]    CREATE TABLE AS's refused body is
+// refused with nothing sent
+#[pgorm_macros::test]
+async fn a_refused_body_is_never_sent() -> Result<(), Error> {
+    let ctx = TestContext::new("view_refused_body").await;
+    let mut db = ctx.db.get().await?;
+    accounts(&db).await?;
+
+    let tied = Query::select()
+        .columns([n("id"), n("name")])
+        .from(n("account"))
+        .limit_with_ties(1)
+        .take();
+    let windowed = Query::select()
+        .column(n("id"))
+        .expr_window_name(Func::count(Expr::col(n("id"))), n("w"))
+        .from(n("account"))
+        .take();
+    let redefined = windowed
+        .clone()
+        .window(n("w"), WindowStatement::new())
+        .window(n("w"), WindowStatement::new())
+        .take();
+    let w = || "w".to_owned();
+    let cases = [
+        (
+            tied.clone(),
+            QueryError::TiesWithoutOrder,
+            SqlState::SYNTAX_ERROR,
+        ),
+        (
+            windowed.clone(),
+            QueryError::WindowUndefined { name: w() },
+            SqlState::UNDEFINED_OBJECT,
+        ),
+        (
+            redefined,
+            QueryError::WindowRedefined { name: w() },
+            SqlState::WINDOWING_ERROR,
+        ),
+    ];
+
+    let tx = db.begin().await?;
+    for (body, refusal, _) in &cases {
+        let built = [
+            View::create(n("refused"), body.clone()).map(|view| view.to_string()),
+            View::create_recursive(n("refused"), n("id"), body.clone())
+                .map(|view| view.to_string()),
+            MaterializedView::create(n("refused"), body.clone()).map(|view| view.to_string()),
+            Table::create_as(n("refused"), body.clone()).map(|table| table.to_string()),
+        ];
+        for statement in built {
+            let sent = async { tx.batch_execute(&statement?).await }.await;
+            match sent {
+                Err(Error::QueryBuilder(error)) => assert_eq!(&error, refusal),
+                other => panic!("expected pgorm-query's refusal, got {other:?}"),
+            }
+        }
+        // A statement the server refused would have aborted the transaction.
+        assert_eq!(tx.query_one("SELECT 1", &[]).await?.get::<_, i32>(0), 1);
+    }
+    tx.commit().await?;
+
+    for (body, _, state) in &cases {
+        for kind in ["VIEW", "MATERIALIZED VIEW", "TABLE"] {
+            let by_hand = format!(r#"CREATE {kind} "refused" AS {body}"#);
+            let error = db.batch_execute(&by_hand).await.expect_err(&by_hand);
+            refused_with(&error, state);
+        }
+    }
+
+    // Both active accounts tie for first on `active DESC`.
+    let ordered = tied.clone().order_by(n("active"), Order::Desc).take();
+    let created = [
+        View::create(n("first_active"), ordered.clone())?.to_string(),
+        MaterializedView::create(n("first_active_kept"), ordered.clone())?.to_string(),
+        Table::create_as(n("first_active_copy"), ordered)?.to_string(),
+    ];
+    for create in created {
+        db.batch_execute(&create).await?;
+    }
+    for relation in ["first_active", "first_active_kept", "first_active_copy"] {
+        assert_eq!(names(&db, relation).await?, ["ada", "it's"]);
+    }
+    let declared = windowed
+        .clone()
+        .window(n("w"), WindowStatement::partition_by(n("active")))
+        .take();
+    db.batch_execute(&View::create(n("counted"), declared)?.to_string())
+        .await?;
+    let counts: Vec<i64> = db
+        .query_all("SELECT count FROM counted ORDER BY id", &[])
+        .await?
+        .iter()
+        .map(|row| row.get(0))
+        .collect();
+    assert_eq!(counts, [2, 2, 1]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 /// A drop reaches its own kind of relation and refuses the other (`42809`),
 /// restricts while a view depends on it (`2BP01`) and cascades to it when
 /// told, and passes over a missing one under `IF EXISTS`.
-// [spec:pgorm:req:sql.ddl.view/test]    DROP VIEW restricts, cascades and refuses a
+// [spec:pgorm:req:sql.ddl.view+1/test]    DROP VIEW restricts, cascades and refuses a
 // materialized view
-// [spec:pgorm:req:sql.ddl.materialized-view/test]    DROP MATERIALIZED VIEW refuses a view
+// [spec:pgorm:req:sql.ddl.materialized-view+1/test]    DROP MATERIALIZED VIEW refuses a view
 #[pgorm_macros::test]
 async fn each_drop_reaches_its_own_kind() -> Result<(), Error> {
     let ctx = TestContext::new("view_drops").await;
     let db = ctx.db.get().await?;
     accounts(&db).await?;
 
-    db.batch_execute(&View::create(n("active_account"), active_accounts()).to_string())
+    db.batch_execute(&View::create(n("active_account"), active_accounts())?.to_string())
         .await?;
     let dependent = View::create(
         n("active_name"),
@@ -740,10 +854,10 @@ async fn each_drop_reaches_its_own_kind() -> Result<(), Error> {
             .column(n("name"))
             .from(n("active_account"))
             .take(),
-    )
+    )?
     .to_string();
     db.batch_execute(&dependent).await?;
-    db.batch_execute(&MaterializedView::create(n("snapshot"), active_accounts()).to_string())
+    db.batch_execute(&MaterializedView::create(n("snapshot"), active_accounts())?.to_string())
         .await?;
 
     for restricted in [
@@ -798,7 +912,7 @@ async fn each_drop_reaches_its_own_kind() -> Result<(), Error> {
 /// `ALTER VIEW` is not built, because `Table`'s statements reach what it
 /// does: PostgreSQL takes `ALTER TABLE`'s rename, column rename and column
 /// default on a view, and its renames on a materialized view.
-// [spec:pgorm:req:sql.ddl.view/test]    a view and a materialized view are renamed, their
+// [spec:pgorm:req:sql.ddl.view+1/test]    a view and a materialized view are renamed, their
 // columns renamed and a view column given an insert default, through Table's statements
 #[pgorm_macros::test]
 async fn table_alterations_reach_a_view() -> Result<(), Error> {
@@ -806,7 +920,7 @@ async fn table_alterations_reach_a_view() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     accounts(&db).await?;
 
-    db.batch_execute(&View::create(n("active_account"), active_accounts()).to_string())
+    db.batch_execute(&View::create(n("active_account"), active_accounts())?.to_string())
         .await?;
     db.batch_execute(&Table::rename(n("active_account"), n("live_account")).to_string())
         .await?;
@@ -823,7 +937,7 @@ async fn table_alterations_reach_a_view() -> Result<(), Error> {
         ["ada", "it's", "cy", "anonymous"]
     );
 
-    db.batch_execute(&MaterializedView::create(n("snapshot"), active_accounts()).to_string())
+    db.batch_execute(&MaterializedView::create(n("snapshot"), active_accounts())?.to_string())
         .await?;
     db.batch_execute(&Table::rename(n("snapshot"), n("kept")).to_string())
         .await?;

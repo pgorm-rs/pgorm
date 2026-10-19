@@ -1364,13 +1364,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Views
 
-> [spec:pgorm:req:sql.ddl.view]
+> [spec:pgorm:req:sql.ddl.view+1]
 > `View` builds the statements a view takes: `create(name, body)`,
 > `create_recursive(name, column, body)` and `drop(name)`. A view is a
 > relation, so it is named as a table is — any `IntoTableName`, a bare name or
 > a `(schema, name)` pair, rendered as quoted, dot-joined identifiers — and its
 > body is a `SelectStatement` the constructor takes by value, as every
-> embedder takes what it embeds (`[spec:pgorm:req:sql.ddl.create-table+16]`).
+> embedder takes what it embeds (`[spec:pgorm:req:sql.ddl.create-table+16]`),
+> and checks as it takes it.
 > Name and body are constructor arguments with no setter, because `CREATE
 > VIEW  AS` and a view without a query are syntax errors, so neither husk
 > constructs (`[dec:pgorm:invalid-states-unrepresentable]`). A view of an
@@ -1395,6 +1396,30 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > literal, a string with a quote or a backslash in its `E''` form
 > (`[spec:pgorm:req:sql.render.string-escape+1]`). The live suite reads the
 > stored definition back with the value in it.
+>
+> `create` and `create_recursive` MUST refuse a body whose tie limit
+> PostgreSQL's grammar refuses — one with no ORDER BY, or beside `SKIP
+> LOCKED` (`sql.ast.select.tie-limit`) — and a body with a WINDOW clause, or a
+> reference to one, that it refuses (`sql.ast.window-statement`), with
+> pgorm-query's error for it, so each returns a `Result` and a view over such
+> a body never constructs. The constructor is the one boundary every body
+> passes on its way to the server. Rendering is infallible, a DDL statement
+> is sent as the text it renders, through `execute` or `batch_execute`, with
+> no executor that could run the checks first as the `SELECT` executors and
+> `copy_out` run them, and the body has no setter once taken, so the query
+> checked is the one that renders: the refused state cannot be designed out,
+> and the failure is a typed error at the nearest fallible boundary
+> (`[dec:pgorm:invalid-states-unrepresentable]`, `[dec:pgorm:no-panic]`). The
+> Python and JavaScript builders refuse the same bodies as they read them. The
+> checks read the body's own clauses, as they do on their own: a `SELECT`
+> nested in the body is the server's to refuse. The oracle rejects an
+> unordered tie limit inside `CREATE VIEW` as it does in a bare `SELECT`
+> (`42601`), and the live suite holds each refusal coming back from a
+> statement built and sent in a transaction as `Error::QueryBuilder`, the
+> transaction left unaborted because nothing reached the server, the server
+> refusing the same body written into a view, a materialized view and a
+> table by hand (`42601`, `42704`, `42P20`), and the corrected body
+> constructing and being taken.
 >
 > Column names are `Name`s appended by `column()` and `columns()` and read
 > back by `get_columns()`. With none, no parentheses are written, because the
@@ -1479,11 +1504,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Materialized views
 
-> [spec:pgorm:req:sql.ddl.materialized-view]
+> [spec:pgorm:req:sql.ddl.materialized-view+1]
 > `MaterializedView` builds the statements a materialized view takes:
 > `create(name, body)`, `refresh(name)` and `drop(name)`. Each names the view
-> as a table is named, and the create takes its body by value and writes it
-> with its values inlined, as a view does (`[spec:pgorm:req:sql.ddl.view]`).
+> as a table is named, and the create takes its body by value, refuses the
+> bodies a view's constructor refuses, returning a `Result`, and writes it
+> with its values inlined, as a view does (`[spec:pgorm:req:sql.ddl.view+1]`).
 >
 > - `MaterializedViewCreateStatement` MUST render `CREATE MATERIALIZED VIEW
 >   [IF NOT EXISTS ]<name>[ (<columns>)] AS <query>[ WITH NO DATA]`.
@@ -1540,7 +1566,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Tables from a query
 
-> [spec:pgorm:req:sql.ddl.create-table-as]
+> [spec:pgorm:req:sql.ddl.create-table-as+1]
 > `Table::create_as(name, body)` builds a `TableCreateAsStatement`, which
 > MUST render `CREATE TABLE [IF NOT EXISTS ]<name>[ (<columns>)] AS <query>[
 > WITH NO DATA]`. It creates a table whose columns are the query's, with
@@ -1548,10 +1574,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > statement runs, or none under `with_no_data()`. The names `column()` and
 > `columns()` give rename the leading columns, and `get_columns()` reads them
 > back; more than the query has are refused (`42601`). The name and the body
-> are constructor arguments, and the body is taken by value and written with
-> its values inlined, as every DDL statement writes a value
-> (`[spec:pgorm:req:sql.ddl+9]`). `if_not_exists()` leaves an existing
-> relation alone, its rows with it.
+> are constructor arguments, and the body is taken by value, refused when a
+> view's constructor refuses it, so `create_as` returns a `Result`
+> (`[spec:pgorm:req:sql.ddl.view+1]`), and written with its values inlined,
+> as every DDL statement writes a value (`[spec:pgorm:req:sql.ddl+9]`).
+> `if_not_exists()` leaves an existing relation alone, its rows with it.
 >
 > From then on it is a table like any other, which the live suite holds: its
 > kind is `r`, a change to the table the query read does not reach it, and

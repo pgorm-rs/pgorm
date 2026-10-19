@@ -3,7 +3,7 @@ use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Domain, DomainCheck,
     Enforcement, Expr, Func, GeneratedKind, Index, IndexOrder, IndexType, IntoName,
     MaterializedView, Name, NotNullConstraint, Query, Schema, SelectStatement, SimpleExpr,
-    StringLen, Table, TableKey, TableName, TypeName, Values, View, ViewCheckOption,
+    StringLen, Table, TableKey, TableName, TypeName, Values, View, ViewCheckOption, error,
     extension::Type,
 };
 use pgorm_python::expressions::Compiled;
@@ -14,7 +14,7 @@ fn a(name: &str) -> Name {
     Name::runtime(name)
 }
 
-fn programs() -> BTreeMap<&'static str, String> {
+fn programs() -> error::Result<BTreeMap<&'static str, String>> {
     let table = TableName::SchemaTable(
         a("schema \"雪\"").into_name(),
         a("items \"雪\"").into_name(),
@@ -56,7 +56,7 @@ fn programs() -> BTreeMap<&'static str, String> {
         .check(Expr::col(a("id \"x\"")).gt(0i64))
         .if_not_exists()
         .to_string();
-    [
+    let programs = [
         ("table", full),
         (
             "generated",
@@ -422,10 +422,11 @@ fn programs() -> BTreeMap<&'static str, String> {
         ),
     ]
     .into_iter()
-    .chain(views(&table))
+    .chain(views(&table)?)
     .chain(schemas())
     .chain(domains())
-    .collect()
+    .collect();
+    Ok(programs)
 }
 
 /// The statements over a schema, its name carrying a quote and a non-ASCII
@@ -569,7 +570,7 @@ fn domains() -> BTreeMap<&'static str, String> {
 
 /// The view, materialized view and `CREATE TABLE AS` statements over one
 /// query, whose string value is written into each definition as a literal.
-fn views(table: &TableName) -> BTreeMap<&'static str, String> {
+fn views(table: &TableName) -> error::Result<BTreeMap<&'static str, String>> {
     let query = || -> SelectStatement {
         Query::select()
             .column(a("id \"x\""))
@@ -579,14 +580,14 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
             .take()
     };
     let view = TableName::SchemaTable(a("schema \"雪\"").into_name(), a("view \"雪\"").into_name());
-    BTreeMap::from([
+    Ok(BTreeMap::from([
         (
             "create_view",
-            View::create(view.clone(), query()).to_string(),
+            View::create(view.clone(), query())?.to_string(),
         ),
         (
             "create_view_options",
-            View::create(view.clone(), query())
+            View::create(view.clone(), query())?
                 .columns([a("key \"x\""), a("label")])
                 .or_replace()
                 .check_option(ViewCheckOption::Local)
@@ -596,13 +597,13 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
         ),
         (
             "create_view_cascaded",
-            View::create(view.clone(), query())
+            View::create(view.clone(), query())?
                 .check_option(ViewCheckOption::Cascaded)
                 .to_string(),
         ),
         (
             "create_recursive_view",
-            View::create_recursive(view.clone(), a("key \"x\""), query())
+            View::create_recursive(view.clone(), a("key \"x\""), query())?
                 .column(a("label"))
                 .or_replace()
                 .security_barrier()
@@ -614,7 +615,7 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
         ),
         (
             "create_materialized_view",
-            MaterializedView::create(view.clone(), query())
+            MaterializedView::create(view.clone(), query())?
                 .columns([a("key \"x\"")])
                 .if_not_exists()
                 .with_no_data()
@@ -642,13 +643,13 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
         ),
         (
             "create_table_as",
-            Table::create_as(view, query())
+            Table::create_as(view, query())?
                 .columns([a("key \"x\""), a("label")])
                 .if_not_exists()
                 .with_no_data()
                 .to_string(),
         ),
-    ])
+    ]))
 }
 
 // [spec:pgorm:req:python.schema+1/test]
@@ -669,7 +670,7 @@ fn ddl_matches_native_rust() -> Result<(), Box<dyn std::error::Error>> {
         let source = CString::new(include_str!("schema_programs.py"))?;
         let examples = PyModule::from_code(py, &source, c"schema_programs.py", c"schema_programs")?;
         let queries = examples.call_method1("programs", (&native,))?;
-        let rust = programs();
+        let rust = programs()?;
         assert_eq!(queries.len()?, rust.len());
         for (name, sql) in rust {
             let query = queries.get_item(name)?;

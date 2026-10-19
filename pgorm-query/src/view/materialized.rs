@@ -1,33 +1,41 @@
 //! `CREATE MATERIALIZED VIEW`, `REFRESH MATERIALIZED VIEW` and `DROP
 //! MATERIALIZED VIEW`.
 
-use crate::{IntoName, IntoTableName, Name, QueryBuilder, SelectStatement, TableName};
+use crate::{
+    IntoName, IntoTableName, Name, QueryBuilder, SelectStatement, TableName, error::Result,
+};
 
-use super::{RelationDrop, impl_view_display, relation_drop_methods};
+use super::{RelationDrop, definition_body, impl_view_display, relation_drop_methods};
 
 /// Helper for constructing any materialized view statement
 ///
 /// A materialized view is a relation holding the rows its query returned when
 /// it was last populated, named as a table is. Its body is a
-/// [`SelectStatement`] written with its values inlined, as a view's is.
-// [spec:pgorm:req:sql.ddl.materialized-view]
+/// [`SelectStatement`] checked as it is taken and written with its values
+/// inlined, as a view's is.
+// [spec:pgorm:req:sql.ddl.materialized-view+1]
 #[derive(Debug, Clone, Copy)]
 pub struct MaterializedView;
 
 impl MaterializedView {
     /// Construct a [`MaterializedViewCreateStatement`] over the materialized
-    /// view it creates and the query it is populated from
-    pub fn create<T>(name: T, body: SelectStatement) -> MaterializedViewCreateStatement
+    /// view it creates and the query it is populated from.
+    ///
+    /// # Errors
+    ///
+    /// The query's tie limit or WINDOW clause, when PostgreSQL's grammar
+    /// refuses it, as for [`View::create`](crate::View::create).
+    pub fn create<T>(name: T, body: SelectStatement) -> Result<MaterializedViewCreateStatement>
     where
         T: IntoTableName,
     {
-        MaterializedViewCreateStatement {
+        Ok(MaterializedViewCreateStatement {
             name: name.into_table_name(),
             columns: Vec::new(),
-            body,
+            body: definition_body(body)?,
             if_not_exists: false,
             no_data: false,
-        }
+        })
     }
 
     /// Construct a [`MaterializedViewRefreshStatement`] over the materialized
@@ -67,7 +75,8 @@ impl MaterializedView {
 /// ```compile_fail,E0599
 /// use pgorm_query::*;
 ///
-/// MaterializedView::create(Name::runtime("m"), Query::select().expr(1).take()).or_replace();
+/// MaterializedView::create(Name::runtime("m"), Query::select().expr(1).take())?.or_replace();
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
 ///
 /// # Examples
@@ -83,7 +92,7 @@ impl MaterializedView {
 ///         .from(Name::runtime("payment"))
 ///         .group_by_col(Name::runtime("day"))
 ///         .take(),
-/// )
+/// )?
 /// .if_not_exists()
 /// .columns([Name::runtime("day"), Name::runtime("total")])
 /// .with_no_data()
@@ -98,8 +107,9 @@ impl MaterializedView {
 ///     ]
 ///     .join(" ")
 /// );
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
-// [spec:pgorm:req:sql.ddl.materialized-view]
+// [spec:pgorm:req:sql.ddl.materialized-view+1]
 #[derive(Debug, Clone)]
 pub struct MaterializedViewCreateStatement {
     pub(crate) name: TableName,
@@ -184,7 +194,7 @@ pub(crate) enum RefreshMode {
 ///     r#"REFRESH MATERIALIZED VIEW CONCURRENTLY "report"."daily_total""#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.materialized-view]
+// [spec:pgorm:req:sql.ddl.materialized-view+1]
 #[derive(Debug, Clone)]
 pub struct MaterializedViewRefreshStatement {
     pub(crate) name: TableName,
@@ -234,7 +244,7 @@ impl MaterializedViewRefreshStatement {
 ///     r#"DROP MATERIALIZED VIEW IF EXISTS "daily_total" RESTRICT"#
 /// );
 /// ```
-// [spec:pgorm:req:sql.ddl.materialized-view]
+// [spec:pgorm:req:sql.ddl.materialized-view+1]
 #[derive(Debug, Clone)]
 pub struct MaterializedViewDropStatement {
     pub(crate) relations: RelationDrop,

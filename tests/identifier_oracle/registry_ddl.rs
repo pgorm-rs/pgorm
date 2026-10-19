@@ -1291,28 +1291,36 @@ pub fn sites() -> Vec<Site> {
             api: "View::create(Name, body)",
             kinds: &["ViewStmt.view.relname"],
             policy: Quoted,
-            render: |n| sql(&View::create(n_(n), body())),
+            render: |n| sql(&View::create(n_(n), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-view.schema",
             api: "View::create((Name, Name), body) — the schema part",
             kinds: &["ViewStmt.view.schemaname"],
             policy: Quoted,
-            render: |n| sql(&View::create((n_(n), fixed("v")), body())),
+            render: |n| sql(&View::create((n_(n), fixed("v")), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-view.column",
             api: "ViewCreateStatement::column(Name)",
             kinds: &["ViewStmt.aliases[0]"],
             policy: Quoted,
-            render: |n| sql(View::create(fixed("v"), body()).column(n_(n))),
+            render: |n| {
+                sql(View::create(fixed("v"), body())
+                    .expect(BODY_TAKEN)
+                    .column(n_(n)))
+            },
         },
         Site {
             id: "ddl/create-view.columns",
             api: "ViewCreateStatement::columns([Name])",
             kinds: &["ViewStmt.aliases[1]"],
             policy: Quoted,
-            render: |n| sql(View::create(fixed("v"), body()).columns([fixed("a"), n_(n)])),
+            render: |n| {
+                sql(View::create(fixed("v"), body())
+                    .expect(BODY_TAKEN)
+                    .columns([fixed("a"), n_(n)]))
+            },
         },
         Site {
             id: "ddl/create-recursive-view.name",
@@ -1323,7 +1331,7 @@ pub fn sites() -> Vec<Site> {
                 "ViewStmt.view.relname",
             ],
             policy: Quoted,
-            render: |n| sql(&View::create_recursive(n_(n), fixed("c"), body())),
+            render: |n| sql(&View::create_recursive(n_(n), fixed("c"), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-recursive-view.first-column",
@@ -1334,7 +1342,7 @@ pub fn sites() -> Vec<Site> {
                 "CommonTableExpr.aliascolnames[0]",
             ],
             policy: Quoted,
-            render: |n| sql(&View::create_recursive(fixed("v"), n_(n), body())),
+            render: |n| sql(&View::create_recursive(fixed("v"), n_(n), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-recursive-view.column",
@@ -1345,7 +1353,11 @@ pub fn sites() -> Vec<Site> {
                 "CommonTableExpr.aliascolnames[1]",
             ],
             policy: Quoted,
-            render: |n| sql(View::create_recursive(fixed("v"), fixed("c"), body()).column(n_(n))),
+            render: |n| {
+                sql(View::create_recursive(fixed("v"), fixed("c"), body())
+                    .expect(BODY_TAKEN)
+                    .column(n_(n)))
+            },
         },
         Site {
             id: "ddl/drop-view.name",
@@ -1374,21 +1386,27 @@ pub fn sites() -> Vec<Site> {
             api: "MaterializedView::create(Name, body)",
             kinds: &["CreateTableAsStmt.into.rel.relname"],
             policy: Quoted,
-            render: |n| sql(&MaterializedView::create(n_(n), body())),
+            render: |n| sql(&MaterializedView::create(n_(n), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-materialized-view.schema",
             api: "MaterializedView::create((Name, Name), body) — the schema part",
             kinds: &["CreateTableAsStmt.into.rel.schemaname"],
             policy: Quoted,
-            render: |n| sql(&MaterializedView::create((n_(n), fixed("m")), body())),
+            render: |n| {
+                sql(&MaterializedView::create((n_(n), fixed("m")), body()).expect(BODY_TAKEN))
+            },
         },
         Site {
             id: "ddl/create-materialized-view.column",
             api: "MaterializedViewCreateStatement::column(Name)",
             kinds: &["CreateTableAsStmt.into.col_names[0]"],
             policy: Quoted,
-            render: |n| sql(MaterializedView::create(fixed("m"), body()).column(n_(n))),
+            render: |n| {
+                sql(MaterializedView::create(fixed("m"), body())
+                    .expect(BODY_TAKEN)
+                    .column(n_(n)))
+            },
         },
         Site {
             id: "ddl/refresh-materialized-view.name",
@@ -1424,21 +1442,25 @@ pub fn sites() -> Vec<Site> {
             api: "Table::create_as(Name, body)",
             kinds: &["CreateTableAsStmt.into.rel.relname"],
             policy: Quoted,
-            render: |n| sql(&Table::create_as(n_(n), body())),
+            render: |n| sql(&Table::create_as(n_(n), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-table-as.schema",
             api: "Table::create_as((Name, Name), body) — the schema part",
             kinds: &["CreateTableAsStmt.into.rel.schemaname"],
             policy: Quoted,
-            render: |n| sql(&Table::create_as((n_(n), fixed("t")), body())),
+            render: |n| sql(&Table::create_as((n_(n), fixed("t")), body()).expect(BODY_TAKEN)),
         },
         Site {
             id: "ddl/create-table-as.column",
             api: "TableCreateAsStatement::column(Name)",
             kinds: &["CreateTableAsStmt.into.col_names[0]"],
             policy: Quoted,
-            render: |n| sql(Table::create_as(fixed("t"), body()).column(n_(n))),
+            render: |n| {
+                sql(Table::create_as(fixed("t"), body())
+                    .expect(BODY_TAKEN)
+                    .column(n_(n)))
+            },
         },
         // -- SCHEMA --------------------------------------------------------
         Site {
@@ -1662,3 +1684,7 @@ pub fn sites() -> Vec<Site> {
 fn body() -> SelectStatement {
     Query::select().expr(1).take()
 }
+
+/// Why a constructor over [`body`] cannot refuse it: the query has no tie
+/// limit and no window for the definition check to refuse.
+const BODY_TAKEN: &str = "SELECT 1 is a body every definition takes";

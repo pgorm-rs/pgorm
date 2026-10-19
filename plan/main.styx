@@ -9697,12 +9697,20 @@ children (
                 title "Rust's view and CREATE TABLE AS builders run the tie-limit and window checks on their query before anything is sent"
                 kind @fix
                 deps (python-view-body-check)
+                sealed true
                 log (
                     {
                         at 2026-10-19T07:51:50.896459Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by python-view-body-check (d962207a). Rust's View::create, MaterializedView::create and Table::create_as never run check_tie_limit / check_windows on their SelectStatement, so a Rust caller can still send an unordered tie-limit or bad-window view body to the server (42601 / 42P20 / 42704), while Python and JavaScript refuse it when the statement is built. Run the checks when the body is taken (a fallible constructor, or in the executor before rendering the DDL), update sql.ddl.view / materialized-view / create-table-as, and test. The same gap exists for COPY TO's SELECT source, which copy-source-tie-check closes."
+                    }
+
+                    {
+                        at 2026-10-19T10:25:48.363181Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

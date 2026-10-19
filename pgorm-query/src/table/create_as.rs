@@ -11,7 +11,9 @@ use crate::{IntoName, Name, QueryBuilder, SelectStatement, TableName};
 /// The query's values are written into the statement as literals, which is
 /// how every DDL statement carries a value.
 ///
-/// The name and the query are taken by [`Table::create_as`](crate::Table::create_as).
+/// The name and the query are taken by [`Table::create_as`](crate::Table::create_as),
+/// which refuses a query whose tie limit or WINDOW clause PostgreSQL's grammar
+/// refuses, as a view's constructor does.
 ///
 /// # Examples
 ///
@@ -25,7 +27,7 @@ use crate::{IntoName, Name, QueryBuilder, SelectStatement, TableName};
 ///         .from(Name::runtime("order"))
 ///         .and_where(Expr::col(Name::runtime("placed")).lt("2020-01-01"))
 ///         .take(),
-/// )
+/// )?
 /// .if_not_exists()
 /// .column(Name::runtime("order_id"))
 /// .to_owned();
@@ -38,8 +40,9 @@ use crate::{IntoName, Name, QueryBuilder, SelectStatement, TableName};
 ///     ]
 ///     .join(" ")
 /// );
+/// # Ok::<(), pgorm_query::error::Error>(())
 /// ```
-// [spec:pgorm:req:sql.ddl.create-table-as]
+// [spec:pgorm:req:sql.ddl.create-table-as+1]
 #[derive(Debug, Clone)]
 pub struct TableCreateAsStatement {
     pub(crate) name: TableName,

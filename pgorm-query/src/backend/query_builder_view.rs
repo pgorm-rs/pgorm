@@ -6,7 +6,7 @@ use super::*;
 use crate::view::{RefreshMode, RelationDrop, ViewDefinition};
 
 impl QueryBuilder {
-    // [spec:pgorm:req:sql.ddl.view]
+    // [spec:pgorm:req:sql.ddl.view+1]
     pub(crate) fn prepare_view_create_statement(
         &self,
         create: &ViewCreateStatement,
@@ -18,7 +18,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.view]
+    // [spec:pgorm:req:sql.ddl.view+1]
     pub(crate) fn prepare_recursive_view_create_statement(
         &self,
         create: &RecursiveViewCreateStatement,
@@ -30,7 +30,7 @@ impl QueryBuilder {
     /// `CREATE [OR REPLACE ]<recursive>VIEW <name>[ (<columns>)][ WITH
     /// (<options>)] AS <query>`: everything a view statement writes before
     /// its check option.
-    // [spec:pgorm:req:sql.ddl.view]
+    // [spec:pgorm:req:sql.ddl.view+1]
     fn prepare_view_definition(
         &self,
         definition: &ViewDefinition,
@@ -61,7 +61,7 @@ impl QueryBuilder {
         self.prepare_relation_body(&definition.body, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.view]
+    // [spec:pgorm:req:sql.ddl.view+1]
     pub(crate) fn prepare_view_drop_statement(
         &self,
         drop: &ViewDropStatement,
@@ -70,7 +70,7 @@ impl QueryBuilder {
         self.prepare_relation_drop("VIEW", &drop.relations, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.materialized-view]
+    // [spec:pgorm:req:sql.ddl.materialized-view+1]
     pub(crate) fn prepare_materialized_view_create_statement(
         &self,
         create: &MaterializedViewCreateStatement,
@@ -88,7 +88,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.materialized-view]
+    // [spec:pgorm:req:sql.ddl.materialized-view+1]
     pub(crate) fn prepare_materialized_view_refresh_statement(
         &self,
         refresh: &MaterializedViewRefreshStatement,
@@ -104,7 +104,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.ddl.materialized-view]
+    // [spec:pgorm:req:sql.ddl.materialized-view+1]
     pub(crate) fn prepare_materialized_view_drop_statement(
         &self,
         drop: &MaterializedViewDropStatement,
@@ -113,7 +113,7 @@ impl QueryBuilder {
         self.prepare_relation_drop("MATERIALIZED VIEW", &drop.relations, sql);
     }
 
-    // [spec:pgorm:req:sql.ddl.create-table-as]
+    // [spec:pgorm:req:sql.ddl.create-table-as+1]
     pub(crate) fn prepare_table_create_as_statement(
         &self,
         create: &TableCreateAsStatement,
