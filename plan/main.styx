@@ -9236,6 +9236,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.ast.select.tie-limit +1 and exec.tie-limit +1 (select-one-zero-limit, cfadc574): narrow_limit_to_one narrows a tie limit to a plain LIMIT of at most one row, a tie limit of zero to LIMIT 0; every site re-read and re-pinned."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:04:57.045751Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ast.expr.similar-to +1 (like-escape-off, 760105c0): LikeExpr::no_escape renders ESCAPE '' for LIKE, ILIKE and SIMILAR TO; every site re-read and re-pinned."
+                        after_done true
+                    }
                 )
             }
 
@@ -11879,6 +11887,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "select-named-windows (d4f6c3e3) bumped napi.windows+1: select.window appends to the WINDOW clause, new ExtendedWindow(base) builds pgorm-query's ExtendedWindow, and check_windows refuses a refused clause as a ConstructionError in compile and embedded; the sites written before the bump re-read and pinned at +1, the binding matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:04:57.234941Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at napi.expressions +3 (like-escape-off, 760105c0): like, ilike, similarTo and their negations take an escape of one character or the empty string, which turns escaping off; every site re-read and re-pinned."
                         after_done true
                     }
                 )
