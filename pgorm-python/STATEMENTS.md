@@ -117,8 +117,9 @@ read the columns of the items before it.
 A function returning `record` — `call("json_to_record", ..)`,
 `jsonb_to_record`, `json_to_recordset`, `jsonb_to_recordset` — has no columns
 until `.column_definition(name, type)` defines them, one call each, appended
-to the list of the call added last; the type is a `pgorm.schema.DataType` or
-what one is built from (`"integer"`, a `TypeName`). A lone call writes the list in its
+to the list of the call added last; the type is a `DataType` (importable from
+`pgorm` as from `pgorm.schema`, one class) or what one is built from
+(`"integer"`, a `TypeName`). A lone call writes the list in its
 alias, `JSON_TO_RECORD($1) AS "r"("a" integer)`; beside `.with_ordinality()`
 or `.columns(..)`, which PostgreSQL does not accept there, and in a
 `ROWS FROM` of several, each call carries its own,

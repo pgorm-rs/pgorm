@@ -102,7 +102,9 @@ validation and privileges still apply; these APIs do not introspect the
 database or compute migrations.
 
 `DataType` accepts the closed built-in names listed in
-`p.capabilities()["schema_policy"]["column_types"]`. `length=` applies to char,
+`p.capabilities()["schema_policy"]["column_types"]`. `p.DataType` is the same
+class as `s.DataType`, exported beside the statement builders whose
+`column_definition` and SQL/JSON `returning` take one too. `length=` applies to char,
 varchar, bit, varbit and vector; varbit requires it. `numeric` accepts
 `precision=1..1000` with optional `scale=0..1000`. The six built-in range types
 and their multiranges are named as PostgreSQL names them, `int4range` through
