@@ -7,6 +7,7 @@ import { after, before, test } from "node:test";
 
 import {
   bind,
+  call,
   col,
   ColumnDef,
   ConstructionError,
@@ -22,6 +23,7 @@ import {
   Pool,
   refreshMaterializedView,
   select,
+  type Select,
   Table,
   Value,
 } from "../lib/index.js";
@@ -209,4 +211,22 @@ test("view statements PostgreSQL cannot take are refused as they are built", () 
     createRecursiveView("counter", ["n"], select(col("n"))).columns(["m"]).securityInvoker().inspect().sql,
     'CREATE RECURSIVE VIEW "counter" ("n", "m") WITH (security_invoker) AS SELECT "n"',
   );
+});
+
+// [spec:pgorm:req:napi.schema-views/test]
+test("a body whose tie limit or window PostgreSQL refuses is refused as each builder is called", () => {
+  const step = select(col("n").add(1)).from(new Table("r")).where(col("n").lt(4));
+  const builders: [string, (body: Select) => { inspect(): { sql: string } }][] = [
+    ["createView", (body) => createView("v", body)],
+    ["createRecursiveView", (body) => createRecursiveView("r", ["n"], body.unionAll(step))],
+    ["createMaterializedView", (body) => createMaterializedView("m", body)],
+    ["createTableAs", (body) => createTableAs("t", body)],
+  ];
+  const unordered = select(col("id").as("n")).from(account).limitWithTies(2);
+  const undeclared = select(call("count", col("id")).over("w").as("n")).from(account);
+  for (const [name, build] of builders) {
+    assert.throws(() => build(unordered), refused(/needs an ORDER BY/), name);
+    assert.throws(() => build(undeclared), refused(/no window "w" is declared/), name);
+    assert.match(build(unordered.orderBy(col("id").asc())).inspect().sql, /ORDER BY "id" ASC FETCH FIRST 2 ROWS WITH TIES/, name);
+  }
 });

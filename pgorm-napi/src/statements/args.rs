@@ -263,8 +263,17 @@ pub(crate) fn select<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
 ) -> NeonResult<SelectStatement> {
+    let select = unchecked(cx, value)?;
+    embedded(cx, select)
+}
+
+/// A `Select` as it was built, with neither of `embedded`'s checks run: only
+/// for a taker whose pgorm-query constructor runs both itself, in the same
+/// order and with the same errors, so the refusal is the one `embedded`
+/// would give.
+fn unchecked<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<SelectStatement> {
     match node(cx, value) {
-        Some(Node::Select(select)) => embedded(cx, select),
+        Some(Node::Select(select)) => Ok(select),
         Some(other) => {
             let what = other.describe();
             refuse(cx, format!("expected a Select, got {what}"))
@@ -305,6 +314,17 @@ pub(crate) fn select_at<'cx>(
 ) -> NeonResult<SelectStatement> {
     let value = arg(cx, index);
     select(cx, value)
+}
+
+/// The `Select` at `index` as a stored definition's body: a view's, a
+/// materialized view's or a `CREATE TABLE AS`'s, whose pgorm-query
+/// constructor checks it.
+pub(crate) fn definition_at<'cx>(
+    cx: &mut FunctionContext<'cx>,
+    index: usize,
+) -> NeonResult<SelectStatement> {
+    let value = arg(cx, index);
+    unchecked(cx, value)
 }
 
 /// The string at `index`, one of `choices`.

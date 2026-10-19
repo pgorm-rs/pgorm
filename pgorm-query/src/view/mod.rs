@@ -40,8 +40,7 @@ pub struct View;
 /// the server's to refuse, as it is for the two checks on their own.
 // [spec:pgorm:req:sql.ddl.view+1]
 pub(crate) fn definition_body(body: SelectStatement) -> Result<SelectStatement> {
-    body.check_tie_limit()?;
-    body.check_windows()?;
+    body.check_clauses()?;
     Ok(body)
 }
 

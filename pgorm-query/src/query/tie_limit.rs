@@ -145,4 +145,16 @@ impl SelectStatement {
             Ok(())
         }
     }
+
+    /// Both checks of this statement's own clauses that rendering leaves to
+    /// its caller, tie limit first and WINDOW clause second, for a builder
+    /// that takes a `SELECT` it will render as it is: a stored definition's
+    /// body and a COPY TO's source. The first refusal found is the error, in
+    /// that order, so every taker reports the same one for the same query.
+    // [spec:pgorm:req:sql.ddl.view+1]
+    // [spec:pgorm:def:sql.ast.copy+2]
+    pub(crate) fn check_clauses(&self) -> Result<()> {
+        self.check_tie_limit()?;
+        self.check_windows()
+    }
 }

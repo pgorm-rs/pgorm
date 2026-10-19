@@ -13278,6 +13278,13 @@ children (
                 kind @note
                 text "Found by copy-binary-rows (004ad54a). Decoding into pgorm Values refuses range types made with CREATE TYPE .. AS RANGE (and the geometric types), so copy_out_rows and other Value decodes in Rust cannot read them. The Python and JavaScript bindings decode created ranges themselves, so only Rust is affected. Decode a created range by its subtype, with live tests through copy_out_rows and a raw query; the geometric types are a separate question."
             }
+
+            {
+                at 2026-10-19T12:40:08.43599Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -13292,6 +13299,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by copy-binary-rows (004ad54a). CopyRowStream::models decodes COPY rows into models, but its tests use only plain scalar fields. Add live cases with an ActiveEnum field (a schema-qualified enum and a domain over one among them) and a JSON-struct field."
+            }
+
+            {
+                at 2026-10-19T12:40:08.125409Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
@@ -13316,12 +13330,20 @@ children (
         title "The view-body and COPY-source checks run once, through one shared helper"
         kind @refactor
         deps (rust-view-body-check)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.983035Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by rust-view-body-check (77650f0c). Python's embedded() and pgorm-napi's select_at still run check_tie_limit and check_windows before calling the view and CREATE TABLE AS constructors, which now run them too, so the constructors' refusal is unreachable from the bindings. One side's check can go for those four builders, keeping the bindings' error types. CopyToStatement::check_source makes the same two calls as definition_body in pgorm-query/src/view/mod.rs; one helper could serve both."
+            }
+
+            {
+                at 2026-10-19T13:16:21.425085Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -674,10 +674,7 @@ impl<F: CopyFormat> CopyToStatement<F> {
     pub fn check_source(&self) -> Result<(), Error> {
         match &self.source.0 {
             Source::Query(query) => match query.as_ref() {
-                SubQueryStatement::SelectStatement(select) => {
-                    select.check_tie_limit()?;
-                    select.check_windows()
-                }
+                SubQueryStatement::SelectStatement(select) => select.check_clauses(),
                 _ => Ok(()),
             },
             Source::Table(_) => Ok(()),
