@@ -3124,3 +3124,144 @@ fn deduplicated_branches_compose_with_every_set_operation() {
          SELECT DISTINCT id FROM table_1"
     );
 }
+
+/// Two tables whose `mood` columns are typed with `cheerful`, a domain over
+/// the enum `mood`.
+mod cheerful {
+    macro_rules! entity {
+        ($module:ident, $table:literal, $key:ident $Key:ident, $other:ident $Other:ident) => {
+            pub mod $module {
+                use crate as pgorm;
+                use crate::entity::prelude::*;
+                use pgorm_query::Name;
+
+                #[derive(Clone, Debug, PartialEq, Eq, DeriveModel, DeriveActiveModel)]
+                pub struct Model {
+                    pub $key: i32,
+                    pub mood: String,
+                    pub $other: String,
+                }
+
+                #[derive(Copy, Clone, Default, Debug, DeriveEntity)]
+                pub struct Entity;
+
+                impl EntityName for Entity {
+                    fn table_name(&self) -> &str {
+                        $table
+                    }
+                }
+
+                #[derive(Copy, Clone, Debug, EnumIter, DerivePrimaryKey)]
+                pub enum PrimaryKey {
+                    $Key,
+                }
+
+                impl PrimaryKeyTrait for PrimaryKey {
+                    type ValueType = i32;
+                    fn auto_increment() -> bool {
+                        false
+                    }
+                }
+
+                #[derive(Copy, Clone, Debug, EnumIter, DeriveColumn)]
+                pub enum Column {
+                    $Key,
+                    Mood,
+                    $Other,
+                }
+
+                impl ColumnTrait for Column {
+                    type EntityName = Entity;
+
+                    fn def(&self) -> ColumnDef {
+                        match self {
+                            Self::$Key => ColumnType::Integer.def(),
+                            Self::Mood => ColumnType::Domain {
+                                name: Name::runtime("cheerful"),
+                                schema: None,
+                                base: Arc::new(ColumnType::Enum {
+                                    name: Name::runtime("mood"),
+                                    schema: None,
+                                    variants: vec![Name::runtime("calm"), Name::runtime("glad")],
+                                }),
+                            }
+                            .def(),
+                            Self::$Other => ColumnType::Text.def(),
+                        }
+                    }
+                }
+
+                #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+                pub enum Relation {}
+
+                impl ActiveModelBehavior for ActiveModel {}
+            }
+        };
+    }
+
+    entity!(line, "line", id Id, note Note);
+    entity!(temper, "temper", rank Rank, label Label);
+}
+
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a pipeline
+// comparison casts each side that is an entity column whose domain is over an
+// enum to the enum — against a literal, a bound value, a list or another such
+// column — and so do coalesce, min and max, while sorting, grouping, count and
+// a plain column keep the bare column
+#[test]
+fn domain_enum_columns_compare_as_the_enum() {
+    use cheerful::{line, temper};
+
+    assert_eq!(
+        sql_of(
+            Pipeline::from(line::Entity)
+                .filter(line::Column::Mood.eq("glad").and(line::Column::Id.gt(1)))
+                .sort(line::Column::Mood)
+                .select((line::Column::Id, line::Column::Mood))
+        ),
+        "SELECT id, mood FROM line WHERE CAST(mood AS mood) = 'glad' AND id > 1 ORDER BY mood"
+    );
+    let (bound, values) = Pipeline::from(line::Entity)
+        .filter_with(|binder| line::Column::Mood.ne(binder.bind("calm")))
+        .select(line::Column::Id)
+        .into_sql()
+        .expect("pipeline compiles");
+    assert_eq!(bound, "SELECT id FROM line WHERE CAST(mood AS mood) <> $1");
+    assert_eq!(values.0, [Value::from("calm")]);
+    assert_eq!(
+        sql_of(
+            Pipeline::from(line::Entity)
+                .filter(line::Column::Mood.in_array(["calm", "glad"]))
+                .filter(line::Column::Mood.coalesce("calm").lte("glad"))
+                .select(line::Column::Id)
+        ),
+        "SELECT id FROM line WHERE CAST(mood AS mood) IN ('calm', 'glad') \
+         AND COALESCE(CAST(mood AS mood), 'calm') <= 'glad'"
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(line::Entity)
+                .join(
+                    JoinSide::Inner,
+                    temper::Entity,
+                    line::Column::Mood.eq(temper::Column::Mood),
+                )
+                .select((line::Column::Id, temper::Column::Label))
+        ),
+        "SELECT line.id, temper.label FROM line \
+         INNER JOIN temper ON CAST(line.mood AS mood) = CAST(temper.mood AS mood)"
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(line::Entity)
+                .group(line::Column::Mood)
+                .aggregate((
+                    max(line::Column::Mood).as_("highest"),
+                    min(line::Column::Mood).as_("lowest"),
+                    count(line::Column::Mood).as_("n"),
+                ))
+        ),
+        "SELECT mood, MAX(CAST(mood AS mood)) AS highest, MIN(CAST(mood AS mood)) AS lowest, \
+         COUNT(mood) AS n FROM line GROUP BY mood"
+    );
+}

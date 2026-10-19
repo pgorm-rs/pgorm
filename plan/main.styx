@@ -12658,12 +12658,20 @@ children (
         title "Subquery membership, relation joins, max/min and pipeline comparisons work on a column whose domain is over an enum"
         kind @fix
         deps (domain-enum-predicates)
+        sealed true
         log (
             {
                 at 2026-10-19T07:41:29.060284Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by domain-enum-predicates (f7862633), checked on 18.6. After the ORM's value predicates and keyset cursors learned to cast a domain-over-enum column to its enum, these still fail with 42883 (no operator / function on the domain): in_subquery / not_in_subquery, where the column is compared with a subquery of the same domain (dmood = dmood); relation joins on such columns; max / min (function max(dmood) does not exist). Pipeline (PRQL) comparisons on such a column are untested. Cast both sides to the enum in subquery membership and join conditions, cast the argument of max / min (and decide which other aggregates need it), check the pipeline's comparisons, and add a domain-enum filter assertion to pgorm-python's generated_application.py (the StockLine entity over the cheerful domain), with live tests."
+            }
+
+            {
+                at 2026-10-19T08:40:19.506203Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

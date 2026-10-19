@@ -4,12 +4,14 @@
 
 use std::marker::PhantomData;
 
-use pgorm_query::{AliasName, IntoName, Name, SqlName};
+use pgorm_query::{AliasName, IntoName, Name, SqlName, TypeName};
 
 use crate::ColumnTrait;
+use crate::entity::compared_enum;
 
 use super::adapter::{self, BinOp, PlExpr, UnOp};
 use super::funcs::CastType;
+use super::sources::typed_cast;
 
 /// A scalar expression, branded with the lifetime of the pipeline stage that
 /// is allowed to consume it.
@@ -25,13 +27,32 @@ use super::funcs::CastType;
 #[derive(Debug, Clone)]
 pub struct Expr<'brand> {
     pub(super) node: PlExpr,
+    /// The enum an entity column whose domain is over one compares as. Only
+    /// the column itself carries it: what an operator builds from the column
+    /// is a new expression of its own type.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+    pub(super) compares_as: Option<TypeName>,
     pub(super) _brand: PhantomData<fn(&'brand ()) -> &'brand ()>,
 }
 
 pub(super) fn branded<'brand>(node: PlExpr) -> Expr<'brand> {
     Expr {
         node,
+        compares_as: None,
         _brand: PhantomData,
+    }
+}
+
+impl Expr<'_> {
+    /// The node an operand of a comparison or an extremum is written as: cast
+    /// to the enum when it is a column whose domain is over one, PostgreSQL
+    /// resolving no operator or aggregate for the domain itself.
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+    pub(super) fn compared(self) -> PlExpr {
+        match &self.compares_as {
+            Some(enum_type) => typed_cast(self.node, enum_type),
+            None => self.node,
+        }
     }
 }
 
@@ -91,12 +112,15 @@ pub fn this<'brand>(column: impl IntoName) -> Expr<'brand> {
 /// An entity column is a table-qualified expression: the column enum carries
 /// its entity, so the qualification is recovered rather than restated.
 // [spec:pgorm:sem:pipeline.qualify+3]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 impl<'brand, C: ColumnTrait> From<C> for Expr<'brand> {
     fn from(column: C) -> Self {
-        branded(adapter::ident_in(
+        let mut expr = branded(adapter::ident_in(
             vec![SqlName::to_string(&*column.entity_name())],
             SqlName::to_string(&column),
-        ))
+        ));
+        expr.compares_as = compared_enum(column.def().get_column_type());
+        expr
     }
 }
 
@@ -138,8 +162,12 @@ literal!(f64, lit_float, std::convert::identity);
 literal!(bool, lit_bool, std::convert::identity);
 literal!(&str, lit_str, std::convert::identity);
 
+/// A binary operator's application, each side that is a column whose domain
+/// is over an enum cast to the enum ([`Expr::compared`]): the comparisons and
+/// `coalesce` need it, and no other operator applies to an enum at all.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
 fn bin<'brand>(lhs: Expr<'brand>, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> {
-    branded(adapter::binary(lhs.node, op, rhs.node))
+    branded(adapter::binary(lhs.compared(), op, rhs.compared()))
 }
 
 /// Everything you can do to an expression.
@@ -160,6 +188,11 @@ fn bin<'brand>(lhs: Expr<'brand>, op: BinOp, rhs: Expr<'brand>) -> Expr<'brand> 
 ///
 /// Every right-hand side takes `impl Into<Expr>`, so columns, tokens,
 /// literals, bound placeholders and expressions are interchangeable there.
+///
+/// An entity column whose domain is over an enum is compared as the enum:
+/// each operator casts it to the enum, either side, PostgreSQL resolving no
+/// operator for the domain itself. Only the column carries the type, so a
+/// token naming such a column's projection compares as the domain.
 ///
 /// The comparison names (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `is_null`,
 /// `is_not_null`) are also [`ColumnTrait`] method names. Both can be in
@@ -213,7 +246,9 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
         bin(self.into(), BinOp::Or, rhs.into())
     }
 
-    /// `COALESCE(self, rhs)`.
+    /// `COALESCE(self, rhs)`. A column whose domain is over an enum is cast
+    /// to the enum, as [`ColumnTrait::if_null`] casts it, so what the
+    /// coalesce yields can be compared.
     fn coalesce(self, rhs: impl Into<Expr<'brand>>) -> Expr<'brand> {
         bin(self.into(), BinOp::Coalesce, rhs.into())
     }
@@ -256,7 +291,8 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     /// Membership in an explicit list: `self IN (items...)`.
     ///
     /// Members are expressions, so they can be literals or bound
-    /// placeholders.
+    /// placeholders. A column whose domain is over an enum, the operand or a
+    /// member, is compared as the enum, as by the comparisons.
     fn in_array<I>(self, items: I) -> Expr<'brand>
     where
         I: IntoIterator,
@@ -264,11 +300,11 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
     {
         let items = items
             .into_iter()
-            .map(|item| item.into().node)
+            .map(|item| item.into().compared())
             .collect::<Vec<_>>();
         branded(adapter::call(
             "in",
-            vec![adapter::array(items), self.into().node],
+            vec![adapter::array(items), self.into().compared()],
         ))
     }
 

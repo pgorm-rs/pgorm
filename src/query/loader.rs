@@ -1,12 +1,13 @@
+use crate::entity::compared_enum;
 use crate::{
-    Condition, ConnectionTrait, EntityName, EntityTrait, Error, Iterable, Key, ModelTrait,
-    PrimaryKeyToColumn, QueryFilter, QueryTrait, Related, RelationDef, RelationType, Req, Select,
-    SelectGraph, error::*,
+    ColumnTrait, Condition, ConnectionTrait, EntityName, EntityTrait, Error, Iterable, Key,
+    ModelTrait, PrimaryKeyToColumn, QueryFilter, QueryTrait, Related, RelationDef, RelationType,
+    Req, Select, SelectGraph, error::*,
 };
 use async_trait::async_trait;
 use pgorm_query::{
     AliasName, ColumnRef, Expr, FromItem, IntoColumnRef, Name, NamedTable, SimpleExpr, TableName,
-    ValueTuple, alias,
+    TypeName, ValueTuple, alias,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -130,7 +131,7 @@ where
 {
     type Model = M;
 
-    // [spec:pgorm:sem:query.loader.batching+7]
+    // [spec:pgorm:sem:query.loader.batching+8]
     // [spec:pgorm:sem:query.loader.regroup+6]
     async fn load_one<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Option<R::Model>>, Error>
     where
@@ -162,7 +163,7 @@ where
             .collect()
     }
 
-    // [spec:pgorm:sem:query.loader.batching+7]
+    // [spec:pgorm:sem:query.loader.batching+8]
     // [spec:pgorm:sem:query.loader.regroup+6]
     async fn load_many<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
@@ -243,7 +244,7 @@ where
 const LOADER_SOURCE_ALIAS: AliasName = alias("pgorm_loader_src");
 
 /// The identifier the input entity's table is bound to inside a loader read.
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 fn source_alias() -> Name {
     Name::new(LOADER_SOURCE_ALIAS)
 }
@@ -257,7 +258,7 @@ fn source_alias() -> Name {
 /// whole — its column pairs, its `on_condition` and its `condition_type`
 /// composed by the same `join_condition` every other join goes through. The
 /// loader reconstructs no part of a relation and so can drop no part of one.
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 fn join_source<R, F>(graph: SelectGraph<R, ()>, rel: RelationDef) -> SelectGraph<R, (Req<F>,)>
 where
     R: EntityTrait,
@@ -287,7 +288,7 @@ where
     F: EntityTrait,
 {
     let src_tbl = FromItem::from(TableName::Table(source_alias()));
-    let condition = prepare_condition(&src_tbl, from_col, keys)?;
+    let condition = prepare_condition(&src_tbl, from_col, &key_casts::<F>(from_col), keys)?;
     let graph = QueryFilter::filter(graph, condition);
 
     let mut buckets: HashMap<ValueTuple, Vec<R::Model>> = keys
@@ -317,7 +318,7 @@ where
 /// lists are the same length and the same order as the input models — so a
 /// caller reporting on a bucket can name the key it was collected for without
 /// reading the input models a second time.
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 async fn load_related<M, R, C>(
     models: &[M],
     select: Select<R>,
@@ -396,7 +397,7 @@ where
 /// from its declaration, never inherited from a builder a caller may have
 /// edited, and clearing before projecting is what makes the two statements
 /// the same one.
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 // [spec:pgorm:sem:query.loader.many-to-many+3]
 fn root_graph<R: EntityTrait>(select: Select<R>) -> SelectGraph<R, ()> {
     let mut query = select.into_query();
@@ -450,7 +451,7 @@ fn check_target_ref(rel: &RelationDef) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 fn resolve_column<Model>(col: &Name) -> Result<<Model::Entity as EntityTrait>::Column, Error>
 where
     Model: ModelTrait,
@@ -465,7 +466,7 @@ where
     })
 }
 
-// [spec:pgorm:sem:query.loader.batching+7]
+// [spec:pgorm:sem:query.loader.batching+8]
 fn extract_key<Model>(target_col: &Key, model: &Model) -> Result<ValueTuple, Error>
 where
     Model: ModelTrait,
@@ -477,13 +478,37 @@ where
     Ok(ValueTuple::from(values))
 }
 
-// [spec:pgorm:sem:query.loader.batching+7]
-fn prepare_condition(table: &FromItem, col: &Key, keys: &[ValueTuple]) -> Result<Condition, Error> {
+/// The enum each key column compares as, by the input entity's own
+/// definition of it: `None` but for a column whose domain is over an enum. A
+/// name the entity does not resolve is `None` here, [`extract_key`] having
+/// already refused it.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+fn key_casts<F: EntityTrait>(from_col: &Key) -> Vec<Option<TypeName>> {
+    from_col
+        .iter()
+        .map(|name| {
+            <F::Column as FromStr>::from_str(&name.to_string())
+                .ok()
+                .and_then(|col| compared_enum(col.def().get_column_type()))
+        })
+        .collect()
+}
+
+// [spec:pgorm:sem:query.loader.batching+8]
+fn prepare_condition(
+    table: &FromItem,
+    col: &Key,
+    casts: &[Option<TypeName>],
+    keys: &[ValueTuple],
+) -> Result<Condition, Error> {
     // TODO when value is hashable, retain only unique values
     let keys = keys.to_owned();
     let mut columns = Vec::with_capacity(col.arity());
     for col in col.iter() {
         columns.push(table_column(table, col)?);
+    }
+    if casts.iter().any(Option::is_some) {
+        return Ok(Condition::all().add(compared_key_predicate(columns, casts, keys)));
     }
     Ok(match columns.as_slice() {
         [column_a] => {
@@ -492,6 +517,37 @@ fn prepare_condition(table: &FromItem, col: &Key, keys: &[ValueTuple]) -> Result
         _ => Condition::all()
             .add(Expr::tuple(columns.iter().cloned().map(SimpleExpr::Column)).in_tuples(keys)),
     })
+}
+
+/// The key predicate where some key column's domain is over an enum: that
+/// column, and every value bound against it, cast to the enum, PostgreSQL
+/// resolving no operator for the domain itself.
+// [spec:pgorm:sem:query.loader.batching+8]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+fn compared_key_predicate(
+    columns: Vec<ColumnRef>,
+    casts: &[Option<TypeName>],
+    keys: Vec<ValueTuple>,
+) -> SimpleExpr {
+    let compared = |i: usize, expr: Expr| match casts.get(i).and_then(Option::as_ref) {
+        Some(enum_type) => expr.cast_as_type(enum_type.clone()),
+        None => SimpleExpr::from(expr),
+    };
+    let columns: Vec<SimpleExpr> = columns
+        .into_iter()
+        .enumerate()
+        .map(|(i, column)| compared(i, Expr::col(column)))
+        .collect();
+    let rows = keys.into_iter().map(|key| {
+        key.into_iter()
+            .enumerate()
+            .map(|(i, value)| compared(i, Expr::val(value)))
+            .collect::<Vec<_>>()
+    });
+    match <[SimpleExpr; 1]>::try_from(columns) {
+        Ok([column]) => Expr::expr(column).is_in(rows.flatten()),
+        Err(columns) => Expr::tuple(columns).is_in(rows.map(SimpleExpr::Tuple)),
+    }
 }
 
 // [spec:pgorm:req:query.loader.table-ref-limitation+3]
@@ -513,7 +569,7 @@ fn table_column(tbl: &FromItem, col: &Name) -> Result<ColumnRef, Error> {
     }
 }
 
-// [spec:pgorm:sem:query.loader.batching+7/test]    the one read a direct load
+// [spec:pgorm:sem:query.loader.batching+8/test]    the one read a direct load
 // issues: the caller's selector rooted, the input entity joined back under the
 // alias the key predicate qualifies against, and the authored relation carried
 // into the `ON` whole — its predicate under either composition
@@ -537,7 +593,7 @@ mod tests {
     ) -> String {
         let src_tbl = FromItem::from(TableName::Table(source_alias()));
         let keys = vec![1i32.into_value_tuple(), 2i32.into_value_tuple()];
-        let condition = prepare_condition(&src_tbl, from_col, &keys)
+        let condition = prepare_condition(&src_tbl, from_col, &[], &keys)
             .expect("a bare table qualifies the key column");
         QueryFilter::filter(graph, condition).as_query().to_string()
     }
@@ -642,6 +698,55 @@ mod tests {
                 r#"FROM "filling""#,
                 r#"WHERE "filling"."name" LIKE 'Ch%'"#,
                 r#"ORDER BY "filling"."id" DESC"#,
+            ]
+            .join(" ")
+        );
+    }
+
+    // [spec:pgorm:sem:query.loader.batching+8/test]    a key column whose
+    // domain is over an enum is cast with each value bound against it, a
+    // composite key holding one written as tuples of the cast values, its
+    // other columns bare
+    #[test]
+    fn domain_enum_key_columns_compare_cast() {
+        let src_tbl = FromItem::from(TableName::Table(source_alias()));
+        let predicate = |col: Key, casts: &[Option<TypeName>], keys: Vec<ValueTuple>| {
+            let condition = prepare_condition(&src_tbl, &col, casts, &keys)
+                .expect("a bare table qualifies the key columns");
+            fruit::Entity::find()
+                .filter(condition)
+                .as_query()
+                .to_string()
+                .split_once("WHERE ")
+                .expect("a WHERE clause")
+                .1
+                .to_owned()
+        };
+        let mood = || Some(TypeName::new(Name::runtime("mood")));
+        assert_eq!(
+            predicate(
+                Key::from(Name::runtime("mood")),
+                &[mood()],
+                vec!["calm".into_value_tuple(), "glad".into_value_tuple()],
+            ),
+            [
+                r#"CAST("pgorm_loader_src"."mood" AS mood)"#,
+                "IN (CAST('calm' AS mood), CAST('glad' AS mood))",
+            ]
+            .join(" ")
+        );
+        assert_eq!(
+            predicate(
+                Key::from(vec![Name::runtime("mood"), Name::runtime("id")]),
+                &[mood(), None],
+                vec![
+                    ("calm", 1).into_value_tuple(),
+                    ("glad", 2).into_value_tuple()
+                ],
+            ),
+            [
+                r#"(CAST("pgorm_loader_src"."mood" AS mood), "pgorm_loader_src"."id")"#,
+                "IN ((CAST('calm' AS mood), 1), (CAST('glad' AS mood), 2))",
             ]
             .join(" ")
         );

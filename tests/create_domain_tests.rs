@@ -17,7 +17,8 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{
-    ColumnType, ConstraintDrop, Domain, DomainCheck, Expr, Name, Query, Schema, extension::Type,
+    ColumnType, ConstraintDrop, Domain, DomainCheck, Expr, Name, Query, Schema, alias,
+    extension::Type,
 };
 use pgorm::{ConnectionTrait, TransactionTrait, entity::prelude::*};
 use pretty_assertions::assert_eq;
@@ -70,6 +71,48 @@ mod line {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// `temper`, keyed by a column of the domain `line.mood` is typed with: the
+/// relation between the two joins a domain over an enum on either side.
+mod temper {
+    use super::Mood;
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[pgorm(table_name = "temper")]
+    pub struct Model {
+        #[pgorm(
+            primary_key,
+            auto_increment = false,
+            column_type = "Domain { name: Name::runtime(\"cheerful\"), schema: None, base: Arc::new(Mood::db_type().get_column_type().clone()) }"
+        )]
+        pub mood: Mood,
+        pub label: String,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// Neither entity declares the relation in its `Relation` enum: PostgreSQL
+/// cannot implement a foreign key between two columns of a domain over an enum
+/// (`42804`), so the tables are created without one, and the relation is a
+/// join the two entities describe.
+impl Related<temper::Entity> for line::Entity {
+    fn to() -> RelationDef {
+        line::Entity::belongs_to(temper::Entity)
+            .columns(line::Column::Mood, temper::Column::Mood)
+            .into()
+    }
+}
+
+impl Related<line::Entity> for temper::Entity {
+    fn to() -> RelationDef {
+        temper::Entity::has_many(line::Entity).into()
+    }
 }
 
 fn n(name: &str) -> Name {
@@ -204,7 +247,7 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 // filters through them, a predicate on the enum's domain comparing as the enum, and a check's
 // refusal arrives as 23514 naming the constraint
 // [spec:pgorm:def:sql.types.column-type+11/test]
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
@@ -305,7 +348,7 @@ async fn ids_where(
 /// no operator for the domain itself. The value is compared, not written, so
 /// the domain's check does not refuse it, and a keyset cursor over the column
 /// pages by the enum's order in either direction.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+8/test]    every value predicate, the
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
 // [spec:pgorm:sem:exec.cursor.keyset+6/test]    a keyset cursor over a column whose domain is
@@ -402,6 +445,301 @@ async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
         page(descending.desc().after(Mood::Glad).all(&db).await?).len(),
         3
     );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// Lines 1 to 5, calm, glad, calm, glad, calm, beside a calm and a glad
+/// temper, each table created from its entity over the same domain.
+async fn lines_and_tempers(db: &impl ConnectionTrait) -> Result<(), Error> {
+    domains(db).await?;
+    let schema = pgorm::Schema::new();
+    db.batch_execute(&schema.create_table_from_entity(line::Entity).to_string())
+        .await?;
+    db.batch_execute(&schema.create_table_from_entity(temper::Entity).to_string())
+        .await?;
+    for (id, mood) in [
+        (1, Mood::Calm),
+        (2, Mood::Glad),
+        (3, Mood::Calm),
+        (4, Mood::Glad),
+        (5, Mood::Calm),
+    ] {
+        written(id, 1, mood, &[]).into_active().insert(db).await?;
+    }
+    for (mood, label) in [(Mood::Calm, "steady"), (Mood::Glad, "bright")] {
+        temper::Model {
+            mood,
+            label: label.to_owned(),
+        }
+        .into_active()
+        .insert(db)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Subquery membership compares a column whose domain is over an enum as the
+/// enum, with the subquery's projection cast beside it — even a projection of
+/// the same domain, which the enum does not compare with either — and max and
+/// min aggregate the column as the enum, the domain having neither.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    in_subquery and
+// not_in_subquery against a subquery projecting the same domain, and max and min of the
+// column, live
+#[pgorm_macros::test]
+async fn domain_enum_subqueries_and_extrema_compare() -> Result<(), Error> {
+    use line::Column::{Id, Mood as Moods};
+
+    let ctx = TestContext::new("domain_enum_subqueries").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let bright = || {
+        Query::select()
+            .column(temper::Column::Mood)
+            .from(temper::Entity)
+            .and_where(temper::Column::Label.eq("bright"))
+            .to_owned()
+    };
+    assert_eq!(
+        line::Entity::find()
+            .select_only()
+            .column(Id)
+            .filter(Moods.in_subquery(bright()))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "line"."id" FROM "line" WHERE CAST("line"."mood" AS mood)"#,
+            r#"IN (SELECT CAST("mood" AS mood) FROM "temper" WHERE "temper"."label" = 'bright')"#,
+        ]
+        .join(" ")
+    );
+    assert_eq!(ids_where(&db, Moods.in_subquery(bright())).await?, [2, 4]);
+    assert_eq!(
+        ids_where(&db, Moods.not_in_subquery(bright())).await?,
+        [1, 3, 5]
+    );
+    let own = Query::select()
+        .column(Moods)
+        .from(line::Entity)
+        .and_where(Id.eq(3))
+        .to_owned();
+    assert_eq!(ids_where(&db, Moods.in_subquery(own)).await?, [1, 3, 5]);
+
+    let extreme = |aggregate: pgorm::pgorm_query::SimpleExpr| {
+        line::Entity::find()
+            .select_only()
+            .expr_as(Expr::expr(aggregate).cast_as(n("text")), alias("extreme"))
+    };
+    assert_eq!(
+        extreme(Moods.max()).as_query().to_string(),
+        r#"SELECT CAST(MAX(CAST("line"."mood" AS mood)) AS text) AS "extreme" FROM "line""#
+    );
+    assert_eq!(
+        extreme(Moods.max()).into_tuple::<String>().one(&db).await?,
+        "glad"
+    );
+    assert_eq!(
+        extreme(Moods.min()).into_tuple::<String>().one(&db).await?,
+        "calm"
+    );
+    assert_eq!(
+        line::Entity::find()
+            .select_only()
+            .expr(Moods.count())
+            .into_tuple::<i64>()
+            .one(&db)
+            .await?,
+        5
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A relation joined on columns whose domain is over an enum compares them
+/// as the enum wherever it is joined: a related read, the graph's edge, both
+/// loaders — whose batch key is the column — and a linked read scoped by a
+/// key of the domain.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a relation over columns whose
+// domain is over an enum joins them as the enum in a related graph read, inner_join, a graph
+// edge, load_one and load_many, and find_related and find_linked scope by such a key, live
+// [spec:pgorm:sem:query.build.join+5/test]    a pair over such columns joins them cast
+// [spec:pgorm:sem:query.loader.batching+8/test]    a batch keyed by such a column casts the
+// key column and its values, from either side of the relation
+#[pgorm_macros::test]
+async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
+    use pgorm::{LoaderTrait, RelatedLink};
+
+    let ctx = TestContext::new("domain_enum_relations").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let labelled = |rows: Vec<(line::Model, Option<temper::Model>)>| {
+        rows.into_iter()
+            .map(|(line, temper)| (line.id, temper.map(|temper| temper.label)))
+            .collect::<Vec<_>>()
+    };
+    let related = line::Entity::graph()
+        .related_maybe::<temper::Entity>()
+        .order_by_asc(line::Column::Id);
+    assert!(
+        related.as_query().to_string().contains(
+            r#"LEFT JOIN "temper" ON CAST("line"."mood" AS mood) = CAST("temper"."mood" AS mood)"#
+        ),
+        "{}",
+        related.as_query().to_string()
+    );
+    let steady = || Some("steady".to_owned());
+    let bright = || Some("bright".to_owned());
+    assert_eq!(
+        labelled(related.all(&db).await?),
+        [
+            (1, steady()),
+            (2, bright()),
+            (3, steady()),
+            (4, bright()),
+            (5, steady())
+        ]
+    );
+    let joined = line::Entity::find()
+        .inner_join(temper::Entity)
+        .filter(temper::Column::Label.eq("bright"))
+        .order_by_asc(line::Column::Id)
+        .all(&db)
+        .await?;
+    assert_eq!(
+        joined.iter().map(|line| line.id).collect::<Vec<_>>(),
+        [2, 4]
+    );
+
+    let graph = line::Entity::graph()
+        .join_one::<temper::Entity>(<line::Entity as Related<temper::Entity>>::to())
+        .order_by_asc(line::Column::Id)
+        .all(&db)
+        .await?;
+    assert_eq!(
+        graph
+            .iter()
+            .map(|(line, temper)| (line.id, temper.label.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            (1, "steady"),
+            (2, "bright"),
+            (3, "steady"),
+            (4, "bright"),
+            (5, "steady")
+        ]
+    );
+
+    let lines = line::Entity::find()
+        .order_by_asc(line::Column::Id)
+        .all(&db)
+        .await?;
+    let tempers = lines.load_one(temper::Entity, &db).await?;
+    assert_eq!(
+        tempers
+            .iter()
+            .map(|temper| temper.as_ref().map(|temper| temper.mood))
+            .collect::<Vec<_>>(),
+        lines.iter().map(|line| Some(line.mood)).collect::<Vec<_>>()
+    );
+    let tempers = temper::Entity::find()
+        .order_by_asc(temper::Column::Label)
+        .all(&db)
+        .await?;
+    let loaded = tempers.load_many(line::Entity, &db).await?;
+    assert_eq!(
+        loaded
+            .iter()
+            .map(|lines| {
+                let mut ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
+                ids.sort_unstable();
+                ids
+            })
+            .collect::<Vec<_>>(),
+        [vec![2, 4], vec![1, 3, 5]]
+    );
+
+    let glad = temper::Entity::find_by_id(Mood::Glad).one(&db).await?;
+    let ids = |lines: Vec<line::Model>| {
+        let mut ids = lines.iter().map(|line| line.id).collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids
+    };
+    assert_eq!(ids(glad.find_related(line::Entity).all(&db).await?), [2, 4]);
+    let linked = glad.find_linked(RelatedLink::to(line::Entity));
+    assert!(
+        linked
+            .as_query()
+            .to_string()
+            .contains(r#"WHERE CAST("r0"."mood" AS mood) = CAST('glad' AS mood)"#),
+        "{}",
+        linked.as_query().to_string()
+    );
+    assert_eq!(ids(linked.all(&db).await?), [2, 4]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A pipeline compares an entity column whose domain is over an enum as the
+/// enum — against a literal, a bound value, a list, or the same domain across
+/// a join — and min and max aggregate it as the enum.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    pipeline comparisons, in_array,
+// coalesce, a join condition and min / max over a column whose domain is over an enum, live
+#[pgorm_macros::test]
+async fn domain_enum_pipeline_compares_as_the_enum() -> Result<(), Error> {
+    use pgorm::pipeline::{CastType, ExprOps, JoinSide, Pipeline, max, min};
+
+    let ctx = TestContext::new("domain_enum_pipeline").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let conn = &db;
+    let ids = |pipeline: Pipeline| async move {
+        pipeline
+            .sort(line::Column::Id)
+            .select(line::Column::Id)
+            .into_tuple::<i32>()
+            .expect("the pipeline compiles")
+            .all(conn)
+            .await
+    };
+    let glad = Pipeline::from(line::Entity).filter(line::Column::Mood.eq("glad"));
+    assert_eq!(ids(glad).await?, [2, 4]);
+    let bound = Pipeline::from(line::Entity)
+        .filter_with(|binder| line::Column::Mood.lt(binder.bind(Mood::Glad)));
+    assert_eq!(ids(bound).await?, [1, 3, 5]);
+    let listed = Pipeline::from(line::Entity).filter(line::Column::Mood.in_array(["glad"]));
+    assert_eq!(ids(listed).await?, [2, 4]);
+    let coalesced =
+        Pipeline::from(line::Entity).filter(line::Column::Mood.coalesce("glad").eq("calm"));
+    assert_eq!(ids(coalesced).await?, [1, 3, 5]);
+    let joined = Pipeline::from(line::Entity)
+        .join(
+            JoinSide::Inner,
+            temper::Entity,
+            line::Column::Mood.eq(temper::Column::Mood),
+        )
+        .filter(temper::Column::Label.eq("bright"));
+    assert_eq!(ids(joined).await?, [2, 4]);
+
+    let extremes = Pipeline::from(line::Entity)
+        .group(line::Column::Qty)
+        .aggregate((
+            max(line::Column::Mood).cast(CastType::Text).as_("highest"),
+            min(line::Column::Mood).cast(CastType::Text).as_("lowest"),
+        ))
+        .into_tuple::<(i32, String, String)>()
+        .expect("the pipeline compiles")
+        .all(&db)
+        .await?;
+    assert_eq!(extremes, [(1, "glad".to_owned(), "calm".to_owned())]);
 
     drop(db);
     ctx.delete().await;

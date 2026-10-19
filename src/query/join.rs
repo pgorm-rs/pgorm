@@ -1,7 +1,7 @@
 use crate::{EntityTrait, QuerySelect, Related, Select};
 pub use pgorm_query::JoinType;
 
-// [spec:pgorm:sem:query.build.join+4]
+// [spec:pgorm:sem:query.build.join+5]
 impl<E> Select<E>
 where
     E: EntityTrait,

@@ -1222,7 +1222,7 @@ pub async fn consolidate_composite_key() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.build.join+4/test]    a composite relation constrains
+// [spec:pgorm:sem:query.build.join+5/test]    a composite relation constrains
 // the join on every declared pair: against rows where each column alone is
 // ambiguous, the join still matches exactly one parent per child
 #[pgorm_macros::test]
