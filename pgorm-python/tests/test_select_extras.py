@@ -127,7 +127,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         mixed = p.Select(a, b).from_(pairs).group_by(a, G.set(a, b)).order_by(b.asc())
         self.assertEqual(await self.rows(mixed), [(1, 2), (1, 3)])
 
-    # [spec:pgorm:req:sql.ast.expr.similar-to/test]    a whole-string match, the default
+    # [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    a whole-string match, the default
     # backslash escape and a chosen one
     async def test_similar_to_matches_whole_strings(self):
         def names(predicate):
@@ -143,6 +143,21 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await names(name.not_similar_to(p.LikePattern("%!%", escape="!"))),
                          [("Ann",), ("Bob",), ("Cy",)])
         self.assertEqual(await names(name.similar_to(p.LikePattern("' OR 1=1 --"))), [])
+
+    # [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    an empty escape turns escaping off for
+    # LIKE, ILIKE and SIMILAR TO, a backslash then matching itself
+    async def test_empty_escape_turns_escaping_off(self):
+        def text(value):
+            return p.bind(value).cast(p.TypeName("text"))
+
+        off = p.LikePattern("a\\b", escape="")
+        answers = await self.rows(p.Select(
+            text("a\\b").like(p.LikePattern("a\\b")).as_("plain"),
+            text("a\\b").like(off).as_("off"),
+            text("A\\B").ilike(off).as_("folded"),
+            text("a\\b").similar_to(off).as_("similar"),
+            text("50%").not_like(p.LikePattern("50\\%", escape="")).as_("percent")))
+        self.assertEqual(answers, [(False, True, True, True, True)])
 
     # [spec:pgorm:req:sql.ast.select.table-function/test]    UNNEST numbered WITH ORDINALITY,
     # its columns named, beside the row it reads

@@ -203,9 +203,9 @@ fn a_exprs(sql: &str) -> Vec<(i64, String)> {
         .collect()
 }
 
-// [spec:pgorm:req:sql.ast.expr.similar-to/test]    both forms, the pattern bound and an ESCAPE
+// [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms, the pattern bound and an ESCAPE
 // inline, and the grammar reads them as SIMILAR TO
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 #[test]
 fn similar_to_binds_its_pattern() {
     let query = Query::select()
@@ -243,7 +243,59 @@ fn similar_to_binds_its_pattern() {
     assert_eq!(patterns, [1, 2]);
 }
 
-// [spec:pgorm:req:sql.ast.expr.similar-to/test]    SIMILAR TO ranks with LIKE: bare under the
+// [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    `no_escape` renders `ESCAPE ''` after LIKE,
+// ILIKE and SIMILAR TO's bound pattern, and the grammar reads an empty escape there
+// [spec:pgorm:def:sql.render.operators+7/test]
+#[test]
+fn no_escape_renders_an_empty_escape() {
+    let off = || LikeExpr::new(r"a\%").no_escape();
+    let query = Query::select()
+        .column(Char::Character)
+        .from(Char::Table)
+        .and_where(Expr::col(Char::Character).like(off()))
+        .and_where(Expr::col(Char::Character).ilike(off()))
+        .and_where(Expr::col(Char::Character).similar_to(off()))
+        .take();
+
+    let (sql, values) = query.build();
+    assert_eq!(
+        sql,
+        r#"SELECT "character" FROM "character" WHERE "character" LIKE $1 ESCAPE '' AND ("character" ILIKE $2 ESCAPE '') AND "character" SIMILAR TO $3 ESCAPE ''"#
+    );
+    assert_eq!(values.0, vec![r"a\%".into(); 3]);
+
+    // The grammar folds an ESCAPE into a call on the pattern: `like_escape`
+    // for LIKE and ILIKE, `similar_to_escape` for SIMILAR TO, the escape its
+    // second argument.
+    let sql = query.to_string();
+    let escapes: Vec<(String, String)> = parsed_nodes(&sql, "AExpr")
+        .iter()
+        .map(|expr| {
+            let call = &expr["rexpr"]["FuncCall"];
+            (
+                call["funcname"][1]["String"]["sval"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+                call["args"][1]["AConst"]["val"]["Sval"]["sval"]
+                    .as_str()
+                    .unwrap_or("no escape")
+                    .to_owned(),
+            )
+        })
+        .collect();
+    let empty = |call: &str| (call.to_owned(), String::new());
+    assert_eq!(
+        escapes,
+        [
+            empty("like_escape"),
+            empty("like_escape"),
+            empty("similar_to_escape")
+        ]
+    );
+}
+
+// [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    SIMILAR TO ranks with LIKE: bare under the
 // logical operators and NOT, an arithmetic operand bare inside it
 // [spec:pgorm:def:sql.render.precedence+9/test]
 #[test]

@@ -3,7 +3,7 @@
 // Expressions over pgorm-query's builders. An operand that is not an
 // expression is a value, bound as a parameter: nothing a caller passes becomes
 // SQL text, and an identifier is quoted wherever it appears.
-// [spec:pgorm:req:napi.expressions+2]
+// [spec:pgorm:req:napi.expressions+3]
 
 import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

@@ -1,5 +1,6 @@
 use crate::keywords::Position;
 use crate::query::RowLimit;
+use crate::types::LikeEscape;
 use crate::{
     extension::{
         ExtensionCreateStatement, ExtensionDropOpt, ExtensionDropStatement, TypeAlterAddOpt,
@@ -544,13 +545,17 @@ impl QueryBuilder {
     }
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
-    /// `LIKE` / `ILIKE`.
-    // [spec:pgorm:def:sql.render.operators+6]
+    /// `LIKE` / `ILIKE` / `SIMILAR TO`.
+    // [spec:pgorm:def:sql.render.operators+7]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
-        if let Some(escape) = like.escape {
-            write!(sql, " ESCAPE ").unwrap();
-            self.prepare_constant(&escape.into(), sql);
+        match like.escape {
+            Some(LikeEscape::Char(escape)) => {
+                write!(sql, " ESCAPE ").unwrap();
+                self.prepare_constant(&escape.into(), sql);
+            }
+            Some(LikeEscape::Off) => write!(sql, " ESCAPE ''").unwrap(),
+            None => {}
         }
     }
 
@@ -711,7 +716,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+6] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+7] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -723,7 +728,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+6]
+    // [spec:pgorm:def:sql.render.operators+7]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,

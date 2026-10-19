@@ -1080,6 +1080,7 @@ assertions (
     {id codegen-accepts-create-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:26:07.721992Z}
     {id select-one-zero-limit, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:57:45.040473Z}
     {id lock-of-table-names, kind @complete, author "brendan@necessary.nu", at 2026-10-19T07:44:55.74759Z}
+    {id like-escape-off, kind @complete, author "brendan@necessary.nu", at 2026-10-19T07:57:31.911135Z}
 )
 
 impl_evidence (

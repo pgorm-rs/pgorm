@@ -117,9 +117,12 @@ class ExpressionTests(unittest.TestCase):
             self.assertIn("ESCAPE", compiled.sql)
         with self.assertRaises(ConstructionError):
             expression.like(needle)
-        for escape in ["", "xy", "\0", 1]:
+        for escape in ["xy", "\0", 1]:
             with self.assertRaises(ConstructionError):
                 LikePattern("pattern", escape=escape)
+        compiled = expression.like(LikePattern(needle, escape="")).inspect()
+        self.assertTrue(compiled.sql.endswith("ESCAPE ''"))
+        self.assertEqual(compiled.params, [Value(needle)])
 
     def test_casts_retain_qualified_enum_identity(self):
         kind = TypeName('Mood"', schema="Tenant")

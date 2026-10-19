@@ -1826,7 +1826,7 @@ fn delete_returning_specific_exprs() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 fn select_pgtrgm_similarity() {
     assert_eq!(
         Query::select()

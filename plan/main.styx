@@ -9361,12 +9361,27 @@ children (
                 title "LIKE and SIMILAR TO can turn escaping off with ESCAPE ''"
                 kind @fix
                 deps (sql-select-extras)
+                sealed true
                 log (
                     {
                         at 2026-10-18T18:24:03.027325Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Found by sql-select-extras (a0e8e0aa). LikeExpr::escape takes a char, so ESCAPE '' (escaping turned off, which PostgreSQL accepts for LIKE and SIMILAR TO) has no spelling, while a multi-character escape stays unrepresentable as it should. Add a way to say \"no escape character\", render ESCAPE '', hold it to the oracle, test it live, and give Python and JavaScript the same."
+                    }
+
+                    {
+                        at 2026-10-19T07:48:30.583827Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-19T07:57:31.911135Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

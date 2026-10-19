@@ -886,7 +886,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle+2/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [

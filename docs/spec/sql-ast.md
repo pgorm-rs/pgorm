@@ -815,7 +815,7 @@ today, including panicking edges and deliberate failsafes.
 > corresponding function call. JSON field, path and key-existence access is
 > `sql.ast.expr.json`.
 
-> [spec:pgorm:req:sql.ast.expr.similar-to]
+> [spec:pgorm:req:sql.ast.expr.similar-to+1]
 > `similar_to(pattern)` and `not_similar_to(pattern)`, on `Expr` and on
 > `SimpleExpr`, build `SIMILAR TO` and `NOT SIMILAR TO`
 > (`BinOper::SimilarTo`, `BinOper::NotSimilarTo`): whether the whole string
@@ -823,12 +823,15 @@ today, including panicking edges and deliberate failsafes.
 > and `_` with `|`, `*`, `+`, `?`, `{m,n}`, grouping and bracket classes
 > added. The pattern is any `IntoLikeExpr`, the operand LIKE takes, held as
 > `SimpleExpr::LikePattern`: it is bound, which the server types `text`, and a
-> `LikeExpr` carries the one-character `ESCAPE` the grammar admits only as a
-> pattern's tail, written as an inline constant. The default escape is a
-> backslash. An escape of more than one character, the server's refusal
-> (`22025`), has no construction, `LikeExpr::escape` taking a `char`, and
-> `ESCAPE ''`, which turns escaping off, is not built for SIMILAR TO, as it is
-> not for LIKE. Both operators are of the LIKE family the renderer ranks by
+> `LikeExpr` carries the `ESCAPE` the grammar admits only as a pattern's tail.
+> The default escape is a backslash; `LikeExpr::escape(c)` replaces it with
+> one character, written as an inline constant, and `LikeExpr::no_escape()`
+> turns escaping off, `ESCAPE ''`, so every character of the pattern, a
+> backslash included, is itself or a wildcard. Both hold for LIKE and ILIKE as
+> for SIMILAR TO, the server accepting the empty escape for all three. An
+> escape of more than one character, the server's refusal (`22025`), has no
+> construction: `escape` takes a `char` and `no_escape` nothing. Both
+> operators are of the LIKE family the renderer ranks by
 > (`sql.render.precedence`), where the grammar ranks `SIMILAR`.
 
 > [spec:pgorm:req:sql.ast.expr.in+1]

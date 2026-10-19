@@ -7,7 +7,8 @@ use crate::{
     identifiers::{Direction, Nulls, PyIdentifier},
 };
 
-/// An explicit SQL LIKE pattern, including its optional escape character.
+/// An explicit SQL LIKE pattern, including its optional escape character; an
+/// empty escape turns escaping off.
 #[pyclass(name = "LikePattern", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct LikePattern {
@@ -24,13 +25,21 @@ impl LikePattern {
             .map_err(|_| ConstructionError::new_err("LIKE pattern requires a string"))?;
         let mut inner = LikeExpr::new(pattern);
         if let Some(escape) = escape {
-            let escape: char = escape.extract().map_err(|_| {
-                ConstructionError::new_err("LIKE escape requires one Unicode scalar")
-            })?;
-            if escape == '\0' {
-                return Err(ConstructionError::new_err("LIKE escape cannot contain NUL"));
-            }
-            inner = inner.escape(escape);
+            let refused = || {
+                ConstructionError::new_err(
+                    "LIKE escape requires one Unicode scalar, or an empty string to turn escaping off",
+                )
+            };
+            let escape: String = escape.extract().map_err(|_| refused())?;
+            let mut chars = escape.chars();
+            inner = match (chars.next(), chars.next()) {
+                (None, _) => inner.no_escape(),
+                (Some('\0'), None) => {
+                    return Err(ConstructionError::new_err("LIKE escape cannot contain NUL"));
+                }
+                (Some(character), None) => inner.escape(character),
+                (Some(_), Some(_)) => return Err(refused()),
+            };
         }
         Ok(Self { inner })
     }

@@ -168,6 +168,12 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
             &globals,
             "p.col('text').ilike(p.LikePattern('!%_', escape='!'))",
             Expr::col(Name::runtime("text")).ilike(LikeExpr::new("!%_").escape('!')),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('text').not_like(p.LikePattern('a\\\\%', escape=''))",
+            Expr::col(Name::runtime("text")).not_like(LikeExpr::new("a\\%").no_escape()),
         )
     })
 }
@@ -270,7 +276,7 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
 }
 
 // [spec:pgorm:req:python.expressions+2/test]
-// [spec:pgorm:req:sql.ast.expr.similar-to/test]    both forms through LikePattern, its
+// [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms through LikePattern, its
 // ESCAPE carried, and a plain string refused as LIKE's is
 #[test]
 fn similar_to_takes_like_patterns() -> PyResult<()> {

@@ -338,7 +338,7 @@ fn alias_identifiers_are_never_empty() {
 // for `SimpleExpr::LikePattern`, the one place the grammar admits it, so it can
 // no longer be applied to two arbitrary operands.
 // [spec:pgorm:req:sql.render.oracle+2/test]
-// [spec:pgorm:def:sql.render.operators+6/test]
+// [spec:pgorm:def:sql.render.operators+7/test]
 // [spec:pgorm:def:sql.types.opers+5/test]
 #[test]
 fn escape_renders_only_inside_like() {

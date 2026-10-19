@@ -199,8 +199,8 @@ test("GROUP BY DISTINCT groups each grouping set its elements reach once", async
   }
 });
 
-// [spec:pgorm:req:napi.expressions+2/test]
-// [spec:pgorm:req:sql.ast.expr.similar-to/test]
+// [spec:pgorm:req:napi.expressions+3/test]
+// [spec:pgorm:req:sql.ast.expr.similar-to+1/test]
 test("SIMILAR TO matches a whole string against its pattern, the pattern bound and its escape honoured", async () => {
   const words = async (predicate: Expr) =>
     field(await pool().query(select(word.col("w")).from(word).where(predicate)), "w").sort();
@@ -219,7 +219,7 @@ test("SIMILAR TO matches a whole string against its pattern, the pattern bound a
 });
 
 // [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
 // [spec:pgorm:req:sql.ast.select.table-function/test]
 test("unnest WITH ORDINALITY numbers each element, reading a column of the item before it", async () => {
   const letters = tableFunction(call("unnest", bind(["x", "y", "z"]).cast("text", { array: true })), {
@@ -241,7 +241,7 @@ test("unnest WITH ORDINALITY numbers each element, reading a column of the item 
 });
 
 // [spec:pgorm:req:napi.select+1/test]
-// [spec:pgorm:req:napi.expressions+2/test]
+// [spec:pgorm:req:napi.expressions+3/test]
 // [spec:pgorm:req:sql.ast.select.table-function/test]
 test("ROWS FROM reads its calls side by side, padding the shorter with NULL", async () => {
   const zipped = tableFunction(

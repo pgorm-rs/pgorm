@@ -430,7 +430,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+2]
+> [spec:pgorm:req:napi.expressions+3]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -451,7 +451,8 @@ SQL text running a built statement.
 > pgorm-query method of that meaning, and `Condition.all` and `Condition.any`
 > pgorm-query's `Condition`, empty ones true and false. `like`, `ilike`,
 > `similarTo` and their negations take a pattern string, bound, and an
-> optional one-character escape (`sql.ast.expr.similar-to`); `startsWith`,
+> optional escape of one character, or the empty string, which turns escaping
+> off (`sql.ast.expr.similar-to`); `startsWith`,
 > `endsWith` and `containsText` read their argument as
 > text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
 > `_` match themselves. `call` reaches only the functions pgorm-query has a

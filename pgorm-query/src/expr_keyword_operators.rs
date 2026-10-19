@@ -183,7 +183,7 @@ impl Expr {
     /// );
     /// assert_eq!(values.0, vec!["(A|B)%".into(), "!%%".into()]);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    // [spec:pgorm:req:sql.ast.expr.similar-to+1]
     pub fn similar_to<L>(self, pattern: L) -> SimpleExpr
     where
         L: IntoLikeExpr,
@@ -193,7 +193,7 @@ impl Expr {
 
     /// Express a `NOT SIMILAR TO` expression, the complement of
     /// [`Expr::similar_to`].
-    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    // [spec:pgorm:req:sql.ast.expr.similar-to+1]
     pub fn not_similar_to<L>(self, pattern: L) -> SimpleExpr
     where
         L: IntoLikeExpr,
@@ -204,7 +204,7 @@ impl Expr {
 
 impl SimpleExpr {
     /// Express a `SIMILAR TO` expression, as [`Expr::similar_to`] does.
-    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    // [spec:pgorm:req:sql.ast.expr.similar-to+1]
     pub fn similar_to<L>(self, pattern: L) -> Self
     where
         L: IntoLikeExpr,
@@ -214,7 +214,7 @@ impl SimpleExpr {
 
     /// Express a `NOT SIMILAR TO` expression, as [`Expr::not_similar_to`]
     /// does.
-    // [spec:pgorm:req:sql.ast.expr.similar-to]
+    // [spec:pgorm:req:sql.ast.expr.similar-to+1]
     pub fn not_similar_to<L>(self, pattern: L) -> Self
     where
         L: IntoLikeExpr,

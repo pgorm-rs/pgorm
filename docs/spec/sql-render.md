@@ -287,7 +287,7 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+6]
+> [spec:pgorm:def:sql.render.operators+7]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `SIMILAR TO`,
 > `NOT SIMILAR TO`, `IS`, `IS NOT`,
@@ -318,8 +318,8 @@ an ideal Postgres renderer would emit.
 > `ESCAPE` is not an operator: it is grammatical only as the tail of a `LIKE`
 > / `ILIKE` / `SIMILAR TO` pattern, so it renders from
 > `SimpleExpr::LikePattern` — the pattern as a value, then ` ESCAPE ` and the
-> escape character as an inline constant — and there is no `BinOper` that
-> could place it anywhere else.
+> escape character as an inline constant, or ` ESCAPE ''` when escaping is
+> off — and there is no `BinOper` that could place it anywhere else.
 
 > [spec:pgorm:def:sql.render.precedence+9]
 > Parenthesis elision is driven by
