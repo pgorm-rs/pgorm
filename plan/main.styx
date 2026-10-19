@@ -543,6 +543,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.ddl.column-def +13 (column-default-parens, 92497302): a column definition's DEFAULT reads a b_expr, so an operator expression renders parenthesised in CREATE TABLE and ADD COLUMN, while ALTER COLUMN SET DEFAULT keeps it bare."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:20:08.605466Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-checked 2026-10-19 at sql.ddl +12 and sql.ddl.alter-table +13 (schema-statement-wrapper, db3d326a): no wrapper enum stands over a family's statements, ForeignKey's one entry point is create, and the rename statements are no longer said to be carried by TableStatement."
+                        after_done true
+                    }
                 )
             }
 
