@@ -164,6 +164,9 @@ await pool.copyIn(load, fs.createReadStream("accounts.csv"));        // rows wri
 
 const dump = copyTo(select(col("id"), col("name")).from(new Table("accounts")).where(col("active").eq(true)), "binary");
 for await (const chunk of await pool.copyOut(dump)) output.write(chunk);   // Uint8Array chunks
+
+await pool.copyInRows(copyFrom("accounts", "binary").columns(["id", "name"]), [[1, "Ada"], [2, null]]);
+for await (const [id, name] of await pool.copyOutRows(dump)) console.log(id, name);
 ```
 
 - **`copyFrom(table, format)`** and **`copyTo(source, format)`** build
@@ -187,6 +190,14 @@ for await (const chunk of await pool.copyOut(dump)) output.write(chunk);   // Ui
 - **`copyOut(statement)`** resolves, once the server accepts the statement,
   with a `CopyOutStream` of `Uint8Array` chunks, one per `next()`; a chunk is
   a piece of the format's byte stream, not a row.
+- **`copyInRows(statement, rows)`** and **`copyOutRows(statement)`** run a
+  binary COPY as rows of values: `rows` is an iterable or async iterable of
+  arrays, each holding a value for every column in order, read as parameters
+  are and written against the column types the server describes before the
+  COPY starts; a row of another width, or a value its column's type does not
+  take, is a `ConstructionError` that abandons the COPY. `copyOutRows`
+  resolves with a `CopyRowStream` of arrays, each value decoded as a result
+  column of its type is, and `columns` naming the columns.
 - A COPY holds what it runs on — a pool's takes a connection of its own; a
   connection or transaction refuses other work with a `LifecycleError` until
   the COPY ends — and, unlike `stream`, it runs in a transaction. Leaving a

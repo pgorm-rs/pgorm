@@ -12348,6 +12348,14 @@ children (
         id copy-binary-rows
         title "Binary COPY reads and writes rows of pgorm Values, from Rust, Python and JavaScript"
         kind @feat
+        implements {
+            main (
+                [spec:pgorm:req:conn.copy.rows]
+                [spec:pgorm:def:sql.ast.copy.parts]
+                [spec:pgorm:req:napi.copy.rows]
+                [spec:pgorm:req:python.copy.rows]
+            )
+        }
         deps (conn-copy)
         log (
             {
@@ -12355,6 +12363,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed from conn-copy (211a6b9b), which built COPY at the byte level only. Binary COPY's format is a header, then per row a field count and each field as length plus the type's binary send form, then a trailer; pgorm already writes and reads every Value's binary form for bind and decode. Add a typed row writer over a CopyInSink<CopyBinary> (rows of Values, each column's type checked against the statement's columns) and a typed reader over a CopyOutStream<CopyBinary> decoding into Values or a model, with the bindings' equivalents (Python rows of values, JavaScript arrays), live round trips over every value kind, and refusals for a row of the wrong width or type."
+            }
+
+            {
+                at 2026-10-18T22:26:22.20178Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

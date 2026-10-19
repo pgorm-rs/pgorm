@@ -1473,6 +1473,17 @@ today, including panicking edges and deliberate failsafes.
 > from a file on the server, and through `PROGRAM`, is not built
 > (`sql.scope`).
 
+> [spec:pgorm:def:sql.ast.copy.parts]
+> A COPY statement's parts are read back through getters, so what a COPY
+> carries can be described without rendering it (`conn.copy.rows`):
+> `CopyFromStatement::get_table` and `get_columns`, its table and its column
+> list, empty when it names none; and `CopyToStatement::get_source`, its
+> `CopySource`, whose `get_table` and `get_query` give the table or the
+> statement it reads, the other `None`. They borrow: nothing a getter returns
+> changes the statement, so a source still holds only what its conversion
+> accepted.
+
+## WITH clauses and CTEs
 ## WITH clauses and CTEs
 
 > [spec:pgorm:def:sql.ast.with+5]

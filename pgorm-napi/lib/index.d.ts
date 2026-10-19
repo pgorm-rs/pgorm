@@ -11,7 +11,7 @@ import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
 import type { SchemaStatement } from "./schema.d.ts";
 import type { Pipeline } from "./pipeline.d.ts";
-import type { CopyFrom, CopyOutStream, CopySource, CopyTo } from "./copy.d.ts";
+import type { CopyFrom, CopyOutStream, CopyRows, CopyRowStream, CopySource, CopyTo } from "./copy.d.ts";
 import type { Listener, ListenerOptions } from "./listen.d.ts";
 
 export * from "./expressions.d.ts";
@@ -499,6 +499,23 @@ export declare abstract class Queryable {
    * own.
    */
   copyOut(statement: CopyTo, options?: OperationOptions): Promise<CopyOutStream>;
+  // [spec:pgorm:req:napi.copy.rows]
+  /**
+   * Run a binary `COPY … FROM STDIN` whose rows are arrays of values, one for
+   * each column the server describes for the statement, in order, and
+   * resolve with the rows it wrote. Each value is read as a {@link Param} is
+   * and written against its column's type as a parameter is bound; a row of
+   * another width, or a value its column's type does not take, is a
+   * {@link ConstructionError} that abandons the COPY, as a source that throws
+   * does. The rows are pulled only as the COPY takes them, a batch at a time.
+   */
+  copyInRows(statement: CopyFrom<"binary">, rows: CopyRows, options?: OperationOptions): Promise<number>;
+  /**
+   * Run a binary `COPY … TO STDOUT` and resolve, once the server accepts it,
+   * with its rows as a {@link CopyRowStream} of arrays of values, each field
+   * decoded by its column's type as a result column of that type is.
+   */
+  copyOutRows(statement: CopyTo<"binary">, options?: OperationOptions): Promise<CopyRowStream>;
   // [spec:pgorm:req:napi.listen]
   /**
    * Send `payload` on `channel` through `SELECT pg_notify($1, $2)`, both

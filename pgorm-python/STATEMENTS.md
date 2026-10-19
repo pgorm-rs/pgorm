@@ -525,6 +525,37 @@ the outcome unknown (outside a transaction the rows may already be
 committed), so the connection, or the whole transaction, is discarded rather
 than reused.
 
+### Rows of values
+
+A binary COPY can also carry rows of values rather than bytes:
+
+```python
+load = CopyFrom(Table("items", schema="app"), "binary").columns("id", "name")
+inserted = await pool.copy_in_rows(load, [(1, "apple"), (2, None)])
+
+async with await pool.copy_out_rows(CopyTo(query, "binary")) as rows:
+    print(rows.columns)              # ("id", "name")
+    async for id, name in rows:
+        ...
+```
+
+`copy_in_rows(statement, rows)` and `copy_out_rows(statement)` take only a
+binary statement, typed `CopyFrom[Literal["binary"]]` and
+`CopyTo[Literal["binary"]]`. Binary COPY sends no column types, so pgorm asks
+the server for them before the COPY starts, by preparing (never running) a
+`SELECT` of the COPY's columns, or the COPY TO's own query; a description the
+server refuses raises its `DatabaseError` and leaves the connection usable.
+`rows` is a sync or async iterable of sequences, each holding a value for every
+column in order: `None` is NULL, and every other value is read as a parameter
+is, a plain value by its kind or a `Value` by its own, and written against its
+column's type. A row of another width, or a value its column's type does not
+take, raises `ConstructionError` naming the column and aborts the COPY, so
+nothing is written. `copy_out_rows` returns a `CopyRowStream`, an async
+iterator of tuples whose values are decoded as a query's result columns of
+those types are; a field no value holds raises `DecodeError` and closes the
+stream. Both hold and release what they run on as `copy_in` and `copy_out`
+do.
+
 ## Inspection and execution preparation
 
 `inspect()` validates the public builder state and invokes that statement's

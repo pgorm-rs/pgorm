@@ -3,12 +3,11 @@ mod fingerprint;
 pub use fingerprint::{QueryContext, QueryFingerprint};
 
 use crate::{
-    ConnectionTrait, CopyInSink, CopyOutStream, CopyTrait, DatabaseConnection, DatabasePool,
-    DatabaseTransaction, Error, SqlText, TransactionTrait,
+    ConnectionTrait, DatabaseConnection, DatabasePool, DatabaseTransaction, Error, SqlText,
+    TransactionTrait,
 };
 use async_trait::async_trait;
 use fingerprint::FingerprintSuffix;
-use pgorm_query::{CopyFormat, CopyFromStatement, CopyToStatement};
 use std::time::{Duration, Instant};
 use tokio_postgres::{
     Row, RowStream,
@@ -576,61 +575,9 @@ impl<M: MetricsCollector> ConnectionTrait for InstrumentedTransaction<'_, M> {
     }
 }
 
-// [spec:pgorm:req:metric.layer.copy]    COPY on an instrumented connection
-#[async_trait]
-impl<M: MetricsCollector> CopyTrait for InstrumentedConnection<M> {
-    async fn copy_in<F>(
-        &mut self,
-        statement: &CopyFromStatement<F>,
-    ) -> Result<CopyInSink<'_>, Error>
-    where
-        F: CopyFormat,
-    {
-        let sql = statement.to_string();
-        report!(self, "copy_in", Some(&sql),
-            self.connection.copy_in(statement).await, _ => None)
-    }
-
-    async fn copy_out<F>(
-        &mut self,
-        statement: &CopyToStatement<F>,
-    ) -> Result<CopyOutStream<'_>, Error>
-    where
-        F: CopyFormat,
-    {
-        let sql = statement.to_string();
-        report!(self, "copy_out", Some(&sql),
-            self.connection.copy_out(statement).await, _ => None)
-    }
-}
-
-// [spec:pgorm:req:metric.layer.copy]    COPY inside an instrumented transaction
-#[async_trait]
-impl<M: MetricsCollector> CopyTrait for InstrumentedTransaction<'_, M> {
-    async fn copy_in<F>(
-        &mut self,
-        statement: &CopyFromStatement<F>,
-    ) -> Result<CopyInSink<'_>, Error>
-    where
-        F: CopyFormat,
-    {
-        let sql = statement.to_string();
-        report!(self, "copy_in", Some(&sql),
-            open_transaction_mut!(self).copy_in(statement).await, _ => None)
-    }
-
-    async fn copy_out<F>(
-        &mut self,
-        statement: &CopyToStatement<F>,
-    ) -> Result<CopyOutStream<'_>, Error>
-    where
-        F: CopyFormat,
-    {
-        let sql = statement.to_string();
-        report!(self, "copy_out", Some(&sql),
-            open_transaction_mut!(self).copy_out(statement).await, _ => None)
-    }
-}
+// Declared below the reporting macros: a `macro_rules!` macro is visible
+// only to code after its definition, a child module's included.
+mod copy;
 
 // [spec:pgorm:sem:metric.layer.tx+3]    timed begin, uninstrumented handle
 #[async_trait]

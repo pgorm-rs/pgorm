@@ -52,7 +52,7 @@ impl PyRecord {
                 table_oid: column.table_oid(),
                 column_id: column.column_id(),
             });
-            let value = super::decode::value(&row, index)?;
+            let value = super::decode::value(super::decode::Field::Row(&row, index))?;
             // A successful terminal guarantees representability in Python now,
             // including temporal bounds and f32 NaN payloads, not at a later getter.
             Python::attach(|py| value.to_python(py))?;

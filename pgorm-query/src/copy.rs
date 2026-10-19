@@ -231,6 +231,20 @@ impl<F: CopyFormat> CopyFromStatement<F> {
         self.options.freeze = true;
         self
     }
+
+    /// The table the rows go into.
+    // [spec:pgorm:def:sql.ast.copy.parts]
+    pub fn get_table(&self) -> &TableName {
+        &self.table
+    }
+
+    /// The columns each row supplies, in order. Empty when the statement
+    /// names none, and each row then supplies every column of the table the
+    /// server does not generate, in the table's order.
+    // [spec:pgorm:def:sql.ast.copy.parts]
+    pub fn get_columns(&self) -> &[Name] {
+        &self.columns
+    }
 }
 
 impl<F: CopyDelimitedFormat> CopyFromStatement<F> {
@@ -443,6 +457,28 @@ pub trait IntoCopySource {
     fn into_copy_source(self) -> CopySource;
 }
 
+impl CopySource {
+    /// The table a `COPY table TO STDOUT` reads, every column of it the
+    /// server does not generate; `None` for a statement's rows.
+    // [spec:pgorm:def:sql.ast.copy.parts]
+    pub fn get_table(&self) -> Option<&TableName> {
+        match &self.0 {
+            Source::Table(table) => Some(table),
+            Source::Query(_) => None,
+        }
+    }
+
+    /// The statement whose rows a `COPY (query) TO STDOUT` reads: a `SELECT`,
+    /// or a write carrying a `RETURNING` list; `None` for a table.
+    // [spec:pgorm:def:sql.ast.copy.parts]
+    pub fn get_query(&self) -> Option<&SubQueryStatement> {
+        match &self.0 {
+            Source::Table(_) => None,
+            Source::Query(query) => Some(query),
+        }
+    }
+}
+
 impl IntoCopySource for CopySource {
     fn into_copy_source(self) -> CopySource {
         self
@@ -646,6 +682,12 @@ impl<F: CopyFormat> CopyToStatement<F> {
             },
             Source::Table(_) => Ok(()),
         }
+    }
+
+    /// What the rows are read from: a table, or a statement's rows.
+    // [spec:pgorm:def:sql.ast.copy.parts]
+    pub fn get_source(&self) -> &CopySource {
+        &self.source
     }
 }
 

@@ -1,14 +1,18 @@
 // @ts-check
 
 // COPY: the `COPY … FROM STDIN` and `COPY … TO STDOUT` statements, built over
-// pgorm-query's, and the data flow `copyIn` and `copyOut` run them with. A
-// COPY's format is named as it is made, and an option its format or its
-// direction does not take is refused as it is called. COPY takes no bind
-// parameters, so `inspect()` gives its SQL, every value in it a literal, and
-// no values.
+// pgorm-query's, and the data flow `copyIn` and `copyOut` run them with, as
+// bytes, and `copyInRows` and `copyOutRows`, as rows of values in the binary
+// format. A COPY's format is named as it is made, and an option its format
+// or its direction does not take is refused as it is called. COPY takes no
+// bind parameters, so `inspect()` gives its SQL, every value in it a
+// literal, and no values.
 // [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:napi.copy.rows]
 
 import { arg, Builder, trusted, TRUSTED } from "./builder.js";
+import { pump } from "./copy-feed.js";
+import { CopyRowStream, pumpRows, rowSource } from "./copy-rows.js";
 import { LifecycleError } from "./errors.js";
 import { abortable, native, queryOptions, TRUSTED as HANDLE } from "./operations.js";
 
@@ -200,13 +204,6 @@ export function copyTo(source, format) {
 }
 
 /**
- * How large a piece of a chunk crosses into the addon at once: a chunk of a
- * hundred megabytes is copied and queued a piece at a time, each within the
- * addon's budget of queued bytes.
- */
-const PIECE = 64 * 1024;
-
-/**
  * @typedef {Uint8Array | Iterable<Uint8Array> | AsyncIterable<Uint8Array>} CopySource
  */
 
@@ -235,149 +232,6 @@ export function copySource(source) {
   );
 }
 
-/**
- * How a source's pull watches the COPY it feeds: the error the COPY was cut
- * off with once the connection, pool or transaction under it closed, the
- * pull waiting to hear it — one slot, so watching costs nothing per chunk —
- * and whether the last pull failed by the source's own error, which leaves
- * nothing to close.
- *
- * @typedef {{ failed: boolean, failure: unknown, wake: ((error: unknown) => void) | undefined, sourceFailed: boolean }} Watch
- */
-
-/**
- * Watch `ended`, which rejects once a COPY is cut off.
- *
- * @param {Promise<void>} ended
- * @returns {Watch}
- */
-function watching(ended) {
-  /** @type {Watch} */
-  const watch = { failed: false, failure: undefined, wake: undefined, sourceFailed: false };
-  ended.then(undefined, (error) => {
-    watch.failed = true;
-    watch.failure = error;
-    watch.wake?.(error);
-  });
-  return watch;
-}
-
-/**
- * The iterator's next step, or a rejection once the signal fires or the COPY
- * is cut off: a source that never yields again does not hold open a COPY that
- * has ended.
- *
- * @param {Iterator<unknown> | AsyncIterator<unknown>} iterator
- * @param {AbortSignal | undefined} signal
- * @param {Watch} watch
- * @returns {Promise<IteratorResult<unknown>>}
- */
-function step(iterator, signal, watch) {
-  signal?.throwIfAborted();
-  if (watch.failed) throw watch.failure;
-  return new Promise((resolve, reject) => {
-    const onAbort = () => reject(signal?.reason);
-    signal?.addEventListener("abort", onAbort, { once: true });
-    watch.wake = reject;
-    const settled = () => {
-      signal?.removeEventListener("abort", onAbort);
-      watch.wake = undefined;
-    };
-    try {
-      Promise.resolve(iterator.next()).then(
-        (result) => {
-          settled();
-          resolve(result);
-        },
-        (error) => {
-          settled();
-          watch.sourceFailed = true;
-          reject(error);
-        },
-      );
-    } catch (error) {
-      settled();
-      watch.sourceFailed = true;
-      reject(error);
-    }
-  });
-}
-
-/**
- * Queue `chunk` for the COPY a piece at a time, waiting on the addon's budget
- * while what it has queued is not yet taken.
- *
- * @param {unknown} handle
- * @param {Uint8Array} chunk
- */
-async function write(handle, chunk) {
-  for (let at = 0; at < chunk.length; at += PIECE) {
-    const piece = chunk.subarray(at, at + PIECE);
-    while (!native.copyInWrite(handle, piece)) await native.copyInReady(handle, piece.length);
-  }
-}
-
-/**
- * Feed a COPY FROM the addon has opened from `open`'s iterator, pulling the
- * next chunk only once the last is queued, and finish it, resolving with the
- * rows it wrote. If the source throws, yields something that is not a
- * `Uint8Array`, or the signal fires, the COPY is abandoned — the server
- * writes nothing — and the promise rejects with that error; an iterator left
- * mid-way is closed.
- *
- * @param {unknown} handle
- * @param {() => Iterator<unknown> | AsyncIterator<unknown>} open
- * @param {AbortSignal | undefined} signal
- * @returns {Promise<number>}
- */
-async function pump(handle, open, signal) {
-  /** @type {Iterator<unknown> | AsyncIterator<unknown> | undefined} */
-  let iterator;
-  let pulling = false;
-  const watch = watching(native.copyInEnded(handle));
-  try {
-    iterator = open();
-    for (;;) {
-      pulling = true;
-      const next = await step(iterator, signal, watch);
-      pulling = false;
-      if (next.done) break;
-      const chunk = next.value;
-      if (!(chunk instanceof Uint8Array)) {
-        throw new TypeError(`a COPY's source yields Uint8Array chunks, not ${describe(chunk)}`);
-      }
-      if (chunk.length > 0) await write(handle, chunk);
-    }
-  } catch (error) {
-    await native.copyInAbort(handle);
-    if (iterator !== undefined && !pulling) await close(iterator);
-    else if (iterator !== undefined && !watch.sourceFailed) void close(iterator);
-    throw error;
-  }
-  return await native.copyInFinish(handle);
-}
-
-/**
- * Close an iterator left mid-way, as `for await` does when its body throws.
- * Its own failure to close is not the COPY's.
- *
- * @param {Iterator<unknown> | AsyncIterator<unknown>} iterator
- */
-async function close(iterator) {
-  try {
-    await iterator.return?.();
-  } catch {
-    // The COPY's own error stands.
-  }
-}
-
-/** @param {unknown} value */
-function describe(value) {
-  if (value === null) return "null";
-  if (typeof value === "object") return value.constructor?.name ?? "an object";
-  return typeof value;
-}
-
 /** The COPY opener a pool, a connection and a transaction each implement, keyed privately. */
 export const COPY = Symbol("copy");
 
@@ -393,9 +247,10 @@ export class CopyRunner {
    * @param {"in" | "out"} _direction
    * @param {unknown} _copy
    * @param {unknown} _token
+   * @param {boolean} _rows
    * @returns {Promise<unknown>}
    */
-  [COPY](_direction, _copy, _token) {
+  [COPY](_direction, _copy, _token, _rows) {
     return Promise.reject(new TypeError("COPY runs on a Pool, a Connection or a Transaction"));
   }
 
@@ -418,7 +273,7 @@ export class CopyRunner {
     const { signal } = queryOptions(options);
     const open = copySource(source);
     return await abortable(signal, async (token) => {
-      const handle = await this[COPY]("in", arg(statement), token);
+      const handle = await this[COPY]("in", arg(statement), token, false);
       return await pump(handle, open, signal);
     });
   }
@@ -437,8 +292,52 @@ export class CopyRunner {
       throw new TypeError("copyOut runs a COPY TO STDOUT, from copyTo(source, format)");
     }
     const { signal } = queryOptions(options);
-    const handle = await abortable(signal, (token) => this[COPY]("out", arg(statement), token));
+    const handle = await abortable(signal, (token) => this[COPY]("out", arg(statement), token, false));
     return new CopyOutStream(handle, this, signal, HANDLE);
+  }
+
+  /**
+   * Run a binary `COPY … FROM STDIN` whose rows are arrays of values, one for
+   * each of the columns the server describes for it, and resolve with the
+   * rows it wrote. Each value is read as a parameter is, and written against
+   * its column's type as a parameter is bound. A row of another width, or a
+   * value its column's type does not take, is a `ConstructionError` that
+   * abandons the COPY, as a source that throws does.
+   *
+   * @param {unknown} statement
+   * @param {unknown} rows
+   * @param {unknown} [options]
+   * @returns {Promise<number>}
+   */
+  async copyInRows(statement, rows, options = {}) {
+    if (!(statement instanceof CopyFrom) || statement.format !== "binary") {
+      throw new TypeError('copyInRows runs a binary COPY FROM STDIN, from copyFrom(table, "binary")');
+    }
+    const { signal } = queryOptions(options);
+    const open = rowSource(rows);
+    return await abortable(signal, async (token) => {
+      const handle = await this[COPY]("in", arg(statement), token, true);
+      return await pumpRows(handle, open, signal);
+    });
+  }
+
+  /**
+   * Run a binary `COPY … TO STDOUT` and resolve, once the server accepts it,
+   * with its rows as a stream of arrays of values, each field decoded by the
+   * type the server describes for its column, as a result column of that
+   * type is.
+   *
+   * @param {unknown} statement
+   * @param {unknown} [options]
+   * @returns {Promise<CopyRowStream>}
+   */
+  async copyOutRows(statement, options = {}) {
+    if (!(statement instanceof CopyTo) || statement.format !== "binary") {
+      throw new TypeError('copyOutRows runs a binary COPY TO STDOUT, from copyTo(source, "binary")');
+    }
+    const { signal } = queryOptions(options);
+    const handle = await abortable(signal, (token) => this[COPY]("out", arg(statement), token, true));
+    return new CopyRowStream(handle, this, signal, HANDLE);
   }
 }
 

@@ -40,6 +40,8 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `pool.stream(query)`, `connection.stream(query)` | `ResultStream`, an `AsyncIterator[Record]` and async context manager |
 | `copy_in(statement, source)` on a pool, connection or transaction | `int` rows inserted |
 | `copy_out(statement)` on a pool, connection or transaction | `CopyOutStream`, an `AsyncIterator[bytes]` and async context manager |
+| `copy_in_rows(statement, rows)` on a pool, connection or transaction | `int` rows inserted; `statement` is a `CopyFrom[Literal["binary"]]` |
+| `copy_out_rows(statement)` on a pool, connection or transaction | `CopyRowStream`, an `AsyncIterator[tuple[object, ...]]` and async context manager |
 | `pool.listener(capacity=1024)` | `Listener`, an `AsyncIterator[Notification]` and async context manager |
 | `notify(channel, payload)` on a pool, connection or transaction | `None` |
 | `connection.begin()`, `transaction.begin()` | `Transaction` |

@@ -1,8 +1,11 @@
 """COPY FROM STDIN and COPY TO STDOUT through pgorm's CopyTrait."""
 
 import asyncio
+import datetime as dt
+from decimal import Decimal
 import os
 import unittest
+from uuid import UUID
 
 import pgorm as p
 
@@ -472,6 +475,179 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(before, after)
         finally:
             await pool.close()
+
+
+KINDS = (
+    "CREATE TABLE python_copy_kinds (id int4 PRIMARY KEY, c_bool bool, c_int2 int2, "
+    "c_int8 int8, c_float8 float8, c_text text, c_bytea bytea, c_jsonb jsonb, c_uuid uuid, "
+    "c_date date, c_time time, c_timestamp timestamp, c_timestamptz timestamptz, "
+    "c_numeric numeric, c_interval interval, c_int4range int4range, c_int4_array int4[], "
+    "c_text_array text[], c_mood python_copy_mood, c_positive python_copy_positive, c_null text)"
+)
+
+# The values `kind_row` writes, as SQL literals the server parses itself.
+LITERALS = (
+    "INSERT INTO python_copy_kinds VALUES (2, true, -7, 9000000000, -2.25, 'it''s ü ☃', "
+    "'\\x0001ff', '{\"k\": \"v\", \"n\": [1, null]}', "
+    "'67e55044-10b1-426f-9247-bb680e5fe0c8', '2026-10-19', '23:59:58.123456', "
+    "'1999-12-31 23:00:00', '2023-11-14 22:13:20Z', 12345.6789, "
+    "'1 year 2 mons 3 days 00:00:04.000005', '[1,5)', '{1,NULL,3}', '{a,\"b,c\"}', "
+    "'loud', 7, NULL)"
+)
+
+
+def kind_row(id):
+    """One value of each kind, as Python writes a parameter of it."""
+    return [
+        id, True, p.Value(-7, "i16"), 9_000_000_000, -2.25, "it's ü ☃", b"\x00\x01\xff",
+        p.Value({"k": "v", "n": [1, None]}, "json"),
+        UUID("67e55044-10b1-426f-9247-bb680e5fe0c8"),
+        dt.date(2026, 10, 19), dt.time(23, 59, 58, 123456), dt.datetime(1999, 12, 31, 23),
+        p.Value(dt.datetime(2023, 11, 14, 22, 13, 20, tzinfo=dt.timezone.utc), "datetime_utc"),
+        Decimal("12345.6789"), p.Interval(14, 3, 4_000_005),
+        p.Value(p.Range(1, 5), "int4range"), p.Value.array("i32", [1, None, 3]),
+        p.Value.array("text", ["a", "b,c"]), "loud", 7, None,
+    ]
+
+
+async def rows_of(stream):
+    async with stream:
+        return [row async for row in stream]
+
+
+class CopyRows(unittest.IsolatedAsyncioTestCase):
+    async def drop(self):
+        for statement in (
+            "DROP TABLE IF EXISTS python_copy_kinds, python_copy_rows, python_copy_points",
+            "DROP TYPE IF EXISTS python_copy_mood",
+            "DROP DOMAIN IF EXISTS python_copy_positive",
+        ):
+            await self.pool.execute(p.RawSQL(statement))
+
+    async def asyncSetUp(self):
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=3)
+        await self.drop()
+        await self.pool.execute(p.RawSQL("CREATE TYPE python_copy_mood AS ENUM ('calm', 'loud')"))
+        await self.pool.execute(p.RawSQL(
+            "CREATE DOMAIN python_copy_positive AS int4 CHECK (VALUE > 0)"
+        ))
+        await self.pool.execute(p.RawSQL(KINDS))
+        await self.pool.execute(p.RawSQL(
+            "CREATE TABLE python_copy_rows (id int PRIMARY KEY, name text, qty int NOT NULL DEFAULT 7)"
+        ))
+        self.kinds = p.Table("python_copy_kinds")
+        self.rows = p.Table("python_copy_rows")
+
+    async def asyncTearDown(self):
+        if self.pool.closed:
+            self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=3)
+        await self.drop()
+        await asyncio.wait_for(self.pool.close(), 2)
+
+    # [spec:pgorm:req:python.copy.rows/test]    each value kind is written as a parameter binds and read back as a result decodes
+    async def test_rows_round_trip_every_kind(self):
+        operations = p.capabilities()["operations"]
+        for name in ("connection.copy_in_rows", "transaction.copy_out_rows"):
+            self.assertIn("CopyTrait", operations[name]["rust_api"])
+        self.assertEqual(await self.pool.copy_in_rows(p.CopyFrom(self.kinds, "binary"), [kind_row(1)]), 1)
+        await self.pool.execute(p.RawSQL(LITERALS))
+        same = await self.pool.fetch_one(p.RawSQL(
+            "SELECT (to_jsonb(a) - 'id') = (to_jsonb(b) - 'id') AS same "
+            "FROM python_copy_kinds a, python_copy_kinds b WHERE a.id = 1 AND b.id = 2"
+        ))
+        self.assertTrue(same["same"])
+        query = p.select(self.kinds.star()).from_(self.kinds).order_by(self.kinds.col("id").asc())
+        stream = await self.pool.copy_out_rows(p.CopyTo(query, "binary"))
+        self.assertEqual(stream.columns[:3], ("id", "c_bool", "c_int2"))
+        self.assertEqual(len(stream.columns), 21)
+        rows = await rows_of(stream)
+        records = await self.pool.fetch_all(p.RawSQL("SELECT * FROM python_copy_kinds ORDER BY id"))
+        self.assertEqual(rows, [tuple(record.values()) for record in records])
+        self.assertEqual(rows[0][1:4], (True, -7, 9_000_000_000))
+        self.assertEqual(rows[0][18], "loud")
+        self.assertIsNone(rows[0][20])
+
+    # [spec:pgorm:req:python.copy.rows/test]    a row of the wrong width or type raises a construction error that aborts the COPY
+    async def test_wrong_width_or_type_aborts_copy(self):
+        copy = p.CopyFrom(self.rows, "binary").columns("id", "name")
+        refusals = [
+            ([[1, "one"], [2]], "1 values for the COPY's 2 columns (id, name)"),
+            ([[1, "one", 3]], "3 values for the COPY's 2 columns"),
+            ([["one", "one"]], "COPY column `id` of type `int4`"),
+            ([[1, Decimal("1.5")]], "COPY column `name` of type `text`"),
+            ([[1, "a"], "bc"], "sequence"),
+            ([[1, "a"], 5], "sequence"),
+        ]
+        for rows, reason in refusals:
+            with self.subTest(reason=reason), self.assertRaises(p.ConstructionError) as caught:
+                await self.pool.copy_in_rows(copy, rows)
+            self.assertIn(reason, str(caught.exception))
+        for source in ("rows", b"rows", 5):
+            with self.subTest(source=source), self.assertRaises(p.ConstructionError):
+                await self.pool.copy_in_rows(copy, source)
+        with self.assertRaisesRegex(p.ConstructionError, "binary"):
+            await self.pool.copy_in_rows(p.CopyFrom(self.rows, "text"), [[1, "a"]])
+        with self.assertRaisesRegex(p.ConstructionError, "binary"):
+            await self.pool.copy_out_rows(p.CopyTo(self.rows, "csv"))
+        count = await self.pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+        self.assertEqual(count["n"], 0)
+
+        self.assertEqual(await self.pool.copy_in_rows(copy, [(1, "one"), [2, None]]), 2)
+        rows = await rows_of(await self.pool.copy_out_rows(p.CopyTo(self.rows, "binary")))
+        self.assertEqual(sorted(rows), [(1, "one", 7), (2, None, 7)])
+        with self.assertRaises(p.DatabaseError) as caught:
+            await self.pool.copy_in_rows(copy, [[1, "again"]])
+        self.assertEqual(caught.exception.sqlstate, "23505")
+
+    # [spec:pgorm:req:python.copy.rows/test]    rows run on a connection and in a transaction, from an async generator
+    async def test_rows_on_connection_and_transaction(self):
+        copy = p.CopyFrom(self.rows, "binary").columns("id", "name")
+
+        async def generated():
+            for id in range(1, 601):
+                yield (id, f"n{id}")
+
+        async with self.pool.connection() as connection:
+            self.assertEqual(await connection.copy_in_rows(copy, generated()), 600)
+            self.assertEqual(await connection.copy_in_rows(copy, []), 0)
+            ids = p.select(self.rows.col("id")).from_(self.rows)
+            self.assertEqual(len(await rows_of(await connection.copy_out_rows(p.CopyTo(ids, "binary")))), 600)
+            transaction = await connection.begin()
+            self.assertEqual(await transaction.copy_in_rows(copy, [[601, "late"]]), 1)
+            returning = (p.insert(self.rows).columns("id", "name").values(602, "returned")
+                         .returning(self.rows.col("qty"), self.rows.col("name")))
+            stream = await transaction.copy_out_rows(p.CopyTo(returning, "binary"))
+            self.assertEqual(stream.columns, ("qty", "name"))
+            self.assertEqual(await rows_of(stream), [(7, "returned")])
+            count = await transaction.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+            self.assertEqual(count["n"], 602)
+            await transaction.rollback()
+            count = await connection.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+            self.assertEqual(count["n"], 600)
+
+    # [spec:pgorm:req:python.copy.rows/test]    a refused description keeps the connection; an undecodable field raises and closes the stream
+    async def test_refused_description_and_undecodable_field(self):
+        async with self.pool.connection() as connection:
+            with self.assertRaises(p.DatabaseError) as caught:
+                await connection.copy_in_rows(p.CopyFrom(p.Table("python_copy_missing"), "binary"), [[1]])
+            self.assertEqual(caught.exception.sqlstate, "42P01")
+            self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 1 AS n")))["n"], 1)
+            transaction = await connection.begin()
+            with self.assertRaises(p.DatabaseError):
+                await transaction.copy_out_rows(p.CopyTo(p.Table("python_copy_missing"), "binary"))
+            await transaction.rollback()
+            self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 2 AS n")))["n"], 2)
+
+        await self.pool.execute(p.RawSQL(
+            "CREATE TABLE python_copy_points AS SELECT point(n, n) AS spot FROM generate_series(1, 3) AS n"
+        ))
+        stream = await self.pool.copy_out_rows(p.CopyTo(p.Table("python_copy_points"), "binary"))
+        with self.assertRaises(p.DecodeError):
+            await anext(stream)
+        self.assertTrue(stream.closed)
+        with self.assertRaises(StopAsyncIteration):
+            await anext(stream)
+        self.assertEqual((await self.pool.fetch_one(p.RawSQL("SELECT 3 AS n")))["n"], 3)
 
 
 if __name__ == "__main__":

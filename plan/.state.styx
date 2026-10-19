@@ -2258,6 +2258,17 @@ impl_evidence (
         {impl_name main, rule sql.value.interval}
         {impl_name main, rule sql.value.interval-text}
     )}
+    {id copy-binary-rows, covered_rules (
+        conn.copy.rows
+        napi.copy.rows
+        python.copy.rows
+        sql.ast.copy.parts
+    ), covered_claims (
+        {impl_name main, rule conn.copy.rows}
+        {impl_name main, rule napi.copy.rows}
+        {impl_name main, rule python.copy.rows}
+        {impl_name main, rule sql.ast.copy.parts}
+    )}
 )
 
 onboarding {kind @adopt, phase 11}

@@ -358,6 +358,34 @@ handle, and each is released by being closed.
 > reason, its connection is discarded and its transaction ends with nothing
 > committed.
 
+> [spec:pgorm:req:napi.copy.rows]
+> `copyInRows(statement, rows)` and `copyOutRows(statement)` MUST run a
+> binary COPY as rows of values through `conn.copy.rows`, on a pool, a
+> connection and a transaction or savepoint, held and released as `copyIn`
+> and `copyOut` are (`napi.copy`). The statement MUST be a `CopyFrom` or
+> `CopyTo` in the `"binary"` format, its type `CopyFrom<"binary">` or
+> `CopyTo<"binary">` and any other refused with a `TypeError`; the columns
+> are the ones pgorm describes, before the COPY starts, and a description
+> the server refuses rejects with its `DatabaseError`, the connection kept.
+> `rows` is an iterable or async iterable of arrays, each a row of its
+> columns' values in order; anything else, a `Uint8Array` or a string
+> included, is a `TypeError` before anything is sent, and an item that is no
+> array is a `TypeError` that abandons the COPY. Each value is read as a
+> parameter is (`napi.inference`) and written against its column's type as a
+> parameter is bound. A row of another width, and a value its column's type
+> does not take, MUST be refused with a `ConstructionError` naming the
+> columns or the column, abandoning the COPY as a source that throws does, so
+> nothing is written. Rows are pulled as the COPY takes them, a batch at a
+> time, and it resolves with the rows written. `copyOutRows` resolves with a
+> `CopyRowStream`, an async iterator of rows, each an array of plain values
+> decoded by its column's type as a result column of that type is
+> (`napi.values`), fetched as they arrive with bounded buffering, one pull
+> at a time; `columns` names the columns. A field no value holds rejects the
+> pull with a `DecodeError` naming the column and closes the stream, which
+> discards the connection; its end, `close()` and `return()` behave as a
+> `CopyOutStream`'s do.
+
+> [spec:pgorm:req:napi.listen]
 > [spec:pgorm:req:napi.listen]
 > `pool.listener({ capacity, signal })` MUST open a `Listener` through pgorm's
 > `DatabasePool::listener` (`conn.listen`): a connection of its own, opened

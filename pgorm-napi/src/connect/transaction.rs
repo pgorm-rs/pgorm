@@ -25,7 +25,7 @@ use super::{
 use crate::{
     errors::{Failure, failure},
     settle,
-    statements::{CopyFrom, CopyTo, copy_from_at, copy_to_at},
+    statements::{CopyFrom, CopyTo},
 };
 
 pub(super) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -691,18 +691,19 @@ fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
     settle::promise(&mut cx, work, |cx, output| output.into_js(cx))
 }
 
-/// `transactionCopyIn(transaction, copy, abort)`: a COPY FROM in the
+/// `transactionCopyIn(transaction, copy, abort, rows)`: a COPY FROM in the
 /// transaction, holding its lock as a statement does until the COPY ends.
 // [spec:pgorm:req:napi.copy+2]
 fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
-    let copy = Box::new(copy_from_at(&mut cx, 1)?);
+    let (copy, rows) = copy::copy_from_rows_at(&mut cx, 1, 3)?;
+    let copy = Box::new(copy);
     let abort = abort_argument(&mut cx, 2)?;
     let lock = match state.lock() {
         Ok(lock) => lock,
         Err(failure) => return settle::rejected(&mut cx, failure),
     };
-    let (shared, link, release) = InState::channel();
+    let (shared, link, release) = InState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let command = Command::CopyIn {
         copy,
@@ -715,18 +716,19 @@ fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     copy::opened(&mut cx, shared, state.send(command), receive, CopyInHandle)
 }
 
-/// `transactionCopyOut(transaction, copy, abort)`: a COPY TO in the
+/// `transactionCopyOut(transaction, copy, abort, rows)`: a COPY TO in the
 /// transaction, which refuses other work until the stream ends or closes.
 // [spec:pgorm:req:napi.copy+2]
 fn transaction_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
-    let copy = Box::new(copy_to_at(&mut cx, 1)?);
+    let (copy, rows) = copy::copy_to_rows_at(&mut cx, 1, 3)?;
+    let copy = Box::new(copy);
     let abort = abort_argument(&mut cx, 2)?;
     let lock = match state.lock() {
         Ok(lock) => lock,
         Err(failure) => return settle::rejected(&mut cx, failure),
     };
-    let (shared, link, release) = OutState::channel();
+    let (shared, link, release) = OutState::channel(rows);
     let (opened, receive) = oneshot::channel();
     let command = Command::CopyOut {
         copy,

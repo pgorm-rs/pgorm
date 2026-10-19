@@ -9,8 +9,9 @@ use std::{
 use bytes::Bytes;
 use futures::{Sink, Stream};
 use pgorm_pool::GenericClient;
-use pgorm_query::{CopyFormat, CopyFromStatement, CopyToStatement};
+use pgorm_query::{CopyBinary, CopyFormat, CopyFromStatement, CopyToStatement};
 
+use super::copy_rows::{self, CopyColumn, CopyRowSink, CopyRowStream};
 use crate::{DatabaseConnection, DatabaseTransaction, Error};
 
 /// COPY's data flow: `COPY … FROM STDIN` and `COPY … TO STDOUT` on a
@@ -85,6 +86,69 @@ pub trait CopyTrait {
     ) -> Result<CopyOutStream<'_>, Error>
     where
         F: CopyFormat;
+
+    /// The columns each row of `statement` supplies, in order, with their
+    /// types, as the server describes them: the statement's column list, or
+    /// every column of its table the server does not generate.
+    ///
+    /// The description prepares a `SELECT` of those columns and runs
+    /// nothing; a table or column that does not exist is refused here, and
+    /// the connection is left as it was.
+    // [spec:pgorm:req:conn.copy.rows]
+    async fn copy_in_columns<F>(
+        &mut self,
+        statement: &CopyFromStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat;
+
+    /// The columns each row of `statement` holds, in order, with their
+    /// types, as the server describes them: its table's columns the server
+    /// does not generate, or its statement's result columns. A write source
+    /// is prepared, never run.
+    // [spec:pgorm:req:conn.copy.rows]
+    async fn copy_out_columns<F>(
+        &mut self,
+        statement: &CopyToStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat;
+
+    /// Start a binary `COPY … FROM STDIN` whose rows are written as pgorm
+    /// [`Value`](pgorm_query::Value)s, each checked against the columns
+    /// [`copy_in_columns`](Self::copy_in_columns) describes.
+    ///
+    /// A refusal of the description leaves the connection as it was; a
+    /// refusal of the COPY itself closes it, as [`copy_in`](Self::copy_in)'s
+    /// does.
+    // [spec:pgorm:req:conn.copy.rows]
+    async fn copy_in_rows(
+        &mut self,
+        statement: &CopyFromStatement<CopyBinary>,
+    ) -> Result<CopyRowSink<'_>, Error>
+    where
+        Self: Send,
+    {
+        let columns = self.copy_in_columns(statement).await?;
+        let sink = self.copy_in(statement).await?;
+        Ok(CopyRowSink::new(sink, columns))
+    }
+
+    /// Start a binary `COPY … TO STDOUT` whose rows arrive as pgorm
+    /// [`Value`](pgorm_query::Value)s, each field decoded by the type
+    /// [`copy_out_columns`](Self::copy_out_columns) describes for its column.
+    // [spec:pgorm:req:conn.copy.rows]
+    async fn copy_out_rows(
+        &mut self,
+        statement: &CopyToStatement<CopyBinary>,
+    ) -> Result<CopyRowStream<'_>, Error>
+    where
+        Self: Send,
+    {
+        let columns = self.copy_out_columns(statement).await?;
+        let stream = self.copy_out(statement).await?;
+        Ok(CopyRowStream::new(stream, columns))
+    }
 }
 
 /// The data of a `COPY … FROM STDIN`, written as [`Bytes`] through its
@@ -254,6 +318,26 @@ impl CopyTrait for DatabaseConnection {
         let stream = self.0.copy_out::<str>(sql.as_str()).await?;
         Ok(CopyOutStream::new(stream))
     }
+
+    async fn copy_in_columns<F>(
+        &mut self,
+        statement: &CopyFromStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat,
+    {
+        copy_rows::copy_in_columns(&self.0, statement).await
+    }
+
+    async fn copy_out_columns<F>(
+        &mut self,
+        statement: &CopyToStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat,
+    {
+        copy_rows::copy_out_columns(&self.0, statement).await
+    }
 }
 
 // [spec:pgorm:req:conn.copy+1]    COPY inside a transaction or savepoint
@@ -282,5 +366,25 @@ impl CopyTrait for DatabaseTransaction<'_> {
         let sql = statement.to_string();
         let stream = self.tx().copy_out::<str>(sql.as_str()).await?;
         Ok(CopyOutStream::new(stream))
+    }
+
+    async fn copy_in_columns<F>(
+        &mut self,
+        statement: &CopyFromStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat,
+    {
+        copy_rows::copy_in_columns(self.tx(), statement).await
+    }
+
+    async fn copy_out_columns<F>(
+        &mut self,
+        statement: &CopyToStatement<F>,
+    ) -> Result<Vec<CopyColumn>, Error>
+    where
+        F: CopyFormat,
+    {
+        copy_rows::copy_out_columns(self.tx(), statement).await
     }
 }

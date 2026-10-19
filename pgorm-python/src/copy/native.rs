@@ -5,25 +5,34 @@
 
 use std::{
     fmt,
-    sync::{Arc, Mutex as StdMutex, MutexGuard},
+    sync::{
+        Arc, Mutex as StdMutex, MutexGuard, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use bytes::{Bytes, BytesMut};
-use pgorm::Error;
-use pyo3::{buffer::PyBuffer, prelude::*, types::PyBytes};
+use pgorm::{CopyRowDecoder, CopyRowEncoder, Error, ValueHolder};
+use pyo3::{
+    buffer::PyBuffer,
+    prelude::*,
+    types::{PyByteArray, PyBytes, PyList, PyString, PyTuple},
+};
 use pyo3_async_runtimes::tokio::future_into_py;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use super::{
     CopyFrom, CopyTo, PyCopyFrom, PyCopyTo,
-    pump::{Message, Piece, QUEUED, drive_in, drive_out, open_in, open_out},
+    pump::{Columns, Message, Piece, QUEUED, Unopened, drive_in, drive_out, open_in, open_out},
 };
 use crate::{
-    errors::{ConstructionError, InternalError, LifecycleError, database_error},
+    errors::{ConstructionError, DecodeError, InternalError, LifecycleError, database_error},
     execution::Target,
+    results::{Field, value},
     runtime::{ConnectionState, Operation},
     transactions::{Lease, State},
+    values::PyValue,
 };
 
 /// The largest `bytes` a COPY TO pull joins from chunks already received.
@@ -35,9 +44,41 @@ type Settled = (Result<Option<u64>, Error>, Operation);
 enum Outcome<T> {
     /// The server refused the statement before any data moved.
     Refused(Error),
+    /// The server refused a COPY of rows' description, a statement of its
+    /// own run before the COPY, which leaves the connection usable.
+    Undescribed(Error),
     Ran(T),
     /// The handle or its opening future went away mid-copy.
     Abandoned,
+}
+
+impl<T> From<Unopened> for Outcome<T> {
+    fn from(unopened: Unopened) -> Self {
+        match unopened {
+            Unopened::Refused(error) => Self::Refused(error),
+            Unopened::Undescribed(error) => Self::Undescribed(error),
+        }
+    }
+}
+
+/// The rows flag a COPY was opened with, refused unless its format is
+/// binary: the one whose rows pgorm writes and reads as values.
+fn rows_columns(rows: bool, binary: bool) -> PyResult<Option<Columns>> {
+    match (rows, binary) {
+        (false, _) => Ok(None),
+        (true, true) => Ok(Some(Arc::new(OnceLock::new()))),
+        (true, false) => Err(ConstructionError::new_err(
+            "rows travel in binary COPY alone: build the statement with the \"binary\" format",
+        )),
+    }
+}
+
+/// The described columns of a COPY of rows that has opened.
+fn described(columns: &Columns) -> PyResult<&[pgorm::CopyColumn]> {
+    columns
+        .get()
+        .map(Vec::as_slice)
+        .ok_or_else(|| LifecycleError::new_err("COPY has not started"))
 }
 
 fn lock<T>(mutex: &StdMutex<T>) -> PyResult<MutexGuard<'_, T>> {
@@ -107,6 +148,7 @@ async fn pump_in(
     state: Arc<ConnectionState>,
     mut operation: Operation,
     statement: CopyFrom,
+    rows: Option<Columns>,
     mut messages: mpsc::Receiver<Message>,
     opened: oneshot::Sender<Result<(), Error>>,
     settled: oneshot::Sender<Settled>,
@@ -119,9 +161,9 @@ async fn pump_in(
             let Ok(connection) = operation.connection_mut() else {
                 return Outcome::Abandoned;
             };
-            let sink = match open_in(connection, &statement).await {
+            let sink = match open_in(connection, &statement, rows.as_ref()).await {
                 Ok(sink) => sink,
-                Err(error) => return Outcome::Refused(error),
+                Err(unopened) => return unopened.into(),
             };
             match opened.take().map(|opened| opened.send(Ok(()))) {
                 Some(Ok(())) => Outcome::Ran(drive_in(sink, &mut messages).await),
@@ -134,6 +176,12 @@ async fn pump_in(
         // dropped before the refusal is reported.
         Outcome::Refused(error) => {
             drop(operation);
+            if let Some(opened) = opened {
+                let _ = opened.send(Err(error));
+            }
+        }
+        Outcome::Undescribed(error) => {
+            operation.restore();
             if let Some(opened) = opened {
                 let _ = opened.send(Err(error));
             }
@@ -152,6 +200,7 @@ async fn pump_out(
     state: Arc<ConnectionState>,
     mut operation: Operation,
     statement: CopyTo,
+    rows: Option<Columns>,
     pieces: mpsc::Sender<Piece>,
     opened: oneshot::Sender<Result<(), Error>>,
 ) {
@@ -163,9 +212,9 @@ async fn pump_out(
             let Ok(connection) = operation.connection_mut() else {
                 return Outcome::Abandoned;
             };
-            let stream = match open_out(connection, &statement).await {
+            let stream = match open_out(connection, &statement, rows.as_ref()).await {
                 Ok(stream) => stream,
-                Err(error) => return Outcome::Refused(error),
+                Err(unopened) => return unopened.into(),
             };
             match opened.take().map(|opened| opened.send(Ok(()))) {
                 Some(Ok(())) => drive_out(stream, &pieces).await.map_or(Outcome::Abandoned, Outcome::Ran),
@@ -174,9 +223,10 @@ async fn pump_out(
         } => outcome,
     };
     match outcome {
-        // A refused COPY TO leaves the connection idle, as any failed
-        // statement does; it is restored before the refusal is reported.
-        Outcome::Refused(error) => {
+        // A refused COPY TO, or a refused description, leaves the
+        // connection idle, as any failed statement does; it is restored
+        // before the refusal is reported.
+        Outcome::Refused(error) | Outcome::Undescribed(error) => {
             operation.restore();
             if let Some(opened) = opened {
                 let _ = opened.send(Err(error));
@@ -195,14 +245,16 @@ async fn pump_out(
 /// its data is written through.
 // [spec:pgorm:req:python.copy+2]
 #[pyfunction]
-#[pyo3(name = "_copy_in")]
+#[pyo3(name = "_copy_in", signature = (target, statement, rows = false))]
 pub(crate) fn copy_in<'py>(
     py: Python<'py>,
     target: &Bound<'_, PyAny>,
     statement: &Bound<'_, PyAny>,
+    rows: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let target = Target::extract(py, target)?;
     let statement = copy_from(statement)?;
+    let columns = rows_columns(rows, matches!(statement, CopyFrom::Binary(_)))?;
     future_into_py(py, async move {
         let (messages, receiver) = mpsc::channel(QUEUED);
         let (connection, settle) = match target {
@@ -214,6 +266,7 @@ pub(crate) fn copy_in<'py>(
                     state.clone(),
                     operation,
                     statement,
+                    columns.clone(),
                     receiver,
                     opened,
                     settled,
@@ -228,7 +281,7 @@ pub(crate) fn copy_in<'py>(
                 }
             }
             Target::Transaction(state) => {
-                let (lease, settle) = state.copy_in(statement, receiver).await?;
+                let (lease, settle) = state.copy_in(statement, columns.clone(), receiver).await?;
                 (state.connection.clone(), Settle::Transaction(lease, settle))
             }
         };
@@ -236,6 +289,10 @@ pub(crate) fn copy_in<'py>(
             connection,
             messages: StdMutex::new(Some(messages)),
             settle: StdMutex::new(Some(settle)),
+            rows: columns.map(|columns| RowsIn {
+                columns,
+                headed: AtomicBool::new(false),
+            }),
         })
     })
 }
@@ -244,14 +301,16 @@ pub(crate) fn copy_in<'py>(
 /// data is read from.
 // [spec:pgorm:req:python.copy+2]
 #[pyfunction]
-#[pyo3(name = "_copy_out")]
+#[pyo3(name = "_copy_out", signature = (target, statement, rows = false))]
 pub(crate) fn copy_out<'py>(
     py: Python<'py>,
     target: &Bound<'_, PyAny>,
     statement: &Bound<'_, PyAny>,
+    rows: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let target = Target::extract(py, target)?;
     let statement = copy_to(statement)?;
+    let columns = rows_columns(rows, matches!(statement, CopyTo::Binary(_)))?;
     future_into_py(py, async move {
         let (pieces, receiver) = mpsc::channel(QUEUED);
         let (connection, transaction, holder) = match target {
@@ -259,7 +318,14 @@ pub(crate) fn copy_out<'py>(
                 let operation = Operation::begin(state.clone())?;
                 let (opened, open) = oneshot::channel();
                 let stopped = CancellationToken::new();
-                let pump = pump_out(state.clone(), operation, statement, pieces, opened);
+                let pump = pump_out(
+                    state.clone(),
+                    operation,
+                    statement,
+                    columns.clone(),
+                    pieces,
+                    opened,
+                );
                 let done = stopped.clone();
                 tokio::spawn(async move {
                     pump.await;
@@ -275,7 +341,7 @@ pub(crate) fn copy_out<'py>(
                 }
             }
             Target::Transaction(state) => {
-                let lease = state.copy_out(statement, pieces).await?;
+                let lease = state.copy_out(statement, columns.clone(), pieces).await?;
                 (
                     state.connection.clone(),
                     Some(state.clone()),
@@ -294,6 +360,10 @@ pub(crate) fn copy_out<'py>(
                 }))),
                 closing: CancellationToken::new(),
                 finished: CancellationToken::new(),
+                rows: columns.map(|columns| RowsOut {
+                    columns,
+                    decoder: StdMutex::new(None),
+                }),
             }),
         })
     })
@@ -308,6 +378,57 @@ pub(crate) struct NativeCopyIn {
     connection: Arc<ConnectionState>,
     messages: StdMutex<Option<mpsc::Sender<Message>>>,
     settle: StdMutex<Option<Settle>>,
+    /// Set for `copy_in_rows`, whose rows are encoded as they are written.
+    rows: Option<RowsIn>,
+}
+
+/// A COPY of rows' writing side: the columns described before it started,
+/// and whether the format's header has gone out.
+struct RowsIn {
+    columns: Columns,
+    headed: AtomicBool,
+}
+
+impl RowsIn {
+    fn head(&self, out: &mut BytesMut) {
+        if !self.headed.swap(true, Ordering::AcqRel) {
+            CopyRowEncoder::header(out);
+        }
+    }
+}
+
+/// The message a refusal of pgorm's carries, without the variant's prefix.
+fn refusal(error: Error) -> String {
+    match error {
+        Error::Type(message) => message,
+        other => other.to_string(),
+    }
+}
+
+/// One COPY row's values, read from a Python sequence as parameters are:
+/// `None` is NULL, anything else a value whose kind is inferred.
+fn row_values(row: &Bound<'_, PyAny>) -> PyResult<Vec<Option<ValueHolder>>> {
+    if row.is_instance_of::<PyString>()
+        || row.is_instance_of::<PyBytes>()
+        || row.is_instance_of::<PyByteArray>()
+    {
+        return Err(ConstructionError::new_err(
+            "a COPY row is a sequence of its columns' values, not text or bytes",
+        ));
+    }
+    let items = row.try_iter().map_err(|_| {
+        ConstructionError::new_err("a COPY row is a sequence of its columns' values")
+    })?;
+    items
+        .map(|item| {
+            let item = item?;
+            if item.is_none() {
+                Ok(None)
+            } else {
+                PyValue::coerce(&item).map(|value| Some(ValueHolder(value.inner)))
+            }
+        })
+        .collect()
 }
 
 impl fmt::Debug for NativeCopyIn {
@@ -334,6 +455,44 @@ impl NativeCopyIn {
         })
     }
 
+    /// Encode `rows`, each a sequence of its columns' values, in the binary
+    /// format — the header before the first — and queue them as one chunk,
+    /// as `write` queues data. A row of another width, or a value its
+    /// column's type does not take, raises a construction error naming the
+    /// column, and nothing of the batch is queued.
+    // [spec:pgorm:req:python.copy.rows]
+    fn write_rows<'py>(
+        &self,
+        py: Python<'py>,
+        rows: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        self.connection.pool.check_owner(py)?;
+        let state = self
+            .rows
+            .as_ref()
+            .ok_or_else(|| LifecycleError::new_err("write_rows writes the rows of copy_in_rows"))?;
+        let encoder = CopyRowEncoder::new(described(&state.columns)?.to_vec());
+        let mut out = BytesMut::new();
+        for row in rows.try_iter()? {
+            let values = row_values(&row?)?;
+            let mut encoded = BytesMut::new();
+            encoder
+                .encode(&values, &mut encoded)
+                .map_err(|error| ConstructionError::new_err(refusal(error)))?;
+            out.extend_from_slice(&encoded);
+        }
+        let mut data = BytesMut::new();
+        state.head(&mut data);
+        data.extend_from_slice(&out);
+        let messages = lock(&self.messages)?
+            .clone()
+            .ok_or_else(|| LifecycleError::new_err("COPY has ended"))?;
+        let data = data.freeze();
+        future_into_py(py, async move {
+            Ok(messages.send(Message::Data(data)).await.is_ok())
+        })
+    }
+
     fn finish<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.connection.pool.check_owner(py)?;
         let messages = lock(&self.messages)?.take();
@@ -341,8 +500,17 @@ impl NativeCopyIn {
             .take()
             .ok_or_else(|| LifecycleError::new_err("COPY has ended"))?;
         let connection = self.connection.clone();
+        let tail = self.rows.as_ref().map(|rows| {
+            let mut tail = BytesMut::new();
+            rows.head(&mut tail);
+            CopyRowEncoder::trailer(&mut tail);
+            tail.freeze()
+        });
         future_into_py(py, async move {
             if let Some(messages) = messages {
+                if let Some(tail) = tail {
+                    let _ = messages.send(Message::Data(tail)).await;
+                }
                 let _ = messages.send(Message::Finish).await;
             }
             settle
@@ -437,6 +605,70 @@ struct OutState {
     active: Arc<Mutex<Option<Active>>>,
     closing: CancellationToken,
     finished: CancellationToken,
+    /// Set for `copy_out_rows`, whose rows are decoded as they arrive.
+    rows: Option<RowsOut>,
+}
+
+/// A COPY of rows' reading side: the columns described before it started,
+/// and the decoder over them, made at the first pull.
+struct RowsOut {
+    columns: Columns,
+    decoder: StdMutex<Option<CopyRowDecoder>>,
+}
+
+impl RowsOut {
+    /// The rows the data holds once `chunk` is added, each field read as a
+    /// result column of its type is; with no chunk, the data's end is checked.
+    fn rows(&self, chunk: Option<&[u8]>) -> PyResult<Vec<Vec<PyValue>>> {
+        let mut slot = lock(&self.decoder)?;
+        let decoder = match slot.as_mut() {
+            Some(decoder) => decoder,
+            None => slot.insert(CopyRowDecoder::new(described(&self.columns)?.to_vec())),
+        };
+        match chunk {
+            Some(chunk) => decoder.push(chunk),
+            None => decoder
+                .finish()
+                .map_err(|error| DecodeError::new_err(refusal(error)))?,
+        }
+        let mut rows = Vec::new();
+        while let Some(fields) = decoder
+            .next_fields()
+            .map_err(|error| DecodeError::new_err(refusal(error)))?
+        {
+            let row = fields
+                .iter()
+                .zip(decoder.columns())
+                .enumerate()
+                .map(|(index, (raw, column))| {
+                    value(Field::Copy {
+                        ty: column.type_(),
+                        raw: raw.as_deref(),
+                        index,
+                    })
+                })
+                .collect::<PyResult<Vec<_>>>()?;
+            rows.push(row);
+        }
+        Ok(rows)
+    }
+}
+
+/// `rows` as a list of tuples of Python values.
+fn rows_to_python(rows: Vec<Vec<PyValue>>) -> PyResult<Py<PyList>> {
+    Python::attach(|py| {
+        let rows = rows
+            .iter()
+            .map(|row| {
+                let values = row
+                    .iter()
+                    .map(|value| value.to_python(py))
+                    .collect::<PyResult<Vec<_>>>()?;
+                PyTuple::new(py, values)
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        PyList::new(py, rows).map(Bound::unbind)
+    })
 }
 
 impl OutState {
@@ -516,6 +748,100 @@ impl NativeCopyOut {
                 }
             }
         })
+    }
+
+    /// The rows that have arrived, at least one, as a list of tuples of
+    /// values; `None` at the end. A field that does not decode raises a
+    /// decode error and closes the stream, discarding its connection.
+    // [spec:pgorm:req:python.copy.rows]
+    fn next_rows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.state.connection.pool.check_owner(py)?;
+        if self.state.rows.is_none() {
+            return Err(LifecycleError::new_err(
+                "next_rows reads the rows of copy_out_rows",
+            ));
+        }
+        let state = self.state.clone();
+        future_into_py(py, async move {
+            state.ensure_open()?;
+            if state.finished.is_cancelled() {
+                return Ok(None);
+            }
+            let mut slot = state.active.clone().try_lock_owned().map_err(|_| {
+                LifecycleError::new_err("copy stream already has an active next operation")
+            })?;
+            let rows_state = state
+                .rows
+                .as_ref()
+                .ok_or_else(|| InternalError::new_err("COPY of rows lost its columns"))?;
+            loop {
+                let Some(active) = slot.as_mut() else {
+                    return Ok(None);
+                };
+                let piece = match active.stashed.take() {
+                    Some(piece) => Some(piece),
+                    None => tokio::select! {
+                        _ = state.closing.cancelled() => return Err(LifecycleError::new_err("copy stream is closed")),
+                        piece = active.pieces.recv() => piece,
+                    },
+                };
+                match piece {
+                    Some(Piece::Chunk(first)) => {
+                        let data = active.gather(first);
+                        match rows_state.rows(Some(&data)) {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => return rows_to_python(rows).map(Some),
+                            Err(error) => {
+                                if let Some(active) = slot.take() {
+                                    active.abandon().await;
+                                }
+                                state.closing.cancel();
+                                state.finished.cancel();
+                                return Err(error);
+                            }
+                        }
+                    }
+                    Some(Piece::End(end)) => {
+                        let (result, operation) = *end;
+                        if let Some(operation) = operation {
+                            operation.restore();
+                        }
+                        if let Some(active) = slot.take() {
+                            active.complete();
+                        }
+                        state.finished.cancel();
+                        result.map_err(|error| {
+                            database_error(error, &state.connection.pool.secrets)
+                        })?;
+                        let rows = rows_state.rows(None)?;
+                        return match rows.is_empty() {
+                            true => Ok(None),
+                            false => rows_to_python(rows).map(Some),
+                        };
+                    }
+                    None => {
+                        drop(slot.take());
+                        state.finished.cancel();
+                        state.ensure_open()?;
+                        return Err(LifecycleError::new_err("COPY ended without completing"));
+                    }
+                }
+            }
+        })
+    }
+
+    /// The names of the columns each row holds, in order, as the server
+    /// describes them.
+    // [spec:pgorm:req:python.copy.rows]
+    fn columns(&self) -> PyResult<Vec<String>> {
+        let rows =
+            self.state.rows.as_ref().ok_or_else(|| {
+                LifecycleError::new_err("columns names the columns of copy_out_rows")
+            })?;
+        Ok(described(&rows.columns)?
+            .iter()
+            .map(|column| column.name().to_owned())
+            .collect())
     }
 
     fn close<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

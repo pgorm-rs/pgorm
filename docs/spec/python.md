@@ -437,6 +437,34 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > finishing, when the outcome is unknown, it discards the connection or
 > transaction.
 
+> [spec:pgorm:req:python.copy.rows]
+> `copy_in_rows(statement, rows)` and `copy_out_rows(statement)` MUST run a
+> binary COPY as rows of values through `conn.copy.rows` on a pool, a
+> connection and a transaction, reserving and releasing what they run on as
+> `copy_in` and `copy_out` do (`python.copy`). The statement MUST be a
+> `CopyFrom` or `CopyTo` in the `"binary"` format, typed
+> `CopyFrom[Literal["binary"]]` or `CopyTo[Literal["binary"]]`, and any other
+> format raises a construction error. The columns are the ones pgorm
+> describes before the COPY starts; a description the server refuses raises
+> its database error and leaves the connection or transaction as a failed
+> statement does. `rows` is a synchronous or asynchronous iterable of rows,
+> text, bytes and anything else refused with a construction error before
+> anything is sent; each row is a sequence of its columns' values in order,
+> text or bytes again refused. A value is read as a parameter is — `None` as
+> NULL, a plain value by its inferred kind, a `Value` by its own — and
+> written against its column's type as a parameter is bound. A row of
+> another width, and a value its column's type does not take, MUST raise a
+> construction error naming the columns or the column and abort the COPY, as
+> anything raised while the data is sent does, so nothing is written. Rows
+> are pulled as the COPY takes them, a batch at a time, and the call returns
+> the rows written. `copy_out_rows` returns a `CopyRowStream`, an async
+> iterator of tuples, each value decoded by its column's type as a result
+> column of that type is (`python.results`), fetched as rows arrive with
+> bounded buffering; `columns` names the columns. A field that does not
+> decode raises a decode error and closes the stream, discarding its
+> connection; its end and closing behave as a `CopyOutStream`'s do.
+
+> [spec:pgorm:req:python.listen]
 > [spec:pgorm:req:python.listen]
 > `pool.listener(capacity=1024)` MUST open a listener through `conn.listen`'s
 > `DatabasePool::listener`, a connection of its own with the pool's

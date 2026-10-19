@@ -4,7 +4,9 @@
 
 use super::{State, scope::Command, state::Pending};
 use crate::{
-    copy::{CopyFrom, CopyTo, Message, Piece, drive_in, drive_out, open_in, open_out},
+    copy::{
+        Columns, CopyFrom, CopyTo, Message, Piece, Unopened, drive_in, drive_out, open_in, open_out,
+    },
     errors::{LifecycleError, database_error},
 };
 use pgorm::{DatabaseTransaction, Error};
@@ -31,7 +33,7 @@ impl State {
     /// the reservation once the server has accepted the COPY.
     async fn copy(
         self: &Arc<Self>,
-        command: impl FnOnce(oneshot::Sender<Result<(), Error>>) -> Command,
+        command: impl FnOnce(oneshot::Sender<Result<(), Unopened>>) -> Command,
         refusal_closes: bool,
     ) -> PyResult<Lease> {
         self.ensure_open()?;
@@ -51,13 +53,17 @@ impl State {
                 _busy: busy,
                 pending,
             }),
-            Err(error) => {
+            Err(unopened) => {
                 // A refused COPY FROM has closed the connection under the
-                // transaction, so `pending` is left to abort it.
-                if !refusal_closes {
+                // transaction, so `pending` is left to abort it; a refused
+                // description has closed nothing.
+                if !refusal_closes || matches!(unopened, Unopened::Undescribed(_)) {
                     pending.complete();
                 }
-                Err(database_error(error, &self.connection.pool.secrets))
+                Err(database_error(
+                    unopened.into_error(),
+                    &self.connection.pool.secrets,
+                ))
             }
         }
     }
@@ -71,6 +77,7 @@ impl State {
     pub(crate) async fn copy_in(
         self: &Arc<Self>,
         statement: CopyFrom,
+        rows: Option<Columns>,
         messages: mpsc::Receiver<Message>,
     ) -> PyResult<(Lease, oneshot::Receiver<Result<Option<u64>, Error>>)> {
         let (reply, settled) = oneshot::channel();
@@ -78,6 +85,7 @@ impl State {
             .copy(
                 |opened| Command::CopyIn {
                     statement,
+                    rows,
                     messages,
                     opened,
                     reply,
@@ -92,11 +100,13 @@ impl State {
     pub(crate) async fn copy_out(
         self: &Arc<Self>,
         statement: CopyTo,
+        rows: Option<Columns>,
         pieces: mpsc::Sender<Piece>,
     ) -> PyResult<Lease> {
         self.copy(
             |opened| Command::CopyOut {
                 statement,
+                rows,
                 pieces,
                 opened,
             },
@@ -106,23 +116,38 @@ impl State {
     }
 }
 
-/// Run a COPY FROM on the owner's transaction: `None` when it never
-/// started, refused — which closes the connection — or abandoned.
+/// How a COPY FROM on the owner's transaction ended.
+pub(super) enum RanIn {
+    /// It never started, was refused — which closes the connection — or was
+    /// abandoned.
+    Lost,
+    /// Its description was refused, which leaves the transaction as any
+    /// failed statement does.
+    Undescribed,
+    Ran(Result<Option<u64>, Error>),
+}
+
+/// Run a COPY FROM on the owner's transaction.
 pub(super) async fn run_in(
     tx: &mut DatabaseTransaction<'_>,
     statement: &CopyFrom,
+    rows: Option<&Columns>,
     messages: &mut mpsc::Receiver<Message>,
-    opened: oneshot::Sender<Result<(), Error>>,
-) -> Option<Result<Option<u64>, Error>> {
-    match open_in(tx, statement).await {
-        Err(error) => {
-            let _ = opened.send(Err(error));
-            None
+    opened: oneshot::Sender<Result<(), Unopened>>,
+) -> RanIn {
+    match open_in(tx, statement, rows).await {
+        Err(Unopened::Undescribed(error)) => {
+            let _ = opened.send(Err(Unopened::Undescribed(error)));
+            RanIn::Undescribed
         }
-        Ok(sink) => {
-            opened.send(Ok(())).ok()?;
-            Some(drive_in(sink, messages).await)
+        Err(refused) => {
+            let _ = opened.send(Err(refused));
+            RanIn::Lost
         }
+        Ok(sink) => match opened.send(Ok(())) {
+            Ok(()) => RanIn::Ran(drive_in(sink, messages).await),
+            Err(_) => RanIn::Lost,
+        },
     }
 }
 
@@ -132,11 +157,12 @@ pub(super) async fn run_in(
 pub(super) async fn run_out(
     tx: &mut DatabaseTransaction<'_>,
     statement: &CopyTo,
+    rows: Option<&Columns>,
     pieces: &mpsc::Sender<Piece>,
-    opened: oneshot::Sender<Result<(), Error>>,
+    opened: oneshot::Sender<Result<(), Unopened>>,
 ) -> bool {
-    match open_out(tx, statement).await {
-        Err(error) => opened.send(Err(error)).is_ok(),
+    match open_out(tx, statement, rows).await {
+        Err(unopened) => opened.send(Err(unopened)).is_ok(),
         Ok(stream) => {
             if opened.send(Ok(())).is_err() {
                 return false;

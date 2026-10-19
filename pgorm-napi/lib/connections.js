@@ -340,9 +340,10 @@ export class Pool extends Queryable {
    * @param {"in" | "out"} direction
    * @param {unknown} copy
    * @param {unknown} token
+   * @param {boolean} rows
    */
-  [COPY](direction, copy, token) {
-    return (direction === "in" ? native.poolCopyIn : native.poolCopyOut)(this.#native, copy, token);
+  [COPY](direction, copy, token, rows) {
+    return (direction === "in" ? native.poolCopyIn : native.poolCopyOut)(this.#native, copy, token, rows);
   }
 }
 
@@ -518,9 +519,10 @@ export class Connection extends Queryable {
    * @param {"in" | "out"} direction
    * @param {unknown} copy
    * @param {unknown} token
+   * @param {boolean} rows
    */
-  [COPY](direction, copy, token) {
-    return (direction === "in" ? native.connectionCopyIn : native.connectionCopyOut)(this.#native, copy, token);
+  [COPY](direction, copy, token, rows) {
+    return (direction === "in" ? native.connectionCopyIn : native.connectionCopyOut)(this.#native, copy, token, rows);
   }
 }
 
@@ -649,8 +651,9 @@ export class Transaction extends Queryable {
    * @param {"in" | "out"} direction
    * @param {unknown} copy
    * @param {unknown} token
+   * @param {boolean} rows
    */
-  [COPY](direction, copy, token) {
-    return (direction === "in" ? native.transactionCopyIn : native.transactionCopyOut)(this.#native, copy, token);
+  [COPY](direction, copy, token, rows) {
+    return (direction === "in" ? native.transactionCopyIn : native.transactionCopyOut)(this.#native, copy, token, rows);
   }
 }

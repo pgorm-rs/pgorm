@@ -3,10 +3,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 from . import _native
-from .copy import CopyOutStream, CopySource, copy_in
+from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource, copy_in, copy_in_rows
 from .listen import Listener
 from .results import Query, Record, ResultStream
 from .transactions import Transaction, TransactionMode, IsolationLevel
@@ -139,6 +139,23 @@ class Pool:
             raise
         return CopyOutStream(native, connection)
 
+    async def copy_in_rows(
+        self, statement: "_native.CopyFrom[Literal['binary']]", rows: CopyRows
+    ) -> int:
+        """Run a binary COPY FROM of rows on a connection of its own; see ``Connection.copy_in_rows``."""
+        async with self.connection() as connection:
+            return await connection.copy_in_rows(statement, rows)
+
+    async def copy_out_rows(self, statement: "_native.CopyTo[Literal['binary']]") -> CopyRowStream:
+        """Open a binary COPY TO of rows whose stream owns the connection it acquired."""
+        connection = await self.acquire()
+        try:
+            native = await _native._copy_out(connection._native, statement, True)
+        except BaseException:
+            await connection.close()
+            raise
+        return CopyRowStream(native, connection)
+
     async def listener(self, *, capacity: int = 1024) -> Listener:
         """Open a dedicated listening connection with this pool's configuration.
 
@@ -238,6 +255,27 @@ class Connection:
     async def copy_out(self, statement: "_native.CopyTo[Any]") -> CopyOutStream:
         """Open a COPY TO; the stream reserves this connection until it ends."""
         return CopyOutStream(await _native._copy_out(self._native, statement), None)
+
+    async def copy_in_rows(
+        self, statement: "_native.CopyFrom[Literal['binary']]", rows: CopyRows
+    ) -> int:
+        """Run a binary COPY FROM whose rows are sequences of values and return the rows it inserted.
+
+        The columns are the ones the server describes for the statement, before
+        the COPY starts; a description the server refuses raises its database
+        error and leaves this connection usable. Each value is read as a
+        parameter is and written against its column's type as a parameter is
+        bound. A row of another width, or a value its column's type does not
+        take, raises a construction error and aborts the COPY, as anything
+        raised while the data is sent does, so nothing is written.
+        """
+        return await copy_in_rows(self._native, statement, rows)
+
+    async def copy_out_rows(self, statement: "_native.CopyTo[Literal['binary']]") -> CopyRowStream:
+        """Open a binary COPY TO whose rows arrive as tuples of values, each
+        decoded by its column's type as a result column is; the stream reserves
+        this connection until it ends."""
+        return CopyRowStream(await _native._copy_out(self._native, statement, True), None)
 
     async def notify(self, channel: str, payload: str) -> None:
         """Send ``payload`` on ``channel`` with ``SELECT pg_notify($1, $2)``.

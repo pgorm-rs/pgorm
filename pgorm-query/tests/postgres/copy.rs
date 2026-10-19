@@ -548,3 +548,31 @@ fn copy_check_source_reads_select_clauses() {
         Ok(())
     );
 }
+
+// [spec:pgorm:def:sql.ast.copy.parts/test]    the getters give back a COPY's table, column list and source
+#[test]
+fn copy_parts_read_back() {
+    let bare = CopyFromStatement::new((n("art"), n("glyph")), CopyBinary);
+    std::assert_eq!(bare.get_table(), &(n("art"), n("glyph")).into_table_name());
+    std::assert_eq!(bare.get_columns(), &[] as &[Name]);
+    let listed = bare.clone().columns([n("id"), n("image")]).to_owned();
+    std::assert_eq!(listed.get_columns(), &[n("id"), n("image")]);
+
+    let table = CopyToStatement::new(Glyph::Table, CopyText);
+    std::assert_eq!(
+        table.get_source().get_table(),
+        Some(&Glyph::Table.into_table_name())
+    );
+    std::assert!(table.get_source().get_query().is_none());
+
+    let select = Query::select()
+        .column(Glyph::Id)
+        .from(Glyph::Table)
+        .to_owned();
+    let query = CopyToStatement::new(select.clone(), CopyCsv);
+    std::assert!(query.get_source().get_table().is_none());
+    std::assert_eq!(
+        query.get_source().get_query(),
+        Some(&select.into_sub_query_statement())
+    );
+}
