@@ -424,6 +424,14 @@ children (
                         text "inline-window-over-named (a08d6a4d) bumped sql.ast.window-statement+8: WindowSelectType gains Extended, expr_window/expr_window_as take any WindowDefinition, and check_windows holds an inline extended window to an extended entry's refusals with any entry as its base, the error's window None; sites re-pinned and the code matches."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:04:53.532307Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.ast.func+11: Function gains JsonToRecord, JsonbToRecord, JsonToRecordset and JsonbToRecordset with their Func constructors, read through a column definition list; sites re-pinned and the code matches."
+                        after_done true
+                    }
                 )
             }
 
