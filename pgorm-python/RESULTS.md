@@ -124,7 +124,10 @@ A connection stream reserves that connection; other operations fail with
 `LifecycleError` while it is active. EOF leaves the connection reusable.
 Early close, decode failure or cancellation discards the incomplete connection.
 Explicit `aclose()` and the context manager provide deterministic cleanup;
-dropping the iterator also cancels and releases its native lease.
+dropping the iterator also cancels and releases its native lease. A stream
+raises `ConstructionError` on truth testing, as `CopyOutStream`,
+`CopyRowStream` and `Listener` do: its truth would say nothing of whether
+rows remain, so `if rows:` is refused where it is written.
 
 `ResultStream` wraps pgorm's `query_raw` / owned `RowStream`, without collecting
 the result or adding a prefetch queue. The driver uses a bounded response

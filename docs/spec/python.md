@@ -153,21 +153,25 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > NOT extend borrowed lifetimes or bypass Rust typestate using unchecked casts.
 > Invalid user operations MUST follow the exception contract, not panic.
 
-> [spec:pgorm:req:python.truth-testing]
+> [spec:pgorm:req:python.truth-testing+1]
 > Every class the package defines MUST raise `ConstructionError` on Python
 > truth testing — `bool()`, `if`, `not`, `and`, `or` — so `if statement:` or
 > `statement or fallback` fails where it is written instead of reading the
 > object as true: a statement, an expression, `Compiled`, every part either
 > is built from (a table, a FROM item, a join kind, a WITH clause, a window
 > or frame, a conflict or MERGE action, a sort direction or NULL ordering, an
-> SQL/JSON clause, a pipeline and its sources), a schema object, and a
+> SQL/JSON clause, a pipeline and its sources), a schema object, a
 > registered entity's or graph's queries and writes, with the views
-> generated code wraps them in. Exempt are values (`Value`, the range types,
-> `Interval`, `TypeName` and `Identifier`, compared with `==` as data), rows,
-> models and what a write answers, pools, connections, transactions and
-> streams, registrations and model declarations, and exceptions. A test MUST
-> enumerate every class the package's modules define, so a class that
-> neither refuses nor is exempt for a stated reason fails it.
+> generated code wraps them in, and every stream — `ResultStream`,
+> `CopyOutStream`, `CopyRowStream` and `Listener` — whose truth would say
+> nothing of whether rows remain, so `if rows:` fails as well. Exempt are
+> values (`Value`, the range types, `Interval`, `TypeName` and `Identifier`,
+> compared with `==` as data), rows, models and what a write answers, pools,
+> connections and transactions and the private native handles under them
+> and under the streams, registrations and model declarations, and
+> exceptions. A test MUST enumerate every class the package's modules
+> define, so a class that neither refuses nor is exempt for a stated reason
+> fails it.
 
 ## Queries for applications
 

@@ -2,10 +2,13 @@
 
 import unittest
 
+import pgorm
 from pgorm import (
-    Condition, Conflict, ConflictTarget, ConstructionError, Join, MatchedAction, Nulls,
-    RawSQL, Table, Value, bind, call, col, delete, insert, literal, merge, select, update,
+    Condition, Conflict, ConflictTarget, ConstructionError, DataType, Join, MatchedAction, Nulls,
+    RawSQL, Table, TableFunction, Value, bind, call, col, delete, insert, literal, merge, select,
+    update,
 )
+from pgorm import schema
 
 
 # [spec:pgorm:req:python.statements+10/test]
@@ -166,6 +169,17 @@ class StatementTests(unittest.TestCase):
                       pending, merged, merged.inspect(), RawSQL("SELECT $1", [1]).inspect()]:
             with self.assertRaises(ConstructionError):
                 bool(query)
+
+    # The DataType a column definition list takes is importable beside the
+    # builders, as the one class pgorm.schema's column definitions take.
+    def test_data_type_is_exported_beside_its_builders(self):
+        self.assertIs(DataType, schema.DataType)
+        self.assertIn("DataType", pgorm.__all__)
+        self.assertEqual(DataType.__module__, "pgorm.schema")
+        record = (TableFunction(call("json_to_record", Value.json({"a": [1]})))
+                  .column_definition("a", DataType("integer").array()).alias("r"))
+        self.assertEqual(select(record.star()).from_(record).inspect().sql,
+                         'SELECT "r".* FROM JSON_TO_RECORD($1) AS "r"("a" integer[])')
 
 
 if __name__ == "__main__":

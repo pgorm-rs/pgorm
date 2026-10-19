@@ -13211,12 +13211,20 @@ children (
         title "Python's DataType is importable from pgorm itself, beside the builders that take one"
         kind @feat
         deps (table-function-column-defs)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.733456Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by table-function-column-defs (2dab5aaa). TableFunction.column_definition takes a DataType, but DataType is only at pgorm.schema.DataType, not top-level pgorm, which is easy to trip over. Export it from pgorm (stubs, capabilities, docs), keeping pgorm.schema.DataType the same object."
+            }
+
+            {
+                at 2026-10-19T12:56:06.241222Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13331,12 +13339,27 @@ children (
         title "Python's async streams agree on truth testing"
         kind @fix
         deps (python-truth-testing-rest)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:41.181398Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-truth-testing-rest (5a276b21). Listener refuses truth testing (python.listen requires it), but ResultStream, CopyOutStream and CopyRowStream keep Python's default truth and are exempt in test_truth_testing.py as streams. Pick one rule for all four (refusing is the consistent choice, since a stream's truth says nothing about whether rows remain) and update the rules, stubs and test."
+            }
+
+            {
+                at 2026-10-19T12:40:08.66569Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:03:32.39233Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

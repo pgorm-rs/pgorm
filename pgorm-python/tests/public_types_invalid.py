@@ -17,6 +17,7 @@ async def invalid(connection: p.Connection) -> None:
     p.Compiled()  # expected-error: call-arg
     p.col("id").__eq__(other=1)  # expected-error: call-arg
     s.DataType("not_a_type")  # expected-error: arg-type
+    p.DataType("not_a_type")  # expected-error: arg-type
     s.create_table(p.Table("t")).column("raw SQL")  # expected-error: arg-type
     p.select(p.literal(1)).limit("3")  # expected-error: arg-type
     p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
