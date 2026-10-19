@@ -6206,6 +6206,14 @@ children (
                         text "inline-window-over-named (a08d6a4d) bumped python.statements+9: over() takes an ExtendedWindow inline, built on any entry of the WINDOW clause and refused by check_windows as an extended entry is; sites re-pinned, test_inline_window_builds_on_a_named_one and window_clause_matches_rust_builders pass."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:05:27.315995Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped python.statements+10: TableFunction.column_definition(name, type) and call()'s json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset; sites re-pinned, test_record_calls_read_through_column_definitions passes with the full suite and checks/typing.py."
+                        after_done true
+                    }
                 )
             }
 
@@ -8919,6 +8927,14 @@ children (
                         text "Operator 2026-10-18, on the two constructs sql-select-extras found in neither sql.scope's lists nor the builder: column definition lists for record-returning functions in FROM / ROWS FROM (json_to_record(..) AS (a int, b text)), which those functions need to be usable at all, recommended built; and the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME, which need tsm_system_rows / tsm_system_time installed, recommended ruled out: \"as you recommend\". Filed as table-function-column-defs, which also records the extension methods as out of scope in sql.scope."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T08:05:27.191311Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.scope+23 per the operator's decision: the extension TABLESAMPLE methods SYSTEM_ROWS and SYSTEM_TIME join the out-of-scope list (they need tsm_system_rows / tsm_system_time installed; FromItem::Template reaches them). Column definition lists, the other construct of that decision, are built. Sites re-pinned."
+                        after_done true
+                    }
                 )
             }
 
@@ -9245,6 +9261,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Scope, per the operator's sql.scope verdict (2026-10-18, on query-second-tier) and sql.scope +16's deferred entry. FETCH FIRST n ROWS WITH TIES (requires ORDER BY: make a tie limit without an order unrepresentable or refused before rendering; check what PostgreSQL refuses, e.g. WITH TIES with OFFSET is fine, without ORDER BY is 42601/2201W); GROUP BY DISTINCT over the grouping sets sql.ast.select.grouping builds; SIMILAR TO and NOT SIMILAR TO with an optional ESCAPE, bound like LIKE's pattern; WITH ORDINALITY on a set-returning function in FROM and ROWS FROM (f(..), g(..)) WITH ORDINALITY with a column alias list; TABLESAMPLE BERNOULLI | SYSTEM (percentage) [REPEATABLE (seed)] on a table in FROM, the percentage and seed bound. Oracle-checked renders on the 18 grammar, live tests on 18.6, each construct's entry graduated from sql.scope's deferred list (bump; query-second-tier re-delivers with a feat commit), sql.surface register entries for new exports, and Python and JavaScript reach each with stubs / .d.ts, capability entries and parity cases. Waits on python-statement-typing, which changes the same Python statement stubs."
+                    }
+
+                    {
+                        at 2026-10-19T08:05:27.021072Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped sql.ast.select.table-function+2 (a call returning record takes a column definition list, sql.ast.select.column-definitions; alias returns FromItem::FunctionCall only for a call without one) and sql.render.table-function+2 (a call's list renders per sql.render.column-definitions); previously unpinned sites pinned and the code matches."
+                        after_done true
                     }
                 )
             }
@@ -11892,6 +11916,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "inline-window-over-named (a08d6a4d) bumped napi.windows+2: over() takes an ExtendedWindow inline, refused by check_windows as an extended entry is; sites re-pinned, windows.test.ts and the window-inline-extended parity case pass in Node and Deno."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-19T08:05:27.436116Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "table-function-column-defs (9ad413aa) bumped napi.select+2 (tableFunction takes { call, columnDefinitions }, a non-empty list of [name, type] pairs) and napi.expressions+3 (call() reaches json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset); sites re-pinned, select-extras.test.ts and the record-functions parity case pass in Node and Deno."
                         after_done true
                     }
                 )
