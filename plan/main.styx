@@ -12620,4 +12620,34 @@ children (
             }
         )
     }
+
+    {
+        id domain-enum-remaining
+        title "Subquery membership, relation joins, max/min and pipeline comparisons work on a column whose domain is over an enum"
+        kind @fix
+        deps (domain-enum-predicates)
+        log (
+            {
+                at 2026-10-19T07:41:29.060284Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by domain-enum-predicates (f7862633), checked on 18.6. After the ORM's value predicates and keyset cursors learned to cast a domain-over-enum column to its enum, these still fail with 42883 (no operator / function on the domain): in_subquery / not_in_subquery, where the column is compared with a subquery of the same domain (dmood = dmood); relation joins on such columns; max / min (function max(dmood) does not exist). Pipeline (PRQL) comparisons on such a column are untested. Cast both sides to the enum in subquery membership and join conditions, cast the argument of max / min (and decide which other aggregates need it), check the pipeline's comparisons, and add a domain-enum filter assertion to pgorm-python's generated_application.py (the StockLine entity over the cheerful domain), with live tests."
+            }
+        )
+    }
+
+    {
+        id spec-prose-unversioned-refs
+        title "Rule text cites other rules without a version pin, so a bump does not leave stale numbers in prose"
+        kind @docs
+        deps (domain-enum-predicates)
+        log (
+            {
+                at 2026-10-19T07:41:29.162922Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found repeatedly while merging (e.g. exec.cursor.keyset+5 cited in paginate.md, entity.md and graph.md after it moved to +6; error.model.sql-class+3 in paginate.md; sql.scope+11 and +17 in sql-ddl.md). Rule text that cites another rule with a +N pin goes stale whenever the cited rule is bumped, and fixing the number edits the citing rule's body, which by nspec's convention bumps it too, so the numbers are left wrong. Replace version-pinned citations inside rule prose with unpinned ones ([spec:pgorm:req:x.y] without +N) across docs/spec, in one pass, as a wording-only change that does not change any rule's effect (the operator allowed wording-only fixes without a bump on 2026-10-09 for a typo; confirm the same applies here before relying on it, or bump each touched rule and re-cover its owner). Optionally add a spec check that refuses a pinned citation in prose."
+            }
+        )
+    }
 )
