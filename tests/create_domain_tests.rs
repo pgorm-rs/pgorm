@@ -351,7 +351,7 @@ async fn ids_where(
 // [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
-// [spec:pgorm:sem:exec.cursor.keyset+6/test]    a keyset cursor over a column whose domain is
+// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a keyset cursor over a column whose domain is
 // over an enum pages forwards and backwards by the enum's order
 #[pgorm_macros::test]
 async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
@@ -681,6 +681,87 @@ async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
         linked.as_query().to_string()
     );
     assert_eq!(ids(linked.all(&db).await?), [2, 4]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A graph cursor's tiebreak on a key whose domain is over an enum compares
+/// it as the enum, as an order column on it does: the root's key under
+/// `cursor_by`, a joined slot's under `cursor_by`, and the ordered slot's own
+/// key under `cursor_by_on`, each resumed from inside a run of rows sharing
+/// the order-column value.
+// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a whole-keyset boundary casts a tiebreak column
+// whose domain is over an enum, and its value, to the enum, live
+// [spec:pgorm:sem:query.graph.cursor+3/test]    the root's key, a joined slot's key and the
+// ordered slot's own key, each a domain over an enum, tiebreak a graph cursor live
+#[pgorm_macros::test]
+async fn domain_enum_graph_cursors_tiebreak_as_the_enum() -> Result<(), Error> {
+    let ctx = TestContext::new("domain_enum_graph_cursors").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let labelled = |rows: Vec<(temper::Model, Option<line::Model>)>| {
+        rows.into_iter()
+            .map(|(temper, line)| (temper.label, line.map(|line| line.id)))
+            .collect::<Vec<_>>()
+    };
+    let by_label = || {
+        temper::Entity::graph()
+            .join_maybe::<line::Entity>(<temper::Entity as Related<line::Entity>>::to())
+            .cursor_by(temper::Column::Label)
+    };
+    let bright = |id| ("bright".to_owned(), Some(id));
+    let steady = |id| ("steady".to_owned(), Some(id));
+    assert_eq!(
+        labelled(
+            by_label()
+                .after_with(("bright", Mood::Glad, 2))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [bright(4), steady(1)]
+    );
+    assert_eq!(
+        labelled(
+            by_label()
+                .before_with(("steady", Mood::Calm, 3))
+                .last(2)
+                .all(&db)
+                .await?
+        ),
+        [bright(4), steady(1)]
+    );
+
+    let ids = |rows: Vec<(line::Model, temper::Model)>| {
+        rows.into_iter()
+            .map(|(line, temper)| (line.id, temper.label))
+            .collect::<Vec<_>>()
+    };
+    let graph = || {
+        line::Entity::graph()
+            .join_one::<temper::Entity>(<line::Entity as Related<temper::Entity>>::to())
+    };
+    assert_eq!(
+        ids(graph()
+            .cursor_by(line::Column::Qty)
+            .after_with((1, 2, Mood::Glad))
+            .first(2)
+            .all(&db)
+            .await?),
+        [(3, "steady".to_owned()), (4, "bright".to_owned())]
+    );
+    assert_eq!(
+        ids(graph()
+            .cursor_by_on::<1, _>(temper::Column::Label)
+            .after_with(("bright", Mood::Glad, 2))
+            .first(2)
+            .all(&db)
+            .await?),
+        [(4, "bright".to_owned()), (1, "steady".to_owned())]
+    );
 
     drop(db);
     ctx.delete().await;

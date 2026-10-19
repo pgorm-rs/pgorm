@@ -1093,6 +1093,8 @@ assertions (
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id graph-cursor-enum-tiebreak, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:00:28.453436Z}
+    {id in-subquery-enum-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-19T12:40:07.568874Z}
 )
 
 impl_evidence (

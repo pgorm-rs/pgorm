@@ -2,7 +2,7 @@ use super::QueryResult;
 use super::graph::GraphRow;
 use super::select::{ensure_select_list, refuse_tie_limit};
 use crate::entity::{compared_enum, compared_value};
-use crate::query::graph::qualified_pk_tiebreaks;
+use crate::query::graph::{Tiebreak, Tiebreaks, qualified_pk_tiebreaks};
 use crate::{
     ColumnTrait, ConnectionTrait, EntityTrait, Error, FromQueryResult, IntoBoundary, IntoKey, Key,
     KeyOf, PartialModelTrait, QueryOrder, QuerySelect, Select, SelectGraph, SelectModel,
@@ -48,15 +48,16 @@ impl Window {
 #[derive(Clone, Copy, Debug)]
 pub struct SelectUndecoded;
 
-/// One order column's boundary casts, captured while the typed column was
+/// One keyset column's boundary casts, captured while the typed column was
 /// still in hand: the value's, which is the column's
 /// [`save_as`](ColumnTrait::save_as), and the enum the column itself is cast
 /// to when its domain is over one, the value then cast to the enum too. The
 /// keyset itself is type-erased to identifiers, so neither can be recovered
-/// later — `cursor_by` captures them at construction.
-// [spec:pgorm:sem:exec.cursor.keyset+6]
+/// later — `cursor_by` captures an order column's at construction, and a
+/// graph its tiebreaks' as it installs them.
+// [spec:pgorm:sem:exec.cursor.keyset+7]
 #[derive(Clone)]
-struct BoundaryCast {
+pub(crate) struct BoundaryCast {
     value: Arc<dyn Fn(Expr) -> SimpleExpr + Send + Sync>,
     column: Option<TypeName>,
 }
@@ -77,7 +78,17 @@ impl BoundaryCast {
         }
     }
 
-    /// The order column as the boundary compares it.
+    /// The casts of one typed column, as every value predicate on it takes
+    /// them ([`compared_value`], [`compared_enum`]).
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    pub(crate) fn of<C: ColumnTrait>(col: C) -> Self {
+        Self {
+            value: Arc::new(move |val| compared_value(&col, val)),
+            column: compared_enum(col.def().get_column_type()),
+        }
+    }
+
+    /// The keyset column as the boundary compares it.
     fn column(&self, column: Expr) -> Expr {
         match &self.column {
             Some(enum_type) => Expr::expr(column.cast_as_type(enum_type.clone())),
@@ -93,10 +104,7 @@ impl BoundaryCast {
             .iter()
             .map(
                 |iden| match C::iter().find(|col| col.as_str() == iden.to_string()) {
-                    Some(col) => Self {
-                        value: Arc::new(move |val| compared_value(&col, val)),
-                        column: compared_enum(col.def().get_column_type()),
-                    },
+                    Some(col) => Self::of(col),
                     None => Self::identity(),
                 },
             )
@@ -112,7 +120,7 @@ pub struct Cursor<S, K = ValueTuple> {
     table: Name,
     order_columns: Key,
     boundary_casts: Vec<BoundaryCast>,
-    secondary_order_by: Vec<(Name, Key)>,
+    secondary_order_by: Vec<(Name, Key, BoundaryCast)>,
     window: Option<Window>,
     before: Option<ValueTuple>,
     after: Option<ValueTuple>,
@@ -145,7 +153,7 @@ impl<S, K> Cursor<S, K> {
     /// Capture the order columns' [`save_as`](ColumnTrait::save_as) casts from
     /// the typed column set they were spelled from, so boundary values reach
     /// SQL under the same cast every value predicate applies.
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     fn with_boundary_casts<C: ColumnTrait>(mut self) -> Self {
         self.boundary_casts = BoundaryCast::capture::<C>(&self.order_columns);
         self
@@ -182,7 +190,7 @@ impl<S, K> Cursor<S, K> {
     ///
     /// The extended arity is not the `K` the order columns fix, so it is
     /// checked when the query is composed rather than by the compiler.
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     pub fn before_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -193,7 +201,7 @@ impl<S, K> Cursor<S, K> {
 
     /// [`Cursor::after`] over the cursor's whole sort key, secondary order
     /// columns included. See [`Cursor::before_with`].
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     pub fn after_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -207,18 +215,35 @@ impl<S, K> Cursor<S, K> {
     ///
     /// Both `ORDER BY` and the boundary comparison read this, so the row order
     /// and the keyset predicate cannot disagree about what a page boundary is.
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
-    fn keyset_columns(&self) -> Vec<(Name, Name)> {
+    ///
+    /// Each column comes with the casts its boundary comparisons take: an
+    /// order column's captured at `cursor_by`, a secondary entry's as it was
+    /// installed.
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    fn keyset_columns(&self) -> Vec<(Name, Name, BoundaryCast)> {
         self.order_columns
             .iter()
-            .map(|col| (Name::clone(&self.table), Name::clone(col)))
-            .chain(self.secondary_order_by.iter().filter_map(|(tbl, col)| {
-                col.single().map(|c1| (Name::clone(tbl), Name::clone(c1)))
-            }))
+            .enumerate()
+            .map(|(i, col)| {
+                let cast = self.boundary_casts.get(i).cloned();
+                (
+                    Name::clone(&self.table),
+                    Name::clone(col),
+                    cast.unwrap_or_else(BoundaryCast::identity),
+                )
+            })
+            .chain(
+                self.secondary_order_by
+                    .iter()
+                    .filter_map(|(tbl, col, cast)| {
+                        col.single()
+                            .map(|c1| (Name::clone(tbl), Name::clone(c1), cast.clone()))
+                    }),
+            )
             .collect()
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     fn apply_filters(&self, query: &mut SelectStatement) -> Result<(), Error> {
         let beyond = |col: Expr, v: SimpleExpr| if self.sort_asc { col.gt(v) } else { col.lt(v) };
         let short_of = |col: Expr, v: SimpleExpr| if self.sort_asc { col.lt(v) } else { col.gt(v) };
@@ -236,7 +261,7 @@ impl<S, K> Cursor<S, K> {
         Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+6]
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, Error>
     where
         F: Fn(Expr, SimpleExpr) -> SimpleExpr,
@@ -267,19 +292,14 @@ impl<S, K> Cursor<S, K> {
         //   (c1 = v1 AND ... AND cn ⋈ vn)
         //   OR (c1 = v1 AND ... AND c(n-1) ⋈ v(n-1))
         //   OR ... OR (c1 ⋈ v1)
-        let col = |(tbl, col): &(Name, Name)| Expr::col((Name::clone(tbl), Name::clone(col)));
-        // Secondary tiebreaks past the captured casts bind bare, as they
-        // always have: they are other tables' primary keys.
-        let identity = BoundaryCast::identity();
-        let cast = |i: usize| self.boundary_casts.get(i).unwrap_or(&identity);
         Ok((1..=columns.len())
             .rev()
             .fold(Condition::any(), |disjunction, n| {
                 disjunction.add(columns.iter().zip(values.iter()).take(n).enumerate().fold(
                     Condition::all(),
-                    |conjunction, (i, (column, val))| {
-                        let val = (cast(i).value)(Expr::val(val.clone()));
-                        let column = cast(i).column(col(column));
+                    |conjunction, (i, ((tbl, col, cast), val))| {
+                        let val = (cast.value)(Expr::val(val.clone()));
+                        let column = cast.column(Expr::col((Name::clone(tbl), Name::clone(col))));
                         conjunction.add(if i + 1 == n {
                             f(column, val)
                         } else {
@@ -342,7 +362,7 @@ impl<S, K> Cursor<S, K> {
         query.clear_order_by();
         let ord = self.resolve_sort_order();
 
-        for (tbl, col) in self.keyset_columns() {
+        for (tbl, col, _) in self.keyset_columns() {
             query.order_by((tbl, col), ord.clone());
         }
     }
@@ -395,25 +415,38 @@ impl<S, K> Cursor<S, K> {
 
     /// Set the trailing order entries a joined read tiebreaks on, each
     /// qualified with the table it belongs to.
+    ///
+    /// The entries name no typed column, so their boundary values bind bare.
+    // [spec:pgorm:sem:exec.cursor.keyset+7]
     pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(Name, Key)>) -> &mut Self {
-        self.secondary_order_by = tbl_col;
+        self.secondary_order_by = tbl_col
+            .into_iter()
+            .map(|(tbl, col)| (tbl, col, BoundaryCast::identity()))
+            .collect();
         self
     }
 
-    /// [`set_secondary_order_by`](Self::set_secondary_order_by), dropping any
-    /// entry that restates one of the order columns: ordering a source by its
-    /// own primary key would otherwise install that key twice.
-    // [spec:pgorm:sem:query.graph.cursor+2]
-    fn set_graph_tiebreaks(&mut self, tiebreaks: Vec<(Name, Key)>) -> &mut Self {
+    /// [`set_secondary_order_by`](Self::set_secondary_order_by) with each
+    /// entry's casts, dropping any entry that restates one of the order
+    /// columns: ordering a source by its own primary key would otherwise
+    /// install that key twice.
+    // [spec:pgorm:sem:query.graph.cursor+3]
+    fn set_graph_tiebreaks(&mut self, tiebreaks: Tiebreaks) -> &mut Self {
         let table = self.table.to_string();
         let order: Vec<String> = self.order_columns.iter().map(|c| c.to_string()).collect();
         self.secondary_order_by = tiebreaks
             .into_iter()
-            .filter(|(tbl, cols)| {
-                !(tbl.to_string() == table
-                    && cols
-                        .single()
-                        .is_some_and(|c| order.contains(&c.to_string())))
+            .filter(|tiebreak| {
+                !(tiebreak.table.to_string() == table
+                    && order.contains(&tiebreak.column.to_string()))
+            })
+            .map(|tiebreak| {
+                let Tiebreak {
+                    table,
+                    column,
+                    cast,
+                } = tiebreak;
+                (table, Key::from(column), cast)
             })
             .collect();
         self
@@ -519,7 +552,7 @@ where
     /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
     /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
     /// ```
-    // [spec:pgorm:sem:exec.cursor.keyset+6/test]
+    // [spec:pgorm:sem:exec.cursor.keyset+7/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoKey,
@@ -531,13 +564,13 @@ where
 
 /// The root entity's primary key as cursor tiebreaks, qualified with its own
 /// table: what a graph ordered on one of its slots falls back to.
-fn pk_tiebreaks<T: EntityTrait>() -> Vec<(Name, Key)> {
+fn pk_tiebreaks<T: EntityTrait>() -> Tiebreaks {
     qualified_pk_tiebreaks::<T>(&Name::new(T::default()))
 }
 
 /// A graph's rows are decoded by [`GraphRow`], so that is what its cursor
 /// selects.
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 impl<E, S> CursorTrait for SelectGraph<E, S>
 where
     E: EntityTrait,
@@ -546,7 +579,7 @@ where
     type Selector = GraphRow<E, S>;
 }
 
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 impl<E, S> SelectGraph<E, S>
 where
     E: EntityTrait,
@@ -592,7 +625,7 @@ where
     ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
     ///     .cursor_by(fruit::Column::Name);
     /// ```
-    // [spec:pgorm:sem:query.graph.cursor+2]
+    // [spec:pgorm:sem:query.graph.cursor+3]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<GraphRow<E, S>, C::ValueType>
     where
         C: KeyOf<E>,
@@ -646,7 +679,7 @@ where
     ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
     ///     .cursor_by_on::<1, _>(cake::Column::Name);
     /// ```
-    // [spec:pgorm:sem:query.graph.cursor+2]
+    // [spec:pgorm:sem:query.graph.cursor+3]
     pub fn cursor_by_on<const I: usize, C>(
         self,
         order_columns: C,
@@ -692,7 +725,7 @@ where
 mod cursor_bind;
 pub use cursor_bind::ValueHolder;
 
-// [spec:pgorm:sem:query.graph.cursor+2/test]    a graph's cursor orders on the
+// [spec:pgorm:sem:query.graph.cursor+3/test]    a graph's cursor orders on the
 // root and tiebreaks on every decoded slot's primary key — each qualified by
 // the slot's effective identifier, in declaration order — while
 // `cursor_by_on` orders on one slot chosen by position and tiebreaks on the
@@ -750,7 +783,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:query.graph.cursor+2/test]    ordered on a root column
+    // [spec:pgorm:sem:query.graph.cursor+3/test]    ordered on a root column
     // that is not its key, the root's own primary key is installed between
     // the order columns and the slots' keys; ordered on that key as well, the
     // restated entry is dropped rather than installed twice
@@ -867,7 +900,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+6/test]    a boundary value on an enum
+    // [spec:pgorm:sem:exec.cursor.keyset+7/test]    a boundary value on an enum
     // order column binds under the column's `save_as` cast, exactly as the
     // value predicates spell it; a plain column still binds bare
     #[test]

@@ -13121,12 +13121,20 @@ children (
         title "A graph cursor's tiebreak on a joined slot's key casts a domain over an enum, as the ordered keys do"
         kind @fix
         deps (domain-enum-remaining)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:38.610946Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by domain-enum-remaining (596d21c2). A graph cursor completes a joined slot's continuation key with that slot's primary key (Tiebreaks) and binds the tiebreak bare. A slot keyed by a domain over an enum (the tests' `temper`) would fail with 42883 under cursor_by, since there is no operator for the domain against text. Thread the key column's save_as cast through Tiebreaks (exec.cursor.keyset, query.graph.cursor) and test cursor_by live over such a key."
+            }
+
+            {
+                at 2026-10-19T13:00:28.453436Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13172,6 +13180,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by domain-enum-remaining (596d21c2). in_subquery / not_in_subquery cast the column and the subquery's one projected expression to the enum (compared_subquery in src/entity/column_def.rs), but leave three shapes as written, and those still fail with 42883: several projected expressions, a windowed projection, and `*`. Handling them needs a column-alias list on FromItem::SubQuery in pgorm-query, so that the subquery can be wrapped and its column cast by name."
+            }
+
+            {
+                at 2026-10-19T12:40:07.568874Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

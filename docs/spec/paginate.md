@@ -36,7 +36,7 @@ bound parameter is held to.
 > cursor over a caller's projection unfetchable until `into_model` or
 > `into_partial_model` names the row type.
 
-> [spec:pgorm:sem:exec.cursor.keyset+6]
+> [spec:pgorm:sem:exec.cursor.keyset+7]
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
@@ -54,17 +54,20 @@ bound parameter is held to.
 > at every arity. Conditions are added to the composed query's `WHERE` via
 > `cond_where`; both `before` and `after` may be set simultaneously.
 >
-> Each boundary value binds under its order column's `save_as` cast
-> (`entity.traits.column.enum-cast`), captured from the typed column set at
-> `cursor_by` time — the keyset itself is type-erased identifiers, so the
-> cast cannot be recovered later. An order column whose domain is over an
-> enum compares as every predicate on it does: the column is cast to the
-> enum in each of the boundary's comparisons, and its value to the enum in
-> place of `save_as`, PostgreSQL resolving no operator for the domain.
-> `ORDER BY` keeps the bare column, which sorts as its enum does, so the row
-> order and the boundary agree. An identifier no column of the capture set
-> claims, and every secondary tiebreak (another table's primary key), binds
-> bare, as a plain column's value always did.
+> Each boundary value binds under its keyset column's `save_as` cast
+> (`entity.traits.column.enum-cast`), captured while the typed column is in
+> hand — an order column's from the typed column set at `cursor_by` time, a
+> graph's tiebreak's from the source's primary-key column as the graph
+> installs it (`[spec:pgorm:sem:query.graph.cursor+3]`) — the keyset itself
+> being type-erased identifiers, so the cast cannot be recovered later. A
+> keyset column whose domain is over an enum compares as every predicate on
+> it does: the column is cast to the enum in each of the boundary's
+> comparisons, and its value to the enum in place of `save_as`, PostgreSQL
+> resolving no operator for the domain (`42883`). `ORDER BY` keeps the bare
+> column, which sorts as its enum does, so the row order and the boundary
+> agree. An identifier no column of the capture set claims, and a secondary
+> entry installed through `set_secondary_order_by`, which names no typed
+> column, binds bare, as a plain column's value always did.
 >
 > A boundary may be given at either of two arities, and its arity selects
 > how much of the keyset it compares. At the arity of the order columns it
