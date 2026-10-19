@@ -27,6 +27,10 @@ def programs(p):
         "truncate": p.truncate(table),
         "add_column": p.add_column(table, p.ColumnDef("extra", "text"), if_not_exists=True),
         "modify_column": p.modify_column(table, p.ColumnDef("extra", "varchar").not_null().default("hello")),
+        "collated": p.CreateTable(table).column(p.ColumnDef('word "x"', "text").not_null().collate("C"))
+            .column(p.ColumnDef("label", "text").collate("C").collate("POSIX", schema="pg_catalog")),
+        "add_column_collated": p.add_column(table, p.ColumnDef("extra", "text").collate('C "x"', schema='schema "雪"')),
+        "modify_column_collated": p.modify_column(table, p.ColumnDef("extra", "varchar").collate("C")),
         "add_primary_key": p.add_primary_key(table, 'id "x"', "name"),
         "add_unique": p.add_unique(table, "name", 'id "x"', name='unique "x"', nulls_not_distinct=True),
         "temporal_keys": base.column(p.ColumnDef('during "x"', p.TypeName("tstzrange")))

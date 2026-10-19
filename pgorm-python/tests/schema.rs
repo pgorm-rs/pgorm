@@ -1,12 +1,13 @@
 //! Native DDL built independently must match Python SQL, including literal escaping.
 use pgorm::pgorm_query::{
     Check, ColumnDef, ColumnType, ConstraintChange, ConstraintDrop, Domain, DomainCheck,
-    Enforcement, Expr, GeneratedKind, Index, IndexOrder, IndexType, IntoName, MaterializedView,
-    Name, NotNullConstraint, Query, Schema, SelectStatement, SimpleExpr, StringLen, Table,
-    TableKey, TableName, TypeName, Values, View, ViewCheckOption, extension::Type,
+    Enforcement, Expr, Func, GeneratedKind, Index, IndexOrder, IndexType, IntoName,
+    MaterializedView, Name, NotNullConstraint, Query, Schema, SelectStatement, SimpleExpr,
+    StringLen, Table, TableKey, TableName, TypeName, Values, View, ViewCheckOption,
+    extension::Type,
 };
 use pgorm_python::expressions::Compiled;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyDict};
 use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
 fn a(name: &str) -> Name {
@@ -137,6 +138,38 @@ fn programs() -> BTreeMap<&'static str, String> {
                     ColumnDef::new_with_type(a("extra"), ColumnType::String(StringLen::None))
                         .not_null()
                         .default("hello"),
+                )
+                .to_string(),
+        ),
+        (
+            "collated",
+            Table::create(table.clone())
+                .col(
+                    ColumnDef::new_with_type(a("word \"x\""), ColumnType::Text)
+                        .not_null()
+                        .collate(a("C")),
+                )
+                .col(
+                    ColumnDef::new_with_type(a("label"), ColumnType::Text)
+                        .collate((a("pg_catalog"), a("POSIX"))),
+                )
+                .to_string(),
+        ),
+        (
+            "add_column_collated",
+            Table::alter(table.clone())
+                .add_column(
+                    ColumnDef::new_with_type(a("extra"), ColumnType::Text)
+                        .collate((a("schema \"雪\""), a("C \"x\""))),
+                )
+                .to_string(),
+        ),
+        (
+            "modify_column_collated",
+            Table::alter(table.clone())
+                .modify_column(
+                    ColumnDef::new_with_type(a("extra"), ColumnType::String(StringLen::None))
+                        .collate(a("C")),
                 )
                 .to_string(),
         ),
@@ -619,7 +652,9 @@ fn views(table: &TableName) -> BTreeMap<&'static str, String> {
 }
 
 // [spec:pgorm:req:python.schema+1/test]
-// [spec:pgorm:req:python.schema-views+1/test]    every view, materialized view and CREATE TABLE AS
+// [spec:pgorm:req:python.schema-collation/test]    a column's collation, qualified or bare and a
+// later call replacing an earlier, renders as the Rust builder renders it in each position
+// [spec:pgorm:req:python.schema-views+2/test]    every view, materialized view and CREATE TABLE AS
 // option renders as the Rust builder renders it
 // [spec:pgorm:req:python.schema-schemas/test]    every schema create, drop and rename renders as
 // the Rust builder renders it
@@ -649,6 +684,70 @@ fn ddl_matches_native_rust() -> Result<(), Box<dyn std::error::Error>> {
                 (executable.sql, executable.values),
                 (compiled.sql, compiled.values)
             );
+        }
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.schema-views+2/test]    each view builder refuses an unordered tie limit
+// and an undeclared window with the error Rust's own checks give
+#[test]
+fn view_bodies_refused_as_rust_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let mut unordered = Query::select();
+    unordered
+        .column(a("id"))
+        .from(a("account"))
+        .limit_with_ties(2);
+    let mut undeclared = Query::select();
+    undeclared
+        .expr_window_name(Func::count(Expr::col(a("id"))), a("w"))
+        .from(a("account"));
+    let refusals = [
+        (
+            "unordered",
+            unordered.check_tie_limit().map_err(|e| e.to_string()),
+        ),
+        (
+            "undeclared",
+            undeclared.check_windows().map_err(|e| e.to_string()),
+        ),
+    ];
+    Python::initialize();
+    Python::attach(|py| -> Result<(), Box<dyn std::error::Error>> {
+        let native = PyModule::new(py, "pgorm._native")?;
+        pgorm_python::install(&native, Default::default())?;
+        let globals = PyDict::new(py);
+        globals.set_item("p", &native)?;
+        py.run(
+            c"account = p.Table('account')
+unordered = p.Select(p.col('id')).from_(account).limit_with_ties(2)
+undeclared = p.Select(p.call('count', p.col('id')).over('w')).from_(account)
+step = p.Select(p.col('n')).from_(p.Table('r'))
+builders = {
+    'create_view': lambda q: p.create_view(p.Table('v'), q),
+    'create_recursive_view': lambda q: p.create_recursive_view(p.Table('r'), ['n'], q.union_all(step)),
+    'create_materialized_view': lambda q: p.create_materialized_view(p.Table('m'), q),
+    'create_table_as': lambda q: p.create_table_as(p.Table('t'), q),
+}",
+            Some(&globals),
+            None,
+        )?;
+        let refused = native.getattr("ConstructionError")?;
+        let builders = globals
+            .get_item("builders")?
+            .ok_or("the program defines its builders")?;
+        let builders = builders.cast::<PyDict>().map_err(PyErr::from)?;
+        assert_eq!(builders.len(), 4);
+        for (name, build) in builders.iter() {
+            for (query, expected) in &refusals {
+                let Err(expected) = expected else {
+                    panic!("Rust admits the {query} query");
+                };
+                let query = globals.get_item(query)?.ok_or("the program defines it")?;
+                let error = build.call1((query,)).expect_err("the body is refused");
+                assert!(error.is_instance(py, &refused), "{name}: {error}");
+                assert_eq!(&error.value(py).to_string(), expected, "{name}");
+            }
         }
         Ok(())
     })

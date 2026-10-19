@@ -12486,6 +12486,13 @@ children (
                 kind @note
                 text "Found by python-select-set-operations (e4152e18). pgorm-python's create_view, create_recursive_view, create_materialized_view and create_table_as (src/schema/view.rs) take query.inner.clone() instead of query.embedded()?, so a view body with a tie limit and no ORDER BY reaches the server, while pgorm-napi's view builders refuse it as they read the query. Use embedded() so the check runs, and add a test per builder."
             }
+
+            {
+                at 2026-10-18T23:10:55.150159Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -12559,6 +12566,9 @@ children (
         id python-column-collation
         title "Python's ColumnDef names a collation, as Rust's column definitions do"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:python.schema-collation])
+        }
         deps (sql-domains)
         log (
             {
@@ -12566,6 +12576,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by sql-domains (2fa97891). pgorm-python's ColumnDef cannot name a collation (Rust's column definitions can, sql.ast.expr.collate's column position), so CreateDomain.collate is the only place Python can name one. Add a collate option to Python's column definitions (and check pgorm-napi's), with stubs, parity cases and a live test."
+            }
+
+            {
+                at 2026-10-18T23:11:36.510113Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

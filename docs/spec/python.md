@@ -277,7 +277,21 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `ConstructionError` on Python truth testing, as a query expression does,
 > and so MUST `Compiled`, which every inspection returns.
 
-> [spec:pgorm:req:python.schema-views+1]
+> [spec:pgorm:req:python.schema-collation]
+> `ColumnDef.collate(name, *, schema)` MUST give the column its one collation
+> through Rust's `ColumnDef::collate` (`sql.ddl.column-def`), the name and the
+> schema each an identifier, a `str` or an `Identifier`: written `COLLATE`
+> after the type, the schema first when one is given, a later call replacing
+> an earlier, since PostgreSQL refuses a column with two. `create_table` and
+> `add_column` write it where the column is declared, and `modify_column` on
+> the column's retype, `ALTER COLUMN .. TYPE .. COLLATE`, the only place
+> PostgreSQL changes a column's collation; every comparison and sort over the
+> column then uses it. A name that is not an identifier MUST be refused with
+> `ConstructionError` as the column is built. What only the server knows it
+> refuses by SQLSTATE, as a `DatabaseError`: a collation that does not exist
+> (`42704`) and a collation on a type without one (`42804`).
+
+> [spec:pgorm:req:python.schema-views+2]
 > `pgorm.schema` MUST build views, materialized views and `CREATE TABLE AS`
 > through pgorm-query's builders (`sql.ddl.view`,
 > `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each a function
@@ -286,7 +300,13 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > it was given, and column names as identifiers. The query is a `Select`,
 > handed to the Rust statement as the `SelectStatement` it owns, so its values
 > reach the definition as the Rust renderer writes them, as literals, and
-> `inspect()` gives an empty parameter list. The functions are
+> `inspect()` gives an empty parameter list. The query is read as a method
+> reads a statement into another (`python.statements`): nothing can order it
+> or declare its windows once it is a definition, so a tie limit Rust's
+> `check_tie_limit` refuses, as one without ORDER BY, and a WINDOW clause or a
+> reference to one that its `check_windows` refuses MUST be refused with
+> `ConstructionError` as the function is called, never sent to the server.
+> The functions are
 > `create_view(name, query, *, columns, or_replace, check_option,
 > security_barrier, security_invoker)`, `check_option` being `"local"` or
 > `"cascaded"`; `create_recursive_view(name, columns, query, *, or_replace,

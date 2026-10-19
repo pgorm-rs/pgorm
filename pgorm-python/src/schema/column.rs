@@ -1,6 +1,6 @@
 use super::types::PyDataType;
 use crate::{errors::ConstructionError, expressions, identifiers::PyIdentifier};
-use pgorm::pgorm_query::{Check, ColumnDef, Enforcement, GeneratedKind};
+use pgorm::pgorm_query::{Check, Collation, ColumnDef, Enforcement, GeneratedKind, IntoCollation};
 use pyo3::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -71,6 +71,21 @@ impl PyColumnDef {
         inner.check(check(condition, name, not_enforced, no_inherit)?);
         Ok(Self { inner })
     }
+    /// `COLLATE` after the type: the column's one collation, a later call
+    /// replacing an earlier, since PostgreSQL refuses a column with two.
+    /// `modify_column` writes it on the retype, the only place PostgreSQL
+    /// changes a column's collation.
+    // [spec:pgorm:req:python.schema-collation]
+    #[pyo3(signature=(name, *, schema=None))]
+    fn collate(
+        &self,
+        name: &Bound<'_, PyAny>,
+        schema: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let mut inner = self.inner.clone();
+        inner.collate(collation(name, schema)?);
+        Ok(Self { inner })
+    }
     fn generated(&self, expression: &Bound<'_, PyAny>, kind: &str) -> PyResult<Self> {
         let kind = match kind {
             "stored" => GeneratedKind::Stored,
@@ -91,6 +106,19 @@ impl PyColumnDef {
             "column definitions cannot be tested as Python booleans",
         ))
     }
+}
+
+/// A collation named by `name`, qualified by `schema` when one is given, each
+/// an identifier: what `ColumnDef.collate` and `CreateDomain.collate` take.
+pub(super) fn collation(
+    name: &Bound<'_, PyAny>,
+    schema: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Collation> {
+    let name = PyIdentifier::new(name)?.name();
+    Ok(match schema {
+        Some(schema) => (PyIdentifier::new(schema)?.name(), name).into_collation(),
+        None => name.into_collation(),
+    })
 }
 
 /// A `CHECK` over `condition`, named, `NOT ENFORCED` and `NO INHERIT` as

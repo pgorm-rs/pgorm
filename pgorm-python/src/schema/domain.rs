@@ -3,6 +3,7 @@
 //! `TypeName`.
 
 use super::{
+    column::collation,
     enums::type_ref,
     statement::{PyDDL, Statement},
     types::PyDataType,
@@ -49,12 +50,8 @@ impl PyCreateDomain {
         name: &Bound<'_, PyAny>,
         schema: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let name = PyIdentifier::new(name)?.name();
         let mut inner = self.inner.clone();
-        match schema {
-            Some(schema) => inner.collate((PyIdentifier::new(schema)?.name(), name)),
-            None => inner.collate(name),
-        };
+        inner.collate(collation(name, schema)?);
         Ok(Self { inner })
     }
 

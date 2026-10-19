@@ -46,6 +46,22 @@ class SchemaConstruction(unittest.TestCase):
         sql = s.create_table(p.Table("test")).column(s.ColumnDef("v", s.DataType(kind).array())).inspect().sql
         self.assertIn('"schema ""雪"""."Mood ""雪"""[]', sql)
 
+    # [spec:pgorm:req:python.schema-collation/test]    a collation is named by identifiers, quoted
+    # and qualified as given, and a later call replaces an earlier
+    def test_column_collation_names_are_identifiers(self):
+        column = s.ColumnDef("word", "text").collate("C")
+        sql = s.create_table(p.Table("t")).column(column.collate('C "x"', schema="pg_catalog")).inspect().sql
+        self.assertEqual(sql, 'CREATE TABLE "t" ( "word" text COLLATE "pg_catalog"."C ""x""" )')
+        self.assertIn('"word" text COLLATE "C"', s.add_column(p.Table("t"), column).inspect().sql)
+        for action in (
+            lambda: column.collate(""),
+            lambda: column.collate("C", schema=""),
+            lambda: column.collate(1),
+            lambda: column.collate("雪" * 22),
+        ):
+            with self.subTest(action=action), self.assertRaises(p.ConstructionError):
+                action()
+
     # [spec:pgorm:req:python.schema+1/test]
     def test_invalid_options_and_unquoted_fragments_fail(self):
         for action in (
@@ -364,6 +380,37 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await self.pool.execute(s.drop_enum(renamed, if_exists=True))
         finally:
             await self.pool.execute(s.drop_enum(shadow, if_exists=True, cascade=True))
+
+    # [spec:pgorm:req:python.schema-collation/test]    a column created under "C" compares and sorts
+    # bytewise, a retype changes its collation, and the server refuses what it cannot apply
+    async def test_column_collation_orders_its_text(self):
+        table = p.Table('words "x"', schema=self.namespace)
+        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").auto_increment()).primary_key("id")
+        ddl = ddl.column(s.ColumnDef("word", "text").collate("C").not_null())
+        await self.pool.execute(ddl.column(s.ColumnDef("label", "text").collate("POSIX", schema="pg_catalog")))
+        for word in ("b", "a", "B", "A"):
+            await self.pool.execute(p.insert(table).columns("word", "label").values(word, word))
+        ordered = p.select(p.col("word")).from_(table).order_by(p.col("word").asc())
+        self.assertEqual([row["word"] for row in await self.pool.fetch_all(ordered)], ["A", "B", "a", "b"])
+        below = p.select(p.col("word")).from_(table).where_(p.col("word") < "a").order_by(p.col("id").asc())
+        self.assertEqual([row["word"] for row in await self.pool.fetch_all(below)], ["B", "A"])
+        await self.pool.execute(s.add_column(table, s.ColumnDef("note", "text").collate("C")))
+        await self.pool.execute(s.modify_column(table, s.ColumnDef("note", "varchar").collate("POSIX", schema="pg_catalog")))
+        catalog = p.RawSQL(
+            "SELECT attname::text AS column, collname::text AS collation FROM pg_attribute "
+            "JOIN pg_collation c ON c.oid = attcollation "
+            "WHERE attrelid = $1::text::regclass AND attnum > 0 ORDER BY attnum",
+            [f'{self.quoted}."words ""x"""'],
+        )
+        rows = [(row["column"], row["collation"]) for row in await self.pool.fetch_all(catalog)]
+        self.assertEqual(rows, [("word", "C"), ("label", "POSIX"), ("note", "POSIX")])
+        for column, sqlstate in (
+            (s.ColumnDef("missing", "text").collate("no such collation"), "42704"),
+            (s.ColumnDef("n", "integer").collate("C"), "42804"),
+        ):
+            with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
+                await self.pool.execute(s.add_column(table, column))
+            self.assertEqual(refused.exception.sqlstate, sqlstate)
 
 
 if __name__ == "__main__":

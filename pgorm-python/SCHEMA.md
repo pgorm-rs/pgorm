@@ -45,7 +45,12 @@ constraint, which PostgreSQL 18 records by name — the one given, or one it
 derives — and which a table that inherits this one takes unless
 `no_inherit=True`. `.check(condition, name=None, not_enforced=False)` adds a
 `CHECK`; `not_enforced=True` is PostgreSQL 18's `NOT ENFORCED`, recorded and
-never checked. Keys are
+never checked. `.collate(name, schema=None)` is the column's one collation,
+written after its type: `s.ColumnDef("code", "text").collate("C")` compares and
+sorts the column's text bytewise, and a later call replaces an earlier.
+`modify_column` writes it on the retype, the only place PostgreSQL changes a
+column's collation. The server refuses a collation that does not exist
+(`42704`) and one on a type without collations (`42804`). Keys are
 the table's: `CreateTable.primary_key(*columns)` declares its one primary key,
 which a later call replaces, and `CreateTable.unique(*columns, name=...,
 nulls_not_distinct=...)` adds a unique key, so a table cannot be written with
@@ -225,7 +230,10 @@ A view, a materialized view and `CREATE TABLE AS` wrap a `Select` in a name.
 PostgreSQL stores a view's definition as SQL text, so the query's values are
 written into it as literals by Rust's renderer, and `inspect().params` is
 empty. The name is a `p.Table` without an alias; `columns=` names the leading
-columns the query returns.
+columns the query returns. The query is read as a CTE body or a subquery is:
+nothing can order it once it is a definition, so a `limit_with_ties` without
+`order_by`, or a WINDOW clause PostgreSQL would refuse, raises
+`ConstructionError` as the function is called.
 
 ```python
 account = p.Table("account", schema="app")
