@@ -27,10 +27,11 @@ use pgorm_query::{
 };
 
 use super::helper::join_condition;
+use crate::executor::BoundaryCast;
 use crate::executor::result_name::result_column_name;
 use crate::{
-    ColumnTrait, EntityTrait, Error, FromQueryResult, Iterable, Key, PrimaryKeyToColumn,
-    QueryFilter, QueryOrder, QueryResult, QueryTrait, Related, RelationDef, StaticName,
+    ColumnTrait, EntityTrait, Error, FromQueryResult, Iterable, PrimaryKeyToColumn, QueryFilter,
+    QueryOrder, QueryResult, QueryTrait, Related, RelationDef, StaticName,
 };
 
 /// The closure shape a call-site `ON` predicate takes: the join's left and
@@ -119,21 +120,38 @@ impl<F: EntityTrait> Slot for Opt<F> {
     }
 }
 
+/// One secondary order entry a decoded source contributes to a cursor's sort
+/// key: a primary-key column, the identifier it is qualified with, and the
+/// casts a boundary compares it under.
+///
+/// The casts are captured here, where the typed column is in hand: the
+/// cursor's keyset is identifiers only, and a key whose domain is over an
+/// enum has no comparison operator unless it and its value are cast.
+// [spec:pgorm:sem:query.graph.cursor+3]
+#[derive(Debug, Clone)]
+pub struct Tiebreak {
+    pub(crate) table: Name,
+    pub(crate) column: Name,
+    pub(crate) cast: BoundaryCast,
+}
+
 /// The secondary order entries one decoded source contributes to a cursor's
 /// sort key: one unary entry per primary-key column.
-pub(crate) type Tiebreaks = Vec<(Name, Key)>;
+pub(crate) type Tiebreaks = Vec<Tiebreak>;
 
 /// One decoded source's primary key as cursor tiebreaks, qualified with the
 /// source's *effective* identifier — its bound alias when it has one — so a
 /// tiebreak names the same table the projection and the `ON` clause do.
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &Name) -> Tiebreaks {
     <F::PrimaryKey as Iterable>::iter()
         .map(|pk| {
-            (
-                Name::clone(qualifier),
-                Key::from(Name::new(pk.into_column())),
-            )
+            let column = pk.into_column();
+            Tiebreak {
+                table: Name::clone(qualifier),
+                column: Name::new(column),
+                cast: BoundaryCast::of(column),
+            }
         })
         .collect()
 }
@@ -145,7 +163,7 @@ pub(crate) fn qualified_pk_tiebreaks<F: EntityTrait>(qualifier: &Name) -> Tiebre
 /// is sealed for the reason [`Slot`] is — an outside implementor could only
 /// make the two disagree. It is implemented for `()` and for every slot tuple
 /// the graph can declare.
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 pub trait Slots: sealed::Sealed {
     /// The primary-key tiebreaks of every declared slot except `skip`, in
     /// declaration order.
@@ -164,14 +182,14 @@ pub trait Slots: sealed::Sealed {
 /// slot — positionally, at compile time. A position no slot occupies has no
 /// implementation, so asking for it is a compile error rather than a silently
 /// mis-qualified column.
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 pub trait SlotAt<const I: usize>: Slots {
     /// The slot at that position, whose entity types the order columns.
     type Slot: Slot;
 }
 
 /// A slotless graph declares no tiebreaks; its cursor is a single-table one.
-// [spec:pgorm:sem:query.graph.cursor+2]
+// [spec:pgorm:sem:query.graph.cursor+3]
 impl Slots for () {
     fn tiebreaks(_qualifiers: &[Name], _skip: usize) -> Tiebreaks {
         Tiebreaks::new()
@@ -185,7 +203,7 @@ impl sealed::Sealed for () {}
 macro_rules! slot_at {
     ( ( $( $all:ident ),+ ) ; ) => {};
     ( ( $( $all:ident ),+ ) ; $s:ident @ $i:literal $( , $rest:ident @ $ri:literal )* ) => {
-        // [spec:pgorm:sem:query.graph.cursor+2]
+        // [spec:pgorm:sem:query.graph.cursor+3]
         impl< $( $all: Slot ),+ > SlotAt<$i> for ( $( $all, )+ ) {
             type Slot = $s;
         }
@@ -200,7 +218,7 @@ macro_rules! slots {
     ( $( $s:ident @ $i:literal ),+ ) => {
         impl< $( $s: Slot ),+ > sealed::Sealed for ( $( $s, )+ ) {}
 
-        // [spec:pgorm:sem:query.graph.cursor+2]
+        // [spec:pgorm:sem:query.graph.cursor+3]
         impl< $( $s: Slot ),+ > Slots for ( $( $s, )+ ) {
             fn tiebreaks(qualifiers: &[Name], skip: usize) -> Tiebreaks {
                 let sources: &[fn(&Name) -> Tiebreaks] =
@@ -425,14 +443,14 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
 
     /// The declared slots' effective identifiers, in declaration order — the
     /// root's excluded, so slot `n` sits at index `n - 1`.
-    // [spec:pgorm:sem:query.graph.cursor+2]
+    // [spec:pgorm:sem:query.graph.cursor+3]
     pub(crate) fn slot_qualifiers(&self) -> &[Name] {
         self.qualifiers.get(1..).unwrap_or_default()
     }
 
     /// The effective identifier of one decoded source: the root at 0, each
     /// slot at its declared position.
-    // [spec:pgorm:sem:query.graph.cursor+2]
+    // [spec:pgorm:sem:query.graph.cursor+3]
     pub(crate) fn qualifier(&self, index: usize) -> Option<Name> {
         self.qualifiers.get(index).cloned()
     }

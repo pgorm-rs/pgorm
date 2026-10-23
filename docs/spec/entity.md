@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+9]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+10]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -202,9 +202,20 @@ explicit limitations.
 > projected expression under the alias it had: the enum resolves no operator
 > with the domain either (`42883`, *operator does not exist: e = d*), so a
 > subquery projecting the same domain needs the cast as much as the column
-> does. A subquery whose projection is not one plain expression — several,
-> `*`, or a window function's, which pgorm-query pairs with its `OVER` — is
-> left as written. `max` and `min` aggregate the column cast to the enum and
+> does. A projection the cast cannot reach in place — `*` or a table's `*`,
+> whose cast is not SQL, or a window function's, which pgorm-query pairs with
+> its `OVER` — is compared through the subquery's array instead:
+> `= ANY(CAST(ARRAY(..) AS e[]))` for `in_subquery`, `<> ALL(..)` for
+> `not_in_subquery`, which answer as `IN` and `NOT IN` do, a null member
+> included (`sql.ast.expr`). The server refuses `ARRAY(..)` of more than one
+> column (`42601`) as it refuses `IN` of one, so a `*` wider than a column is
+> refused, never narrowed to its first column, as wrapping it in a derived
+> table whose alias list named one column would narrow it. The array is the
+> subquery's whole result, built once rather than planned as a semi-join,
+> which is the cost of these shapes alone. Several projected expressions are
+> left as written: the membership is of one column, so the server refuses
+> them (`42601`, *subquery has too many columns*) whatever their types, and no
+> cast could make them a comparison. `max` and `min` aggregate the column cast to the enum and
 > yield the enum, PostgreSQL resolving neither for the domain (`42883`,
 > *function max(d) does not exist*); `count` resolves for the domain and keeps
 > the bare column, and `sum` resolves for no enum at all. A relation's join

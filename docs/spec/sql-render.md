@@ -667,9 +667,10 @@ an ideal Postgres renderer would emit.
 > context item, a `PASSING` value and a `DEFAULT` render as they do in the
 > query functions — typed and bound, typed and bound, and an escaped literal.
 
-> [spec:pgorm:req:sql.render.subquery+4]
+> [spec:pgorm:req:sql.render.subquery+5]
 > A `SimpleExpr::SubQuery` MUST render its optional operator prefix (`EXISTS`,
-> `ANY`, `SOME`, `ALL`) directly followed by the parenthesized sub-statement.
+> `ANY`, `SOME`, `ALL`, `ARRAY`) directly followed by the parenthesized
+> sub-statement.
 > A `SimpleExpr::Tuple` renders `(e1, e2, …)`; `SimpleExpr::Values` renders
 > `(v1, v2, …)` with each element parameterized. As a FROM item,
 > `FromItem::SubQuery` renders `(SELECT …) AS "alias"`, `FromItem::ValuesList`

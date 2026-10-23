@@ -844,10 +844,12 @@ assertions (
     {id generative-live-wire-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-18T18:33:19.713463Z}
     {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
     {id graph-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T17:40:27.266491Z}
+    {id graph-cursor-enum-tiebreak, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:00:28.453436Z}
     {id graph-long-column-aliases, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:53:25.354727Z}
     {id graph-unicode-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T21:59:36.946216Z}
     {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
     {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
+    {id in-subquery-enum-shapes, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:22:25.129436Z}
     {id infra.prepared-api, kind @complete, author "brendan@necessary.nu", at 2026-09-03T20:25:06.421353Z}
     {id infra.schema-index-qualify, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:11:17.901701Z}
     {id infra.sql-err, kind @complete, author "brendan@necessary.nu", at 2026-09-01T23:57:44.542609Z}

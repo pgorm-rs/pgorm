@@ -303,8 +303,8 @@ async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
 // [spec:pgorm:req:entity.traits.entity-name+2/test]    finds, filters,
 // ordering, pagination, keyset cursors and the schema-qualified enum's value
 // predicates all address tenant_a.item
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]
-// [spec:pgorm:sem:exec.cursor.keyset+6/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]
+// [spec:pgorm:sem:exec.cursor.keyset+7/test]
 #[pgorm_macros::test]
 async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_finds").await;
@@ -370,7 +370,7 @@ async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
 // junction fold inside tenant_a, an INNER join from tenant_a.item to the
 // unqualified owner, grouped rows and a graph cursor — every source
 // qualified by its own declaration
-// [spec:pgorm:sem:query.graph.cursor+2/test]
+// [spec:pgorm:sem:query.graph.cursor+3/test]
 #[pgorm_macros::test]
 async fn graph_reads_span_schemas() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_graph").await;

@@ -1,5 +1,6 @@
 use pgorm_query::{tests_cfg::*, *};
 
+mod array_subquery;
 mod case;
 mod collate;
 mod comment;

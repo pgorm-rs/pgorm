@@ -247,7 +247,7 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 // filters through them, a predicate on the enum's domain comparing as the enum, and a check's
 // refusal arrives as 23514 naming the constraint
 // [spec:pgorm:def:sql.types.column-type+11/test]
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
@@ -348,10 +348,10 @@ async fn ids_where(
 /// no operator for the domain itself. The value is compared, not written, so
 /// the domain's check does not refuse it, and a keyset cursor over the column
 /// pages by the enum's order in either direction.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    every value predicate, the
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
-// [spec:pgorm:sem:exec.cursor.keyset+6/test]    a keyset cursor over a column whose domain is
+// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a keyset cursor over a column whose domain is
 // over an enum pages forwards and backwards by the enum's order
 #[pgorm_macros::test]
 async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
@@ -485,7 +485,7 @@ async fn lines_and_tempers(db: &impl ConnectionTrait) -> Result<(), Error> {
 /// enum, with the subquery's projection cast beside it — even a projection of
 /// the same domain, which the enum does not compare with either — and max and
 /// min aggregate the column as the enum, the domain having neither.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    in_subquery and
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    in_subquery and
 // not_in_subquery against a subquery projecting the same domain, and max and min of the
 // column, live
 #[pgorm_macros::test]
@@ -560,11 +560,112 @@ async fn domain_enum_subqueries_and_extrema_compare() -> Result<(), Error> {
     Ok(())
 }
 
+/// Subquery membership on a column whose domain is over an enum compares as
+/// the enum whatever the subquery projects: a `*`, a table's `*` and a window
+/// function's projection, which no cast reaches in place, are compared
+/// through the subquery's array, with `NOT IN`'s answer to a null member. A
+/// `*` wider than one column, and several projected expressions, are refused
+/// by the server as they are under any `IN`, never narrowed to one column.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    in_subquery and not_in_subquery
+// against a `*`, a table's `*` and a windowed projection of the domain compare as the enum,
+// live, while a wider `*` and several projections are refused with 42601
+#[pgorm_macros::test]
+async fn domain_enum_subqueries_of_every_shape_compare() -> Result<(), Error> {
+    use line::Column::{Id, Mood as Moods};
+    use pgorm::pgorm_query::{Asterisk, Func, Order, OrderedStatement, WindowStatement};
+
+    let ctx = TestContext::new("domain_enum_subquery_shapes").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let bright = || {
+        Query::select()
+            .column(temper::Column::Mood)
+            .from(temper::Entity)
+            .and_where(temper::Column::Label.eq("bright"))
+            .to_owned()
+    };
+    let starred = || {
+        Query::select()
+            .column(Asterisk)
+            .from_subquery(bright(), alias("b"))
+            .to_owned()
+    };
+    assert_eq!(
+        line::Entity::find()
+            .select_only()
+            .column(Id)
+            .filter(Moods.in_subquery(starred()))
+            .as_query()
+            .to_string(),
+        [
+            r#"SELECT "line"."id" FROM "line" WHERE CAST("line"."mood" AS mood) = ANY(CAST(ARRAY("#,
+            r#"SELECT * FROM (SELECT "mood" FROM "temper" WHERE "temper"."label" = 'bright') AS "b""#,
+            r#") AS mood[]))"#,
+        ]
+        .concat()
+    );
+    assert_eq!(ids_where(&db, Moods.in_subquery(starred())).await?, [2, 4]);
+    assert_eq!(
+        ids_where(&db, Moods.not_in_subquery(starred())).await?,
+        [1, 3, 5]
+    );
+    let table_starred = Query::select()
+        .column((alias("b"), Asterisk))
+        .from_subquery(bright(), alias("b"))
+        .to_owned();
+    assert_eq!(
+        ids_where(&db, Moods.in_subquery(table_starred)).await?,
+        [2, 4]
+    );
+
+    // Ordered by label, the previous temper's mood is null for "bright" and
+    // glad for "steady": a member is glad, and a null member leaves no row
+    // NOT IN the set, as it leaves none under any NOT IN.
+    let previous = || {
+        Query::select()
+            .expr_window(
+                Func::named(n("lag")).arg(Expr::col(temper::Column::Mood)),
+                WindowStatement::new()
+                    .order_by(temper::Column::Label, Order::Asc)
+                    .take(),
+            )
+            .from(temper::Entity)
+            .to_owned()
+    };
+    assert_eq!(ids_where(&db, Moods.in_subquery(previous())).await?, [2, 4]);
+    assert_eq!(
+        ids_where(&db, Moods.not_in_subquery(previous())).await?,
+        Vec::<i32>::new()
+    );
+
+    let wide = Query::select()
+        .column(Asterisk)
+        .from(temper::Entity)
+        .to_owned();
+    let error = ids_where(&db, Moods.in_subquery(wide))
+        .await
+        .expect_err("a two-column * is refused");
+    refused_with(&error, &SqlState::SYNTAX_ERROR);
+    let several = Query::select()
+        .columns([temper::Column::Mood, temper::Column::Label])
+        .from(temper::Entity)
+        .to_owned();
+    let error = ids_where(&db, Moods.in_subquery(several))
+        .await
+        .expect_err("two projected expressions are refused");
+    refused_with(&error, &SqlState::SYNTAX_ERROR);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 /// A relation joined on columns whose domain is over an enum compares them
 /// as the enum wherever it is joined: a related read, the graph's edge, both
 /// loaders — whose batch key is the column — and a linked read scoped by a
 /// key of the domain.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    a relation over columns whose
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    a relation over columns whose
 // domain is over an enum joins them as the enum in a related graph read, inner_join, a graph
 // edge, load_one and load_many, and find_related and find_linked scope by such a key, live
 // [spec:pgorm:sem:query.build.join+5/test]    a pair over such columns joins them cast
@@ -687,10 +788,91 @@ async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
     Ok(())
 }
 
+/// A graph cursor's tiebreak on a key whose domain is over an enum compares
+/// it as the enum, as an order column on it does: the root's key under
+/// `cursor_by`, a joined slot's under `cursor_by`, and the ordered slot's own
+/// key under `cursor_by_on`, each resumed from inside a run of rows sharing
+/// the order-column value.
+// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a whole-keyset boundary casts a tiebreak column
+// whose domain is over an enum, and its value, to the enum, live
+// [spec:pgorm:sem:query.graph.cursor+3/test]    the root's key, a joined slot's key and the
+// ordered slot's own key, each a domain over an enum, tiebreak a graph cursor live
+#[pgorm_macros::test]
+async fn domain_enum_graph_cursors_tiebreak_as_the_enum() -> Result<(), Error> {
+    let ctx = TestContext::new("domain_enum_graph_cursors").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let labelled = |rows: Vec<(temper::Model, Option<line::Model>)>| {
+        rows.into_iter()
+            .map(|(temper, line)| (temper.label, line.map(|line| line.id)))
+            .collect::<Vec<_>>()
+    };
+    let by_label = || {
+        temper::Entity::graph()
+            .join_maybe::<line::Entity>(<temper::Entity as Related<line::Entity>>::to())
+            .cursor_by(temper::Column::Label)
+    };
+    let bright = |id| ("bright".to_owned(), Some(id));
+    let steady = |id| ("steady".to_owned(), Some(id));
+    assert_eq!(
+        labelled(
+            by_label()
+                .after_with(("bright", Mood::Glad, 2))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [bright(4), steady(1)]
+    );
+    assert_eq!(
+        labelled(
+            by_label()
+                .before_with(("steady", Mood::Calm, 3))
+                .last(2)
+                .all(&db)
+                .await?
+        ),
+        [bright(4), steady(1)]
+    );
+
+    let ids = |rows: Vec<(line::Model, temper::Model)>| {
+        rows.into_iter()
+            .map(|(line, temper)| (line.id, temper.label))
+            .collect::<Vec<_>>()
+    };
+    let graph = || {
+        line::Entity::graph()
+            .join_one::<temper::Entity>(<line::Entity as Related<temper::Entity>>::to())
+    };
+    assert_eq!(
+        ids(graph()
+            .cursor_by(line::Column::Qty)
+            .after_with((1, 2, Mood::Glad))
+            .first(2)
+            .all(&db)
+            .await?),
+        [(3, "steady".to_owned()), (4, "bright".to_owned())]
+    );
+    assert_eq!(
+        ids(graph()
+            .cursor_by_on::<1, _>(temper::Column::Label)
+            .after_with(("bright", Mood::Glad, 2))
+            .first(2)
+            .all(&db)
+            .await?),
+        [(4, "bright".to_owned()), (1, "steady".to_owned())]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 /// A pipeline compares an entity column whose domain is over an enum as the
 /// enum — against a literal, a bound value, a list, or the same domain across
 /// a join — and min and max aggregate it as the enum.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+9/test]    pipeline comparisons, in_array,
+// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    pipeline comparisons, in_array,
 // coalesce, a join condition and min / max over a column whose domain is over an enum, live
 #[pgorm_macros::test]
 async fn domain_enum_pipeline_compares_as_the_enum() -> Result<(), Error> {

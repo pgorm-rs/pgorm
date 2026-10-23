@@ -256,7 +256,7 @@ chapter is stated twice anywhere else.
 > root twice; adjacency is a property of primary-key ordering, not a
 > precondition of correctness.
 
-> [spec:pgorm:sem:query.graph.cursor+2]
+> [spec:pgorm:sem:query.graph.cursor+3]
 > `cursor_by<C: KeyOf<E>>(cols)` re-homes the joined keyset cursor
 > onto the graph: order columns on the root's table, then the root's own
 > primary key, then the primary-key columns of every decoded slot
@@ -273,7 +273,12 @@ chapter is stated twice anywhere else.
 > the sibling — then the root's primary key, then the remaining decoded
 > slots' in declaration order. On both paths a tiebreak entry that
 > restates one of the order columns is dropped rather than installed
-> twice. Both return `Cursor<GraphRow<E, S>, C::ValueType>`, so the
+> twice. Each tiebreak carries the casts its key column's boundary
+> comparisons take, captured from the typed primary-key column as it is
+> installed (`[spec:pgorm:sem:exec.cursor.keyset+7]`), so a key whose domain
+> is over an enum — the root's, a joined slot's, or the ordered slot's own —
+> is compared as the enum in a whole-keyset boundary, as an order column on
+> it is. Both return `Cursor<GraphRow<E, S>, C::ValueType>`, so the
 > boundary arity is typed by the order columns exactly as
 > `[spec:pgorm:def:exec.cursor+5]` states.
 >
@@ -281,7 +286,7 @@ chapter is stated twice anywhere else.
 > disjuncts, `before` / `after` at order-column arity and `before_with` /
 > `after_with` at whole-keyset arity, the direction resolution, the
 > arity-mismatch error, and the NULL-tiebreak limitation are
-> `[spec:pgorm:sem:exec.cursor.keyset+5]` and
+> `[spec:pgorm:sem:exec.cursor.keyset+7]` and
 > `[spec:pgorm:sem:exec.cursor.order+4]`, unchanged and not restated
 > here. The NULL limitation is live on a graph: an unmatched `Opt` slot's
 > primary key IS null, so a row whose tiebreak is null is reachable

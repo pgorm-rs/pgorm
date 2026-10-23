@@ -24,7 +24,7 @@ mod subscript;
 pub use subscript::Subscript;
 
 /// Helper to build a [`SimpleExpr`].
-// [spec:pgorm:def:sql.ast.expr+6]
+// [spec:pgorm:def:sql.ast.expr+7]
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub(crate) left: SimpleExpr,
@@ -37,7 +37,7 @@ pub struct Expr {
 ///
 /// [`SimpleExpr`] is a node in the expression tree and can represent identifiers, function calls,
 /// various operators and sub-queries.
-// [spec:pgorm:def:sql.ast.expr+6]
+// [spec:pgorm:def:sql.ast.expr+7]
 #[derive(Debug, Clone, PartialEq)]
 pub enum SimpleExpr {
     Column(ColumnRef),
@@ -1326,7 +1326,6 @@ impl Expr {
             Box::new(sel.into_sub_query_statement()),
         )
     }
-
     /// Express a `AS enum` expression.
     ///
     /// # Examples
