@@ -984,7 +984,7 @@ async fn create_row_table<C>(db: &C) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
-    let stmt = Schema::new().create_table_from_entity(row::Entity);
+    let stmt = Schema::new().create_table_from_entity(row::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
     Ok(())
 }
@@ -1117,7 +1117,7 @@ async fn update_accepts_set_or_unchanged_key() -> Result<(), Error> {
 async fn manual_key_insert_and_update_are_explicit() -> Result<(), Error> {
     let ctx = TestContext::new("manual_key_insert_and_update").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(manual_key::Entity);
+    let stmt = Schema::new().create_table_from_entity(manual_key::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     // `update` on a key that matches no row reports it rather than creating one.
@@ -1242,7 +1242,7 @@ mod hooked {
 async fn active_model_hook_ordering() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_hook_ordering").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(hooked::Entity);
+    let stmt = Schema::new().create_table_from_entity(hooked::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     HOOK_LOG.lock().unwrap().clear();
@@ -1336,7 +1336,7 @@ mod hook_abort {
 async fn active_model_hook_error_aborts() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_hook_error_aborts").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(hook_abort::Entity);
+    let stmt = Schema::new().create_table_from_entity(hook_abort::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     // `insert` aborts before executing.
@@ -1428,7 +1428,7 @@ mod after_hook_abort {
 async fn active_model_after_hook_error_keeps_the_write() -> Result<(), Error> {
     let ctx = TestContext::new("active_model_after_hook_error").await;
     let mut db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(after_hook_abort::Entity);
+    let stmt = Schema::new().create_table_from_entity(after_hook_abort::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     // `insert` returns the hook's `Err` — with the row already inserted.

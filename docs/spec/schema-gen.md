@@ -8,9 +8,10 @@ executes SQL.
 
 ## Table projection
 
-> [spec:pgorm:sem:schema.from-entity+8]
-> `Schema::create_table_from_entity::<E>()` produces one `TableCreateStatement`
-> for `E`: the table ref from `entity.table_ref()`, the entity comment if any,
+> [spec:pgorm:sem:schema.from-entity+9]
+> `Schema::create_table_from_entity::<E>()` returns one `TableCreateStatement`
+> for `E`, or the refusal below: the table ref from `entity.table_ref()`, the
+> entity comment if any,
 > and one column per `E::Column` variant projected from `ColumnTrait::def()` —
 > the declared `ColumnType` (with `Enum { name, .. }` rewritten to a named
 > type reference naming the Postgres enum), `NOT NULL` unless the column is
@@ -45,6 +46,24 @@ executes SQL.
 > a `REFERENCES` clause names the table the relation points at rather than
 > whatever `search_path` resolves; the derived constraint name still uses the
 > bare table.
+>
+> A foreign key PostgreSQL cannot implement is refused rather than written.
+> The server implements none with a column on either side typed as a domain
+> over an enum, directly or through further domains: it answers `42804`
+> (*incompatible types*) between two columns of one such domain, between
+> two domains over the same enum, and between such a column and the enum
+> itself, in either direction. When any pair a belongs-to relation matches
+> for equality has such a column on either side, generation MUST return
+> `Error::Type` naming the entity, the relation and the pair, and MUST NOT
+> leave the constraint out in silence. The side's type is read from the
+> record a `ColumnPairs` keeps when its pair is named by entity columns
+> (`entity.traits.column.enum-cast`), as `DeriveRelation` and
+> `RelationBuilder` name them; a pair named by bare names records none, so it
+> is not checked and its key is written as declared. Every other pairing is
+> written: an enum with the same enum, a domain over a base that is no enum
+> with that base or the same domain, and a domain over an array of an enum,
+> or an array of such a domain, with the same type, all of which the server
+> keys. This is the only way generation fails.
 >
 > Comments ride on the create statement (`get_comment()`,
 > `ColumnSpec::Comment`) but are inert there — executing it attaches nothing

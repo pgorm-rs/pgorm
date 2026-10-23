@@ -13229,6 +13229,7 @@ children (
         title "create_table_from_entity stops emitting a foreign key PostgreSQL refuses over a domain over an enum"
         kind @fix
         deps (domain-enum-remaining)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.0283Z
@@ -13242,6 +13243,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\" to refusing. create_table_from_entity returns an error naming the relation when a belongs_to's columns are a domain over an enum (PostgreSQL refuses the foreign key with 42804), rather than leaving the constraint out."
+            }
+
+            {
+                at 2026-10-23T19:43:20.712999Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:23:59.632137Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13578,12 +13593,20 @@ children (
         id graph-related-one
         title "A graph joins the path Related<F> describes as a required source, as related_maybe does for an optional one"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:05.909041Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23, from the porting feedback: there is related_maybe::<F>() but no related_one::<F>(), so an inner join needed graph().join_one::<F>(Relation::X.def()) and a RelationTrait import although Related<F> already knows the relation (the graph spec left related_one unspecified). Add related_one::<F>() on SelectGraph: via() the junction when Related::via is Some, then join_one Related::to(), every hop inner. Spec it in query.graph.slots, live tests including a junction path and an unmatched row dropping out."
+            }
+
+            {
+                at 2026-10-23T19:58:05.348074Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13666,12 +13689,27 @@ children (
         title "A tiebreak a caller installs on a cursor carries its column's cast"
         kind @fix
         deps (graph-cursor-enum-tiebreak)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.164692Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by graph-cursor-enum-tiebreak. Cursor::set_secondary_order_by takes untyped entries, so a tiebreak a caller installs on a column whose type is a domain over an enum still fails with 42883. Give it a typed form that takes the column (and so its save_as cast), as the graph's own tiebreaks now do."
+            }
+
+            {
+                at 2026-10-23T19:43:20.402439Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:06:32.010953Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

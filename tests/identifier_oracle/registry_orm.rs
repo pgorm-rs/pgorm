@@ -6,8 +6,8 @@
 //! `live_capture.rs`: pgorm-pool's savepoint name (its SQL is built inside
 //! tokio-postgres), the migration ledger's custom table name (built inside
 //! the migrator and run against the database), and the cursor's qualifiers —
-//! `Cursor::new`'s table, `set_secondary_order_by`, a graph cursor's alias
-//! tiebreak — which render only on execution.
+//! `Cursor::new`'s table, `set_secondary_order_by`, `add_secondary_order_by`,
+//! a graph cursor's alias tiebreak — which render only on execution.
 
 use pgorm::{
     DeleteMany, EntityName, EntityTrait, JoinType, QueryFilter, QuerySelect, QueryTrait,
@@ -564,12 +564,9 @@ fn entity_sites() -> Vec<Site> {
             api: "Schema::create_table_from_entity(entity) with a runtime table name",
             kinds: &["CreateStmt.relation.relname"],
             policy: Quoted,
-            render: |n| {
-                Rendered::sql(
-                    Schema::new()
-                        .create_table_from_entity(dyn_named::Entity::table(n))
-                        .to_string(),
-                )
+            render: |n| match Schema::new().create_table_from_entity(dyn_named::Entity::table(n)) {
+                Ok(table) => Rendered::sql(table.to_string()),
+                Err(error) => Rendered::Refused(error.to_string()),
             },
         },
         Site {

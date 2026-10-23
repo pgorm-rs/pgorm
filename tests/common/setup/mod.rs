@@ -205,7 +205,7 @@ where
 {
     let schema = Schema::new();
     assert_eq!(
-        schema.create_table_from_entity(entity).to_string(),
+        schema.create_table_from_entity(entity)?.to_string(),
         create.to_string()
     );
 

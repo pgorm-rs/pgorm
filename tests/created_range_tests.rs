@@ -267,7 +267,7 @@ async fn create_the_range_types(db: &DatabaseConnection) -> Result<(), Error> {
 // [spec:pgorm:sem:macros.derive.created-range+1/test]
 async fn the_table_names_each_created_type(db: &DatabaseConnection) -> Result<(), Error> {
     let schema = Schema::new();
-    let measures = schema.create_table_from_entity(measures::Entity);
+    let measures = schema.create_table_from_entity(measures::Entity)?;
     let sql = measures.to_string();
     assert!(
         sql.contains(r#""span" floatrange NOT NULL"#)
@@ -275,7 +275,7 @@ async fn the_table_names_each_created_type(db: &DatabaseConnection) -> Result<()
         "{sql}"
     );
     create_table_without_asserts(db, &measures).await?;
-    create_table_without_asserts(db, &schema.create_table_from_entity(subtypes::Entity)).await?;
+    create_table_without_asserts(db, &schema.create_table_from_entity(subtypes::Entity)?).await?;
     assert_eq!(
         <Slot as pgorm::pgorm_query::ValueType>::column_type(),
         ColumnType::CreatedRange {

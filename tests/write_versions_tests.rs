@@ -115,7 +115,7 @@ async fn stocked(db: &DatabaseConnection, rows: &[stock::Model]) -> Result<(), E
     for create in schema.create_enum_from_entity(stock::Entity) {
         db.batch_execute(&create.to_string()).await?;
     }
-    db.batch_execute(&schema.create_table_from_entity(stock::Entity).to_string())
+    db.batch_execute(&schema.create_table_from_entity(stock::Entity)?.to_string())
         .await?;
     Insert::many(rows.iter().cloned().map(IntoActiveModel::into_active_model))
         .exec(db)
@@ -304,8 +304,8 @@ async fn a_table_called_old_keeps_its_old_row() -> Result<(), Error> {
     let ctx = TestContext::new("write_versions_old_table").await;
     let db = ctx.db.get().await?;
     for create in [
-        Schema::new().create_table_from_entity(old::Entity),
-        Schema::new().create_table_from_entity(pgorm_old::Entity),
+        Schema::new().create_table_from_entity(old::Entity)?,
+        Schema::new().create_table_from_entity(pgorm_old::Entity)?,
     ] {
         db.batch_execute(&create.to_string()).await?;
     }

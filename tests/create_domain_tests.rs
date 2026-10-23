@@ -99,8 +99,8 @@ mod temper {
 
 /// Neither entity declares the relation in its `Relation` enum: PostgreSQL
 /// cannot implement a foreign key between two columns of a domain over an enum
-/// (`42804`), so the tables are created without one, and the relation is a
-/// join the two entities describe.
+/// (`42804`), so `create_table_from_entity` would refuse the relation, and it
+/// is a join the two entities describe instead.
 impl Related<temper::Entity> for line::Entity {
     fn to() -> RelationDef {
         line::Entity::belongs_to(temper::Entity)
@@ -247,7 +247,7 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 // filters through them, a predicate on the enum's domain comparing as the enum, and a check's
 // refusal arrives as 23514 naming the constraint
 // [spec:pgorm:def:sql.types.column-type+11/test]
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
@@ -255,7 +255,7 @@ async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
     let db = ctx.db.get().await?;
     domains(&db).await?;
     let create = pgorm::Schema::new()
-        .create_table_from_entity(line::Entity)
+        .create_table_from_entity(line::Entity)?
         .to_string();
     assert_eq!(
         create,
@@ -348,10 +348,10 @@ async fn ids_where(
 /// no operator for the domain itself. The value is compared, not written, so
 /// the domain's check does not refuse it, and a keyset cursor over the column
 /// pages by the enum's order in either direction.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    every value predicate, the
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a keyset cursor over a column whose domain is
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    a keyset cursor over a column whose domain is
 // over an enum pages forwards and backwards by the enum's order
 #[pgorm_macros::test]
 async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
@@ -362,7 +362,7 @@ async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
     domains(&db).await?;
     db.batch_execute(
         &pgorm::Schema::new()
-            .create_table_from_entity(line::Entity)
+            .create_table_from_entity(line::Entity)?
             .to_string(),
     )
     .await?;
@@ -456,9 +456,9 @@ async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
 async fn lines_and_tempers(db: &impl ConnectionTrait) -> Result<(), Error> {
     domains(db).await?;
     let schema = pgorm::Schema::new();
-    db.batch_execute(&schema.create_table_from_entity(line::Entity).to_string())
+    db.batch_execute(&schema.create_table_from_entity(line::Entity)?.to_string())
         .await?;
-    db.batch_execute(&schema.create_table_from_entity(temper::Entity).to_string())
+    db.batch_execute(&schema.create_table_from_entity(temper::Entity)?.to_string())
         .await?;
     for (id, mood) in [
         (1, Mood::Calm),
@@ -485,7 +485,7 @@ async fn lines_and_tempers(db: &impl ConnectionTrait) -> Result<(), Error> {
 /// enum, with the subquery's projection cast beside it — even a projection of
 /// the same domain, which the enum does not compare with either — and max and
 /// min aggregate the column as the enum, the domain having neither.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    in_subquery and
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    in_subquery and
 // not_in_subquery against a subquery projecting the same domain, and max and min of the
 // column, live
 #[pgorm_macros::test]
@@ -566,7 +566,7 @@ async fn domain_enum_subqueries_and_extrema_compare() -> Result<(), Error> {
 /// through the subquery's array, with `NOT IN`'s answer to a null member. A
 /// `*` wider than one column, and several projected expressions, are refused
 /// by the server as they are under any `IN`, never narrowed to one column.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    in_subquery and not_in_subquery
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    in_subquery and not_in_subquery
 // against a `*`, a table's `*` and a windowed projection of the domain compare as the enum,
 // live, while a wider `*` and several projections are refused with 42601
 #[pgorm_macros::test]
@@ -665,7 +665,7 @@ async fn domain_enum_subqueries_of_every_shape_compare() -> Result<(), Error> {
 /// as the enum wherever it is joined: a related read, the graph's edge, both
 /// loaders — whose batch key is the column — and a linked read scoped by a
 /// key of the domain.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    a relation over columns whose
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    a relation over columns whose
 // domain is over an enum joins them as the enum in a related graph read, inner_join, a graph
 // edge, load_one and load_many, and find_related and find_linked scope by such a key, live
 // [spec:pgorm:sem:query.build.join+5/test]    a pair over such columns joins them cast
@@ -793,7 +793,7 @@ async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
 /// `cursor_by`, a joined slot's under `cursor_by`, and the ordered slot's own
 /// key under `cursor_by_on`, each resumed from inside a run of rows sharing
 /// the order-column value.
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a whole-keyset boundary casts a tiebreak column
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    a whole-keyset boundary casts a tiebreak column
 // whose domain is over an enum, and its value, to the enum, live
 // [spec:pgorm:sem:query.graph.cursor+3/test]    the root's key, a joined slot's key and the
 // ordered slot's own key, each a domain over an enum, tiebreak a graph cursor live
@@ -869,10 +869,86 @@ async fn domain_enum_graph_cursors_tiebreak_as_the_enum() -> Result<(), Error> {
     Ok(())
 }
 
+/// A tiebreak a caller appends on a column whose domain is over an enum
+/// compares as the enum, its casts taken from the column; the same entry
+/// installed as bare identifiers has no operator to compare with.
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    an entry appended through
+// add_secondary_order_by on a column whose domain is over an enum resumes from inside a run,
+// in either direction, where set_secondary_order_by's bare entry is refused with 42883, live
+#[pgorm_macros::test]
+async fn domain_enum_appended_tiebreak_compares_as_enum() -> Result<(), Error> {
+    use line::Column::{Id, Mood as Moods, Qty};
+    use pgorm::IntoKey;
+
+    let ctx = TestContext::new("domain_enum_appended_tiebreak").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let page = |models: Vec<line::Model>| models.iter().map(|line| line.id).collect::<Vec<_>>();
+    // Every line's quantity is 1, so the tiebreaks order the rows: the calm
+    // lines 1, 3 and 5, then the glad lines 2 and 4.
+    let typed = || {
+        let mut cursor = line::Entity::find().cursor_by(Qty);
+        cursor
+            .add_secondary_order_by(line::Entity, Moods)
+            .add_secondary_order_by(line::Entity, Id);
+        cursor
+    };
+    assert_eq!(page(typed().first(2).all(&db).await?), [1, 3]);
+    assert_eq!(
+        page(
+            typed()
+                .after_with((1, Mood::Calm, 3))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 2]
+    );
+    assert_eq!(
+        page(
+            typed()
+                .before_with((1, Mood::Glad, 4))
+                .last(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 2]
+    );
+    assert_eq!(
+        page(
+            typed()
+                .desc()
+                .after_with((1, Mood::Glad, 2))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 3]
+    );
+
+    let mut untyped = line::Entity::find().cursor_by(Qty);
+    untyped.set_secondary_order_by(vec![
+        (Name::new(line::Entity), Moods.into_key()),
+        (Name::new(line::Entity), Id.into_key()),
+    ]);
+    let refused = untyped
+        .after_with((1, Mood::Calm, 3))
+        .first(2)
+        .all(&db)
+        .await
+        .expect_err("a bare value has no operator against the domain");
+    refused_with(&refused, &SqlState::UNDEFINED_FUNCTION);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 /// A pipeline compares an entity column whose domain is over an enum as the
 /// enum — against a literal, a bound value, a list, or the same domain across
 /// a join — and min and max aggregate it as the enum.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    pipeline comparisons, in_array,
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    pipeline comparisons, in_array,
 // coalesce, a join condition and min / max over a column whose domain is over an enum, live
 #[pgorm_macros::test]
 async fn domain_enum_pipeline_compares_as_the_enum() -> Result<(), Error> {
@@ -944,7 +1020,7 @@ async fn a_prepared_insert_keeps_its_planned_default() -> Result<(), Error> {
     first
         .batch_execute(
             &pgorm::Schema::new()
-                .create_table_from_entity(line::Entity)
+                .create_table_from_entity(line::Entity)?
                 .to_string(),
         )
         .await?;
@@ -1024,7 +1100,7 @@ async fn a_cleared_pool_writes_the_new_default() -> Result<(), Error> {
     domains(&held).await?;
     held.batch_execute(
         &pgorm::Schema::new()
-            .create_table_from_entity(line::Entity)
+            .create_table_from_entity(line::Entity)?
             .to_string(),
     )
     .await?;

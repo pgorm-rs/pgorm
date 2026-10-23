@@ -661,7 +661,9 @@ async fn a_nested_ordering_names_a_relation_in_scope() {
 }
 
 async fn create_entity_table<E: EntityTrait>(db: &impl ConnectionTrait, entity: E) {
-    let stmt = Schema::new().create_table_from_entity(entity);
+    let stmt = Schema::new()
+        .create_table_from_entity(entity)
+        .expect("the entity's table is generated");
     create_table_without_asserts(db, &stmt)
         .await
         .expect("could not create table");

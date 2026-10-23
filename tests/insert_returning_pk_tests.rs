@@ -33,7 +33,7 @@ async fn create_manual_key_table<C>(db: &C) -> Result<(), Error>
 where
     C: ConnectionTrait,
 {
-    let stmt = Schema::new().create_table_from_entity(manual_key::Entity);
+    let stmt = Schema::new().create_table_from_entity(manual_key::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
     Ok(())
 }

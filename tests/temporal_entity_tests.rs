@@ -111,8 +111,8 @@ async fn rooms(db: &DatabaseConnection) -> Result<Vec<room::Model>, Error> {
     db.batch_execute(&Extension::create(Name::runtime("btree_gist")).to_string())
         .await?;
     for create in [
-        Schema::new().create_table_from_entity(room::Entity),
-        Schema::new().create_table_from_entity(booking::Entity),
+        Schema::new().create_table_from_entity(room::Entity)?,
+        Schema::new().create_table_from_entity(booking::Entity)?,
     ] {
         db.batch_execute(&create.to_string()).await?;
     }
@@ -132,13 +132,13 @@ async fn rooms(db: &DatabaseConnection) -> Result<Vec<room::Model>, Error> {
 /// An update and a delete by key reach that version alone.
 // [spec:pgorm:def:entity.traits.primary-key+7/test]    against a live server: a temporal key is
 // generated WITHOUT OVERLAPS, and looked up, updated and deleted by equality, period included
-// [spec:pgorm:sem:schema.from-entity+8/test]
+// [spec:pgorm:sem:schema.from-entity+9/test]
 #[pgorm_macros::test]
 async fn a_temporal_key_names_one_version() -> Result<(), Error> {
     let ctx = TestContext::new("temporal_entity_key").await;
     let db = ctx.db.get().await?;
     let create = Schema::new()
-        .create_table_from_entity(room::Entity)
+        .create_table_from_entity(room::Entity)?
         .to_string();
     assert!(
         create.contains(r#"PRIMARY KEY ("id", "valid_at" WITHOUT OVERLAPS)"#),
@@ -210,7 +210,7 @@ async fn a_period_relation_joins_overlapping_versions() -> Result<(), Error> {
     let ctx = TestContext::new("temporal_entity_relation").await;
     let db = ctx.db.get().await?;
     let create = Schema::new()
-        .create_table_from_entity(booking::Entity)
+        .create_table_from_entity(booking::Entity)?
         .to_string();
     assert!(
         create.contains(

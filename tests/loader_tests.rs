@@ -517,7 +517,7 @@ async fn create_ledger_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
-    let stmt = Schema::new().create_table_from_entity(ledger::Entity);
+    let stmt = Schema::new().create_table_from_entity(ledger::Entity)?;
     create_table_without_asserts(db, &stmt).await
 }
 
@@ -525,7 +525,7 @@ async fn create_padded_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
-    let stmt = Schema::new().create_table_from_entity(padded::Entity);
+    let stmt = Schema::new().create_table_from_entity(padded::Entity)?;
     create_table_without_asserts(db, &stmt).await
 }
 
@@ -533,7 +533,7 @@ async fn create_tagged_table<C>(db: &C) -> Result<u64, Error>
 where
     C: ConnectionTrait,
 {
-    let stmt = Schema::new().create_table_from_entity(tagged::Entity);
+    let stmt = Schema::new().create_table_from_entity(tagged::Entity)?;
     create_table_without_asserts(db, &stmt).await
 }
 

@@ -1123,12 +1123,12 @@ pub async fn consolidate_composite_key() -> Result<(), Error> {
     let schema = Schema::new();
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(composite_parent::Entity),
+        &schema.create_table_from_entity(composite_parent::Entity)?,
     )
     .await?;
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(composite_child::Entity),
+        &schema.create_table_from_entity(composite_child::Entity)?,
     )
     .await?;
 
@@ -1236,12 +1236,12 @@ pub async fn composite_join_constrains_both_columns() -> Result<(), Error> {
     let schema = Schema::new();
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(composite_parent::Entity),
+        &schema.create_table_from_entity(composite_parent::Entity)?,
     )
     .await?;
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(composite_child::Entity),
+        &schema.create_table_from_entity(composite_child::Entity)?,
     )
     .await?;
 

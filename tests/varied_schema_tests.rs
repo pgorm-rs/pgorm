@@ -194,15 +194,15 @@ async fn create_schemas(db: &DatabaseConnection) -> Result<(), Error> {
         db.execute(&stmt.to_string(), &[]).await?;
     }
     db.execute(
-        &schema.create_table_from_entity(owner::Entity).to_string(),
+        &schema.create_table_from_entity(owner::Entity)?.to_string(),
         &[],
     )
     .await?;
     for table in [
-        schema.create_table_from_entity(tenant_a::item::Entity),
-        schema.create_table_from_entity(tenant_a::tag::Entity),
-        schema.create_table_from_entity(tenant_a::item_tag::Entity),
-        schema.create_table_from_entity(tenant_b::item::Entity),
+        schema.create_table_from_entity(tenant_a::item::Entity)?,
+        schema.create_table_from_entity(tenant_a::tag::Entity)?,
+        schema.create_table_from_entity(tenant_a::item_tag::Entity)?,
+        schema.create_table_from_entity(tenant_b::item::Entity)?,
     ] {
         db.execute(&table.to_string(), &[]).await?;
     }
@@ -303,8 +303,8 @@ async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
 // [spec:pgorm:req:entity.traits.entity-name+2/test]    finds, filters,
 // ordering, pagination, keyset cursors and the schema-qualified enum's value
 // predicates all address tenant_a.item
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]
 #[pgorm_macros::test]
 async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_finds").await;
@@ -366,7 +366,7 @@ async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots+1/test]    graph reads span schemas: a
+// [spec:pgorm:sem:query.graph.slots+2/test]    graph reads span schemas: a
 // junction fold inside tenant_a, an INNER join from tenant_a.item to the
 // unqualified owner, grouped rows and a graph cursor — every source
 // qualified by its own declaration

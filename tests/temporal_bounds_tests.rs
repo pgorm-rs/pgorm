@@ -273,7 +273,7 @@ async fn round_trips_boundary_values_through_an_entity() -> Result<(), Error> {
     let schema = Schema::new();
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(temporal_probe::Entity),
+        &schema.create_table_from_entity(temporal_probe::Entity)?,
     )
     .await?;
 

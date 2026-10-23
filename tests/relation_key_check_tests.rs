@@ -147,7 +147,7 @@ async fn key_of(db: &DatabaseConnection, table: &str) -> Result<(bool, bool, boo
 }
 
 async fn create<E: EntityTrait>(db: &DatabaseConnection, entity: E) -> Result<String, Error> {
-    let create = Schema::new().create_table_from_entity(entity).to_string();
+    let create = Schema::new().create_table_from_entity(entity)?.to_string();
     db.batch_execute(&create).await?;
     Ok(create)
 }

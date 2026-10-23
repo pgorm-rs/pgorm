@@ -34,7 +34,7 @@ mod token {
 
 async fn create_token_table(db: &DatabaseConnection) -> Result<(), Error> {
     let create = Schema::new()
-        .create_table_from_entity(token::Entity)
+        .create_table_from_entity(token::Entity)?
         .to_string();
     assert_eq!(
         create,

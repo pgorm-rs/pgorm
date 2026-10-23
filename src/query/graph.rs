@@ -50,13 +50,13 @@ mod sealed {
 ///
 /// The type states that the join cannot miss, so there is no `Option` to
 /// unwrap for a row the join guarantees.
-// [spec:pgorm:sem:query.graph.slots+1]
+// [spec:pgorm:sem:query.graph.slots+2]
 pub struct Req<F>(PhantomData<F>);
 
 /// A joined source that may be absent: `LEFT JOIN`, decoded through the
 /// absence witness ([`FromQueryResult::from_query_result_optional`]) as
 /// `Option<Model>`.
-// [spec:pgorm:sem:query.graph.slots+1]
+// [spec:pgorm:sem:query.graph.slots+2]
 pub struct Opt<F>(PhantomData<F>);
 
 impl<F> fmt::Debug for Req<F> {
@@ -79,7 +79,7 @@ impl<F: EntityTrait> sealed::Sealed for Opt<F> {}
 ///
 /// The trait is sealed — [`Req<F>`] and [`Opt<F>`] are the only slots — so
 /// the four cannot be recombined into a pairing the graph does not mean.
-// [spec:pgorm:sem:query.graph.slots+1]
+// [spec:pgorm:sem:query.graph.slots+2]
 pub trait Slot: sealed::Sealed {
     /// The entity behind the slot.
     type Entity: EntityTrait;
@@ -96,7 +96,7 @@ pub trait Slot: sealed::Sealed {
     fn decode(res: &QueryResult, pre: &str) -> Result<Self::Out, Error>;
 }
 
-// [spec:pgorm:sem:query.graph.slots+1]
+// [spec:pgorm:sem:query.graph.slots+2]
 impl<F: EntityTrait> Slot for Req<F> {
     type Entity = F;
     type Out = F::Model;
@@ -108,7 +108,7 @@ impl<F: EntityTrait> Slot for Req<F> {
     }
 }
 
-// [spec:pgorm:sem:query.graph.slots+1]
+// [spec:pgorm:sem:query.graph.slots+2]
 impl<F: EntityTrait> Slot for Opt<F> {
     type Entity = F;
     type Out = Option<F::Model>;
@@ -483,10 +483,19 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// ```
     // [spec:pgorm:def:query.graph]
     pub fn via(mut self, rel: RelationDef) -> Self {
+        self.hop(JoinType::LeftJoin, rel);
+        self
+    }
+
+    /// Join a never-decoded hop under the relation's own condition, as
+    /// `join`: [`via`](Self::via)'s `LEFT`, or the `INNER` a required path
+    /// takes.
+    // [spec:pgorm:def:query.graph]
+    // [spec:pgorm:sem:query.graph.slots+2]
+    fn hop(&mut self, join: JoinType, rel: RelationDef) {
         let to_tbl = rel.to_tbl.clone();
         let condition = join_condition(rel);
-        self.query.join(JoinType::LeftJoin, to_tbl, condition);
-        self
+        self.query.join(join, to_tbl, condition);
     }
 
     /// THE one edge walker: bind the joined side to an alias if asked, join
@@ -534,15 +543,15 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
 /// of arities generated here — a seventh has no receiver impl, and raising
 /// the ceiling is one more entry in the invocation below.
 macro_rules! grow {
-    ( $( ( $( $prev:ident ),* ) ),+ $(,)? ) => {$(
-        // [spec:pgorm:sem:query.graph.slots+1]
+    ( $( $( #[doc = $example:literal] )* ( $( $prev:ident ),* ) ),+ $(,)? ) => {$(
+        // [spec:pgorm:sem:query.graph.slots+2]
         impl<E: EntityTrait $(, $prev: Slot )*> SelectGraph<E, ( $( $prev, )* )> {
             /// `LEFT JOIN` a source that may be absent, decoded as
             /// `Option<F::Model>` through the absence witness.
             ///
             /// `rel.to_tbl` is joined under the relation's own condition,
             /// `on_condition` and `condition_type` included.
-            // [spec:pgorm:sem:query.graph.slots+1]
+            // [spec:pgorm:sem:query.graph.slots+2]
             pub fn join_maybe<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -605,7 +614,7 @@ macro_rules! grow {
 
             /// `INNER JOIN` a source that must match, decoded as a bare
             /// `F::Model` — no `Option` to unwrap for a join that cannot miss.
-            // [spec:pgorm:sem:query.graph.slots+1]
+            // [spec:pgorm:sem:query.graph.slots+2]
             pub fn join_one<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -634,7 +643,7 @@ macro_rules! grow {
             /// [`via`](Self::via)ed first and then [`Related::to`] is
             /// [`join_maybe`](Self::join_maybe)d — the whole related path in
             /// one call, junction hop included.
-            // [spec:pgorm:sem:query.graph.slots+1]
+            // [spec:pgorm:sem:query.graph.slots+2]
             pub fn related_maybe<F: EntityTrait>(
                 self,
             ) -> SelectGraph<E, ( $( $prev, )* Opt<F>, )>
@@ -647,11 +656,57 @@ macro_rules! grow {
                 };
                 graph.join_maybe::<F>(<E as Related<F>>::to())
             }
+
+            /// Fold the path [`Related<F>`] already describes into the graph
+            /// as a required source: [`related_maybe`](Self::related_maybe)'s
+            /// path, every hop of it `INNER`.
+            ///
+            /// When [`Related::via`] is `Some`, that junction relation is
+            /// joined `INNER` — not [`via`](Self::via)'s `LEFT` — and then
+            /// [`Related::to`] is [`join_one`](Self::join_one)d, so a root
+            /// row with no related `F` is not in the result, and each row
+            /// that is decodes `F` as a bare `F::Model`.
+            $( #[doc = $example] )*
+            // [spec:pgorm:sem:query.graph.slots+2]
+            pub fn related_one<F: EntityTrait>(
+                mut self,
+            ) -> SelectGraph<E, ( $( $prev, )* Req<F>, )>
+            where
+                E: Related<F>,
+            {
+                if let Some(via) = <E as Related<F>>::via() {
+                    self.hop(<Req<F> as Slot>::JOIN, via);
+                }
+                self.join_one::<F>(<E as Related<F>>::to())
+            }
         }
     )+};
 }
 
 grow!(
+    // The example rides the slotless receiver alone: a doctest written into
+    // every generated impl would be compiled and run once per arity.
+    #[doc = r##"
+```
+use pgorm::{entity::*, query::*, tests_cfg::{cake, filling}};
+use pgorm::query::{Req, SelectGraph};
+
+let graph: SelectGraph<cake::Entity, (Req<filling::Entity>,)> =
+    cake::Entity::graph().related_one::<filling::Entity>();
+
+assert_eq!(
+    graph.as_query().to_string(),
+    [
+        r#"SELECT "cake"."id" AS "s0_id", "cake"."name" AS "s0_name","#,
+        r#""filling"."id" AS "s1_id", "filling"."name" AS "s1_name", "filling"."vendor_id" AS "s1_vendor_id""#,
+        r#"FROM "cake""#,
+        r#"INNER JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
+        r#"INNER JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id""#,
+    ]
+    .join(" ")
+);
+```
+"##]
     (),
     (S1),
     (S1, S2),
@@ -698,8 +753,9 @@ impl<E: EntityTrait, S> QueryTrait for SelectGraph<E, S> {
 // [spec:pgorm:def:query.graph/test]    construction projects the root under
 // `s0_` and selects from its table, `via` joins without consuming a prefix,
 // and the filter / order / query traits reach the same statement
-// [spec:pgorm:sem:query.graph.slots+1/test]    the slot kind fixes the join
-// type, and the declared tuple grows to the generated ceiling
+// [spec:pgorm:sem:query.graph.slots+2/test]    the slot kind fixes the join
+// type, `related_one` joins its whole path INNER, and the declared tuple
+// grows to the generated ceiling
 // [spec:pgorm:sem:query.graph.writer+4/test]    one prefixed block per decoded
 // source, in declaration order, under the source's effective identifier
 // [spec:pgorm:req:query.graph.aliases/test]    an `_as` slot is named by its
@@ -808,6 +864,51 @@ mod tests {
                 .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
                 .as_query()
                 .to_string()
+        );
+    }
+
+    #[test]
+    fn related_one_joins_every_hop_inner() {
+        assert_renders(
+            cake::Entity::graph()
+                .related_one::<filling::Entity>()
+                .as_query()
+                .to_string(),
+            &[
+                r#"SELECT "cake"."id" AS "s0_id", "cake"."name" AS "s0_name","#,
+                r#""filling"."id" AS "s1_id", "filling"."name" AS "s1_name", "filling"."vendor_id" AS "s1_vendor_id""#,
+                r#"FROM "cake""#,
+                r#"INNER JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
+                r#"INNER JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id""#,
+            ],
+        );
+    }
+
+    #[test]
+    fn related_one_without_a_junction_is_join_one() {
+        assert_eq!(
+            cake::Entity::graph()
+                .related_one::<fruit::Entity>()
+                .as_query()
+                .to_string(),
+            cake::Entity::graph()
+                .join_one::<fruit::Entity>(cake::Relation::Fruit.def())
+                .as_query()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn related_one_appends_after_existing_slots() {
+        let graph = cake::Entity::graph()
+            .related_maybe::<fruit::Entity>()
+            .related_one::<filling::Entity>();
+
+        assert_eq!(graph.qualifiers.len(), 3);
+        let sql = graph.as_query().to_string();
+        assert!(
+            sql.contains(r#""filling"."id" AS "s2_id""#),
+            "the required slot takes the next prefix: {sql}"
         );
     }
 

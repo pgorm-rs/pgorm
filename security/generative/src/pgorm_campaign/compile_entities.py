@@ -258,8 +258,8 @@ def key_check_cases():
             _nested("room", room),
             _nested(
                 "stay",
-                stay
-                + "\n\n    pub fn statement() -> pgorm::pgorm_query::TableCreateStatement {\n"
+                stay + "\n\n    pub fn statement()"
+                " -> Result<pgorm::pgorm_query::TableCreateStatement, pgorm::Error> {\n"
                 "        pgorm::Schema::new().create_table_from_entity(Entity)\n    }",
             ),
         ]

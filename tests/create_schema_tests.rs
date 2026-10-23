@@ -96,7 +96,7 @@ async fn billing(db: &impl ConnectionTrait) -> Result<(), Error> {
     }
     db.batch_execute(
         &generator
-            .create_table_from_entity(invoice::Entity)
+            .create_table_from_entity(invoice::Entity)?
             .to_string(),
     )
     .await?;

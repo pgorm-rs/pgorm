@@ -192,8 +192,11 @@ async fn an_entity_stores_zero_at_its_declared_scale() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     let schema = Schema::new();
-    create_table_without_asserts(&db, &schema.create_table_from_entity(decimal_probe::Entity))
-        .await?;
+    create_table_without_asserts(
+        &db,
+        &schema.create_table_from_entity(decimal_probe::Entity)?,
+    )
+    .await?;
 
     decimal_probe::ActiveModel {
         id: set(1),

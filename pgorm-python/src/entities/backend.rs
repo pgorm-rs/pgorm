@@ -45,7 +45,7 @@ pub(crate) enum Change {
 
 pub(crate) trait EntityBackend: Debug + Send + Sync {
     fn info(&self) -> &Arc<EntityInfo>;
-    fn schema(&self) -> crate::schema::PyEntitySchema;
+    fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error>;
     fn select(&self) -> Select;
     fn active(&self) -> Active;
     fn expression(&self, column: &str) -> Result<SimpleExpr, Error>;

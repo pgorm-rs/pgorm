@@ -122,6 +122,18 @@ pub fn live_sites() -> Vec<LiveSite> {
         },
         LiveSite {
             site: Site {
+                id: "pgorm/cursor.add-secondary-order-by",
+                api: "Cursor::add_secondary_order_by(Name, column)",
+                kinds: &["RangeVar.alias.aliasname", "ColumnRef.fields[0]"],
+                policy: Policy::Quoted,
+                render: live_only,
+            },
+            run: |url, name| Box::pin(appended_order(url, name)),
+            reset: None,
+            long_name_stops_after: None,
+        },
+        LiveSite {
+            site: Site {
                 id: "pgorm/graph.cursor-by.alias",
                 api: "SelectGraph::join_maybe_as(relation, Name).cursor_by(key)",
                 kinds: &[
@@ -271,6 +283,29 @@ async fn secondary_order(url: &str, name: &str) {
     let _ = cursor.first(1).all(&db).await;
 }
 
+/// Page `cake` under the alias `name`, tiebreaking on a typed column the
+/// cursor appends qualified by it.
+async fn appended_order(url: &str, name: &str) {
+    let Ok(config) = url.parse() else {
+        return;
+    };
+    let pool: DatabasePool = pgorm::connect(config);
+    let Ok(db) = pool.get().await else {
+        return;
+    };
+    let query = Query::select()
+        .column(Asterisk)
+        .from_as(Name::runtime("cake"), Name::runtime(name))
+        .take();
+    let mut cursor = pgorm::Cursor::<SelectModel<cake::Model>, pgorm::Value>::new(
+        query,
+        Name::runtime("cake"),
+        cake::Column::Id,
+    );
+    cursor.add_secondary_order_by(Name::runtime(name), cake::Column::Name);
+    let _ = cursor.first(1).all(&db).await;
+}
+
 /// Page a graph whose joined `fruit` is bound under the alias `name`, so the
 /// cursor's tiebreak is qualified by it.
 async fn graph_cursor(url: &str, name: &str) {
@@ -415,7 +450,7 @@ fn judge_sequence(
 
 /// Every live-only site holds every corpus name, statement by statement, and
 /// keeps a NUL-bearing name out of the server.
-// [spec:pgorm:req:security.ident-oracle+14/test]
+// [spec:pgorm:req:security.ident-oracle+15/test]
 // [spec:pgorm:req:security.ident-oracle.nul+2/test]
 #[tokio::test]
 async fn live_sites_hold_every_hostile_name() {

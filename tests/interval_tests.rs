@@ -227,7 +227,7 @@ async fn entity_interval_fields_write_and_read() -> Result<(), Error> {
     let schema = Schema::new();
     create_table_without_asserts(
         &db,
-        &schema.create_table_from_entity(interval_probe::Entity),
+        &schema.create_table_from_entity(interval_probe::Entity)?,
     )
     .await?;
 

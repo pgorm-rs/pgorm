@@ -1102,6 +1102,9 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id graph-related-one, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:05.348074Z}
+    {id cursor-typed-secondary, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:06:32.010953Z}
+    {id schema-fk-domain-enum, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:23:59.632137Z}
 )
 
 impl_evidence (

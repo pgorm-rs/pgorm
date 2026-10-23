@@ -9,8 +9,8 @@ use crate::{
     SelectProjected, SelectorTrait, Slot, SlotAt, Slots, error::query_err,
 };
 use pgorm_query::{
-    Condition, Expr, IntoValueTuple, Name, Order, SelectStatement, SimpleExpr, TypeName, Value,
-    ValueTuple,
+    Condition, Expr, IntoName, IntoValueTuple, Name, Order, SelectStatement, SimpleExpr, TypeName,
+    Value, ValueTuple,
 };
 use tokio_postgres::types::{IsNull, Kind, ToSql, Type, to_sql_checked};
 // use uuid::Uuid;
@@ -55,7 +55,7 @@ pub struct SelectUndecoded;
 /// keyset itself is type-erased to identifiers, so neither can be recovered
 /// later — `cursor_by` captures an order column's at construction, and a
 /// graph its tiebreaks' as it installs them.
-// [spec:pgorm:sem:exec.cursor.keyset+7]
+// [spec:pgorm:sem:exec.cursor.keyset+8]
 #[derive(Clone)]
 pub(crate) struct BoundaryCast {
     value: Arc<dyn Fn(Expr) -> SimpleExpr + Send + Sync>,
@@ -80,7 +80,7 @@ impl BoundaryCast {
 
     /// The casts of one typed column, as every value predicate on it takes
     /// them ([`compared_value`], [`compared_enum`]).
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     pub(crate) fn of<C: ColumnTrait>(col: C) -> Self {
         Self {
             value: Arc::new(move |val| compared_value(&col, val)),
@@ -153,7 +153,7 @@ impl<S, K> Cursor<S, K> {
     /// Capture the order columns' [`save_as`](ColumnTrait::save_as) casts from
     /// the typed column set they were spelled from, so boundary values reach
     /// SQL under the same cast every value predicate applies.
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     fn with_boundary_casts<C: ColumnTrait>(mut self) -> Self {
         self.boundary_casts = BoundaryCast::capture::<C>(&self.order_columns);
         self
@@ -190,7 +190,7 @@ impl<S, K> Cursor<S, K> {
     ///
     /// The extended arity is not the `K` the order columns fix, so it is
     /// checked when the query is composed rather than by the compiler.
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     pub fn before_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -201,7 +201,7 @@ impl<S, K> Cursor<S, K> {
 
     /// [`Cursor::after`] over the cursor's whole sort key, secondary order
     /// columns included. See [`Cursor::before_with`].
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     pub fn after_with<V>(&mut self, values: V) -> &mut Self
     where
         V: IntoValueTuple,
@@ -219,7 +219,7 @@ impl<S, K> Cursor<S, K> {
     /// Each column comes with the casts its boundary comparisons take: an
     /// order column's captured at `cursor_by`, a secondary entry's as it was
     /// installed.
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     fn keyset_columns(&self) -> Vec<(Name, Name, BoundaryCast)> {
         self.order_columns
             .iter()
@@ -243,7 +243,7 @@ impl<S, K> Cursor<S, K> {
             .collect()
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     fn apply_filters(&self, query: &mut SelectStatement) -> Result<(), Error> {
         let beyond = |col: Expr, v: SimpleExpr| if self.sort_asc { col.gt(v) } else { col.lt(v) };
         let short_of = |col: Expr, v: SimpleExpr| if self.sort_asc { col.lt(v) } else { col.gt(v) };
@@ -261,7 +261,7 @@ impl<S, K> Cursor<S, K> {
         Ok(())
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     fn apply_filter<F>(&self, values: ValueTuple, f: F) -> Result<Condition, Error>
     where
         F: Fn(Expr, SimpleExpr) -> SimpleExpr,
@@ -414,15 +414,53 @@ impl<S, K> Cursor<S, K> {
     }
 
     /// Set the trailing order entries a joined read tiebreaks on, each
-    /// qualified with the table it belongs to.
+    /// qualified with the table it belongs to, replacing every entry already
+    /// installed — those [`add_secondary_order_by`](Self::add_secondary_order_by)
+    /// appended included.
     ///
-    /// The entries name no typed column, so their boundary values bind bare.
-    // [spec:pgorm:sem:exec.cursor.keyset+7]
+    /// The entries name no typed column, so their boundary values bind bare:
+    /// this is the form for an entry no entity column describes. A column
+    /// whose domain is over an enum has no comparison operator against a bare
+    /// value (`42883`); install one through `add_secondary_order_by`.
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
     pub fn set_secondary_order_by(&mut self, tbl_col: Vec<(Name, Key)>) -> &mut Self {
         self.secondary_order_by = tbl_col
             .into_iter()
             .map(|(tbl, col)| (tbl, col, BoundaryCast::identity()))
             .collect();
+        self
+    }
+
+    /// Append one trailing order entry on a typed column, qualified with
+    /// `table` — the column's own table, or the alias it was joined under.
+    ///
+    /// The column's boundary casts are captured here, while it is typed, as an
+    /// order column's are at `cursor_by` and a graph's tiebreak's as it is
+    /// installed: a boundary value binds under the column's
+    /// [`save_as`](ColumnTrait::save_as), and a column whose domain is over an
+    /// enum is compared as the enum. Each entry takes the next trailing
+    /// position of the keyset, so [`Cursor::after_with`] /
+    /// [`Cursor::before_with`] take its value after those of the entries
+    /// installed before it.
+    ///
+    /// ```
+    /// # use pgorm::{entity::prelude::*, tests_cfg::fruit};
+    /// let mut cursor = fruit::Entity::find().cursor_by(fruit::Column::CakeId);
+    /// cursor.add_secondary_order_by(fruit::Entity, fruit::Column::Id);
+    ///
+    /// // The whole key is the order column, then the appended entry.
+    /// cursor.after_with((1, 10)).first(2);
+    /// ```
+    // [spec:pgorm:sem:exec.cursor.keyset+8]
+    pub fn add_secondary_order_by<C>(&mut self, table: impl IntoName, col: C) -> &mut Self
+    where
+        C: ColumnTrait,
+    {
+        self.secondary_order_by.push((
+            table.into_name(),
+            Key::from(Name::new(col)),
+            BoundaryCast::of(col),
+        ));
         self
     }
 
@@ -552,7 +590,7 @@ where
     /// # use pgorm::{entity::prelude::*, tests_cfg::cake};
     /// cake::Entity::find().cursor_by(cake::Column::Id).after((1, "cheese"));
     /// ```
-    // [spec:pgorm:sem:exec.cursor.keyset+7/test]
+    // [spec:pgorm:sem:exec.cursor.keyset+8/test]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<SelectModel<M>, C::ValueType>
     where
         C: IntoKey,
@@ -900,7 +938,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:exec.cursor.keyset+7/test]    a boundary value on an enum
+    // [spec:pgorm:sem:exec.cursor.keyset+8/test]    a boundary value on an enum
     // order column binds under the column's `save_as` cast, exactly as the
     // value predicates spell it; a plain column still binds bare
     #[test]
@@ -920,5 +958,38 @@ mod tests {
             sql.contains(r#""cake"."id" > 7"#),
             "a plain column's boundary binds bare: {sql}"
         );
+    }
+
+    // [spec:pgorm:sem:exec.cursor.keyset+8/test]    an entry appended through
+    // `add_secondary_order_by` carries its column's casts into the boundary,
+    // under the table it was given, and `set_secondary_order_by` replaces it
+    #[test]
+    fn appended_tiebreaks_carry_their_column_cast() {
+        use crate::tests_cfg::{active_enums::Tea, lunch_set};
+
+        let mut cursor = lunch_set::Entity::find().cursor_by(lunch_set::Column::Name);
+        cursor
+            .add_secondary_order_by(alias("lunch"), lunch_set::Column::Tea)
+            .add_secondary_order_by(lunch_set::Entity, lunch_set::Column::Id);
+        assert_eq!(
+            order_by(&mut cursor),
+            r#""lunch_set"."name" ASC, "lunch"."tea" ASC, "lunch_set"."id" ASC"#
+        );
+
+        let sql = composed(cursor.after_with(("Set", Tea::BreakfastTea, 3)));
+        assert!(
+            sql.contains(r#""lunch"."tea" > CAST('BreakfastTea' AS tea)"#),
+            "the appended entry's value takes its column's cast: {sql}"
+        );
+        assert!(
+            sql.contains(r#""lunch_set"."id" > 3"#),
+            "a plain appended entry binds bare: {sql}"
+        );
+
+        let mut replaced = lunch_set::Entity::find().cursor_by(lunch_set::Column::Name);
+        replaced
+            .add_secondary_order_by(lunch_set::Entity, lunch_set::Column::Id)
+            .set_secondary_order_by(vec![]);
+        assert_eq!(order_by(&mut replaced), r#""lunch_set"."name" ASC"#);
     }
 }
