@@ -167,5 +167,5 @@ from ._copy import (
 from ._listen import Notification as Notification, _Listener as _Listener
 from ._runtime import (
     _Pool as _Pool, _Connection as _Connection, _Stream as _Stream,
-    _Transaction as _Transaction,
+    _Transaction as _Transaction, STATEMENT_CACHE_CHANNEL as STATEMENT_CACHE_CHANNEL,
 )

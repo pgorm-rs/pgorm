@@ -1,4 +1,7 @@
-use pgorm_migration::pgorm::{Config, ConnectionTrait, DatabasePool, Error, types::ToSql};
+use pgorm_migration::pgorm::{
+    Config, ConnectionTrait, DatabasePool, Error, ManagerConfig, NoTls, STATEMENT_CACHE_CHANNEL,
+    types::ToSql,
+};
 
 const NO_PARAMS: [&(dyn ToSql + Sync); 0] = [];
 
@@ -50,6 +53,21 @@ impl TestContext {
     /// deploy replica racing this one would hold.
     pub fn second_pool(&self) -> DatabasePool {
         pgorm_migration::pgorm::connect(config(&self.base_url, &self.db_name))
+    }
+
+    /// Another process's pool of one connection, listening on the channel the
+    /// runner notifies by default.
+    pub fn listening_pool(&self) -> DatabasePool {
+        pgorm_migration::pgorm::connect_with(
+            config(&self.base_url, &self.db_name),
+            NoTls,
+            ManagerConfig {
+                statement_cache_channel: Some(STATEMENT_CACHE_CHANNEL.to_owned()),
+                ..ManagerConfig::default()
+            },
+            |builder| builder.max_size(1),
+        )
+        .expect("a one-connection pool builds")
     }
 
     pub async fn delete(&self) {

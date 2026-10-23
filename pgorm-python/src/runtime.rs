@@ -103,7 +103,7 @@ fn running_loop(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 }
 
 // [spec:pgorm:req:python.runtime]
-// [spec:pgorm:req:python.connections+2]
+// [spec:pgorm:req:python.connections+3]
 #[derive(Debug)]
 #[pyclass(name = "_Pool", module = "pgorm._native", frozen)]
 pub(crate) struct NativePool {
@@ -113,7 +113,7 @@ pub(crate) struct NativePool {
 #[pymethods]
 impl NativePool {
     #[new]
-    #[pyo3(signature = (dsn, *, tls=None, ca_pem=None, max_size=10, connect_timeout=10.0, acquire_timeout=30.0, statement_cache_size=128, recycle="verified"))]
+    #[pyo3(signature = (dsn, *, tls=None, ca_pem=None, max_size=10, connect_timeout=10.0, acquire_timeout=30.0, statement_cache_size=128, recycle="verified", statement_cache_channel=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
@@ -125,6 +125,7 @@ impl NativePool {
         acquire_timeout: f64,
         statement_cache_size: usize,
         recycle: &str,
+        statement_cache_channel: Option<String>,
     ) -> PyResult<Self> {
         let owner = running_loop(py)?.unbind();
         let (pool, secrets, acquire_timeout) = PoolConfig {
@@ -136,6 +137,7 @@ impl NativePool {
             acquire_timeout,
             statement_cache_size,
             recycle: recycle.to_owned(),
+            statement_cache_channel,
         }
         .build()?;
         Ok(Self {
@@ -211,8 +213,8 @@ impl NativePool {
     /// Mark every connection's cached prepared statements stale, as
     /// `DatabasePool::clear_statement_caches` does. Nothing is sent, so a
     /// closed pool or another event loop is no reason to refuse it.
-    // [spec:pgorm:req:python.connections+2]
-    // [spec:pgorm:req:conn.pool.statement-cache.clear]
+    // [spec:pgorm:req:python.connections+3]
+    // [spec:pgorm:req:conn.pool.statement-cache.clear+1]
     fn clear_statement_caches(&self) {
         self.state.pool.clear_statement_caches();
     }
@@ -448,6 +450,8 @@ impl Drop for NativeConnection {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    // [spec:pgorm:req:python.connections+3]    the channel pgorm-migration's runner notifies
+    module.add("STATEMENT_CACHE_CHANNEL", pgorm::STATEMENT_CACHE_CHANNEL)?;
     module.add_class::<NativePool>()?;
     module.add_class::<NativeConnection>()?;
     module.add_class::<crate::transactions::NativeTransaction>()?;

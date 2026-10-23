@@ -1013,7 +1013,7 @@ async fn prepared_inserts(db: &impl ConnectionTrait) -> Result<i64, Error> {
 /// writes the domain's new default: one idle at the time as soon as it is
 /// lent, and one checked out at the time once it is returned and lent again.
 /// The insert it had prepared is closed on the server before it runs anything.
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    idle and checked-out connections that
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    idle and checked-out connections that
 // prepared an insert before SET DEFAULT write the new default once next lent, their old statement
 // deallocated on the server, while a connection still checked out keeps it
 // [spec:pgorm:req:sql.ddl.domain+2/test]    the clear is the remedy for a planned default

@@ -24,6 +24,7 @@ pub(crate) struct PoolConfig {
     pub(crate) acquire_timeout: Duration,
     pub(crate) statement_cache_size: usize,
     pub(crate) recycle: String,
+    pub(crate) statement_cache_channel: Option<String>,
 }
 
 /// A built pool, the secrets its errors redact, and how long acquiring a
@@ -93,7 +94,7 @@ fn milliseconds<'cx>(
 
 impl PoolConfig {
     /// `dsn` and the pool options object, as JavaScript passes them.
-    // [spec:pgorm:req:napi.connections+2]
+    // [spec:pgorm:req:napi.connections+3]
     pub(crate) fn read<'cx>(
         cx: &mut Cx<'cx>,
         dsn: Handle<'cx, JsValue>,
@@ -119,6 +120,10 @@ impl PoolConfig {
             Some(recycle) => string(cx, recycle)?,
             None => "verified".to_owned(),
         };
+        let statement_cache_channel = match option(cx, options, "statementCacheChannel")? {
+            Some(channel) => Some(string(cx, channel)?),
+            None => None,
+        };
         Ok(Self {
             dsn,
             tls,
@@ -128,13 +133,14 @@ impl PoolConfig {
             acquire_timeout: milliseconds(cx, options, "acquireTimeout", Duration::from_secs(30))?,
             statement_cache_size: count(cx, options, "statementCacheSize", 128)?,
             recycle,
+            statement_cache_channel,
         })
     }
 
     /// The pool. TLS verifies the server's certificate and host name unless
     /// the connection string says `sslmode=disable` or `tls` is `"disable"`;
     /// there is no silent fallback to plaintext.
-    // [spec:pgorm:req:napi.connections+2]
+    // [spec:pgorm:req:napi.connections+3]
     pub(crate) fn build(self) -> Result<Built, Failure> {
         let invalid = |message: &str| Failure::Construction(message.to_owned());
         if self.max_size == 0 || self.max_size > tokio::sync::Semaphore::MAX_PERMITS {
@@ -159,6 +165,17 @@ impl PoolConfig {
             "fast" => pgorm::RecyclingMethod::Fast,
             _ => return Err(invalid("recycle is \"verified\" or \"fast\"")),
         };
+        // [spec:pgorm:req:conn.pool.statement-cache.listen]    refused here, by name, rather than
+        // as connect_with's anonymous invalid configuration
+        if self
+            .statement_cache_channel
+            .as_ref()
+            .is_some_and(|channel| channel.is_empty() || channel.len() > 63)
+        {
+            return Err(invalid(
+                "statementCacheChannel is a channel name of 1 to 63 bytes",
+            ));
+        }
         let manager = pgorm::ManagerConfig {
             recycling_method,
             tag: None,
@@ -166,6 +183,7 @@ impl PoolConfig {
                 None => pgorm::StatementCacheSize::Disabled,
                 Some(size) => pgorm::StatementCacheSize::Bounded(size),
             },
+            statement_cache_channel: self.statement_cache_channel,
         };
         let max_size = self.max_size;
         let pool = match mode {

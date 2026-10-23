@@ -9,7 +9,7 @@ use pgorm_migration::prelude::*;
 /// A fresh database has nothing applied; `up` installs the tracking table and
 /// runs every pending migration in order.
 // [spec:pgorm:def:migration.runner+3/test]
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 // [spec:pgorm:sem:migration.name+3/test]    asserted names are file stems
 // [spec:pgorm:req:migration.ledger-upgrade+1/test]    the fresh-install half: the legacy name is never created
 // [spec:pgorm:def:macros.derive+3/test]    `DeriveMigrationName` names each migration after the file stem
@@ -61,7 +61,7 @@ async fn fresh_install_applies_all_pending() -> Result<(), Error> {
 
 /// Re-running `up` on an already-migrated database is a no-op: no migration is
 /// re-applied and no extra ledger row is written.
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 #[tokio::test]
 async fn repeated_up_is_idempotent() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_idempotent").await;
@@ -88,7 +88,7 @@ async fn repeated_up_is_idempotent() -> Result<(), Error> {
 /// `steps` bounds how many pending migrations are applied, and `status` reports
 /// the split without altering it.
 // [spec:pgorm:def:migration.runner+3/test]
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 #[tokio::test]
 async fn stepped_up_reports_status() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_status").await;
@@ -142,7 +142,7 @@ async fn migration_table_name_is_overridable() -> Result<(), Error> {
 
 /// The whole `up` run shares one transaction, so a failing migration rolls back
 /// every migration in the run along with the ledger rows.
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 // [spec:pgorm:req:migration.up-only/test]    no rollback path other than the transaction
 #[tokio::test]
 async fn failed_migration_rolls_back_the_run() -> Result<(), Error> {
@@ -203,7 +203,7 @@ async fn duplicate_migration_names_are_rejected() -> Result<(), Error> {
 
 /// The advisory key is a stable function of the ledger's name: it does not move
 /// between builds, and two migrators with different ledgers do not contend.
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 #[test]
 fn lock_key_is_derived_from_the_ledger_name() {
     assert_eq!(
@@ -218,7 +218,7 @@ fn lock_key_is_derived_from_the_ledger_name() {
 
 /// Two runners racing one fresh database both succeed: the loser waits on the
 /// advisory lock, then recomputes the pending set and finds nothing to do.
-// [spec:pgorm:sem:migration.up+3/test]
+// [spec:pgorm:sem:migration.up+4/test]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn concurrent_runners_queue_on_the_advisory_lock() -> Result<(), Error> {
     let ctx = TestContext::new("pgorm_migration_concurrent").await;
@@ -646,9 +646,9 @@ async fn a_read_never_widens_a_pre_checksum_ledger() -> Result<(), Error> {
 /// prepared an insert through it: once the batch commits, the runner has the
 /// pool clear its statements, and the insert is prepared again and writes the
 /// new default. A run that applies nothing leaves prepared statements alone.
-// [spec:pgorm:sem:migration.up+3/test]    a committed batch that applied a migration clears the
+// [spec:pgorm:sem:migration.up+4/test]    a committed batch that applied a migration clears the
 // pool's statement caches, and a run that applied nothing does not
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    the runner clears after the DDL it applied
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    the runner clears after the DDL it applied
 #[tokio::test]
 async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
     use common::migrator::domain_default::{Created, Defaulted};
@@ -686,6 +686,103 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
     assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
     drop(conn);
 
+    ctx.delete().await;
+    Ok(())
+}
+
+/// Another process's pool, listening on the channel the runner notifies by
+/// default, hears a batch that applied a migration and clears: its insert,
+/// prepared before the batch changed the domain's default, writes the new one.
+/// A run that applies nothing sends nothing, nor does a migrator that names no
+/// channel, as the fence each is followed by shows: notifications reach a
+/// session in commit order.
+// [spec:pgorm:sem:migration.up+4/test]    a batch that applied a migration notifies the channel as
+// it commits, and a run that applied nothing, or a migrator naming no channel, does not
+// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    another pool listening on the default
+// channel clears once the runner's batch commits
+#[tokio::test]
+async fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
+    use common::migrator::domain_default::{Created, Defaulted, Unannounced};
+    use futures::StreamExt;
+    use pgorm_migration::pgorm::{Listener, Notifications, STATEMENT_CACHE_CHANNEL, notify};
+    use std::time::Duration;
+
+    const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
+    const PREPARED: &str = "SELECT count(*) FROM pg_prepared_statements \
+                            WHERE statement = 'INSERT INTO line (id) VALUES ($1) RETURNING qty'";
+    const LISTENING: &str = "SELECT count(*) FROM pg_stat_activity \
+                             WHERE datname = current_database() AND query = $1 AND state = 'idle'";
+    const ARRIVAL: Duration = Duration::from_secs(10);
+
+    async fn payload(notifications: &mut Notifications) -> Result<String, Error> {
+        let notification = tokio::time::timeout(ARRIVAL, notifications.next())
+            .await
+            .expect("a notification arrives in time")
+            .expect("the stream has not ended")?;
+        assert_eq!(notification.channel(), STATEMENT_CACHE_CHANNEL);
+        Ok(notification.payload().to_owned())
+    }
+
+    let ctx = TestContext::new("pgorm_migration_notifies_listening_pools").await;
+    let db = &ctx.db;
+    let (listener, mut notifications) = db.listener(Listener::DEFAULT_CAPACITY).await?;
+    listener.listen(STATEMENT_CACHE_CHANNEL).await?;
+
+    Created::up(db.clone(), None).await?;
+    assert_eq!(payload(&mut notifications).await?, "");
+
+    // Opened after `Created`'s notification, so only `Defaulted`'s can clear it.
+    let elsewhere = ctx.listening_pool();
+    drop(elsewhere.get().await?);
+    let listen = format!("LISTEN \"{STATEMENT_CACHE_CHANNEL}\"");
+    let deadline = tokio::time::Instant::now() + ARRIVAL;
+    while db
+        .get()
+        .await?
+        .query_one(LISTENING, &[&listen])
+        .await?
+        .get::<_, i64>(0)
+        < 2
+    {
+        assert!(tokio::time::Instant::now() < deadline, "the pool listens");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let conn = elsewhere.get().await?;
+    assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
+    drop(conn);
+    let conn = elsewhere.get().await?;
+    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
+    drop(conn);
+
+    Defaulted::up(db.clone(), None).await?;
+    assert_eq!(payload(&mut notifications).await?, "");
+    let deadline = tokio::time::Instant::now() + ARRIVAL;
+    loop {
+        let conn = elsewhere.get().await?;
+        if conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0) == 0 {
+            assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
+            break;
+        }
+        drop(conn);
+        assert!(tokio::time::Instant::now() < deadline, "the pool clears");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
+    Defaulted::up(db.clone(), None).await?;
+    Unannounced::up(db.clone(), None).await?;
+    assert_eq!(
+        db.get()
+            .await?
+            .query_one(INSERT, &[&3])
+            .await?
+            .get::<_, i32>(0),
+        3,
+        "the runner still clears its own pool"
+    );
+    notify(&db.get().await?, STATEMENT_CACHE_CHANNEL, "fence").await?;
+    assert_eq!(payload(&mut notifications).await?, "fence");
+
+    drop((listener, notifications, elsewhere));
     ctx.delete().await;
     Ok(())
 }

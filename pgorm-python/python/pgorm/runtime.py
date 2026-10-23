@@ -12,6 +12,11 @@ from .results import Query, Record, ResultStream
 from .transactions import Transaction, TransactionMode, IsolationLevel
 
 
+STATEMENT_CACHE_CHANNEL: str = _native.STATEMENT_CACHE_CHANNEL
+"""The channel pgorm-migration's runner notifies once a batch that applied a
+migration commits; pass it as ``statement_cache_channel`` to clear on it."""
+
+
 class PoolStatus(NamedTuple):
     """A snapshot of native pool capacity and current usage."""
 
@@ -22,7 +27,7 @@ class PoolStatus(NamedTuple):
 
 
 # [spec:pgorm:req:python.runtime]
-# [spec:pgorm:req:python.connections+2]
+# [spec:pgorm:req:python.connections+3]
 class Pool:
     """A pool owned by the asyncio loop running at construction.
 
@@ -32,6 +37,12 @@ class Pool:
     certificate store trusts are used, and a store holding none raises
     ``ConstructionError``. A pool keeps reusable connections and one shared
     Tokio runtime.
+
+    ``statement_cache_channel`` names a channel the pool listens on through a
+    connection of its own, from its first acquisition until it closes; every
+    notification there, whatever its payload, clears every connection's cached
+    statements as ``clear_statement_caches()`` does. ``STATEMENT_CACHE_CHANNEL``
+    is the one pgorm-migration's runner notifies after a migration.
     """
 
     def __init__(
@@ -45,6 +56,7 @@ class Pool:
         acquire_timeout: float = 30.0,
         statement_cache_size: int = 128,
         recycle: str = "verified",
+        statement_cache_channel: str | None = None,
     ) -> None:
         if not isinstance(dsn, str):
             raise _native.ConstructionError("dsn must be a string")
@@ -53,6 +65,8 @@ class Pool:
                 raise _native.ConstructionError(f"{name} must be a nonnegative integer")
         if isinstance(connect_timeout, bool) or isinstance(acquire_timeout, bool):
             raise _native.ConstructionError("timeouts must be numeric durations")
+        if statement_cache_channel is not None and not isinstance(statement_cache_channel, str):
+            raise _native.ConstructionError("statement_cache_channel must be a string or None")
         try:
             ca_pem = Path(cafile).read_bytes() if cafile is not None else None
         except OSError:
@@ -62,6 +76,7 @@ class Pool:
                 dsn, tls=tls, ca_pem=ca_pem, max_size=max_size,
                 connect_timeout=connect_timeout, acquire_timeout=acquire_timeout,
                 statement_cache_size=statement_cache_size, recycle=recycle,
+                statement_cache_channel=statement_cache_channel,
             )
         except (TypeError, ValueError, OverflowError) as error:
             raise _native.ConstructionError(str(error)) from None

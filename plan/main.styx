@@ -13279,6 +13279,9 @@ children (
         id statement-cache-cross-process
         title "A statement-cache clear reaches every process using the database, and connections held across it"
         kind @feat
+        implements {
+            main ([spec:pgorm:req:conn.pool.statement-cache.listen])
+        }
         deps (statement-cache-after-ddl)
         log (
             {
@@ -13293,6 +13296,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23, asked whether a statement-cache clear should reach other processes: \"opt-in setting\". Build a pool setting, off by default. When on, the pool keeps one connection of its own LISTENing on a channel; pgorm-migration's runner NOTIFYs that channel after a batch that applied a migration commits; every pool with the setting on runs clear_statement_caches() on the notification. The cost is one idle connection per pool that turns it on. Same setting in the Python and JavaScript pools. Connections held checked out across the clear keep their statements until returned, as for a local clear; DISCARD ALL recycling reusing the recycle-time clear stays in scope if it falls out naturally."
+            }
+
+            {
+                at 2026-10-23T20:13:34.797774Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Design: the setting is ManagerConfig::statement_cache_channel: Option<String> (None by default; the struct is serde config already, and connect_with's signature stays as is, though an exhaustive ManagerConfig literal now needs the field). The listener lives in pgorm-pool: started by the pool's first Manager::create (pool construction is synchronous and the Python/JS pools are built outside any runtime), its task holding only Arc<dyn Connect>, the PgConfig and the Arc'd generation; Manager's Drop aborts it and DatabasePool::close stops it via Manager::stop_statement_cache_listener. Reconnects 100 ms doubling to 10 s; clears on every LISTEN that takes effect (first included) and on every notification, payload ignored. Default channel STATEMENT_CACHE_CHANNEL = pgorm_statement_caches. The runner notifies MigratorTrait::statement_cache_channel() (default Some(STATEMENT_CACHE_CHANNEL), None sends nothing) inside the batch's transaction, always when the batch applied a migration. Not visible in metrics (MetricsCollector has no defaults; tracing logs instead). DISCARD ALL recycling clear left out: detecting it would mean parsing a Custom recycle SQL."
+                after_done true
             }
         )
     }

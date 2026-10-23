@@ -127,7 +127,7 @@ pub trait MigratorTrait: Send {
     /// The hash is spelled out here rather than taken from `DefaultHasher`
     /// because the key has to agree between processes that need not share a
     /// compiler version, let alone a `HashMap` seed.
-    // [spec:pgorm:sem:migration.up+3]
+    // [spec:pgorm:sem:migration.up+4]
     fn lock_key() -> i64 {
         const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
         const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -148,7 +148,7 @@ pub trait MigratorTrait: Send {
     /// `pg_advisory_xact_lock` is released at end of transaction: taken in
     /// autocommit it would be surrendered before the caller's next statement,
     /// which is the shape of the bug rather than the fix.
-    // [spec:pgorm:sem:migration.up+3]
+    // [spec:pgorm:sem:migration.up+4]
     async fn lock(db: &DatabaseTransaction<'_>) -> Result<(), Error> {
         let key = Self::lock_key();
         db.execute("SELECT pg_advisory_xact_lock($1)", &[&key])
@@ -197,7 +197,7 @@ pub trait MigratorTrait: Send {
     }
 
     /// Get list of migrations with status
-    // [spec:pgorm:sem:migration.up+3]    pending set difference + missing-file detection
+    // [spec:pgorm:sem:migration.up+4]    pending set difference + missing-file detection
     // [spec:pgorm:req:migration.checksum+1]    recorded digests are checked on every read
     // [spec:pgorm:req:migration.read-only]    status is computed from a read alone
     async fn get_migration_with_status(
@@ -407,21 +407,48 @@ pub trait MigratorTrait: Send {
         Ok(())
     }
 
+    /// The channel `up` notifies once a batch that applied a migration
+    /// commits, so that every pool listening there clears its statement
+    /// caches; `None` notifies nothing. It is
+    /// [`STATEMENT_CACHE_CHANNEL`](pgorm::STATEMENT_CACHE_CHANNEL) by default,
+    /// the one a pool given that channel as its
+    /// [`statement_cache_channel`](pgorm::ManagerConfig::statement_cache_channel)
+    /// listens on.
+    // [spec:pgorm:sem:migration.up+4]    the channel the runner notifies
+    fn statement_cache_channel() -> Option<String> {
+        Some(pgorm::STATEMENT_CACHE_CHANNEL.to_owned())
+    }
+
     /// Apply pending migrations, then clear the pool's cached statements if the
-    /// committed batch applied any
-    // [spec:pgorm:sem:migration.up+3]
+    /// committed batch applied any, notifying every other pool listening on
+    /// [`statement_cache_channel`](MigratorTrait::statement_cache_channel)
+    // [spec:pgorm:sem:migration.up+4]
     async fn up(db: DatabasePool, steps: Option<u32>) -> Result<(), Error> {
         tracing::debug!("Applying migrations");
+        let channel = Self::statement_cache_channel();
         let applied = exec_with_connection(&db, move |manager| {
             tracing::debug!("Exec up");
-            Box::pin(async move { exec_up::<Self>(manager, steps).await })
+            let channel = channel.clone();
+            Box::pin(async move {
+                let applied = exec_up::<Self>(manager, steps).await?;
+                // Sent inside the batch's transaction, the notification is
+                // delivered exactly when the batch commits, and never if it
+                // rolls back.
+                // [spec:pgorm:sem:migration.up+4]    other processes' pools hear of a committed batch
+                if applied > 0
+                    && let Some(channel) = channel
+                {
+                    pgorm::notify(manager, &channel, "").await?;
+                }
+                Ok(applied)
+            })
         })
         .await?;
 
         // The pool's connections may hold statements planned against the schema
         // the batch changed, and PostgreSQL does not re-plan every such change:
         // an insert prepared before a domain's default changed keeps the old one.
-        // [spec:pgorm:req:conn.pool.statement-cache.clear]    the runner clears after a batch commits
+        // [spec:pgorm:req:conn.pool.statement-cache.clear+1]    the runner clears after a batch commits
         if applied > 0 {
             db.clear_statement_caches();
         }
@@ -518,7 +545,7 @@ impl ReadableLedger {
     }
 }
 
-// [spec:pgorm:sem:migration.up+3]    one connection, one transaction for the whole batch
+// [spec:pgorm:sem:migration.up+4]    one connection, one transaction for the whole batch
 async fn exec_with_connection<T, F>(db: &DatabasePool, f: F) -> Result<T, Error>
 where
     F: for<'b> Fn(
@@ -533,7 +560,7 @@ where
 }
 
 /// Applies the pending migrations inside `db`, answering how many it applied.
-// [spec:pgorm:sem:migration.up+3]    lock, then declaration-order application, step bound, ledger append
+// [spec:pgorm:sem:migration.up+4]    lock, then declaration-order application, step bound, ledger append
 async fn exec_up<M>(db: &DatabaseTransaction<'_>, mut steps: Option<u32>) -> Result<usize, Error>
 where
     M: MigratorTrait + ?Sized,

@@ -63,7 +63,7 @@ def enable_tls(name, root):
         time.sleep(0.05)
 
 
-# [spec:pgorm:req:python.connections+2/test]
+# [spec:pgorm:req:python.connections+3/test]
 @contextmanager
 def fixture():
     name = f"pgorm-python-{uuid.uuid4().hex[:12]}"

@@ -116,15 +116,21 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
 
 - **`Pool`** builds from a connection string and options (`tls`, `ca`,
   `maxSize`, `connectTimeout`, `acquireTimeout`, `statementCacheSize`,
-  `recycle`; durations in milliseconds) without sending anything; `connect`
-  also pings. TLS is `verify-full` — certificate and host name checked against
-  `ca` or the platform's trust store — unless the string says
+  `recycle`, `statementCacheChannel`; durations in milliseconds) without
+  sending anything; `connect` also pings. TLS is `verify-full` — certificate
+  and host name checked against `ca` or the platform's trust store — unless
+  the string says
   `sslmode=disable` or `tls` is `"disable"`, and never falls back to plaintext.
   A statement run on a pool takes a connection for itself alone. After DDL
   that a cached plan does not see, such as a domain's changed default,
   `pool.clearStatementCaches()` makes every connection prepare its statements
   again: an idle one before it is next lent, one checked out at the time once
-  it is returned and lent again.
+  it is returned and lent again. That reaches only this process's pool; one
+  built with `statementCacheChannel: STATEMENT_CACHE_CHANNEL` also clears on
+  every notification there, as pgorm-migration's runner sends after a
+  migration from any process. It listens through a connection of its own,
+  opened by its first acquisition, reopened if it drops (clearing once each
+  time it listens again) and closed with the pool.
 - **`Connection`** (from `pool.acquire()`) is the caller's until closed, and
   runs one operation at a time; another meanwhile is a `LifecycleError`, not a
   queue.
