@@ -287,6 +287,14 @@ children (
                         text "sql.render.subquery +5 (in-subquery-enum-shapes, a4b9cbd2): a SimpleExpr::SubQuery's operator prefix includes ARRAY, rendered directly before the parenthesized sub-statement."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-23T20:33:52.917041Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "boolean-operator-parens (d5a931eb) and between-render-parens (6ff68b71) bumped sql.render.precedence+12 (&&, ~ and ~* join the boolean-valued set; the BETWEEN family renders bare under AND/OR/NOT) and sql.render.parens+4 (BETWEEN's bounds are operands of the BETWEEN, not of its AND); every site re-read and re-pinned, and the renderer, now in query_builder/precedence.rs, matches."
+                        after_done true
+                    }
                 )
             }
 
