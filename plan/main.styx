@@ -13236,7 +13236,6 @@ children (
         title "create_table_from_entity stops emitting a foreign key PostgreSQL refuses over a domain over an enum"
         kind @fix
         deps (domain-enum-remaining)
-        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.0283Z
@@ -13433,6 +13432,20 @@ children (
                 kind @decision
                 text "Operator 2026-10-23: \"yes\" to leaving it and documenting it. No pre-check (it would cost a catalogue read before every COPY): document in conn.copy and the bindings' COPY docs that a column list naming a generated column is refused by the server at the start, which closes the connection."
             }
+
+            {
+                at 2026-10-23T19:43:21.326978Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:09:43.816294Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13593,6 +13606,13 @@ children (
                 kind @note
                 text "Operator 2026-10-23, from an agent's report on porting an application from SeaORM: find_also_related broke at 8 call sites and the compiler gave no hint of the replacement. A #[doc(alias)] only helps rustdoc search; stable Rust cannot add a hint to rustc's \"no method named\" error. Write the guide (find_also_related/linked and SelectTwo to graph() / related_maybe / join_maybe, the removed Statement/StatementBuilder, the scoped transactions, set(..), Insert::one/many, the pool not being a ConnectionTrait, the migration surface: up only, the ledger rename, and so on, from CLAUDE.md's Key Differences and the spec's departures), link it from the README, and put #[doc(alias = \"...\")] for each old name on its replacement."
             }
+
+            {
+                at 2026-10-23T20:28:06.091883Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13600,7 +13620,6 @@ children (
         id graph-related-one
         title "A graph joins the path Related<F> describes as a required source, as related_maybe does for an optional one"
         kind @feat
-        sealed true
         log (
             {
                 at 2026-10-23T19:22:05.909041Z
@@ -13696,7 +13715,6 @@ children (
         title "A tiebreak a caller installs on a cursor carries its column's cast"
         kind @fix
         deps (graph-cursor-enum-tiebreak)
-        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.164692Z

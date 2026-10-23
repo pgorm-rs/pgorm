@@ -55,6 +55,7 @@ pub trait LoaderTrait {
     ///
     /// The junction is the one the relation's `via` already names, so it is
     /// not passed in: there is no second junction to disagree with it.
+    #[doc(alias = "load_many_to_many")]
     async fn load_many_via<R, S, C>(&self, stmt: S, db: &C) -> Result<Vec<Vec<R::Model>>, Error>
     where
         C: ConnectionTrait,

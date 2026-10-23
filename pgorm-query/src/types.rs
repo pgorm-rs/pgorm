@@ -10,6 +10,7 @@ use std::{any::Any, fmt, ops, sync::Arc};
 /// SQL, `SqlName` is a name — so the two positions a string can land in are
 /// told apart by the trait it satisfies rather than by convention.
 // [spec:pgorm:def:sql.types+9]
+#[doc(alias = "Iden")]
 pub trait SqlName: Any + Send + Sync {
     /// Write the identifier as PostgreSQL spells one: wrapped in double
     /// quotes, with any embedded double quote doubled.
@@ -46,6 +47,7 @@ pub trait SqlName: Any + Send + Sync {
 /// the program; `Debug` is what makes a column printable in the generic code
 /// that takes one.
 // [spec:pgorm:def:sql.types+9]
+#[doc(alias = "IdenStatic")]
 pub trait StaticName: SqlName + Copy + fmt::Debug + 'static {
     /// The name as an unquoted string.
     fn as_str(&self) -> &str;
@@ -58,6 +60,7 @@ pub trait StaticName: SqlName + Copy + fmt::Debug + 'static {
 /// deliberately two words and no more — widening it widens every node.
 #[derive(Debug)]
 #[repr(transparent)]
+#[doc(alias("DynIden", "SeaRc", "SharedIden"))]
 pub struct Name(Arc<dyn SqlName>);
 
 impl ops::Deref for Name {
@@ -120,6 +123,7 @@ impl Name {
     }
 }
 
+#[doc(alias = "IntoIden")]
 pub trait IntoName {
     fn into_name(self) -> Name;
 }
@@ -386,6 +390,7 @@ where
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(alias = "TableRef")]
 pub enum TableName {
     /// Table identifier without any schema prefix
     Table(Name),
@@ -480,6 +485,7 @@ pub trait IntoNamedTable {
 // [spec:pgorm:def:sql.types.table-ref+6]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
+#[doc(alias = "TableRef")]
 pub enum FromItem {
     /// A table name with an optional alias
     Table(NamedTable),
@@ -747,6 +753,7 @@ struct RuntimeName(String);
 /// );
 /// ```
 #[derive(Default, Debug, Clone, Copy)]
+#[doc(alias = "asterisk")]
 pub struct Asterisk;
 
 /// SQL Keywords

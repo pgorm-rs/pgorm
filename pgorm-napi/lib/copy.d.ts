@@ -54,7 +54,11 @@ export type CopyToSource = TableRef | Select | Insert | Update | Delete | Merge;
 export declare class CopyFrom<F extends CopyFormat = CopyFormat> extends Builder {
   private constructor();
   readonly format: F;
-  /** The columns each row supplies, in order, added to those named before; a column left out takes its default. */
+  /**
+   * The columns each row supplies, in order, added to those named before; a column left out takes its default.
+   * A generated column takes no data: a list naming one is refused when the COPY starts, closing its connection.
+   * With no list, the generated columns are left out.
+   */
   columns(columns: readonly string[]): CopyFrom<F>;
   /** `FREEZE`: write the rows already frozen; the server refuses it unless the table was made or truncated in this transaction. */
   freeze(): CopyFrom<F>;

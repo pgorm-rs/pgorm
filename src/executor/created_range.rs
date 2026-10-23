@@ -97,7 +97,7 @@ impl<'a> CreatedRangeCodec<'a> {
 /// A field of `ty`, a range type a schema created, as its text form: the
 /// binary form read through the subtype's codec, then written as `Display`
 /// writes the range.
-// [spec:pgorm:req:conn.copy.rows+1]
+// [spec:pgorm:req:conn.copy.rows+2]
 pub(crate) fn created_range_text(ty: &Type, raw: &[u8]) -> Result<String, WireError> {
     let codec = CreatedRangeCodec::of(ty)?;
     (codec.text)(codec.subtype, raw)

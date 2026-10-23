@@ -91,6 +91,7 @@ impl Update {
     ///     r#"UPDATE "fruit" SET "name" = 'Golden Apple' WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```
+    #[doc(alias = "update_many")]
     pub fn many<E>(entity: E) -> UpdateMany<E>
     where
         E: EntityTrait,

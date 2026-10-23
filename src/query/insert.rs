@@ -213,6 +213,7 @@ where
     ///     r#"INSERT INTO "cake" ("id", "name") VALUES (1, 'Apple Pie'), (2, 'Orange Scone')"#,
     /// );
     /// ```
+    #[doc(alias = "insert_many")]
     pub fn many<M, I>(models: I) -> Self
     where
         M: IntoActiveModel<A>,
@@ -422,6 +423,7 @@ where
     /// [`OnConflict::do_nothing`](pgorm_query::OnConflict::do_nothing), which
     /// attaches an `ON CONFLICT` clause to a statement that does run.
     // [spec:pgorm:sem:query.build.insert.empty-failsafe+5]
+    #[doc(alias = "do_nothing")]
     pub fn on_empty_do_nothing(self) -> TryInsert<A, R>
     where
         A: ActiveModelTrait,

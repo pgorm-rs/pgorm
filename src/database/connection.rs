@@ -30,6 +30,7 @@ mod private {
 /// — are therefore total: neither has a case where the SQL it is looking at has
 /// gone missing.
 // [spec:pgorm:def:conn.sql-text+2]
+#[doc(alias("Statement", "StatementBuilder", "from_sql_and_values", "from_string"))]
 pub trait SqlText: private::Sealed {
     /// The statement's SQL text.
     fn sql_text(&self) -> &str;
@@ -120,6 +121,7 @@ pub trait ConnectionTrait: Sync {
     /// Execute a statement and return its rows as a stream, without buffering
     /// the whole result set
     // [spec:pgorm:def:exec.stream+2]
+    #[doc(alias = "StreamTrait")]
     async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + SqlText + Sync,
@@ -146,6 +148,7 @@ pub trait ConnectionTrait: Sync {
     /// into `sql` by the caller — build these strings from trusted input only,
     /// and reach for [`ConnectionTrait::execute`] the moment user data is
     /// involved.
+    #[doc(alias = "execute_unprepared")]
     async fn batch_execute(&self, sql: &str) -> Result<(), Error>;
 }
 

@@ -171,6 +171,12 @@ pub trait EntityTrait: EntityName {
     /// declaration, never inherited from a builder whose select list a caller
     /// may have edited.
     // [spec:pgorm:def:query.graph]
+    #[doc(alias(
+        "find_also_related",
+        "find_with_related",
+        "find_also_linked",
+        "find_with_linked"
+    ))]
     fn graph() -> SelectGraph<Self> {
         SelectGraph::new()
     }

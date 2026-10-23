@@ -2,6 +2,11 @@
 
 A fork of [SeaORM](https://github.com/SeaQL/sea-orm) focused entirely on Postgres support.
 
+Porting an application from SeaORM? [Coming from SeaORM](COMING_FROM_SEAORM.md) maps every
+removed or renamed API to its replacement. The same guide is the `pgorm::coming_from_seaorm`
+page of the API documentation, whose search also finds each old name: searching
+`find_also_related` leads to `related_maybe`.
+
 ## Primary differences with SeaORM
 
 - Supports ONLY Postgres; the test suite runs against PostgreSQL 18 and no older release. The `pg-19`

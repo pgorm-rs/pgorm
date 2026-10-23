@@ -234,7 +234,7 @@ fn ordered_kinds() -> CopyToStatement<CopyBinary> {
     )
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    every value kind pgorm binds is written as binary rows and read back, as the server reads the same literals
+// [spec:pgorm:req:conn.copy.rows+2/test]    every value kind pgorm binds is written as binary rows and read back, as the server reads the same literals
 #[pgorm_macros::test]
 async fn copy_rows_round_trip_every_kind() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_round_trip_every_kind").await;
@@ -289,7 +289,7 @@ async fn copy_rows_round_trip_every_kind() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    a row of the wrong width or a value its column cannot take is refused, and the sink goes on
+// [spec:pgorm:req:conn.copy.rows+2/test]    a row of the wrong width or a value its column cannot take is refused, and the sink goes on
 #[pgorm_macros::test]
 async fn copy_rows_refuse_wrong_width_or_type() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_refuse_wrong_width").await;
@@ -358,7 +358,7 @@ async fn copy_rows_refuse_wrong_width_or_type() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    the columns come from the server: a list, a whole table without its generated columns, a query's result
+// [spec:pgorm:req:conn.copy.rows+2/test]    the columns come from the server: a list, a whole table without its generated columns, a query's result
 #[pgorm_macros::test]
 async fn copy_rows_columns_from_the_server() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_columns_from_server").await;
@@ -450,7 +450,7 @@ async fn answers_in_step(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    a description the server refuses leaves the connection as it was; a type no value holds fails its row
+// [spec:pgorm:req:conn.copy.rows+2/test]    a description the server refuses leaves the connection as it was; a type no value holds fails its row
 #[pgorm_macros::test]
 async fn copy_rows_refusals_before_and_after_start() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_refusals").await;
@@ -504,6 +504,51 @@ async fn copy_rows_refusals_before_and_after_start() -> Result<(), Error> {
     Ok(())
 }
 
+// [spec:pgorm:req:conn.copy.rows+2/test]    a list naming a generated column is described, since a SELECT reads one, and refused at the start, closing the connection
+#[pgorm_macros::test]
+async fn copy_rows_naming_a_generated_column_closes() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_rows_generated_column").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(
+        "CREATE TABLE priced (id int, doubled int GENERATED ALWAYS AS (id * 2) STORED)",
+    )
+    .await?;
+
+    let copy = CopyFromStatement::new(n("priced"), CopyBinary)
+        .columns([n("id"), n("doubled")])
+        .to_owned();
+    assert_eq!(
+        db.copy_in_columns(&copy).await?,
+        [
+            CopyColumn::new("id", Type::INT4),
+            CopyColumn::new("doubled", Type::INT4)
+        ]
+    );
+    answers_in_step(&db).await?;
+
+    let refused = db.copy_in_rows(&copy).await.map(drop);
+    let Err(error) = refused else {
+        panic!("a generated column takes no data");
+    };
+    assert_eq!(
+        sqlstate(&error),
+        Some(&SqlState::INVALID_COLUMN_REFERENCE),
+        "{error}"
+    );
+    let after = db
+        .query_one("SELECT 1", &[])
+        .await
+        .expect_err("the connection is closed");
+    assert!(
+        matches!(&after, Error::Postgres(error) if error.is_closed()),
+        "{after}"
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
 mod item {
     use pgorm::entity::prelude::*;
 
@@ -522,7 +567,7 @@ mod item {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    models are written and read by column name, in a transaction and through the metrics wrapper
+// [spec:pgorm:req:conn.copy.rows+2/test]    models are written and read by column name, in a transaction and through the metrics wrapper
 #[pgorm_macros::test]
 async fn copy_rows_models_in_a_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_models_transaction").await;
@@ -692,7 +737,7 @@ fn entries() -> Vec<entry::Model> {
     ]
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    models with enum and JSON fields: a schema's enum, an enum through a domain, an enum array, JSON structs
+// [spec:pgorm:req:conn.copy.rows+2/test]    models with enum and JSON fields: a schema's enum, an enum through a domain, an enum array, JSON structs
 #[pgorm_macros::test]
 async fn copy_rows_models_with_enum_and_json() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_models_enum_json").await;
@@ -812,7 +857,7 @@ fn slots(items: Option<&[&str]>) -> Value {
     )
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    a range type a schema created reads as its text form, writes back from it, and agrees with a raw query's decode
+// [spec:pgorm:req:conn.copy.rows+2/test]    a range type a schema created reads as its text form, writes back from it, and agrees with a raw query's decode
 #[pgorm_macros::test]
 async fn copy_rows_created_ranges_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_created_ranges").await;
@@ -929,7 +974,7 @@ async fn copy_rows_created_ranges_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+1/test]    text that spells no range of the subtype is refused as its row is written, and a subtype no RangeSubtype reads has no value
+// [spec:pgorm:req:conn.copy.rows+2/test]    text that spells no range of the subtype is refused as its row is written, and a subtype no RangeSubtype reads has no value
 #[pgorm_macros::test]
 async fn copy_rows_created_range_refusals() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_created_range_refusals").await;

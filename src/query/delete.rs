@@ -108,6 +108,7 @@ impl Delete {
     ///     r#"DELETE FROM "fruit" WHERE "fruit"."name" LIKE '%Apple%'"#,
     /// );
     /// ```
+    #[doc(alias = "delete_many")]
     pub fn many<E>(entity: E) -> DeleteMany<E>
     where
         E: EntityTrait,

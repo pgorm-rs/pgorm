@@ -49,15 +49,23 @@ use crate::{DatabaseConnection, DatabaseTransaction, Error};
 /// caching it would fill the bounded cache with statements run once.
 ///
 /// [`ConnectionTrait`]: crate::ConnectionTrait
-// [spec:pgorm:req:conn.copy+1]
+// [spec:pgorm:req:conn.copy+2]
 #[async_trait::async_trait]
 pub trait CopyTrait {
     /// Start `COPY … FROM STDIN`, returning the sink its data is written to.
     ///
     /// The server has accepted the statement when this returns; a table or
-    /// column that does not exist, or an option the server refuses, is the
-    /// error here. A row the server cannot take — a constraint violation, a
-    /// field that does not parse — is reported by [`CopyInSink::finish`].
+    /// column that does not exist, a column list naming a generated column,
+    /// or an option the server refuses, is the error here. A row the server
+    /// cannot take — a constraint violation, a field that does not parse — is
+    /// reported by [`CopyInSink::finish`].
+    ///
+    /// A generated column, stored or virtual, takes no data, so list only the
+    /// columns the rows supply: the server refuses a list naming one with
+    /// SQLSTATE `42P10`, and pgorm does not check the list first, since that
+    /// would cost a catalogue read before every COPY. A statement with no
+    /// column list already leaves the generated columns out, and the server
+    /// computes them as the rows go in.
     ///
     /// A refusal here also closes the connection, and with it any transaction
     /// open on it, which ends without committing. The driver has by then sent
@@ -94,7 +102,7 @@ pub trait CopyTrait {
     /// The description prepares a `SELECT` of those columns and runs
     /// nothing; a table or column that does not exist is refused here, and
     /// the connection is left as it was.
-    // [spec:pgorm:req:conn.copy.rows+1]
+    // [spec:pgorm:req:conn.copy.rows+2]
     async fn copy_in_columns<F>(
         &mut self,
         statement: &CopyFromStatement<F>,
@@ -106,7 +114,7 @@ pub trait CopyTrait {
     /// types, as the server describes them: its table's columns the server
     /// does not generate, or its statement's result columns. A write source
     /// is prepared, never run.
-    // [spec:pgorm:req:conn.copy.rows+1]
+    // [spec:pgorm:req:conn.copy.rows+2]
     async fn copy_out_columns<F>(
         &mut self,
         statement: &CopyToStatement<F>,
@@ -120,8 +128,12 @@ pub trait CopyTrait {
     ///
     /// A refusal of the description leaves the connection as it was; a
     /// refusal of the COPY itself closes it, as [`copy_in`](Self::copy_in)'s
-    /// does.
-    // [spec:pgorm:req:conn.copy.rows+1]
+    /// does. A column list naming a generated column is the second kind: the
+    /// description prepares a `SELECT`, which reads a generated column like
+    /// any other, so it is the COPY's start that refuses the list and closes
+    /// the connection. Leave generated columns out of the list, or give no
+    /// list, which leaves them out already.
+    // [spec:pgorm:req:conn.copy.rows+2]
     async fn copy_in_rows(
         &mut self,
         statement: &CopyFromStatement<CopyBinary>,
@@ -137,7 +149,7 @@ pub trait CopyTrait {
     /// Start a binary `COPY … TO STDOUT` whose rows arrive as pgorm
     /// [`Value`](pgorm_query::Value)s, each field decoded by the type
     /// [`copy_out_columns`](Self::copy_out_columns) describes for its column.
-    // [spec:pgorm:req:conn.copy.rows+1]
+    // [spec:pgorm:req:conn.copy.rows+2]
     async fn copy_out_rows(
         &mut self,
         statement: &CopyToStatement<CopyBinary>,
@@ -165,7 +177,7 @@ pub trait CopyTrait {
 /// a transaction nothing is written; inside one, the transaction is aborted,
 /// as by any failed statement, and only a rollback ends it. `Sink::close`
 /// finishes the COPY as `finish` does but discards the row count.
-// [spec:pgorm:req:conn.copy+1]
+// [spec:pgorm:req:conn.copy+2]
 pub struct CopyInSink<'a> {
     sink: Pin<Box<tokio_postgres::CopyInSink<Bytes>>>,
     /// What is left of a chunk longer than one message carries, sent before
@@ -259,7 +271,7 @@ impl fmt::Debug for CopyInSink<'_> {
 /// server back rather than filling memory. Dropping it early does not stop
 /// the server: the connection reads and discards the rest of the data before
 /// the next statement on it runs.
-// [spec:pgorm:req:conn.copy+1]
+// [spec:pgorm:req:conn.copy+2]
 pub struct CopyOutStream<'a> {
     stream: Pin<Box<tokio_postgres::CopyOutStream>>,
     connection: PhantomData<&'a mut ()>,
@@ -291,7 +303,7 @@ impl fmt::Debug for CopyOutStream<'_> {
     }
 }
 
-// [spec:pgorm:req:conn.copy+1]    COPY on the pooled client
+// [spec:pgorm:req:conn.copy+2]    COPY on the pooled client
 #[async_trait::async_trait]
 impl CopyTrait for DatabaseConnection {
     async fn copy_in<F>(
@@ -340,7 +352,7 @@ impl CopyTrait for DatabaseConnection {
     }
 }
 
-// [spec:pgorm:req:conn.copy+1]    COPY inside a transaction or savepoint
+// [spec:pgorm:req:conn.copy+2]    COPY inside a transaction or savepoint
 #[async_trait::async_trait]
 impl CopyTrait for DatabaseTransaction<'_> {
     async fn copy_in<F>(

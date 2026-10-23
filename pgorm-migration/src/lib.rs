@@ -22,6 +22,7 @@ pub trait MigrationName {
 // [spec:pgorm:def:migration.runner+3]    author-facing half
 // [spec:pgorm:req:migration.up-only]    `up` is the only direction
 #[async_trait::async_trait]
+#[doc(alias = "SchemaManager")]
 pub trait MigrationTrait: MigrationName + Send + Sync {
     /// Define actions to perform when applying the migration
     async fn up(&self, tx: &DatabaseTransaction<'_>) -> Result<(), Error>;

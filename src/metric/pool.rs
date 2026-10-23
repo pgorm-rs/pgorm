@@ -6,6 +6,7 @@ use crate::{DatabasePool, Error};
 /// A connection pool wrapper that produces instrumented connections
 // [spec:pgorm:def:metric.layer+2]    pool wrapper
 #[derive(Debug, Clone)]
+#[doc(alias = "set_metric_callback")]
 pub struct InstrumentedPool<M: MetricsCollector> {
     pool: DatabasePool,
     metrics: M,

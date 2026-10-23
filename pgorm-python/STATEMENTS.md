@@ -537,9 +537,16 @@ not end at a row boundary.
   after the rest of the source has been sent: the protocol reports nothing
   while data is still flowing.
 - A COPY FROM the server refuses before any data moves (a missing table or
-  column, an option it rejects) raises `DatabaseError` and closes the
-  connection, and with it any transaction on it; the pool lends a fresh
-  connection next time.
+  column, a column list naming a generated column, an option it rejects)
+  raises `DatabaseError` and closes the connection, and with it any
+  transaction on it; the pool lends a fresh connection next time.
+- A generated column, stored or virtual, takes no data, so `columns(...)`
+  should name only the columns the source supplies: the server refuses a list
+  naming one with SQLSTATE `42P10`, and pgorm does not check the list first,
+  since that would cost a catalogue read before every COPY. With no column
+  list a COPY leaves the generated columns out, and the server computes them
+  as the rows go in. A COPY TO a table leaves them out too; a `Select` naming
+  them reads them.
 
 `copy_out` returns a `CopyOutStream`, an async iterator of `bytes`. A chunk
 joins the `CopyData` messages already received, up to 64 KiB; no row boundary
@@ -581,6 +588,9 @@ binary statement, typed `CopyFrom[Literal["binary"]]` and
 the server for them before the COPY starts, by preparing (never running) a
 `SELECT` of the COPY's columns, or the COPY TO's own query; a description the
 server refuses raises its `DatabaseError` and leaves the connection usable.
+A generated column in the list is not caught there, since a `SELECT` reads
+one: the COPY's start refuses it and closes the connection, as `copy_in`
+does.
 `rows` is a sync or async iterable of sequences, each holding a value for every
 column in order: `None` is NULL, and every other value is read as a parameter
 is, a plain value by its kind or a `Value` by its own, and written against its

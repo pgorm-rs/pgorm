@@ -25,6 +25,7 @@ pub const DEFAULT_LEDGER_TABLE: &str = "pgorm_migrations";
 /// last migrated by SeaORM, or by pgorm before the rename, keeps its ledger
 /// here; `install` adopts it rather than leaving it to read as unmigrated.
 // [spec:pgorm:req:migration.ledger-upgrade+1]    the name that is looked for
+#[doc(alias = "seaql_migrations")]
 pub const LEGACY_LEDGER_TABLE: &str = "seaql_migrations";
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -287,6 +288,7 @@ pub trait MigratorTrait: Send {
     /// new name is absent, so a database that already has both keeps both and
     /// the legacy table is not touched.
     // [spec:pgorm:req:migration.ledger-upgrade+1]    detect, then rename in place
+    #[doc(alias = "seaql_migrations")]
     async fn adopt_legacy_ledger(db: &(impl ConnectionTrait)) -> Result<(), Error> {
         if SqlName::to_string(&*Self::migration_table_name()) != DEFAULT_LEDGER_TABLE {
             return Ok(());

@@ -72,6 +72,7 @@ where
     /// straight to `set` contributes nothing.
     // [spec:pgorm:sem:exec.crud.update+7]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary+2]
+    #[doc(alias = "UpdateResult")]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
@@ -97,6 +98,7 @@ where
     /// whether the statement was sent.
     // [spec:pgorm:sem:exec.crud.update+7]
     // [spec:pgorm:sem:exec.crud.exec-vocabulary+2]
+    #[doc(alias = "exec_with_returning")]
     pub async fn exec_returning_models<C>(mut self, db: &C) -> Result<Vec<E::Model>, Error>
     where
         C: ConnectionTrait,

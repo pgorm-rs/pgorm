@@ -226,6 +226,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// [txn]: crate::DatabaseTransaction
     // [spec:pgorm:req:entity.active-model.persistence+2]
     // [spec:pgorm:req:entity.active-model.hooks+1]
+    #[doc(alias = "save")]
     async fn insert<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,
@@ -270,6 +271,7 @@ pub trait ActiveModelTrait: Clone + Debug {
     /// [txn]: crate::DatabaseTransaction
     // [spec:pgorm:req:entity.active-model.persistence+2]
     // [spec:pgorm:req:entity.active-model.hooks+1]
+    #[doc(alias = "save")]
     async fn update<'a, C>(self, db: &'a C) -> Result<<Self::Entity as EntityTrait>::Model, Error>
     where
         <Self::Entity as EntityTrait>::Model: IntoActiveModel<Self>,

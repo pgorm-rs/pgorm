@@ -18,7 +18,7 @@ pub use tokio_postgres::Notification;
 
 /// The chunk type COPY's data travels in, both ways, re-exported so writing a
 /// [`CopyInSink`] needs no direct dependency on `bytes`.
-// [spec:pgorm:req:conn.copy+1]
+// [spec:pgorm:req:conn.copy+2]
 pub use bytes::Bytes;
 pub use tokio_postgres::{Config, IsolationLevel};
 
@@ -95,6 +95,7 @@ fn simple_manager_config(tag: Option<String>) -> ManagerConfig {
 /// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
 /// pool — deadpool rejects a pool configured with timeouts but no runtime.
 // [spec:pgorm:req:conn.pool+3]    the general entry point
+#[doc(alias = "ConnectOptions")]
 pub fn connect_with<T>(
     config: Config,
     tls: T,
@@ -134,6 +135,7 @@ where
 /// or [`connect_with`] for one whose TLS and manager configuration it chooses
 /// too.
 // [spec:pgorm:req:conn.pool+3]
+#[doc(alias = "Database")]
 pub fn connect(config: Config) -> DatabasePool {
     connect_with(config, NoTls, simple_manager_config(None), identity)
         .expect("pgorm's default pool configuration builds")
@@ -147,6 +149,7 @@ pub fn connect(config: Config) -> DatabasePool {
 /// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
 /// pool — deadpool rejects a pool configured with timeouts but no runtime.
 // [spec:pgorm:req:conn.pool+3]    builder customization
+#[doc(alias = "ConnectOptions")]
 pub fn connect_with_builder(
     config: Config,
     build: impl Fn(PoolBuilder) -> PoolBuilder,
