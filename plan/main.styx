@@ -13621,12 +13621,20 @@ children (
         title "Boolean-valued operators render bare under AND and OR, as comparisons do"
         kind @fix
         deps (like-ilike-render-parens)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:06.528319Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by like-ilike-render-parens. returns_boolean in pgorm-query/src/backend/query_builder.rs leaves out Overlap (&&), Regex (~) and RegexCaseInsensitive (~*), all of which return boolean, so under AND/OR they keep parentheses their peers drop. Audit the operator list against PostgreSQL's operators (the containment and range operators too), fix it, and let the render oracle confirm each."
+            }
+
+            {
+                at 2026-10-23T19:58:11.56594Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13643,6 +13651,13 @@ children (
                 kind @note
                 text "Found by like-ilike-render-parens. A BETWEEN-family expression under AND/OR stays parenthesised (the napi between golden renders (\"a\" BETWEEN $1 AND $2) AND ...); the grammar accepts it bare. First check sql.render.precedence and sql.render.parens for a stated reason (BETWEEN's own AND makes the bare form harder to read); if there is one, record it in the rule and close; if not, render it bare and move the goldens."
             }
+
+            {
+                at 2026-10-23T19:43:20.914135Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -13657,6 +13672,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by oracle-shim-parenthesised. The shim's statement keywords at the start of a render leave out VALUES and TABLE (it accepts them only after a leading parenthesis). No render begins that way today; add them so one that does cannot skip the grammar check."
+            }
+
+            {
+                at 2026-10-23T19:43:21.147095Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

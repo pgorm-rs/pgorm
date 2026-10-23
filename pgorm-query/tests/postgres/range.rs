@@ -316,7 +316,7 @@ fn overlaps_renders_the_overlap_operator() {
     let (sql, values) = query.build();
     assert_eq!(
         sql,
-        r#"SELECT "id" FROM "t" WHERE ("span" && $1) AND ("tags" && $2)"#
+        r#"SELECT "id" FROM "t" WHERE "span" && $1 AND "tags" && $2"#
     );
     assert_eq!(
         values,
@@ -328,7 +328,7 @@ fn overlaps_renders_the_overlap_operator() {
     let inline = query.to_string();
     assert_eq!(
         inline,
-        r#"SELECT "id" FROM "t" WHERE ("span" && int4range(1, 5, '[)')) AND ("tags" && ARRAY ['a','b'])"#
+        r#"SELECT "id" FROM "t" WHERE "span" && int4range(1, 5, '[)') AND "tags" && ARRAY ['a','b']"#
     );
     for sql in [&sql, &inline] {
         let overlaps: Vec<_> = parsed_nodes(sql, "AExpr")

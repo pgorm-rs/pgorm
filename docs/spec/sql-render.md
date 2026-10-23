@@ -327,7 +327,7 @@ an ideal Postgres renderer would emit.
 > escape character as an inline constant, or ` ESCAPE ''` when escaping is
 > off — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+10]
+> [spec:pgorm:def:sql.render.precedence+11]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -355,12 +355,18 @@ an ideal Postgres renderer would emit.
 > one of these lexemes but not to its `Oper` predicate is the failure mode
 > this clause exists to name.
 > The Postgres-specific extension also
-> treats an inner `@>`, `<@`, `%` (similarity), `<%`, `<<%`, `@@`, `?`, `?|`,
-> or `?&` comparison as higher precedence than a logical outer operator — the
-> membership of that set is "returns boolean", which is why the JSON existence
-> operators join it and the JSON *accessors* (`->`, `->>`, `#>`, `#>>`, which
-> return JSON or text) do not. All other combinations are considered unknown
-> and keep their parentheses.
+> treats an inner `@>`, `<@`, `&&`, `%` (similarity), `<%`, `<<%`, `@@`, `?`,
+> `?|`, `?&`, `~` or `~*` comparison as higher precedence than a logical outer
+> operator — the membership of that set is "returns boolean", which is why the
+> JSON existence operators join it and the JSON *accessors* (`->`, `->>`,
+> `#>`, `#>>`, which return JSON or text) do not. Every member is a generic
+> operator, which the grammar ranks above the comparisons (the similarity `%`
+> ranks with `*`), so its bare form under `AND`, `OR` and `NOT` groups as the
+> expression was built; a boolean-valued variant missing from the set keeps
+> parentheses its peers drop. An operator with no `BinOper` variant (`!~`,
+> `!~*`, `@?`, `-|-`) reaches the renderer only as `BinOper::Raw`, whose
+> result the renderer cannot know, and keeps its parentheses. All other
+> combinations are considered unknown and keep their parentheses.
 
 > [spec:pgorm:req:sql.render.parens+3]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by

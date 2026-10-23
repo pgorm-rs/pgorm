@@ -23,6 +23,7 @@ mod merge;
 mod oracle;
 mod oracle_pins;
 mod oracle_sweep;
+mod precedence;
 mod query;
 mod range;
 mod render;

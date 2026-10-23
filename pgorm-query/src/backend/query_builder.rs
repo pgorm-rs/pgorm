@@ -2519,7 +2519,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
     /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+10]
+    // [spec:pgorm:def:sql.render.precedence+11]
     fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -2582,16 +2582,19 @@ impl QueryBuilder {
 }
 
 /// The operators outside the comparison/IN/LIKE/IS families that still yield a
-/// boolean, and so bind tighter than a logical operator. Membership is exactly
-/// "returns boolean", which is why the JSON *existence* tests are here and the
-/// JSON accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are
-/// not.
-// [spec:pgorm:def:sql.render.precedence+10]
+/// boolean. Each is a generic operator, which the grammar ranks above every
+/// comparison, or the similarity `%`, ranked with `*`, so each binds tighter
+/// than a logical operator. Membership is exactly "returns boolean", which is
+/// why the JSON *existence* tests are here and the JSON accessors — `->`,
+/// `->>`, `#>`, `#>>`, which return JSON or text — are not; a boolean-valued
+/// variant missing here keeps parentheses its peers drop.
+// [spec:pgorm:def:sql.render.precedence+11]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,
         BinOper::Contained
             | BinOper::Contains
+            | BinOper::Overlap
             | BinOper::Similarity
             | BinOper::WordSimilarity
             | BinOper::StrictWordSimilarity
@@ -2599,6 +2602,8 @@ fn returns_boolean(b: &BinOper) -> bool {
             | BinOper::HasJsonKey
             | BinOper::HasAnyJsonKeys
             | BinOper::HasAllJsonKeys
+            | BinOper::Regex
+            | BinOper::RegexCaseInsensitive
     )
 }
 
