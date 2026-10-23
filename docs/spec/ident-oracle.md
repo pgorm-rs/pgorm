@@ -20,7 +20,7 @@ the modules under `tests/identifier_oracle/`.
 
 ## The property
 
-> [spec:pgorm:req:security.ident-oracle+14]
+> [spec:pgorm:req:security.ident-oracle+15]
 > Every public API that renders a caller-supplied name into SQL text MUST be
 > registered with the oracle. A new identifier-bearing API is incomplete until
 > it is registered, and an unregistered site is not covered by this rule. The
@@ -32,7 +32,8 @@ the modules under `tests/identifier_oracle/`.
 > - `live_capture.rs` for sites whose SQL exists only against a live server:
 >   pgorm-pool's savepoint name, the migration ledger's custom table name,
 >   and the cursor's qualifiers (`Cursor::new`'s table,
->   `set_secondary_order_by`, and a graph cursor's alias tiebreak).
+>   `set_secondary_order_by`, `add_secondary_order_by`, and a graph cursor's
+>   alias tiebreak).
 >
 > Each entry gives:
 >

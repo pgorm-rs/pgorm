@@ -351,7 +351,7 @@ async fn ids_where(
 // [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a keyset cursor over a column whose domain is
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    a keyset cursor over a column whose domain is
 // over an enum pages forwards and backwards by the enum's order
 #[pgorm_macros::test]
 async fn domain_enum_predicates_compare_as_the_enum() -> Result<(), Error> {
@@ -793,7 +793,7 @@ async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
 /// `cursor_by`, a joined slot's under `cursor_by`, and the ordered slot's own
 /// key under `cursor_by_on`, each resumed from inside a run of rows sharing
 /// the order-column value.
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a whole-keyset boundary casts a tiebreak column
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    a whole-keyset boundary casts a tiebreak column
 // whose domain is over an enum, and its value, to the enum, live
 // [spec:pgorm:sem:query.graph.cursor+3/test]    the root's key, a joined slot's key and the
 // ordered slot's own key, each a domain over an enum, tiebreak a graph cursor live
@@ -863,6 +863,82 @@ async fn domain_enum_graph_cursors_tiebreak_as_the_enum() -> Result<(), Error> {
             .await?),
         [(4, "bright".to_owned()), (1, "steady".to_owned())]
     );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A tiebreak a caller appends on a column whose domain is over an enum
+/// compares as the enum, its casts taken from the column; the same entry
+/// installed as bare identifiers has no operator to compare with.
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    an entry appended through
+// add_secondary_order_by on a column whose domain is over an enum resumes from inside a run,
+// in either direction, where set_secondary_order_by's bare entry is refused with 42883, live
+#[pgorm_macros::test]
+async fn domain_enum_appended_tiebreak_compares_as_enum() -> Result<(), Error> {
+    use line::Column::{Id, Mood as Moods, Qty};
+    use pgorm::IntoKey;
+
+    let ctx = TestContext::new("domain_enum_appended_tiebreak").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let page = |models: Vec<line::Model>| models.iter().map(|line| line.id).collect::<Vec<_>>();
+    // Every line's quantity is 1, so the tiebreaks order the rows: the calm
+    // lines 1, 3 and 5, then the glad lines 2 and 4.
+    let typed = || {
+        let mut cursor = line::Entity::find().cursor_by(Qty);
+        cursor
+            .add_secondary_order_by(line::Entity, Moods)
+            .add_secondary_order_by(line::Entity, Id);
+        cursor
+    };
+    assert_eq!(page(typed().first(2).all(&db).await?), [1, 3]);
+    assert_eq!(
+        page(
+            typed()
+                .after_with((1, Mood::Calm, 3))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 2]
+    );
+    assert_eq!(
+        page(
+            typed()
+                .before_with((1, Mood::Glad, 4))
+                .last(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 2]
+    );
+    assert_eq!(
+        page(
+            typed()
+                .desc()
+                .after_with((1, Mood::Glad, 2))
+                .first(2)
+                .all(&db)
+                .await?
+        ),
+        [5, 3]
+    );
+
+    let mut untyped = line::Entity::find().cursor_by(Qty);
+    untyped.set_secondary_order_by(vec![
+        (Name::new(line::Entity), Moods.into_key()),
+        (Name::new(line::Entity), Id.into_key()),
+    ]);
+    let refused = untyped
+        .after_with((1, Mood::Calm, 3))
+        .first(2)
+        .all(&db)
+        .await
+        .expect_err("a bare value has no operator against the domain");
+    refused_with(&refused, &SqlState::UNDEFINED_FUNCTION);
 
     drop(db);
     ctx.delete().await;

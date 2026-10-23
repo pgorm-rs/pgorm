@@ -733,7 +733,7 @@ mod tests {
     }
 }
 
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]    a cursor keyed on an enum
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]    a cursor keyed on an enum
 // column pages across boundaries — the boundary value binds under the same
 // `save_as` cast every value predicate applies
 // [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    enum set membership

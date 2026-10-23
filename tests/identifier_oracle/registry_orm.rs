@@ -6,8 +6,8 @@
 //! `live_capture.rs`: pgorm-pool's savepoint name (its SQL is built inside
 //! tokio-postgres), the migration ledger's custom table name (built inside
 //! the migrator and run against the database), and the cursor's qualifiers —
-//! `Cursor::new`'s table, `set_secondary_order_by`, a graph cursor's alias
-//! tiebreak — which render only on execution.
+//! `Cursor::new`'s table, `set_secondary_order_by`, `add_secondary_order_by`,
+//! a graph cursor's alias tiebreak — which render only on execution.
 
 use pgorm::{
     DeleteMany, EntityName, EntityTrait, JoinType, QueryFilter, QuerySelect, QueryTrait,

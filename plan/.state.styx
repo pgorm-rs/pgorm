@@ -1103,7 +1103,7 @@ assertions (
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
     {id graph-related-one, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:05.348074Z}
-    {id cursor-typed-secondary, kind @doing, author "brendan@necessary.nu", at 2026-10-23T19:43:20.402439Z}
+    {id cursor-typed-secondary, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:06:32.010953Z}
     {id schema-fk-domain-enum, kind @doing, author "brendan@necessary.nu", at 2026-10-23T19:43:20.712999Z}
 )
 

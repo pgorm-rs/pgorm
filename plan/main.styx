@@ -13681,6 +13681,7 @@ children (
         title "A tiebreak a caller installs on a cursor carries its column's cast"
         kind @fix
         deps (graph-cursor-enum-tiebreak)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.164692Z
@@ -13694,6 +13695,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:06:32.010953Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

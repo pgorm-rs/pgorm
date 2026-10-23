@@ -304,7 +304,7 @@ async fn schema_ddl_and_crud_round_trip() -> Result<(), Error> {
 // ordering, pagination, keyset cursors and the schema-qualified enum's value
 // predicates all address tenant_a.item
 // [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]
-// [spec:pgorm:sem:exec.cursor.keyset+7/test]
+// [spec:pgorm:sem:exec.cursor.keyset+8/test]
 #[pgorm_macros::test]
 async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     let ctx = TestContext::new("varied_schema_finds").await;
