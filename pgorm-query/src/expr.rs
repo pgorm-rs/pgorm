@@ -321,6 +321,7 @@ impl Expr {
     ///     r#"SELECT "character", "size_w", "size_h" FROM "character" WHERE 1 = 1"#
     /// );
     /// ```
+    #[doc(alias = "cust")]
     pub fn raw(s: &'static str) -> SimpleExpr {
         SimpleExpr::Raw(s)
     }
@@ -397,6 +398,7 @@ impl Expr {
     /// assert!(Expr::template("6 = $1 * $2", [2]).is_err());
     /// ```
     // [spec:pgorm:req:sql.render.custom-expr+3]
+    #[doc(alias = "cust_with_values")]
     pub fn template<T, V, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,
@@ -450,6 +452,7 @@ impl Expr {
     /// # }
     /// ```
     // [spec:pgorm:req:sql.render.custom-expr+3]
+    #[doc(alias = "cust_with_expr")]
     pub fn template_with_expr<T, E>(s: T, expr: E) -> Result<SimpleExpr>
     where
         T: Into<String>,
@@ -463,6 +466,7 @@ impl Expr {
     ///
     /// See [`Expr::template`] for how the template's census is checked.
     // [spec:pgorm:req:sql.render.custom-expr+3]
+    #[doc(alias = "cust_with_exprs")]
     pub fn template_with_exprs<T, I>(s: T, v: I) -> Result<SimpleExpr>
     where
         T: Into<String>,

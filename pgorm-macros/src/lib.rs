@@ -963,6 +963,7 @@ pub fn derive_active_enum_display(input: TokenStream) -> TokenStream {
 /// assert_eq!(MyOther.to_string(), "my_other");
 /// ```
 #[cfg(feature = "derive")]
+#[doc(alias = "DeriveIden")]
 #[proc_macro_derive(DeriveSqlName, attributes(pgorm))]
 pub fn derive_sql_name(input: TokenStream) -> TokenStream {
     let derive_input = parse_macro_input!(input as DeriveInput);

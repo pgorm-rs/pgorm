@@ -101,6 +101,7 @@ fn is_stale_cached_plan(error: &tokio_postgres::Error) -> bool {
 // [spec:pgorm:req:conn.pool.no-conn-trait]
 #[derive(Debug, Clone)]
 #[repr(transparent)]
+#[doc(alias = "DbConn")]
 pub struct DatabasePool(pub(crate) Pool);
 
 /// A set of [`DatabasePool`]s keyed by their tags, as built by
@@ -156,6 +157,7 @@ pub struct DatabaseConnection(pub(crate) Object);
 /// because that is the only one in which the server honours it.
 // [spec:pgorm:req:conn.tx+2]    transaction configuration
 #[derive(Debug, Clone, Copy, Default)]
+#[doc(alias = "AccessMode")]
 pub enum TransactionMode {
     /// Inherit the session defaults: `START TRANSACTION` with no clause, the
     /// same transaction [`TransactionTrait::begin`] opens.
@@ -185,6 +187,7 @@ impl DatabaseConnection {
     /// because a nested transaction is a savepoint, and `SAVEPOINT` takes
     /// neither an isolation level nor an access mode.
     // [spec:pgorm:req:conn.tx+2]    configured START TRANSACTION on the pooled client
+    #[doc(alias = "begin_with_config")]
     pub async fn begin_with(
         &mut self,
         mode: TransactionMode,
@@ -238,6 +241,7 @@ impl DatabaseConnection {
     /// [`DatabaseConnection::transaction`] over a transaction configured by
     /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
     // [spec:pgorm:sem:conn.tx.closure+2]    configured BEGIN
+    #[doc(alias = "transaction_with_config")]
     pub async fn transaction_with<'s, T, E, F>(
         &'s mut self,
         mode: TransactionMode,

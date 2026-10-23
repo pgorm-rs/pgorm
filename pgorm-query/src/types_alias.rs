@@ -24,6 +24,7 @@ use super::*;
 /// ```
 // [spec:pgorm:def:sql.types+9]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[doc(alias = "Alias")]
 pub struct AliasName(&'static str);
 
 /// Mint an [`AliasName`] token for a name the query introduces.

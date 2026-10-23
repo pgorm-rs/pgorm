@@ -39,6 +39,10 @@
     clippy::print_stdout
 )]
 
+// A module with no items, so that rustdoc renders the guide beside the API it
+// describes and compiles its examples as doctests.
+#[doc = include_str!("../COMING_FROM_SEAORM.md")]
+pub mod coming_from_seaorm {}
 mod database;
 mod docs;
 /// Module for the Entity type and operations

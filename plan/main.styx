@@ -13579,12 +13579,20 @@ children (
         id coming-from-seaorm
         title "A Coming from SeaORM guide maps every removed or renamed API to its replacement, and the replacements carry doc aliases for the old names"
         kind @docs
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:05.689377Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23, from an agent's report on porting an application from SeaORM: find_also_related broke at 8 call sites and the compiler gave no hint of the replacement. A #[doc(alias)] only helps rustdoc search; stable Rust cannot add a hint to rustc's \"no method named\" error. Write the guide (find_also_related/linked and SelectTwo to graph() / related_maybe / join_maybe, the removed Statement/StatementBuilder, the scoped transactions, set(..), Insert::one/many, the pool not being a ConnectionTrait, the migration surface: up only, the ledger rename, and so on, from CLAUDE.md's Key Differences and the spec's departures), link it from the README, and put #[doc(alias = \"...\")] for each old name on its replacement."
+            }
+
+            {
+                at 2026-10-23T20:28:06.091883Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -9,6 +9,7 @@ pub enum ConditionType {
 /// Represents the value of an [`Condition::any`] or [`Condition::all`]: a set of disjunctive or conjunctive conditions.
 // [spec:pgorm:def:sql.ast.condition+1]
 #[derive(Debug, Clone, PartialEq)]
+#[doc(alias = "Cond")]
 pub struct Condition {
     pub(crate) negate: bool,
     pub(crate) condition_type: ConditionType,

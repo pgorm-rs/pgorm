@@ -170,6 +170,7 @@ where
     ///
     /// [`fetch_and_next`]: Paginator::fetch_and_next
     // [spec:pgorm:sem:exec.paginator.fetch+3]
+    #[doc(alias = "next")]
     pub fn advance(&mut self) {
         self.page += 1;
     }

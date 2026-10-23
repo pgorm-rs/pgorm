@@ -122,6 +122,7 @@ where
 }
 
 // [spec:pgorm:sem:macros.derive.iden.query]
+#[doc(alias = "Iden")]
 #[proc_macro_derive(SqlName, attributes(iden, method))]
 pub fn derive_sql_name(input: TokenStream) -> TokenStream {
     let DeriveInput {

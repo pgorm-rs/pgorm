@@ -680,6 +680,7 @@ where
     ///     .cursor_by_on::<1, _>(cake::Column::Name);
     /// ```
     // [spec:pgorm:sem:query.graph.cursor+3]
+    #[doc(alias = "cursor_by_other")]
     pub fn cursor_by_on<const I: usize, C>(
         self,
         order_columns: C,

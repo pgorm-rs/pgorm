@@ -372,6 +372,7 @@ pub(crate) fn project_source<F: EntityTrait>(
 ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def());
 /// ```
 // [spec:pgorm:def:query.graph]
+#[doc(alias("SelectTwo", "SelectTwoMany"))]
 pub struct SelectGraph<E: EntityTrait, S = ()> {
     pub(crate) query: SelectStatement,
     /// The decoded sources' effective identifiers, in declaration order: the
@@ -482,6 +483,7 @@ impl<E: EntityTrait, S> SelectGraph<E, S> {
     /// );
     /// ```
     // [spec:pgorm:def:query.graph]
+    #[doc(alias("find_also_linked", "find_with_linked"))]
     pub fn via(mut self, rel: RelationDef) -> Self {
         let to_tbl = rel.to_tbl.clone();
         let condition = join_condition(rel);
@@ -543,6 +545,7 @@ macro_rules! grow {
             /// `rel.to_tbl` is joined under the relation's own condition,
             /// `on_condition` and `condition_type` included.
             // [spec:pgorm:sem:query.graph.slots+1]
+            #[doc(alias("select_also", "find_also_linked"))]
             pub fn join_maybe<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -635,6 +638,7 @@ macro_rules! grow {
             /// [`join_maybe`](Self::join_maybe)d — the whole related path in
             /// one call, junction hop included.
             // [spec:pgorm:sem:query.graph.slots+1]
+            #[doc(alias("find_also_related", "find_with_related"))]
             pub fn related_maybe<F: EntityTrait>(
                 self,
             ) -> SelectGraph<E, ( $( $prev, )* Opt<F>, )>

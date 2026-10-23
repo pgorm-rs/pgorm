@@ -3,6 +3,7 @@ use tokio_postgres::error::SqlState;
 /// An error from unsuccessful database operations
 // [spec:pgorm:def:error.model+10]
 #[derive(thiserror::Error, Debug)]
+#[doc(alias = "DbErr")]
 pub enum Error {
     /// Postgres error
     #[error("Postgres Error: {0:?} {db:?}", db = .0.as_db_error())]
@@ -211,6 +212,7 @@ where
 // [spec:pgorm:sem:error.model.sql-class+4]
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[doc(alias = "SqlErr")]
 pub enum SqlError {
     /// A duplicate key in a unique index or primary key (`23505`)
     #[error("Unique Constraint Violated: {}", .0.message)]
@@ -318,6 +320,7 @@ impl Error {
     /// Classify an [`Error`] as a [`SqlError`], returning `None` when the error is
     /// not a recognised constraint violation.
     // [spec:pgorm:sem:error.model.sql-class+4]    classifier entry point
+    #[doc(alias = "sql_err")]
     pub fn sql_error(&self) -> Option<SqlError> {
         match self {
             Error::Postgres(e) => SqlError::classify(e.as_db_error()?),

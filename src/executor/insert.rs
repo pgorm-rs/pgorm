@@ -192,6 +192,7 @@ where
     // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    #[doc(alias = "exec_without_returning")]
     pub async fn exec<C>(self, db: &C) -> Result<u64, Error>
     where
         C: ConnectionTrait,
@@ -216,6 +217,7 @@ where
     // [spec:pgorm:sem:exec.crud.insert+6]
     // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
+    #[doc(alias("last_insert_id", "InsertResult"))]
     pub async fn exec_returning_pk<C>(self, db: &C) -> Result<InsertedPrimaryKey<A>, Error>
     where
         C: ConnectionTrait,
@@ -233,6 +235,7 @@ where
     // [spec:pgorm:sem:exec.crud.insert-returning+3]
     // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
+    #[doc(alias = "exec_with_returning")]
     pub async fn exec_returning_model<C>(self, db: &C) -> Result<InsertedModel<A>, Error>
     where
         InsertedModel<A>: IntoActiveModel<A>,
@@ -282,6 +285,7 @@ where
     // [spec:pgorm:req:exec.crud.exec-vocabulary+2]
     // [spec:pgorm:sem:query.build.insert+5]
     // [spec:pgorm:req:query.build.insert.uniform-columns+4]
+    #[doc(alias = "exec_with_returning")]
     pub async fn exec_returning_models<C>(self, db: &C) -> Result<Vec<InsertedModel<A>>, Error>
     where
         InsertedModel<A>: IntoActiveModel<A>,

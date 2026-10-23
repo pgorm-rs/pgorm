@@ -287,6 +287,12 @@ impl<E: EntityTrait, F: EntityTrait> SelectGraph<E, (Opt<F>,)> {
     /// # }
     /// ```
     // [spec:pgorm:sem:query.graph.grouped+1]
+    #[doc(alias(
+        "find_with_related",
+        "find_with_linked",
+        "select_with",
+        "SelectTwoMany"
+    ))]
     pub async fn all_grouped<C: ConnectionTrait>(
         self,
         db: &C,
