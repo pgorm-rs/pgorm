@@ -625,7 +625,7 @@ known limitations.
 > string literal and nothing else. While the calling crate is being compiled, the
 > literal's text is handed to `pg_query::parse` — the Rust binding to libpg_query, the
 > PostgreSQL server's own parser, at the same revision the render oracle uses and for
-> the same reason (`[spec:pgorm:req:sql.render.oracle+2]`), so a literal is held to
+> the same reason (`[spec:pgorm:req:sql.render.oracle+3]`), so a literal is held to
 > PostgreSQL 18's grammar: a statement only 18 parses, such as a `VIRTUAL` generated
 > column, compiles. A literal the grammar
 > accepts expands to itself, byte for byte, as a `&'static str` usable in const

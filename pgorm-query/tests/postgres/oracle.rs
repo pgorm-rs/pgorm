@@ -29,13 +29,32 @@ const STATEMENT_KEYWORDS: [&str; 14] = [
     "COPY ",
 ];
 
-/// Whether `sql` opens with a statement keyword, and so is a candidate for the
-/// oracle rather than a rendered fragment.
+/// The keywords a parenthesised query opens with once its parentheses are
+/// stripped. The grammar lets a statement begin with `(` only as
+/// `select_with_parens`, whose body is a `SELECT`, `VALUES`, `TABLE` or
+/// `WITH` query; no other statement can be wrapped.
+const QUERY_KEYWORDS: [&str; 4] = ["SELECT ", "VALUES ", "TABLE ", "WITH "];
+
+/// Whether `sql` opens with a statement keyword, or with parentheses around
+/// a query (a grouped set operation's leading arm), and so is a candidate for
+/// the oracle rather than a rendered fragment. A parenthesised fragment that
+/// is not a query — a collation, a tuple, a parenthesised operand — has no
+/// query keyword inside its opening parentheses and stays skipped.
 pub fn looks_like_statement(sql: &str) -> bool {
     let sql = sql.trim_start();
-    STATEMENT_KEYWORDS
-        .iter()
-        .any(|kw| sql.len() >= kw.len() && sql[..kw.len()].eq_ignore_ascii_case(kw))
+    let query = sql.trim_start_matches(|c: char| c == '(' || c.is_whitespace());
+    if query.len() < sql.len() {
+        opens_with_any(query, &QUERY_KEYWORDS)
+    } else {
+        opens_with_any(sql, &STATEMENT_KEYWORDS)
+    }
+}
+
+fn opens_with_any(sql: &str, keywords: &[&str]) -> bool {
+    keywords.iter().any(|kw| {
+        sql.get(..kw.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(kw))
+    })
 }
 
 /// Run `sql` through the PostgreSQL grammar, returning the parser's diagnostic on
@@ -51,7 +70,7 @@ pub fn parses(sql: &str) -> Result<(), String> {
 ///
 /// # Panics
 /// Panics when the PostgreSQL grammar rejects `sql`.
-// [spec:pgorm:req:sql.render.oracle+2]
+// [spec:pgorm:req:sql.render.oracle+3]
 pub fn assert_parses(sql: &str) {
     if let Err(report) = parses(sql) {
         panic!("{report}");

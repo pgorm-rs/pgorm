@@ -13,7 +13,7 @@ fn base() -> SelectStatement {
     Query::select().column(Glyph::Id).from(Glyph::Table).take()
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    the select clause vocabulary
+// [spec:pgorm:req:sql.render.oracle+3/test]    the select clause vocabulary
 // [spec:pgorm:req:sql.render.select-order+7/test]
 #[test]
 fn sweep_select_clause_shapes() {
@@ -76,7 +76,7 @@ fn sweep_select_clause_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    expression rendering, including the parenthesis
+// [spec:pgorm:req:sql.render.oracle+3/test]    expression rendering, including the parenthesis
 // elision of `sql.render.precedence`
 // [spec:pgorm:req:sql.render.parens+3/test]
 #[test]
@@ -142,7 +142,7 @@ fn sweep_expression_shapes() {
     );
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    the join vocabulary
+// [spec:pgorm:req:sql.render.oracle+3/test]    the join vocabulary
 // [spec:pgorm:req:sql.render.joins+2/test]
 #[test]
 fn sweep_join_shapes() {
@@ -225,7 +225,7 @@ fn sweep_join_shapes() {
     sweep(statements);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    set operations and row locking
+// [spec:pgorm:req:sql.render.oracle+3/test]    set operations and row locking
 // [spec:pgorm:sem:sql.render.locking+1/test]
 #[test]
 fn sweep_union_and_locking_shapes() {
@@ -270,7 +270,7 @@ fn sweep_union_and_locking_shapes() {
     sweep(statements);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    common table expressions
+// [spec:pgorm:req:sql.render.oracle+3/test]    common table expressions
 // [spec:pgorm:req:sql.render.cte+4/test]
 #[test]
 fn sweep_cte_shapes() {
@@ -302,7 +302,7 @@ fn sweep_cte_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    window functions over a real function call
+// [spec:pgorm:req:sql.render.oracle+3/test]    window functions over a real function call
 // [spec:pgorm:req:sql.render.window+7/test]
 #[test]
 fn sweep_window_function_shapes() {
@@ -368,7 +368,7 @@ fn sweep_window_function_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    INSERT, including ON CONFLICT and RETURNING
+// [spec:pgorm:req:sql.render.oracle+3/test]    INSERT, including ON CONFLICT and RETURNING
 // [spec:pgorm:req:sql.render.insert+2/test]
 // [spec:pgorm:req:sql.render.on-conflict+2/test]
 // [spec:pgorm:req:sql.render.returning+4/test]
@@ -433,7 +433,7 @@ fn sweep_insert_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    UPDATE and DELETE
+// [spec:pgorm:req:sql.render.oracle+3/test]    UPDATE and DELETE
 // [spec:pgorm:req:sql.render.update-delete+3/test]
 #[test]
 fn sweep_update_and_delete_shapes() {
@@ -460,7 +460,7 @@ fn sweep_update_and_delete_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    MERGE
+// [spec:pgorm:req:sql.render.oracle+3/test]    MERGE
 // [spec:pgorm:req:sql.render.merge+1/test]
 #[test]
 fn sweep_merge_shapes() {
@@ -543,7 +543,7 @@ fn sweep_merge_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    table DDL
+// [spec:pgorm:req:sql.render.oracle+3/test]    table DDL
 // [spec:pgorm:req:sql.ddl.create-table+16/test]
 // [spec:pgorm:req:sql.ddl.alter-table+13/test]
 #[test]
@@ -749,7 +749,7 @@ fn sweep_table_ddl_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    index, foreign-key, type, extension and comment DDL
+// [spec:pgorm:req:sql.render.oracle+3/test]    index, foreign-key, type, extension and comment DDL
 // [spec:pgorm:req:sql.ddl.index-create+11/test]
 #[test]
 fn sweep_schema_object_ddl_shapes() {
@@ -825,7 +825,7 @@ fn sweep_schema_object_ddl_shapes() {
     ]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    every `ColumnType` that has a PostgreSQL spelling
+// [spec:pgorm:req:sql.render.oracle+3/test]    every `ColumnType` that has a PostgreSQL spelling
 // [spec:pgorm:def:sql.render.ddl.types+6/test]
 #[test]
 fn sweep_column_type_vocabulary() {
@@ -884,7 +884,7 @@ fn sweep_column_type_vocabulary() {
     }));
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    the binary operator vocabulary, minus `Escape`, which
+// [spec:pgorm:req:sql.render.oracle+3/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
 // [spec:pgorm:def:sql.render.operators+7/test]
 #[test]
@@ -949,7 +949,7 @@ fn sweep_binary_operator_vocabulary() {
     }));
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    the `build()` path: `$N` placeholders parse as
+// [spec:pgorm:req:sql.render.oracle+3/test]    the `build()` path: `$N` placeholders parse as
 // PostgreSQL parameter references
 // [spec:pgorm:req:sql.render.placeholders+1/test]
 #[test]
@@ -994,7 +994,7 @@ fn sweep_placeholder_builds() {
     sweep([select, insert, update, delete, cast, merge]);
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    `assert_query_eq` is the paired helper: it holds a
+// [spec:pgorm:req:sql.render.oracle+3/test]    `assert_query_eq` is the paired helper: it holds a
 // rendered statement to both its expected spelling and the grammar
 #[test]
 fn oracle_pairs_text_and_grammar_checks() {
@@ -1005,7 +1005,7 @@ fn oracle_pairs_text_and_grammar_checks() {
     );
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]    both arms of the shim's type dispatch reach the
+// [spec:pgorm:req:sql.render.oracle+3/test]    both arms of the shim's type dispatch reach the
 // oracle, so a silent regression in method resolution cannot mute the retrofitted assertions
 #[test]
 #[should_panic(expected = "PostgreSQL rejected")]
@@ -1020,9 +1020,48 @@ fn oracle_shim_fires_on_a_string() {
     crate::oracle::assert_eq!(rendered, rendered.clone());
 }
 
-// [spec:pgorm:req:sql.render.oracle+2/test]
+// [spec:pgorm:req:sql.render.oracle+3/test]
 #[test]
 #[should_panic(expected = "PostgreSQL rejected")]
 fn oracle_shim_fires_on_a_str_slice() {
     crate::oracle::assert_eq!("SELECT FROM WHERE", "SELECT FROM WHERE");
+}
+
+// [spec:pgorm:req:sql.render.oracle+3/test]    a render that opens with a parenthesised query is
+// a statement, so a grouped set operation is held to the grammar through the shim
+#[test]
+#[should_panic(expected = "PostgreSQL rejected")]
+fn oracle_shim_fires_on_a_parenthesised_query() {
+    let grouped = "((SELECT 1 UNION (SELECT FROM WHERE)) INTERSECT (SELECT 2)";
+    crate::oracle::assert_eq!(grouped, grouped);
+}
+
+// [spec:pgorm:req:sql.render.oracle+3/test]    a grouped set operation's render passes the shim's
+// grammar check, and a parenthesised fragment that is no query is not parsed
+#[test]
+fn oracle_shim_reads_a_grouped_set_operation() {
+    let arm = |table: &str| {
+        Query::select()
+            .column(Glyph::Id)
+            .from(Name::runtime(table))
+            .take()
+    };
+    let grouped = arm("a")
+        .union(UnionType::Distinct, arm("b"))
+        .union(UnionType::Intersect, arm("c"))
+        .to_string();
+    assert!(crate::oracle::looks_like_statement(&grouped), "{grouped}");
+    crate::oracle::assert_eq!(
+        grouped,
+        r#"(SELECT "id" FROM "a" UNION (SELECT "id" FROM "b")) INTERSECT (SELECT "id" FROM "c")"#
+    );
+
+    for fragment in [
+        r#"("image" COLLATE "C")"#,
+        "(1, 2)",
+        "(CASE WHEN TRUE THEN 1 END)",
+        r#"( "selected" )"#,
+    ] {
+        assert!(!crate::oracle::looks_like_statement(fragment), "{fragment}");
+    }
 }

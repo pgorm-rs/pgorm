@@ -40,7 +40,7 @@ an ideal Postgres renderer would emit.
 
 ## Render conformance
 
-> [spec:pgorm:req:sql.render.oracle+2]
+> [spec:pgorm:req:sql.render.oracle+3]
 > Every string `QueryBuilder` renders — through the `to_string()` path with
 > literals inlined, or through the `build()` path with `$N` placeholders — MUST
 > parse under the PostgreSQL grammar. The contract is enforced inside the test
@@ -63,9 +63,15 @@ an ideal Postgres renderer would emit.
 > and an `assert_eq!` shim — imported by a test module in place of
 > `pretty_assertions::assert_eq` — applies the oracle to any left-hand `String`
 > or `&str` that opens with a statement keyword, so the existing render
-> assertions are held to the grammar without being rewritten one by one.
-> Rendered fragments that are not whole statements are skipped by that keyword
-> test. `oracle_sweep.rs` additionally composes a matrix of builder outputs —
+> assertions are held to the grammar without being rewritten one by one. A
+> render that opens with a parenthesis is a statement when a query keyword
+> (`SELECT`, `VALUES`, `TABLE`, `WITH`) follows its opening parentheses: the
+> grammar lets a statement begin with `(` only as a parenthesised query, which
+> is how a grouped set operation's render begins
+> (`[spec:pgorm:sem:sql.ast.select.union+2]`).
+> Rendered fragments that are not whole statements — a parenthesised operand,
+> a collation, a tuple among them — are skipped by that keyword test.
+> `oracle_sweep.rs` additionally composes a matrix of builder outputs —
 > select/join/CTE/window/union/locking shapes, INSERT/UPDATE/DELETE with
 > RETURNING and ON CONFLICT, the DDL statements, the `ColumnType` and `BinOper`
 > vocabularies, and the `build()` placeholder path — and requires every
@@ -321,7 +327,7 @@ an ideal Postgres renderer would emit.
 > escape character as an inline constant, or ` ESCAPE ''` when escaping is
 > off — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+9]
+> [spec:pgorm:def:sql.render.precedence+10]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -343,8 +349,9 @@ an ideal Postgres renderer would emit.
 > operator is logical (`AND`/`OR`/`NOT`). Each of those families is the whole
 > family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
 > `SYMMETRIC` forms, and IS is `IS`, `IS NOT`, `IS DISTINCT FROM` and
-> `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `SIMILAR TO` and
-> `NOT SIMILAR TO`, which the grammar ranks together — a new operator added to
+> `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `ILIKE`,
+> `NOT ILIKE`, `SIMILAR TO` and `NOT SIMILAR TO`, which the grammar ranks
+> together at one level — a new operator added to
 > one of these lexemes but not to its `Oper` predicate is the failure mode
 > this clause exists to name.
 > The Postgres-specific extension also

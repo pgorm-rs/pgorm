@@ -271,6 +271,14 @@ children (
                         text "Re-checked 2026-10-19 at sql.render.operators +7 (like-escape-off, 760105c0): a pattern's ESCAPE tail renders as an inline constant, or ESCAPE '' when escaping is off."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-19T13:20:35.498187Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "like-ilike-render-parens (26b39edf) bumped sql.render.precedence+10: the LIKE family is LIKE, NOT LIKE, ILIKE, NOT ILIKE, SIMILAR TO and NOT SIMILAR TO, so ILIKE renders bare under AND/OR/NOT as LIKE does (Oper::is_like gained ILike/NotILike); every site re-read and re-pinned, and the renderer matches."
+                        after_done true
+                    }
                 )
             }
 
@@ -13203,6 +13211,13 @@ children (
                 kind @note
                 text "Found by set-operation-grouping (2dab5aaa). The oracle's assert_eq! shim parse-checks only renders that begin with a statement keyword, so a grouped set operation's render, which begins with `(`, skips the grammar check unless the test calls assert_query_eq directly, as the new tests do. Make the shim recognise a leading parenthesis. That changes sql.render.oracle's text: a bump, and re-pinning its 49 sites."
             }
+
+            {
+                at 2026-10-19T12:54:44.020549Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13211,7 +13226,6 @@ children (
         title "Python's DataType is importable from pgorm itself, beside the builders that take one"
         kind @feat
         deps (table-function-column-defs)
-        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.733456Z
@@ -13255,6 +13269,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by like-escape-off (289e49b1). The renderer wraps ILIKE and NOT ILIKE in parentheses under AND (`... AND (\"c\" ILIKE $2 ESCAPE '')`) but leaves LIKE bare. Both are valid SQL, but the difference has no reason behind it. Find where ILIKE is treated as needing parentheses (sql.render.parens, sql.render.precedence), make the two consistent, and update the goldens; like-escape-off's test records today's output."
+            }
+
+            {
+                at 2026-10-19T12:40:07.816309Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-19T13:15:58.738564Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13339,7 +13367,6 @@ children (
         title "Python's async streams agree on truth testing"
         kind @fix
         deps (python-truth-testing-rest)
-        sealed true
         log (
             {
                 at 2026-10-19T12:38:41.181398Z
