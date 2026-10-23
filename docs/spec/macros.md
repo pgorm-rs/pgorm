@@ -619,9 +619,13 @@ known limitations.
 
 ## Compile-time SQL validation
 
-> [spec:pgorm:def:macros.sql+4]
-> `pgorm-sql-macro` is a proc-macro crate exporting exactly two function-like macros:
-> `sql!`, specified here, and `prql!` (`[spec:pgorm:def:macros.prql]`). `sql!` takes one
+> [spec:pgorm:def:macros.sql+5]
+> `pgorm-sql-macro` is a proc-macro crate exporting two function-like macros for
+> callers: `sql!`, specified here, and `prql!` (`[spec:pgorm:def:macros.prql]`). A
+> third, hidden from its documentation, is the compile-time half of pgorm-migration's
+> `sql_migration!` (`[spec:pgorm:def:migration.sql-file]`), which calls it with its own
+> crate path and holds a migration's `.sql` file to the grammar as `sql!` holds a
+> literal; nothing else is meant to call it. `sql!` takes one
 > string literal and nothing else. While the calling crate is being compiled, the
 > literal's text is handed to `pg_query::parse` — the Rust binding to libpg_query, the
 > PostgreSQL server's own parser, at the same revision the render oracle uses and for

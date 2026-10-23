@@ -236,6 +236,82 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > grandfathers them either way and the reported status does not depend on
 > whether the widening has happened yet.
 
+## A migration written as a SQL file
+
+> [spec:pgorm:def:migration.sql-file]
+> `sql_migration!("path/m20260101_000001_name.sql")` is a migration written as a
+> `.sql` file. It expands to a `SqlMigration`, a `MigrationTrait` implementor
+> holding the migration's name and the file's text as `&'static str`s, so it is
+> usable in const position and boxes into `migrations()` beside migrations
+> written in Rust. Its `name()` is the file stem of the path the macro was
+> given: the identity `migration.name` gives a Rust migration through `file!()`,
+> read from the SQL file instead, so `m20260101_000001_name.sql` and
+> `m20260101_000001_name.rs` name the same migration and `get_migration_files`
+> refuses the pair. Its `up` hands the text to `batch_execute` on the batch's
+> transaction, which runs a `;`-separated script whole through the simple-query
+> protocol, with no parameters, so a failing statement rolls back the run as
+> any migration's error does.
+>
+> `SqlMigration::new(name, sql)` builds the same value from a name and text the
+> caller supplies, without the macro's file or its compile-time check, and
+> `sql()` returns the text a value runs.
+>
+> The macro is `pgorm-migration`'s, and its prelude exports it. It forwards
+> `$crate` and the caller's tokens to a hidden proc macro in `pgorm-sql-macro`,
+> the crate that holds the grammar check `sql!` makes (`macros.sql`), so the
+> expansion names `SqlMigration` by the path the caller reaches
+> `pgorm-migration` by, renamed or not.
+
+> [spec:pgorm:req:migration.sql-file.checksum]
+> A `SqlMigration` MUST report a checksum, and it MUST be the lowercase
+> hexadecimal SHA-256 digest of the text `up` runs. This is the opt-in
+> `migration.checksum` leaves to the author, taken on the author's behalf,
+> because the objection to hashing a source file does not hold here: the file
+> is the whole migration, so no change to what it does can hide outside it. A
+> comment edited in an applied file therefore reads as an edit, which is the
+> forward-only posture of `migration.up-only`: an applied file is left as it
+> is, and the next file says what changed.
+>
+> The digest MUST NOT depend on where or how the file was built. The text is
+> the file's bytes, as UTF-8, with every CRLF line ending written as LF, so a
+> checkout that converts line endings — git's `core.autocrlf` on Windows — runs
+> the same script and records the same digest as one that does not, and a
+> ledger written from one machine verifies from another. The algorithm and its
+> encoding are fixed, because changing either would report every applied file
+> as edited.
+
+> [spec:pgorm:req:migration.sql-file.compile]
+> The file MUST be read while the calling crate compiles, and a file the macro
+> cannot use MUST be a compile error spanned on the path literal rather than a
+> failure at run time: a path that names no file stem, a file that cannot be
+> read, text that is not UTF-8, and text PostgreSQL's grammar refuses. The
+> grammar check is `sql!`'s — `pg_query::parse` over the whole script, held to
+> PostgreSQL 18's grammar, syntax only (`macros.sql.script`,
+> `macros.sql.ceiling`) — and its message names the file and the line the
+> parser stopped on, reprinting that line with a caret under the token the
+> parser named. A psql meta-command or a `COPY ... FROM stdin` data block is
+> refused like any other text the server would not run.
+>
+> The path is resolved against `CARGO_MANIFEST_DIR`, the directory holding the
+> calling crate's `Cargo.toml`, as sqlx's `migrate!` resolves its own, and not
+> against the calling file as `include_str!` is. Cargo sets that variable for
+> every compilation and every tool that expands proc macros sets it too, so the
+> same string names the same file from every module, from inside another
+> macro, and in an editor. `proc_macro::Span::local_file`, which would give the
+> calling file, is stable, but whether it answers depends on the host
+> expanding the macro.
+>
+> The expansion MUST make the file an input of the calling crate's build. A
+> proc macro's output is cached with the crate, and stable Rust gives a proc
+> macro no way to declare a file it read, so an edited file would otherwise go
+> on running, and digesting, its old text until something else forced a
+> rebuild. The expansion therefore includes the file with `include_bytes!` in
+> an unused constant: the compiler records it among the crate's inputs, an
+> edit rebuilds the crate, and the macro reads, checks and digests the new
+> text. The text that runs is the macro's own literal rather than the included
+> bytes, so what is checked, what is digested and what runs come from one read
+> of the file.
+
 ## Adopting a ledger left under the inherited name
 
 > [spec:pgorm:req:migration.ledger-upgrade+2]

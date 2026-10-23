@@ -3,9 +3,16 @@
 pub mod ledger;
 pub mod migrator;
 pub mod prelude;
+mod sql_file;
 pub mod util;
 
 pub use migrator::*;
+pub use sql_file::SqlMigration;
+
+#[doc(hidden)]
+pub mod __private {
+    pub use pgorm_sql_macro::sql_migration;
+}
 
 pub use async_trait;
 pub use pgorm;

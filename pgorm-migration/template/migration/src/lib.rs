@@ -7,6 +7,12 @@ pub struct Migrator;
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20220101_000001_create_table::Migration)]
+        vec![
+            // A migration written in Rust, with the query builders.
+            Box::new(m20220101_000001_create_table::Migration),
+            // A migration written as a SQL file, named after the file. The
+            // path is relative to this crate's Cargo.toml.
+            Box::new(sql_migration!("src/m20220101_000002_index_post_title.sql")),
+        ]
     }
 }

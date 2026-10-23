@@ -11,6 +11,30 @@ A starter migration crate lives at
 add your migration modules to the migrator, and run it against your
 database.
 
+## Migrations written as SQL
+
+A migration can also be a `.sql` file, listed beside the Rust ones:
+
+```rust,ignore
+fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m20260101_000001_create_post::Migration),
+        Box::new(sql_migration!("src/m20260101_000002_index_post_title.sql")),
+    ]
+}
+```
+
+The path is relative to the crate's `Cargo.toml`. `sql_migration!` reads the
+file while the crate compiles and holds it to PostgreSQL's grammar, as
+`pgorm::sql!` holds a literal, so a syntax error is a compile error naming the
+file and line. The migration is named after the file stem, its `up` runs the
+file through `batch_execute` inside the batch's transaction, and its checksum
+is the SHA-256 digest of the file's text, so editing the file after it has
+been applied is reported by `status` and refused by `up`. Line endings are
+read as LF, so a Windows checkout reports the same checksum. The check is
+syntax only: a missing table is the server's to report when the migration
+runs, and psql meta-commands such as `\set` are not SQL and are refused.
+
 ## The ledger
 
 Applied migrations are recorded in a table named `pgorm_migrations`, which by

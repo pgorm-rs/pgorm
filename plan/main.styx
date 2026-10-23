@@ -13614,6 +13614,9 @@ children (
         id migration-sql-files
         title "A .sql file is a migration in one line: named after its file, checksummed by its contents, its grammar checked at compile time"
         kind @feat
+        implements {
+            main ([spec:pgorm:def:migration.sql-file] [spec:pgorm:req:migration.sql-file.checksum] [spec:pgorm:req:migration.sql-file.compile])
+        }
         log (
             {
                 at 2026-10-23T19:22:06.318562Z

@@ -841,3 +841,88 @@ async fn a_public_table_of_that_name_is_ignored() -> Result<(), Error> {
     ctx.delete().await;
     Ok(())
 }
+
+/// A `.sql` file is named after its file stem and reports the SHA-256 digest
+/// of its text, with no database involved.
+// [spec:pgorm:def:migration.sql-file/test]    the name is the file stem
+// [spec:pgorm:req:migration.sql-file.checksum/test]    a known digest
+#[test]
+fn a_sql_file_is_named_and_digested() {
+    use common::migrator::sql_files::{CREATE_NOTE_DIGEST, EDITED_NOTE_DIGEST};
+
+    let migration = sql_migration!("tests/sql/m20260101_000001_create_note.sql");
+    assert_eq!(migration.name(), "m20260101_000001_create_note");
+    assert_eq!(migration.checksum().as_deref(), Some(CREATE_NOTE_DIGEST));
+    assert!(migration.sql().contains("CREATE TABLE note ("));
+
+    let edited = sql_migration!("tests/sql/edited/m20260101_000001_create_note.sql");
+    assert_eq!(edited.name(), migration.name());
+    assert_eq!(edited.checksum().as_deref(), Some(EDITED_NOTE_DIGEST));
+}
+
+/// SQL-file migrations run through the migrator beside one written in Rust,
+/// each recorded under its file stem with its digest. Editing an applied file
+/// is then reported by `status` and by `up`, which applies nothing.
+// [spec:pgorm:def:migration.sql-file/test]    run by the migrator, in order, beside a Rust migration
+// [spec:pgorm:req:migration.sql-file.checksum/test]    an edited file is caught by the checksum check
+#[tokio::test]
+async fn sql_file_migrations_run_and_detect_edits() -> Result<(), Error> {
+    use common::migrator::sql_files::{CREATE_NOTE_DIGEST, EDITED_NOTE_DIGEST, Edited, Written};
+
+    let ctx = TestContext::new("pgorm_migration_sql_files").await;
+    let db = &ctx.db;
+
+    Written::up(db.clone(), None).await?;
+    assert!(has_table(db, "cake").await?);
+    assert_eq!(count_rows(db, "note").await?, 2);
+
+    let conn = db.get().await?;
+    let recorded: Vec<(String, Option<String>)> = conn
+        .query_all(
+            "SELECT version, checksum FROM pgorm_migrations ORDER BY version",
+            &[],
+        )
+        .await?
+        .iter()
+        .map(|row| (row.get(0), row.get(1)))
+        .collect();
+    assert_eq!(
+        recorded,
+        vec![
+            ("m20220118_000001_create_cake_table".to_owned(), None),
+            (
+                "m20260101_000001_create_note".to_owned(),
+                Some(CREATE_NOTE_DIGEST.to_owned())
+            ),
+            (
+                "m20260101_000002_seed_note".to_owned(),
+                Some("8cf25c961bdc64bf30696cdc1ae9bc2618744207d4427d0ef7bab318e80aef80".to_owned())
+            ),
+        ]
+    );
+
+    let err = Edited::status(&conn)
+        .await
+        .expect_err("an edited SQL file must be reported");
+    let Error::Custom(msg) = &err else {
+        panic!("expected Error::Custom, got {err}");
+    };
+    assert!(msg.contains("m20260101_000001_create_note"), "{msg}");
+    assert!(msg.contains(CREATE_NOTE_DIGEST), "{msg}");
+    assert!(msg.contains(EDITED_NOTE_DIGEST), "{msg}");
+    drop(conn);
+
+    let err = Edited::up(db.clone(), None)
+        .await
+        .expect_err("an edited SQL file must be reported");
+    assert!(
+        matches!(&err, Error::Custom(msg) if msg.contains(EDITED_NOTE_DIGEST)),
+        "{err}"
+    );
+    assert!(!has_column(db, "note", "pinned").await?);
+
+    Written::up(db.clone(), None).await?;
+
+    ctx.delete().await;
+    Ok(())
+}
