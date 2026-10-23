@@ -13674,6 +13674,7 @@ children (
         title "The render oracle's shim checks a render that begins with VALUES or TABLE"
         kind @test
         deps (oracle-shim-parenthesised)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:06.95864Z
@@ -13687,6 +13688,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:30:37.381664Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

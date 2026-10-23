@@ -40,7 +40,7 @@ an ideal Postgres renderer would emit.
 
 ## Render conformance
 
-> [spec:pgorm:req:sql.render.oracle+3]
+> [spec:pgorm:req:sql.render.oracle+4]
 > Every string `QueryBuilder` renders — through the `to_string()` path with
 > literals inlined, or through the `build()` path with `$N` placeholders — MUST
 > parse under the PostgreSQL grammar. The contract is enforced inside the test
@@ -62,13 +62,16 @@ an ideal Postgres renderer would emit.
 > token it names; `assert_query_eq` pairs that check with the expected spelling;
 > and an `assert_eq!` shim — imported by a test module in place of
 > `pretty_assertions::assert_eq` — applies the oracle to any left-hand `String`
-> or `&str` that opens with a statement keyword, so the existing render
+> or `&str` that opens with a statement keyword — a query keyword (`SELECT`,
+> `VALUES`, `TABLE`, `WITH`) or the verb of a write, DDL or utility statement
+> (`INSERT`, `CREATE`, `COPY` and the rest) — so the existing render
 > assertions are held to the grammar without being rewritten one by one. A
-> render that opens with a parenthesis is a statement when a query keyword
-> (`SELECT`, `VALUES`, `TABLE`, `WITH`) follows its opening parentheses: the
-> grammar lets a statement begin with `(` only as a parenthesised query, which
-> is how a grouped set operation's render begins
-> (`[spec:pgorm:sem:sql.ast.select.union+2]`).
+> query keyword opens a statement whether it begins the render bare or
+> follows its opening parentheses: the grammar lets a statement begin with
+> `(` only as a parenthesised query, which is how a grouped set operation's
+> render begins (`[spec:pgorm:sem:sql.ast.select.union+2]`), and a bare
+> `VALUES` or `TABLE` query, which no builder renders today, is a statement
+> the shim parses the day one does.
 > Rendered fragments that are not whole statements — a parenthesised operand,
 > a collation, a tuple among them — are skipped by that keyword test.
 > `oracle_sweep.rs` additionally composes a matrix of builder outputs —
