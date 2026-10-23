@@ -1078,7 +1078,7 @@ async fn seed_composite(db: &DatabaseConnection) -> Result<(), Error> {
     use cursor_composite::*;
 
     let schema = pgorm::Schema::new();
-    create_table_without_asserts(db, &schema.create_table_from_entity(Entity)).await?;
+    create_table_without_asserts(db, &schema.create_table_from_entity(Entity)?).await?;
 
     for (index, (a, b)) in COMPOSITE_ROWS.into_iter().enumerate() {
         let id = index as i32 + 1;

@@ -655,10 +655,10 @@ mod tests {
 
         validate_compact_entities(
             vec![
-                schema.create_table_from_entity(bills::Entity),
-                schema.create_table_from_entity(users::Entity),
-                schema.create_table_from_entity(users_saved_bills::Entity),
-                schema.create_table_from_entity(users_votes::Entity),
+                schema.create_table_from_entity(bills::Entity)?,
+                schema.create_table_from_entity(users::Entity)?,
+                schema.create_table_from_entity(users_saved_bills::Entity)?,
+                schema.create_table_from_entity(users_votes::Entity)?,
             ],
             vec![
                 (
@@ -688,9 +688,9 @@ mod tests {
 
         validate_compact_entities(
             vec![
-                schema.create_table_from_entity(bills::Entity),
-                schema.create_table_from_entity(users::Entity),
-                schema.create_table_from_entity(users_votes::Entity),
+                schema.create_table_from_entity(bills::Entity)?,
+                schema.create_table_from_entity(users::Entity)?,
+                schema.create_table_from_entity(users_votes::Entity)?,
             ],
             vec![
                 ("bills", include_str!("../tests_cfg/many_to_many/bills.rs")),
@@ -710,9 +710,9 @@ mod tests {
 
         validate_compact_entities(
             vec![
-                schema.create_table_from_entity(bills::Entity),
-                schema.create_table_from_entity(users::Entity),
-                schema.create_table_from_entity(users_votes::Entity),
+                schema.create_table_from_entity(bills::Entity)?,
+                schema.create_table_from_entity(users::Entity)?,
+                schema.create_table_from_entity(users_votes::Entity)?,
             ],
             vec![
                 (
@@ -738,8 +738,8 @@ mod tests {
 
         validate_compact_entities(
             vec![
-                schema.create_table_from_entity(bills::Entity),
-                schema.create_table_from_entity(users::Entity),
+                schema.create_table_from_entity(bills::Entity)?,
+                schema.create_table_from_entity(users::Entity)?,
             ],
             vec![
                 (

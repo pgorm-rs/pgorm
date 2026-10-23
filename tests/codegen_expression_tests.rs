@@ -71,9 +71,9 @@ async fn generated_entities_keep_their_expressions() -> Result<(), Error> {
     db.batch_execute("DROP TABLE stock_item, formula, stock_code")
         .await?;
     for create in [
-        Schema::new().create_table_from_entity(stock_item::Entity),
-        Schema::new().create_table_from_entity(formula::Entity),
-        Schema::new().create_table_from_entity(stock_code::Entity),
+        Schema::new().create_table_from_entity(stock_item::Entity)?,
+        Schema::new().create_table_from_entity(formula::Entity)?,
+        Schema::new().create_table_from_entity(stock_code::Entity)?,
     ] {
         db.batch_execute(&create.to_string()).await?;
     }

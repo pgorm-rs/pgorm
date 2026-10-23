@@ -635,7 +635,7 @@ fn primary_key_value_type_errs_on_arity() {
 async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
     let ctx = TestContext::new("mistyped_primary_key").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity);
+    let stmt = Schema::new().create_table_from_entity(mistyped_key::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     let inserted = Insert::one(mistyped_key::ActiveModel { id: set(1) })
@@ -670,7 +670,7 @@ async fn mistyped_primary_key_errs_on_crud() -> Result<(), Error> {
 async fn composite_key_noop_update_keeps_filters() -> Result<(), Error> {
     let ctx = TestContext::new("composite_noop_filters").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(pair::Entity);
+    let stmt = Schema::new().create_table_from_entity(pair::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     let row = Insert::one(pair::ActiveModel {
@@ -1163,7 +1163,7 @@ fn model_trait_into_active_needs_no_annotation() {
 async fn model_trait_delete_runs_through_active_model() -> Result<(), Error> {
     let ctx = TestContext::new("model_trait_delete").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(item::Entity);
+    let stmt = Schema::new().create_table_from_entity(item::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     let apple = item::ActiveModel {
@@ -1285,7 +1285,7 @@ impl FromQueryResult for PrefixProbe {
 async fn from_query_result_surface() -> Result<(), Error> {
     let ctx = TestContext::new("from_query_result_surface").await;
     let db = ctx.db.get().await?;
-    let stmt = Schema::new().create_table_from_entity(item::Entity);
+    let stmt = Schema::new().create_table_from_entity(item::Entity)?;
     db.execute(&stmt.to_string(), &[]).await?;
 
     Insert::many([

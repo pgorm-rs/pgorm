@@ -91,7 +91,7 @@ async fn generated_interval_columns_keep_their_qualifiers() -> Result<(), Error>
     db.batch_execute("DROP TABLE interval_span").await?;
     db.batch_execute(
         &Schema::new()
-            .create_table_from_entity(interval_span::Entity)
+            .create_table_from_entity(interval_span::Entity)?
             .to_string(),
     )
     .await?;
@@ -136,7 +136,7 @@ async fn generated_interval_fields_round_trip() -> Result<(), Error> {
 
     db.batch_execute(
         &Schema::new()
-            .create_table_from_entity(interval_span::Entity)
+            .create_table_from_entity(interval_span::Entity)?
             .to_string(),
     )
     .await?;

@@ -564,12 +564,9 @@ fn entity_sites() -> Vec<Site> {
             api: "Schema::create_table_from_entity(entity) with a runtime table name",
             kinds: &["CreateStmt.relation.relname"],
             policy: Quoted,
-            render: |n| {
-                Rendered::sql(
-                    Schema::new()
-                        .create_table_from_entity(dyn_named::Entity::table(n))
-                        .to_string(),
-                )
+            render: |n| match Schema::new().create_table_from_entity(dyn_named::Entity::table(n)) {
+                Ok(table) => Rendered::sql(table.to_string()),
+                Err(error) => Rendered::Refused(error.to_string()),
             },
         },
         Site {

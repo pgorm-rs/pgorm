@@ -38,7 +38,7 @@ fn refusal(err: &Error) -> String {
 
 async fn seed(db: &DatabaseConnection) -> Result<(), Error> {
     let schema = Schema::new();
-    create_table_without_asserts(db, &schema.create_table_from_entity(wire_probe::Entity)).await?;
+    create_table_without_asserts(db, &schema.create_table_from_entity(wire_probe::Entity)?).await?;
 
     wire_probe::ActiveModel {
         id: set(1),

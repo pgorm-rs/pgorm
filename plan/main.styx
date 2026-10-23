@@ -13229,6 +13229,7 @@ children (
         title "create_table_from_entity stops emitting a foreign key PostgreSQL refuses over a domain over an enum"
         kind @fix
         deps (domain-enum-remaining)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.0283Z
@@ -13249,6 +13250,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:23:59.632137Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

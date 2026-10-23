@@ -134,7 +134,7 @@ async fn each_kind_reaches_the_catalog() -> Result<(), Error> {
 /// other column and recomputed when the row changes; a model writes them by
 /// leaving them `NotSet`, and one that supplies a value is refused, as a
 /// `GENERATED ALWAYS` identity is.
-// [spec:pgorm:sem:schema.from-entity+8/test]    an entity's generated column is
+// [spec:pgorm:sem:schema.from-entity+9/test]    an entity's generated column is
 // created as its kind, after the column it reads
 // [spec:pgorm:req:entity.traits.column-def+2/test]    a generated column is read
 // and recomputed, and a value written into it is refused (428C9)
@@ -143,7 +143,7 @@ async fn entity_generated_columns_compute_on_write() -> Result<(), Error> {
     let ctx = TestContext::new("generated_entity_columns").await;
     let db = ctx.db.get().await?;
 
-    let create = Schema::new().create_table_from_entity(line::Entity);
+    let create = Schema::new().create_table_from_entity(line::Entity)?;
     assert_eq!(
         create.to_string(),
         [

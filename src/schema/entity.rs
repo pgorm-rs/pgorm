@@ -1,6 +1,6 @@
 use crate::{
     ActiveEnum, ColumnTrait, ColumnType, EntityTrait, Error, Iterable, PrimaryKeyArity,
-    PrimaryKeyToColumn, PrimaryKeyTrait, RelationTrait, Schema, entity::ColumnDefault,
+    PrimaryKeyToColumn, PrimaryKeyTrait, RelationDef, RelationTrait, Schema, entity::ColumnDefault,
 };
 use pgorm_query::{
     ColumnDef, Comment, CommentStatement, ForeignKeyCreateStatement, IdentityGeneration, Index,
@@ -31,7 +31,12 @@ impl Schema {
     }
 
     /// Creates a table from an Entity. See [TableCreateStatement] for more details.
-    pub fn create_table_from_entity<E>(&self, entity: E) -> TableCreateStatement
+    ///
+    /// Each belongs-to relation becomes a foreign key. One PostgreSQL cannot
+    /// implement is refused with [`Error::Type`] naming the relation rather
+    /// than written: the server keys no column typed as a domain over an
+    /// enum, on either side of the key, not even to the enum itself (`42804`).
+    pub fn create_table_from_entity<E>(&self, entity: E) -> Result<TableCreateStatement, Error>
     where
         E: EntityTrait,
     {
@@ -238,7 +243,7 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+8]    the comment statements, one stream per entity
+// [spec:pgorm:sem:schema.from-entity+9]    the comment statements, one stream per entity
 pub(crate) fn create_comments_from_entity<E>(entity: E) -> Vec<CommentStatement>
 where
     E: EntityTrait,
@@ -257,8 +262,8 @@ where
     vec
 }
 
-// [spec:pgorm:sem:schema.from-entity+8]
-pub(crate) fn create_table_from_entity<E>(entity: E) -> TableCreateStatement
+// [spec:pgorm:sem:schema.from-entity+9]
+pub(crate) fn create_table_from_entity<E>(entity: E) -> Result<TableCreateStatement, Error>
 where
     E: EntityTrait,
 {
@@ -301,17 +306,51 @@ where
     }
 
     for relation in E::Relation::iter() {
-        let relation = relation.def();
-        if relation.is_owner {
+        let def = relation.def();
+        if def.is_owner {
             continue;
         }
-        stmt.foreign_key(ForeignKeyCreateStatement::from(relation));
+        refuse_unkeyable(&entity, &relation, &def)?;
+        stmt.foreign_key(ForeignKeyCreateStatement::from(def));
     }
 
-    stmt.take()
+    Ok(stmt.take())
 }
 
-// [spec:pgorm:sem:schema.from-entity+8]    column projection, and the serial family for a one-column key
+/// Refuse a foreign key PostgreSQL cannot implement: one matching a pair
+/// with a column typed as a domain over an enum on either side, which the
+/// server answers `42804` (incompatible types) whatever the other side is —
+/// the same domain, another domain over the enum, or the enum itself.
+///
+/// Each side's type is the one its [`ColumnPairs`](crate::ColumnPairs)
+/// recorded when the pair was named by entity columns; a pair named by bare
+/// names recorded none and passes unchecked.
+// [spec:pgorm:sem:schema.from-entity+9]
+fn refuse_unkeyable<E: EntityTrait>(
+    entity: &E,
+    relation: &E::Relation,
+    def: &RelationDef,
+) -> Result<(), Error> {
+    let unkeyable = def
+        .columns
+        .compared_pairs()
+        .find(|(_, compared)| compared.from.is_some() || compared.to.is_some());
+    let Some(((from, to), _)) = unkeyable else {
+        return Ok(());
+    };
+    Err(Error::Type(format!(
+        "relation `{relation:?}` of `{entity}` cannot be a foreign key: `{from_tbl}`.`{from}` \
+         references `{to_tbl}`.`{to}`, and PostgreSQL implements no foreign key with a column \
+         typed as a domain over an enum on either side (42804)",
+        entity = entity.to_string(),
+        from_tbl = def.from_tbl.qualifier().to_string(),
+        from = from.to_string(),
+        to_tbl = def.to_tbl.qualifier().to_string(),
+        to = to.to_string(),
+    )))
+}
+
+// [spec:pgorm:sem:schema.from-entity+9]    column projection, and the serial family for a one-column key
 fn column_def_from_entity_column<E>(column: E::Column) -> ColumnDef
 where
     E: EntityTrait,
@@ -365,6 +404,7 @@ mod tests {
         assert_eq!(
             schema
                 .create_table_from_entity(CakeFillingPrice)
+                .expect("the table is generated")
                 .to_string(),
             get_cake_filling_price_stmt().to_string()
         );
@@ -414,7 +454,10 @@ mod tests {
         let schema = Schema::new();
 
         assert_eq!(
-            schema.create_table_from_entity(indexes::Entity).to_string(),
+            schema
+                .create_table_from_entity(indexes::Entity)
+                .expect("the table is generated")
+                .to_string(),
             get_indexes_stmt().to_string()
         );
 

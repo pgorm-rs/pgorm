@@ -3203,7 +3203,7 @@ mod cheerful {
     entity!(temper, "temper", rank Rank, label Label);
 }
 
-// [spec:pgorm:sem:entity.traits.column.enum-cast+10/test]    a pipeline
+// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    a pipeline
 // comparison casts each side that is an entity column whose domain is over an
 // enum to the enum — against a literal, a bound value, a list or another such
 // column — and so do coalesce, min and max, while sorting, grouping, count and

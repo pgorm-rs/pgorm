@@ -96,9 +96,15 @@ fn schema_expressions_reach_the_entity() {
 
     let tables = parse_schema(SCHEMA).expect("schema should parse");
     let entities = [
-        pgorm::Schema::new().create_table_from_entity(stock_item::Entity),
-        pgorm::Schema::new().create_table_from_entity(formula::Entity),
-        pgorm::Schema::new().create_table_from_entity(stock_code::Entity),
+        pgorm::Schema::new()
+            .create_table_from_entity(stock_item::Entity)
+            .expect("the entity's table is generated"),
+        pgorm::Schema::new()
+            .create_table_from_entity(formula::Entity)
+            .expect("the entity's table is generated"),
+        pgorm::Schema::new()
+            .create_table_from_entity(stock_code::Entity)
+            .expect("the entity's table is generated"),
     ];
     for (bridged, entity) in tables.iter().zip(&entities) {
         assert_eq!(expressions(entity), expressions(bridged));

@@ -273,12 +273,14 @@ async fn compare(db: &mut DatabaseConnection, report: &Value) -> Result {
         db.execute(&statement.to_string(), &[]).await?;
     }
     db.execute(
-        &schema.create_table_from_entity(account::Entity).to_string(),
+        &schema
+            .create_table_from_entity(account::Entity)?
+            .to_string(),
         &[],
     )
     .await?;
     db.execute(
-        &schema.create_table_from_entity(note::Entity).to_string(),
+        &schema.create_table_from_entity(note::Entity)?.to_string(),
         &[],
     )
     .await?;

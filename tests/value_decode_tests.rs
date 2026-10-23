@@ -68,7 +68,8 @@ async fn main() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     let schema = Schema::new();
-    create_table_without_asserts(&db, &schema.create_table_from_entity(net_decode::Entity)).await?;
+    create_table_without_asserts(&db, &schema.create_table_from_entity(net_decode::Entity)?)
+        .await?;
 
     round_trip_inet_and_macaddr(&db).await?;
     decode_inet_and_macaddr_as_tuple(&db).await?;
@@ -602,7 +603,7 @@ async fn big_unsigned_binds_checked() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     let schema = Schema::new();
-    create_table_without_asserts(&db, &schema.create_table_from_entity(big_counter::Entity))
+    create_table_without_asserts(&db, &schema.create_table_from_entity(big_counter::Entity)?)
         .await?;
 
     for (id, counter) in [(1, -1_i64), (2, 7), (3, i64::MAX)] {

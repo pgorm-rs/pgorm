@@ -119,8 +119,8 @@ async fn generated_enum_arrays_keep_their_types() -> Result<(), Error> {
 
     let generator = Schema::new();
     for create in [
-        generator.create_table_from_entity(survey::Entity),
-        generator.create_table_from_entity(expanded_survey::Entity),
+        generator.create_table_from_entity(survey::Entity)?,
+        generator.create_table_from_entity(expanded_survey::Entity)?,
     ] {
         db.batch_execute("DROP TABLE survey").await?;
         db.batch_execute(&create.to_string()).await?;

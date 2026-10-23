@@ -19,7 +19,10 @@ fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
             .extract()?;
         assert_eq!(
             table.sql,
-            schema.create_table_from_entity(account::Entity).to_string()
+            schema
+                .create_table_from_entity(account::Entity)
+                .expect("the account table is generated")
+                .to_string()
         );
         assert!(table.values.0.is_empty());
         let expected = [

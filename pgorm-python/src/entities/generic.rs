@@ -37,12 +37,12 @@ where
     }
 
     // [spec:pgorm:req:python.schema+1]
-    fn schema(&self) -> crate::schema::PyEntitySchema {
+    fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error> {
         use crate::schema::{PyCreateIndex, PyCreateTable, PyDDL, PyEntitySchema, Statement};
         let schema = pgorm::Schema::new();
-        PyEntitySchema {
+        Ok(PyEntitySchema {
             table: PyCreateTable {
-                inner: schema.create_table_from_entity(E::default()),
+                inner: schema.create_table_from_entity(E::default())?,
             },
             enums: schema
                 .create_enum_from_entity(E::default())
@@ -63,7 +63,7 @@ where
                     inner: Statement::Comment(inner),
                 })
                 .collect(),
-        }
+        })
     }
 
     fn select(&self) -> Select {

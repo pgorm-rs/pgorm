@@ -65,6 +65,7 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - `load_one`/`load_many` evaluate the complete authored relation (`on_condition` and `condition_type` included) by riding the graph machinery, and `load_one` errors on an unmatched key instead of yielding `None` silently
 - `RelationDef::rev()` preserves an attached `on_condition`'s authored argument roles
 - Enum types can be schema-qualified end to end: `ColumnType::Enum` carries `schema`, `DeriveActiveEnum` takes `schema_name = "..."`, and codegen keys enums by full identity with no cross-schema fallback
+- `Schema::create_table_from_entity` returns `Result<TableCreateStatement, Error>`: a belongs-to relation with a column typed as a domain over an enum on either side, which PostgreSQL cannot key (`42804`), is refused with `Error::Type` naming it rather than written
 - Prefixed result-column names (the graph's `s{i}_` aliases and every prefixed decode) are bounded to PostgreSQL's 63-byte identifier limit through one shared composition
 
 ### Connections

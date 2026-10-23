@@ -1109,6 +1109,7 @@ fn a_foreign_keys_check_reaches_the_relation() {
     );
     let regenerated = pgorm::Schema::new()
         .create_table_from_entity(key_stay::Entity)
+        .expect("the entity's table is generated")
         .to_string();
     assert!(
         regenerated
@@ -1207,6 +1208,7 @@ fn temporal_key_and_period_relation_round_trip() {
     assert!(temporal_room::PrimaryKey::without_overlaps());
     let room = pgorm::Schema::new()
         .create_table_from_entity(temporal_room::Entity)
+        .expect("the entity's table is generated")
         .to_string();
     assert!(
         room.contains(r#"PRIMARY KEY ("id", "valid_at" WITHOUT OVERLAPS)"#),
@@ -1214,6 +1216,7 @@ fn temporal_key_and_period_relation_round_trip() {
     );
     let stay = pgorm::Schema::new()
         .create_table_from_entity(temporal_stay::Entity)
+        .expect("the entity's table is generated")
         .to_string();
     assert!(
         stay.contains(

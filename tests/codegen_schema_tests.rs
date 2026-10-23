@@ -87,8 +87,8 @@ async fn generated_entities_create_the_schemas_table() -> Result<(), Error> {
 
     let generator = Schema::new();
     for create in [
-        generator.create_table_from_entity(deal::Entity),
-        generator.create_table_from_entity(expanded_deal::Entity),
+        generator.create_table_from_entity(deal::Entity)?,
+        generator.create_table_from_entity(expanded_deal::Entity)?,
     ] {
         db.batch_execute("DROP TABLE sales.deal").await?;
         db.batch_execute(&create.to_string()).await?;

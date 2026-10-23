@@ -31,5 +31,8 @@ pub(super) fn schema_from_entity(entity: &Bound<'_, PyAny>) -> PyResult<PyEntity
     let entity = entity.extract::<PyRef<'_, PyEntity>>().map_err(|_| {
         UnsupportedCapabilityError::new_err("schema.from_entity requires a registered native Entity; runtime models use explicit DDL builders")
     })?;
-    Ok(entity.backend.schema())
+    entity
+        .backend
+        .schema()
+        .map_err(|error| ConstructionError::new_err(error.to_string()))
 }

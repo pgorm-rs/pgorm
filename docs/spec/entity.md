@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+10]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+11]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -228,9 +228,10 @@ explicit limitations.
 > column and its values (`query.loader.batching`), and
 > `belongs_to_tbl_alias`, which scopes `find_linked` to one model, compares
 > each key column as `belongs_to` does. PostgreSQL implements no foreign key
-> between columns of such a domain (`42804`, *incompatible types*), so the
-> `REFERENCES` `create_table_from_entity` writes for a relation over them is
-> refused: such a relation is a join with no key behind it.
+> with a column of such a domain on either side (`42804`, *incompatible
+> types*), not even with the enum it is over, so `create_table_from_entity`
+> refuses a relation over one rather than write its key
+> (`schema.from-entity`): such a relation is a join with no key behind it.
 >
 > A pipeline's entity column so typed carries the enum it compares as
 > (`pipeline.qualify`), and each `ExprOps` operator applied to it — the

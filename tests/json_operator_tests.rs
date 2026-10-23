@@ -41,7 +41,7 @@ mod doc {
 
 async fn seed(db: &impl ConnectionTrait) -> Result<(), Error> {
     let create = Schema::new()
-        .create_table_from_entity(doc::Entity)
+        .create_table_from_entity(doc::Entity)?
         .to_string();
     db.execute(create.as_str(), &[]).await?;
 

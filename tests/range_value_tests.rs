@@ -74,8 +74,8 @@ async fn main() -> Result<(), Error> {
     let db = ctx.db.get().await?;
 
     let schema = Schema::new();
-    create_table_without_asserts(&db, &schema.create_table_from_entity(spans::Entity)).await?;
-    create_table_without_asserts(&db, &schema.create_table_from_entity(lists::Entity)).await?;
+    create_table_without_asserts(&db, &schema.create_table_from_entity(spans::Entity)?).await?;
+    create_table_without_asserts(&db, &schema.create_table_from_entity(lists::Entity)?).await?;
 
     every_range_type_round_trips_through_an_entity(&db).await?;
     a_discrete_range_comes_back_canonical(&db).await?;

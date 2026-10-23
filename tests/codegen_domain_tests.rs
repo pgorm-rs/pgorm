@@ -112,7 +112,7 @@ async fn generated_domain_columns_keep_their_domains() -> Result<(), Error> {
     db.batch_execute("DROP TABLE stock_line").await?;
     db.batch_execute(
         &Schema::new()
-            .create_table_from_entity(stock_line::Entity)
+            .create_table_from_entity(stock_line::Entity)?
             .to_string(),
     )
     .await?;
