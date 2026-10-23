@@ -5483,6 +5483,14 @@ children (
                         text "query.graph.cursor +3 (graph-cursor-enum-tiebreak, 32ab45e8): each tiebreak a graph installs carries the casts of its typed primary-key column (Tiebreak in src/query/graph.rs), so the root's key, a joined slot's or the ordered slot's own key whose domain is over an enum is compared as the enum in a whole-keyset boundary."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-23T20:31:43.759647Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at query.graph.cursor +3 (the domain-over-enum tiebreak casts from 32ab45e8, described in the note above): the state's recorded version was still +2 until the migration-sql-files commit refreshed it; every site of the rule is pinned at +3 and none is stale."
+                        after_done true
+                    }
                 )
             }
 
@@ -6999,6 +7007,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at python.schema +1 (python-schema-truth-testing, 1c883ab5, which added truth testing to the rule): DataType, ColumnDef, CreateTable, CreateIndex, DDL, EntitySchema and Compiled raise ConstructionError on bool(); test_schema_objects_refuse_truth_testing samples every class the native schema module defines or pgorm.schema exports, and registered_schema.py truth-tests a registered entity's EntitySchema (checks/entities.py passed); the rest of the rule's text is unchanged and its 37 sites were re-read and re-pinned."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-23T20:31:43.892392Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at python.schema +1 (truth testing refused on schema objects, 1c883ab5, re-checked in the note above): the state's recorded version was still the bare rule until the migration-sql-files commit refreshed it; every site of the rule is pinned at +1 and none is stale."
                         after_done true
                     }
                 )
