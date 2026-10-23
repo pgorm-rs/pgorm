@@ -191,6 +191,17 @@ for await (const [id, name] of await pool.copyOutRows(dump)) console.log(id, nam
   COPY — nothing is written; inside a transaction it is aborted until rolled
   back — and the promise rejects with that error. A row the server refuses
   rejects with its `DatabaseError` once the data is sent.
+- A COPY FROM the server refuses at its start — a missing table or column, a
+  column list naming a generated column, an option it rejects — rejects with
+  its `DatabaseError` and closes the connection, ending any transaction on it;
+  a pool lends a fresh connection next time. A generated column, stored or
+  virtual, takes no data, so name only the columns the rows supply: the server
+  refuses a list naming one with SQLSTATE `42P10`, and pgorm does not check
+  the list first, since that would cost a catalogue read before every COPY.
+  With no column list a COPY leaves the generated columns out, and the server
+  computes them as the rows go in; `copyInRows` describes a generated column
+  without complaint, since a `select` reads one, so its COPY is refused at the
+  start in the same way.
 - **`copyOut(statement)`** resolves, once the server accepts the statement,
   with a `CopyOutStream` of `Uint8Array` chunks, one per `next()`; a chunk is
   a piece of the format's byte stream, not a row.

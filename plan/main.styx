@@ -13397,6 +13397,7 @@ children (
         title "COPY's docs say a column list naming a generated column is refused at the start, closing the connection"
         kind @docs
         deps (copy-binary-rows)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.232561Z
@@ -13410,6 +13411,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\" to leaving it and documenting it. No pre-check (it would cost a catalogue read before every COPY): document in conn.copy and the bindings' COPY docs that a column list naming a generated column is refused by the server at the start, which closes the connection."
+            }
+
+            {
+                at 2026-10-23T19:43:21.326978Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:09:43.816294Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

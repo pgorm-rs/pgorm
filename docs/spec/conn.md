@@ -691,7 +691,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## COPY
 
-> [spec:pgorm:req:conn.copy+1]
+> [spec:pgorm:req:conn.copy+2]
 > `CopyTrait` is COPY's data flow on a connection: `copy_in(&mut self,
 > &CopyFromStatement<F>)` starts `COPY … FROM STDIN` and returns a
 > `CopyInSink<'_>`, and `copy_out(&mut self, &CopyToStatement<F>)` starts `COPY
@@ -754,8 +754,9 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > before its next statement runs.
 >
 > A refusal at the start is the error `copy_in` or `copy_out` returns: an
-> undefined table or column, an option the server refuses (`sql.ast.copy`), a
-> transaction already aborted. A COPY FROM refused there MUST close its
+> undefined table or column, a column list naming a generated column, an
+> option the server refuses (`sql.ast.copy`), a transaction already aborted. A
+> COPY FROM refused there MUST close its
 > connection. tokio-postgres sends `Bind`, `Execute` and `Sync` together and a
 > second `Sync` when the sink ends. The server ignores the first while it is
 > in copy-in mode, so a COPY that starts is answered by one `ReadyForQuery`;
@@ -774,8 +775,19 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > cannot parse is refused without closing anything. A COPY TO is one request
 > answered by one `ReadyForQuery` whether or not it starts, and a refused one
 > leaves the connection as it was.
+>
+> A generated column, stored or virtual, takes no data, and PostgreSQL refuses
+> a column list naming one with `42P10` (*column is a generated column*) when
+> the COPY starts, not when its text is prepared: a COPY FROM whose list names
+> one therefore closes its connection, as every refusal there does. pgorm does
+> not look first. Knowing which columns are generated takes a catalogue read
+> (`pg_attribute.attgenerated`), which every COPY would pay for a mistake the
+> caller can avoid by listing only the columns it sends. A COPY with no column
+> list leaves the generated columns out in both directions, the server
+> computing them as the rows go in; a COPY TO reads one only through a
+> `SELECT` source naming it, since `CopyToStatement` takes no column list.
 
-> [spec:pgorm:req:conn.copy.rows+1]
+> [spec:pgorm:req:conn.copy.rows+2]
 > Binary COPY carries rows of pgorm `Value`s, each field in its value's
 > binary form, the form a parameter is bound in and a result column decoded
 > from. The format sends no column types — a header, then each row as its
@@ -793,7 +805,10 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > type the domain is over, whose form its values travel in, and checks the
 > domain's constraint as it reads them. A table or column the server refuses
 > is refused by the description, before any COPY starts, and leaves the
-> connection as it was. The statements' parts are read through pgorm-query's
+> connection as it was. A generated column in a COPY FROM's list is not: a
+> `SELECT` reads one, so the description names it like any other column, and
+> the COPY's start is what refuses it, closing the connection (`conn.copy`).
+> The statements' parts are read through pgorm-query's
 > getters (`sql.ast.copy.parts`).
 >
 > `copy_in_rows(&CopyFromStatement<CopyBinary>)` and

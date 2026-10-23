@@ -18,7 +18,7 @@ pub use tokio_postgres::Notification;
 
 /// The chunk type COPY's data travels in, both ways, re-exported so writing a
 /// [`CopyInSink`] needs no direct dependency on `bytes`.
-// [spec:pgorm:req:conn.copy+1]
+// [spec:pgorm:req:conn.copy+2]
 pub use bytes::Bytes;
 pub use tokio_postgres::{Config, IsolationLevel};
 

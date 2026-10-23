@@ -84,7 +84,7 @@ fn sqlstate(error: &Error) -> Option<&SqlState> {
     }
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    text format both ways: rows in, the same text out, NULL as \N
+// [spec:pgorm:req:conn.copy+2/test]    text format both ways: rows in, the same text out, NULL as \N
 #[pgorm_macros::test]
 async fn copy_text_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("copy_text_round_trip").await;
@@ -119,7 +119,7 @@ async fn copy_text_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    csv both ways with a header, quoting and a forced quote
+// [spec:pgorm:req:conn.copy+2/test]    csv both ways with a header, quoting and a forced quote
 #[pgorm_macros::test]
 async fn copy_csv_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("copy_csv_round_trip").await;
@@ -165,7 +165,7 @@ async fn copy_csv_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    binary out of one table is binary in to another, value for value
+// [spec:pgorm:req:conn.copy+2/test]    binary out of one table is binary in to another, value for value
 #[pgorm_macros::test]
 async fn copy_binary_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("copy_binary_round_trip").await;
@@ -199,7 +199,7 @@ async fn copy_binary_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a column subset leaves the other columns to their defaults
+// [spec:pgorm:req:conn.copy+2/test]    a column subset leaves the other columns to their defaults
 #[pgorm_macros::test]
 async fn copy_column_subset_takes_defaults() -> Result<(), Error> {
     let ctx = TestContext::new("copy_column_subset_defaults").await;
@@ -226,7 +226,7 @@ async fn copy_column_subset_takes_defaults() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a unique violation mid-copy fails finish with 23505 and aborts the transaction
+// [spec:pgorm:req:conn.copy+2/test]    a unique violation mid-copy fails finish with 23505 and aborts the transaction
 #[pgorm_macros::test]
 async fn copy_violation_aborts_the_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("copy_violation_aborts_tx").await;
@@ -267,7 +267,7 @@ async fn copy_violation_aborts_the_transaction() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a dropped sink aborts the COPY: no rows, and the connection keeps working
+// [spec:pgorm:req:conn.copy+2/test]    a dropped sink aborts the COPY: no rows, and the connection keeps working
 #[pgorm_macros::test]
 async fn copy_dropped_sink_writes_nothing() -> Result<(), Error> {
     let ctx = TestContext::new("copy_dropped_sink_nothing").await;
@@ -312,7 +312,7 @@ fn wide_row(id: u32) -> String {
     format!("{id:08}\t{}\n", "x".repeat(90))
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    several megabytes stream through both directions chunk by chunk
+// [spec:pgorm:req:conn.copy+2/test]    several megabytes stream through both directions chunk by chunk
 #[pgorm_macros::test]
 async fn copy_streams_several_megabytes() -> Result<(), Error> {
     let ctx = TestContext::new("copy_streams_megabytes").await;
@@ -374,7 +374,7 @@ async fn copy_streams_several_megabytes() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    one chunk longer than a message carries is split, not refused
+// [spec:pgorm:req:conn.copy+2/test]    one chunk longer than a message carries is split, not refused
 #[pgorm_macros::test]
 async fn copy_in_one_oversized_chunk() -> Result<(), Error> {
     let ctx = TestContext::new("copy_in_one_oversized_chunk").await;
@@ -402,7 +402,7 @@ async fn copy_in_one_oversized_chunk() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    COPY TO over a SELECT whose values are inlined
+// [spec:pgorm:req:conn.copy+2/test]    COPY TO over a SELECT whose values are inlined
 #[pgorm_macros::test]
 async fn copy_out_of_a_select() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_of_a_select").await;
@@ -428,7 +428,7 @@ async fn copy_out_of_a_select() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    each write is a COPY TO source through its RETURNING list
+// [spec:pgorm:req:conn.copy+2/test]    each write is a COPY TO source through its RETURNING list
 #[pgorm_macros::test]
 async fn copy_out_of_writes_returning() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_of_writes_returning").await;
@@ -488,7 +488,7 @@ async fn copy_out_of_writes_returning() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a write without RETURNING is refused as a source before anything runs
+// [spec:pgorm:req:conn.copy+2/test]    a write without RETURNING is refused as a source before anything runs
 #[pgorm_macros::test]
 async fn copy_out_refuses_silent_write() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_refuses_silent_write").await;
@@ -517,7 +517,7 @@ async fn copy_out_refuses_silent_write() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a SELECT source's refused tie limit or window is refused before anything is sent
+// [spec:pgorm:req:conn.copy+2/test]    a SELECT source's refused tie limit or window is refused before anything is sent
 #[pgorm_macros::test]
 async fn copy_out_checks_select_source() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_checks_select_source").await;
@@ -581,7 +581,7 @@ async fn copy_out_checks_select_source() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a COPY TO refused at open leaves the connection as it was
+// [spec:pgorm:req:conn.copy+2/test]    a COPY TO refused at open leaves the connection as it was
 #[pgorm_macros::test]
 async fn copy_out_refused_at_open() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_refused_at_open").await;
@@ -613,7 +613,7 @@ async fn answers_in_step(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    a COPY FROM refused at open closes its connection rather than leave it out of step
+// [spec:pgorm:req:conn.copy+2/test]    a COPY FROM refused at open closes its connection rather than leave it out of step
 #[pgorm_macros::test]
 async fn copy_in_refused_at_open_closes() -> Result<(), Error> {
     let ctx = TestContext::new("copy_in_refused_at_open").await;
@@ -669,7 +669,59 @@ async fn copy_in_refused_at_open_closes() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    an abandoned COPY TO stream leaves the connection usable
+// [spec:pgorm:req:conn.copy+2/test]    a column list naming a generated column is refused at the start and closes the connection; with no list the generated columns are left out
+#[pgorm_macros::test]
+async fn copy_in_naming_a_generated_column_closes() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_in_generated_column").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(
+        "CREATE TABLE priced (id int PRIMARY KEY, price int NOT NULL, \
+         doubled int GENERATED ALWAYS AS (price * 2) STORED, \
+         tripled int GENERATED ALWAYS AS (price * 3) VIRTUAL)",
+    )
+    .await?;
+
+    for generated in ["doubled", "tripled"] {
+        let copy = CopyFromStatement::new(n("priced"), CopyText)
+            .columns([n("id"), n("price"), n(generated)])
+            .to_owned();
+        let error = db
+            .copy_in(&copy)
+            .await
+            .expect_err("a generated column takes no data");
+        assert_eq!(
+            sqlstate(&error),
+            Some(&SqlState::INVALID_COLUMN_REFERENCE),
+            "{error}"
+        );
+        let after = db
+            .query_one("SELECT 1", &[])
+            .await
+            .expect_err("the connection is closed");
+        assert!(
+            matches!(&after, Error::Postgres(error) if error.is_closed()),
+            "{after}"
+        );
+        drop(db);
+        db = ctx.db.get().await?;
+        answers_in_step(&db).await?;
+    }
+
+    let whole = CopyFromStatement::new(n("priced"), CopyText);
+    assert_eq!(copy_in_all(&mut db, &whole, &["1\t10\n"]).await?, 1);
+    let row = db
+        .query_one("SELECT doubled, tripled FROM priced WHERE id = 1", &[])
+        .await?;
+    assert_eq!((row.get::<_, i32>(0), row.get::<_, i32>(1)), (20, 30));
+    let out = copy_out_all(&mut db, &CopyToStatement::new(n("priced"), CopyText)).await?;
+    assert_eq!(String::from_utf8_lossy(&out), "1\t10\n");
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.copy+2/test]    an abandoned COPY TO stream leaves the connection usable
 #[pgorm_macros::test]
 async fn copy_out_dropped_early() -> Result<(), Error> {
     let ctx = TestContext::new("copy_out_dropped_early").await;
@@ -806,7 +858,7 @@ async fn copy_every_offered_option_runs() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy+1/test]    ON_ERROR ignore skips a row that does not convert, and the count says so
+// [spec:pgorm:req:conn.copy+2/test]    ON_ERROR ignore skips a row that does not convert, and the count says so
 #[pgorm_macros::test]
 async fn copy_ignore_skips_bad_rows() -> Result<(), Error> {
     let ctx = TestContext::new("copy_ignore_skips_bad_rows").await;
