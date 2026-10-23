@@ -13096,6 +13096,13 @@ children (
                 kind @note
                 text "Another, found by statement-cache-after-ddl (039d67f0): docs/spec/sql-ddl.md cites conn.pool.statement-cache+2 inside another rule's body, left unbumped so as not to re-stale that rule."
             }
+
+            {
+                at 2026-10-23T19:22:05.222987Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23: \"yes\". Drop the +N pins from rule cross-references in prose across docs/spec in one pass, as a wording-only change with no bumps. Fold in view-check-rule-callers (sql.ast.select.tie-limit and sql.ast.window-statement wrongly say a view body can reach the server unchecked) on the same terms."
+            }
         )
     }
 
@@ -13151,6 +13158,13 @@ children (
                 kind @note
                 text "Found by domain-enum-remaining (596d21c2). The Rust pipeline casts a typed column's comparisons (typed_cast in src/pipeline/sources.rs), but `col(table, column)` and alias tokens carry no column type, and neither do the Python and JavaScript pipelines, so comparing such a column with a bound string fails with 42883. A fix needs the column's type at those points (from the bindings' entity registrations, or named by the caller) and an enum-capable cast, since CastType is a closed set. Settle where the type comes from before building."
             }
+
+            {
+                at 2026-10-23T19:22:04.71849Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23: \"yes\" to taking the column's type from its entity wherever one is known (the bindings' entity registrations, a typed source), and letting the caller name the type where none is. Also in scope (found by in-subquery-enum-shapes): the Python and JavaScript statement builders' subquery membership carries no column type either, so it gets none of the domain-over-enum casts."
+            }
         )
     }
 
@@ -13165,6 +13179,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by domain-enum-remaining (596d21c2). For a declared belongs_to over columns whose type is a domain over an enum, create_table_from_entity emits a REFERENCES that PostgreSQL refuses with 42804 (incompatible types), both between two such columns and between one and its enum. This is documented, not handled. Either refuse it when generating, with an error naming the relation, or leave the constraint out with a note; codegen could say the same of a schema it reads. Test live."
+            }
+
+            {
+                at 2026-10-23T19:22:04.855336Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23: \"yes\" to refusing. create_table_from_entity returns an error naming the relation when a belongs_to's columns are a domain over an enum (PostgreSQL refuses the foreign key with 42804), rather than leaving the constraint out."
             }
         )
     }
@@ -13195,6 +13216,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by statement-cache-after-ddl (039d67f0). clear_statement_caches reaches only the calling process's pool, so after a migration other replicas' pools on the same database keep statements planned against the old schema. A connection checked out for the application's life (a Rust DatabaseConnection, a Python or JavaScript Connection) never sees a clear either, by the operator's design. RecyclingMethod::Custom(\"DISCARD ALL\"), which conn.pool.statement-cache.invalidate calls out of reach, could reuse the same recycle-time clear. One design for the cross-process part is a NOTIFY on a channel each pool listens to through a dedicated listener connection; whether pgorm should open that connection itself is the operator's call."
+            }
+
+            {
+                at 2026-10-23T19:22:04.570727Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23, asked whether a statement-cache clear should reach other processes: \"opt-in setting\". Build a pool setting, off by default. When on, the pool keeps one connection of its own LISTENing on a channel; pgorm-migration's runner NOTIFYs that channel after a batch that applied a migration commits; every pool with the setting on runs clear_statement_caches() on the notification. The cost is one idle connection per pool that turns it on. Same setting in the Python and JavaScript pools. Connections held checked out across the clear keep their statements until returned, as for a local clear; DISCARD ALL recycling reusing the recycle-time clear stays in scope if it falls out naturally."
             }
         )
     }
@@ -13255,6 +13283,13 @@ children (
                 kind @note
                 text "Found by schema-statement-wrapper (289e49b1). That node deleted pgorm-query's SchemaStatement so that 'schema' means only a database schema. pgorm-napi has its own JavaScript SchemaStatement class, the base of its DDL builders in lib/schema.d.ts, with the same clash beside its CREATE SCHEMA builders. Rename it (a breaking change to the JavaScript typings) or record why it stays."
             }
+
+            {
+                at 2026-10-23T19:22:04.984735Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23: \"yes\", rename it. A breaking change to the JavaScript typings; no alias kept."
+            }
         )
     }
 
@@ -13289,8 +13324,8 @@ children (
 
     {
         id copy-generated-column-refusal
-        title "A COPY FROM naming a generated column is refused before it starts, keeping the connection"
-        kind @fix
+        title "COPY's docs say a column list naming a generated column is refused at the start, closing the connection"
+        kind @docs
         deps (copy-binary-rows)
         log (
             {
@@ -13298,6 +13333,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by copy-binary-rows (004ad54a). A COPY FROM whose column list names a generated column is refused by the server at its start, and a refused COPY FROM closes its connection (conn.copy). The columns are described before a row COPY starts, but through a prepared SELECT, which does not say whether a column is generated; refusing first needs a catalogue read (pg_attribute.attgenerated) or the entity's declaration. Decide whether plain copy_in should check too."
+            }
+
+            {
+                at 2026-10-23T19:22:05.106496Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-23: \"yes\" to leaving it and documenting it. No pre-check (it would cost a catalogue read before every COPY): document in conn.copy and the bindings' COPY docs that a column list naming a generated column is refused by the server at the start, which closes the connection."
             }
         )
     }
@@ -13343,6 +13385,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by rust-view-body-check (77650f0c). sql.ast.select.tie-limit+1 and sql.ast.window-statement+8 list the executors and the Python and JavaScript builders as the callers of check_tie_limit and check_windows, and say a caller of pgorm-query alone who skips the check reaches the server. For view, materialized view and CREATE TABLE AS bodies that no longer holds: the Rust constructors run both checks. Update both rules, which means bumping them, re-covering their owners and re-pinning their annotations; this could ride with spec-prose-unversioned-refs if that pass bumps them anyway."
+            }
+
+            {
+                at 2026-10-23T19:22:05.451762Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Folded into spec-prose-unversioned-refs by the operator's 2026-10-23 decision; completes with it."
             }
         )
     }
@@ -13402,6 +13451,167 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-stream-truth-testing (0ace12e8). In docs/spec/python.md the python.listen rule's marker line is written twice in a row, and nspec reads the second as the first line of the rule's body. Removing it changes the body, so the rule takes a bump, its owner (conn-listen) is re-covered, and its annotations are re-pinned."
+            }
+        )
+    }
+
+    {
+        id coming-from-seaorm
+        title "A Coming from SeaORM guide maps every removed or renamed API to its replacement, and the replacements carry doc aliases for the old names"
+        kind @docs
+        log (
+            {
+                at 2026-10-23T19:22:05.689377Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-23, from an agent's report on porting an application from SeaORM: find_also_related broke at 8 call sites and the compiler gave no hint of the replacement. A #[doc(alias)] only helps rustdoc search; stable Rust cannot add a hint to rustc's \"no method named\" error. Write the guide (find_also_related/linked and SelectTwo to graph() / related_maybe / join_maybe, the removed Statement/StatementBuilder, the scoped transactions, set(..), Insert::one/many, the pool not being a ConnectionTrait, the migration surface: up only, the ledger rename, and so on, from CLAUDE.md's Key Differences and the spec's departures), link it from the README, and put #[doc(alias = \"...\")] for each old name on its replacement."
+            }
+        )
+    }
+
+    {
+        id graph-related-one
+        title "A graph joins the path Related<F> describes as a required source, as related_maybe does for an optional one"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T19:22:05.909041Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-23, from the porting feedback: there is related_maybe::<F>() but no related_one::<F>(), so an inner join needed graph().join_one::<F>(Relation::X.def()) and a RelationTrait import although Related<F> already knows the relation (the graph spec left related_one unspecified). Add related_one::<F>() on SelectGraph: via() the junction when Related::via is Some, then join_one Related::to(), every hop inner. Spec it in query.graph.slots, live tests including a junction path and an unmatched row dropping out."
+            }
+        )
+    }
+
+    {
+        id migration-ledger-schema
+        title "The migration ledger can live in a schema of its own, which the runner creates if it is missing"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T19:22:06.108631Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-23, from the porting feedback: the ledger table sat beside the application's tables, and the old server's audit triggers on every table made recording the first migration fail. migration_table_name() returns an unqualified Name, so the ledger can be renamed but not put in a schema (also noted 2026-09-08 by the varied-schema work). Let the ledger be schema-qualified (a TableRef or a schema hook beside the name), have the runner CREATE SCHEMA IF NOT EXISTS before creating the ledger, keep legacy-name adoption to the default name, and document it in the migration README and migration.runner. Live tests."
+            }
+        )
+    }
+
+    {
+        id migration-sql-files
+        title "A .sql file is a migration in one line: named after its file, checksummed by its contents, its grammar checked at compile time"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T19:22:06.318562Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-23, from the porting feedback: running a raw .sql file as a migration needed batch_execute and a hand-written migration name, and the template shows only the query-builder style. Add a macro (working name sql_migration!(\"path/m2026..._name.sql\")) expanding to a MigrationTrait whose name is the file stem, whose up runs the file through batch_execute, and whose checksum is a digest of the file's text (so editing an applied file is caught), validated through the sql! macro's libpg_query check at compile time (multi-statement). Show both styles in the migration template. Spec in migration.md; tests for the name, the checksum, the compile-time refusal (trybuild or compile_fail doctest) and a live run."
+            }
+        )
+    }
+
+    {
+        id boolean-operator-parens
+        title "Boolean-valued operators render bare under AND and OR, as comparisons do"
+        kind @fix
+        deps (like-ilike-render-parens)
+        log (
+            {
+                at 2026-10-23T19:22:06.528319Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by like-ilike-render-parens. returns_boolean in pgorm-query/src/backend/query_builder.rs leaves out Overlap (&&), Regex (~) and RegexCaseInsensitive (~*), all of which return boolean, so under AND/OR they keep parentheses their peers drop. Audit the operator list against PostgreSQL's operators (the containment and range operators too), fix it, and let the render oracle confirm each."
+            }
+        )
+    }
+
+    {
+        id between-render-parens
+        title "BETWEEN under AND and OR renders bare, unless the spec keeps its parentheses on purpose"
+        kind @fix
+        deps (like-ilike-render-parens)
+        log (
+            {
+                at 2026-10-23T19:22:06.736516Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by like-ilike-render-parens. A BETWEEN-family expression under AND/OR stays parenthesised (the napi between golden renders (\"a\" BETWEEN $1 AND $2) AND ...); the grammar accepts it bare. First check sql.render.precedence and sql.render.parens for a stated reason (BETWEEN's own AND makes the bare form harder to read); if there is one, record it in the rule and close; if not, render it bare and move the goldens."
+            }
+        )
+    }
+
+    {
+        id oracle-shim-values-table
+        title "The render oracle's shim checks a render that begins with VALUES or TABLE"
+        kind @test
+        deps (oracle-shim-parenthesised)
+        log (
+            {
+                at 2026-10-23T19:22:06.95864Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by oracle-shim-parenthesised. The shim's statement keywords at the start of a render leave out VALUES and TABLE (it accepts them only after a leading parenthesis). No render begins that way today; add them so one that does cannot skip the grammar check."
+            }
+        )
+    }
+
+    {
+        id cursor-typed-secondary
+        title "A tiebreak a caller installs on a cursor carries its column's cast"
+        kind @fix
+        deps (graph-cursor-enum-tiebreak)
+        log (
+            {
+                at 2026-10-23T19:22:07.164692Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by graph-cursor-enum-tiebreak. Cursor::set_secondary_order_by takes untyped entries, so a tiebreak a caller installs on a column whose type is a domain over an enum still fails with 42883. Give it a typed form that takes the column (and so its save_as cast), as the graph's own tiebreaks now do."
+            }
+        )
+    }
+
+    {
+        id bindings-array-subquery
+        title "Python and JavaScript expressions take ARRAY(subquery), as Rust's Expr::array does"
+        kind @feat
+        deps (in-subquery-enum-shapes)
+        log (
+            {
+                at 2026-10-23T19:22:07.381794Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by in-subquery-enum-shapes, which added Expr::array(SelectStatement) rendering ARRAY(...) in pgorm-query. Neither binding exposes it. Add it with stubs/typings, capability entries, parity cases and live tests."
+            }
+        )
+    }
+
+    {
+        id value-decode-created-multiranges
+        title "The Rust Value decode reads a multirange type a schema created"
+        kind @feat
+        deps (value-decode-created-ranges)
+        log (
+            {
+                at 2026-10-23T19:22:07.590096Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by value-decode-created-ranges. Created multiranges still have no Value decode in COPY or elsewhere in Rust, because tokio-postgres reports them as simple types. Decode them by a catalogue lookup of the multirange's range type or by a text cast, as created ranges decode to their text form."
+            }
+        )
+    }
+
+    {
+        id check-clauses-shared
+        title "Every caller pairing the tie-limit and window checks calls one public check"
+        kind @refactor
+        deps (view-check-dedup)
+        log (
+            {
+                at 2026-10-23T19:22:07.811222Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by view-check-dedup, which added the crate-private SelectStatement::check_clauses for the view and COPY-source checks. PySelect::check, pgorm-napi's checked and the executor's ensure_select_list still pair check_tie_limit and check_windows themselves. Making check_clauses public (an addition, with a sql.surface entry) would let all of them share it."
             }
         )
     }
