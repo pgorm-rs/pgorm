@@ -13152,6 +13152,13 @@ children (
                 kind @decision
                 text "Operator 2026-10-23: \"yes\". Drop the +N pins from rule cross-references in prose across docs/spec in one pass, as a wording-only change with no bumps. Fold in view-check-rule-callers (sql.ast.select.tie-limit and sql.ast.window-statement wrongly say a view body can reach the server unchecked) on the same terms."
             }
+
+            {
+                at 2026-10-23T20:42:26.949136Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "More found 2026-10-23: docs/spec/paginate.md cites macros.sql+4 in backticks (migration-sql-files)."
+            }
         )
     }
 
@@ -13755,6 +13762,151 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by view-check-dedup, which added the crate-private SelectStatement::check_clauses for the view and COPY-source checks. PySelect::check, pgorm-napi's checked and the executor's ensure_select_list still pair check_tie_limit and check_windows themselves. Making check_clauses public (an addition, with a sql.surface entry) would let all of them share it."
+            }
+        )
+    }
+
+    {
+        id test-run-isolation
+        title "Concurrent test runs on one PostgreSQL server never touch each other's databases, roles or connections"
+        kind @test
+        log (
+            {
+                at 2026-10-23T20:42:25.599936Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-23: \"can't you design the tests so they can't conflict\". On 2026-10-23 the lead's full run and an agent's pgorm-migration run, from two checkouts on the shared server, dropped each other's databases: pgorm-migration names a test database after the test alone and drops \"any prior copy\" first (DROP DATABASE .. WITH (FORCE)), so 7 tests failed with 57P01, 3D000 and 23505 on pg_database. pgorm's tests/common/setup/mod.rs adds a hash of the checkout path (scoped_db_name), which separates worktrees but not two runs of one checkout. Design agreed with the operator: (1) every test database name carries a suffix unique to the test process, not only to the checkout, through one shared helper per language (Rust crates, pgorm-napi tests/support.ts), within the 63-byte limit; (2) a run never drops a database it did not create (the drop-a-prior-copy step goes); (3) leftovers of a crashed run are swept only when provably dead: the name records the creating process, and a database is dropped only when that process no longer exists and nobody is connected; (4) cluster-wide objects a test creates (roles: tests/view_tests.rs, pgorm-migration's role test) take the same per-run suffix, and every pg_terminate_backend (tests/listen_tests.rs, pgorm-pool/tests/postgres.rs, pgorm-napi listen/copy tests, pgorm-python test_listen.py) matches only its own database's connections; (5) live tests that run in the shared postgres database (pgorm-query, pgorm-pool) are checked for anything they leave or share there, and moved onto per-run databases if they do; (6) proof: the same suites run twice at once, from one checkout and from two worktrees, with zero failures, and the old naming shown to fail that test. pgorm-python's suite runs on its own disposable server and is out of scope; security/ harnesses keep their own containers."
+            }
+        )
+    }
+
+    {
+        id python-schema-refusal-test
+        title "Python's schema.from_entity raises ConstructionError for a foreign key PostgreSQL cannot build, tested"
+        kind @test
+        deps (schema-fk-domain-enum)
+        log (
+            {
+                at 2026-10-23T20:42:25.740008Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by schema-fk-domain-enum (c8da47a9). create_table_from_entity now refuses a belongs_to over a column typed as a domain over an enum, and pgorm-python maps the refusal to ConstructionError from schema.from_entity, but nothing tests that path: it needs an application-binding entity with a domain-over-enum key. Add it, and bump python.schema if its text should say so."
+            }
+        )
+    }
+
+    {
+        id codegen-refused-fk
+        title "Codegen does not generate a relation that create_table_from_entity would refuse"
+        kind @fix
+        deps (schema-fk-domain-enum)
+        log (
+            {
+                at 2026-10-23T20:42:25.882865Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by schema-fk-domain-enum (c8da47a9). pgorm-codegen reads DDL text and can emit a belongs_to over columns typed as a domain over an enum, which create_table_from_entity now refuses (PostgreSQL itself refuses such a key with 42804, so a dump cannot contain one as a constraint, but codegen may infer relations otherwise). Check whether codegen can produce one; if it can, refuse or annotate it as unsupported, as codegen does for other unsupported domain features. Also: a relation whose ColumnPairs are built from bare names records no types and is not checked by generation."
+            }
+        )
+    }
+
+    {
+        id graph-limit-offset
+        title "A graph takes limit and offset as the other SELECT builders do"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T20:42:26.025853Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by coming-from-seaorm. SelectGraph does not implement QuerySelect, so porting find_also_related(..).limit(n) needs graph.query().limit(n), paginate, or a cursor's first(n), the most awkward replacement the guide had to explain. Decide whether SelectGraph should take limit/offset directly (row-level, as the SQL does, which for a many slot is not per-root) and say what they mean for grouped reads (all_grouped) before adding them."
+            }
+        )
+    }
+
+    {
+        id graph-via-as
+        title "A graph's via hop can be re-bound to an alias, so a path through one table twice can be written"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T20:42:26.167976Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by coming-from-seaorm. via() has no _as form, so a SeaORM linked chain that passes through the same table twice has no direct graph spelling except an alias on the last hop. Add via_as(rel, alias) with the same aliasing terms as join_maybe_as / join_one_as (query.graph.aliases), with live tests of a self-referencing path."
+            }
+        )
+    }
+
+    {
+        id codegen-root-export
+        title "pgorm-codegen exports entities_from_sql from its crate root"
+        kind @feat
+        log (
+            {
+                at 2026-10-23T20:42:26.30576Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by coming-from-seaorm. entities_from_sql is reachable only as pgorm_codegen::sql_schema::entities_from_sql. Re-export it (and whatever a caller needs beside it) at the crate root and update the docs and guide."
+            }
+        )
+    }
+
+    {
+        id docs-stale-cleanup
+        title "Doc comments, READMEs and rule text that describe removed or changed things are corrected"
+        kind @docs
+        log (
+            {
+                at 2026-10-23T20:42:26.448116Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by coming-from-seaorm, statement-cache-cross-process and migration-sql-files (2026-10-23): EntityTrait's doc comment (src/entity/base_entity.rs) lists the deleted insert/update/delete shortcuts; the codegen.entity rule (docs/spec/codegen.md) names pgorm-cli and date_time_crate, deleted in 38096c9b; pgorm-codegen's README says entities can be introspected from a live database, which nothing does; src/entity/created_range.rs has two unresolved doc links (crate::Range, crate::Multirange) that cargo doc warns about; conn.pool says Box<dyn Connect> where the pool now holds an Arc; migration.sql-file.compile says the compile error names the line, which holds only when the parser's message names a token (macros.sql.ceiling). Rule text changes take bumps."
+            }
+        )
+    }
+
+    {
+        id cache-listener-keepalive
+        title "The statement-cache listener survives a server's idle_session_timeout without clearing every cache each time"
+        kind @fix
+        deps (statement-cache-cross-process)
+        log (
+            {
+                at 2026-10-23T20:42:26.586012Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by statement-cache-cross-process. A server with idle_session_timeout set ends the pool's idle listening connection; each reconnect clears every statement cache, since a notification may have been missed. Keep the connection from idling out (a periodic no-op query, or SET idle_session_timeout = 0 on the listener's session, which is the cheaper and exact fix if the role may set it) and test it against a server with the timeout set."
+            }
+        )
+    }
+
+    {
+        id binoper-missing-variants
+        title "The regex-mismatch, JSON-path and range-position operators have BinOper variants, so they render with their real precedence"
+        kind @feat
+        deps (boolean-operator-parens)
+        log (
+            {
+                at 2026-10-23T20:42:26.726332Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by boolean-operator-parens. !~, !~*, @?, -|- and the range position operators &< and &> have no BinOper variant and arrive only as BinOper::Raw, whose result type is unknown, so they keep parentheses under the logical operators. sql.types.opers asks for a variant where an operator's parenthesisation differs from the default. Add them (and their binding spellings) with oracle-checked grouping tests."
+            }
+        )
+    }
+
+    {
+        id generic-operator-redundant-parens
+        title "A boolean generic operator under a comparison, IS, IN or LIKE renders bare where the grammar groups it the same way"
+        kind @fix
+        deps (boolean-operator-parens)
+        log (
+            {
+                at 2026-10-23T20:42:26.873Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by boolean-operator-parens. The grammar ranks generic operators (@>, &&, ~ ..) above comparison, IS, IN and LIKE, but such an operator under one of them keeps parentheses, e.g. (\"a\" @> $1) = TRUE. Only redundant, never a wrong grouping; low priority."
             }
         )
     }
