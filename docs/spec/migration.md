@@ -12,7 +12,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## The runner and its ledger
 
-> [spec:pgorm:def:migration.runner+3]
+> [spec:pgorm:def:migration.runner+4]
 > A migration is a `MigrationTrait` implementor: `MigrationName + Send + Sync`
 > plus a single `async fn up(&self, tx: &DatabaseTransaction<'_>)`, and an
 > optional `fn checksum(&self) -> Option<String>` defaulting to `None`. A
@@ -21,8 +21,9 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > migration the project owns.
 >
 > `MigratorTrait` provides, on top of that list: `migration_table_name() ->
-> Name` (defaulting to the `ledger` entity's name), `install(db)` to create
-> the ledger, `adopt_legacy_ledger(db)` to take over one left under the
+> Name` (defaulting to the `ledger` entity's name) and `migration_table_schema()
+> -> Option<Name>` (defaulting to `None`) to place the ledger, `install(db)` to
+> create it, `adopt_legacy_ledger(db)` to take over one left under the
 > inherited name, `up(db, steps)` to apply pending migrations, `status(db)` to
 > log each migration's state, `lock_key()` and `lock(tx)` for the run's advisory
 > lock, and the `get_migration_files` / `get_migration_models` /
@@ -38,12 +39,34 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > The ledger is a three-column table — `version TEXT NOT NULL PRIMARY KEY`,
 > `applied_at BIGINT NOT NULL`, and a nullable `checksum TEXT` — mirrored by the
 > `ledger::Model` entity, whose `checksum` field is `Option<String>`. `install`
-> creates it with `IF NOT EXISTS` under `migration_table_name()`, so an
-> overridden name is honoured on creation as well as on read and write. It is
-> the only method that provisions anything, and `up` is the only method that
-> calls it — the accessors read instead, per `migration.read-only`. Results are
-> reported as `Migration` values exposing `name()` and `status()`, where
-> `MigrationStatus` is `Pending` or `Applied` and `Display`s as those words.
+> creates it with `IF NOT EXISTS` under `migration_table_name()`, in
+> `migration_table_schema()` when that is set, so an overridden placement is
+> honoured on creation as well as on read and write. It is the only method that
+> provisions anything, and `up` is the only method that calls it — the
+> accessors read instead, per `migration.read-only`. Results are reported as
+> `Migration` values exposing `name()` and `status()`, where `MigrationStatus`
+> is `Pending` or `Applied` and `Display`s as those words.
+>
+> `migration_table_schema()` puts the ledger in a schema of its own. `None`
+> leaves the table's name unqualified, so it resolves through `search_path` as
+> any unqualified name does, which is where every earlier release put it. A
+> schema keeps the ledger apart from the application's tables and from the
+> triggers, policies and grants they carry: `install` creates the schema before
+> the table when `pg_namespace` does not list it, with `CREATE SCHEMA IF NOT
+> EXISTS`, and every statement the runner issues against the ledger names the
+> table qualified by it — the creation and the widening, the catalogue reads
+> that locate the table and inspect its columns, the read of its rows, and each
+> row's insert — so a table of the same name elsewhere on `search_path` is never
+> taken for it. The catalogue is read before the `CREATE SCHEMA` because that
+> statement checks the database's `CREATE` privilege before it checks whether
+> the schema exists, and a role that owns a schema made for it need not hold
+> that privilege. The schema does not enter `lock_key()`: ledgers of one name in
+> two schemas share a key, which orders their runs and does nothing else, and
+> the default ledger keeps the key every earlier release took. Moving a ledger
+> that already exists is the operator's step, not the runner's: a ledger left
+> where it was reads as absent from the new place, so every migration would run
+> again. It is moved with `ALTER TABLE ... SET SCHEMA` before a release that
+> names the schema runs.
 >
 > The ledger's default physical name is `pgorm_migrations`, exposed as
 > `DEFAULT_LEDGER_TABLE`, and the Rust module holding its entity is `ledger`.
@@ -215,7 +238,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## Adopting a ledger left under the inherited name
 
-> [spec:pgorm:req:migration.ledger-upgrade+1]
+> [spec:pgorm:req:migration.ledger-upgrade+2]
 > Renaming the default ledger table cannot be done by changing the default. A
 > deployment upgraded to the renamed crate would look at `pgorm_migrations`,
 > find nothing, and read its entire applied history as pending — then re-run
@@ -234,10 +257,13 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > deliberately: it is harmless, and it is the only remaining evidence of where
 > the table came from.
 >
-> Three conditions gate it, all required. `migration_table_name()` MUST be the
-> default — a custom name is the caller's own ledger, is not adopted from, and
-> is never renamed, which also makes overriding it back to `seaql_migrations`
-> the supported way to decline the rename entirely. The default name MUST be
+> Three conditions gate it, all required. The ledger MUST be the default one:
+> `migration_table_name()` the default name and `migration_table_schema()`
+> `None`. A custom name or a schema is the caller's own placement, is not
+> adopted from, and is never renamed, which also makes overriding the name back
+> to `seaql_migrations` the supported way to decline the rename entirely. The
+> legacy table is looked for, and renamed, where the unqualified name resolves,
+> because that is where an earlier release left it. The default name MUST be
 > absent — a database holding both keeps both, the ledger in use wins, and the
 > legacy table is left untouched rather than read or destroyed. The legacy name
 > MUST be present, or there is nothing to adopt. All three are re-tested on
@@ -272,9 +298,9 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > failure this requirement exists to prevent — an upgraded deployment's entire
 > applied history read as pending — and would do so on the very call an operator
 > makes to decide whether the upgrade is safe. The read is gated on the same
-> first condition as the rename: `migration_table_name()` MUST be the default,
-> so a caller who named their own ledger is never answered from a table that is
-> not theirs. Nor does the read need the second condition, because it resolves
+> first condition as the rename: the ledger MUST be the default one, so a
+> caller who named or placed their own ledger is never answered from a table
+> that is not theirs. Nor does the read need the second condition, because it resolves
 > the two names in order — the ledger in use still wins, and a legacy table
 > beside it is still neither read nor touched. The consequence is that `status`
 > gives the same answer before and after adoption, and only `up` moves the
@@ -282,7 +308,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 
 ## Asking is not changing
 
-> [spec:pgorm:req:migration.read-only]
+> [spec:pgorm:req:migration.read-only+1]
 > Checking migration status MUST write nothing. `status`,
 > `get_migration_models`, `get_migration_with_status`, `get_pending_migrations`
 > and `get_applied_migrations` are named for reads and are exactly what a
@@ -295,13 +321,17 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > without applying anything still has `install` itself.
 >
 > A read therefore *locates* the ledger instead of creating it, from catalogue
-> reads alone: `migration_table_name()` if that table exists, else
+> reads alone: the configured table — `migration_table_name()`, qualified by
+> `migration_table_schema()` when that is set — if it exists, else
 > `LEGACY_LEDGER_TABLE` under the gate `migration.ledger-upgrade` sets, else
-> nothing. Resolution is one `to_regclass` over both candidate names, which
-> takes no relation lock, and the names are passed through `quote_ident` so the
+> nothing. Resolution is one `to_regclass` over both candidates, which takes no
+> relation lock, and each identifier is passed through `quote_ident` so the
 > lookup agrees with the quoted form the crate renders everywhere else rather
-> than case-folding a mixed-case ledger away. Where the located table lacks the
-> checksum column, the projection substitutes a bound `NULL` per
+> than case-folding a mixed-case ledger away. A configured schema qualifies the
+> lookup, so the ledger is found in that schema or not at all, never in another
+> schema on `search_path`; the checksum column is looked for in the same
+> schema, or in the current schema for an unqualified ledger. Where the located
+> table lacks the column, the projection substitutes a bound `NULL` per
 > `migration.checksum`.
 >
 > No ledger is not an error and not an empty answer about a missing table: it

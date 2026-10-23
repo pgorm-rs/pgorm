@@ -13592,12 +13592,20 @@ children (
         id migration-ledger-schema
         title "The migration ledger can live in a schema of its own, which the runner creates if it is missing"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:06.108631Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23, from the porting feedback: the ledger table sat beside the application's tables, and the old server's audit triggers on every table made recording the first migration fail. migration_table_name() returns an unqualified Name, so the ledger can be renamed but not put in a schema (also noted 2026-09-08 by the varied-schema work). Let the ledger be schema-qualified (a TableRef or a schema hook beside the name), have the runner CREATE SCHEMA IF NOT EXISTS before creating the ledger, keep legacy-name adoption to the default name, and document it in the migration README and migration.runner. Live tests."
+            }
+
+            {
+                at 2026-10-23T20:10:20.003834Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13612,6 +13620,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23, from the porting feedback: running a raw .sql file as a migration needed batch_execute and a hand-written migration name, and the template shows only the query-builder style. Add a macro (working name sql_migration!(\"path/m2026..._name.sql\")) expanding to a MigrationTrait whose name is the file stem, whose up runs the file through batch_execute, and whose checksum is a digest of the file's text (so editing an applied file is caught), validated through the sql! macro's libpg_query check at compile time (multi-statement). Show both styles in the migration template. Spec in migration.md; tests for the name, the checksum, the compile-time refusal (trybuild or compile_fail doctest) and a live run."
+            }
+
+            {
+                at 2026-10-23T19:43:20.099659Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }
