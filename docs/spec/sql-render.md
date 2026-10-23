@@ -327,7 +327,7 @@ an ideal Postgres renderer would emit.
 > escape character as an inline constant, or ` ESCAPE ''` when escaping is
 > off — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+11]
+> [spec:pgorm:def:sql.render.precedence+12]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -345,15 +345,22 @@ an ideal Postgres renderer would emit.
 > could not cost a `BETWEEN` operand its bare rendering); the inner expression
 > is an arithmetic (`* / % + -`) or shift (`<< >>`) binary and the outer
 > operator is a comparison, BETWEEN, IN, LIKE, or logical operator; or the
-> inner expression is a comparison, IN, LIKE, or IS binary and the outer
-> operator is logical (`AND`/`OR`/`NOT`). Each of those families is the whole
-> family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
+> inner expression is a comparison, BETWEEN, IN, LIKE, or IS binary and the
+> outer operator is logical (`AND`/`OR`/`NOT`). Each of those families is the
+> whole family and not a pair: BETWEEN is `BETWEEN`, `NOT BETWEEN` and both
 > `SYMMETRIC` forms, and IS is `IS`, `IS NOT`, `IS DISTINCT FROM` and
 > `IS NOT DISTINCT FROM`, and LIKE is `LIKE`, `NOT LIKE`, `ILIKE`,
 > `NOT ILIKE`, `SIMILAR TO` and `NOT SIMILAR TO`, which the grammar ranks
 > together at one level — a new operator added to
 > one of these lexemes but not to its `Oper` predicate is the failure mode
 > this clause exists to name.
+> A BETWEEN is bare under the logical operators for the reason a comparison
+> is: the grammar ranks BETWEEN above `NOT`, `AND` and `OR`, so in
+> `a BETWEEN 1 AND 2 AND b` the first `AND` is BETWEEN's own and the second
+> the logical operator, the one reading the grammar admits. Its own `AND` is
+> no reason to keep the parentheses, and no rule kept them on purpose; its
+> bounds are operands of the BETWEEN rather than of that `AND`
+> (`sql.render.parens`).
 > The Postgres-specific extension also
 > treats an inner `@>`, `<@`, `&&`, `%` (similarity), `<%`, `<<%`, `@@`, `?`,
 > `?|`, `?&`, `~` or `~*` comparison as higher precedence than a logical outer
@@ -368,7 +375,7 @@ an ideal Postgres renderer would emit.
 > result the renderer cannot know, and keeps its parentheses. All other
 > combinations are considered unknown and keep their parentheses.
 
-> [spec:pgorm:req:sql.render.parens+3]
+> [spec:pgorm:req:sql.render.parens+4]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by
 > default, dropping parentheses only in these cases. Left operand: dropped when
 > `sql.render.precedence` says the left is higher-precedence, or when the left
@@ -378,7 +385,14 @@ an ideal Postgres renderer would emit.
 > dropped when higher-precedence, or under the one structural hack left for a
 > ternary construct encoded as nested binaries: the outer operator is in the
 > BETWEEN family — `BETWEEN`, `NOT BETWEEN`, and the two `SYMMETRIC` forms —
-> and the right is an `AND` binary (`x BETWEEN a AND b`). The hack keys on
+> and the right is an `AND` binary (`x BETWEEN a AND b`). That `AND` is
+> BETWEEN's own keyword, not a logical operator, so it renders bare and each
+> bound is placed as an operand of the BETWEEN: bare when
+> `sql.render.precedence` ranks it above BETWEEN (an atom, an arithmetic or
+> shift binary), parenthesised otherwise. Judged as operands of a logical
+> `AND`, a comparison bound would render bare and regroup — the grammar reads
+> `x BETWEEN a AND c = d` as `(x BETWEEN a AND c) = d` — and a LIKE lower
+> bound would not parse, the lower bound being a `b_expr`. The hack keys on
 > `Oper::is_between`, so membership of that predicate, not the lexeme, is what
 > decides: an operator whose text begins `BETWEEN` but which the predicate
 > does not name renders `x BETWEEN … (a AND b)`, which parses as a comparison

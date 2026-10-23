@@ -257,7 +257,7 @@ fn select_18() {
             .and_where(Expr::col(Glyph::Aspect).between(3, 5))
             .and_where(Expr::col(Glyph::Aspect).not_between(8, 10))
             .to_string(),
-        r#"SELECT "aspect" FROM "glyph" WHERE ("aspect" BETWEEN 3 AND 5) AND ("aspect" NOT BETWEEN 8 AND 10)"#
+        r#"SELECT "aspect" FROM "glyph" WHERE "aspect" BETWEEN 3 AND 5 AND "aspect" NOT BETWEEN 8 AND 10"#
     );
 }
 
@@ -2261,7 +2261,7 @@ fn json_key_existence_operators_render() {
     );
 }
 
-// [spec:pgorm:def:sql.render.precedence+11/test]    the existence operators return
+// [spec:pgorm:def:sql.render.precedence+12/test]    the existence operators return
 // boolean, so a logical outer operator drops their parentheses the way it does
 // for `@>`; the accessors return JSON or text and keep theirs
 #[test]
@@ -2380,7 +2380,7 @@ fn regex_case_insensitive_bin_oper() {
 }
 
 #[test]
-// [spec:pgorm:req:sql.render.parens+3/test]
+// [spec:pgorm:req:sql.render.parens+4/test]
 fn test_issue_674_nested_logical() {
     let t = SimpleExpr::Value(true.into());
     let f = SimpleExpr::Value(false.into());
@@ -2401,7 +2401,7 @@ fn test_issue_674_nested_logical() {
 }
 
 #[test]
-// [spec:pgorm:def:sql.render.precedence+11/test]
+// [spec:pgorm:def:sql.render.precedence+12/test]
 fn test_issue_674_nested_comparison() {
     let int100 = SimpleExpr::Value(100i32.into());
     let int0 = SimpleExpr::Value(0i32.into());

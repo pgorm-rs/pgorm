@@ -13644,6 +13644,7 @@ children (
         title "BETWEEN under AND and OR renders bare, unless the spec keeps its parentheses on purpose"
         kind @fix
         deps (like-ilike-render-parens)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:06.736516Z
@@ -13657,6 +13658,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-23T20:14:51.562869Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

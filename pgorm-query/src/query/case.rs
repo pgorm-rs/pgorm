@@ -117,7 +117,7 @@ impl CaseStatement {
     ///     [
     ///         r#"SELECT"#,
     ///         r#"(CASE WHEN ("character"."font_size" > 48 OR "character"."size_w" > 500) THEN 'large'"#,
-    ///         r#"WHEN (("character"."font_size" BETWEEN 24 AND 48) OR ("character"."size_w" BETWEEN 300 AND 500)) THEN 'medium'"#,
+    ///         r#"WHEN ("character"."font_size" BETWEEN 24 AND 48 OR "character"."size_w" BETWEEN 300 AND 500) THEN 'medium'"#,
     ///         r#"ELSE 'small' END) AS "char_size""#,
     ///         r#"FROM "character""#
     ///     ]

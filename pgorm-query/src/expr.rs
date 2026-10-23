@@ -1984,10 +1984,6 @@ impl SimpleExpr {
         self.like_like(BinOper::NotLike, like.into_like_expr())
     }
 
-    pub(crate) fn is_binary(&self) -> bool {
-        matches!(self, Self::Binary(_, _, _))
-    }
-
     pub(crate) fn get_bin_oper(&self) -> Option<&BinOper> {
         match self {
             Self::Binary(_, oper, _) => Some(oper),

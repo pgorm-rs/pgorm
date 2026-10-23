@@ -39,6 +39,7 @@ mod json;
 mod json_table;
 #[path = "query_builder_merge.rs"]
 mod merge;
+mod precedence;
 #[path = "query_builder_range.rs"]
 mod range;
 #[path = "query_builder_returning.rs"]
@@ -416,15 +417,8 @@ impl QueryBuilder {
             SimpleExpr::Unary(op, expr) => {
                 self.prepare_un_oper(op, sql);
                 write!(sql, " ").unwrap();
-                let drop_expr_paren =
-                    self.inner_expr_well_known_greater_precedence(expr, &(*op).into());
-                if !drop_expr_paren {
-                    write!(sql, "(").unwrap();
-                }
-                self.prepare_simple_expr(expr, sql);
-                if !drop_expr_paren {
-                    write!(sql, ")").unwrap();
-                }
+                let bare = self.inner_expr_well_known_greater_precedence(expr, &(*op).into());
+                self.prepare_operand(expr, bare, sql);
             }
             SimpleExpr::FunctionCall(func) => {
                 self.prepare_function_name(&func.func, sql);
@@ -1324,57 +1318,6 @@ impl QueryBuilder {
     fn prepare_condition_where(&self, condition: &Condition, sql: &mut dyn SqlWriter) {
         let simple_expr = condition.to_simple_expr();
         self.prepare_simple_expr(&simple_expr, sql);
-    }
-
-    /// Translate a binary expr to SQL.
-    // [spec:pgorm:req:sql.render.parens+3]
-    fn binary_expr(
-        &self,
-        left: &SimpleExpr,
-        op: &BinOper,
-        right: &SimpleExpr,
-        sql: &mut dyn SqlWriter,
-    ) {
-        // If left has higher precedence than op, we can drop parentheses around left
-        let drop_left_higher_precedence =
-            self.inner_expr_well_known_greater_precedence(left, &(*op).into());
-
-        // Figure out if left associativity rules allow us to drop the left parenthesis
-        let drop_left_assoc = left.is_binary()
-            && op == left.get_bin_oper().unwrap()
-            && self.well_known_left_associative(op);
-
-        let left_paren = !drop_left_higher_precedence && !drop_left_assoc;
-        if left_paren {
-            write!(sql, "(").unwrap();
-        }
-        self.prepare_simple_expr(left, sql);
-        if left_paren {
-            write!(sql, ")").unwrap();
-        }
-
-        write!(sql, " ").unwrap();
-        self.prepare_bin_oper(op, sql);
-        write!(sql, " ").unwrap();
-
-        // If right has higher precedence than op, we can drop parentheses around right
-        let drop_right_higher_precedence =
-            self.inner_expr_well_known_greater_precedence(right, &(*op).into());
-
-        let op_as_oper = Oper::BinOper(*op);
-        // Due to representation of trinary op between as nested binary ops.
-        let drop_right_between_hack = op_as_oper.is_between()
-            && right.is_binary()
-            && matches!(right.get_bin_oper(), Some(&BinOper::And));
-
-        let right_paren = !drop_right_higher_precedence && !drop_right_between_hack;
-        if right_paren {
-            write!(sql, "(").unwrap();
-        }
-        self.prepare_simple_expr(right, sql);
-        if right_paren {
-            write!(sql, ")").unwrap();
-        }
     }
 
     /// Write insert default rows expression.
@@ -2509,102 +2452,6 @@ impl QueryBuilder {
             None => {}
         }
     }
-
-    /// Whether parentheses around `inner` can be dropped inside `outer_oper`.
-    ///
-    /// One table, because there is one dialect. Atoms never need them —
-    /// all but a column and a tuple already wrap themselves. A binary inner
-    /// expression keeps them unless it binds tighter than the operator it
-    /// sits under: arithmetic and shifts bind tighter than comparison,
-    /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
-    /// boolean binds tighter than `AND`/`OR`/`NOT`. Every other pairing is
-    /// unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+11]
-    fn inner_expr_well_known_greater_precedence(
-        &self,
-        inner: &SimpleExpr,
-        outer_oper: &Oper,
-    ) -> bool {
-        match inner {
-            SimpleExpr::Column(_)
-            | SimpleExpr::Tuple(_)
-            | SimpleExpr::Constant(_)
-            | SimpleExpr::FunctionCall(_)
-            | SimpleExpr::Value(_)
-            | SimpleExpr::Keyword(_)
-            | SimpleExpr::Case(_)
-            | SimpleExpr::SimpleCase(_)
-            | SimpleExpr::Subscript(_, _)
-            | SimpleExpr::Collate(_, _)
-            | SimpleExpr::Grouping(_)
-            | SimpleExpr::LikePattern(_)
-            | SimpleExpr::SqlJson(_)
-            | SimpleExpr::AsEnum(_, _)
-            | SimpleExpr::SubQuery(_, _) => true,
-            SimpleExpr::Binary(_, inner_bin_oper, _) => {
-                let inner_oper: Oper = (*inner_bin_oper).into();
-                if inner_oper.is_arithmetic() || inner_oper.is_shift() {
-                    outer_oper.is_comparison()
-                        || outer_oper.is_between()
-                        || outer_oper.is_in()
-                        || outer_oper.is_like()
-                        || outer_oper.is_logical()
-                } else if inner_oper.is_comparison()
-                    || inner_oper.is_in()
-                    || inner_oper.is_like()
-                    || inner_oper.is_is()
-                    || returns_boolean(inner_bin_oper)
-                {
-                    outer_oper.is_logical()
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
-    }
-
-    /// The operators whose repetition renders flat: `a AND b AND c`,
-    /// `a || b || c`.
-    // [spec:pgorm:req:sql.render.parens+3]
-    fn well_known_left_associative(&self, op: &BinOper) -> bool {
-        matches!(
-            op,
-            BinOper::And
-                | BinOper::Or
-                | BinOper::Add
-                | BinOper::Sub
-                | BinOper::Mul
-                | BinOper::Mod
-                | BinOper::Concatenate
-        )
-    }
-}
-
-/// The operators outside the comparison/IN/LIKE/IS families that still yield a
-/// boolean. Each is a generic operator, which the grammar ranks above every
-/// comparison, or the similarity `%`, ranked with `*`, so each binds tighter
-/// than a logical operator. Membership is exactly "returns boolean", which is
-/// why the JSON *existence* tests are here and the JSON accessors — `->`,
-/// `->>`, `#>`, `#>>`, which return JSON or text — are not; a boolean-valued
-/// variant missing here keeps parentheses its peers drop.
-// [spec:pgorm:def:sql.render.precedence+11]
-fn returns_boolean(b: &BinOper) -> bool {
-    matches!(
-        b,
-        BinOper::Contained
-            | BinOper::Contains
-            | BinOper::Overlap
-            | BinOper::Similarity
-            | BinOper::WordSimilarity
-            | BinOper::StrictWordSimilarity
-            | BinOper::Matches
-            | BinOper::HasJsonKey
-            | BinOper::HasAnyJsonKeys
-            | BinOper::HasAllJsonKeys
-            | BinOper::Regex
-            | BinOper::RegexCaseInsensitive
-    )
 }
 
 impl SubQueryStatement {
