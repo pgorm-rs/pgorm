@@ -366,7 +366,7 @@ async fn qualified_finds_filters_and_cursors() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots+1/test]    graph reads span schemas: a
+// [spec:pgorm:sem:query.graph.slots+2/test]    graph reads span schemas: a
 // junction fold inside tenant_a, an INNER join from tenant_a.item to the
 // unqualified owner, grouped rows and a graph cursor — every source
 // qualified by its own declaration

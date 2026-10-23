@@ -62,7 +62,7 @@ chapter is stated twice anywhere else.
 > through it stands outside every guarantee this family states, on the same
 > terms as handing a hand-built statement to `Selector::from_select`.
 
-> [spec:pgorm:sem:query.graph.slots+1]
+> [spec:pgorm:sem:query.graph.slots+2]
 > The slot kind is the join type is the decode shape. The three are one
 > declaration, so they cannot disagree:
 >
@@ -79,6 +79,13 @@ chapter is stated twice anywhere else.
 >   in: when `Related::via()` is `Some`, that junction relation is `via()`ed
 >   first, then `Related::to()` is `join_maybe`d — the whole described
 >   path in one call, junction hop included.
+> - `related_one::<F>()` where `E: Related<F>` folds the same path in as a
+>   required source, appending `Req<F>`: when `Related::via()` is `Some`,
+>   that junction relation is INNER JOINed under `join_condition` — not
+>   `via()`ed, whose join is LEFT — and then `Related::to()` is
+>   `join_one`d. Every hop of the path is INNER, so the SQL states the
+>   semantics the slot declares: a root row with no related `F` is not in
+>   the result, and each row that is decodes `F` as a bare `F::Model`.
 >
 > "LEFT-joined but decoded as required" and "INNER-joined but decoded
 > optional" are unrepresentable: no method constructs either pairing, and

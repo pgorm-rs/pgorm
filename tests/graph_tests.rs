@@ -3,8 +3,9 @@
 //! Three decoded sources with same-named columns and absent middles, a
 //! required slot decoding without `Option`, the same table entering twice
 //! under an alias with a call-site `ON`, a junction folded in by
-//! `related_maybe`, a `via` hop re-tightened by a required slot, and the
-//! terminals landing on the ordinary selector machinery.
+//! `related_maybe` and as a required path by `related_one`, a `via` hop
+//! re-tightened by a required slot, and the terminals landing on the
+//! ordinary selector machinery.
 //!
 //! Run locally:
 //! `DATABASE_URL="postgres://postgres:postgres@localhost:54329" cargo test --test graph_tests`
@@ -150,7 +151,7 @@ async fn graph_three_sources() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots+1/test]    a required slot joins INNER and
+// [spec:pgorm:sem:query.graph.slots+2/test]    a required slot joins INNER and
 // decodes as a bare `Model` — "absent" is not a value the caller unwraps —
 // while the same relation as an optional slot keeps the unmatched roots
 #[pgorm_macros::test]
@@ -278,7 +279,7 @@ async fn graph_filtered_join_keeps_unmatched_roots() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.slots+1/test]    `related_maybe` folds the whole
+// [spec:pgorm:sem:query.graph.slots+2/test]    `related_maybe` folds the whole
 // described path in — junction hop included — and a required slot joined
 // through a `via` hop re-tightens the chain to INNER semantics end to end
 #[pgorm_macros::test]
@@ -327,6 +328,61 @@ async fn graph_related_and_via() -> Result<(), Error> {
         .await?;
 
     assert_eq!(tail, [(cheesecake(), sweet_supplies())]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:sem:query.graph.slots+2/test]    `related_one` folds the described
+// path in as a required source — a direct relation and a junction path alike —
+// so a root row with no related row drops out and the rest decode bare
+#[pgorm_macros::test]
+async fn graph_related_one_drops_unmatched_roots() -> Result<(), Error> {
+    let ctx = TestContext::new("graph_related_one").await;
+    let db = ctx.db.get().await?;
+    schema(&db).await?;
+
+    // Lonely and Mudcake have no fruit.
+    let direct: Vec<(cake::Model, fruit::Model)> = cake::Entity::graph()
+        .related_one::<fruit::Entity>()
+        .order_by_asc(cake::Column::Id)
+        .order_by_asc(fruit::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(direct, [(cheesecake(), cherry()), (cheesecake(), peach())]);
+
+    // Lonely has no junction row, so the junction hop is where it drops out.
+    let junction: Vec<(cake::Model, filling::Model)> = cake::Entity::graph()
+        .related_one::<filling::Entity>()
+        .order_by_asc(cake::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        junction,
+        [(cheesecake(), cream()), (mudcake(), orphanite())]
+    );
+
+    // A required slot behind an optional one: the optional slot keeps
+    // nothing alive that the required path refuses.
+    let both: Vec<(cake::Model, Option<fruit::Model>, filling::Model)> = cake::Entity::graph()
+        .related_maybe::<fruit::Entity>()
+        .related_one::<filling::Entity>()
+        .order_by_asc(cake::Column::Id)
+        .order_by_asc(fruit::Column::Id)
+        .all(&db)
+        .await?;
+
+    assert_eq!(
+        both,
+        [
+            (cheesecake(), Some(cherry()), cream()),
+            (cheesecake(), Some(peach()), cream()),
+            (mudcake(), None, orphanite()),
+        ]
+    );
 
     drop(db);
     ctx.delete().await;
