@@ -1,14 +1,9 @@
-use pgorm_migration::pgorm::{Config, ConnectionTrait, DatabasePool, Error, types::ToSql};
+use pgorm_migration::pgorm::{ConnectionTrait, DatabasePool, Error, types::ToSql};
 
-const NO_PARAMS: [&(dyn ToSql + Sync); 0] = [];
+use super::run_scope::{self, config};
 
-fn config(base_url: &str, db_name: &str) -> Config {
-    format!("{base_url}/{db_name}")
-        .parse()
-        .expect("DATABASE_URL is not a valid PostgreSQL connection string")
-}
-
-/// A throwaway database, dropped and recreated on construction.
+/// A throwaway database of this process's own, created on construction under
+/// a name no other run can hold (`run_scope`).
 pub struct TestContext {
     base_url: String,
     db_name: String,
@@ -16,32 +11,23 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new(db_name: &str) -> Self {
+    pub async fn new(test_name: &str) -> Self {
         dotenvy::from_filename(".env.local").ok();
         dotenvy::from_filename(".env").ok();
 
         let base_url =
             std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");
+        let db_name = run_scope::scoped_name(test_name);
 
-        let maintenance = pgorm_migration::pgorm::connect(config(&base_url, "postgres"));
-        let conn = maintenance.get().await.expect("connect to maintenance db");
-
-        conn.execute_raw(
-            &format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE);"),
-            NO_PARAMS,
-        )
-        .await
-        .expect("drop test database");
-
-        conn.execute_raw(&format!("CREATE DATABASE \"{db_name}\";"), NO_PARAMS)
+        run_scope::create_database(&base_url, &db_name)
             .await
             .expect("create test database");
 
-        let db = pgorm_migration::pgorm::connect(config(&base_url, db_name));
+        let db = pgorm_migration::pgorm::connect(config(&base_url, &db_name));
 
         Self {
             base_url,
-            db_name: db_name.to_owned(),
+            db_name,
             db,
         }
     }
@@ -52,15 +38,12 @@ impl TestContext {
         pgorm_migration::pgorm::connect(config(&self.base_url, &self.db_name))
     }
 
+    /// Drop the database. A failure is left to the sweep a later run makes once
+    /// this process has exited.
     pub async fn delete(&self) {
-        let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
-        let conn = maintenance.get().await.expect("connect to maintenance db");
-        let _ = conn
-            .execute_raw(
-                &format!("DROP DATABASE IF EXISTS \"{}\" WITH (FORCE);", self.db_name),
-                NO_PARAMS,
-            )
-            .await;
+        if let Err(err) = run_scope::drop_database(&self.base_url, &self.db_name).await {
+            tracing::warn!("test database {:?} outlived its test: {err}", self.db_name);
+        }
     }
 }
 

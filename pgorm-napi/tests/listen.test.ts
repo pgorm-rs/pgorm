@@ -198,7 +198,11 @@ test("a terminated backend ends iteration with its error, after what had arrived
   // The listening session sends what it has pending before it answers, so
   // both are waiting once this resolves.
   await listener.listen("napi_doomed");
-  await pool().execute("SELECT pg_terminate_backend($1)", [pid]);
+  const terminated = await pool().execute(
+    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = $1 AND datname = current_database()",
+    [pid],
+  );
+  assert.equal(terminated, 1, "the listening session is in this file's database");
 
   assert.deepEqual(await heard(listener), ["napi_doomed", "2"]);
   assert.deepEqual(await heard(listener), ["napi_doomed", "3"]);

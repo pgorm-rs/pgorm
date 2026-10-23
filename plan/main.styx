@@ -13770,12 +13770,20 @@ children (
         id test-run-isolation
         title "Concurrent test runs on one PostgreSQL server never touch each other's databases, roles or connections"
         kind @test
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:25.599936Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23: \"can't you design the tests so they can't conflict\". On 2026-10-23 the lead's full run and an agent's pgorm-migration run, from two checkouts on the shared server, dropped each other's databases: pgorm-migration names a test database after the test alone and drops \"any prior copy\" first (DROP DATABASE .. WITH (FORCE)), so 7 tests failed with 57P01, 3D000 and 23505 on pg_database. pgorm's tests/common/setup/mod.rs adds a hash of the checkout path (scoped_db_name), which separates worktrees but not two runs of one checkout. Design agreed with the operator: (1) every test database name carries a suffix unique to the test process, not only to the checkout, through one shared helper per language (Rust crates, pgorm-napi tests/support.ts), within the 63-byte limit; (2) a run never drops a database it did not create (the drop-a-prior-copy step goes); (3) leftovers of a crashed run are swept only when provably dead: the name records the creating process, and a database is dropped only when that process no longer exists and nobody is connected; (4) cluster-wide objects a test creates (roles: tests/view_tests.rs, pgorm-migration's role test) take the same per-run suffix, and every pg_terminate_backend (tests/listen_tests.rs, pgorm-pool/tests/postgres.rs, pgorm-napi listen/copy tests, pgorm-python test_listen.py) matches only its own database's connections; (5) live tests that run in the shared postgres database (pgorm-query, pgorm-pool) are checked for anything they leave or share there, and moved onto per-run databases if they do; (6) proof: the same suites run twice at once, from one checkout and from two worktrees, with zero failures, and the old naming shown to fail that test. pgorm-python's suite runs on its own disposable server and is out of scope; security/ harnesses keep their own containers."
+            }
+
+            {
+                at 2026-10-23T22:25:20.936686Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

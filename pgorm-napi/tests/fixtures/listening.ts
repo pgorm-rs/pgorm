@@ -14,9 +14,10 @@ const pool = new Pool(process.env.PGORM_TEST_DSN ?? "", { maxSize: 1 });
 const channel = `napi_collected_${process.pid}`;
 
 async function listening(): Promise<number> {
-  const row = await pool.one("SELECT count(*)::int AS n FROM pg_stat_activity WHERE query = $1", [
-    `LISTEN "${channel}"`,
-  ]);
+  const row = await pool.one(
+    "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND query = $1",
+    [`LISTEN "${channel}"`],
+  );
   return row.n as number;
 }
 

@@ -409,13 +409,20 @@ async fn recycle_rejects_closed_connection() {
         .unwrap()
         .get(0);
 
-    // Kill the pooled backend from an unrelated pool.
+    // Kill the pooled backend from an unrelated pool. The pid is matched with
+    // the database as well, so nothing but the session this test holds can be
+    // the one terminated.
     let executioner = create_pool();
     let executioner = executioner.get().await.unwrap();
-    let _ = executioner
-        .query("SELECT pg_terminate_backend($1)", &[&pid])
+    let terminated = executioner
+        .query(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity \
+             WHERE pid = $1 AND datname = current_database()",
+            &[&pid],
+        )
         .await
         .unwrap();
+    assert_eq!(terminated.len(), 1);
 
     for _ in 0..200 {
         if client.is_closed() {
@@ -786,11 +793,11 @@ async fn savepoint_name_cannot_smuggle_sql() {
     let pool = create_pool();
     let mut client = pool.get().await.unwrap();
 
+    // Temporary, because these tests share the `postgres` database with every
+    // other run on the server: a table of the session's own cannot be seen,
+    // filled or dropped by a concurrent run of this test.
     client
-        .batch_execute(
-            "DROP TABLE IF EXISTS savepoint_injection_probe;
-             CREATE TABLE savepoint_injection_probe (id int)",
-        )
+        .batch_execute("CREATE TEMPORARY TABLE savepoint_injection_probe (id int)")
         .await
         .unwrap();
 

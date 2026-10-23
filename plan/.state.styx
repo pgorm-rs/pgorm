@@ -1105,6 +1105,7 @@ assertions (
     {id graph-related-one, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:05.348074Z}
     {id cursor-typed-secondary, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:06:32.010953Z}
     {id schema-fk-domain-enum, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:23:59.632137Z}
+    {id test-run-isolation, kind @complete, author "brendan@necessary.nu", at 2026-10-23T22:25:20.936686Z}
 )
 
 impl_evidence (

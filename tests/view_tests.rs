@@ -456,10 +456,7 @@ async fn security_options_change_what_a_view_reveals() -> Result<(), Error> {
     );
 
     let role = scoped_db_name("view_tests_reader");
-    db.batch_execute(&format!(
-        "DROP ROLE IF EXISTS \"{role}\"; CREATE ROLE \"{role}\""
-    ))
-    .await?;
+    db.batch_execute(&format!("CREATE ROLE \"{role}\"")).await?;
     db.batch_execute(&View::create(n("definer"), visible())?.to_string())
         .await?;
     let invoker = View::create(n("invoker"), visible())?
