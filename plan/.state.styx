@@ -787,6 +787,7 @@ assertions (
     {id connect-tls, kind @complete, author "brendan@necessary.nu", at 2026-09-05T19:51:09.445413Z}
     {id constraint-drop-rename, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:25:32.290402Z}
     {id constraint-not-valid, kind @complete, author "brendan@necessary.nu", at 2026-10-08T19:57:45.855691Z}
+    {id copy-row-models-coverage, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:19:01.914388Z}
     {id copy-source-tie-check, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:11:08.642586Z}
     {id copy-to-source-returning, kind @complete, author "brendan@necessary.nu", at 2026-10-18T20:23:14.97164Z}
     {id count-of-expression, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:08:15.50063Z}
@@ -1087,6 +1088,7 @@ assertions (
     {id unrep.transaction-mode, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:45:38.889783Z}
     {id update-noop-filters, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:47:17.383924Z}
     {id update-nothing-distinct, kind @complete, author "brendan@necessary.nu", at 2026-09-21T14:57:13.616578Z}
+    {id value-decode-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:42:57.820055Z}
     {id value-float-eq-hash, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:20.231538Z}
     {id value-serde-impls, kind @complete, author "brendan@necessary.nu", at 2026-10-18T19:16:24.718286Z}
     {id varied-schemas, kind @complete, author "brendan@necessary.nu", at 2026-09-08T09:05:31.028259Z}
@@ -1098,6 +1100,7 @@ assertions (
     {id verify.misc, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:44:38.013192Z}
     {id verify.query, kind @complete, author "brendan@necessary.nu", at 2026-09-02T09:45:21.141182Z}
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
+    {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
 )
 

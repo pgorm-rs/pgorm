@@ -2,12 +2,13 @@
 //! `Select`, whose values the Rust renderer writes into the definition as
 //! literals, a definition being stored as SQL text that binds nothing.
 //!
-//! Each query is read as an embedded statement is, through
-//! `PySelect::embedded`: nothing can order it or declare its windows once it
-//! is a definition, so a tie limit or a WINDOW clause PostgreSQL would
-//! refuse is refused here, before any statement exists. The Rust constructor
-//! runs the same two checks on the query it takes, and its refusal is the
-//! same `ConstructionError`.
+//! Nothing can order a query or declare its windows once it is a definition,
+//! so a tie limit or a WINDOW clause PostgreSQL would refuse is refused as
+//! the function is called. The Rust constructor runs the two checks
+//! `PySelect::embedded` runs, in the same order and with the same errors, on
+//! the query it takes, so the query is handed over unchecked and the
+//! constructor's refusal is raised as the `ConstructionError` an embedded
+//! read would raise.
 
 use super::{
     statement::{PyDDL, Statement},
@@ -56,7 +57,7 @@ pub(super) fn create_view(
     security_invoker: bool,
 ) -> PyResult<PyDDL> {
     let option = check_option.map(self::check_option).transpose()?;
-    let mut inner = View::create(table_name(name)?, query.embedded()?)
+    let mut inner = View::create(table_name(name)?, query.inner.clone())
         .map_err(|error| ConstructionError::new_err(error.to_string()))?;
     inner.columns(column_names(&columns)?);
     if or_replace {
@@ -96,7 +97,7 @@ pub(super) fn create_recursive_view(
             "a recursive view names at least one column",
         ));
     };
-    let mut inner = View::create_recursive(table_name(name)?, first, query.embedded()?)
+    let mut inner = View::create_recursive(table_name(name)?, first, query.inner.clone())
         .map_err(|error| ConstructionError::new_err(error.to_string()))?;
     inner.columns(columns);
     if or_replace {
@@ -139,7 +140,7 @@ pub(super) fn create_materialized_view(
     if_not_exists: bool,
     with_no_data: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = MaterializedView::create(table_name(name)?, query.embedded()?)
+    let mut inner = MaterializedView::create(table_name(name)?, query.inner.clone())
         .map_err(|error| ConstructionError::new_err(error.to_string()))?;
     inner.columns(column_names(&columns)?);
     if if_not_exists {
@@ -211,7 +212,7 @@ pub(super) fn create_table_as(
     if_not_exists: bool,
     with_no_data: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = Table::create_as(table_name(name)?, query.embedded()?)
+    let mut inner = Table::create_as(table_name(name)?, query.inner.clone())
         .map_err(|error| ConstructionError::new_err(error.to_string()))?;
     inner.columns(column_names(&columns)?);
     if if_not_exists {

@@ -325,7 +325,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Range types a schema creates
 
-> [spec:pgorm:def:sql.value.created-range+2]
+> [spec:pgorm:def:sql.value.created-range+3]
 > A range type a schema creates with `CREATE TYPE ... AS RANGE`
 > (`[spec:pgorm:req:sql.ddl.type-range+2]`) is named by that schema, so no
 > `RangeType` variant can carry it, and `Value` does not: it stays one pointer
@@ -377,11 +377,13 @@ including panic semantics and quirks inherited from sea-query.
 > such as the text the newtype converts into, is cast as it is. There is no
 > cast between two range types (`CAST(int4range(1, 5) AS slot)` is `42846`),
 > so text is the one form every range type reads. A text operand is a bound
-> parameter pinned to `text`, `CAST($1::text AS floatrange)`, because a bare
-> `$1` there is typed as the range and its text would be read as the range's
-> binary form; inline it is an escaped string literal, and the two renderings
-> are one value. A bound holding the literal's syntax, a quote or a
-> placeholder is read back as the text it is.
+> parameter pinned to `text`, `CAST($1::text AS floatrange)`, so the server's
+> input function reads it, every spelling the type takes; a bare `$1` there is
+> typed as the range, and a `String` bound to it is read by pgorm instead,
+> through the subtype's Rust parsing
+> (`[spec:pgorm:req:exec.cursor.binding-range+2]`). Inline it is an escaped
+> string literal, and the two renderings are one value. A bound holding the
+> literal's syntax, a quote or a placeholder is read back as the text it is.
 >
 > A column of the type is `ColumnType::CreatedRange { name, schema, subtype }`:
 > DDL writes the name, schema-qualified and quoted where needed, and the
@@ -396,6 +398,9 @@ including panic semantics and quirks inherited from sea-query.
 > range as a range over its subtype, so `Range<T>` decodes for every
 > `RangeSubtype` and refuses one over another subtype
 > (`[spec:pgorm:def:exec.decode.range+3]`), and the newtype decodes through it.
+> Where a column is read into `Value`s, as a binary COPY reads one, a range
+> type a schema created over a `RangeSubtype` reads as the `String` of its
+> text form, the value its newtype converts into (`conn.copy.rows`).
 >
 > pgorm cannot author the C function a canonical function is
 > (`[spec:pgorm:req:sql.ddl.type-range+2]`), so a range type a schema creates
@@ -417,7 +422,8 @@ including panic semantics and quirks inherited from sea-query.
 > types either (`42846`). Its variadic constructor over an array of its
 > ranges (`floatmultirange(VARIADIC $1)`) was the other route and is not
 > taken: it needs the range's name as well as the multirange's, and an array
-> of the range bound as `floatrange[]`, whose elements no `Value` holds.
+> of the range bound as `floatrange[]`, one more statement shape for a value
+> the text cast already writes.
 >
 > It is read as its text, because tokio-postgres learns a type's kind from
 > `pg_range` joined on the *range* type, so a created multirange arrives as a

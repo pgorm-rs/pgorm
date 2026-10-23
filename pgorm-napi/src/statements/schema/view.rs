@@ -2,9 +2,11 @@
 //! refresh and drops a materialized view takes, and `CREATE TABLE AS`. Each
 //! body is the `Select` builder's statement, written by pgorm-query with its
 //! values inlined: a definition is stored as SQL text and binds nothing.
-//! The body is read as an embedded `Select` is, its tie limit and WINDOW
-//! clause checked, and pgorm-query's constructor runs the same checks, its
-//! refusal reaching JavaScript as the same error.
+//! The body's tie limit and WINDOW clause are checked by pgorm-query's
+//! constructor, which runs the two checks an embedded `Select` is read
+//! through, in the same order and with the same errors, so the body is read
+//! unchecked and the constructor's refusal reaches JavaScript as the error an
+//! embedded read would raise.
 
 use neon::prelude::*;
 use pgorm::pgorm_query::{DropBehavior, MaterializedView, Table, View, ViewCheckOption};
@@ -12,7 +14,7 @@ use pgorm::pgorm_query::{DropBehavior, MaterializedView, Table, View, ViewCheckO
 use super::{
     super::{
         Node,
-        args::{arg, refuse, select_at},
+        args::{arg, definition_at, refuse},
     },
     Ddl, Part,
     options::{BEHAVIOR, choice, columns, flag, names, object, pick, relation_at, relations_at},
@@ -75,7 +77,7 @@ macro_rules! on_view {
 // [spec:pgorm:req:napi.schema-views]
 fn create_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
-    let body = select_at(cx, 1)?;
+    let body = definition_at(cx, 1)?;
     match View::create(name, body) {
         Ok(view) => Ok(Ddl::CreateView(Box::new(view)).into()),
         Err(error) => refuse(cx, error.to_string()),
@@ -89,7 +91,7 @@ fn create_recursive_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     let listed = arg(cx, 1);
     let (first, rest) = columns(cx, listed, "a recursive view's column list")?;
-    let body = select_at(cx, 2)?;
+    let body = definition_at(cx, 2)?;
     let mut view = match View::create_recursive(name, first, body) {
         Ok(view) => view,
         Err(error) => return refuse(cx, error.to_string()),
@@ -217,7 +219,7 @@ fn drop_view(cx: &mut FunctionContext) -> NeonResult<Node> {
 // [spec:pgorm:req:napi.schema-views]
 fn create_materialized_view(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
-    let body = select_at(cx, 1)?;
+    let body = definition_at(cx, 1)?;
     match MaterializedView::create(name, body) {
         Ok(create) => Ok(Ddl::CreateMaterializedView(Box::new(create)).into()),
         Err(error) => refuse(cx, error.to_string()),
@@ -309,7 +311,7 @@ fn drop_materialized_view(cx: &mut FunctionContext) -> NeonResult<Node> {
 // [spec:pgorm:req:napi.schema-views]
 fn create_table_as(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
-    let body = select_at(cx, 1)?;
+    let body = definition_at(cx, 1)?;
     match Table::create_as(name, body) {
         Ok(create) => Ok(Ddl::CreateTableAs(Box::new(create)).into()),
         Err(error) => refuse(cx, error.to_string()),

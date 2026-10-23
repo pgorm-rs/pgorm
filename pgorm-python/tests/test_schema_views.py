@@ -70,8 +70,8 @@ class ViewConstruction(unittest.TestCase):
             with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
 
-    # [spec:pgorm:req:python.schema-views+2/test]    each builder reads its query as an embedded
-    # statement, refusing a tie limit without ORDER BY and an undeclared window as it is called
+    # [spec:pgorm:req:python.schema-views+2/test]    each builder refuses a query whose tie limit
+    # has no ORDER BY, or whose window is undeclared, as it is called, with the Rust constructor's error
     def test_view_bodies_check_tie_limit_and_windows(self):
         table = p.Table("account")
         step = p.Select(p.col("n") + 1).from_(p.Table("r")).where_(p.col("n") < 4)

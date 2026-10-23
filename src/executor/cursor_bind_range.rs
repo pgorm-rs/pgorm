@@ -13,13 +13,14 @@ use postgres_protocol::{
 };
 
 use super::*;
+use crate::executor::created_range::created_range_bounds;
 
 type WireResult<T> = Result<T, Box<dyn std::error::Error + Sync + Send>>;
 
 /// Bind a range against a range type — a built-in one or a range type a
 /// schema created, which tokio-postgres reports as a range over its subtype
 /// all the same. Any other inferred type is refused.
-// [spec:pgorm:req:exec.cursor.binding-range+1]
+// [spec:pgorm:req:exec.cursor.binding-range+2]
 pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) -> BindResult {
     match wire_type(ty).kind() {
         Kind::Range(subtype) => {
@@ -30,6 +31,26 @@ pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) ->
     }
 }
 
+/// Bind a range's text form against a range type a schema created, whose
+/// `Value` that text is: the `String` its newtype converts into and a binary
+/// COPY reads its column as. The text is read by the subtype's Rust type, so
+/// the range is written as a `Value::Range` is; text spelling no range of the
+/// subtype, and a subtype no `RangeSubtype` reads, are a mismatch.
+// [spec:pgorm:req:exec.cursor.binding-range+2]
+pub(super) fn bind_created_text(text: &str, ty: &Type, out: &mut BytesMut) -> BindResult {
+    let target = wire_type(ty);
+    let Kind::Range(subtype) = target.kind() else {
+        return Err(mismatch("String", ty));
+    };
+    match created_range_bounds(target, text) {
+        Ok(range) => {
+            write_range(&range, subtype, out)?;
+            Ok(IsNull::No)
+        }
+        Err(error) => Err(format!("{}: {error}", mismatch("String", ty)).into()),
+    }
+}
+
 /// Bind a multirange: a count, then each range length-prefixed in a range's
 /// own encoding.
 ///
@@ -37,7 +58,7 @@ pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) ->
 /// kind from `pg_range` joined on the *range* type, so a multirange a schema
 /// created comes back as a simple type with no subtype to write the bounds
 /// in, and guessing one would send bytes the server reads as something else.
-// [spec:pgorm:req:exec.cursor.binding-range+1]
+// [spec:pgorm:req:exec.cursor.binding-range+2]
 pub(super) fn bind_multirange(
     multirange: &Multirange<Value>,
     ty: &Type,
@@ -59,7 +80,7 @@ pub(super) fn bind_multirange(
 
 /// A range's binary form: a flag byte, then each present bound
 /// length-prefixed. The empty range is the flag byte alone.
-// [spec:pgorm:req:exec.cursor.binding-range+1]
+// [spec:pgorm:req:exec.cursor.binding-range+2]
 fn write_range(range: &Range<Value>, subtype: &Type, out: &mut BytesMut) -> WireResult<()> {
     match range {
         Range::Empty => {
@@ -80,7 +101,7 @@ fn write_range(range: &Range<Value>, subtype: &Type, out: &mut BytesMut) -> Wire
 /// argument and as the literal rendering writes one. Sent as a NULL, it would
 /// reach the server as a bound of length -1, which the range's receive
 /// function reads as a length rather than as a NULL.
-// [spec:pgorm:req:exec.cursor.binding-range+1]
+// [spec:pgorm:req:exec.cursor.binding-range+2]
 fn write_bound(
     bound: &Bound<Value>,
     subtype: &Type,
@@ -127,7 +148,7 @@ mod tests {
         )
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn binds_each_bound_with_its_inclusivity() {
         assert_eq!(
@@ -148,7 +169,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn binds_the_empty_range_as_its_own_flag() {
         assert_eq!(
@@ -164,7 +185,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn binds_a_null_bound_as_no_bound() {
         assert_eq!(
@@ -179,7 +200,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn writes_bounds_through_the_scalar_adapter() {
         // An `int8` value narrowed to the range's `int4` subtype, as a scalar is.
@@ -210,7 +231,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn binds_a_created_range_type_by_subtype() {
         let created = Type::new(
@@ -225,7 +246,75 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    fn created(name: &str, subtype: Type) -> Type {
+        Type::new(
+            name.to_owned(),
+            16_390,
+            Kind::Range(subtype),
+            "geo".to_owned(),
+        )
+    }
+
+    fn text(text: &str) -> Value {
+        Value::String(Some(Box::new(text.to_owned())))
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
+    #[test]
+    fn binds_a_created_range_from_its_text() {
+        let slot = created("slot", Type::INT4);
+        assert_eq!(
+            bytes(text("[1,5)"), &slot),
+            bytes(Range::from(1i32..5).into(), &slot)
+        );
+        let reach = created("floatrange", Type::FLOAT8);
+        // A bound range's tag is not what it is written by: the subtype is.
+        let bounds = Range::new(
+            Bound::Included(Value::Double(Some(f64::NEG_INFINITY))),
+            Bound::Included(Value::Double(Some(2.5))),
+        );
+        assert_eq!(
+            bytes(text("[-inf, 2.5]"), &reach),
+            bytes(
+                Value::Range(pgorm_query::RangeType::Numeric, Some(Box::new(bounds))),
+                &reach
+            )
+        );
+        assert_eq!(bytes(text(" EMPTY "), &reach), [0b0000_0001]);
+        assert_eq!(encode_as(Value::String(None), &reach), Ok(None));
+        // A domain over the range is the range on the wire.
+        let domain = Type::new(
+            "reach".to_owned(),
+            16_391,
+            Kind::Domain(reach.clone()),
+            "geo".to_owned(),
+        );
+        assert_eq!(bytes(text("(,0)"), &domain), bytes(text("(,0)"), &reach));
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
+    #[test]
+    fn refuses_text_spelling_no_range_of_the_subtype() {
+        let slot = created("slot", Type::INT4);
+        assert_eq!(
+            encode_as(text("[1.5,2)"), &slot),
+            Err("cannot bind a `String` value to Postgres type `geo.slot`: \
+                 `[1.5,2)` is the text of no range of `int4`"
+                .to_owned())
+        );
+        let net = created("netrange", Type::INET);
+        assert!(
+            encode_as(text("[10.0.0.1,10.0.0.9]"), &net)
+                .is_err_and(|error| error.contains("over `inet` has no value")),
+        );
+        // A built-in range has a `Value::Range` of its own and takes no text.
+        assert_eq!(
+            encode_as(text("[1,5)"), &Type::INT4_RANGE),
+            Err("cannot bind a `String` value to Postgres type `int4range`".to_owned())
+        );
+    }
+
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn binds_a_multirange_as_counted_ranges() {
         let multirange: Multirange<i32> = [Range::from(1..3), Range::Empty].into_iter().collect();
@@ -247,7 +336,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:exec.cursor.binding-range+1/test]
+    // [spec:pgorm:req:exec.cursor.binding-range+2/test]
     #[test]
     fn refuses_a_range_against_other_types() {
         assert_eq!(

@@ -1,3 +1,4 @@
+pub(crate) mod created_range;
 mod cursor;
 mod decode;
 mod delete;

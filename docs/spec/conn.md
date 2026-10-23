@@ -775,7 +775,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > answered by one `ReadyForQuery` whether or not it starts, and a refused one
 > leaves the connection as it was.
 
-> [spec:pgorm:req:conn.copy.rows]
+> [spec:pgorm:req:conn.copy.rows+1]
 > Binary COPY carries rows of pgorm `Value`s, each field in its value's
 > binary form, the form a parameter is bound in and a result column decoded
 > from. The format sends no column types — a header, then each row as its
@@ -800,16 +800,18 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `copy_out_rows(&CopyToStatement<CopyBinary>)` are provided by `CopyTrait`
 > over the descriptions and `copy_in` and `copy_out`, so they take only a
 > binary statement, borrow as those do, and a COPY refused at its start
-> behaves as `conn.copy` says. `CopyRowSink::send` writes a row, one value
-> for each column in order. A row of another width, and a value its column's
-> type does not take — the check `ValueHolder` makes of a parameter
+> behaves as `conn.copy` says. `CopyRowSink::send` writes a row, one value for
+> each column in order. A row of another width, and a value its column's type
+> does not take — the check `ValueHolder` makes of a parameter
 > (`exec.cursor.binding-accepts`) — MUST be refused with `Error::Type` naming
 > the COPY's columns or the column, with nothing of the row written, and the
-> sink goes on taking rows. `send_model` writes a model's value for each of the
-> COPY's columns by name, refusing a column its entity lacks. `finish`
-> writes the trailer and returns the row count; a row the server refuses is
-> reported there, and a sink dropped unfinished aborts the COPY, as for
-> bytes.
+> sink goes on taking rows. That check takes a range type a schema created
+> from the `String` of its text form (`exec.cursor.binding-range`), so the
+> rows a COPY TO reads from such a column write back into it. `send_model`
+> writes a model's value for each of the COPY's columns by name, refusing a
+> column its entity lacks. `finish` writes the trailer and returns the row
+> count; a row the server refuses is reported there, and a sink dropped
+> unfinished aborts the COPY, as for bytes.
 >
 > `CopyRowStream` is a `Stream` of rows, each a `Vec<Value>` whose fields are
 > decoded by their column's type through the driver's codec for it, the one
@@ -817,16 +819,25 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `TinyInt`, `oid` as `Unsigned`, the text types and an enum's label as
 > `String`, a built-in range or multirange as `Range` or `Multirange`, an
 > array as an `Array` of its element's variant, and every other type pgorm
-> binds as its own variant. A type no `Value` holds — a geometric type, a
-> range type a schema created — and a field that does not decode are an
-> `Error::Type` naming the column. Data that is not the format — no
-> signature, a header flag the format does not define, a row whose field
-> count is not the COPY's, data ending before the trailer or going on after
-> it — is an `Error::Query`. Either ends the stream as its last item.
-> `models::<E>()` reads each row into a model of `E` through its
-> `ActiveModel`, setting each column the entity has from the field of its
-> name: a column the entity lacks is left unread, and a model column the
-> COPY lacks is `Error::AttrNotSet`.
+> binds as its own variant. A range type a schema created reads as the
+> `String` of its text form, the `Value` the newtype naming it converts into
+> (`sql.value.created-range`): the driver reports it as a range over its
+> subtype, so the range is read through the `FromSql` of the `RangeSubtype`
+> that subtype reads as — `int2`, `int4`, `int8`, `float4`, `float8`,
+> `numeric`, `text`, `varchar`, `bpchar`, `date`, `time`, `timestamp`,
+> `timestamptz`, and `uuid` under `with-uuid`, a domain over one read as the
+> one — and written as that type's `Display` writes it, so a model's newtype
+> field reads through `models`, and an array of one reads as an `Array` of
+> those `String`s. A type no `Value` holds — a geometric type, a range type a
+> schema created over any other subtype, and a multirange a schema created,
+> which the driver reports as a simple type — and a field that does not decode
+> are an `Error::Type` naming the column. Data that is not the format — no
+> signature, a header flag the format does not define, a row whose field count
+> is not the COPY's, data ending before the trailer or going on after it — is
+> an `Error::Query`. Either ends the stream as its last item. `models::<E>()`
+> reads each row into a model of `E` through its `ActiveModel`, setting each
+> column the entity has from the field of its name: a column the entity lacks
+> is left unread, and a model column the COPY lacks is `Error::AttrNotSet`.
 >
 > `CopyRowEncoder` and `CopyRowDecoder` are the format's two sides over a
 > list of columns, for a caller that moves the bytes itself, as the bindings
