@@ -334,7 +334,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Target release
 
-> [spec:pgorm:req:sql.target+2]
+> [spec:pgorm:req:sql.target]
 > A build of pgorm targets one PostgreSQL major release. 18 is the floor and
 > the default: a build that names no release targets 18, there is no `pg-18`
 > feature to say so, and nothing older is kept working. The `pg-19` cargo
@@ -383,33 +383,6 @@ today, including panicking edges and deliberate failsafes.
 > 19-only syntax under `pg-19` too. That work decides how the parsers follow
 > the target, and whether pgorm-sql-macro and pgorm-codegen gain the feature
 > for it, keeping an 18 build's `sql!` from accepting what 18 cannot parse.
->
-> Any number of runs MAY share the server `DATABASE_URL` names at once: two
-> checkouts, two runs of one checkout, the Rust crates' suites and
-> pgorm-napi's. A run MUST NOT touch another's databases, roles or connections.
-> Each database or role a live test creates is named for the process that
-> creates it, `{label}_{seq}__{owner}_{pid}_{stamp}`. The label is the test's
-> own, cut so the whole name fits PostgreSQL's 63 bytes. The sequence counts
-> the names that process has minted, so two labels cut to one prefix still
-> differ. The owner is a hash of the host name and the user, the scope in
-> which a process id means anything. The pid is the creating process. The
-> stamp is the Unix second at which it minted its first name, which tells the
-> creator from a later process given the same pid. The Rust crates mint these
-> names through one unpublished crate, `pgorm-test-support`, a dev-dependency
-> of pgorm and pgorm-migration that reaches the server through tokio-postgres
-> rather than pgorm; pgorm-napi's support module mints the same names.
->
-> A run MUST NOT drop a database or role it did not create, so nothing drops a
-> prior copy before creating its own. The one exception is a leftover whose
-> creator is provably gone: its name records this host and user, no process
-> holds its pid (or the one that does started after the stamp), and no session
-> is connected to it. Such a database is dropped without `FORCE`, so a session
-> that arrives in between makes the drop fail rather than be evicted. Whatever
-> the host cannot answer counts as the creator still running. A test that
-> terminates a backend MUST name it by pid within its own database. A test
-> that runs in the shared `postgres` database, as pgorm-pool's do, MUST keep
-> what it creates there to its own session: a temporary table, a session
-> setting.
 
 ## SELECT statements
 

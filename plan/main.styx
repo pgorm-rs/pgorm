@@ -13770,6 +13770,9 @@ children (
         id test-run-isolation
         title "Concurrent test runs on one PostgreSQL server never touch each other's databases, roles or connections"
         kind @test
+        implements {
+            main ([spec:pgorm:req:testing.isolation])
+        }
         sealed true
         log (
             {

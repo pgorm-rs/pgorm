@@ -63,7 +63,7 @@ async fn exists(maintenance: &Client, catalogue: &str, name: &str) -> Result<boo
     Ok(maintenance.query_one(sql, &[&name]).await?.get(0))
 }
 
-// [spec:pgorm:req:sql.target+2/test]    the sweep drops a database and a role
+// [spec:pgorm:req:testing.isolation/test]    the sweep drops a database and a role
 // only when their creator is gone from this host and nobody is connected; a
 // running creator, one of another host or user, and an occupied database all
 // keep theirs
