@@ -5483,6 +5483,14 @@ children (
                         text "query.graph.cursor +3 (graph-cursor-enum-tiebreak, 32ab45e8): each tiebreak a graph installs carries the casts of its typed primary-key column (Tiebreak in src/query/graph.rs), so the root's key, a joined slot's or the ordered slot's own key whose domain is over an enum is compared as the enum in a whole-keyset boundary."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-24T06:24:46.16168Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: query.graph.cursor+3 moved after this node's delivery (32ab45e8, a graph cursor's tiebreak on a key whose domain is over an enum compares as the enum), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 
@@ -6999,6 +7007,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-18 at python.schema +1 (python-schema-truth-testing, 1c883ab5, which added truth testing to the rule): DataType, ColumnDef, CreateTable, CreateIndex, DDL, EntitySchema and Compiled raise ConstructionError on bool(); test_schema_objects_refuse_truth_testing samples every class the native schema module defines or pgorm.schema exports, and registered_schema.py truth-tests a registered entity's EntitySchema (checks/entities.py passed); the rest of the rule's text is unchanged and its 37 sites were re-read and re-pinned."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-24T06:24:46.635199Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: python.schema+1 moved after this node's delivery (1c883ab5, every Python schema object and Compiled refuse truth testing), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
                 )
@@ -12258,6 +12274,14 @@ children (
                         text "table-function-column-defs (9ad413aa) bumped napi.select+2 (tableFunction takes { call, columnDefinitions }, a non-empty list of [name, type] pairs) and napi.expressions+3 (call() reaches json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset); sites re-pinned, select-extras.test.ts and the record-functions parity case pass in Node and Deno."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-24T06:24:46.493586Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: napi.expressions+4 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 
@@ -12349,6 +12373,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-19 at napi.entity-reads +1 (select-one-zero-limit, cfadc574): one and oneOpt narrow the row limit to one row as Rust does, a limit of zero staying zero; inspect and a live test in both runtimes hold it."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-24T06:24:46.338834Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: napi.entity-reads+2 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
                 )
@@ -12704,6 +12736,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Delivered again at sql.ast.copy +1, python.copy +1 and napi.copy +1 (copy-to-source-returning, be37b37f): a write without RETURNING no longer converts into a CopySource, and Python's CopyTo and JavaScript's copyTo refuse it with a ConstructionError."
+                after_done true
+            }
+
+            {
+                at 2026-10-24T06:24:45.853709Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered: conn.copy+1, napi.copy+2, python.copy+2 and sql.ast.copy+2 moved after this node's delivery (59b37f92, a COPY TO over a SELECT runs the tie-limit and window checks before anything is sent), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                 after_done true
             }
         )

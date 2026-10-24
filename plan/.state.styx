@@ -1353,13 +1353,6 @@ impl_evidence (
         {impl_name main, rule python.copy}
         {impl_name main, rule sql.ast.copy}
         {impl_name main, rule sql.render.copy}
-    ), rule_versions_seen (
-        {id conn.copy, version 0}
-        {id metric.layer.copy, version 0}
-        {id napi.copy, version 1}
-        {id python.copy, version 1}
-        {id sql.ast.copy, version 1}
-        {id sql.render.copy, version 0}
     )}
     {id conn-listen, covered_rules (
         conn.listen
@@ -1409,8 +1402,6 @@ impl_evidence (
         query.graph.cursor
     ), covered_claims (
         {impl_name main, rule query.graph.cursor}
-    ), rule_versions_seen (
-        {id query.graph.cursor, version 2}
     )}
     {id decide.migration, covered_rules (
         migration.name
@@ -1667,13 +1658,6 @@ impl_evidence (
         {impl_name main, rule napi.entity-reads}
         {impl_name main, rule napi.entity-versions}
         {impl_name main, rule napi.entity-writes}
-    ), rule_versions_seen (
-        {id napi.application, version 0}
-        {id napi.entities, version 0}
-        {id napi.entity-graphs, version 0}
-        {id napi.entity-reads, version 1}
-        {id napi.entity-versions, version 0}
-        {id napi.entity-writes, version 0}
     )}
     {id napi-models, covered_rules (
         napi.cursors
@@ -1807,15 +1791,6 @@ impl_evidence (
         {impl_name main, rule napi.statements}
         {impl_name main, rule napi.windows}
         {impl_name main, rule napi.writes}
-    ), rule_versions_seen (
-        {id napi.expressions, version 3}
-        {id napi.merge, version 0}
-        {id napi.ranges, version 0}
-        {id napi.select, version 2}
-        {id napi.sql-json, version 0}
-        {id napi.statements, version 0}
-        {id napi.windows, version 2}
-        {id napi.writes, version 0}
     )}
     {id napi-values, covered_rules (
         napi.inference
@@ -2142,8 +2117,6 @@ impl_evidence (
         python.schema
     ), covered_claims (
         {impl_name main, rule python.schema}
-    ), rule_versions_seen (
-        {id python.schema, version 0}
     )}
     {id python.statements, covered_rules (
         python.raw
