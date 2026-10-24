@@ -5491,6 +5491,14 @@ children (
                         text "query.graph.cursor is at +3 since 32ab45e8 (a graph cursor's tiebreak on a key whose domain is over an enum compares as the enum); every annotation is pinned +3 and the graph cursor tests pass on main, so the node is re-covered against it."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-23T20:31:43.759647Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at query.graph.cursor +3 (the domain-over-enum tiebreak casts from 32ab45e8, described in the note above): the state's recorded version was still +2 until the migration-sql-files commit refreshed it; every site of the rule is pinned at +3 and none is stale."
+                        after_done true
+                    }
                 )
             }
 
@@ -7015,6 +7023,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "python.schema is at +1 since 1c883ab5 (every Python schema object and Compiled refuse truth testing); every annotation is pinned +1, so the node is re-covered against it."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-23T20:31:43.892392Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at python.schema +1 (truth testing refused on schema objects, 1c883ab5, re-checked in the note above): the state's recorded version was still the bare rule until the migration-sql-files commit refreshed it; every site of the rule is pinned at +1 and none is stale."
                         after_done true
                     }
                 )
@@ -13675,6 +13691,13 @@ children (
                 kind @note
                 text "Operator 2026-10-23, from the porting feedback: the ledger table sat beside the application's tables, and the old server's audit triggers on every table made recording the first migration fail. migration_table_name() returns an unqualified Name, so the ledger can be renamed but not put in a schema (also noted 2026-09-08 by the varied-schema work). Let the ledger be schema-qualified (a TableRef or a schema hook beside the name), have the runner CREATE SCHEMA IF NOT EXISTS before creating the ledger, keep legacy-name adoption to the default name, and document it in the migration README and migration.runner. Live tests."
             }
+
+            {
+                at 2026-10-23T20:10:20.003834Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13682,12 +13705,22 @@ children (
         id migration-sql-files
         title "A .sql file is a migration in one line: named after its file, checksummed by its contents, its grammar checked at compile time"
         kind @feat
+        implements {
+            main ([spec:pgorm:def:migration.sql-file] [spec:pgorm:req:migration.sql-file.checksum] [spec:pgorm:req:migration.sql-file.compile])
+        }
         log (
             {
                 at 2026-10-23T19:22:06.318562Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23, from the porting feedback: running a raw .sql file as a migration needed batch_execute and a hand-written migration name, and the template shows only the query-builder style. Add a macro (working name sql_migration!(\"path/m2026..._name.sql\")) expanding to a MigrationTrait whose name is the file stem, whose up runs the file through batch_execute, and whose checksum is a digest of the file's text (so editing an applied file is caught), validated through the sql! macro's libpg_query check at compile time (multi-statement). Show both styles in the migration template. Spec in migration.md; tests for the name, the checksum, the compile-time refusal (trybuild or compile_fail doctest) and a live run."
+            }
+
+            {
+                at 2026-10-23T19:43:20.099659Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

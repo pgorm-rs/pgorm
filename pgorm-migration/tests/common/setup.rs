@@ -70,6 +70,38 @@ impl TestContext {
         .expect("a one-connection pool builds")
     }
 
+    /// A pool against this database whose sessions act as `role`, which the
+    /// server's superuser login is allowed to become.
+    pub fn pool_as(&self, role: &str) -> DatabasePool {
+        let mut config = config(&self.base_url, &self.db_name);
+        config.options(format!("-c role={role}"));
+        pgorm_migration::pgorm::connect(config)
+    }
+
+    /// Create `role` afresh, without login and without any privilege a test
+    /// does not grant it. Roles belong to the cluster rather than to the test
+    /// database, so [`TestContext::drop_role`] removes it again.
+    pub async fn create_role(&self, role: &str) {
+        let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
+        let conn = maintenance.get().await.expect("connect to maintenance db");
+        conn.execute_raw(&format!("DROP ROLE IF EXISTS \"{role}\""), NO_PARAMS)
+            .await
+            .expect("drop test role");
+        conn.execute_raw(&format!("CREATE ROLE \"{role}\" NOLOGIN"), NO_PARAMS)
+            .await
+            .expect("create test role");
+    }
+
+    /// Drop a role [`TestContext::create_role`] made, once the database whose
+    /// objects it owned is gone.
+    pub async fn drop_role(&self, role: &str) {
+        let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
+        let conn = maintenance.get().await.expect("connect to maintenance db");
+        let _ = conn
+            .execute_raw(&format!("DROP ROLE IF EXISTS \"{role}\""), NO_PARAMS)
+            .await;
+    }
+
     pub async fn delete(&self) {
         let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
         let conn = maintenance.get().await.expect("connect to maintenance db");
@@ -120,6 +152,48 @@ pub async fn count_rows(db: &DatabasePool, table: &str) -> Result<i64, Error> {
     let conn = db.get().await?;
     let row = conn
         .query_one(&format!("SELECT COUNT(*) FROM \"{table}\""), &[])
+        .await?;
+    Ok(row.get(0))
+}
+
+pub async fn has_schema(db: &DatabasePool, schema: &str) -> Result<bool, Error> {
+    let conn = db.get().await?;
+    let params: [&(dyn ToSql + Sync); 1] = [&schema];
+    let row = conn
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)",
+            &params,
+        )
+        .await?;
+    Ok(row.get(0))
+}
+
+/// [`has_column`] for a table named in `schema` rather than the current one.
+pub async fn has_column_in(
+    db: &DatabasePool,
+    schema: &str,
+    table: &str,
+    column: &str,
+) -> Result<bool, Error> {
+    let conn = db.get().await?;
+    let params: [&(dyn ToSql + Sync); 3] = [&schema, &table, &column];
+    let row = conn
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns \
+             WHERE table_schema = $1 AND table_name = $2 AND column_name = $3)",
+            &params,
+        )
+        .await?;
+    Ok(row.get(0))
+}
+
+pub async fn count_rows_in(db: &DatabasePool, schema: &str, table: &str) -> Result<i64, Error> {
+    let conn = db.get().await?;
+    let row = conn
+        .query_one(
+            &format!("SELECT COUNT(*) FROM \"{schema}\".\"{table}\""),
+            &[],
+        )
         .await?;
     Ok(row.get(0))
 }

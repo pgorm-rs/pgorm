@@ -130,7 +130,7 @@ pub use tokio_postgres::row::RowIndex;
 /// [`DecodeRaw::into_tuple`]: crate::DecodeRaw::into_tuple
 /// [`into_values`]: crate::DecodeRaw::into_values
 /// [`FromQueryResult::find_by_statement`]: crate::FromQueryResult::find_by_statement
-// [spec:pgorm:def:macros.sql+4]
+// [spec:pgorm:def:macros.sql+5]
 pub use pgorm_sql_macro::sql;
 
 /// Compile a PRQL string literal to PostgreSQL SQL at build time, expanding

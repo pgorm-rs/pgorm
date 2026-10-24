@@ -10,6 +10,12 @@ publish = false
 [dependencies]
 async-trait = { version = "0.1.92", default-features = false }
 pgorm = { path = "..", features = ["macros"] }
+# The compile-time half of `sql_migration!`: it reads and checks the file
+# through the same libpg_query oracle as `pgorm::sql!`.
+pgorm-sql-macro = { version = "0.2.0", path = "../pgorm-sql-macro" }
+# The digest a SQL-file migration reports as its checksum; already in the
+# dependency graph through tokio-postgres's SCRAM support.
+sha2 = { version = "0.11.0", default-features = false }
 # pgorm-cli = { path = "../pgorm/pgorm-cli", default-features = false, optional = true }
 tracing = { version = "0.1.44", default-features = false, features = ["log"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }

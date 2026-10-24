@@ -11,6 +11,71 @@ A starter migration crate lives at
 add your migration modules to the migrator, and run it against your
 database.
 
+## Migrations written as SQL
+
+A migration can also be a `.sql` file, listed beside the Rust ones:
+
+```rust,ignore
+fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+    vec![
+        Box::new(m20260101_000001_create_post::Migration),
+        Box::new(sql_migration!("src/m20260101_000002_index_post_title.sql")),
+    ]
+}
+```
+
+The path is relative to the crate's `Cargo.toml`. `sql_migration!` reads the
+file while the crate compiles and holds it to PostgreSQL's grammar, as
+`pgorm::sql!` holds a literal, so a syntax error is a compile error naming the
+file and line. The migration is named after the file stem, its `up` runs the
+file through `batch_execute` inside the batch's transaction, and its checksum
+is the SHA-256 digest of the file's text, so editing the file after it has
+been applied is reported by `status` and refused by `up`. Line endings are
+read as LF, so a Windows checkout reports the same checksum. The check is
+syntax only: a missing table is the server's to report when the migration
+runs, and psql meta-commands such as `\set` are not SQL and are refused.
+
+## The ledger
+
+Applied migrations are recorded in a table named `pgorm_migrations`, which by
+default sits wherever `search_path` puts an unqualified name — usually beside
+your own tables in `public`. A migrator can give it a schema of its own, so
+that triggers, policies or grants applied to every application table do not
+reach it:
+
+```rust,ignore
+#[async_trait::async_trait]
+impl MigratorTrait for Migrator {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(m20220101_000001_create_table::Migration)]
+    }
+
+    fn migration_table_schema() -> Option<Name> {
+        Some(Name::runtime("pgorm"))
+    }
+}
+```
+
+`up` creates the schema if it is missing, then the ledger inside it, and every
+read and write names the table in that schema, so a table of the same name in
+`public` is never taken for it. A schema created ahead of time is used as it
+is; the runner checks the catalogue first, so a role that owns the schema
+needs no `CREATE` privilege on the database. `migration_table_name()` renames
+the table the same way.
+
+The runner does not move a ledger that already exists. A ledger left in its
+old place reads as absent from the new one, which would run every migration
+again, so move it before deploying a release that names the schema:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS pgorm;
+ALTER TABLE pgorm_migrations SET SCHEMA pgorm;
+```
+
+A ledger last written by SeaORM, under `seaql_migrations`, is renamed to
+`pgorm_migrations` on the next `up` — but only for the default name with no
+schema. A migrator that names or places its own ledger takes it over by hand.
+
 ## Schemas
 
 An entity declared with `schema_name` lives in that schema, and so does a
