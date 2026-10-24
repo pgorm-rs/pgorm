@@ -241,6 +241,11 @@ fn manifest() -> Value {
         operations.extend(crate::schema::capabilities());
         operations.extend(crate::transactions::capabilities());
         operations.extend(crate::copy::capabilities());
+        // [spec:pgorm:req:python.connections+3]
+        operations.insert(
+            "pool.statement_cache_channel".to_owned(),
+            json!({"rust_api": "pgorm::ManagerConfig::statement_cache_channel", "features": ["runtime-tokio"]}),
+        );
     }
     if let Some(forms) = manifest["result_forms"].as_array_mut() {
         forms.extend(["copy_from", "copy_to", "copy_count", "copy_stream"].map(Value::from));

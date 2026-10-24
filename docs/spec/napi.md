@@ -242,9 +242,10 @@ A `Pool` holds the connections, a `Connection` is one of them checked out, a
 statement's rows over one. Each is a JavaScript object over a boxed native
 handle, and each is released by being closed.
 
-> [spec:pgorm:req:napi.connections+2]
+> [spec:pgorm:req:napi.connections+3]
 > A `Pool` MUST be built from a connection string and options — TLS mode, CA,
-> size, connect and acquire timeouts, statement-cache size and recycling — by
+> size, connect and acquire timeouts, statement-cache size, recycling and
+> statement-cache channel — by
 > a constructor that sends nothing and throws a `ConstructionError` for an
 > unusable string or option; `connect` resolves with a pool whose server
 > answered. TLS MUST default to `verify-full`, verifying the server's
@@ -254,7 +255,12 @@ handle, and each is released by being closed.
 > `acquire`, and runs a statement of its own on a connection lent to it alone.
 > `clearStatementCaches()` marks every connection's cached statements stale
 > as `conn.pool.statement-cache.clear` describes; it sends nothing, returns
-> nothing, and is refused by no state of the pool.
+> nothing, and is refused by no state of the pool. `statementCacheChannel`,
+> absent by default, names a channel the pool listens on, clearing on every
+> notification there as `conn.pool.statement-cache.listen` describes; an
+> empty name or one longer than 63 bytes is a `ConstructionError`, and
+> closing the pool closes the listening connection. `STATEMENT_CACHE_CHANNEL`,
+> exported by the package, is the channel pgorm-migration's runner notifies.
 >
 > Each handle — pool, connection, transaction, stream — MUST be closable
 > explicitly, by `close()` or `await using`, and what it holds MUST be

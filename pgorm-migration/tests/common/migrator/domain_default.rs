@@ -49,3 +49,27 @@ impl MigratorTrait for Defaulted {
         vec![Box::new(CREATED), Box::new(DEFAULTED)]
     }
 }
+
+const REDEFAULTED: Script = Script {
+    name: "m20240201_000003_redefault_quantity",
+    sql: "ALTER DOMAIN quantity SET DEFAULT 3",
+};
+
+/// [`Defaulted`], then another change to the default, from a migrator that
+/// notifies no channel.
+pub struct Unannounced;
+
+#[async_trait::async_trait]
+impl MigratorTrait for Unannounced {
+    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
+        vec![
+            Box::new(CREATED),
+            Box::new(DEFAULTED),
+            Box::new(REDEFAULTED),
+        ]
+    }
+
+    fn statement_cache_channel() -> Option<String> {
+        None
+    }
+}

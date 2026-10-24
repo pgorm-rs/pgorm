@@ -14,6 +14,7 @@ import {
   DecodeError,
   LifecycleError,
   Pool,
+  STATEMENT_CACHE_CHANNEL,
   TimeoutError,
   Value,
 } from "../lib/index.js";
@@ -80,7 +81,7 @@ function withoutSslmode(text: string, host?: string): string {
   return url.toString();
 }
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("a pool sends nothing until used, and refuses an unusable option at construction", async () => {
   await using unreachable = new Pool("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable");
   assert.equal(unreachable.closed, false);
@@ -94,6 +95,9 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
       { connectTimeout: -1 },
       { acquireTimeout: Number.NaN },
       { recycle: "never" },
+      { statementCacheChannel: "" },
+      { statementCacheChannel: "c".repeat(64) },
+      { statementCacheChannel: 7 },
     ]
   ) {
     // deno-lint-ignore no-explicit-any
@@ -102,14 +106,14 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
   assert.throws(() => new Pool("postgres://["), ConstructionError);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("connect resolves with a pool whose server answered, and rejects when none does", async () => {
   await using connected = await connect(dsn());
   assert.equal(await connected.ping(), true);
   await assert.rejects(connect("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable"), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("closing a connection returns it to its pool at once, and a closed connection refuses work", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 1000 });
   const first = await single.acquire();
@@ -125,8 +129,8 @@ test("closing a connection returns it to its pool at once, and a closed connecti
   await first.close();
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    from JavaScript
+// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    from JavaScript
 test("clearing the statement caches makes a connection that ran an insert prepare it again", async () => {
   await using single = new Pool(scratch(), { maxSize: 1 });
   await single.execute("CREATE DOMAIN stock AS integer DEFAULT 1");
@@ -148,7 +152,53 @@ test("clearing the statement caches makes a connection that ran an insert prepar
   single.clearStatementCaches();
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+/** Poll `probe` until it answers true, failing past ten seconds. */
+async function eventually(what: string, probe: () => Promise<boolean>): Promise<void> {
+  const deadline = performance.now() + 10_000;
+  while (!(await probe())) {
+    assert.ok(performance.now() < deadline, `${what} did not happen in time`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+// [spec:pgorm:req:napi.connections+3/test]    a pool given statementCacheChannel listens from its
+// first acquisition, clears on a notification there whatever its payload, and closes its
+// listening connection with the pool; a pool without it keeps its statements
+// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    from JavaScript
+test("a pool listening on statementCacheChannel clears when notified, and only that pool", async () => {
+  assert.equal(STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches");
+  await using quiet = new Pool(scratch(), { maxSize: 1 });
+  await quiet.execute("CREATE DOMAIN crate AS integer DEFAULT 1");
+  await quiet.execute("CREATE TABLE pallet (id int PRIMARY KEY, crate crate)");
+  const insert = "INSERT INTO pallet (id) VALUES ($1) RETURNING crate";
+  const prepared =
+    "SELECT count(*)::int AS n FROM pg_prepared_statements WHERE statement = 'INSERT INTO pallet (id) VALUES ($1) RETURNING crate'";
+  const listening = `SELECT count(*)::int AS n FROM pg_stat_activity
+    WHERE datname = current_database() AND query = $1 AND state = 'idle'`;
+  const listen = [`LISTEN "${STATEMENT_CACHE_CHANNEL}"`];
+
+  const notified = new Pool(scratch(), { maxSize: 1, statementCacheChannel: STATEMENT_CACHE_CHANNEL });
+  try {
+    assert.equal(await notified.ping(), true);
+    await eventually("the listener's LISTEN", async () => (await quiet.one(listening, listen)).n === 1);
+    assert.equal((await notified.one(insert, [1])).crate, 1);
+    assert.equal((await notified.one(prepared)).n, 1);
+    assert.equal((await quiet.one(insert, [2])).crate, 1);
+
+    await quiet.execute("ALTER DOMAIN crate SET DEFAULT 2");
+    await quiet.execute("SELECT pg_notify($1, 'not read')", [STATEMENT_CACHE_CHANNEL]);
+    await eventually("the clear", async () => (await notified.one(prepared)).n === 0);
+    assert.equal((await notified.one(insert, [3])).crate, 2);
+    assert.equal((await quiet.one(insert, [4])).crate, 1, "the planned default");
+
+    await notified.close();
+    await eventually("the listener's close", async () => (await quiet.one(listening, listen)).n === 0);
+  } finally {
+    await notified.close();
+  }
+});
+
+// [spec:pgorm:req:napi.connections+3/test]
 // [spec:pgorm:req:napi.errors+2/test]
 test("acquiring waits for a free connection within acquireTimeout, then fails with a TimeoutError", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 200 });
@@ -159,7 +209,7 @@ test("acquiring waits for a free connection within acquireTimeout, then fails wi
   assert.equal((await held.one("SELECT 3 AS n")).n, 3);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 // [spec:pgorm:req:napi.errors+2/test]
 test("a connection runs one operation at a time and refuses a second rather than racing it", async () => {
   await using connection = await pool().acquire();
@@ -174,7 +224,7 @@ test("a connection runs one operation at a time and refuses a second rather than
   assert.equal((await connection.one("SELECT 4 AS n")).n, 4);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 // [spec:pgorm:req:napi.cancellation/test]
 test("closing a pool cancels what runs on it and releases every connection", async () => {
   const closing = new Pool(scratch(), { maxSize: 3 });
@@ -197,7 +247,7 @@ test("closing a pool cancels what runs on it and releases every connection", asy
   await assert.rejects(closing.acquire(), lifecycle(/closed/));
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("collecting unreferenced handles never cuts work short, and rolls back and returns what is idle", async () => {
   const outcome = await runFixture("collected", 30_000, {}, { exposeGc: true });
   assert.equal(outcome.stderr, "");
@@ -208,13 +258,13 @@ test("collecting unreferenced handles never cuts work short, and rolls back and 
   );
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("verify-full TLS never falls back to plaintext", async () => {
   await using strict = new Pool(withoutSslmode(dsn()));
   await assert.rejects(strict.ping(), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("verify-full TLS connects through a configured CA, and checks the host name", async (context) => {
   const ca = tlsCa();
   if (ca === undefined) {
@@ -228,7 +278,7 @@ test("verify-full TLS connects through a configured CA, and checks the host name
   await assert.rejects(misnamed.ping(), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("verify-full TLS binds SCRAM authentication to the server's certificate", async (context) => {
   const ca = tlsCa();
   if (ca === undefined || new URL(dsn()).password === "") {

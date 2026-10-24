@@ -276,7 +276,7 @@ test("an aborted pull leaves the listener open; an aborted listen closes it", as
 });
 
 // [spec:pgorm:req:napi.listen/test]
-// [spec:pgorm:req:napi.connections+2/test]
+// [spec:pgorm:req:napi.connections+3/test]
 test("closing the pool closes its listeners, ending a pull in flight", async () => {
   const closing = new Pool(scratch(), { maxSize: 1 });
   const listener = await closing.listener();

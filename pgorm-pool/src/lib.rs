@@ -20,6 +20,7 @@
     unused_results
 )]
 
+mod cache_listener;
 mod config;
 mod copy;
 mod generic_client;
@@ -40,6 +41,7 @@ use std::{
 };
 
 use bytes::Buf;
+use cache_listener::CacheListener;
 use config::Tag;
 use deadpool::managed;
 #[cfg(not(target_arch = "wasm32"))]
@@ -62,6 +64,7 @@ pub use self::config::{
     StatementCacheSize, TargetSessionAttrs,
 };
 
+pub use self::cache_listener::STATEMENT_CACHE_CHANNEL;
 pub use self::generic_client::GenericClient;
 pub use self::raw::{RawConnection, Unpooled};
 pub use self::transaction::{Transaction, TransactionBuilder};
@@ -96,9 +99,10 @@ pub struct Manager {
     // status: Arc<Status>,
     config: ManagerConfig,
     pg_config: PgConfig,
-    connect: Box<dyn Connect>,
+    connect: Arc<dyn Connect>,
     /// [`StatementCaches`] of [`Client`]s handed out by the [`Pool`].
     pub statement_caches: StatementCaches,
+    listener: CacheListener,
 }
 
 impl Manager {
@@ -144,8 +148,9 @@ impl Manager {
             config,
             pg_config,
             // status: Arc::new(Status::default()),
-            connect: Box::new(connect),
+            connect: Arc::new(connect),
             statement_caches: StatementCaches::default(),
+            listener: CacheListener::default(),
         }
     }
 
@@ -163,6 +168,40 @@ impl Manager {
     pub async fn connect_raw(&self) -> Result<Unpooled, Error> {
         self.connect.connect_raw(&self.pg_config).await
     }
+
+    /// Close the connection listening on
+    /// [`ManagerConfig::statement_cache_channel`] and end its task, or keep
+    /// one from opening if the pool has not opened a connection yet.
+    ///
+    /// [`Pool::close`] does not reach the manager, so a pool closed without
+    /// this keeps listening until it is dropped; pgorm's
+    /// `DatabasePool::close` calls both.
+    // [spec:pgorm:req:conn.pool.statement-cache.listen]    closing the pool ends the listener
+    pub fn stop_statement_cache_listener(&self) {
+        self.listener.stop();
+    }
+
+    /// Start listening on [`ManagerConfig::statement_cache_channel`], once.
+    fn start_statement_cache_listener(&self) {
+        let Some(channel) = &self.config.statement_cache_channel else {
+            return;
+        };
+        self.listener.start(|| {
+            cache_listener::listen_for_clears(
+                self.connect.clone(),
+                self.pg_config.clone(),
+                channel.clone(),
+                self.statement_caches.generation.clone(),
+            )
+        });
+    }
+}
+
+// [spec:pgorm:req:conn.pool.statement-cache.listen]    a dropped pool does not leak the listener
+impl Drop for Manager {
+    fn drop(&mut self) {
+        self.listener.stop();
+    }
 }
 
 impl fmt::Debug for Manager {
@@ -178,12 +217,15 @@ impl fmt::Debug for Manager {
     }
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle+2]    create/recycle/detach
+// [spec:pgorm:sem:conn.pool.lifecycle+3]    create/recycle/detach
 impl managed::Manager for Manager {
     type Type = ClientWrapper;
     type Error = Error;
 
     async fn create(&self) -> Result<ClientWrapper, Error> {
+        // Started ahead of the connection, so that its first `LISTEN`, which
+        // clears, tends to precede the first statement prepared.
+        self.start_statement_cache_listener();
         let (client, conn_task) = self.connect.connect(&self.pg_config).await?;
         let mut client_wrapper =
             ClientWrapper::with_cache_size(client, conn_task, self.config.statement_cache);
@@ -289,9 +331,11 @@ where
 #[derive(Default, Debug)]
 pub struct StatementCaches {
     caches: Mutex<Vec<Weak<StatementCache>>>,
-    /// Counts [`StatementCaches::clear_before_reuse`] calls. A connection whose
-    /// cache was last cleared at an older count is cleared before it is lent.
-    generation: AtomicU64,
+    /// Counts [`StatementCaches::clear_before_reuse`] calls and the clears
+    /// the statement-cache listener hears. A connection whose cache was last
+    /// cleared at an older count is cleared before it is lent. Shared with the
+    /// listener's task, which must not hold the manager.
+    generation: Arc<AtomicU64>,
 }
 
 impl StatementCaches {
@@ -336,16 +380,16 @@ impl StatementCaches {
     ///
     /// Call it after DDL that changes what a cached plan depends on: PostgreSQL
     /// re-plans most such changes itself, but not a domain's default.
-    // [spec:pgorm:req:conn.pool.statement-cache.clear]    bump the generation
+    // [spec:pgorm:req:conn.pool.statement-cache.clear+1]    bump the generation
     pub fn clear_before_reuse(&self) {
-        let _ = self.generation.fetch_add(1, Ordering::AcqRel);
+        cache_listener::advance(&self.generation);
     }
 
     /// Clears `client`'s cache if a [`StatementCaches::clear_before_reuse`]
     /// has been asked for since it was last cleared. Called only while the
     /// pool holds the connection idle, so no statement of its owner's can be
     /// mid-preparation.
-    // [spec:pgorm:req:conn.pool.statement-cache.clear]    an idle connection catches up before it is lent
+    // [spec:pgorm:req:conn.pool.statement-cache.clear+1]    an idle connection catches up before it is lent
     fn bring_up_to_date(&self, client: &mut ClientWrapper) {
         let current = self.generation.load(Ordering::Acquire);
         if client.cache_generation != current {
@@ -649,7 +693,7 @@ impl DerefMut for ClientWrapper {
     }
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle+2]    connection task abort on drop
+// [spec:pgorm:sem:conn.pool.lifecycle+3]    connection task abort on drop
 impl Drop for ClientWrapper {
     fn drop(&mut self) {
         self.conn_task.abort()

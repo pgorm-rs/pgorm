@@ -437,7 +437,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > MUST define interpreter, thread and event-loop ownership; unsupported
 > cross-owner use MUST raise a documented error rather than deadlock or panic.
 
-> [spec:pgorm:req:python.connections+2]
+> [spec:pgorm:req:python.connections+3]
 > Connection construction MUST expose supported pgorm pool, connection and TLS
 > configuration, including certificate verification, without a silent plaintext
 > fallback. Pools and checked-out resources MUST support explicit asynchronous
@@ -445,7 +445,13 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > execution and statement-cache machinery, and a pool MUST expose
 > `clear_statement_caches()`, a synchronous call that marks every connection's
 > cached statements stale as `conn.pool.statement-cache.clear` describes and
-> refuses nothing, since it sends nothing. Credentials MUST be redacted from
+> refuses nothing, since it sends nothing. `Pool` MUST take
+> `statement_cache_channel`, `None` by default: given a channel, the pool
+> listens there and clears on every notification as
+> `conn.pool.statement-cache.listen` describes, an empty name or one longer
+> than 63 bytes being refused with `ConstructionError`, and closing the pool
+> closes the listening connection. `pgorm.STATEMENT_CACHE_CHANNEL` is the
+> channel pgorm-migration's runner notifies. Credentials MUST be redacted from
 > representations, exceptions and default diagnostic logs.
 
 > [spec:pgorm:req:python.transactions]

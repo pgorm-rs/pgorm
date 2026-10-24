@@ -55,7 +55,7 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > told. The old table name survives in exactly one place — as
 > `LEGACY_LEDGER_TABLE`, the name adoption looks for.
 
-> [spec:pgorm:sem:migration.up+3]
+> [spec:pgorm:sem:migration.up+4]
 > `up(db, steps)` acquires one pooled connection, opens one transaction, and
 > runs the entire batch inside it before committing. The transaction's first
 > statement is `SELECT pg_advisory_xact_lock($key)`, where `$key` is
@@ -79,6 +79,22 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > (`sql.ddl.domain`). A run that applied nothing changed no schema but perhaps
 > the ledger's own, and a batch that rolled back changed nothing, so neither
 > clears, and re-running `up` stays a no-op.
+>
+> The same batch, after its last ledger row and before it commits, also
+> notifies `statement_cache_channel()` with an empty payload, through
+> `pgorm::notify` on the batch's own transaction. The hook answers
+> `Some(STATEMENT_CACHE_CHANNEL)` unless a migrator overrides it, and `None`
+> sends nothing. The local clear reaches only the pool `up` was given, while
+> every pool listening on the channel clears on the notification
+> (`conn.pool.statement-cache.listen`): another replica's, a worker's,
+> whichever process holds it. Sending it inside the transaction makes
+> PostgreSQL deliver it exactly when the batch commits and never when it rolls
+> back, the condition the local clear waits for, with no statement after the
+> commit that could fail once the batch is already applied. It is sent whether
+> or not any session listens, which costs nothing past the commit, and only
+> when the batch applied at least one migration. A channel the server refuses
+> — empty, or longer than 63 bytes — fails the notification, and with it the
+> batch.
 >
 > The lock makes concurrent runners queue instead of collide. Without it the
 > loser of a race fails on whatever it happened to hit first — a duplicate

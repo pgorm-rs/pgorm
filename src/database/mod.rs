@@ -26,6 +26,13 @@ pub use tokio_postgres::{Config, IsolationLevel};
 /// pool never requires naming `pgorm_pool` itself.
 pub use pgorm_pool::{ManagerConfig, PoolBuilder, RecyclingMethod, StatementCacheSize};
 
+/// The channel pgorm-migration's runner notifies once a batch that applied a
+/// migration commits: the one to give
+/// [`ManagerConfig::statement_cache_channel`] for a pool to clear its
+/// statement caches after another process's migration.
+// [spec:pgorm:req:conn.pool.statement-cache.listen]
+pub use pgorm_pool::STATEMENT_CACHE_CHANNEL;
+
 /// The TLS connector types [`connect_with`]'s bounds are written in, plus the
 /// [`NoTls`] the simple entry points pass, re-exported for the same reason.
 pub use tokio_postgres::{
@@ -45,8 +52,9 @@ fn pool_build_err(err: BuildError) -> Error {
 }
 
 /// The manager configuration the simple entry points delegate with: no
-/// recycling query, the default statement-cache bound, and `tag` — `None`
-/// everywhere but [`connect_multi_with_builder`], which names each pool.
+/// recycling query, the default statement-cache bound, no statement-cache
+/// channel, and `tag` — `None` everywhere but [`connect_multi_with_builder`],
+/// which names each pool.
 ///
 /// Spelled out rather than taken from `ManagerConfig::default()` because these
 /// are the defaults `conn.pool` fixes for those entry points, not whatever the
@@ -56,6 +64,25 @@ fn simple_manager_config(tag: Option<String>) -> ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
         tag,
         statement_cache: StatementCacheSize::default(),
+        statement_cache_channel: None,
+    }
+}
+
+/// The longest channel name `LISTEN` keeps whole and `pg_notify` accepts.
+const CHANNEL_BYTES: usize = 63;
+
+/// Refuse a [`ManagerConfig::statement_cache_channel`] no notification could
+/// reach: an empty name, which `LISTEN` refuses, or one longer than an
+/// identifier, which it truncates while `pg_notify` refuses it whole.
+// [spec:pgorm:req:conn.pool.statement-cache.listen]    an unusable channel is refused at construction
+fn check_statement_cache_channel(manager: &ManagerConfig) -> Result<(), Error> {
+    match &manager.statement_cache_channel {
+        Some(channel) if channel.is_empty() || channel.len() > CHANNEL_BYTES => {
+            Err(Error::Custom(format!(
+                "statement_cache_channel {channel:?} is not a channel name of 1 to {CHANNEL_BYTES} bytes"
+            )))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -82,6 +109,7 @@ fn simple_manager_config(tag: Option<String>) -> ManagerConfig {
 ///         recycling_method: RecyclingMethod::Verified,
 ///         tag: Some("reader".to_owned()),
 ///         statement_cache: StatementCacheSize::Disabled,
+///         statement_cache_channel: Some(pgorm::STATEMENT_CACHE_CHANNEL.to_owned()),
 ///     },
 ///     |builder| builder.max_size(8),
 /// )?;
@@ -90,10 +118,17 @@ fn simple_manager_config(tag: Option<String>) -> ManagerConfig {
 /// # }
 /// ```
 ///
+/// [`ManagerConfig::statement_cache_channel`] is the one setting here that
+/// costs a connection: a pool given one keeps a connection of its own
+/// listening there from its first checkout, and clears its statement caches
+/// whenever a notification arrives, as another process's migration sends.
+///
 /// # Errors
 ///
 /// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
-/// pool — deadpool rejects a pool configured with timeouts but no runtime.
+/// pool — deadpool rejects a pool configured with timeouts but no runtime —
+/// or if `statement_cache_channel` is empty or longer than the 63 bytes of an
+/// identifier.
 // [spec:pgorm:req:conn.pool+3]    the general entry point
 #[doc(alias = "ConnectOptions")]
 pub fn connect_with<T>(
@@ -108,6 +143,7 @@ where
     T::TlsConnect: Sync + Send,
     <T::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    check_statement_cache_channel(&manager)?;
     let mgr = Manager::from_config(config, tls, manager);
     build(Pool::builder(mgr))
         .build()

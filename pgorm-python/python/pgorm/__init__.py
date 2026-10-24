@@ -124,7 +124,7 @@ from ._native import (
     capabilities,
     require_capability,
 )
-from .runtime import Connection, Pool, PoolStatus, connect
+from .runtime import STATEMENT_CACHE_CHANNEL, Connection, Pool, PoolStatus, connect
 from .results import Record, Field, ResultStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 from .transactions import Transaction, TransactionMode, IsolationLevel
@@ -157,6 +157,7 @@ __all__ = [
     "IsolationLevel",
     "Pool",
     "PoolStatus",
+    "STATEMENT_CACHE_CHANNEL",
     "connect",
     "Record",
     "Field",

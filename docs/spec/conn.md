@@ -139,17 +139,20 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Connection lifecycle in pgorm-pool
 
-> [spec:pgorm:sem:conn.pool.lifecycle+2]
+> [spec:pgorm:sem:conn.pool.lifecycle+3]
 > `Manager::create` connects via `tokio_postgres`, spawns the connection
 > driver future onto a tokio task, and hands out a `ClientWrapper` owning the
 > client, the task's `JoinHandle`, and a fresh per-connection
 > `StatementCache`; the cache is registered with the manager's
 > `StatementCaches` registry, current with every clear asked of it so far.
-> Dropping a `ClientWrapper` aborts its connection task. `Manager::recycle`
-> rejects clients whose `is_closed()` is true; otherwise it clears the
-> connection's statement cache if a clear has been asked for since the cache
-> was last cleared (`conn.pool.statement-cache.clear`), then runs the
-> recycling method's query, if any. `detach` unregisters the connection's
+> Before it connects, the first `create` of a pool whose `ManagerConfig`
+> names a `statement_cache_channel` starts that pool's statement-cache
+> listener (`conn.pool.statement-cache.listen`), and dropping the `Manager`
+> stops it. Dropping a `ClientWrapper` aborts its connection task.
+> `Manager::recycle` rejects clients whose `is_closed()` is true; otherwise it
+> clears the connection's statement cache if a clear has been asked for since
+> the cache was last cleared (`conn.pool.statement-cache.clear`), then runs
+> the recycling method's query, if any. `detach` unregisters the connection's
 > statement cache.
 
 > [spec:pgorm:sem:conn.pool.recycle]
@@ -320,7 +323,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `Fast` (`conn.pool`), so they cannot reach it; a caller who passes such a
 > method to `connect_with` should pair it with `StatementCacheSize::Disabled`.
 
-> [spec:pgorm:req:conn.pool.statement-cache.clear]
+> [spec:pgorm:req:conn.pool.statement-cache.clear+1]
 > `DatabasePool::clear_statement_caches()` MUST drop every pooled
 > connection's cached prepared statements, so that each statement is prepared
 > again the next time a connection runs it. It is for DDL that changes what a
@@ -360,6 +363,82 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > it as `clear_statement_caches()` and `clearStatementCaches()`
 > (`python.connections`, `napi.connections`); and pgorm-migration's `up`
 > calls it once a batch that applied a migration commits (`migration.up`).
+>
+> It reaches only the pool it is called on, and so only the process holding
+> that pool. A pool in another process on the same database clears when a
+> notification arrives on the channel it listens on, if it was built to
+> (`conn.pool.statement-cache.listen`), and `up` sends one as its batch
+> commits.
+
+> [spec:pgorm:req:conn.pool.statement-cache.listen]
+> `ManagerConfig::statement_cache_channel: Option<String>` carries a clear
+> between processes. A pool given a channel keeps one connection of its own
+> `LISTEN`ing on it (`conn.listen`) and, whenever a notification arrives
+> there, advances its `StatementCaches` generation exactly as
+> `clear_before_reuse` does (`conn.pool.statement-cache.clear`). The payload
+> is ignored: any notification on the channel clears, so a sender agrees with
+> its listeners on the name alone. The setting MUST be off by default,
+> `None`, because it costs each pool that takes it one idle connection, and
+> `connect`, `connect_with_builder` and `connect_multi_with_builder` leave it
+> off (`conn.pool`); `connect_with` is how it is set. `STATEMENT_CACHE_CHANNEL`,
+> `pgorm_statement_caches`, defined in pgorm-pool and re-exported by pgorm, is
+> the channel pgorm-migration's runner notifies unless told otherwise
+> (`migration.up`). A notification reaches only sessions connected to the
+> database it was sent in, so one name serves every database on a server
+> without a clear crossing between them.
+>
+> The listening connection is opened through `Manager::connect_raw`, with the
+> pool's configuration and TLS connector, as `DatabasePool::listener`'s is: it
+> is not taken from the pool, counts against no size, has no statement cache,
+> and is never lent or recycled. The pool's first `Manager::create` starts it,
+> just before that connection opens (`conn.pool.lifecycle`), rather than the
+> pool's construction: a pool is built in a synchronous call that may run
+> outside any runtime, as the Python and JavaScript pools' are, and a pool
+> that has opened no connection has prepared nothing to clear. Its task holds
+> the pool's connector, configuration and generation, and nothing that keeps
+> the pool alive.
+>
+> Unlike a caller's `Listener`, which reports a lost connection and never
+> reconnects, this one MUST survive losing its connection, since nobody reads
+> its errors. When the connection fails, is terminated, or cannot be opened,
+> it opens another after a wait of 100 ms that doubles with each attempt that
+> fails to `LISTEN`, up to 10 s, and returns to 100 ms once a `LISTEN` takes
+> effect. Each time its `LISTEN` takes effect, the first time included, it
+> MUST clear once: a notification sent while no session of the pool listened
+> reached none, and a connection the pool opened before the first `LISTEN`
+> may have prepared statements before a notification it could not hear. Each
+> loss is logged through `tracing` as a warning, and each clear it makes at
+> debug level. Two servers keep it from settling: a hot standby refuses
+> `LISTEN`, and receives no notification anyway, so the listener retries
+> there at its longest wait; and a server whose `idle_session_timeout` ends
+> idle sessions ends this one, so each reconnection clears the pool once more.
+>
+> `DatabasePool::close` MUST stop the listener, closing its connection,
+> through `Manager::stop_statement_cache_listener`, which also keeps a pool
+> that has not yet connected from starting one. `pgorm_pool::Pool::close` does
+> not reach the manager, so a pool closed through pgorm-pool alone listens
+> until it is dropped. Dropping a pool's last handle drops its `Manager`,
+> whose drop MUST stop the listener as well, so a dropped pool leaks neither
+> the task nor its connection.
+>
+> `connect_with` MUST refuse a channel no notification could reach with
+> `Error::Custom`, before anything connects: an empty name, which `LISTEN`
+> refuses, and one longer than 63 bytes, which `LISTEN` truncates with only a
+> notice while `pg_notify` refuses it whole. A `Manager` built through
+> pgorm-pool alone with such a name logs an error and listens on nothing.
+>
+> The clear is the deferred one `conn.pool.statement-cache.clear` describes:
+> an idle connection is cleared before it is next lent, and one checked out
+> across it — a Rust `DatabaseConnection`, or a Python or JavaScript
+> `Connection` held for the application's life — keeps its statements until
+> it is returned. The metrics layer does not see it (`metric.layer`): the
+> listener runs inside pgorm-pool, below the `InstrumentedPool` that wraps the
+> built pool, and runs no statement a caller wrote, while `MetricsCollector`'s
+> seven hooks report statements, transactions and acquisitions and have no
+> defaults, so a hook for this would be a change every collector had to make.
+> The Python and JavaScript pools take the setting as
+> `statement_cache_channel` and `statementCacheChannel`, and export
+> `STATEMENT_CACHE_CHANNEL` (`python.connections`, `napi.connections`).
 
 ## Statement execution surface
 

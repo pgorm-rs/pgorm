@@ -172,7 +172,15 @@ deadlines, statement-cache bounds and verified/fast recycling are keyword
 options on `Pool`. After DDL that a cached plan does not see, such as a
 domain's changed default, `pool.clear_statement_caches()` makes every
 connection prepare its statements again: an idle one before it is next lent,
-and one checked out at the time once it is returned and lent again.
+and one checked out at the time once it is returned and lent again. That
+reaches only this process's pool. A pool built with
+`statement_cache_channel=pgorm.STATEMENT_CACHE_CHANNEL` also clears whenever a
+notification arrives on that channel, as pgorm-migration's runner sends after
+a migration from any process: it keeps one connection of its own listening
+from its first acquisition until it closes, reconnects if that connection
+drops, and clears once each time it listens again. The option is off by
+default; any channel name of 1 to 63 bytes works, and a notification's
+payload is ignored.
 
 Closing a pool rejects waiters and cancels operations on its checked-out
 connections. Closing a connection releases it. If an operation is cancelled

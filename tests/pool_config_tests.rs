@@ -149,6 +149,7 @@ pub async fn connect_with_applies_manager_config() -> Result<(), Error> {
             recycling_method: RecyclingMethod::Clean,
             tag: Some("connect-with-reader".to_owned()),
             statement_cache: StatementCacheSize::Disabled,
+            statement_cache_channel: None,
         },
         |builder| builder.max_size(1),
     )?;

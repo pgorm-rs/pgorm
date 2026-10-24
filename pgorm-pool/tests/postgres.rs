@@ -54,6 +54,7 @@ fn single_connection_pool(recycling_method: RecyclingMethod) -> Pool {
         recycling_method,
         tag: Default::default(),
         statement_cache: StatementCacheSize::default(),
+        statement_cache_channel: None,
     });
     cfg.pool = Some(PoolConfig::new(1));
     cfg.create_pool(tokio_postgres::NoTls).unwrap()
@@ -66,6 +67,7 @@ fn cache_size_pool(statement_cache: StatementCacheSize) -> Pool {
         recycling_method: RecyclingMethod::Fast,
         tag: Default::default(),
         statement_cache,
+        statement_cache_channel: None,
     });
     cfg.create_pool(tokio_postgres::NoTls).unwrap()
 }
@@ -223,6 +225,7 @@ async fn recycling_methods() {
             recycling_method,
             tag: Default::default(),
             statement_cache: StatementCacheSize::default(),
+            statement_cache_channel: None,
         });
         let pool = cfg.create_pool(tokio_postgres::NoTls).unwrap();
         for _ in 0usize..20usize {
@@ -251,7 +254,7 @@ async fn statement_cache_clear() {
 }
 
 // [spec:pgorm:sem:conn.pool.statement-cache+3/test]    the manager-level registry clears every live cache
-// [spec:pgorm:sem:conn.pool.lifecycle+2/test]    each created connection gets a fresh cache, registered with the manager
+// [spec:pgorm:sem:conn.pool.lifecycle+3/test]    each created connection gets a fresh cache, registered with the manager
 #[tokio::test]
 async fn statement_caches_clear() {
     let pool = create_pool();
@@ -271,7 +274,7 @@ async fn statement_caches_clear() {
     assert!(client1.statement_cache.size() == 0);
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    an idle connection is cleared, on the client
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    an idle connection is cleared, on the client
 // and the server, before it is next lent
 #[tokio::test]
 async fn clear_before_reuse_clears_an_idle_connection() {
@@ -294,7 +297,7 @@ async fn clear_before_reuse_clears_an_idle_connection() {
     );
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    a connection checked out at the clear keeps
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    a connection checked out at the clear keeps
 // its statements until it is returned, and is cleared before it is lent again
 #[tokio::test]
 async fn clear_before_reuse_waits_for_a_return() {
@@ -315,7 +318,7 @@ async fn clear_before_reuse_waits_for_a_return() {
     assert_eq!(prepared_count(&client, PROBE).await, 0);
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    a connection created after a clear is not
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    a connection created after a clear is not
 // cleared by it, and one several clears behind is cleared once
 #[tokio::test]
 async fn clear_before_reuse_clears_each_connection_once() {
@@ -348,7 +351,7 @@ async fn clear_before_reuse_clears_each_connection_once() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle+2/test]    dropping a ClientWrapper aborts its connection task
+// [spec:pgorm:sem:conn.pool.lifecycle+3/test]    dropping a ClientWrapper aborts its connection task
 #[tokio::test]
 async fn client_wrapper_drop_aborts_conn_task() {
     struct AbortWitness(Arc<AtomicBool>);
@@ -397,7 +400,7 @@ async fn client_wrapper_drop_aborts_conn_task() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle+2/test]    recycle refuses a client whose is_closed() is true
+// [spec:pgorm:sem:conn.pool.lifecycle+3/test]    recycle refuses a client whose is_closed() is true
 #[tokio::test]
 async fn recycle_rejects_closed_connection() {
     let pool = single_connection_pool(RecyclingMethod::Fast);
@@ -443,7 +446,7 @@ async fn recycle_rejects_closed_connection() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.lifecycle+2/test]    detach unregisters the connection's statement cache
+// [spec:pgorm:sem:conn.pool.lifecycle+3/test]    detach unregisters the connection's statement cache
 #[tokio::test]
 async fn detach_unregisters_statement_cache() {
     let pool = create_pool();

@@ -16,6 +16,7 @@ pub(crate) struct PoolConfig {
     pub(crate) acquire_timeout: f64,
     pub(crate) statement_cache_size: usize,
     pub(crate) recycle: String,
+    pub(crate) statement_cache_channel: Option<String>,
 }
 
 pub(crate) fn seconds(value: f64, name: &str) -> PyResult<Duration> {
@@ -28,7 +29,7 @@ pub(crate) fn seconds(value: f64, name: &str) -> PyResult<Duration> {
         .map_err(|_| ConstructionError::new_err(format!("{name} is outside the supported range")))
 }
 
-// [spec:pgorm:req:python.connections+2]
+// [spec:pgorm:req:python.connections+3]
 impl PoolConfig {
     pub(crate) fn build(self) -> PyResult<(pgorm::DatabasePool, Redactions, Duration)> {
         if self.max_size == 0 || self.max_size > tokio::sync::Semaphore::MAX_PERMITS {
@@ -55,6 +56,17 @@ impl PoolConfig {
                 ));
             }
         };
+        // [spec:pgorm:req:conn.pool.statement-cache.listen]    refused here, by name, rather than
+        // as connect_with's anonymous invalid configuration
+        if self
+            .statement_cache_channel
+            .as_ref()
+            .is_some_and(|channel| channel.is_empty() || channel.len() > 63)
+        {
+            return Err(ConstructionError::new_err(
+                "statement_cache_channel must be a channel name of 1 to 63 bytes",
+            ));
+        }
         let manager = pgorm::ManagerConfig {
             recycling_method,
             tag: None,
@@ -62,6 +74,7 @@ impl PoolConfig {
                 None => pgorm::StatementCacheSize::Disabled,
                 Some(size) => pgorm::StatementCacheSize::Bounded(size),
             },
+            statement_cache_channel: self.statement_cache_channel,
         };
         let pool = match mode {
             "disable" => {

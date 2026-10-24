@@ -31,6 +31,14 @@ export * from "./listen.d.ts";
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
 
+// [spec:pgorm:req:napi.connections+3]
+/**
+ * The channel pgorm-migration's runner notifies once a batch that applied a
+ * migration commits: give it as {@link PoolOptions.statementCacheChannel} for
+ * a pool to clear its cached statements after a migration run elsewhere.
+ */
+export declare const STATEMENT_CACHE_CHANNEL: string;
+
 /** The base class of every error pgorm-napi rejects with. */
 export declare class PgormError extends Error {}
 
@@ -410,7 +418,7 @@ export declare class Value {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.connections+2]
+// [spec:pgorm:req:napi.connections+3]
 /** How a {@link Pool} connects. Durations are in milliseconds. */
 export interface PoolOptions {
   /**
@@ -431,6 +439,16 @@ export interface PoolOptions {
   readonly statementCacheSize?: number;
   /** How a returned connection is checked before reuse: `"verified"` (the default) or `"fast"`. */
   readonly recycle?: "verified" | "fast";
+  /**
+   * A channel of 1 to 63 bytes the pool listens on, through a connection of
+   * its own opened by its first acquisition and closed with the pool. Every
+   * notification there, whatever its payload, clears every connection's
+   * cached statements as {@link Pool.clearStatementCaches} does; the
+   * connection reconnects if it drops, clearing once each time it listens
+   * again. Absent by default. {@link STATEMENT_CACHE_CHANNEL} is the channel
+   * pgorm-migration's runner notifies.
+   */
+  readonly statementCacheChannel?: string;
 }
 
 /** A snapshot of a pool's capacity and use. */

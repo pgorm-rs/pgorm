@@ -175,3 +175,6 @@ export {
 
 /** @type {string} */
 export const version = native.version;
+
+/** @type {string} */
+export const STATEMENT_CACHE_CHANNEL = native.statementCacheChannel;

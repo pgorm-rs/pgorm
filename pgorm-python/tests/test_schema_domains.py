@@ -1,4 +1,5 @@
 """CREATE DOMAIN, ALTER DOMAIN and DROP DOMAIN from the installed native wheel."""
+import asyncio
 import os
 import unittest
 from uuid import uuid4
@@ -183,10 +184,10 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.insert(self.table).columns("id", "qty").values(6, 60))
         self.assertEqual(await self.quantities(), [(2, 3), (6, 60)])
 
-    # [spec:pgorm:req:python.connections+2/test]    clear_statement_caches makes the connection
+    # [spec:pgorm:req:python.connections+3/test]    clear_statement_caches makes the connection
     # that already ran an insert prepare it again, its old statement closed on the server, and
     # write the domain's new default
-    # [spec:pgorm:req:conn.pool.statement-cache.clear/test]    from Python
+    # [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    from Python
     async def test_a_cleared_pool_writes_the_new_default(self):
         await self.create()
 
@@ -205,6 +206,70 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         self.pool.clear_statement_caches()
         self.assertEqual((await self.pool.fetch_one(prepared))["n"], 0)
         self.assertEqual((await self.pool.fetch_one(insert(3)))["qty"], 9)
+
+    async def eventually(self, what, probe):
+        deadline = asyncio.get_running_loop().time() + 10
+        while not await probe():
+            self.assertLess(asyncio.get_running_loop().time(), deadline, what)
+            await asyncio.sleep(0.01)
+
+    # [spec:pgorm:req:python.connections+3/test]    a pool given statement_cache_channel listens
+    # from its first acquisition, clears on a notification there whatever its payload, and
+    # closes its listening connection when it closes; a pool without the setting keeps its
+    # statements
+    # [spec:pgorm:req:conn.pool.statement-cache.listen/test]    from Python
+    async def test_a_notified_pool_writes_the_new_default(self):
+        p.require_capability("pool.statement_cache_channel")
+        self.assertEqual(p.STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches")
+        await self.create()
+        channel = 'caches "雪 ' + uuid4().hex[:8]
+        listening = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1, statement_cache_channel=channel)
+
+        def insert(row):
+            return p.insert(self.table).columns("id").values(row).returning(p.col("qty"))
+
+        prepared = p.RawSQL(
+            "SELECT count(*)::integer AS n FROM pg_prepared_statements WHERE statement LIKE $1",
+            ["INSERT INTO%"],
+        )
+        listeners = p.RawSQL(
+            "SELECT count(*)::integer AS n FROM pg_stat_activity "
+            "WHERE datname = current_database() AND query = $1 AND state = 'idle'",
+            ['LISTEN "' + channel.replace('"', '""') + '"'],
+        )
+
+        async def listening_count():
+            return (await self.pool.fetch_one(listeners))["n"]
+
+        try:
+            self.assertTrue(await listening.ping())
+            await self.eventually("the listener's LISTEN", lambda: self.is_count(listening_count, 1))
+            self.assertEqual((await listening.fetch_one(insert(1)))["qty"], 7)
+            self.assertEqual((await listening.fetch_one(prepared))["n"], 1)
+            self.assertEqual((await self.pool.fetch_one(insert(2)))["qty"], 7)
+
+            await self.pool.execute(s.set_domain_default(self.domain, 9))
+            async with self.pool.connection() as connection:
+                await connection.notify(channel, "not read")
+            await self.eventually(
+                "the clear",
+                lambda: self.is_count(lambda: self.count(listening, prepared), 0),
+            )
+            self.assertEqual((await listening.fetch_one(insert(3)))["qty"], 9)
+            self.assertEqual((await self.pool.fetch_one(insert(4)))["qty"], 7)
+
+            await listening.close()
+            await self.eventually("the listener's close", lambda: self.is_count(listening_count, 0))
+        finally:
+            await listening.close()
+
+    @staticmethod
+    async def count(pool, query):
+        return (await pool.fetch_one(query))["n"]
+
+    @staticmethod
+    async def is_count(probe, expected):
+        return await probe() == expected
 
     # [spec:pgorm:req:python.schema-domains/test]    a rename keeps the column typed with the
     # domain, a drop is refused under RESTRICT while a column uses it, and CASCADE drops the

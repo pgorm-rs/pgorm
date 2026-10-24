@@ -579,6 +579,25 @@ pub struct ManagerConfig {
     /// caches at all. See [`StatementCacheSize`].
     #[serde(default)]
     pub statement_cache: StatementCacheSize,
+
+    /// A channel whose notifications clear every connection's statement cache,
+    /// as [`StatementCaches::clear_before_reuse`] does; `None`, the default,
+    /// listens on nothing.
+    ///
+    /// When set, the pool keeps one connection of its own listening on the
+    /// channel, opened when the pool opens its first connection. It is not
+    /// lent, counts against no size, and is reopened if it drops, the caches
+    /// being cleared once each time its `LISTEN` takes effect, since a
+    /// notification sent while it was down reached nothing. A notification's
+    /// payload is ignored. [`STATEMENT_CACHE_CHANNEL`] is the channel
+    /// pgorm-migration's runner notifies once a batch that applied a migration
+    /// commits.
+    ///
+    /// [`StatementCaches::clear_before_reuse`]: super::StatementCaches::clear_before_reuse
+    /// [`STATEMENT_CACHE_CHANNEL`]: super::STATEMENT_CACHE_CHANNEL
+    // [spec:pgorm:req:conn.pool.statement-cache.listen]    the setting, off by default
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statement_cache_channel: Option<String>,
 }
 
 static DEFAULT_TAG_COUNT: AtomicUsize = AtomicUsize::new(0);

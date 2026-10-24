@@ -565,7 +565,7 @@ pub async fn logging_metrics_emits_expected_levels() {
 
 // [spec:pgorm:def:metric.layer+2/test]    three wrappers, their inner()/metrics() accessors, and the pool's
 // tag()/status()/clear_statement_caches()
-// [spec:pgorm:req:conn.pool.statement-cache.clear/test]    the instrumented pool clears the pool it wraps
+// [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    the instrumented pool clears the pool it wraps
 #[pgorm_macros::test]
 pub async fn wrappers_expose_inner_and_metrics() -> Result<(), Error> {
     fn assert_collector_bounds<M: MetricsCollector>() {

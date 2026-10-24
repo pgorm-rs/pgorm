@@ -44,7 +44,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     # [spec:pgorm:req:python.runtime/test]
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_connection_reuse_and_context_cleanup(self):
         self.assertTrue(await self.pool.ping())
         self.assertEqual(self.pool.status().size, 1)
@@ -71,7 +71,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await waiting
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_shutdown_releases_checked_out_resources_and_waiters(self):
         connection = await self.pool.acquire()
         waiting = asyncio.create_task(self.pool.acquire())
@@ -105,12 +105,16 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(pgorm.CancelledError, asyncio.CancelledError)
 
     # [spec:pgorm:req:python.errors+1/test]
+    # [spec:pgorm:req:python.connections+3/test]    an empty, overlong or non-string
+    # statement_cache_channel is a ConstructionError
     async def test_bad_configuration_is_an_explicit_construction_error(self):
         for options in (
             {"max_size": 0}, {"max_size": -1}, {"max_size": True},
             {"max_size": 2**100}, {"statement_cache_size": -1},
             {"acquire_timeout": 0}, {"connect_timeout": float("nan")},
             {"tls": "ignore-certificate"}, {"recycle": "invented"},
+            {"statement_cache_channel": ""}, {"statement_cache_channel": "c" * 64},
+            {"statement_cache_channel": 1},
         ):
             with self.subTest(options=options):
                 with self.assertRaises(pgorm.ConstructionError):
@@ -121,7 +125,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(secret, str(caught.exception))
 
     # [spec:pgorm:req:python.errors+1/test]
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_sqlstate_and_credential_redaction(self):
         parts = urlsplit(self.dsn)
         password = "deliberately-invalid-private-password"
@@ -139,7 +143,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await pool.close()
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_tls_never_falls_back_to_plaintext(self):
         pool = pgorm.Pool(self.dsn, tls="verify-full")
         try:
@@ -148,7 +152,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await pool.close()
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_platform_store_refuses_an_unknown_ca(self):
         # The test server's certificate is signed by a CA minted for this run,
         # which no platform store holds: without cafile it must be refused.
@@ -162,7 +166,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await pool.close()
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_default_trust_is_the_certificate_store(self):
         # SSL_CERT_FILE replaces the platform's store, so naming the test CA
         # there and passing no cafile shows the default trust is the store's.
@@ -171,7 +175,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         async with pool:
             self.assertTrue(await pool.ping())
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_rootless_store_fails_construction(self):
         with tempfile.TemporaryDirectory(prefix="pgorm-python-empty-store-") as directory:
             empty_file = Path(directory) / "none.pem"
@@ -195,12 +199,12 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                 async with pgorm.Pool(self.dsn) as pool:
                     self.assertTrue(await pool.ping())
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_verified_tls_accepts_the_configured_ca(self):
         async with pgorm.Pool(self.dsn, tls="verify-full", cafile=os.environ["PGORM_TEST_CA"]) as pool:
             self.assertTrue(await pool.ping())
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_verified_tls_binds_scram_to_the_certificate(self):
         # channel_binding=require refuses SCRAM unless it is bound to the TLS
         # session (SCRAM-SHA-256-PLUS over the server certificate's
@@ -219,7 +223,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await pool.close()
 
-    # [spec:pgorm:req:python.connections+2/test]
+    # [spec:pgorm:req:python.connections+3/test]
     async def test_certificate_hostname_is_verified(self):
         parts = urlsplit(self.dsn)
         netloc = f"{parts.username}:{quote(parts.password)}@wrong.test:{parts.port}"
