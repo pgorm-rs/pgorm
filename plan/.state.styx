@@ -2001,8 +2001,6 @@ impl_evidence (
         python.truth-testing
     ), covered_claims (
         {impl_name main, rule python.truth-testing}
-    ), rule_versions_seen (
-        {id python.truth-testing, version 0}
     )}
     {id python.acceptance, covered_rules (
         python.acceptance

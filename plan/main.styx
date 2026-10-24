@@ -12886,6 +12886,14 @@ children (
                 kind @note
                 text "Found by python-schema-truth-testing (9248d83a). After it, every schema object, Compiled, expression and statement refuses truth testing, but other native classes still evaluate as true: EntityUpdate, EntityUpdateMany, EntityInsert, EntityInsertMany (src/entities/versions.rs), Window, With, FromItem, Join, Table, Conflict, ConflictTarget, ConflictUpdate, the frame classes and the MERGE action classes. Add the refusal to each, and make one test enumerate every class pgorm._native defines (with an explicit, reasoned allow-list for value types where truthiness is meaningful, if any) so a new class without the refusal fails; extend python.statements / python.expressions text as needed (bump, re-deliver the feat owners in a separate feat commit). Waits on sql-select-extras, which adds Python classes in the same modules."
             }
+
+            {
+                at 2026-10-24T06:25:48.479587Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered: python.truth-testing+1 moved after this node's delivery (b9ac84d3, every Python stream refuses truth testing, as Listener does), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                after_done true
+            }
         )
     }
 
