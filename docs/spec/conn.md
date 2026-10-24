@@ -690,12 +690,11 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
-> [spec:pgorm:sem:conn.tx.closure+2]
+> [spec:pgorm:sem:conn.tx.closure+3]
 > `DatabaseConnection::transaction(f)` and `transaction_with(opts, f)` run a
 > closure inside a transaction, taking `F: AsyncFnOnce(&mut
-> DatabaseTransaction<'s>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
-> boxed future — where `'s` is the lifetime of the `&'s mut self` receiver.
-> `transaction` opens the transaction with `TransactionTrait::begin`,
+> DatabaseTransaction<'_>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
+> boxed future. `transaction` opens the transaction with `TransactionTrait::begin`,
 > `transaction_with` with `begin_with(opts)`; the rest of the cycle is shared.
 > `Ok(value)` is followed by `COMMIT`, and `value` is returned only once the
 > `COMMIT` succeeded. `Err(e)` is followed by an *awaited* `rollback()`, so the
@@ -703,11 +702,15 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > path of `conn.tx.guard`, not the fire-and-forget `Drop` path, and it is why
 > the closure API does not inherit that rule's unobservable-rollback caveat.
 >
-> The `&'s mut self` borrow is MOVED into the opening call
-> (`TransactionTrait::begin(self)` / `DatabaseConnection::begin_with(self,
-> opts)`) rather than reborrowed, so the closure is handed the concrete
-> `DatabaseTransaction<'s>` and `F` needs no higher-ranked bound over the
-> transaction's own lifetime.
+> The bound is higher-ranked over the transaction's lifetime, and every
+> closure form — these two and `transaction_with_retry` (`conn.tx.retry`) —
+> MUST return a future that is `Send` whenever the closure's is, so the call
+> runs inside `tokio::spawn` or a handler a web framework requires to be
+> `Send`. Naming the receiver's lifetime instead (`F: AsyncFnOnce(&mut
+> DatabaseTransaction<'s>)` with `&'s mut self`) compiles at a direct `.await`
+> but fails a spawned task's `Send` check, which then needs the closure general
+> over every lifetime: "implementation of `AsyncFnOnce` is not general
+> enough".
 >
 > The handle the closure receives is a `ConnectionTrait` implementor in its own
 > right (`conn.pool.conn-trait`), so `&txn` is what a helper generic over `&C`
@@ -738,14 +741,14 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > failed rollback its consequence, so promoting the latter would replace the
 > answer to "why did this transaction fail?" with a symptom.
 
-> [spec:pgorm:sem:conn.tx.retry+1]
+> [spec:pgorm:sem:conn.tx.retry+2]
 > `DatabaseConnection::transaction_with_retry(opts, max_retries, f)` is
 > `transaction_with` plus replay: it retries the whole begin/run/commit cycle —
 > not the failing statement — while the failure is retryable, for at most `1 +
 > max_retries` attempts. Each attempt reborrows the connection for a fresh
-> `begin_with(opts)`, so unlike `conn.tx.closure` the bound is higher-ranked
-> over the transaction lifetime: `F: AsyncFnMut(&mut DatabaseTransaction<'_>) ->
-> Result<T, E>`. A failed attempt is rolled back exactly as `conn.tx.closure`
+> `begin_with(opts)`, under the same higher-ranked bound as `conn.tx.closure`
+> but callable once per attempt: `F: AsyncFnMut(&mut DatabaseTransaction<'_>)
+> -> Result<T, E>`. A failed attempt is rolled back exactly as `conn.tx.closure`
 > specifies before the next one begins.
 >
 > Retryable means SQLSTATE `40001` (`serialization_failure`) or `40P01`

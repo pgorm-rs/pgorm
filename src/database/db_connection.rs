@@ -226,10 +226,10 @@ impl DatabaseConnection {
     /// returns. `Ok` is returned only once `COMMIT` succeeded; a failing
     /// `BEGIN` or `COMMIT` is [`TransactionError::Connection`] and the
     /// closure's own error is [`TransactionError::Transaction`].
-    // [spec:pgorm:sem:conn.tx.closure+2]    plain BEGIN
-    pub async fn transaction<'s, T, E, F>(&'s mut self, f: F) -> Result<T, TransactionError<E>>
+    // [spec:pgorm:sem:conn.tx.closure+3]    plain BEGIN
+    pub async fn transaction<T, E, F>(&mut self, f: F) -> Result<T, TransactionError<E>>
     where
-        F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+        F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
     {
         let txn = TransactionTrait::begin(self)
             .await
@@ -240,15 +240,15 @@ impl DatabaseConnection {
 
     /// [`DatabaseConnection::transaction`] over a transaction configured by
     /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
-    // [spec:pgorm:sem:conn.tx.closure+2]    configured BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+3]    configured BEGIN
     #[doc(alias = "transaction_with_config")]
-    pub async fn transaction_with<'s, T, E, F>(
-        &'s mut self,
+    pub async fn transaction_with<T, E, F>(
+        &mut self,
         mode: TransactionMode,
         f: F,
     ) -> Result<T, TransactionError<E>>
     where
-        F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+        F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
     {
         let txn = DatabaseConnection::begin_with(self, mode)
             .await
@@ -266,7 +266,7 @@ impl DatabaseConnection {
     /// replay it. `f` is [`AsyncFnMut`] because it is called once per attempt,
     /// and must therefore be replayable: every effect it has outside the
     /// transaction happens again on each attempt.
-    // [spec:pgorm:sem:conn.tx.retry+1]
+    // [spec:pgorm:sem:conn.tx.retry+2]
     pub async fn transaction_with_retry<T, E, F>(
         &mut self,
         mode: TransactionMode,
@@ -319,13 +319,10 @@ enum Retryable<E> {
     Transaction(E),
 }
 
-// [spec:pgorm:sem:conn.tx.closure+2]    commit on Ok, awaited rollback on Err
-async fn drive<'s, T, E, F>(
-    mut txn: DatabaseTransaction<'s>,
-    f: F,
-) -> Result<T, TransactionError<E>>
+// [spec:pgorm:sem:conn.tx.closure+3]    commit on Ok, awaited rollback on Err
+async fn drive<T, E, F>(mut txn: DatabaseTransaction<'_>, f: F) -> Result<T, TransactionError<E>>
 where
-    F: AsyncFnOnce(&mut DatabaseTransaction<'s>) -> Result<T, E>,
+    F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
 {
     match f(&mut txn).await {
         Ok(value) => txn
@@ -340,7 +337,7 @@ where
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+2]    a failed ROLLBACK does not displace the closure error
+// [spec:pgorm:sem:conn.tx.closure+3]    a failed ROLLBACK does not displace the closure error
 async fn rollback(txn: DatabaseTransaction<'_>) {
     if let Err(error) = txn.rollback().await {
         tracing::error!(
@@ -356,7 +353,7 @@ async fn rollback(txn: DatabaseTransaction<'_>) {
 /// the transaction machinery itself, which is why there is deliberately no
 /// `From<Error>` impl: with `E = Error` it would silently file every
 /// closure-side error under `Connection` and erase that distinction.
-// [spec:pgorm:sem:conn.tx.closure+2]    error wrapper
+// [spec:pgorm:sem:conn.tx.closure+3]    error wrapper
 #[derive(Debug)]
 pub enum TransactionError<E> {
     /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.

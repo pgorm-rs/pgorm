@@ -650,7 +650,7 @@ fn serializable() -> TransactionMode {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+2/test]    Ok commits, and the value is returned
+// [spec:pgorm:sem:conn.tx.closure+3/test]    Ok commits, and the value is returned
 #[pgorm_macros::test]
 pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_commit_txclosure").await;
@@ -684,7 +684,54 @@ pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+2/test]    Err rolls back and is wrapped, not swallowed
+// [spec:pgorm:sem:conn.tx.closure+3/test]    each closure form's future is Send, so it runs in a spawned task
+#[pgorm_macros::test]
+pub async fn transaction_closures_run_in_spawned_tasks() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_closures_run_in_spawned_tasks").await;
+    create_tables(&ctx.db).await?;
+
+    let pool = ctx.db.clone();
+    tokio::spawn(async move {
+        let mut db = pool.get().await?;
+        db.transaction(async |txn| insert_bakery(&*txn, "Plain Bakery", 1.0).await)
+            .await
+            .map_err(|e| Error::Custom(e.to_string()))
+    })
+    .await
+    .expect("the spawned task completes")?;
+
+    let pool = ctx.db.clone();
+    tokio::spawn(async move {
+        let mut db = pool.get().await?;
+        db.transaction_with(serializable(), async |txn| {
+            insert_bakery(&*txn, "Configured Bakery", 2.0).await
+        })
+        .await
+        .map_err(|e| Error::Custom(e.to_string()))
+    })
+    .await
+    .expect("the spawned task completes")?;
+
+    let pool = ctx.db.clone();
+    tokio::spawn(async move {
+        let mut db = pool.get().await?;
+        db.transaction_with_retry(serializable(), 3, async |txn| {
+            insert_bakery(&*txn, "Retried Bakery", 3.0).await
+        })
+        .await
+        .map_err(|e| Error::Custom(e.to_string()))
+    })
+    .await
+    .expect("the spawned task completes")?;
+
+    assert_eq!(count_bakeries(&ctx.db.get().await?, "Bakery").await?, 3);
+
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:conn.tx.closure+3/test]    Err rolls back and is wrapped, not swallowed
 #[pgorm_macros::test]
 pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_error_txclosure").await;
@@ -718,7 +765,7 @@ pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+1/test]    SQLSTATE 40001 raised by a statement is retried
+// [spec:pgorm:sem:conn.tx.retry+2/test]    SQLSTATE 40001 raised by a statement is retried
 #[pgorm_macros::test]
 pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_concurrent_update_txclosure").await;
@@ -777,7 +824,7 @@ pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+1/test]    write skew between two serializable transactions
+// [spec:pgorm:sem:conn.tx.retry+2/test]    write skew between two serializable transactions
 #[pgorm_macros::test]
 pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_write_skew_txclosure").await;
@@ -817,7 +864,7 @@ pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+1/test]    a non-retryable error is returned on the first attempt
+// [spec:pgorm:sem:conn.tx.retry+2/test]    a non-retryable error is returned on the first attempt
 #[pgorm_macros::test]
 pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_non_retryable_txclosure").await;

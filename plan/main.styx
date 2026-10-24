@@ -13993,12 +13993,20 @@ children (
         id tx-closure-send
         title "transaction and transaction_with take a closure whose future is Send, so they run in a spawned task"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-24T15:10:39.894021Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-24, after asking whether transactions only worked in an async block. DatabaseConnection::transaction and transaction_with bound F: AsyncFnOnce(&mut DatabaseTransaction<'s>), naming the connection borrow as the transaction's inner lifetime; the Send check of a spawned future then needs the closure general over every lifetime, so tokio::spawn (or an axum handler) refuses the call with \"implementation of AsyncFnOnce is not general enough\". transaction_with_retry, bound with '_, was never affected, nor was begin(). Shown on Rust 1.99 (red: a test spawning each closure form fails to compile at transaction and transaction_with; green: with the bounds and drive's written AsyncFnOnce(&mut DatabaseTransaction<'_>) and the unused 's dropped, transaction_tests passes 22/22 including the new transaction_closures_run_in_spawned_tasks). The patch is at scratchpad tx-send.patch; the old WIP branch origin/feature/transaction-blocks (2025-03-21) hit the same wall and switched to async_trait(?Send)."
+            }
+
+            {
+                at 2026-10-24T15:30:08.176678Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
