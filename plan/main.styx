@@ -13988,4 +13988,47 @@ children (
             }
         )
     }
+
+    {
+        id tx-closure-send
+        title "transaction and transaction_with take a closure whose future is Send, so they run in a spawned task"
+        kind @fix
+        log (
+            {
+                at 2026-10-24T15:10:39.894021Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-24, after asking whether transactions only worked in an async block. DatabaseConnection::transaction and transaction_with bound F: AsyncFnOnce(&mut DatabaseTransaction<'s>), naming the connection borrow as the transaction's inner lifetime; the Send check of a spawned future then needs the closure general over every lifetime, so tokio::spawn (or an axum handler) refuses the call with \"implementation of AsyncFnOnce is not general enough\". transaction_with_retry, bound with '_, was never affected, nor was begin(). Shown on Rust 1.99 (red: a test spawning each closure form fails to compile at transaction and transaction_with; green: with the bounds and drive's written AsyncFnOnce(&mut DatabaseTransaction<'_>) and the unused 's dropped, transaction_tests passes 22/22 including the new transaction_closures_run_in_spawned_tasks). The patch is at scratchpad tx-send.patch; the old WIP branch origin/feature/transaction-blocks (2025-03-21) hit the same wall and switched to async_trait(?Send)."
+            }
+        )
+    }
+
+    {
+        id tx-closure-only
+        title "Transactions are opened only through a closure: begin() is gone from the public API, savepoints and the metrics wrappers take the closure form, and the bindings run their transactions inside one"
+        kind @feat
+        deps (tx-closure-send)
+        log (
+            {
+                at 2026-10-24T15:10:40.210184Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-24: once the closure forms run in spawned tasks, remove begin() (\"rewrite the bindings\", choosing deletion over deprecation, per the standing rule that a replaced API is deleted, not deprecated). Design, probed on Rust 1.99: TransactionTrait carries transaction<T, E, F>(&mut self, f: F) -> impl Future<Output = Result<T, E>> with F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>, one default body, and no + Send on the returned future: a trait method promising + Send cannot prove the closure's CallOnceFuture is Send on stable (bounding it needs the unstable async_fn_traits; a helper trait with a Send associated future is not general enough for async closures), but without the promise the future of a call on a concrete type is Send, so a connection transaction with a savepoint transaction nested in it ran in tokio::spawn and committed. The cost: code generic over C: TransactionTrait gets a future not known to be Send. Scope: transaction on the trait for DatabaseConnection, DatabaseTransaction (savepoint) and InstrumentedConnection/InstrumentedTransaction (recording the begin/commit/rollback metrics the guard did); transaction_with and transaction_with_retry stay inherent on DatabaseConnection (a savepoint takes no mode); delete begin, begin_with, begin_instrumented and the public commit/rollback (the closure decides: Ok commits, Err rolls back, a dropped future rolls back); pgorm-migration's exec_with_connection moves to the closure; pgorm-python (transactions/native.rs, scope.rs) and pgorm-napi (connect/transaction.rs) run each transaction's command loop inside transaction(async |tx| ..), returning Ok on the commit command and Err on rollback, a nested Begin recursing through tx.transaction, with their Python and JavaScript APIs unchanged; the 62 begin() calls in tests move to closures, and the guard-drop tests become tests that a failed or dropped closure rolls back. Update conn.tx, conn.tx.guard, conn.tx.closure, metric.layer.tx, the bindings' transaction rules, CLAUDE.md's Scoped transactions bullet and the Coming from SeaORM guide. Delete origin/feature/transaction-blocks only if the operator says so."
+            }
+        )
+    }
+
+    {
+        id ident-oracle-load-flake
+        title "The identifier oracle's live capture does not come back empty when the machine is slow"
+        kind @test
+        log (
+            {
+                at 2026-10-24T15:10:40.488977Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-24 merging migration-ledger-schema: at load 40, identifier_oracle::live_capture::live_sites_hold_every_hostile_name failed after 226 s with \"site `pgorm/cursor.table`, name `zero-width-joiner`: the run stopped after 0 of 1 statements: []\"; alone it passes in 26 s. A capture that silently returns nothing under load hides real failures. Find what bounds the capture (a timeout, a log read racing the server) and make it wait for the statement or fail saying it timed out."
+            }
+        )
+    }
 )
