@@ -17,6 +17,9 @@ futures = { version = "0.3.34", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 dotenvy = "0.15.7"
+# Run-scoped names for the databases the live tests create, and the sweep of
+# crashed runs' leftovers (tests/common/setup.rs).
+pgorm-test-support = { path = "../pgorm-test-support" }
 tokio.workspace = true
 
 [features]

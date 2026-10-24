@@ -165,7 +165,7 @@ let run: Creator | undefined;
 
 /**
  * This process, as the names it mints record it: the owner hashes the host
- * name and the user as the Rust suites' `tests/common/run_scope.rs` does, and
+ * name and the user as the Rust suites' `pgorm-test-support` crate does, and
  * is 0, which no sweep acts on, when the host name cannot be learned.
  */
 function thisRun(): Creator {
@@ -183,7 +183,7 @@ let minted = 0;
  * A database name for `label`, unique to this process and to this call within
  * it, in the form every live suite on a shared server mints:
  * `{label}_{seq}__{owner}_{pid}_{stamp}`, the label cut to fit 63 bytes. The
- * Rust suites' `tests/common/run_scope.rs` says what each part is for.
+ * Rust suites' `pgorm-test-support` crate says what each part is for.
  */
 export function scopedName(label: string): string {
   const { owner, pid, stamp } = thisRun();

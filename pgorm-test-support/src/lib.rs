@@ -26,9 +26,8 @@
 //! started after the stamp, and to which no session is connected. Every
 //! question this host cannot answer counts as the creator still running.
 //!
-//! pgorm-migration's tests carry a byte-for-byte copy of this file at
-//! `pgorm-migration/tests/common/run_scope.rs`, which `tests/run_scope_tests.rs`
-//! holds identical, and pgorm-napi's `tests/support.ts` mints and sweeps the
+//! pgorm's and pgorm-migration's live tests take this crate as a
+//! dev-dependency, and pgorm-napi's `tests/support.ts` mints and sweeps the
 //! same names, so each suite can reclaim the others' leftovers.
 
 use std::{
@@ -41,7 +40,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use pgorm::{Config, ConnectionTrait, DatabasePool, Error, types::ToSql};
+use tokio_postgres::{Client, Config, Error, NoTls, error::SqlState};
 
 /// The longest identifier PostgreSQL stores without truncating it.
 const MAX_IDENTIFIER_LEN: usize = 63;
@@ -79,10 +78,25 @@ enum Holder {
     StartedAt(u64),
 }
 
+/// The connection configuration for `db_name` on the server `base_url` names.
+/// It is the type `pgorm::connect` takes, since both crates name the
+/// workspace's tokio-postgres.
 pub fn config(base_url: &str, db_name: &str) -> Config {
     format!("{base_url}/{db_name}")
         .parse()
         .expect("DATABASE_URL is not a valid PostgreSQL connection string")
+}
+
+/// A client on `db_name`, its connection driven by a task on the current
+/// tokio runtime until the client is dropped.
+pub async fn connect(base_url: &str, db_name: &str) -> Result<Client, Error> {
+    let (client, connection) = config(base_url, db_name).connect(NoTls).await?;
+    tokio::spawn(async move {
+        if let Err(err) = connection.await {
+            tracing::debug!("test support connection ended: {err}");
+        }
+    });
+    Ok(client)
 }
 
 /// This process, as the names it mints record it.
@@ -97,6 +111,7 @@ pub fn this_run() -> Creator {
 
 /// A database or role name for `label`, unique to this process and to this
 /// call within it.
+// [spec:pgorm:req:sql.target+2]    the per-run name every live test object takes
 pub fn scoped_name(label: &str) -> String {
     name_for(label, this_run())
 }
@@ -157,35 +172,24 @@ pub fn may_be_running(creator: Creator) -> bool {
 /// Create the database `name` for this process, first reclaiming whatever
 /// crashed runs left on the server.
 pub async fn create_database(base_url: &str, name: &str) -> Result<(), Error> {
-    let maintenance = pgorm::connect(config(base_url, "postgres"));
+    let maintenance = connect(base_url, "postgres").await?;
     sweep_once(&maintenance).await;
-    retrying(|| async {
-        let conn = maintenance.get().await?;
-        conn.batch_execute(&format!("CREATE DATABASE {}", quoted(name)))
-            .await
-    })
-    .await
+    let create = format!("CREATE DATABASE {}", quoted(name));
+    retrying(|| maintenance.batch_execute(&create)).await
 }
 
 /// Drop the database `name`, which this process created. `FORCE` can evict
 /// only this process's own sessions, since no other run knows the name.
 pub async fn drop_database(base_url: &str, name: &str) -> Result<(), Error> {
-    let maintenance = pgorm::connect(config(base_url, "postgres"));
-    retrying(|| async {
-        let conn = maintenance.get().await?;
-        conn.batch_execute(&format!(
-            "DROP DATABASE IF EXISTS {} WITH (FORCE)",
-            quoted(name)
-        ))
-        .await
-    })
-    .await
+    let maintenance = connect(base_url, "postgres").await?;
+    let drop = format!("DROP DATABASE IF EXISTS {} WITH (FORCE)", quoted(name));
+    retrying(|| maintenance.batch_execute(&drop)).await
 }
 
 /// Sweep the server once per process: under nextest that is once per test,
 /// which keeps a crashed run's leftovers from outliving the next run's first
 /// test, and under `cargo test` once per test binary.
-async fn sweep_once(maintenance: &DatabasePool) {
+async fn sweep_once(maintenance: &Client) {
     static SWEPT: AtomicBool = AtomicBool::new(false);
     if SWEPT.swap(true, Ordering::Relaxed) {
         return;
@@ -201,33 +205,32 @@ async fn sweep_once(maintenance: &DatabasePool) {
 /// The databases are dropped without `FORCE`: a session that connected after
 /// the catalogue was read makes the drop fail rather than be evicted. Each
 /// failure is left for a later sweep.
-pub async fn sweep(maintenance: &DatabasePool) -> Result<(), Error> {
-    let conn = maintenance.get().await?;
-    let pattern: [&(dyn ToSql + Sync); 1] = [&TAG_PATTERN];
-    let databases = conn
-        .query_all(
+// [spec:pgorm:req:sql.target+2]    only a provably gone creator's leftovers are dropped
+pub async fn sweep(maintenance: &Client) -> Result<(), Error> {
+    let databases = maintenance
+        .query(
             "SELECT d.datname::text FROM pg_database d \
              WHERE d.datname ~ $1 AND NOT d.datistemplate \
              AND NOT EXISTS (SELECT 1 FROM pg_stat_activity a WHERE a.datname = d.datname)",
-            &pattern,
+            &[&TAG_PATTERN],
         )
         .await?;
     for name in abandoned(databases.iter().map(|row| row.get(0))) {
-        let dropped = conn
+        let dropped = maintenance
             .batch_execute(&format!("DROP DATABASE IF EXISTS {}", quoted(&name)))
             .await;
         if let Err(err) = dropped {
             tracing::debug!("leftover database {name:?} stays: {err}");
         }
     }
-    let roles = conn
-        .query_all(
+    let roles = maintenance
+        .query(
             "SELECT rolname::text FROM pg_roles WHERE rolname ~ $1",
-            &pattern,
+            &[&TAG_PATTERN],
         )
         .await?;
     for name in abandoned(roles.iter().map(|row| row.get(0))) {
-        let dropped = conn
+        let dropped = maintenance
             .batch_execute(&format!("DROP ROLE IF EXISTS {}", quoted(&name)))
             .await;
         if let Err(err) = dropped {
@@ -247,23 +250,18 @@ fn quoted(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-/// Whether an error is another session holding what a statement needs, such
-/// as a connection to `template1` during `CREATE DATABASE`, rather than a
-/// refusal on the statement's merits.
-fn is_contended(err: &Error) -> bool {
-    matches!(err, Error::Postgres(err) if err.code().is_some_and(|code| code.code() == "55006"))
-}
-
-/// Re-run `step` while it fails on a contended state, waiting longer each time.
-async fn retrying<F, Fut, T>(mut step: F) -> Result<T, Error>
+/// Re-run `step` while another session holds what it needs, such as a
+/// connection to `template1` during `CREATE DATABASE`, waiting longer each
+/// time; any other refusal is the statement's own and returns at once.
+async fn retrying<F, Fut>(mut step: F) -> Result<(), Error>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, Error>>,
+    Fut: Future<Output = Result<(), Error>>,
 {
     let mut attempt = 1;
     loop {
         match step().await {
-            Err(err) if attempt < DDL_ATTEMPTS && is_contended(&err) => {
+            Err(err) if attempt < DDL_ATTEMPTS && err.code() == Some(&SqlState::OBJECT_IN_USE) => {
                 tokio::time::sleep(DDL_BACKOFF * attempt).await;
                 attempt += 1;
             }

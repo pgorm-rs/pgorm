@@ -11,10 +11,10 @@ use pretty_assertions::assert_eq;
 /// name carries this process and its place among the names the process
 /// minted, so no other run on the server, from this checkout or any other, can
 /// hold it.
-pub use super::run_scope::{config, scoped_name as scoped_db_name};
+pub use pgorm_test_support::{config, scoped_name as scoped_db_name};
 
 pub async fn setup(base_url: &str, db_name: &str) -> DatabasePool {
-    super::run_scope::create_database(base_url, db_name)
+    pgorm_test_support::create_database(base_url, db_name)
         .await
         .map_err(|err| Error::Custom(format!("test database {db_name:?} was not created: {err}")))
         .expect("the test database is created");
@@ -29,7 +29,7 @@ pub async fn setup(base_url: &str, db_name: &str) -> DatabasePool {
 /// test leaked. A database that survives every attempt is reported rather than
 /// failed on: once this process has exited, the next run's sweep reclaims it.
 pub async fn tear_down(base_url: &str, db_name: &str) {
-    if let Err(err) = super::run_scope::drop_database(base_url, db_name).await {
+    if let Err(err) = pgorm_test_support::drop_database(base_url, db_name).await {
         tracing::warn!("test database {db_name:?} outlived its test: {err}");
     }
 }

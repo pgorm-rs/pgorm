@@ -1,9 +1,9 @@
 use pgorm_migration::pgorm::{ConnectionTrait, DatabasePool, Error, types::ToSql};
 
-use super::run_scope::{self, config};
+use pgorm_test_support::{config, create_database, drop_database, scoped_name};
 
 /// A throwaway database of this process's own, created on construction under
-/// a name no other run can hold (`run_scope`).
+/// a name no other run can hold (`pgorm_test_support`).
 pub struct TestContext {
     base_url: String,
     db_name: String,
@@ -17,9 +17,9 @@ impl TestContext {
 
         let base_url =
             std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");
-        let db_name = run_scope::scoped_name(test_name);
+        let db_name = scoped_name(test_name);
 
-        run_scope::create_database(&base_url, &db_name)
+        create_database(&base_url, &db_name)
             .await
             .expect("create test database");
 
@@ -41,7 +41,7 @@ impl TestContext {
     /// Drop the database. A failure is left to the sweep a later run makes once
     /// this process has exited.
     pub async fn delete(&self) {
-        if let Err(err) = run_scope::drop_database(&self.base_url, &self.db_name).await {
+        if let Err(err) = drop_database(&self.base_url, &self.db_name).await {
             tracing::warn!("test database {:?} outlived its test: {err}", self.db_name);
         }
     }

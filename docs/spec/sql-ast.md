@@ -334,7 +334,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Target release
 
-> [spec:pgorm:req:sql.target+1]
+> [spec:pgorm:req:sql.target+2]
 > A build of pgorm targets one PostgreSQL major release. 18 is the floor and
 > the default: a build that names no release targets 18, there is no `pg-18`
 > feature to say so, and nothing older is kept working. The `pg-19` cargo
@@ -395,9 +395,9 @@ today, including panicking edges and deliberate failsafes.
 > which a process id means anything. The pid is the creating process. The
 > stamp is the Unix second at which it minted its first name, which tells the
 > creator from a later process given the same pid. The Rust crates mint these
-> names through `tests/common/run_scope.rs`, of which pgorm-migration's tests
-> carry a copy that a test holds byte-for-byte identical; pgorm-napi's support
-> module mints the same names.
+> names through one unpublished crate, `pgorm-test-support`, a dev-dependency
+> of pgorm and pgorm-migration that reaches the server through tokio-postgres
+> rather than pgorm; pgorm-napi's support module mints the same names.
 >
 > A run MUST NOT drop a database or role it did not create, so nothing drops a
 > prior copy before creating its own. The one exception is a leftover whose
