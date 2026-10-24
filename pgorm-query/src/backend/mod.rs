@@ -32,9 +32,10 @@ impl Oper {
         )
     }
 
-    /// The BETWEEN family, symmetric forms included. Membership is what makes
-    /// `x BETWEEN a AND b` render its bounds bare rather than parenthesised
-    /// (`[spec:pgorm:req:sql.render.parens+3]`), so a form left out of this
+    /// The BETWEEN family, symmetric forms included. Membership is what renders
+    /// the `AND` of `x BETWEEN a AND b` as BETWEEN's own keyword, each bound an
+    /// operand of the BETWEEN, rather than as a parenthesised logical `AND`
+    /// (`[spec:pgorm:req:sql.render.parens+4]`), so a form left out of this
     /// list renders as the wrong statement, not merely a noisy one.
     pub(crate) fn is_between(&self) -> bool {
         matches!(

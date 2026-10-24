@@ -20,7 +20,7 @@
     "values": [["text","a"], ["text","b"], ["text","a"], ["text","a"], ["i64","1"], ["i64","2"], ["text","a"], ["i64","1"], ["text","x"]]
   },
   "between": {
-    "sql": "SELECT * FROM \"t\" WHERE (\"a\" BETWEEN $1 AND $2) AND (\"b\" NOT BETWEEN $3 AND $4) AND (\"c\" BETWEEN SYMMETRIC $5 AND $6) AND (\"d\" NOT BETWEEN SYMMETRIC $7 AND $8)",
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" BETWEEN $1 AND $2 AND \"b\" NOT BETWEEN $3 AND $4 AND \"c\" BETWEEN SYMMETRIC $5 AND $6 AND \"d\" NOT BETWEEN SYMMETRIC $7 AND $8",
     "values": [["i64","1"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","10"], ["i64","1"], ["i64","10"], ["i64","1"]]
   },
   "patterns": {

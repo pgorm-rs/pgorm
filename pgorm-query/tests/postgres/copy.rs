@@ -277,7 +277,7 @@ fn copy_to_query_inlines_values() {
         sql,
         [
             r#"COPY (SELECT "id", "image" FROM "glyph" WHERE "image" = E'it\'s'"#,
-            r#"AND ("aspect" BETWEEN 1.5 AND 2.5) ORDER BY "id" ASC) TO STDOUT"#,
+            r#"AND "aspect" BETWEEN 1.5 AND 2.5 ORDER BY "id" ASC) TO STDOUT"#,
             r#"WITH (FORMAT csv, HEADER true, QUOTE '"', ESCAPE '"', FORCE_QUOTE ("image"))"#,
         ]
         .join(" ")

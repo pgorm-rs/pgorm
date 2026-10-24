@@ -520,7 +520,7 @@ bound parameter is held to.
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` revision, on PostgreSQL 18's grammar, that the render
-> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+3]`,
+> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+4]`,
 > `[spec:pgorm:def:macros.sql+4]`) — and MUST NOT decide it by inspecting
 > the statement's text. The
 > statement is accepted only when it parses, holds exactly one statement,

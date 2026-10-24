@@ -110,7 +110,7 @@ fn narrowing_keeps_a_zero_limit() {
 
 // [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two shapes the grammar refuses are refused by
 // `check_tie_limit`, and the grammar does refuse what they render
-// [spec:pgorm:req:sql.render.oracle+3/test]    the one render held rejected by design
+// [spec:pgorm:req:sql.render.oracle+4/test]    the one render held rejected by design
 // [spec:pgorm:req:sql.render.tie-limit/test]
 #[test]
 fn ungrammatical_tie_limits_are_refused() {
@@ -297,7 +297,7 @@ fn no_escape_renders_an_empty_escape() {
 
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    SIMILAR TO ranks with LIKE: bare under the
 // logical operators and NOT, an arithmetic operand bare inside it
-// [spec:pgorm:def:sql.render.precedence+10/test]
+// [spec:pgorm:def:sql.render.precedence+12/test]
 #[test]
 fn similar_to_sits_in_the_like_family() {
     let sql = Query::select()
@@ -351,7 +351,7 @@ fn grouping(node: &serde_json::Value) -> String {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence+10/test]    ILIKE and NOT ILIKE rank with LIKE: bare under
+// [spec:pgorm:def:sql.render.precedence+12/test]    ILIKE and NOT ILIKE rank with LIKE: bare under
 // the logical operators and NOT, ESCAPE tail included, an arithmetic operand bare inside them,
 // and the grammar groups the bare render as the condition was built
 #[test]

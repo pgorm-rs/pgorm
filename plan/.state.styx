@@ -875,7 +875,9 @@ assertions (
     {id active-model-json-error-atomicity, kind @complete, author "brendan@necessary.nu", at 2026-09-05T22:06:08.030555Z}
     {id active-model-unknown-column, kind @complete, author "brendan@necessary.nu", at 2026-09-21T15:28:21.192315Z}
     {id api-doc-honesty, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:16:04.02923Z}
+    {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
+    {id boolean-operator-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:11.56594Z}
     {id bound-datetime-max-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:21.710443Z}
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
     {id bug.crate-metadata, kind @complete, author "brendan@necessary.nu", at 2026-09-03T18:41:14.563922Z}
@@ -1041,6 +1043,7 @@ assertions (
     {id nullable-projection-absence, kind @complete, author "brendan@necessary.nu", at 2026-09-07T13:08:20.541646Z}
     {id on-conflict-columns, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:15:11.139777Z}
     {id oracle-shim-parenthesised, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:54:44.020549Z}
+    {id oracle-shim-values-table, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:30:37.381664Z}
     {id orm-merge-sync, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:28:04.904937Z}
     {id orm-returning-old-new, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:17:50.237394Z}
     {id orm.try-insert-conflicted, kind @complete, author "brendan@necessary.nu", at 2026-09-02T12:15:34.424217Z}

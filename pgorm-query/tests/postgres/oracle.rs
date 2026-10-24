@@ -11,9 +11,14 @@
 
 /// Statement keywords the [`assert_eq`] shim uses to tell a whole rendered
 /// statement from a rendered fragment (a bare column reference, a value literal,
-/// an expression) that no grammar could parse on its own.
-const STATEMENT_KEYWORDS: [&str; 14] = [
+/// an expression) that no grammar could parse on its own. Every
+/// [`QUERY_KEYWORDS`] entry is here too: a query that opens a render bare is as
+/// much a statement as one wrapped in parentheses, and a keyword missing here
+/// lets such a render pass the shim unparsed.
+const STATEMENT_KEYWORDS: [&str; 16] = [
     "SELECT ",
+    "VALUES ",
+    "TABLE ",
     "INSERT ",
     "UPDATE ",
     "DELETE ",
@@ -70,7 +75,7 @@ pub fn parses(sql: &str) -> Result<(), String> {
 ///
 /// # Panics
 /// Panics when the PostgreSQL grammar rejects `sql`.
-// [spec:pgorm:req:sql.render.oracle+3]
+// [spec:pgorm:req:sql.render.oracle+4]
 pub fn assert_parses(sql: &str) {
     if let Err(report) = parses(sql) {
         panic!("{report}");
