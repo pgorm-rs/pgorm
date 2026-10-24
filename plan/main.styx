@@ -10270,6 +10270,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-10-24T06:25:32.569098Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: security.ident-oracle+15 moved after this node's delivery (53584a26, a tiebreak a caller installs on a cursor carries its column's cast), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 

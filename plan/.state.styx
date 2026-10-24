@@ -1543,9 +1543,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule security.ident-oracle}
         {impl_name main, rule security.ident-oracle.nul}
-    ), rule_versions_seen (
-        {id security.ident-oracle, version 14}
-        {id security.ident-oracle.nul, version 2}
     )}
     {id infra.conn, covered_rules (
         conn.pool
