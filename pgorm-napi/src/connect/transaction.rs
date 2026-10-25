@@ -1,17 +1,21 @@
-//! Transactions and savepoints. pgorm's `DatabaseTransaction` borrows its
-//! connection, and a savepoint its parent, exclusively; that borrow cannot
-//! cross into JavaScript, so a task on the runtime owns each one, nested
-//! savepoint frames inside their parent's, and JavaScript's handles send it
-//! owned commands. While a savepoint is open its parent's frame is suspended
-//! inside it, holding the parent's lock: the parent refuses a statement, a
-//! commit, a rollback or another savepoint until the child finishes, and
-//! refuses a second request while one runs, rather than queue or race it.
+//! Transactions and savepoints. pgorm opens a transaction only around a
+//! closure, whose `DatabaseTransaction` borrows its connection, and a
+//! savepoint's its parent, exclusively; that borrow cannot cross into
+//! JavaScript, so a task on the runtime serves each frame's commands inside
+//! its closure, nested savepoint frames inside their parent's, and
+//! JavaScript's handles send it owned commands. While a savepoint is open its
+//! parent's frame is suspended inside it, holding the parent's lock: the
+//! parent refuses a statement, a commit, a rollback or another savepoint until
+//! the child finishes, and refuses a second request while one runs, rather
+//! than queue or race it.
 
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, future::Future, sync::Arc, time::Duration};
 
 use futures_util::future::BoxFuture;
 use neon::{prelude::*, types::Finalize};
-use pgorm::{DatabaseTransaction, IsolationLevel, TransactionMode, TransactionTrait};
+use pgorm::{
+    DatabaseTransaction, IsolationLevel, TransactionError, TransactionMode, TransactionTrait,
+};
 use tokio::sync::{Mutex, OwnedMutexGuard, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
@@ -23,7 +27,7 @@ use super::{
     job::{Database, Job, Output, taken},
 };
 use crate::{
-    errors::{Failure, failure},
+    errors::{Failure, Redactions, failure},
     settle,
     statements::{CopyFrom, CopyTo},
 };
@@ -223,7 +227,7 @@ impl State {
     /// The frame's lock, refusing rather than waiting when a request or an
     /// open savepoint holds it. Taken on the JavaScript thread as each request
     /// is made, so requests are refused in the order JavaScript made them.
-    // [spec:pgorm:req:napi.transactions]
+    // [spec:pgorm:req:napi.transactions+1]
     fn lock(&self) -> Result<OwnedMutexGuard<()>, Failure> {
         self.ensure_open()?;
         self.busy.clone().try_lock_owned().map_err(|_| {
@@ -304,20 +308,16 @@ impl State {
     /// Free the frame once a COPY in it has ended: its lock first, so that a
     /// statement JavaScript runs as the COPY settles finds it free. A COPY
     /// whose connection is discarded ends the whole transaction, nothing in
-    /// it committed, as an aborted statement does.
+    /// it committed, as an aborted statement does, and the frame is told so.
     // [spec:pgorm:req:napi.copy+2]
-    fn after_copy(
-        &self,
-        settle: Settle,
-        lock: OwnedMutexGuard<()>,
-        release: Release,
-    ) -> Option<Completion> {
+    fn after_copy(&self, settle: Settle, lock: OwnedMutexGuard<()>, release: Release) -> bool {
         drop(lock);
-        if settle == Settle::Discard {
+        let discarded = settle == Settle::Discard;
+        if discarded {
             self.root.aborted.cancel();
         }
         drop(release);
-        (settle == Settle::Discard).then(Completion::discarded)
+        discarded
     }
 
     /// A savepoint, which holds this frame's lock until it finishes.
@@ -347,127 +347,258 @@ impl State {
     }
 }
 
-/// Serve one frame's commands until it commits or rolls back, a savepoint's
-/// frame nested inside while it is open. Abandoned — its handle collected
-/// unfinished — a frame rolls back within five seconds or discards the
-/// connection.
-// [spec:pgorm:req:napi.transactions]
-fn serve<'a>(
-    mut tx: DatabaseTransaction<'a>,
+/// How a frame's command loop ended short of discarding it: the error its
+/// closure returns, so that pgorm rolls the frame back.
+enum Exit {
+    /// JavaScript rolled the frame back; the reply goes once the rollback has.
+    RolledBack(Finish),
+    /// The frame's handle was collected unfinished.
+    Abandoned,
+}
+
+/// What ends a frame by dropping its transaction's future rather than letting
+/// it finish, which rolls back without awaiting the server: `discard`, which
+/// the frame cancels as it gives its connection up, and `ending`, which an
+/// abandoned frame's closure cancels as it returns, leaving the rollback five
+/// seconds before the connection is discarded instead.
+#[derive(Clone, Default)]
+struct Halt {
+    discard: CancellationToken,
+    ending: CancellationToken,
+}
+
+impl Halt {
+    async fn run<T>(&self, transaction: impl Future<Output = T>) -> Option<T> {
+        tokio::select! {
+            () = self.discard.cancelled() => None,
+            () = async {
+                self.ending.cancelled().await;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            } => None,
+            ended = transaction => Some(ended),
+        }
+    }
+
+    /// Give the frame's connection up. The closure never returns, so pgorm
+    /// awaits no rollback on a connection in an unknown state, and
+    /// [`Halt::run`] drops the transaction instead.
+    async fn discard<T>(&self) -> T {
+        self.discard.cancel();
+        std::future::pending().await
+    }
+}
+
+/// How a frame's transaction ended, for the code that opened it.
+enum Ended {
+    /// `BEGIN` or `SAVEPOINT` was refused, the closure never ran, and the
+    /// wait for the frame to open is still to be answered.
+    Refused(Finish, pgorm::Error),
+    Ran(Completion),
+}
+
+/// One frame: its commands, and what outlives the closure serving them.
+struct Frame {
     state: Arc<State>,
-    mut commands: mpsc::UnboundedReceiver<Command>,
-) -> BoxFuture<'a, Completion> {
-    Box::pin(async move {
-        let _finished = Finished(state.finished.clone());
+    commands: mpsc::UnboundedReceiver<Command>,
+    secrets: Redactions,
+    /// Answered from inside the closure as it starts, so a refused opening
+    /// finds it unanswered.
+    opened: Option<Finish>,
+    /// A commit's reply, held outside the closure because the `COMMIT` runs
+    /// once the closure has returned and the reply carries its failure.
+    committed: Option<Finish>,
+    /// Set as the frame opens and dropped with the frame, once its `COMMIT`
+    /// or `ROLLBACK` has finished too.
+    finished: Option<Finished>,
+    halt: Halt,
+}
+
+impl Frame {
+    fn new(state: Arc<State>, commands: mpsc::UnboundedReceiver<Command>, opened: Finish) -> Self {
         let secrets = state.connection.pool.secrets.clone();
-        loop {
-            let command = tokio::select! {
-                () = state.abandoned.cancelled() => None,
-                command = commands.recv() => command,
-            };
-            let Some(command) = command else {
-                let rolled_back = tokio::time::timeout(Duration::from_secs(5), tx.rollback()).await;
-                return Completion {
-                    healthy: matches!(rolled_back, Ok(Ok(()))),
-                    reply: None,
-                    result: Ok(()),
+        Self {
+            state,
+            commands,
+            secrets,
+            opened: Some(opened),
+            committed: None,
+            finished: None,
+            halt: Halt::default(),
+        }
+    }
+
+    /// Serve the frame's commands inside its transaction, a savepoint's frame
+    /// nested inside while it is open: `Ok` once JavaScript commits, an `Exit`
+    /// once it rolls back or the handle is collected unfinished.
+    // [spec:pgorm:req:napi.transactions+1]
+    fn serve<'a>(
+        &'a mut self,
+        tx: &'a mut DatabaseTransaction<'_>,
+    ) -> BoxFuture<'a, Result<(), Exit>> {
+        Box::pin(async move {
+            self.finished = Some(Finished(self.state.finished.clone()));
+            if self
+                .opened
+                .take()
+                .is_some_and(|opened| opened.send(Ok(())).is_err())
+            {
+                return self.halt.discard().await;
+            }
+            loop {
+                let command = tokio::select! {
+                    () = self.state.abandoned.cancelled() => None,
+                    command = self.commands.recv() => command,
                 };
-            };
-            match command {
-                Command::Run { statement, reply } => {
-                    let outcome = tokio::select! {
-                        () = state.abandoned.cancelled() => return Completion::discarded(),
-                        outcome = statement.run(&tx, &secrets) => outcome,
-                    };
-                    if reply.send(outcome).is_err() {
-                        return Completion::discarded();
-                    }
-                }
-                Command::Job { job, reply } => {
-                    let outcome = tokio::select! {
-                        () = state.abandoned.cancelled() => return Completion::discarded(),
-                        outcome = job(Database::Transaction(&tx), &secrets) => outcome,
-                    };
-                    if reply.send(outcome).is_err() {
-                        return Completion::discarded();
-                    }
-                }
-                Command::Finish { commit, reply } => {
-                    let outcome = if commit {
-                        tx.commit().await
-                    } else {
-                        tx.rollback().await
-                    };
-                    return Completion {
-                        healthy: outcome.is_ok(),
-                        reply: Some(reply),
-                        result: outcome.map_err(|error| failure(&error, &secrets)),
-                    };
-                }
-                Command::CopyIn {
-                    copy,
-                    link,
-                    opened,
-                    abort,
-                    release,
-                    lock,
-                } => {
-                    let stop = state.copy_stop(abort);
-                    let settle = copy::copy_in(&mut tx, &copy, link, opened, &stop, &secrets).await;
-                    if let Some(completion) = state.after_copy(settle, lock, release) {
-                        return completion;
-                    }
-                }
-                Command::CopyOut {
-                    copy,
-                    link,
-                    opened,
-                    abort,
-                    release,
-                    lock,
-                } => {
-                    let stop = state.copy_stop(abort);
-                    let settle =
-                        copy::copy_out(&mut tx, &copy, link, opened, &stop, &secrets).await;
-                    if let Some(completion) = state.after_copy(settle, lock, release) {
-                        return completion;
-                    }
-                }
-                Command::Begin {
-                    child,
-                    receiver,
-                    opened,
-                    parent_lock,
-                } => {
-                    let nested = match tx.begin().await {
-                        Ok(nested) => nested,
-                        Err(error) => {
-                            if opened.send(Err(failure(&error, &secrets))).is_err() {
-                                return Completion::discarded();
-                            }
-                            continue;
+                let Some(command) = command else {
+                    self.halt.ending.cancel();
+                    return Err(Exit::Abandoned);
+                };
+                match command {
+                    Command::Run { statement, reply } => {
+                        let outcome = tokio::select! {
+                            () = self.state.abandoned.cancelled() => return self.halt.discard().await,
+                            outcome = statement.run(&*tx, &self.secrets) => outcome,
+                        };
+                        if reply.send(outcome).is_err() {
+                            return self.halt.discard().await;
                         }
-                    };
-                    if opened.send(Ok(())).is_err() {
-                        return Completion::discarded();
                     }
-                    let completion = serve(nested, child.clone(), receiver).await;
-                    let healthy = completion.healthy;
-                    drop(parent_lock);
-                    completion.respond();
-                    child.released.cancel();
-                    if !healthy {
-                        return Completion::discarded();
+                    Command::Job { job, reply } => {
+                        let outcome = tokio::select! {
+                            () = self.state.abandoned.cancelled() => return self.halt.discard().await,
+                            outcome = job(Database::Transaction(&*tx), &self.secrets) => outcome,
+                        };
+                        if reply.send(outcome).is_err() {
+                            return self.halt.discard().await;
+                        }
+                    }
+                    Command::Finish {
+                        commit: true,
+                        reply,
+                    } => {
+                        self.committed = Some(reply);
+                        return Ok(());
+                    }
+                    Command::Finish {
+                        commit: false,
+                        reply,
+                    } => return Err(Exit::RolledBack(reply)),
+                    Command::CopyIn {
+                        copy,
+                        link,
+                        opened,
+                        abort,
+                        release,
+                        lock,
+                    } => {
+                        let stop = self.state.copy_stop(abort);
+                        let settle =
+                            copy::copy_in(&mut *tx, &copy, link, opened, &stop, &self.secrets)
+                                .await;
+                        if self.state.after_copy(settle, lock, release) {
+                            return self.halt.discard().await;
+                        }
+                    }
+                    Command::CopyOut {
+                        copy,
+                        link,
+                        opened,
+                        abort,
+                        release,
+                        lock,
+                    } => {
+                        let stop = self.state.copy_stop(abort);
+                        let settle =
+                            copy::copy_out(&mut *tx, &copy, link, opened, &stop, &self.secrets)
+                                .await;
+                        if self.state.after_copy(settle, lock, release) {
+                            return self.halt.discard().await;
+                        }
+                    }
+                    Command::Begin {
+                        child,
+                        receiver,
+                        opened,
+                        parent_lock,
+                    } => {
+                        let mut frame = Frame::new(child.clone(), receiver, opened);
+                        let halt = frame.halt.clone();
+                        let ended = halt
+                            .run(tx.transaction(async |savepoint| frame.serve(savepoint).await))
+                            .await;
+                        let completion = match frame.end(ended) {
+                            Ended::Ran(completion) => completion,
+                            Ended::Refused(opened, error) => {
+                                if opened.send(Err(failure(&error, &self.secrets))).is_err() {
+                                    return self.halt.discard().await;
+                                }
+                                continue;
+                            }
+                        };
+                        drop(frame);
+                        let healthy = completion.healthy;
+                        drop(parent_lock);
+                        completion.respond();
+                        child.released.cancel();
+                        if !healthy {
+                            return self.halt.discard().await;
+                        }
                     }
                 }
             }
-        }
-    })
+        })
+    }
+
+    /// What the frame's transaction ended in: `None` is a future [`Halt`]
+    /// dropped. A frame whose `COMMIT` or `ROLLBACK` failed has left its
+    /// connection in a state nobody knows, so it is not healthy, and the reply
+    /// carries the failure.
+    fn end(&mut self, ended: Option<Result<(), TransactionError<Exit>>>) -> Ended {
+        let Some(ended) = ended else {
+            return Ended::Ran(Completion::discarded());
+        };
+        Ended::Ran(match ended {
+            Ok(()) => Completion {
+                healthy: true,
+                reply: self.committed.take(),
+                result: Ok(()),
+            },
+            Err(TransactionError::Connection(error)) => {
+                if let Some(opened) = self.opened.take() {
+                    return Ended::Refused(opened, error);
+                }
+                Completion {
+                    healthy: false,
+                    reply: self.committed.take(),
+                    result: Err(failure(&error, &self.secrets)),
+                }
+            }
+            Err(TransactionError::Transaction(Exit::RolledBack(reply))) => Completion {
+                healthy: true,
+                reply: Some(reply),
+                result: Ok(()),
+            },
+            Err(TransactionError::Transaction(Exit::Abandoned)) => Completion {
+                healthy: true,
+                reply: None,
+                result: Ok(()),
+            },
+            Err(TransactionError::RollbackFailed { cause, rollback }) => Completion {
+                healthy: false,
+                reply: match cause {
+                    Exit::RolledBack(reply) => Some(reply),
+                    Exit::Abandoned => None,
+                },
+                result: Err(failure(&rollback, &self.secrets)),
+            },
+        })
+    }
 }
 
 /// Open a transaction on `connection`, which it holds until it finishes: a
-/// task takes the connection out of its slot and owns the transaction.
-// [spec:pgorm:req:napi.transactions]
+/// task takes the connection out of its slot and serves the transaction from
+/// inside the closure pgorm opens it around.
+// [spec:pgorm:req:napi.transactions+1]
 async fn begin(
     mut operation: Operation,
     mode: TransactionMode,
@@ -484,7 +615,6 @@ async fn begin(
             () = owner.root.aborted.cancelled() => None,
             () = owner.connection.closing() => None,
             served = async {
-                let secrets = owner.connection.pool.secrets.clone();
                 let db = match operation.connection_mut() {
                     Ok(db) => db,
                     Err(error) => {
@@ -492,17 +622,18 @@ async fn begin(
                         return None;
                     }
                 };
-                let tx = match db.begin_with(mode).await {
-                    Ok(tx) => tx,
-                    Err(error) => {
-                        let _ = opened.send(Err(failure(&error, &secrets)));
-                        return None;
+                let mut frame = Frame::new(owner.clone(), receiver, opened);
+                let halt = frame.halt.clone();
+                let ended = halt
+                    .run(db.transaction_with(mode, async |tx| frame.serve(tx).await))
+                    .await;
+                match frame.end(ended) {
+                    Ended::Ran(completion) => Some(completion),
+                    Ended::Refused(opened, error) => {
+                        let _ = opened.send(Err(failure(&error, &frame.secrets)));
+                        None
                     }
-                };
-                if opened.send(Ok(())).is_err() {
-                    return None;
                 }
-                Some(serve(tx, owner.clone(), receiver).await)
             } => served,
         };
         match served {

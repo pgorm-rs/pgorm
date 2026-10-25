@@ -338,7 +338,7 @@ test("every row terminal can give its columns tagged", async () => {
   assert.equal(all?.n?.isNull, true);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a callback transaction commits when it resolves and rolls back when it throws", async () => {
   await reset();
   const result = await pool().transaction(async (tx) => {
@@ -360,7 +360,7 @@ test("a callback transaction commits when it resolves and rolls back when it thr
   assert.deepEqual(await ids(), [1]);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("an explicit transaction commits or rolls back once, and holds its connection until then", async () => {
   await reset();
   await using connection = await pool().acquire();
@@ -378,7 +378,7 @@ test("an explicit transaction commits or rolls back once, and holds its connecti
   assert.deepEqual(await ids(), [2]);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a savepoint rolls back alone inside a transaction that commits", async () => {
   await reset();
   await pool().transaction(async (tx) => {
@@ -400,7 +400,25 @@ test("a savepoint rolls back alone inside a transaction that commits", async () 
   assert.deepEqual(await ids(), [1, 4]);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
+test("a rollback the server cannot answer rejects with its failure and discards the connection", async () => {
+  await reset();
+  const connection = await pool().acquire();
+  const pid = (await connection.one("SELECT pg_backend_pid() AS pid")).pid as number;
+  const tx = await connection.begin();
+  await tx.execute("INSERT INTO items VALUES (1, 'lost')");
+  await pool().execute("SELECT pg_terminate_backend($1, 5000)", [pid]);
+  await assert.rejects(tx.rollback(), (error: unknown) => {
+    assert.ok(error instanceof ConnectionError || error instanceof DatabaseError, `${error}`);
+    return true;
+  });
+  assert.equal(tx.closed, true);
+  assert.equal(connection.closed, true);
+  await connection.close();
+  assert.deepEqual(await ids(), []);
+});
+
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a transaction is refused while its savepoint is open, not raced", async () => {
   await reset();
   await using connection = await pool().acquire();
@@ -418,7 +436,7 @@ test("a transaction is refused while its savepoint is open, not raced", async ()
   assert.deepEqual(await ids(), [1, 2]);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a second statement on a transaction already running one is refused, not queued", async () => {
   await using connection = await pool().acquire();
   await connection.transaction(async (tx) => {
@@ -431,7 +449,7 @@ test("a second statement on a transaction already running one is refused, not qu
   });
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a callback that returns with its savepoint open fails, and nothing it wrote commits", async () => {
   await reset();
   const connection = await pool().acquire();
@@ -447,7 +465,7 @@ test("a callback that returns with its savepoint open fails, and nothing it wrot
   assert.deepEqual(await ids(), []);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a failed statement aborts the transaction, and a savepoint recovers from one", async () => {
   await reset();
   await pool().transaction(async (tx) => {
@@ -469,7 +487,7 @@ test("a failed statement aborts the transaction, and a savepoint recovers from o
   assert.deepEqual(await ids(), [1, 2]);
 });
 
-// [spec:pgorm:req:napi.transactions/test]
+// [spec:pgorm:req:napi.transactions+1/test]
 test("a transaction's mode and isolation level reach the server", async () => {
   const settings =
     "SELECT current_setting('transaction_isolation') AS isolation, current_setting('transaction_read_only') AS read_only, current_setting('transaction_deferrable') AS deferrable";

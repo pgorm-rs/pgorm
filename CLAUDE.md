@@ -52,7 +52,7 @@ Row streaming is reachable through the public crate: `ConnectionTrait::query_raw
 - Uses tokio-postgres directly (no sqlx)
 - deadpool for connection pooling
 - Parameters are passed alongside the statement so it is prepared properly (no string interpolation)
-- Scoped transactions: `TransactionTrait::begin(&mut self)` returns a `DatabaseTransaction<'_>` that borrows the parent exclusively
+- Transactions are opened only through a closure: `conn.transaction(async |tx| ..)` (the sealed `TransactionTrait`, a savepoint on a `DatabaseTransaction`) and `DatabaseConnection::transaction_with(mode, ..)` / `transaction_with_retry` give the closure a `&mut DatabaseTransaction<'_>` borrowing the parent exclusively; `Ok` commits, `Err` rolls back with the `ROLLBACK` awaited (one that fails comes back beside the closure's error as `TransactionError::RollbackFailed`, the connection's state then unknown), and a future dropped before it finishes rolls back as the handle drops. There is no public `begin`, `commit` or `rollback`. On a concrete receiver the call's future is `Send` whenever the closure's is, so it runs in `tokio::spawn`, savepoints nested inside included; code generic over `C: TransactionTrait` gets a future not known to be `Send`
 - `DatabasePool` deliberately does **not** implement `ConnectionTrait` — you must `pool.get()` a connection first
 - ActiveValue fields are written with the free `set(..)` (`name: set("Apple")`) or `.into()`; both convert into the column type, so no `.to_owned()`. `ActiveValue::Set` is the pattern-matching spelling
 - `ColumnTrait` carries `eq_col`/`ne_col`/`gt_col`/`gte_col`/`lt_col`/`lte_col`/`eq_expr` for column-to-column and column-to-expression predicates; `eq` and friends stay value-only so their `save_as` enum cast is never dropped
@@ -113,7 +113,7 @@ let conn = pool.get().await?; // records connection acquisition
 
 The two query hooks take a `QueryContext<'_>` — `operation()`, `sql()`, and `fingerprint()` — instead of a bare operation name. `fingerprint()` is libpg_query's constants-normalized query identity, grouped by PostgreSQL 18's query-ID rules (an alias stands for its relation, schema qualifiers are ignored), and requires the off-by-default `metrics-fingerprint` feature; without it no statement is parsed for metrics and the answer is always `None` (pg_query is linked either way, for the paginator and the macros).
 
-Note that `begin()` on an `InstrumentedConnection` returns a plain `DatabaseTransaction` — wrap it in `InstrumentedTransaction::new` to keep per-statement metrics inside the transaction.
+`transaction` on an `InstrumentedConnection` gives its closure an `InstrumentedTransaction`, so the statements and savepoints inside stay instrumented; a transaction whose closure's future is dropped records no ending.
 
 #### PostgreSQL Native Observability
 Still the best source of truth for query statistics:

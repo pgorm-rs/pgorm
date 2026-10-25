@@ -6,11 +6,31 @@ use pgorm::pipeline::{self as pl, ExprOps, IntoSource, JoinSide};
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, Change, ColumnTrait, ConnectionTrait,
     DatabaseConnection, EntityTrait, Insert, ModelTrait, QueryFilter, QueryOrder, Schema,
-    TransactionMode, TransactionTrait, Update, Upserted, ValueHolder, Values, set,
+    TransactionError, TransactionMode, TransactionTrait, Update, Upserted, ValueHolder, Values,
+    set,
 };
 use serde_json::{Value, json};
 
-type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
+type Failure = Box<dyn std::error::Error>;
+type Result<T = ()> = std::result::Result<T, Failure>;
+
+/// A closure transaction's outcome, the failure of its `BEGIN` or `COMMIT`
+/// and the closure's own alike.
+fn ended<T>(outcome: std::result::Result<T, TransactionError<Failure>>) -> Result<T> {
+    outcome.map_err(|error| match error {
+        TransactionError::Connection(error) => error.into(),
+        TransactionError::Transaction(error) => error,
+        unfinished @ TransactionError::RollbackFailed { .. } => unfinished.to_string().into(),
+    })
+}
+
+/// What a closure returns to roll its transaction back.
+const ROLL_BACK: &str = "the oracle rolls this transaction back";
+
+/// Whether a closure transaction ended through [`ROLL_BACK`].
+fn rolled_back(outcome: &std::result::Result<(), TransactionError<Failure>>) -> bool {
+    matches!(outcome, Err(TransactionError::Transaction(error)) if error.to_string() == ROLL_BACK)
+}
 
 fn parameters(values: Values) -> Vec<ValueHolder> {
     values.0.into_iter().map(ValueHolder).collect()
@@ -285,29 +305,53 @@ async fn compare(db: &mut DatabaseConnection, report: &Value) -> Result {
     )
     .await?;
     let connection = exercise(db).await?;
-    let mut transaction = db.begin().await?;
-    let transaction_report = exercise(&transaction).await?;
-    let child = transaction.begin().await?;
-    active(3, "savepoint").insert(&child).await?;
-    child.rollback().await?;
-    let savepoint = account::Entity::find_by_id(3)
-        .one_opt(&transaction)
-        .await?
-        .is_none();
-    transaction.commit().await?;
-    let transaction = db.begin().await?;
-    active(4, "rolled back").insert(&transaction).await?;
-    transaction.rollback().await?;
+    let (transaction_report, savepoint) = ended(
+        db.transaction(async |transaction| {
+            let transaction_report = exercise(&transaction).await?;
+            let child = transaction
+                .transaction(async |child| {
+                    active(3, "savepoint").insert(&child).await?;
+                    Err::<(), Failure>(ROLL_BACK.into())
+                })
+                .await;
+            if !rolled_back(&child) {
+                return Err(format!("the savepoint did not roll back: {child:?}").into());
+            }
+            let savepoint = account::Entity::find_by_id(3)
+                .one_opt(&transaction)
+                .await?
+                .is_none();
+            Ok::<_, Failure>((transaction_report, savepoint))
+        })
+        .await,
+    )?;
+    let outcome = db
+        .transaction(async |transaction| {
+            active(4, "rolled back").insert(&transaction).await?;
+            Err::<(), Failure>(ROLL_BACK.into())
+        })
+        .await;
+    if !rolled_back(&outcome) {
+        return Err(format!("the transaction did not roll back: {outcome:?}").into());
+    }
     let rollback = account::Entity::find_by_id(4).one_opt(db).await?.is_none();
-    let read_only = db
-        .begin_with(TransactionMode::ReadOnly { isolation: None })
-        .await?;
-    let mode = read_only
-        .query_one("SHOW transaction_read_only", &[])
-        .await?
-        .try_get::<_, String>(0)?
-        == "on";
-    read_only.rollback().await?;
+    let mut mode = false;
+    let outcome = db
+        .transaction_with(
+            TransactionMode::ReadOnly { isolation: None },
+            async |read_only| {
+                mode = read_only
+                    .query_one("SHOW transaction_read_only", &[])
+                    .await?
+                    .try_get::<_, String>(0)?
+                    == "on";
+                Err::<(), Failure>(ROLL_BACK.into())
+            },
+        )
+        .await;
+    if !rolled_back(&outcome) {
+        return Err(format!("the read-only transaction did not roll back: {outcome:?}").into());
+    }
     let (sql, values) = Query::select()
         .column(Name::runtime("id"))
         .from((Name::runtime("python_entities"), Name::runtime("accounts")))

@@ -269,12 +269,6 @@ class EffectEmitter:
                 f"{pad}    Ok({REPLAY}::observe::compiled(&sql, &tagged(&values))?)",
             ]
             self.record(step, body, lines, pad)
-        elif name in ("commit", "rollback"):
-            body = [
-                f"{pad}    pgorm::DatabaseTransaction::{name}({connection}).await?;",
-                f"{pad}    Ok({REPLAY}::observe::unit())",
-            ]
-            self.record(step, body, lines, pad)
         else:
             raise UnsupportedInstruction("no standalone Rust source for " + name)
 
@@ -421,12 +415,12 @@ class EffectEmitter:
             return ["pgorm_query::QueryStatementBuilder"]
         if name == "begin":
             return [
-                "pgorm::TransactionTrait::begin_with"
+                "pgorm::DatabaseConnection::transaction_with"
                 if step["scope"] == "root"
-                else "pgorm::TransactionTrait::begin"
+                else "pgorm::TransactionTrait::transaction"
             ]
         if name in ("commit", "rollback"):
-            return ["pgorm::DatabaseTransaction::" + name]
+            return ["pgorm::TransactionTrait::transaction"]
         raise UnsupportedInstruction("no standalone Rust source for " + name)
 
     def transaction_mode(self, data):
@@ -446,44 +440,120 @@ class EffectEmitter:
         return f"pgorm::TransactionMode::{variant} {{ isolation: {level} }}"
 
     def begin(self, step, lines, indent, remaining):
+        """A transaction scope: its steps run inside the closure pgorm opens
+        the transaction around, and the step that closes it is what the
+        closure returns — `Ok` to commit, `Err` to roll back."""
         pad = indent
+        inner = pad + "    "
         child = self.connection(step["data"]["child"])
         identity = f"{literal(step['id'])}, {literal(step['op'])}"
         paths = ", ".join(literal(path) for path in self.paths(step))
+        scope_name = literal(step["data"]["child"])
+        begun, opened, rolled = (
+            f"{name}_{step['id']}" for name in ("begun", "opened", "rolled_back")
+        )
         if step["scope"] == "root":
             mode = self.transaction_mode(step["data"])
-            opened = (
-                f"pgorm::DatabaseConnection::begin_with(&mut "
-                f"{self.connection(step['scope'])}, {mode}).await"
+            call = (
+                f"pgorm::DatabaseConnection::transaction_with(&mut "
+                f"{self.connection(step['scope'])}, {mode}, async |{child}| {{"
             )
         else:
-            opened = (
-                f"pgorm::TransactionTrait::begin(&mut "
-                f"{self.connection(step['scope'])}).await"
+            call = (
+                f"pgorm::TransactionTrait::transaction(&mut *"
+                f"{self.connection(step['scope'])}, async |{child}| {{"
             )
-        lines.append(f"{pad}match {opened} {{")
+        lines.append(f"{pad}{{")
+        # Both outcomes of opening the scope sit here, ahead of its steps: one
+        # is reported as the closure starts, the other once the call returns
+        # without having run it.
         lines.append(
-            f"{pad}    Err(error) => report.failed({identity}, &[], "
+            f"{inner}let {begun} = |report: &mut Report, error: Option<pgorm::Error>| "
+            "match error {"
+        )
+        lines.append(
+            f"{inner}    None => report.observed({identity}, &[{paths}], "
+            f"{REPLAY}::observe::transaction({scope_name})),"
+        )
+        lines.append(
+            f"{inner}    Some(error) => report.failed({identity}, &[], "
             "&harness.observe(&Error::from(error))),"
         )
-        lines.append(f"{pad}    Ok(mut {child}) => {{")
-        scope_name = literal(step["data"]["child"])
+        lines.append(f"{inner}}};")
+        lines.append(f"{inner}let mut {opened} = false;")
+        # The closure's `?` fails the whole program, as it would outside a
+        # scope; a scope that ends without committing returns an error of its
+        # own, which `rolled` tells apart from those.
+        body = []
+        consumed, closing = self.steps(remaining, body, inner + "    ")
+        commits = closing is not None and closing["op"] == "commit"
+        if not commits:
+            lines.append(f"{inner}let mut {rolled} = false;")
+        lines.append(f"{inner}let ended = {call}")
+        lines.append(f"{inner}    {opened} = true;")
+        lines.append(f"{inner}    {begun}(report, None);")
+        lines.extend(body)
+        if commits:
+            lines.append(f"{inner}    Ok::<(), Error>(())")
+        else:
+            lines.append(f"{inner}    {rolled} = true;")
+            lines.append(
+                f"{inner}    Err::<(), Error>(Error::from(pgorm::Error::Custom("
+                '"the scope rolls back".to_owned())))'
+            )
+        lines.append(f"{inner}}})")
+        lines.append(f"{inner}.await;")
+        lines.append(f"{inner}match ended {{")
         lines.append(
-            f"{pad}        report.observed({identity}, &[{paths}], "
-            f"{REPLAY}::observe::transaction({scope_name}));"
+            f"{inner}    Err(pgorm::TransactionError::Connection(error)) if !{opened} => "
+            f"{begun}(report, Some(error)),"
         )
-        consumed = self.steps(remaining, lines, pad + "        ")
-        lines.append(f"{pad}    }}")
+        guard = "" if commits else f" if !{rolled}"
+        lines.append(
+            f"{inner}    Err(pgorm::TransactionError::Transaction(error)){guard} => "
+            "return Err(error),"
+        )
+        lines.append(
+            f"{inner}    Err(pgorm::TransactionError::RollbackFailed {{ cause, .. }}){guard} => "
+            "return Err(cause),"
+        )
+        if closing is not None:
+            closed = f"{literal(closing['id'])}, {literal(closing['op'])}"
+            rendered = ", ".join(literal(path) for path in self.paths(closing))
+            observed = (
+                f"report.observed({closed}, &[{rendered}], {REPLAY}::observe::unit())"
+            )
+            if commits:
+                lines.append(f"{inner}    Ok(()) => {observed},")
+                lines.append(
+                    f"{inner}    Err(pgorm::TransactionError::Connection(error)) => "
+                    f"report.failed({closed}, &[], &harness.observe(&Error::from(error))),"
+                )
+            else:
+                lines.append(
+                    f"{inner}    Err(pgorm::TransactionError::Transaction(_)) => {observed},"
+                )
+                lines.append(
+                    f"{inner}    Err(pgorm::TransactionError::RollbackFailed {{ rollback, .. }}) => "
+                    f"report.failed({closed}, &[], &harness.observe(&Error::from(rollback))),"
+                )
+                lines.append(f"{inner}    _ => {{}}")
+        else:
+            lines.append(f"{inner}    _ => {{}}")
+        lines.append(f"{inner}}}")
         lines.append(f"{pad}}}")
         return consumed
 
     def steps(self, remaining, lines, indent):
-        """Emit steps until the scope opened by the caller closes."""
+        """Emit steps until the scope opened by the caller closes: how many it
+        consumed, and the commit or rollback that closed it."""
         consumed = 0
         while remaining:
             step = remaining[0]
             consumed += 1
             remaining = remaining[1:]
+            if step["op"] in ("commit", "rollback"):
+                return consumed, step
             if step["op"] == "begin":
                 nested = self.begin(step, lines, indent, remaining)
                 consumed += nested
@@ -495,6 +565,4 @@ class EffectEmitter:
             used, self.current = self.current, outer | self.current
             self.declare(used, lines, indent)
             lines.extend(body)
-            if step["op"] in ("commit", "rollback"):
-                break
-        return consumed
+        return consumed, None

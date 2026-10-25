@@ -1,9 +1,11 @@
 # Transactions and savepoints
 
 Transactions run through the real Rust `DatabaseTransaction` and its native
-savepoints. A scoped Rust task owns the borrowed connection; Python handles
-send owned operations to that task. No borrowed lifetime is extended and no
-transaction state is simulated by Python SQL strings.
+savepoints. A scoped Rust task serves each one from inside the closure pgorm
+opens it around; Python handles send owned operations to that task, and a
+commit or rollback is what the closure returns, so pgorm issues the `COMMIT` or
+`ROLLBACK`. No borrowed lifetime is extended and no transaction state is
+simulated by Python SQL strings.
 
 ```python
 import asyncio

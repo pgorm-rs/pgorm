@@ -4,8 +4,6 @@ use tokio_postgres::{
     types::{BorrowToSql, ToSql},
 };
 
-use super::DatabaseTransaction;
-
 mod private {
     pub trait Sealed {}
 
@@ -150,13 +148,4 @@ pub trait ConnectionTrait: Sync {
     /// involved.
     #[doc(alias = "execute_unprepared")]
     async fn batch_execute(&self, sql: &str) -> Result<(), Error>;
-}
-
-/// Spawn database transaction
-// [spec:pgorm:req:conn.tx+2]
-#[async_trait::async_trait]
-pub trait TransactionTrait {
-    /// Execute SQL `BEGIN` transaction.
-    /// Returns a Transaction that can be committed or rolled back
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error>;
 }

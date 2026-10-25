@@ -82,16 +82,19 @@ async fn batch_execute_in_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("batch_execute_txn_txbatch").await;
     let mut db = ctx.db.get().await?;
 
-    let txn = db.begin().await?;
-    txn.batch_execute(&format!(
-        "{TWO_TABLES}
-         INSERT INTO batch_left (id) VALUES (4);
-         INSERT INTO batch_right (id) VALUES (5), (6);"
-    ))
-    .await?;
+    db.transaction(async |txn| {
+        txn.batch_execute(&format!(
+            "{TWO_TABLES}
+             INSERT INTO batch_left (id) VALUES (4);
+             INSERT INTO batch_right (id) VALUES (5), (6);"
+        ))
+        .await?;
 
-    assert_eq!(ids(&txn, "batch_left").await?, [4]);
-    txn.commit().await?;
+        assert_eq!(ids(&txn, "batch_left").await?, [4]);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     assert_eq!(ids(&db, "batch_left").await?, [4]);
     assert_eq!(ids(&db, "batch_right").await?, [5, 6]);

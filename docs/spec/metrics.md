@@ -20,7 +20,7 @@ chooses to construct, so unused metrics cost nothing.
 > `QueryContext<'a>` and `QueryFingerprint`, both defined by
 > `metric.fingerprint`.
 
-> [spec:pgorm:def:metric.layer.collector+2]
+> [spec:pgorm:def:metric.layer.collector+3]
 > `MetricsCollector` defines seven async hook points:
 > `record_query_success(query, duration, rows)`,
 > `record_query_error(query, duration, error)`,
@@ -49,9 +49,9 @@ chooses to construct, so unused metrics cost nothing.
 > which is where an implementor writing a counter reads them, rather than only
 > on the wrapper methods that happen to call them.
 > `record_transaction_rollback` in particular means *the transaction ended
-> without committing* — by `rollback()` or by a failed `commit()` alike — and
-> says so in its own documentation; `record_transaction_commit` is success
-> only.
+> without committing* — by a closure that returned `Err` or by a failed
+> `COMMIT` alike — and says so in its own documentation;
+> `record_transaction_commit` is success only.
 >
 > Two implementations ship in-tree: `NoOpMetrics`, whose hooks are all empty
 > bodies, and `LoggingMetrics`, which emits `tracing` events — `debug` for
@@ -159,50 +159,47 @@ chooses to construct, so unused metrics cost nothing.
 
 ## Transaction instrumentation
 
-> [spec:pgorm:sem:metric.layer.tx+3]
-> `TransactionTrait::begin` on `InstrumentedConnection` times `BEGIN` and
-> reports `record_transaction_begin` on success; a failed begin is reported
-> through `record_query_error` under the operation `"begin"` — a context with
-> no statement text, since none was sent — not a dedicated hook. Its return
-> type is fixed by the trait, so it hands back a plain `DatabaseTransaction`:
-> statements issued through that handle bypass the collector entirely unless
-> the caller wraps it via `InstrumentedTransaction::new`.
-> `InstrumentedConnection::begin_instrumented` is the wrapping counterpart — an
-> inherent method reporting the same two hooks, but returning an
-> `InstrumentedTransaction<'_, M>` sharing a clone of the collector, so
-> per-statement metrics inside the transaction need no second call.
+> [spec:pgorm:sem:metric.layer.tx+4]
+> `InstrumentedConnection` and `InstrumentedTransaction` are `TransactionTrait`
+> implementors (`conn.tx`) whose closure is given an
+> `InstrumentedTransaction<'_, M>` sharing a clone of the collector, so the
+> statements, COPYs and savepoints inside an instrumented transaction are
+> instrumented with no wrapping by the caller. `InstrumentedTransaction` has no
+> public constructor: it exists only as that handle, and its `inner()` reaches
+> the plain `DatabaseTransaction` beneath, whose statements bypass the
+> collector.
 >
-> `InstrumentedTransaction::commit` times the commit and reports
+> Opening a transaction — `BEGIN` on the connection, a savepoint inside a
+> transaction — is timed and reports `record_transaction_begin` on success; a
+> failed opening is reported through `record_query_error` under the operation
+> `"begin"` — a context with no statement text, since none was sent — not a
+> dedicated hook.
+>
+> A closure that returns `Ok` is followed by a timed `COMMIT` reporting
 > `record_transaction_commit` on success. A failed commit MUST report both
 > `record_query_error` — under the operation `"commit"`, a context with no
-> statement text — and `record_transaction_rollback`, in that order.
-> `InstrumentedTransaction::rollback` consumes the handle, awaits the inner
-> `DatabaseTransaction::rollback`, and reports `record_transaction_rollback` on
-> either outcome — the transaction is discarded whether or not the `ROLLBACK`
-> round trip succeeds — additionally reporting a failed round trip through
-> `record_query_error` under the operation `"rollback"`, likewise with no
-> statement text.
+> statement text — and `record_transaction_rollback`, in that order. A closure
+> that returns `Err` is followed by an awaited `ROLLBACK`, which reports
+> `record_transaction_rollback` on either outcome — the transaction is
+> discarded whether or not the round trip succeeds — and a failed round trip
+> additionally through `record_query_error` under the operation `"rollback"`,
+> likewise with no statement text.
 >
-> The two exit paths thus report the same pair on failure, which is the point:
+> The two ends thus report the same pair on failure, which is the point:
 > PostgreSQL aborts a transaction whose `COMMIT` fails, so the transaction
 > ended without committing in both cases and the rollback hook means exactly
 > that (`metric.layer.collector`). Reporting only the rollback hook would leave
 > the commit error itself unreported — visible to the caller through the
-> returned `Error` and to nobody else — while a collector's `rollbacks_total`
-> silently absorbed a failure with no matching entry in its error stream. That
-> is the asymmetry this fixes: previously `rollback` recorded both hooks and
-> `commit` recorded one, and the only statement of what the rollback hook
-> counted lived on `rollback`'s own documentation, which an implementor writing
-> the counter never has to read.
+> returned `TransactionError::Connection` and to nobody else — while a
+> collector's `rollbacks_total` silently absorbed a failure with no matching
+> entry in its error stream.
 >
 > The failure is not reported through a hook of its own. See
 > `metric.layer.collector` for why the count stays at seven.
 >
-> Its `Drop` impl is an empty no-op, and dropping an uncommitted instrumented
-> transaction therefore records nothing at all — not even a rollback. This is a
-> limit, not a policy: every collector hook is `async` while `Drop::drop` is
-> synchronous, so no hook is reachable from drop. Drop defers entirely to the
-> inner `DatabaseTransaction`'s drop behavior (tracing warning plus a
-> fire-and-forget `ROLLBACK`), and the rollback hook reaches the collector only
-> when a caller asks for one by calling `rollback`, or when a failing `commit`
-> forces one.
+> A transaction whose closure's future is dropped before it finishes records
+> no ending at all — not even a rollback. This is a limit, not a policy: every
+> collector hook is `async` while `Drop::drop` is synchronous, so no hook is
+> reachable from a drop. The drop defers entirely to the inner
+> `DatabaseTransaction`'s (`conn.tx.guard`): a tracing warning plus a
+> fire-and-forget `ROLLBACK`.

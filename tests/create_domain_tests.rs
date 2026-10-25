@@ -1450,12 +1450,14 @@ async fn the_server_refuses_what_no_builder_sees() -> Result<(), Error> {
 async fn a_domain_rolls_back_with_its_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("domain_rolls_back").await;
     let mut db = ctx.db.get().await?;
-    {
-        let txn = db.begin().await?;
-        txn.batch_execute(&Domain::create(n("d"), ColumnType::Integer).to_string())
-            .await?;
-        txn.rollback().await?;
-    }
+    let outcome = db
+        .transaction(async |txn| {
+            txn.batch_execute(&Domain::create(n("d"), ColumnType::Integer).to_string())
+                .await?;
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     let left = db
         .query_one("SELECT count(*) FROM pg_type WHERE typname = 'd'", &[])
         .await?;

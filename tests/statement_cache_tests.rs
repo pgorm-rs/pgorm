@@ -53,7 +53,7 @@ async fn repeated_queries_reuse_one_prepared_statement() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    autocommit: DDL that changes the result type is retried
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    autocommit: DDL that changes the result type is retried
 #[pgorm_macros::test]
 async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     let ctx = TestContext::new("added_column_reprepares_stmtcache").await;
@@ -90,7 +90,7 @@ async fn added_column_reprepares_the_cached_plan() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    exactly one retry, then the error
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    exactly one retry, then the error
 #[pgorm_macros::test]
 async fn a_second_stale_plan_error_surfaces() -> Result<(), Error> {
     let ctx = TestContext::new("second_stale_plan_stmtcache").await;
@@ -143,9 +143,12 @@ async fn transaction_shares_the_connection_cache() -> Result<(), Error> {
         .await?;
     assert_eq!(db.query_all(SELECT_ALL, &[]).await?.len(), 1);
 
-    let txn = db.begin().await?;
-    assert_eq!(txn.query_all(SELECT_ALL, &[]).await?.len(), 1);
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        assert_eq!(txn.query_all(SELECT_ALL, &[]).await?.len(), 1);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     assert_eq!(
         prepared_count(&db, SELECT_ALL).await?,
@@ -159,7 +162,7 @@ async fn transaction_shares_the_connection_cache() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    ROLLBACK does not discard a Parse
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    ROLLBACK does not discard a Parse
 #[pgorm_macros::test]
 async fn rolled_back_transaction_keeps_its_statements() -> Result<(), Error> {
     let ctx = TestContext::new("rolled_back_keeps_stmtcache").await;
@@ -168,9 +171,13 @@ async fn rolled_back_transaction_keeps_its_statements() -> Result<(), Error> {
     db.batch_execute("CREATE TABLE plan_check (a int4); INSERT INTO plan_check VALUES (1);")
         .await?;
 
-    let txn = db.begin().await?;
-    assert_eq!(txn.query_all(SELECT_ALL, &[]).await?.len(), 1);
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            assert_eq!(txn.query_all(SELECT_ALL, &[]).await?.len(), 1);
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     assert_eq!(
         db.query_all(SELECT_ALL, &[]).await?.len(),
@@ -217,7 +224,7 @@ fn sqlstate<T: std::fmt::Debug>(result: Result<T, Error>) -> SqlState {
     }
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    in a transaction: the original error, not the retry's
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    in a transaction: the original error, not the retry's
 #[pgorm_macros::test]
 async fn a_tx_stale_plan_surfaces_the_original_error() -> Result<(), Error> {
     let ctx = TestContext::new("tx_stale_plan_stmtcache").await;
@@ -230,15 +237,19 @@ async fn a_tx_stale_plan_surfaces_the_original_error() -> Result<(), Error> {
     db.batch_execute("ALTER TABLE plan_check ADD COLUMN b text")
         .await?;
 
-    let txn = db.begin().await?;
-    let code = sqlstate(txn.query_all(SELECT_ALL, &[]).await);
-    assert_eq!(
-        code,
-        SqlState::FEATURE_NOT_SUPPORTED,
-        "the caller is told the plan went stale, not that the transaction it \
-         aborted is aborted (25P02)"
-    );
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            let code = sqlstate(txn.query_all(SELECT_ALL, &[]).await);
+            assert_eq!(
+                code,
+                SqlState::FEATURE_NOT_SUPPORTED,
+                "the caller is told the plan went stale, not that the transaction it \
+                 aborted is aborted (25P02)"
+            );
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     // The eviction happened even though the retry did not, so the caller's own
     // re-run prepares afresh and succeeds.
@@ -260,7 +271,7 @@ async fn a_tx_stale_plan_surfaces_the_original_error() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    a nested transaction fences the rejection
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    a nested transaction fences the rejection
 #[pgorm_macros::test]
 async fn nested_tx_stale_plan_leaves_the_outer_alive() -> Result<(), Error> {
     let ctx = TestContext::new("nested_stale_plan_stmtcache").await;
@@ -276,23 +287,30 @@ async fn nested_tx_stale_plan_leaves_the_outer_alive() -> Result<(), Error> {
     db.batch_execute("ALTER TABLE plan_check ADD COLUMN b text")
         .await?;
 
-    let mut outer = db.begin().await?;
-    outer.execute("INSERT INTO witness VALUES (7)", &[]).await?;
+    db.transaction(async |outer| {
+        outer.execute("INSERT INTO witness VALUES (7)", &[]).await?;
 
-    let nested = outer.begin().await?;
-    let code = sqlstate(nested.query_all(SELECT_ALL, &[]).await);
-    assert_eq!(code, SqlState::FEATURE_NOT_SUPPORTED);
-    nested.rollback().await?;
+        let outcome = outer
+            .transaction(async |nested| {
+                let code = sqlstate(nested.query_all(SELECT_ALL, &[]).await);
+                assert_eq!(code, SqlState::FEATURE_NOT_SUPPORTED);
+                roll_back::<()>()
+            })
+            .await;
+        assert_rolled_back(outcome);
 
-    // Only the savepoint's subtransaction was aborted, so the outer one is live
-    // and the evicted key prepares again inside it.
-    let columns = outer
-        .query_all(SELECT_ALL, &[])
-        .await
-        .expect("ROLLBACK TO SAVEPOINT left the outer transaction usable")[0]
-        .len();
-    assert_eq!(columns, 2);
-    outer.commit().await?;
+        // Only the savepoint's subtransaction was aborted, so the outer one is
+        // live and the evicted key prepares again inside it.
+        let columns = outer
+            .query_all(SELECT_ALL, &[])
+            .await
+            .expect("ROLLBACK TO SAVEPOINT left the outer transaction usable")[0]
+            .len();
+        assert_eq!(columns, 2);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the outer transaction commits");
 
     let witnessed: i64 = db
         .query_one("SELECT count(*) FROM witness", &[])
@@ -306,7 +324,7 @@ async fn nested_tx_stale_plan_leaves_the_outer_alive() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    the iterator-parameter methods, in a transaction
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    the iterator-parameter methods, in a transaction
 #[pgorm_macros::test]
 async fn iterator_path_stale_plan_inside_a_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("tx_stale_iter_stmtcache").await;
@@ -319,22 +337,29 @@ async fn iterator_path_stale_plan_inside_a_transaction() -> Result<(), Error> {
     db.batch_execute("ALTER TABLE plan_check ADD COLUMN b text")
         .await?;
 
-    let txn = db.begin().await?;
-    let code = sqlstate(txn.execute_raw(SELECT_ALL, NO_PARAMS).await);
-    assert_eq!(
-        code,
-        SqlState::FEATURE_NOT_SUPPORTED,
-        "the path that never retried still must not report 25P02"
-    );
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            let code = sqlstate(txn.execute_raw(SELECT_ALL, NO_PARAMS).await);
+            assert_eq!(
+                code,
+                SqlState::FEATURE_NOT_SUPPORTED,
+                "the path that never retried still must not report 25P02"
+            );
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
-    let txn = db.begin().await?;
-    let stream = txn
-        .query_raw(SELECT_ALL, NO_PARAMS)
-        .await
-        .expect("the evicted key prepares again in a fresh transaction");
-    drop(stream);
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        let stream = txn
+            .query_raw(SELECT_ALL, NO_PARAMS)
+            .await
+            .expect("the evicted key prepares again in a fresh transaction");
+        drop(stream);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the fresh transaction commits");
 
     drop(db);
     ctx.delete().await;
@@ -342,7 +367,7 @@ async fn iterator_path_stale_plan_inside_a_transaction() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3/test]    autocommit control: the iterator path recovers one call later
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4/test]    autocommit control: the iterator path recovers one call later
 #[pgorm_macros::test]
 async fn iterator_path_stale_plan_recovers_next_call() -> Result<(), Error> {
     let ctx = TestContext::new("iter_stale_next_call_stmtcache").await;

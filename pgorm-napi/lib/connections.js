@@ -5,7 +5,7 @@
 // callback — never by waiting for garbage collection.
 // [spec:pgorm:req:napi.connections+3]
 // [spec:pgorm:req:napi.results]
-// [spec:pgorm:req:napi.transactions]
+// [spec:pgorm:req:napi.transactions+1]
 // [spec:pgorm:req:napi.copy+2]
 // [spec:pgorm:req:napi.listen]
 

@@ -102,7 +102,7 @@ class SuiteTests(unittest.TestCase):
             for case in compile_suite.cases()
             if case.verdict == "reject" and not case.expects.coded
         ]
-        # The one region rejection rustc assigns no code to, and the derive's
+        # The region rejections rustc assigns no code to, and the derive's
         # own refusals, which reach rustc as `compile_error!` and so carry no
         # code either; anything else appearing here means a case reached for
         # prose where a code exists.
@@ -113,6 +113,7 @@ class SuiteTests(unittest.TestCase):
                 "entity-key-temporal-alone",
                 "entity-relation-enforcement-unknown",
                 "entity-relation-period-half",
+                "txn-escapes-closure",
             ],
         )
 

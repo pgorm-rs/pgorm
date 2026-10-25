@@ -306,12 +306,14 @@ async fn a_rename_moves_what_the_schema_holds() -> Result<(), Error> {
 async fn a_schema_rolls_back_with_its_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("schema_rolls_back").await;
     let mut db = ctx.db.get().await?;
-    {
-        let txn = db.begin().await?;
-        billing(&txn).await?;
-        assert_eq!(contents(&txn, "billing").await?.len(), 4);
-        txn.rollback().await?;
-    }
+    let outcome = db
+        .transaction(async |txn| {
+            billing(&txn).await?;
+            assert_eq!(contents(&txn, "billing").await?.len(), 4);
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     assert_eq!(schemas(&db).await?, ["public"]);
 
     drop(db);

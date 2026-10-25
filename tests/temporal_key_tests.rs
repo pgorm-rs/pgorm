@@ -221,16 +221,16 @@ async fn a_temporal_unique_key_takes_its_options() -> Result<(), Error> {
         .expect_err("NULLS NOT DISTINCT makes the two rows one key");
     refused_with(&refused, &SqlState::EXCLUSION_VIOLATION);
 
-    let txn = db.begin().await?;
-    txn.batch_execute(
-        "INSERT INTO deferred_slot VALUES (1, '[2020-01-01,2020-03-01)'), \
-         (1, '[2020-02-01,2020-04-01)')",
-    )
-    .await?;
-    let refused = txn
-        .commit()
-        .await
-        .expect_err("an overlap still present at COMMIT");
+    let refused = commit_refused(
+        db.transaction(async |txn| {
+            txn.batch_execute(
+                "INSERT INTO deferred_slot VALUES (1, '[2020-01-01,2020-03-01)'), \
+                 (1, '[2020-02-01,2020-04-01)')",
+            )
+            .await
+        })
+        .await,
+    );
     refused_with(&refused, &SqlState::EXCLUSION_VIOLATION);
 
     drop(db);

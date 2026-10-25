@@ -116,27 +116,29 @@ async fn stream_empty(db: &DatabaseConnection) -> Result<(), Error> {
 
 // [spec:pgorm:def:exec.stream+2/test]    streaming through a transaction
 async fn stream_in_transaction(db: &mut DatabaseConnection) -> Result<(), Error> {
-    let txn = db.begin().await?;
-
-    bakery::ActiveModel {
-        name: set("Transient Bakery"),
-        profit_margin: set(1.5),
-        ..Default::default()
-    }
-    .insert(&txn)
-    .await?;
-
-    let streamed: Vec<bakery::Model> = Bakery::find()
-        .order_by_asc(bakery::Column::Id)
-        .stream(&txn)
-        .await?
-        .try_collect()
+    db.transaction(async |txn| {
+        bakery::ActiveModel {
+            name: set("Transient Bakery"),
+            profit_margin: set(1.5),
+            ..Default::default()
+        }
+        .insert(&txn)
         .await?;
 
-    assert_eq!(streamed.len(), 5);
-    assert_eq!(streamed[4].name, "Transient Bakery");
+        let streamed: Vec<bakery::Model> = Bakery::find()
+            .order_by_asc(bakery::Column::Id)
+            .stream(&txn)
+            .await?
+            .try_collect()
+            .await?;
 
-    txn.commit().await?;
+        assert_eq!(streamed.len(), 5);
+        assert_eq!(streamed[4].name, "Transient Bakery");
+
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     let after = Bakery::find().all(db).await?;
     assert_eq!(after.len(), 5);

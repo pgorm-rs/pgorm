@@ -59,14 +59,16 @@ pub async fn transaction() -> Result<(), Error> {
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    let txn = db.begin().await?;
+    db.transaction(async |txn| {
+        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+        insert_bakery(&txn, "Top Bakery", 15.0).await?;
 
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-    insert_bakery(&txn, "Top Bakery", 15.0).await?;
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
-
-    txn.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 2);
 
@@ -86,9 +88,9 @@ pub async fn transaction_with_reference() -> Result<(), Error> {
     let name2 = "Top Bakery";
     let search_name = "Bakery";
 
-    let txn = db.begin().await?;
-    _transaction_with_reference(&txn, name1, name2, search_name).await?;
-    txn.commit().await?;
+    db.transaction(async |txn| _transaction_with_reference(txn, name1, name2, search_name).await)
+        .await
+        .expect("the transaction commits");
 
     assert_eq!(count_bakeries(&db, search_name).await?, 2);
 
@@ -112,29 +114,37 @@ async fn _transaction_with_reference(
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+2/test]    the implicit path: dropping an uncommitted handle rolls back, and the queued ROLLBACK lands ahead of the connection's next statement
+/// Run a transaction on `db` that inserts `names` and then never finishes,
+/// dropping its future once the inserts are in, as a timeout or a cancelled
+/// task would.
+async fn insert_then_drop(db: &mut DatabaseConnection, names: &[&str]) {
+    let (inserted, ready) = tokio::sync::oneshot::channel();
+    let transaction = db.transaction(async |txn| {
+        for name in names {
+            insert_bakery(&txn, name, 10.4).await?;
+        }
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, names.len());
+        inserted.send(()).expect("the test is waiting");
+
+        std::future::pending::<Result<(), Error>>().await
+    });
+
+    tokio::select! {
+        outcome = transaction => panic!("the transaction cannot finish: {outcome:?}"),
+        ready = ready => ready.expect("the closure signals its inserts"),
+    }
+}
+
+// [spec:pgorm:sem:conn.tx.guard+3/test]    a dropped closure future rolls back, and the queued ROLLBACK lands ahead of the connection's next statement
 #[pgorm_macros::test]
-pub async fn transaction_begin_out_of_scope() -> Result<(), Error> {
-    let ctx = TestContext::new("transaction_begin_out_of_scope_test").await;
+pub async fn transaction_dropped_future_rolls_back() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_dropped_future_rolls_back").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 0);
 
-    {
-        // Transaction begin in this scope
-        let txn = db.begin().await?;
-
-        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-
-        assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 1);
-
-        insert_bakery(&txn, "Top Bakery", 15.0).await?;
-
-        assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 2);
-
-        // The scope ended and transaction is dropped without commit
-    }
+    insert_then_drop(&mut db, &["SeaSide Bakery", "Top Bakery"]).await;
 
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 0);
 
@@ -144,18 +154,44 @@ pub async fn transaction_begin_out_of_scope() -> Result<(), Error> {
     Ok(())
 }
 
+// [spec:pgorm:sem:conn.tx.guard+3/test]    a closure stopped by a timeout rolls back
 #[pgorm_macros::test]
-pub async fn transaction_begin_commit() -> Result<(), Error> {
-    let ctx = TestContext::new("transaction_begin_commit_test").await;
+pub async fn transaction_timed_out_rolls_back() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_timed_out_rolls_back").await;
+    create_tables(&ctx.db).await?;
+    let mut db = ctx.db.get().await?;
+
+    // Whether the insert is in when the timeout fires or still on the wire,
+    // dropping the future leaves the rollback to the handle, so the outcome
+    // does not depend on how fast the server answers.
+    let elapsed = tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        db.transaction(async |txn| {
+            insert_bakery(&txn, "Slow Bakery", 10.4).await?;
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            Ok::<_, Error>(())
+        }),
+    )
+    .await;
+
+    assert!(elapsed.is_err(), "the timeout ends the transaction first");
+    assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
+
+    drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+#[pgorm_macros::test]
+pub async fn transaction_commits_on_ok() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_commits_on_ok").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 0);
 
-    {
-        // Transaction begin in this scope
-        let txn = db.begin().await?;
-
+    db.transaction(async |txn| {
         insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
 
         assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 1);
@@ -164,9 +200,10 @@ pub async fn transaction_begin_commit() -> Result<(), Error> {
 
         assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 2);
 
-        // Commit changes before the end of scope
-        txn.commit().await?;
-    }
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 2);
 
@@ -184,27 +221,30 @@ pub async fn transaction_error_rollback() -> Result<(), Error> {
 
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 0);
 
-    {
-        let txn = db.begin().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+            insert_bakery(&txn, "Top Bakery", 15.0).await?;
 
-        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-        insert_bakery(&txn, "Top Bakery", 15.0).await?;
+            assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 2);
 
-        assert_eq!(bakery::Entity::find().all(&txn).await?.len(), 2);
-
-        let res = bakery::ActiveModel {
-            id: set(1),
-            name: set("Duplicated primary key"),
-            profit_margin: set(20.0),
-        }
-        .insert(&txn)
+            bakery::ActiveModel {
+                id: set(1),
+                name: set("Duplicated primary key"),
+                profit_margin: set(20.0),
+            }
+            .insert(&txn)
+            .await
+        })
         .await;
 
-        assert!(res.is_err());
-
-        // The scope ended and transaction is dropped without commit
-    }
-
+    assert!(
+        matches!(
+            outcome,
+            Err(TransactionError::Transaction(Error::Postgres(_)))
+        ),
+        "the duplicate key fails the closure: {outcome:?}"
+    );
     assert_eq!(bakery::Entity::find().all(&db).await?.len(), 0);
 
     drop(db);
@@ -213,24 +253,27 @@ pub async fn transaction_error_rollback() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+2/test]    the explicit path: rollback() consumes the handle and awaits the round trip
+// [spec:pgorm:sem:conn.tx.guard+3/test]    an Err rolls back, and the ROLLBACK is awaited before the call returns
 #[pgorm_macros::test]
-pub async fn transaction_explicit_rollback() -> Result<(), Error> {
-    let ctx = TestContext::new("transaction_explicit_rollback_txrollback").await;
+pub async fn transaction_err_rolls_back() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_err_rolls_back_txrollback").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
 
-    let txn = db.begin().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+            insert_bakery(&txn, "Top Bakery", 15.0).await?;
 
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-    insert_bakery(&txn, "Top Bakery", 15.0).await?;
+            assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
+            roll_back::<()>()
+        })
+        .await;
 
-    txn.rollback().await.unwrap();
-
+    assert_rolled_back(outcome);
     assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
 
     drop(db);
@@ -239,7 +282,7 @@ pub async fn transaction_explicit_rollback() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+2/test]    the ROLLBACK queued by Drop still lands after the connection returns to the pool
+// [spec:pgorm:sem:conn.tx.guard+3/test]    the ROLLBACK a dropped future queues still lands after the connection returns to the pool
 #[pgorm_macros::test]
 pub async fn transaction_drop_rollback_survives_handback() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_drop_rollback_survives_handback").await;
@@ -257,13 +300,9 @@ pub async fn transaction_drop_rollback_survives_handback() -> Result<(), Error> 
     let mut db = pool.get().await?;
     let pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);
 
-    {
-        let txn = db.begin().await?;
-        insert_bakery(&txn, "Dropped Bakery", 10.4).await?;
-        assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
-        // Dropped without commit: Drop enqueues ROLLBACK and returns at once,
-        // without awaiting the server's response.
-    }
+    // Dropped unfinished: the handle's Drop enqueues ROLLBACK and returns at
+    // once, without awaiting the server's response.
+    insert_then_drop(&mut db, &["Dropped Bakery"]).await;
 
     drop(db);
 
@@ -286,37 +325,37 @@ pub async fn transaction_drop_rollback_survives_handback() -> Result<(), Error> 
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.guard+2/test]    a failing COMMIT reaches the caller as Error::Postgres
+// [spec:pgorm:sem:conn.tx.guard+3/test]    a failing COMMIT reaches the caller as TransactionError::Connection(Error::Postgres)
 #[pgorm_macros::test]
 pub async fn transaction_commit_failure_maps_error() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_commit_failure_maps_error").await;
     let mut db = ctx.db.get().await?;
 
     // A deferred constraint is only checked at COMMIT, so the failure can reach
-    // no statement other than commit() itself.
+    // nothing but the commit itself.
     db.batch_execute(
         "CREATE TABLE deferred_probe (id int, CONSTRAINT deferred_probe_key UNIQUE (id) \
          DEFERRABLE INITIALLY DEFERRED)",
     )
     .await?;
 
-    let txn = db.begin().await?;
-    txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
-        .await?;
-    txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
-        .await?;
-
-    let err = txn
-        .commit()
+    let err = db
+        .transaction(async |txn| {
+            txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
+                .await?;
+            txn.execute("INSERT INTO deferred_probe VALUES (1)", &[])
+                .await?;
+            Ok::<_, Error>(())
+        })
         .await
         .expect_err("the deferred unique constraint must fail the COMMIT");
 
     match &err {
-        Error::Postgres(e) => assert_eq!(
+        TransactionError::Connection(Error::Postgres(e)) => assert_eq!(
             e.as_db_error().map(|e| e.code()),
             Some(&SqlState::UNIQUE_VIOLATION),
         ),
-        other => panic!("expected Error::Postgres, got {other:?}"),
+        other => panic!("expected TransactionError::Connection(Error::Postgres), got {other:?}"),
     }
 
     assert!(
@@ -332,33 +371,35 @@ pub async fn transaction_commit_failure_maps_error() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    ReadOnly emits both clauses, and the server enforces the access mode
+// [spec:pgorm:req:conn.tx+3/test]    ReadOnly emits both clauses, and the server enforces the access mode
 #[pgorm_macros::test]
 pub async fn transaction_read_only_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_read_only_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    let txn = db
-        .begin_with(TransactionMode::ReadOnly {
-            isolation: Some(IsolationLevel::RepeatableRead),
+    let read_only = TransactionMode::ReadOnly {
+        isolation: Some(IsolationLevel::RepeatableRead),
+    };
+    let outcome = db
+        .transaction_with(read_only, async |txn| {
+            assert_eq!(
+                show(&txn, "transaction_isolation").await?,
+                "repeatable read"
+            );
+            assert_eq!(show(&txn, "transaction_read_only").await?, "on");
+
+            let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
+                .await
+                .expect_err("INSERT must be rejected in a read-only transaction");
+
+            assert_read_only_violation(&err);
+
+            roll_back::<()>()
         })
-        .await?;
+        .await;
 
-    assert_eq!(
-        show(&txn, "transaction_isolation").await?,
-        "repeatable read"
-    );
-    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
-
-    let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
-        .await
-        .expect_err("INSERT must be rejected in a read-only transaction");
-
-    assert_read_only_violation(&err);
-
-    txn.rollback().await?;
-
+    assert_rolled_back(outcome);
     assert_eq!(count_bakeries(&db, "Bakery").await?, 0);
 
     drop(db);
@@ -367,27 +408,25 @@ pub async fn transaction_read_only_txconfig() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    ReadWrite carries the isolation level, and still commits
+// [spec:pgorm:req:conn.tx+3/test]    ReadWrite carries the isolation level, and still commits
 #[pgorm_macros::test]
 pub async fn transaction_serializable_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_serializable_txconfig").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    let txn = db
-        .begin_with(TransactionMode::ReadWrite {
-            isolation: Some(IsolationLevel::Serializable),
-        })
-        .await?;
+    db.transaction_with(serializable(), async |txn| {
+        assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
+        assert_eq!(show(&txn, "transaction_read_only").await?, "off");
 
-    assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
-    assert_eq!(show(&txn, "transaction_read_only").await?, "off");
+        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
 
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
-
-    txn.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the serializable transaction commits");
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
 
@@ -397,7 +436,7 @@ pub async fn transaction_serializable_txconfig() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    Default appends no clause, so the session default stands
+// [spec:pgorm:req:conn.tx+3/test]    Default appends no clause, so the session default stands
 #[pgorm_macros::test]
 pub async fn transaction_default_inherits_session_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_default_inherits_session_txconfig").await;
@@ -407,17 +446,21 @@ pub async fn transaction_default_inherits_session_txconfig() -> Result<(), Error
     db.batch_execute("SET default_transaction_read_only = on")
         .await?;
 
-    let txn = db.begin_with(TransactionMode::Default).await?;
+    let outcome = db
+        .transaction_with(TransactionMode::Default, async |txn| {
+            assert_eq!(show(&txn, "transaction_read_only").await?, "on");
 
-    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
+            let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
+                .await
+                .expect_err("Default must inherit the session's read-only default");
 
-    let err = insert_bakery(&txn, "Read Only Bakery", 10.4)
-        .await
-        .expect_err("Default must inherit the session's read-only default");
+            assert_read_only_violation(&err);
 
-    assert_read_only_violation(&err);
+            roll_back::<()>()
+        })
+        .await;
 
-    txn.rollback().await?;
+    assert_rolled_back(outcome);
 
     db.batch_execute("SET default_transaction_read_only = off")
         .await?;
@@ -430,7 +473,7 @@ pub async fn transaction_default_inherits_session_txconfig() -> Result<(), Error
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    ReadWrite overrides a read-only session default
+// [spec:pgorm:req:conn.tx+3/test]    ReadWrite overrides a read-only session default
 #[pgorm_macros::test]
 pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_read_write_overrides_default_txconfig").await;
@@ -440,15 +483,16 @@ pub async fn transaction_read_write_overrides_default_txconfig() -> Result<(), E
     db.batch_execute("SET default_transaction_read_only = on")
         .await?;
 
-    let txn = db
-        .begin_with(TransactionMode::ReadWrite { isolation: None })
-        .await?;
+    db.transaction_with(
+        TransactionMode::ReadWrite { isolation: None },
+        async |txn| {
+            assert_eq!(show(&txn, "transaction_read_only").await?, "off");
 
-    assert_eq!(show(&txn, "transaction_read_only").await?, "off");
-
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-
-    txn.commit().await?;
+            insert_bakery(&txn, "SeaSide Bakery", 10.4).await
+        },
+    )
+    .await
+    .expect("the read-write transaction commits");
 
     db.batch_execute("SET default_transaction_read_only = off")
         .await?;
@@ -467,80 +511,83 @@ pub async fn transaction_with_active_model_behaviour() -> Result<(), Error> {
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    {
-        let txn = db.begin().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            assert_eq!(
+                cake::ActiveModel {
+                    name: set("Cake with invalid price"),
+                    price: set(rust_dec(0)),
+                    gluten_free: set(false),
+                    ..Default::default()
+                }
+                .insert(&txn)
+                .await,
+                Err(Error::Custom(
+                    "[before_save] Invalid Price, insert: true".to_owned()
+                ))
+            );
 
-        assert_eq!(
-            cake::ActiveModel {
-                name: set("Cake with invalid price"),
-                price: set(rust_dec(0)),
-                gluten_free: set(false),
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 0);
+
+            assert_eq!(
+                cake::ActiveModel {
+                    name: set("Cake with invalid price"),
+                    price: set(rust_dec(-10)),
+                    gluten_free: set(false),
+                    ..Default::default()
+                }
+                .insert(&txn)
+                .await,
+                Err(Error::Custom(
+                    "[after_save] Invalid Price, insert: true".to_owned()
+                ))
+            );
+
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 1);
+
+            let readonly_cake_1 = cake::ActiveModel {
+                name: set("Readonly cake (err_on_before_delete)"),
+                price: set(rust_dec(10)),
+                gluten_free: set(true),
                 ..Default::default()
             }
             .insert(&txn)
-            .await,
-            Err(Error::Custom(
-                "[before_save] Invalid Price, insert: true".to_owned()
-            ))
-        );
+            .await?;
 
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 0);
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
 
-        assert_eq!(
-            cake::ActiveModel {
-                name: set("Cake with invalid price"),
-                price: set(rust_dec(-10)),
-                gluten_free: set(false),
+            assert_eq!(
+                readonly_cake_1.delete(&txn).await.err(),
+                Some(Error::Custom(
+                    "[before_delete] Cannot be deleted".to_owned()
+                ))
+            );
+
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
+
+            let readonly_cake_2 = cake::ActiveModel {
+                name: set("Readonly cake (err_on_after_delete)"),
+                price: set(rust_dec(10)),
+                gluten_free: set(true),
                 ..Default::default()
             }
             .insert(&txn)
-            .await,
-            Err(Error::Custom(
-                "[after_save] Invalid Price, insert: true".to_owned()
-            ))
-        );
+            .await?;
 
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 1);
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 3);
 
-        let readonly_cake_1 = cake::ActiveModel {
-            name: set("Readonly cake (err_on_before_delete)"),
-            price: set(rust_dec(10)),
-            gluten_free: set(true),
-            ..Default::default()
-        }
-        .insert(&txn)
-        .await?;
+            assert_eq!(
+                readonly_cake_2.delete(&txn).await.err(),
+                Some(Error::Custom("[after_delete] Cannot be deleted".to_owned()))
+            );
 
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
+            assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
 
-        assert_eq!(
-            readonly_cake_1.delete(&txn).await.err(),
-            Some(Error::Custom(
-                "[before_delete] Cannot be deleted".to_owned()
-            ))
-        );
+            roll_back::<()>()
+        })
+        .await;
 
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
-
-        let readonly_cake_2 = cake::ActiveModel {
-            name: set("Readonly cake (err_on_after_delete)"),
-            price: set(rust_dec(10)),
-            gluten_free: set(true),
-            ..Default::default()
-        }
-        .insert(&txn)
-        .await?;
-
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 3);
-
-        assert_eq!(
-            readonly_cake_2.delete(&txn).await.err(),
-            Some(Error::Custom("[after_delete] Cannot be deleted".to_owned()))
-        );
-
-        assert_eq!(cake::Entity::find().all(&txn).await?.len(), 2);
-    }
-
+    assert_rolled_back(outcome);
     assert_eq!(cake::Entity::find().all(&db).await?.len(), 0);
 
     drop(db);
@@ -555,90 +602,133 @@ pub async fn transaction_nested() -> Result<(), Error> {
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    let mut txn = db.begin().await?;
+    db.transaction(async |txn| {
+        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+        insert_bakery(&txn, "Top Bakery", 15.0).await?;
 
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
-    insert_bakery(&txn, "Top Bakery", 15.0).await?;
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
-
-    {
         // Nested transaction (savepoint) that gets committed
-        let mut txn2 = txn.begin().await?;
+        txn.transaction(async |txn2| {
+            insert_bakery(&txn2, "Nested Bakery", 88.88).await?;
 
-        insert_bakery(&txn2, "Nested Bakery", 88.88).await?;
+            assert_eq!(count_bakeries(&txn2, "Bakery").await?, 3);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 3);
+            // Nested-nested transaction rolled back
+            let outcome = txn2
+                .transaction(async |txn3| {
+                    insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
 
-        {
-            // Nested-nested transaction rolled back on drop
-            let txn3 = txn2.begin().await?;
+                    assert_eq!(count_bakeries(&txn3, "Bakery").await?, 4);
 
-            insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
+                    roll_back::<()>()
+                })
+                .await;
+            assert_rolled_back(outcome);
 
-            assert_eq!(count_bakeries(&txn3, "Bakery").await?, 4);
-        }
+            assert_eq!(count_bakeries(&txn2, "Bakery").await?, 3);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 3);
-
-        {
             // Nested-nested transaction committed
-            let txn3 = txn2.begin().await?;
+            txn2.transaction(async |txn3| {
+                insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
 
-            insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
+                assert_eq!(count_bakeries(&txn3, "Bakery").await?, 4);
 
-            assert_eq!(count_bakeries(&txn3, "Bakery").await?, 4);
+                Ok::<_, Error>(())
+            })
+            .await
+            .expect("the savepoint commits");
 
-            txn3.commit().await?;
-        }
+            assert_eq!(count_bakeries(&txn2, "Bakery").await?, 4);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 4);
+            Ok::<_, Error>(())
+        })
+        .await
+        .expect("the savepoint commits");
 
-        txn2.commit().await?;
-    }
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 4);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 4);
+        // Nested transaction (savepoint) rolled back
+        let outcome = txn
+            .transaction(async |txn2| {
+                insert_bakery(&txn2, "Rock n Roll Bakery", 28.8).await?;
 
-    {
-        // Nested transaction (savepoint) rolled back on drop
-        let mut txn2 = txn.begin().await?;
+                assert_eq!(count_bakeries(&txn2, "Bakery").await?, 5);
 
-        insert_bakery(&txn2, "Rock n Roll Bakery", 28.8).await?;
+                // Nested-nested transaction committed
+                txn2.transaction(async |txn3| {
+                    insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 5);
+                    assert_eq!(count_bakeries(&txn3, "Bakery").await?, 6);
 
-        {
-            // Nested-nested transaction committed
-            let txn3 = txn2.begin().await?;
+                    Ok::<_, Error>(())
+                })
+                .await
+                .expect("the savepoint commits");
 
-            insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
+                assert_eq!(count_bakeries(&txn2, "Bakery").await?, 6);
 
-            assert_eq!(count_bakeries(&txn3, "Bakery").await?, 6);
+                // Nested-nested transaction rolled back
+                let outcome = txn2
+                    .transaction(async |txn3| {
+                        insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
 
-            txn3.commit().await?;
-        }
+                        assert_eq!(count_bakeries(&txn3, "Bakery").await?, 7);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 6);
+                        roll_back::<()>()
+                    })
+                    .await;
+                assert_rolled_back(outcome);
 
-        {
-            // Nested-nested transaction rolled back on drop
-            let txn3 = txn2.begin().await?;
+                assert_eq!(count_bakeries(&txn2, "Bakery").await?, 6);
 
-            insert_bakery(&txn3, "Rock n Roll Bakery", 28.8).await?;
+                roll_back::<()>()
+            })
+            .await;
+        assert_rolled_back(outcome);
 
-            assert_eq!(count_bakeries(&txn3, "Bakery").await?, 7);
-        }
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 4);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 6);
-    }
-
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 4);
-
-    txn.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 4);
 
     drop(db);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:conn.tx.closure+4/test]    a savepoint nested in a connection transaction, both plain closures, runs in a spawned task and commits
+#[pgorm_macros::test]
+pub async fn transaction_nested_in_spawned_task() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_nested_in_spawned_task").await;
+    create_tables(&ctx.db).await?;
+
+    let pool = ctx.db.clone();
+    let counted = tokio::spawn(async move {
+        let mut db = pool.get().await?;
+        db.transaction(async |txn| {
+            insert_bakery(&txn, "Outer Bakery", 1.0).await?;
+            txn.transaction(async |savepoint| {
+                insert_bakery(&savepoint, "Savepoint Bakery", 2.0).await?;
+                count_bakeries(&savepoint, "Bakery").await
+            })
+            .await
+            .map_err(|e| Error::Custom(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::Custom(e.to_string()))
+    })
+    .await
+    .expect("the spawned task completes")?;
+
+    assert_eq!(counted, 2);
+    assert_eq!(count_bakeries(&ctx.db.get().await?, "Bakery").await?, 2);
+
     ctx.delete().await;
 
     Ok(())
@@ -650,7 +740,7 @@ fn serializable() -> TransactionMode {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+3/test]    Ok commits, and the value is returned
+// [spec:pgorm:sem:conn.tx.closure+4/test]    Ok commits, and the value is returned
 #[pgorm_macros::test]
 pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_commit_txclosure").await;
@@ -684,7 +774,7 @@ pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+3/test]    each closure form's future is Send, so it runs in a spawned task
+// [spec:pgorm:sem:conn.tx.closure+4/test]    each closure form's future is Send, so it runs in a spawned task
 #[pgorm_macros::test]
 pub async fn transaction_closures_run_in_spawned_tasks() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closures_run_in_spawned_tasks").await;
@@ -731,7 +821,7 @@ pub async fn transaction_closures_run_in_spawned_tasks() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+3/test]    Err rolls back and is wrapped, not swallowed
+// [spec:pgorm:sem:conn.tx.closure+4/test]    Err rolls back and is wrapped, not swallowed
 #[pgorm_macros::test]
 pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_error_txclosure").await;
@@ -765,7 +855,42 @@ pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+2/test]    SQLSTATE 40001 raised by a statement is retried
+// [spec:pgorm:sem:conn.tx.closure+4/test]    a ROLLBACK that fails after the closure's error is reported beside it
+#[pgorm_macros::test]
+pub async fn transaction_failed_rollback_is_reported() -> Result<(), Error> {
+    let ctx = TestContext::new("transaction_failed_rollback_is_reported").await;
+    let mut db = ctx.db.get().await?;
+    let killer = ctx.db.get().await?;
+    let pid: i32 = db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0);
+
+    // The backend ends while the transaction is idle, so the ROLLBACK that
+    // follows the closure's error has nobody to answer it.
+    let outcome = db
+        .transaction(async |txn| {
+            txn.execute("SELECT 1", &[]).await?;
+            killer
+                .execute("SELECT pg_terminate_backend($1, 5000)", &[&pid])
+                .await?;
+            Err::<(), Error>(Error::Custom("closure said no".to_owned()))
+        })
+        .await;
+
+    match outcome {
+        Err(TransactionError::RollbackFailed {
+            cause: Error::Custom(message),
+            rollback: Error::Postgres(_),
+        }) => assert_eq!(message, "closure said no"),
+        other => panic!("expected TransactionError::RollbackFailed, got {other:?}"),
+    }
+
+    db.discard();
+    drop(killer);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:conn.tx.retry+3/test]    SQLSTATE 40001 raised by a statement is retried
 #[pgorm_macros::test]
 pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_concurrent_update_txclosure").await;
@@ -791,14 +916,17 @@ pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error
 
             if attempts == 1 {
                 let mut other = pool.get().await?;
-                let other_txn = other.begin().await?;
-                other_txn
-                    .execute(
-                        "UPDATE bakery SET profit_margin = 99.0 WHERE name = $1",
-                        &[&"SeaSide Bakery"],
-                    )
-                    .await?;
-                other_txn.commit().await?;
+                other
+                    .transaction(async |other_txn| {
+                        other_txn
+                            .execute(
+                                "UPDATE bakery SET profit_margin = 99.0 WHERE name = $1",
+                                &[&"SeaSide Bakery"],
+                            )
+                            .await
+                    })
+                    .await
+                    .expect("the concurrent update commits");
             }
 
             txn.execute(
@@ -824,7 +952,7 @@ pub async fn transaction_retry_concurrent_update_txclosure() -> Result<(), Error
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+2/test]    write skew between two serializable transactions
+// [spec:pgorm:sem:conn.tx.retry+3/test]    write skew between two serializable transactions
 #[pgorm_macros::test]
 pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_write_skew_txclosure").await;
@@ -843,10 +971,13 @@ pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
 
             if attempts == 1 {
                 let mut other = pool.get().await?;
-                let other_txn = other.begin_with(serializable()).await?;
-                count_bakeries(&other_txn, "Bakery").await?;
-                insert_bakery(&other_txn, "Rival Bakery", 20.0).await?;
-                other_txn.commit().await?;
+                other
+                    .transaction_with(serializable(), async |other_txn| {
+                        count_bakeries(&other_txn, "Bakery").await?;
+                        insert_bakery(&other_txn, "Rival Bakery", 20.0).await
+                    })
+                    .await
+                    .expect("the rival transaction commits");
             }
 
             Ok::<_, Error>(seen)
@@ -864,7 +995,7 @@ pub async fn transaction_retry_write_skew_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.retry+2/test]    a non-retryable error is returned on the first attempt
+// [spec:pgorm:sem:conn.tx.retry+3/test]    a non-retryable error is returned on the first attempt
 #[pgorm_macros::test]
 pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_retry_non_retryable_txclosure").await;
@@ -898,40 +1029,45 @@ pub async fn transaction_retry_non_retryable_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    a savepoint under a configured outer transaction
+// [spec:pgorm:req:conn.tx+3/test]    a savepoint under a configured outer transaction
 #[pgorm_macros::test]
 pub async fn transaction_nested_under_config_txtests() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_nested_under_config_txtests").await;
     create_tables(&ctx.db).await?;
     let mut db = ctx.db.get().await?;
 
-    let mut txn = db.begin_with(serializable()).await?;
+    db.transaction_with(serializable(), async |txn| {
+        insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
 
-    insert_bakery(&txn, "SeaSide Bakery", 10.4).await?;
+        let outcome = txn
+            .transaction(async |txn2| {
+                insert_bakery(&txn2, "Rolled Back Bakery", 88.88).await?;
 
-    {
-        let txn2 = txn.begin().await?;
+                assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
 
-        insert_bakery(&txn2, "Rolled Back Bakery", 88.88).await?;
+                roll_back::<()>()
+            })
+            .await;
+        assert_rolled_back(outcome);
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
-    }
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
+        txn.transaction(async |txn2| {
+            insert_bakery(&txn2, "Top Bakery", 15.0).await?;
 
-    {
-        let txn2 = txn.begin().await?;
+            assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
 
-        insert_bakery(&txn2, "Top Bakery", 15.0).await?;
+            Ok::<_, Error>(())
+        })
+        .await
+        .expect("the savepoint commits");
 
-        assert_eq!(count_bakeries(&txn2, "Bakery").await?, 2);
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
 
-        txn2.commit().await?;
-    }
-
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 2);
-
-    txn.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the configured transaction commits");
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 2);
 
@@ -941,7 +1077,7 @@ pub async fn transaction_nested_under_config_txtests() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.tx+2/test]    DeferrableSnapshot carries serializable + read only, the one combination DEFERRABLE needs
+// [spec:pgorm:req:conn.tx+3/test]    DeferrableSnapshot carries serializable + read only, the one combination DEFERRABLE needs
 #[pgorm_macros::test]
 pub async fn transaction_deferrable_txtests() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_deferrable_txtests").await;
@@ -950,15 +1086,17 @@ pub async fn transaction_deferrable_txtests() -> Result<(), Error> {
 
     insert_bakery(&db, "SeaSide Bakery", 10.4).await?;
 
-    let txn = db.begin_with(TransactionMode::DeferrableSnapshot).await?;
+    db.transaction_with(TransactionMode::DeferrableSnapshot, async |txn| {
+        assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
+        assert_eq!(show(&txn, "transaction_read_only").await?, "on");
+        assert_eq!(show(&txn, "transaction_deferrable").await?, "on");
 
-    assert_eq!(show(&txn, "transaction_isolation").await?, "serializable");
-    assert_eq!(show(&txn, "transaction_read_only").await?, "on");
-    assert_eq!(show(&txn, "transaction_deferrable").await?, "on");
+        assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
 
-    assert_eq!(count_bakeries(&txn, "Bakery").await?, 1);
-
-    txn.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the deferrable snapshot commits");
 
     assert_eq!(count_bakeries(&db, "Bakery").await?, 1);
 

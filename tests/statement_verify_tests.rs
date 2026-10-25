@@ -337,19 +337,22 @@ async fn invalid_sql_reports_the_server_error(db: &DatabaseConnection) -> Result
 
 // [spec:pgorm:def:exec.verify/test]    an open transaction verifies on its own client
 async fn verify_inside_transaction(db: &mut DatabaseConnection) -> Result<(), Error> {
-    let tx = db.begin().await?;
+    let outcome = db
+        .transaction(async |tx| {
+            tx.verify::<Matching>(NO_ROWS).await?;
+            let error = tx
+                .verify::<WrongType>(NO_ROWS)
+                .await
+                .expect_err("`id` is INT4, which `String` cannot read");
+            assert!(matches!(
+                error,
+                Error::Verify(VerifyError::ColumnType { .. })
+            ));
 
-    tx.verify::<Matching>(NO_ROWS).await?;
-    let error = tx
-        .verify::<WrongType>(NO_ROWS)
-        .await
-        .expect_err("`id` is INT4, which `String` cannot read");
-    assert!(matches!(
-        error,
-        Error::Verify(VerifyError::ColumnType { .. })
-    ));
-
-    tx.rollback().await?;
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     Ok(())
 }

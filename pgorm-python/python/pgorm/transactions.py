@@ -17,7 +17,7 @@ TransactionMode: TypeAlias = Literal["default", "read_write", "read_only", "defe
 IsolationLevel: TypeAlias = Literal["read_uncommitted", "read_committed", "repeatable_read", "serializable"]
 
 
-# [spec:pgorm:req:python.transactions]
+# [spec:pgorm:req:python.transactions+1]
 class Transaction:
     """One native transaction; its parent is reserved until commit or rollback.
 

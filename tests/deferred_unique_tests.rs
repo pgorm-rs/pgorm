@@ -113,23 +113,25 @@ async fn a_deferred_unique_key_admits_a_transient_duplicate(
     )
     .await?;
 
-    let txn = db.begin().await?;
-    collide(&txn, "deferred_slot").await?;
-    txn.execute("UPDATE deferred_slot SET position = 2 WHERE id = 1", &[])
-        .await?;
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        collide(&txn, "deferred_slot").await?;
+        txn.execute("UPDATE deferred_slot SET position = 2 WHERE id = 1", &[])
+            .await
+    })
+    .await
+    .expect("the swap commits");
     let row = db
         .query_one("SELECT position FROM deferred_slot WHERE id = 1", &[])
         .await?;
     assert_eq!(row.get::<_, i32>(0), 2, "the swap committed");
 
-    let txn = db.begin().await?;
-    txn.execute("UPDATE deferred_slot SET position = 2 WHERE id = 2", &[])
-        .await?;
-    let refused = txn
-        .commit()
-        .await
-        .expect_err("a duplicate still present at COMMIT");
+    let refused = commit_refused(
+        db.transaction(async |txn| {
+            txn.execute("UPDATE deferred_slot SET position = 2 WHERE id = 2", &[])
+                .await
+        })
+        .await,
+    );
     refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
 
     Ok(())
@@ -165,14 +167,18 @@ async fn set_constraints_immediate_fires_the_check_early(
     )
     .await?;
 
-    let txn = db.begin().await?;
-    collide(&txn, "named_slot").await?;
-    let refused = txn
-        .execute("SET CONSTRAINTS named_slot_position IMMEDIATE", &[])
-        .await
-        .expect_err("the deferred duplicate is checked when made immediate");
-    refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            collide(&txn, "named_slot").await?;
+            let refused = txn
+                .execute("SET CONSTRAINTS named_slot_position IMMEDIATE", &[])
+                .await
+                .expect_err("the deferred duplicate is checked when made immediate");
+            refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     Ok(())
 }
@@ -200,23 +206,23 @@ async fn a_deferred_primary_key_is_checked_at_commit(
     )
     .await?;
 
-    let txn = db.begin().await?;
-    txn.execute("UPDATE seat SET id = 1 WHERE holder = 'b'", &[])
-        .await?;
-    txn.execute("UPDATE seat SET id = 2 WHERE holder = 'a'", &[])
-        .await?;
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        txn.execute("UPDATE seat SET id = 1 WHERE holder = 'b'", &[])
+            .await?;
+        txn.execute("UPDATE seat SET id = 2 WHERE holder = 'a'", &[])
+            .await
+    })
+    .await
+    .expect("the swap commits");
     let row = db
         .query_one("SELECT holder FROM seat WHERE id = 1", &[])
         .await?;
     assert_eq!(row.get::<_, String>(0), "b", "the ids swapped");
 
-    let txn = db.begin().await?;
-    txn.execute("UPDATE seat SET id = 1", &[]).await?;
-    let refused = txn
-        .commit()
-        .await
-        .expect_err("a duplicate id still present at COMMIT");
+    let refused = commit_refused(
+        db.transaction(async |txn| txn.execute("UPDATE seat SET id = 1", &[]).await)
+            .await,
+    );
     refused_with(&refused, &SqlState::UNIQUE_VIOLATION);
 
     Ok(())

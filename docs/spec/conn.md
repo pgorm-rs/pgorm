@@ -237,7 +237,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > through `connect_with`, the general entry point those three delegate to, which
 > takes the whole `ManagerConfig`.
 
-> [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]
+> [spec:pgorm:req:conn.pool.statement-cache.invalidate+4]
 > Reusing a prepared statement admits one failure that preparing afresh does
 > not: PostgreSQL raises SQLSTATE `0A000` — *cached plan must not change result
 > type* — when a statement's plan is revalidated and the result it would now
@@ -288,9 +288,9 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `ConnectionTrait` on `DatabaseConnection` and `&DatabaseConnection` is the
 > retrying path, and on `DatabaseTransaction` — with `&mut DatabaseTransaction`
 > forwarding to it (`conn.pool.conn-trait`) — the evict-only one. No third case
-> hides between them: `TransactionTrait::begin` borrows the connection
-> exclusively (`conn.tx`), so while a transaction handle is alive the borrow
-> checker forbids reaching the connection's impls at all.
+> hides between them: a transaction's closure borrows the connection
+> exclusively (`conn.tx`), so while the transaction is open the borrow checker
+> forbids reaching the connection's impls at all.
 >
 > `execute_raw` and `query_raw` never retry, transaction or no transaction. They
 > take an `IntoIterator` consumed by the first attempt, which is not `Clone` and
@@ -608,16 +608,36 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Transactions
 
-> [spec:pgorm:req:conn.tx+2]
-> `TransactionTrait::begin(&mut self)` MUST return a `DatabaseTransaction<'_>`
-> borrowing the parent exclusively, so no other statement can run on the
-> connection while the transaction handle is alive. `DatabaseConnection::begin`
-> issues `BEGIN` on the pooled client; `DatabaseTransaction::begin` creates a
-> nested transaction, which `tokio_postgres` implements as a savepoint. Both
+> [spec:pgorm:req:conn.tx+3]
+> A transaction MUST be opened only by running a closure inside one:
+> `TransactionTrait::transaction(f)`, and on a `DatabaseConnection` the
+> inherent `transaction_with(mode, f)` and `transaction_with_retry`
+> (`conn.tx.closure`, `conn.tx.retry`). No public method returns a transaction
+> handle, commits one or rolls one back. The closure is given
+> `&mut DatabaseTransaction<'_>`, borrowing the parent exclusively, so no other
+> statement can run on the connection while the transaction is open, and what
+> the closure returns ends it. On a `DatabaseConnection` the transaction is
+> `BEGIN` on the pooled client; on a `DatabaseTransaction` it is a nested
+> transaction, which `tokio_postgres` implements as a savepoint. Both
 > transaction levels share the connection's statement cache.
 >
-> `DatabaseConnection::begin_with(mode: TransactionMode)` is the configured
-> counterpart, opening the transaction through `pgorm_pool`'s
+> `TransactionTrait` is sealed, and its handle is the receiver's kind:
+> `DatabaseTransaction` on a connection or a transaction, the
+> `InstrumentedTransaction` of `metric.layer.tx` on the metrics wrappers, each a
+> `TransactionTrait` itself. Opening and ending a transaction are methods of
+> crate-private traits that take a token no other crate can construct, so even
+> code generic over `TransactionTrait`, which has those methods in reach
+> through its bound, cannot call them. The handle type is declared on a trait
+> of its own, apart from the one that opens it: a trait that declares a
+> lifetime-generic type and returns it from `&mut self` must bound it by
+> `Self: 't`, which a closure generic over every `'t` cannot satisfy for a
+> parent that is itself borrowed. Opening is generic over the borrow alone,
+> never in an implementation that relates the handle's lifetime to the
+> borrow's: a spawned task's `Send` check erases every lifetime in the future
+> it holds and needs each implementation it meets to hold for any of them.
+>
+> `DatabaseConnection::transaction_with(mode: TransactionMode, f)` is the
+> configured counterpart, opening the transaction through `pgorm_pool`'s
 > `TransactionBuilder`, which emits `START TRANSACTION` followed by the clauses
 > the mode selects. `TransactionMode` MUST be a closed `Debug + Clone + Copy +
 > Default` enum of exactly four variants, each one a combination PostgreSQL
@@ -626,7 +646,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > - `Default` — the `Default::default()` variant — appends no clause. The bare
 >   `START TRANSACTION` inherits `default_transaction_isolation`,
 >   `default_transaction_read_only`, and `default_transaction_deferrable`, so it
->   opens the same transaction `begin` does.
+>   opens the same transaction `transaction` does.
 > - `ReadWrite { isolation: Option<IsolationLevel> }` appends `ISOLATION LEVEL
 >   <level>` when `isolation` is `Some`, then `READ WRITE`. That clause is
 >   emitted unconditionally rather than elided as the usual server default, so
@@ -654,31 +674,31 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `IsolationLevel` is `tokio_postgres::IsolationLevel`, re-exported from
 > `pgorm`.
 >
-> `begin_with` is an inherent method on `DatabaseConnection`, deliberately NOT
-> on `TransactionTrait`: the trait's other implementor is
-> `DatabaseTransaction`, whose `begin` is a savepoint, and `SAVEPOINT` accepts
-> no isolation level, access mode, or deferrability. Putting the configured
-> form on the trait would require the savepoint implementation to ignore or
-> reject its argument, so it is offered only where PostgreSQL honours it.
+> `transaction_with` is an inherent method on `DatabaseConnection`,
+> deliberately NOT on `TransactionTrait`: the trait's other implementors open
+> savepoints, and `SAVEPOINT` accepts no isolation level, access mode, or
+> deferrability. Putting the configured form on the trait would require the
+> savepoint implementation to ignore or reject its argument, so it is offered
+> only where PostgreSQL honours it.
 
-> [spec:pgorm:sem:conn.tx.guard+2]
-> `DatabaseTransaction` wraps `Option<pgorm_pool::Transaction>` as a
-> commit-or-rollback guard. `commit(self)` and `rollback(self)` each consume
-> the handle, `take()` the inner transaction, and await `COMMIT` / `ROLLBACK`
-> respectively, mapping failure to `Error::Postgres`. Because both take the
-> `Option`, the `Drop` impl's
-> `tracing::warn!("Transaction dropped without committing!")` fires only on
-> the implicit path — neither `commit` nor `rollback` was called.
+> [spec:pgorm:sem:conn.tx.guard+3]
+> `DatabaseTransaction` wraps `Option<pgorm_pool::Transaction>` as the handle a
+> transaction closure is given, and a transaction has three ends. Two are
+> awaited and chosen by the closure (`conn.tx.closure`): `COMMIT` after `Ok`,
+> `ROLLBACK` after `Err`, each consuming the handle, `take()`-ing the inner
+> transaction and awaiting the server's answer, mapping failure to
+> `Error::Postgres`; neither is public. Because both take the `Option`, the
+> `Drop` impl's `tracing::warn!("Transaction dropped without committing!")`
+> fires only on the third: the closure's future dropped before it finished —
+> a timeout, a cancelled task, a `select!` that took another branch — or a
+> panic unwinding through it.
 >
-> The two rollback paths are not equivalent. Explicit `rollback` awaits the
-> round trip, so a failure reaches the caller. The implicit path — dropping an
-> uncommitted handle — is fire-and-forget: `tokio_postgres::Transaction::drop`
+> The two rollbacks are not equivalent. The closure's awaits the round trip.
+> The dropped handle's is fire-and-forget: `tokio_postgres::Transaction::drop`
 > synchronously enqueues a raw `ROLLBACK` (`ROLLBACK TO <savepoint>` when
 > nested) onto the connection's unbounded request channel and discards both the
 > response stream and any send error, so the rollback's outcome is
-> unobservable and the warning is the only trace of it. The
-> uncommitted-transaction check is a runtime warning, not a compile-time or
-> panic-level guarantee.
+> unobservable and the warning is the only trace of it.
 >
 > The queued rollback is nevertheless correctly ordered against subsequent work
 > on the same connection. The enqueue happens inside `Drop`, and the exclusive
@@ -690,27 +710,40 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
-> [spec:pgorm:sem:conn.tx.closure+3]
-> `DatabaseConnection::transaction(f)` and `transaction_with(opts, f)` run a
-> closure inside a transaction, taking `F: AsyncFnOnce(&mut
-> DatabaseTransaction<'_>) -> Result<T, E>` — a native `AsyncFn*` bound, not a
-> boxed future. `transaction` opens the transaction with `TransactionTrait::begin`,
-> `transaction_with` with `begin_with(opts)`; the rest of the cycle is shared.
+> [spec:pgorm:sem:conn.tx.closure+4]
+> `TransactionTrait::transaction(f)` and `DatabaseConnection::transaction_with(opts,
+> f)` run a closure inside a transaction, taking `F: AsyncFnOnce(&mut
+> Self::Transaction<'_>) -> Result<T, E>` — `&mut DatabaseTransaction<'_>` on a
+> connection or a transaction — a native `AsyncFn*` bound, not a boxed future.
+> `transaction` is one default body on the trait, the same for every
+> implementor, opening through the sealed means of `conn.tx`;
+> `transaction_with` opens with `opts`; the rest of the cycle is shared.
 > `Ok(value)` is followed by `COMMIT`, and `value` is returned only once the
-> `COMMIT` succeeded. `Err(e)` is followed by an *awaited* `rollback()`, so the
-> transaction is over by the time the caller is resumed — this is the explicit
-> path of `conn.tx.guard`, not the fire-and-forget `Drop` path, and it is why
-> the closure API does not inherit that rule's unobservable-rollback caveat.
+> `COMMIT` succeeded. `Err(e)` is followed by an *awaited* `ROLLBACK`, so the
+> transaction is over by the time the caller is resumed — one of the awaited
+> ends of `conn.tx.guard`, not its fire-and-forget drop, which is why the
+> closure's rollback does not inherit that end's unobservable outcome. A
+> future dropped before the closure finishes takes the drop.
 >
-> The bound is higher-ranked over the transaction's lifetime, and every
-> closure form — these two and `transaction_with_retry` (`conn.tx.retry`) —
-> MUST return a future that is `Send` whenever the closure's is, so the call
-> runs inside `tokio::spawn` or a handler a web framework requires to be
-> `Send`. Naming the receiver's lifetime instead (`F: AsyncFnOnce(&mut
+> The bound is higher-ranked over the transaction's lifetime, and on a
+> concrete receiver every closure form — these two and `transaction_with_retry`
+> (`conn.tx.retry`) — MUST return a future that is `Send` whenever the
+> closure's is, so the call runs inside `tokio::spawn` or a handler a web
+> framework requires to be `Send`, a savepoint's closure nested in it
+> included. Naming the receiver's lifetime instead (`F: AsyncFnOnce(&mut
 > DatabaseTransaction<'s>)` with `&'s mut self`) compiles at a direct `.await`
 > but fails a spawned task's `Send` check, which then needs the closure general
 > over every lifetime: "implementation of `AsyncFnOnce` is not general
 > enough".
+>
+> The future `TransactionTrait::transaction` returns promises no `Send`.
+> Promising it would mean bounding an async closure's future, which stable
+> Rust cannot state: the bound needs the unstable `async_fn_traits`, and a
+> helper trait with a `Send` associated future is not general enough for an
+> async closure. Without the promise the compiler sees through the future a
+> call on a concrete type returns, so that call is `Send` whenever its
+> closure's future is; code generic over `C: TransactionTrait` gets a future it
+> does not know to be `Send`.
 >
 > The handle the closure receives is a `ConnectionTrait` implementor in its own
 > right (`conn.pool.conn-trait`), so `&txn` is what a helper generic over `&C`
@@ -726,30 +759,39 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > flatten to `Error` and erase the distinction `TransactionError` exists to
 > draw.
 >
-> Failures are wrapped in `TransactionError<E>`, whose two variants keep the two
-> kinds of failure apart: `Connection(Error)` for a failing `BEGIN` or `COMMIT`
-> — the transaction machinery — and `Transaction(E)` for the closure's own
-> error. It is `Debug` unconditionally, `Display` where `E: Display`, and
-> `std::error::Error` with a `source()` where `E: Error + 'static`. There is
-> deliberately no `From<Error> for TransactionError<E>`: with `E = Error`, the
-> common case, it would file every closure-side error under `Connection` and
-> erase the distinction the enum exists to draw.
+> Failures are wrapped in `TransactionError<E>`, whose variants keep the kinds
+> of failure apart: `Connection(Error)` for a failing `BEGIN` or `COMMIT` —
+> the transaction machinery — `Transaction(E)` for the closure's own error,
+> rolled back, and `RollbackFailed { cause: E, rollback: Error }` for the
+> closure's error followed by a `ROLLBACK` that failed too. It is `Debug`
+> unconditionally, `Display` where `E: Display`, and `std::error::Error` with a
+> `source()` where `E: Error + 'static`. There is deliberately no
+> `From<Error> for TransactionError<E>`: with `E = Error`, the common case, it
+> would file every closure-side error under `Connection` and erase the
+> distinction the enum exists to draw.
 >
-> When the closure returned an error AND the `ROLLBACK` then fails, the closure
-> error is what the caller receives; the rollback failure is reported through
-> `tracing::error!` and not substituted. The closure error is the cause and the
-> failed rollback its consequence, so promoting the latter would replace the
-> answer to "why did this transaction fail?" with a symptom.
+> When the closure returned an error AND the `ROLLBACK` then fails, the caller
+> MUST be told both. The closure's error stays the cause — `RollbackFailed`'s
+> `cause` and its `source()`, so the answer to "why did this transaction
+> fail?" is not replaced with a symptom — and the rollback's failure travels
+> beside it rather than only to a log, because after it neither pgorm nor the
+> caller knows how the transaction ended or what state its connection is in.
+> A caller that would hand the connection on, a pool's or a binding's, needs
+> that to discard it (`DatabaseConnection::discard`) rather than lend it
+> again.
 
-> [spec:pgorm:sem:conn.tx.retry+2]
+> [spec:pgorm:sem:conn.tx.retry+3]
 > `DatabaseConnection::transaction_with_retry(opts, max_retries, f)` is
 > `transaction_with` plus replay: it retries the whole begin/run/commit cycle —
 > not the failing statement — while the failure is retryable, for at most `1 +
 > max_retries` attempts. Each attempt reborrows the connection for a fresh
-> `begin_with(opts)`, under the same higher-ranked bound as `conn.tx.closure`
+> transaction opened as `transaction_with` opens one, under the same
+> higher-ranked bound as `conn.tx.closure`
 > but callable once per attempt: `F: AsyncFnMut(&mut DatabaseTransaction<'_>)
 > -> Result<T, E>`. A failed attempt is rolled back exactly as `conn.tx.closure`
-> specifies before the next one begins.
+> specifies before the next one begins, and an attempt whose `ROLLBACK` fails
+> ends the retrying with `RollbackFailed`: a connection in an unknown state is
+> not one to replay a transaction on.
 >
 > Retryable means SQLSTATE `40001` (`serialization_failure`) or `40P01`
 > (`deadlock_detected`) — the transaction-rollback errors PostgreSQL raises

@@ -233,32 +233,36 @@ async fn copy_violation_aborts_the_transaction() -> Result<(), Error> {
     let mut db = ctx.db.get().await?;
     db.execute(ITEMS, &[]).await?;
 
-    let mut txn = db.begin().await?;
-    txn.execute("INSERT INTO item (id) VALUES (100)", &[])
-        .await?;
-    let error = copy_in_all(
-        &mut txn,
-        &CopyFromStatement::new(n("item"), CopyCsv),
-        &["1,a,1\n2,b,2\n1,again,3\n3,c,3\n"],
-    )
-    .await
-    .expect_err("the duplicate key is refused");
-    assert_eq!(
-        sqlstate(&error),
-        Some(&SqlState::UNIQUE_VIOLATION),
-        "{error}"
-    );
+    let outcome = db
+        .transaction(async |txn| {
+            txn.execute("INSERT INTO item (id) VALUES (100)", &[])
+                .await?;
+            let error = copy_in_all(
+                txn,
+                &CopyFromStatement::new(n("item"), CopyCsv),
+                &["1,a,1\n2,b,2\n1,again,3\n3,c,3\n"],
+            )
+            .await
+            .expect_err("the duplicate key is refused");
+            assert_eq!(
+                sqlstate(&error),
+                Some(&SqlState::UNIQUE_VIOLATION),
+                "{error}"
+            );
 
-    let after = txn
-        .execute("SELECT 1", &[])
-        .await
-        .expect_err("a failed COPY aborts the transaction it ran in");
-    assert_eq!(
-        sqlstate(&after),
-        Some(&SqlState::IN_FAILED_SQL_TRANSACTION),
-        "{after}"
-    );
-    txn.rollback().await?;
+            let after = txn
+                .execute("SELECT 1", &[])
+                .await
+                .expect_err("a failed COPY aborts the transaction it ran in");
+            assert_eq!(
+                sqlstate(&after),
+                Some(&SqlState::IN_FAILED_SQL_TRANSACTION),
+                "{after}"
+            );
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     assert_eq!(items(&db, "item").await?, []);
 
@@ -290,16 +294,20 @@ async fn copy_dropped_sink_writes_nothing() -> Result<(), Error> {
     );
 
     // The same inside a transaction leaves the transaction aborted.
-    let mut txn = db.begin().await?;
-    {
-        let mut sink = txn
-            .copy_in(&CopyFromStatement::new(n("item"), CopyText))
-            .await?;
-        sink.send(Bytes::from_static(b"5\tplum\t3\n")).await?;
-    }
-    let after = txn.execute("SELECT 1", &[]).await.expect_err("aborted");
-    assert_eq!(sqlstate(&after), Some(&SqlState::IN_FAILED_SQL_TRANSACTION));
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            {
+                let mut sink = txn
+                    .copy_in(&CopyFromStatement::new(n("item"), CopyText))
+                    .await?;
+                sink.send(Bytes::from_static(b"5\tplum\t3\n")).await?;
+            }
+            let after = txn.execute("SELECT 1", &[]).await.expect_err("aborted");
+            assert_eq!(sqlstate(&after), Some(&SqlState::IN_FAILED_SQL_TRANSACTION));
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     assert_eq!(items(&db, "item").await?, [(1, None, 7)]);
 
     drop(db);
@@ -551,8 +559,7 @@ async fn copy_out_checks_select_source() -> Result<(), Error> {
         .expr_window_name(Func::count(Expr::col(n("id"))), n("w"))
         .from(n("item"))
         .to_owned();
-    {
-        let mut tx = db.begin().await?;
+    db.transaction(async |tx| {
         let refused = tx
             .copy_out(&CopyToStatement::new(windowed, CopyCsv))
             .await
@@ -566,8 +573,10 @@ async fn copy_out_checks_select_source() -> Result<(), Error> {
         );
         // Nothing reached the server, so the transaction is not aborted.
         assert_eq!(tx.query_one("SELECT 1", &[]).await?.get::<_, i32>(0), 1);
-        tx.commit().await?;
-    }
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     let ordered = tied.clone().order_by(n("qty"), Order::Asc).to_owned();
     let out = copy_out_all(&mut db, &CopyToStatement::new(ordered, CopyText)).await?;
@@ -643,19 +652,23 @@ async fn copy_in_refused_at_open_closes() -> Result<(), Error> {
     // takes the transaction's connection with it.
     let mut db = ctx.db.get().await?;
     answers_in_step(&db).await?;
-    let mut txn = db.begin().await?;
-    txn.execute("INSERT INTO item (id) VALUES (1)", &[]).await?;
-    assert!(txn.execute("SELECT 1/0", &[]).await.is_err());
-    let error = txn
-        .copy_in(&CopyFromStatement::new(n("item"), CopyText))
-        .await
-        .expect_err("the transaction is aborted");
-    assert_eq!(
-        sqlstate(&error),
-        Some(&SqlState::IN_FAILED_SQL_TRANSACTION),
-        "{error}"
-    );
-    drop(txn);
+    let outcome = db
+        .transaction(async |txn| {
+            txn.execute("INSERT INTO item (id) VALUES (1)", &[]).await?;
+            assert!(txn.execute("SELECT 1/0", &[]).await.is_err());
+            let error = txn
+                .copy_in(&CopyFromStatement::new(n("item"), CopyText))
+                .await
+                .expect_err("the transaction is aborted");
+            assert_eq!(
+                sqlstate(&error),
+                Some(&SqlState::IN_FAILED_SQL_TRANSACTION),
+                "{error}"
+            );
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     drop(db);
 
     // The pool lends a connection that answers in step, and nothing the
@@ -757,61 +770,64 @@ async fn copy_every_offered_option_runs() -> Result<(), Error> {
         log_verbosity: Some(CopyLogVerbosity::Silent),
     };
 
-    let mut txn = db.begin().await?;
-    // FREEZE needs the table truncated in the current subtransaction.
-    txn.execute("TRUNCATE item", &[]).await?;
+    db.transaction(async |txn| {
+        // FREEZE needs the table truncated in the current subtransaction.
+        txn.execute("TRUNCATE item", &[]).await?;
 
-    let text = CopyFromStatement::new(n("item"), CopyText)
-        .columns([n("id"), n("name"), n("qty")])
-        .freeze()
-        .delimiter('|')
-        .null_string("~")
-        .default_string("@")
-        .header_match()
-        .encoding("UTF8")
-        .on_error_ignore(ignore)
-        .and_where(Expr::col(n("id")).gt(0))
-        .to_owned();
-    assert_eq!(
-        copy_in_all(&mut txn, &text, &["id|name|qty\n1|~|@\n0|zero|1\n"]).await?,
-        1
-    );
+        let text = CopyFromStatement::new(n("item"), CopyText)
+            .columns([n("id"), n("name"), n("qty")])
+            .freeze()
+            .delimiter('|')
+            .null_string("~")
+            .default_string("@")
+            .header_match()
+            .encoding("UTF8")
+            .on_error_ignore(ignore)
+            .and_where(Expr::col(n("id")).gt(0))
+            .to_owned();
+        assert_eq!(
+            copy_in_all(txn, &text, &["id|name|qty\n1|~|@\n0|zero|1\n"]).await?,
+            1
+        );
 
-    let csv = CopyFromStatement::new(n("item"), CopyCsv)
-        .columns([n("id"), n("name"), n("qty")])
-        .freeze()
-        .delimiter(';')
-        .null_string("N")
-        .default_string("D")
-        .header()
-        .quote('\'')
-        .escape('\\')
-        .force_not_null([n("name")])
-        .force_null([n("qty")])
-        .encoding("UTF8")
-        .on_error_ignore(CopyIgnore::default())
-        .to_owned();
-    assert_eq!(
-        copy_in_all(&mut txn, &csv, &["ignored header\n2;'N';D\n"]).await?,
-        1
-    );
+        let csv = CopyFromStatement::new(n("item"), CopyCsv)
+            .columns([n("id"), n("name"), n("qty")])
+            .freeze()
+            .delimiter(';')
+            .null_string("N")
+            .default_string("D")
+            .header()
+            .quote('\'')
+            .escape('\\')
+            .force_not_null([n("name")])
+            .force_null([n("qty")])
+            .encoding("UTF8")
+            .on_error_ignore(CopyIgnore::default())
+            .to_owned();
+        assert_eq!(
+            copy_in_all(txn, &csv, &["ignored header\n2;'N';D\n"]).await?,
+            1
+        );
 
-    let all = CopyFromStatement::new(n("item"), CopyCsv)
-        .force_not_null_all()
-        .force_null_all()
-        .to_owned();
-    assert_eq!(copy_in_all(&mut txn, &all, &["3,c,3\n"]).await?, 1);
+        let all = CopyFromStatement::new(n("item"), CopyCsv)
+            .force_not_null_all()
+            .force_null_all()
+            .to_owned();
+        assert_eq!(copy_in_all(txn, &all, &["3,c,3\n"]).await?, 1);
 
-    let binary_out = copy_out_all(&mut txn, &CopyToStatement::new(n("item"), CopyBinary)).await?;
-    txn.execute("TRUNCATE item", &[]).await?;
-    let binary = CopyFromStatement::new(n("item"), CopyBinary)
-        .columns([n("id"), n("name"), n("qty")])
-        .freeze()
-        .to_owned();
-    let mut sink = txn.copy_in(&binary).await?;
-    sink.send(Bytes::from(binary_out)).await?;
-    assert_eq!(sink.finish().await?, 3);
-    txn.commit().await?;
+        let binary_out = copy_out_all(txn, &CopyToStatement::new(n("item"), CopyBinary)).await?;
+        txn.execute("TRUNCATE item", &[]).await?;
+        let binary = CopyFromStatement::new(n("item"), CopyBinary)
+            .columns([n("id"), n("name"), n("qty")])
+            .freeze()
+            .to_owned();
+        let mut sink = txn.copy_in(&binary).await?;
+        sink.send(Bytes::from(binary_out)).await?;
+        assert_eq!(sink.finish().await?, 3);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("every option's COPY commits");
 
     assert_eq!(
         items(&db, "item").await?,
@@ -958,10 +974,13 @@ async fn instrumented_copy_reports_at_open() -> Result<(), Error> {
     );
     drop(doomed);
 
-    let mut txn = db.begin_instrumented().await?;
-    assert_eq!(copy_in_all(&mut txn, &copy_in, &["2\tb\t2\n"]).await?, 1);
-    assert_eq!(copy_out_all(&mut txn, &copy_out).await?, b"1,a,1\n2,b,2\n");
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        assert_eq!(copy_in_all(txn, &copy_in, &["2\tb\t2\n"]).await?, 1);
+        assert_eq!(copy_out_all(txn, &copy_out).await?, b"1,a,1\n2,b,2\n");
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the instrumented transaction commits");
 
     let recorded = metrics.0.lock().unwrap().clone();
     let copies: Vec<_> = recorded

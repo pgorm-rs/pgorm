@@ -1015,10 +1015,10 @@ class Emitter:
                     )
                     mode = f"mode={literal(d['mode'])}"
                     opened = call(connection, "begin", [mode, f"isolation={isolation}"])
-                    path = "pgorm::TransactionTrait::begin_with"
+                    path = "pgorm::DatabaseConnection::transaction_with"
                 else:
                     opened = call(connection, "begin", [])
-                    path = "pgorm::TransactionTrait::begin"
+                    path = "pgorm::TransactionTrait::transaction"
                 observation = {"kind": "transaction", "scope": d["child"]}
                 lines.append(f"{indent}{child} = await {opened}")
                 lines.append(f"{indent}open_transactions.append({child})")
@@ -1027,7 +1027,7 @@ class Emitter:
                 lines.append(indent + OBSERVED)
                 return
             case "commit" | "rollback":
-                path = "pgorm::DatabaseTransaction::" + name
+                path = "pgorm::TransactionTrait::transaction"
                 lines.append(f"{indent}await " + call(connection, name, []))
                 lines.append(f"{indent}open_transactions.remove({connection})")
                 lines.append(f"{indent}_paths = {literal([path])}")

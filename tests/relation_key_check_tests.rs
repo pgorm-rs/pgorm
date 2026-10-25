@@ -246,17 +246,22 @@ async fn a_deferred_relation_waits_for_commit() -> Result<(), Error> {
     assert!(later.contains("DEFERRABLE INITIALLY DEFERRED"), "{later}");
     assert_eq!(key_of(&db, "later_book").await?, (true, true, true));
 
-    let tx = db.begin().await?;
-    tx.execute("INSERT INTO later_book VALUES (1, 7)", &[])
-        .await?;
-    tx.execute("INSERT INTO shelf VALUES (7, 'late')", &[])
-        .await?;
-    tx.commit().await?;
+    db.transaction(async |tx| {
+        tx.execute("INSERT INTO later_book VALUES (1, 7)", &[])
+            .await?;
+        tx.execute("INSERT INTO shelf VALUES (7, 'late')", &[])
+            .await
+    })
+    .await
+    .expect("the shelf arrives before the commit");
 
-    let tx = db.begin().await?;
-    tx.execute("INSERT INTO later_book VALUES (2, 8)", &[])
-        .await?;
-    let refused = tx.commit().await.expect_err("a shelf that never came");
+    let refused = commit_refused(
+        db.transaction(async |tx| {
+            tx.execute("INSERT INTO later_book VALUES (2, 8)", &[])
+                .await
+        })
+        .await,
+    );
     refused_with(&refused, &SqlState::FOREIGN_KEY_VIOLATION);
 
     drop(db);

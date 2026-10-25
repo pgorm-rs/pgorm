@@ -1,6 +1,10 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use crate::{ConnectionTrait, RetryableError, SqlText, TransactionTrait, error::*};
+use super::{
+    drive, rolled_back,
+    sealed::{Close, TOKEN},
+};
+use crate::{ConnectionTrait, RetryableError, SqlText, TransactionError, error::*};
 use deadpool::Status;
 use pgorm_pool::{Object, Pool, Transaction};
 use tokio_postgres::{
@@ -21,7 +25,7 @@ use tokio_postgres::{
 /// the methods whose parameters are a reusable `&[&dyn ToSql]` slice can use
 /// this macro, and only outside a transaction — see [`cached_evict`] for why an
 /// open transaction takes the other one.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    evict, re-prepare, retry once
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4]    evict, re-prepare, retry once
 macro_rules! cached_retry {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
@@ -60,7 +64,7 @@ macro_rules! cached_retry {
 /// caller's actionable error with a consequence of pgorm's own retry. Recovery
 /// inside a transaction belongs to whoever owns the transaction's boundary: the
 /// eviction guarantees their next attempt prepares afresh.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    evict without a retry
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4]    evict without a retry
 macro_rules! cached_evict {
     ($owner:expr, $statement:expr, |$prepared:ident| $call:expr) => {{
         let owner = $owner;
@@ -91,7 +95,7 @@ macro_rules! cached_evict {
 /// same way: outside a transaction it is retried once and fails identically, at
 /// the cost of one round trip on a call that was already failing, and inside
 /// one it costs an eviction that makes the next call parse the text again.
-// [spec:pgorm:req:conn.pool.statement-cache.invalidate+3]    the SQLSTATE that means "re-prepare"
+// [spec:pgorm:req:conn.pool.statement-cache.invalidate+4]    the SQLSTATE that means "re-prepare"
 fn is_stale_cached_plan(error: &tokio_postgres::Error) -> bool {
     error.code() == Some(&SqlState::FEATURE_NOT_SUPPORTED)
 }
@@ -149,18 +153,21 @@ impl DatabasePool {
 #[derive(Debug)]
 pub struct DatabaseConnection(pub(crate) Object);
 
-/// How [`DatabaseConnection::begin_with`] opens a transaction: the isolation
-/// level and access mode it selects, as the combinations PostgreSQL acts on.
+/// How [`DatabaseConnection::transaction_with`] opens its transaction: the
+/// isolation level and access mode it selects, as the combinations PostgreSQL
+/// acts on.
 ///
 /// `DEFERRABLE` is reachable only through [`TransactionMode::DeferrableSnapshot`],
 /// which carries the whole `SERIALIZABLE READ ONLY DEFERRABLE` combination,
 /// because that is the only one in which the server honours it.
-// [spec:pgorm:req:conn.tx+2]    transaction configuration
+// [spec:pgorm:req:conn.tx+3]    transaction configuration
 #[derive(Debug, Clone, Copy, Default)]
 #[doc(alias = "AccessMode")]
 pub enum TransactionMode {
     /// Inherit the session defaults: `START TRANSACTION` with no clause, the
-    /// same transaction [`TransactionTrait::begin`] opens.
+    /// same transaction [`TransactionTrait::transaction`] opens.
+    ///
+    /// [`TransactionTrait::transaction`]: crate::TransactionTrait::transaction
     #[default]
     Default,
     /// `READ WRITE`, emitted explicitly so it overrides a session running
@@ -181,17 +188,8 @@ pub enum TransactionMode {
 }
 
 impl DatabaseConnection {
-    /// Open a transaction configured by `mode`.
-    ///
-    /// This is an inherent method rather than a [`TransactionTrait`] one
-    /// because a nested transaction is a savepoint, and `SAVEPOINT` takes
-    /// neither an isolation level nor an access mode.
-    // [spec:pgorm:req:conn.tx+2]    configured START TRANSACTION on the pooled client
-    #[doc(alias = "begin_with_config")]
-    pub async fn begin_with(
-        &mut self,
-        mode: TransactionMode,
-    ) -> Result<DatabaseTransaction<'_>, Error> {
+    // [spec:pgorm:req:conn.tx+3]    configured START TRANSACTION on the pooled client
+    async fn open_with(&mut self, mode: TransactionMode) -> Result<DatabaseTransaction<'_>, Error> {
         let mut builder = self.0.build_transaction();
 
         match mode {
@@ -219,29 +217,17 @@ impl DatabaseConnection {
         Ok(DatabaseTransaction(Some(builder.start().await?)))
     }
 
-    /// Run `f` inside a transaction, committing when it returns `Ok` and
-    /// rolling back when it returns `Err`.
+    /// [`TransactionTrait::transaction`] over a transaction configured by
+    /// `mode`.
     ///
-    /// The rollback is awaited, so the transaction is over by the time this
-    /// returns. `Ok` is returned only once `COMMIT` succeeded; a failing
-    /// `BEGIN` or `COMMIT` is [`TransactionError::Connection`] and the
-    /// closure's own error is [`TransactionError::Transaction`].
-    // [spec:pgorm:sem:conn.tx.closure+3]    plain BEGIN
-    pub async fn transaction<T, E, F>(&mut self, f: F) -> Result<T, TransactionError<E>>
-    where
-        F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
-    {
-        let txn = TransactionTrait::begin(self)
-            .await
-            .map_err(TransactionError::Connection)?;
-
-        drive(txn, f).await
-    }
-
-    /// [`DatabaseConnection::transaction`] over a transaction configured by
-    /// `mode`, as [`DatabaseConnection::begin_with`] would open it.
-    // [spec:pgorm:sem:conn.tx.closure+3]    configured BEGIN
-    #[doc(alias = "transaction_with_config")]
+    /// This is an inherent method rather than a [`TransactionTrait`] one
+    /// because a nested transaction is a savepoint, and `SAVEPOINT` takes
+    /// neither an isolation level nor an access mode.
+    ///
+    /// [`TransactionTrait`]: crate::TransactionTrait
+    /// [`TransactionTrait::transaction`]: crate::TransactionTrait::transaction
+    // [spec:pgorm:sem:conn.tx.closure+4]    configured BEGIN
+    #[doc(alias("transaction_with_config", "begin_with_config"))]
     pub async fn transaction_with<T, E, F>(
         &mut self,
         mode: TransactionMode,
@@ -250,7 +236,8 @@ impl DatabaseConnection {
     where
         F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
     {
-        let txn = DatabaseConnection::begin_with(self, mode)
+        let txn = self
+            .open_with(mode)
             .await
             .map_err(TransactionError::Connection)?;
 
@@ -266,7 +253,7 @@ impl DatabaseConnection {
     /// replay it. `f` is [`AsyncFnMut`] because it is called once per attempt,
     /// and must therefore be replayable: every effect it has outside the
     /// transaction happens again on each attempt.
-    // [spec:pgorm:sem:conn.tx.retry+2]
+    // [spec:pgorm:sem:conn.tx.retry+3]
     pub async fn transaction_with_retry<T, E, F>(
         &mut self,
         mode: TransactionMode,
@@ -281,19 +268,19 @@ impl DatabaseConnection {
 
         loop {
             let mut txn = self
-                .begin_with(mode)
+                .open_with(mode)
                 .await
                 .map_err(TransactionError::Connection)?;
 
             let outcome = match f(&mut txn).await {
-                Ok(value) => match txn.commit().await {
+                Ok(value) => match txn.commit(TOKEN).await {
                     Ok(()) => return Ok(value),
                     Err(error) => Retryable::Connection(error),
                 },
-                Err(error) => {
-                    rollback(txn).await;
-                    Retryable::Transaction(error)
-                }
+                Err(cause) => match rolled_back(txn, cause).await {
+                    TransactionError::Transaction(error) => Retryable::Transaction(error),
+                    unfinished => return Err(unfinished),
+                },
             };
 
             let (retryable, raised_by) = match &outcome {
@@ -319,120 +306,40 @@ enum Retryable<E> {
     Transaction(E),
 }
 
-// [spec:pgorm:sem:conn.tx.closure+3]    commit on Ok, awaited rollback on Err
-async fn drive<T, E, F>(mut txn: DatabaseTransaction<'_>, f: F) -> Result<T, TransactionError<E>>
-where
-    F: AsyncFnOnce(&mut DatabaseTransaction<'_>) -> Result<T, E>,
-{
-    match f(&mut txn).await {
-        Ok(value) => txn
-            .commit()
-            .await
-            .map(|()| value)
-            .map_err(TransactionError::Connection),
-        Err(error) => {
-            rollback(txn).await;
-            Err(TransactionError::Transaction(error))
-        }
-    }
-}
-
-// [spec:pgorm:sem:conn.tx.closure+3]    a failed ROLLBACK does not displace the closure error
-async fn rollback(txn: DatabaseTransaction<'_>) {
-    if let Err(error) = txn.rollback().await {
-        tracing::error!(
-            %error,
-            "ROLLBACK failed after the transaction closure returned an error"
-        );
-    }
-}
-
-/// Why a closure transaction did not commit.
+/// The handle a transaction closure is given, borrowing the
+/// [`DatabaseConnection`] or parent transaction it was opened on.
 ///
-/// The two variants keep the closure's own failure distinct from a failure of
-/// the transaction machinery itself, which is why there is deliberately no
-/// `From<Error>` impl: with `E = Error` it would silently file every
-/// closure-side error under `Connection` and erase that distinction.
-// [spec:pgorm:sem:conn.tx.closure+3]    error wrapper
-#[derive(Debug)]
-pub enum TransactionError<E> {
-    /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.
-    Connection(Error),
-    /// The closure returned an error; the transaction was rolled back.
-    Transaction(E),
-}
-
-impl<E> std::fmt::Display for TransactionError<E>
-where
-    E: std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Connection(error) => write!(f, "Transaction Connection Error: {error}"),
-            Self::Transaction(error) => write!(f, "Transaction Error: {error}"),
-        }
-    }
-}
-
-impl<E> std::error::Error for TransactionError<E>
-where
-    E: std::error::Error + 'static,
-{
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Connection(error) => Some(error),
-            Self::Transaction(error) => Some(error),
-        }
-    }
-}
-
-// [spec:pgorm:sem:conn.tx.guard+2]
-/// An open transaction, borrowing the [`DatabaseConnection`] or parent
-/// transaction it was opened on. Rolls back if dropped uncommitted.
+/// What the closure returns ends it. A closure whose future is dropped before
+/// it finishes leaves this handle to roll back as it drops, which queues the
+/// `ROLLBACK` without awaiting the server's answer.
+// [spec:pgorm:sem:conn.tx.guard+3]
 #[derive(Debug)]
 pub struct DatabaseTransaction<'a>(pub(crate) Option<Transaction<'a>>);
 
 impl<'a> DatabaseTransaction<'a> {
-    /// The open transaction. The `Option` is emptied only by `commit` and
-    /// `rollback`, both of which consume the handle, so it is always `Some`
+    /// The open transaction. The `Option` is emptied only by [`take`], which
+    /// the consuming commit and rollback alone call, so it is always `Some`
     /// here.
+    ///
+    /// [`take`]: DatabaseTransaction::take
     pub(super) fn tx(&self) -> &Transaction<'a> {
         self.0.as_ref().expect("transaction already consumed")
     }
 
     /// As [`DatabaseTransaction::tx`], for the mutable borrow a nested
     /// savepoint needs.
-    fn tx_mut(&mut self) -> &mut Transaction<'a> {
+    pub(super) fn tx_mut(&mut self) -> &mut Transaction<'a> {
         self.0.as_mut().expect("transaction already consumed")
     }
 
-    /// Commits the transaction, making every change made within it permanent.
-    pub async fn commit(mut self) -> Result<(), Error> {
-        if let Some(tx) = self.0.take() {
-            tx.commit().await.map_err(Error::Postgres)
-        } else {
-            unreachable!()
-        }
-    }
-
-    /// Rolls the transaction back, discarding every change made within it.
-    ///
-    /// Dropping an uncommitted handle also rolls back, but the two paths differ:
-    /// `Drop` queues a `ROLLBACK` on the connection and returns immediately,
-    /// discarding the server's response, so a failure is invisible and only a
-    /// `tracing::warn!` marks that it happened. This method awaits the
-    /// `ROLLBACK` round trip and surfaces any failure as `Error::Postgres`, and
-    /// consumes the handle so no warning is emitted.
-    pub async fn rollback(mut self) -> Result<(), Error> {
-        if let Some(tx) = self.0.take() {
-            tx.rollback().await.map_err(Error::Postgres)
-        } else {
-            unreachable!()
-        }
+    /// The transaction, for a commit or rollback that consumes the handle
+    /// and so leaves its `Drop` nothing to roll back.
+    pub(super) fn take(&mut self) -> Transaction<'a> {
+        self.0.take().expect("transaction already consumed")
     }
 }
 
-// [spec:pgorm:sem:conn.tx.guard+2]    rollback-on-drop warning
+// [spec:pgorm:sem:conn.tx.guard+3]    rollback-on-drop warning
 impl Drop for DatabaseTransaction<'_> {
     fn drop(&mut self) {
         if self.0.is_some() {
@@ -778,23 +685,6 @@ impl ConnectionTrait for &mut DatabaseTransaction<'_> {
     }
 }
 
-#[async_trait::async_trait]
-impl TransactionTrait for DatabaseTransaction<'_> {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {
-        Ok(DatabaseTransaction(Some(
-            self.tx_mut().transaction().await?,
-        )))
-    }
-}
-
-// [spec:pgorm:req:conn.tx+2]    BEGIN on the pooled client
-#[async_trait::async_trait]
-impl TransactionTrait for DatabaseConnection {
-    async fn begin(&mut self) -> Result<DatabaseTransaction<'_>, Error> {
-        let tx = self.0.transaction().await?;
-        Ok(DatabaseTransaction(Some(tx)))
-    }
-}
 #[cfg(test)]
 mod tests {
     use crate::DatabasePool;
