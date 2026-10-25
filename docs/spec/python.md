@@ -293,13 +293,18 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > distinct. Unsupported entity combinations and arities MUST be reported in the
 > capability manifest and rejected, never lowered silently to a different API.
 
-> [spec:pgorm:req:python.pipeline]
+> [spec:pgorm:req:python.pipeline+1]
 > The pipeline API MUST compose runtime sources, joins, filters, projections,
 > derive, grouping/aggregation, windows, ordering, take and supported set
 > operations through pgorm::pipeline. Literal and binder paths MUST remain
 > selectable. Bound expressions MUST be lowered within valid Rust binder
 > scopes; Python ownership MUST NOT erase their scope discipline. Registered
 > select_sources terminals MUST preserve Rust model/optional-row decoding.
+> `pl.col(table, entity.col(name))` MUST lower through the registration's
+> own `Named::col`, so a registered column whose domain is over an enum
+> compares as the enum, and `compares_as(TypeName)` MUST lower through
+> `ExprOps::compares_as` for a column no registration types
+> (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`).
 
 > [spec:pgorm:req:python.raw]
 > Raw SQL MUST be an explicit application API with a declared SQL template and

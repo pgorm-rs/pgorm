@@ -72,4 +72,9 @@ def programs(n):
         "qualified": n.Pipeline(n.Table('items β', schema='schema β')).select(
             col('items β', 'id β').as_('out β')
         ),
+        "compares_as": base.filter_with(
+            lambda b: category.compares_as(n.TypeName("Mood", schema="app")).in_array(
+                [b.bind("glad"), "calm"]
+            )
+        ),
     }

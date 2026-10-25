@@ -15,7 +15,7 @@ use crate::{
     UnsupportedCapabilityError,
     errors::{ConstructionError, LifecycleError},
     identifiers::PyIdentifier,
-    values::PyValue,
+    values::{PyTypeName, PyValue},
 };
 
 /// A native expression recipe with an optional, checked Python callback scope.
@@ -231,6 +231,17 @@ impl PyPipelineExpr {
         };
         Self::compose(
             Recipe::Cast(self.recipe.clone(), kind),
+            std::slice::from_ref(self),
+        )
+    }
+
+    /// Compare this expression as the enum `type_name`, through Rust's
+    /// `ExprOps::compares_as`: what a column whose domain is over an enum
+    /// needs where no registration says so.
+    // [spec:pgorm:req:python.pipeline+1]
+    fn compares_as(&self, type_name: PyRef<'_, PyTypeName>) -> PyResult<Self> {
+        Self::compose(
+            Recipe::ComparesAs(self.recipe.clone(), type_name.rust_type()),
             std::slice::from_ref(self),
         )
     }

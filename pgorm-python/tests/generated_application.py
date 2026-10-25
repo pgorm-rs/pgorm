@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 import pgorm as p
-from pgorm import app
+from pgorm import app, pipeline as pl
 from pgorm._registered.compat import check
 from pgorm._registered.entities import Change, Inserted, Updated
 import registered_entities as fixture
@@ -294,6 +294,53 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
                 await active.set_id(2).set_small(150).insert(connection)
             self.assertEqual(refused.exception.sqlstate, "23514")
 
+
+    # [spec:pgorm:req:python.pipeline+1/test]    a registered column a pipeline reads compares
+    # as the enum its domain is over, under its table and under a source's name, where the
+    # column named by text is refused with 42883
+    async def test_pipeline_compares_registered_domain_as_enum(self):
+        def line(identifier, mood):
+            return (
+                app.StockLine.active()
+                .set_id(identifier)
+                .set_qty(1)
+                .set_small(1)
+                .set_code("A")
+                .set_codes([])
+                .set_mood(mood)
+                .set_moods(None)
+                .set_labels(None)
+                .set_span(None)
+                .set_amount(Decimal("1"))
+            )
+
+        stock = p.entity("app.StockLine")
+        mood = app.StockLine.col("mood")
+        identifier = pl.col("stock_line", "id")
+        async with self.pool.connection() as connection:
+            for number, label in ((1, "glad"), (2, "calm"), (3, "glad")):
+                await line(number, label).insert(connection)
+
+            async def ids(query):
+                rows = await query.select(identifier).all(connection)
+                return sorted(row["id"] for row in rows)
+
+            typed = pl.col("stock_line", mood)
+            glad = pl.from_(stock).filter(typed == "glad")
+            self.assertIn('CAST(mood AS mood) = \'glad\'', glad.inspect().sql)
+            self.assertEqual(await ids(glad), [1, 3])
+            bound = pl.from_(stock).filter_with(lambda binder: typed < binder.bind("glad"))
+            self.assertEqual(await ids(bound), [2])
+            peer = pl.source(stock).named("peer")
+            joined = (
+                pl.from_(stock)
+                .join(peer, typed == pl.col("peer", mood))
+                .filter(pl.col("peer", "id") == 3)
+            )
+            self.assertEqual(await ids(joined), [1, 3])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await ids(pl.from_(stock).filter(pl.col("stock_line", "mood") == "glad"))
+            self.assertEqual(refused.exception.sqlstate, "42883")
 
 class GeneratedContract(unittest.TestCase):
     # [spec:pgorm:req:python.codegen+2/test]

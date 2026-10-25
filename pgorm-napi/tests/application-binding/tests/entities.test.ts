@@ -8,9 +8,12 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
 import {
+  bind,
   CheckViolationError,
+  col as statementCol,
   Conflict,
   ConstructionError,
+  DatabaseError,
   DecodeError,
   entities,
   entity,
@@ -20,6 +23,8 @@ import {
   LifecycleError,
   pipeline as pl,
   Pool,
+  select,
+  Table,
   TypeName,
 } from "../../../lib/index.js";
 import { scratchDatabase } from "../../support.ts";
@@ -122,7 +127,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads+2/test]
+// [spec:pgorm:req:napi.entity-reads+3/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());
@@ -143,7 +148,7 @@ test("a query reads records through Select's terminals, keyed by SQL column", as
   assert.equal(counted.n, 1n);
 });
 
-// [spec:pgorm:req:napi.entity-reads+2/test]
+// [spec:pgorm:req:napi.entity-reads+3/test]
 test("one and oneOpt narrow a row limit and never widen one of zero", async () => {
   await seed();
   const none = Account.find().orderBy(Account.col("id").asc()).limit(0);
@@ -200,7 +205,7 @@ test("an ActiveModel holds each column's state, and its writes run the applicati
 // [spec:pgorm:req:napi.schema-domains/test]    a domain column reports, binds and reads as the
 // kind it is over, and a check refuses a value written to it as a CheckViolationError naming the
 // domain
-// [spec:pgorm:req:napi.entity-reads+2/test]    a column whose domain is over an enum compares as
+// [spec:pgorm:req:napi.entity-reads+3/test]    a column whose domain is over an enum compares as
 // the enum
 test("a registered entity's domain columns read, write and compare as the types they are over", async () => {
   assert.deepStrictEqual(
@@ -249,6 +254,50 @@ test("a registered entity's domain columns read, write and compare as the types 
     );
   }
   assert.deepStrictEqual(ids(await Parcel.find().orderBy(byId).all(pool())), [1, 2, 3, 4]);
+});
+
+// [spec:pgorm:req:napi.entity-reads+3/test]    a column whose domain is over an enum is a
+// member of a list of values and of a subquery's rows as the enum, either way round, where the
+// column's plain expression is refused with 42883
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]    a registered column a pipeline reads
+// compares as the enum, under its table and under a source's name, where the column named by text
+// is refused with 42883
+test("a registered column whose domain is over an enum is a member, and a pipeline's column, as the enum", async () => {
+  for (const [id, mood] of [[1, "calm"], [2, "busy"], [3, "calm"]] as const) {
+    await Parcel.active().set("id", id).set("mood", mood).set("codes", []).insert(pool());
+  }
+  const undefinedOperator = (error: unknown) => {
+    assert.ok(error instanceof DatabaseError, `expected a DatabaseError, got ${error}`);
+    assert.equal(error.sqlstate, "42883");
+    return true;
+  };
+  const ids = (records: readonly EntityRecord[]) => records.map((record) => record.id).sort();
+  const byId = Parcel.col("id").asc();
+  const mood = Parcel.col("mood");
+  const busy = select(mood).from(new Table("parcels", { schema: "napi_entities" })).where(Parcel.col("id").eq(2));
+  assert.match(
+    mood.isIn(busy).inspect().sql,
+    /^SELECT CAST\("parcels"\."mood" AS napi_entities\.mood\) IN \(SELECT CAST\("parcels"\."mood" AS napi_entities\.mood\) FROM/,
+  );
+  assert.deepStrictEqual(ids(await Parcel.find().where(mood.isIn(busy)).all(pool())), [2]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(mood.isNotIn(busy)).orderBy(byId).all(pool())), [1, 3]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(mood.isIn(["busy"])).all(pool())), [2]);
+  assert.deepStrictEqual(ids(await Parcel.find().where(mood.isNotIn(["busy"])).all(pool())), [1, 3]);
+  await assert.rejects(Parcel.find().where(mood.isIn([bind("busy")])).all(pool()), undefinedOperator);
+  const bare = Parcel.find().where(statementCol("mood", { table: "parcels", schema: "napi_entities" }).isIn(busy));
+  await assert.rejects(bare.all(pool()), undefinedOperator);
+
+  const pipelineId = pl.col("parcels", "id");
+  const rows = async (pipeline: pl.Pipeline) =>
+    (await pool().query(pipeline.select(pipelineId).sort(pipelineId))).map((row) => row.id);
+  const typed = pl.col("parcels", mood);
+  assert.match(pl.from(Parcel).filter(typed.eq("busy")).inspect().sql, /CAST\(mood AS napi_entities\.mood\) = \$1/);
+  assert.deepStrictEqual(await rows(pl.from(Parcel).filter(typed.eq("busy"))), [2]);
+  assert.deepStrictEqual(await rows(pl.from(Parcel).filter(typed.lt("busy"))), [1, 3]);
+  const peer = pl.source(Parcel).named("peer");
+  const joined = pl.from(Parcel).join(peer, typed.eq(pl.col("peer", mood))).filter(pl.col("peer", "id").eq(3));
+  assert.deepStrictEqual(await rows(joined), [1, 3]);
+  await assert.rejects(rows(pl.from(Parcel).filter(pl.col("parcels", "mood").eq("busy"))), undefinedOperator);
 });
 
 // [spec:pgorm:req:napi.entity-writes/test]

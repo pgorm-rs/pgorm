@@ -11,9 +11,11 @@
 use std::sync::Arc;
 
 use pgorm::{
-    pgorm_query::{Name, Value},
+    pgorm_query::{Name, TypeName, Value},
     pipeline::{self as pl, ExprOps},
 };
+
+use crate::entities::PipelineColumn;
 
 /// The binary operators pgorm's pipeline has.
 #[derive(Debug, Clone, Copy)]
@@ -122,6 +124,8 @@ pub(super) enum Recipe {
     /// The placeholder a binder minted, by its index in the binder's values.
     Bound(usize),
     Column(Name, Name),
+    /// A registered entity's column, under the name its relation is read by.
+    Registered(Name, Arc<dyn PipelineColumn>),
     Alias(Name),
     This(Name),
     That(Name),
@@ -129,6 +133,7 @@ pub(super) enum Recipe {
     Unary(Unary, Arc<Self>),
     Named(Arc<Self>, Name),
     Cast(Arc<Self>, pl::CastType),
+    ComparesAs(Arc<Self>, TypeName),
     In(Arc<Self>, Vec<Arc<Self>>),
     CountRows,
     RowNumber,
@@ -154,6 +159,7 @@ impl Recipe {
             Self::Unary(_, inner)
             | Self::Named(inner, _)
             | Self::Cast(inner, _)
+            | Self::ComparesAs(inner, _)
             | Self::Function(_, inner) => inner.binds(),
             Self::In(inner, items) => inner.binds() || items.iter().any(|item| item.binds()),
             Self::Case(arms, otherwise) => {
@@ -168,7 +174,7 @@ impl Recipe {
 
     /// The pgorm expression, or `None` where a value or placeholder needs a
     /// binder the lowering does not have.
-    // [spec:pgorm:req:napi.pipeline-expressions+1]
+    // [spec:pgorm:req:napi.pipeline-expressions+2]
     pub(super) fn lower<'brand>(
         &self,
         with: &mut Lowering<'_, 'brand>,
@@ -184,6 +190,7 @@ impl Recipe {
             Self::Value(value) => with.binder.as_mut()?.bind(value.clone()),
             Self::Bound(index) => with.bound.get(*index)?.clone(),
             Self::Column(table, column) => pl::col(table.clone(), column.clone()),
+            Self::Registered(table, column) => column.lower(table.clone()),
             Self::Alias(name) => name.clone().into(),
             Self::This(name) => pl::this(name.clone()),
             Self::That(name) => pl::that(name.clone()),
@@ -193,6 +200,7 @@ impl Recipe {
             Self::Unary(operator, inner) => unary(*operator, inner.lower(with)?),
             Self::Named(inner, name) => inner.lower(with)?.as_runtime(name.clone()),
             Self::Cast(inner, kind) => inner.lower(with)?.cast(*kind),
+            Self::ComparesAs(inner, enum_type) => inner.lower(with)?.compares_as(enum_type.clone()),
             Self::In(inner, items) => {
                 let inner = inner.lower(with)?;
                 let items: Option<Vec<_>> = items.iter().map(|item| item.lower(with)).collect();

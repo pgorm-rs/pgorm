@@ -13318,6 +13318,7 @@ children (
         title "Pipeline comparisons on an enum, or a domain over one, cast it where the pipeline does not know the column's type"
         kind @fix
         deps (domain-enum-remaining)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:38.80905Z
@@ -13331,6 +13332,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\" to taking the column's type from its entity wherever one is known (the bindings' entity registrations, a typed source), and letting the caller name the type where none is. Also in scope (found by in-subquery-enum-shapes): the Python and JavaScript statement builders' subquery membership carries no column type either, so it gets none of the domain-over-enum casts."
+            }
+
+            {
+                at 2026-10-25T23:33:44.800678Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-25T23:34:10.811673Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Design: the type comes from the entity where one is known and is named by the caller where none is. Rust: Named::col(column) writes a named entity's column typed by the entity; ExprOps::compares_as(enum TypeName) names the enum for col() and alias tokens. Python/JS: pl.col(table, entity.col(name)) lowers through the registration's own Named::col; compares_as / comparesAs names the enum. JS EntityColumn.isIn/isNotIn (values and Select) go through ColumnTrait is_in/in_subquery. Python's statement builders have no subquery membership at all, so there was nothing to cast there; a statement builder's own expression stays SQL as written (the caller casts)."
+                after_done true
             }
         )
     }
@@ -13917,6 +13933,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by in-subquery-enum-shapes, which added Expr::array(SelectStatement) rendering ARRAY(...) in pgorm-query. Neither binding exposes it. Add it with stubs/typings, capability entries, parity cases and live tests."
+            }
+
+            {
+                at 2026-10-25T22:09:44.912851Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

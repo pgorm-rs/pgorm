@@ -9,6 +9,7 @@ import { after, before, test } from "node:test";
 import {
   col as statementCol,
   ConstructionError,
+  DatabaseError,
   DecodeError,
   Interval,
   LifecycleError,
@@ -44,6 +45,10 @@ before(async () => {
       "CREATE TABLE app.items (id int8 PRIMARY KEY, category text, amount int4)",
       `INSERT INTO app.items VALUES (1, 'fruit', 5), (2, 'fruit', 7), (3, 'veg', 2), (4, 'veg', 9),
         (5, 'O''Brien; -- \\', 4), (6, NULL, 1)`,
+      "CREATE TYPE app.mood AS ENUM ('sad', 'calm', 'glad')",
+      "CREATE DOMAIN app.cheerful AS app.mood",
+      "CREATE TABLE app.lines (id int8 PRIMARY KEY, mood app.cheerful NOT NULL)",
+      "INSERT INTO app.lines VALUES (1, 'calm'), (2, 'glad'), (3, 'calm'), (4, 'glad')",
     ]
   ) {
     await pool().execute(sql);
@@ -82,7 +87,7 @@ test("a pipeline's stages run as any statement does, through each terminal", asy
   assert.equal(await pool().transaction((tx) => tx.execute(base.select(id))), 6);
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 test("a value an operand is given is bound; only literal() writes one into the SQL", async () => {
   const awkward = "O'Brien; -- \\";
   const bound = base.filter(category.eq(awkward)).select(id);
@@ -103,7 +108,41 @@ test("a value an operand is given is bound; only literal() writes one into the S
   assert.deepStrictEqual(await pool().query(cast), [{ spelled: "5", negated: -5 }]);
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]    a column whose domain is over an enum,
+// read with no registration, compares as the schema-qualified enum comparesAs names, bound, listed,
+// coalesced, through an alias and in max, where each left bare is refused with 42883
+test("a column whose domain is over an enum compares as the enum it is named as", async () => {
+  const lines = pl.from(new Table("lines", { schema: "app" }));
+  const mood = pl.col("lines", "mood");
+  const lineId = pl.col("lines", "id");
+  const typed = mood.comparesAs(new TypeName("mood", { schema: "app" }));
+  const ids = async (pipeline: pl.Pipeline) => (await pool().query(pipeline.select(lineId).sort(lineId))).map((row) => row.id);
+  assert.equal(
+    lines.filter(typed.eq("glad")).inspect().sql,
+    "SELECT * FROM app.lines WHERE CAST(mood AS app.mood) = $1",
+  );
+  assert.deepStrictEqual(await ids(lines.filter(typed.eq("glad"))), [2n, 4n]);
+  assert.deepStrictEqual(await ids(lines.filter(typed.inArray(["calm", pl.literal("sad")]))), [1n, 3n]);
+  assert.deepStrictEqual(await ids(lines.filter(typed.coalesce("glad").lt("glad"))), [1n, 3n]);
+  const m = pl.alias("m");
+  const named = m.comparesAs("mood");
+  assert.equal(
+    lines.derive(mood.as(m)).filter(named.eq(pl.literal("glad"))).inspect().sql,
+    "WITH table_0 AS (SELECT *, mood AS m FROM app.lines) SELECT * FROM table_0 WHERE CAST(m AS mood) = 'glad'",
+  );
+  const highest = await pool().one(lines.group().aggregate(pl.max(typed).cast("text").as("highest")));
+  assert.deepStrictEqual(highest, { highest: "glad" });
+  const undefinedOperator = (error: unknown) => {
+    assert.ok(error instanceof DatabaseError, `expected a DatabaseError, got ${error}`);
+    assert.equal(error.sqlstate, "42883");
+    return true;
+  };
+  await assert.rejects(ids(lines.filter(mood.eq("glad"))), undefinedOperator);
+  await assert.rejects(pool().query(lines.derive(mood.as(m)).filter(m.eq("glad"))), undefinedOperator);
+  assert.throws(() => mood.comparesAs(5 as unknown as string), construction(/a TypeName/));
+});
+
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 test("an interval binds in a pipeline as any value does", async () => {
   const span = new Interval({ months: 1, days: -2, microseconds: 3_000_004n });
   const selected = base.filter(id.eq(1)).selectWith((binder) => [
@@ -231,7 +270,7 @@ test("a placeholder used outside the stage its binder's function returns it to i
 });
 
 // [spec:pgorm:req:napi.pipeline-binder/test]
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);

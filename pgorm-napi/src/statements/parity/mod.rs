@@ -196,7 +196,7 @@ fn schema_family_matches_its_golden_file() {
 }
 
 // [spec:pgorm:req:napi.pipeline/test]
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 // [spec:pgorm:req:napi.pipeline-binder/test]
 #[test]
 fn pipeline_family_matches_its_golden_file() {

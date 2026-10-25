@@ -247,7 +247,7 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 // filters through them, a predicate on the enum's domain comparing as the enum, and a check's
 // refusal arrives as 23514 naming the constraint
 // [spec:pgorm:def:sql.types.column-type+11/test]
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]
 // [spec:pgorm:def:exec.decode.array+2/test]
 #[pgorm_macros::test]
 async fn an_entity_reads_and_writes_through_domains() -> Result<(), Error> {
@@ -348,7 +348,7 @@ async fn ids_where(
 /// no operator for the domain itself. The value is compared, not written, so
 /// the domain's check does not refuse it, and a keyset cursor over the column
 /// pages by the enum's order in either direction.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    every value predicate, the
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    every value predicate, the
 // column-taking and expression-taking forms and if_null cast a column whose domain is over an
 // enum, and its values, to the enum, live
 // [spec:pgorm:sem:exec.cursor.keyset+8/test]    a keyset cursor over a column whose domain is
@@ -485,7 +485,7 @@ async fn lines_and_tempers(db: &impl ConnectionTrait) -> Result<(), Error> {
 /// enum, with the subquery's projection cast beside it — even a projection of
 /// the same domain, which the enum does not compare with either — and max and
 /// min aggregate the column as the enum, the domain having neither.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    in_subquery and
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    in_subquery and
 // not_in_subquery against a subquery projecting the same domain, and max and min of the
 // column, live
 #[pgorm_macros::test]
@@ -566,7 +566,7 @@ async fn domain_enum_subqueries_and_extrema_compare() -> Result<(), Error> {
 /// through the subquery's array, with `NOT IN`'s answer to a null member. A
 /// `*` wider than one column, and several projected expressions, are refused
 /// by the server as they are under any `IN`, never narrowed to one column.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    in_subquery and not_in_subquery
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    in_subquery and not_in_subquery
 // against a `*`, a table's `*` and a windowed projection of the domain compare as the enum,
 // live, while a wider `*` and several projections are refused with 42601
 #[pgorm_macros::test]
@@ -665,7 +665,7 @@ async fn domain_enum_subqueries_of_every_shape_compare() -> Result<(), Error> {
 /// as the enum wherever it is joined: a related read, the graph's edge, both
 /// loaders — whose batch key is the column — and a linked read scoped by a
 /// key of the domain.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    a relation over columns whose
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    a relation over columns whose
 // domain is over an enum joins them as the enum in a related graph read, inner_join, a graph
 // edge, load_one and load_many, and find_related and find_linked scope by such a key, live
 // [spec:pgorm:sem:query.build.join+5/test]    a pair over such columns joins them cast
@@ -948,7 +948,7 @@ async fn domain_enum_appended_tiebreak_compares_as_enum() -> Result<(), Error> {
 /// A pipeline compares an entity column whose domain is over an enum as the
 /// enum — against a literal, a bound value, a list, or the same domain across
 /// a join — and min and max aggregate it as the enum.
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    pipeline comparisons, in_array,
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    pipeline comparisons, in_array,
 // coalesce, a join condition and min / max over a column whose domain is over an enum, live
 #[pgorm_macros::test]
 async fn domain_enum_pipeline_compares_as_the_enum() -> Result<(), Error> {
@@ -998,6 +998,76 @@ async fn domain_enum_pipeline_compares_as_the_enum() -> Result<(), Error> {
         .all(&db)
         .await?;
     assert_eq!(extremes, [(1, "glad".to_owned(), "calm".to_owned())]);
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A pipeline compares a column whose domain is over an enum as the enum
+/// where it reads the column without its entity's own reference: a named
+/// relation's column through `Named::col`, which the entity types, and a
+/// `col` reference or an alias token through `compares_as`, which names the
+/// enum. Each left bare is compared as the domain, which the server refuses.
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    a named relation's column,
+// a col reference and an alias token naming a projection compare as the enum, bound or
+// literal, live, where each left bare is refused with 42883
+#[pgorm_macros::test]
+async fn untyped_pipeline_columns_compare_as_the_enum() -> Result<(), Error> {
+    use pgorm::pipeline::{Expr, ExprOps, IntoSource, JoinSide, Pipeline, alias, col};
+
+    let ctx = TestContext::new("domain_enum_untyped_pipeline").await;
+    let db = ctx.db.get().await?;
+    lines_and_tempers(&db).await?;
+
+    let conn = &db;
+    let ids = |pipeline: Pipeline| async move {
+        pipeline
+            .sort(line::Column::Id)
+            .select(line::Column::Id)
+            .into_tuple::<i32>()
+            .expect("the pipeline compiles")
+            .all(conn)
+            .await
+    };
+    let undefined = |result: Result<Vec<i32>, Error>| {
+        refused_with(
+            &result.expect_err("the domain compared bare has no operator"),
+            &SqlState::UNDEFINED_FUNCTION,
+        );
+    };
+
+    let peer = temper::Entity.named(alias("peer"));
+    let joined = |mood: Expr<'static>| {
+        Pipeline::from(line::Entity)
+            .join(JoinSide::Inner, peer.clone(), line::Column::Mood.eq(mood))
+            .filter(peer.col(temper::Column::Label).eq("bright"))
+    };
+    assert_eq!(ids(joined(peer.col(temper::Column::Mood))).await?, [2, 4]);
+    undefined(ids(joined(col(alias("peer"), alias("mood")))).await);
+
+    let bound = |typed: bool| {
+        Pipeline::from(line::Entity).filter_with(move |binder| {
+            let mood = col(alias("line"), alias("mood"));
+            let mood = if typed {
+                mood.compares_as(alias("mood"))
+            } else {
+                mood
+            };
+            mood.eq(binder.bind("glad"))
+        })
+    };
+    assert_eq!(ids(bound(true)).await?, [2, 4]);
+    undefined(ids(bound(false)).await);
+
+    let m = alias("m");
+    let derived = |compared: Expr<'static>| {
+        Pipeline::from(line::Entity)
+            .derive(line::Column::Mood.as_(m))
+            .filter(compared.lt("glad"))
+    };
+    assert_eq!(ids(derived(m.compares_as(alias("mood")))).await?, [1, 3, 5]);
+    undefined(ids(derived(m.into())).await);
 
     drop(db);
     ctx.delete().await;

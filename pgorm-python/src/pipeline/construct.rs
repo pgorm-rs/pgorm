@@ -7,7 +7,7 @@ use super::{
     expression::{PyPipelineExpr, alias_name},
     recipe::{Function, Recipe},
 };
-use crate::{UnsupportedCapabilityError, errors::ConstructionError};
+use crate::{UnsupportedCapabilityError, entities::PyEntityColumn, errors::ConstructionError};
 
 pub(super) fn integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     if !value.is_exact_instance_of::<PyInt>() {
@@ -35,12 +35,27 @@ pub(super) fn pipeline_alias(name: &Bound<'_, PyAny>) -> PyResult<PyPipelineExpr
     PyPipelineExpr::compose(Recipe::Alias(alias_name(name)?), &[])
 }
 
+/// `pl.col(table, column)`: a column qualified by the relation it is read
+/// from. A registered entity's column (`entity.col(name)`) is the entity's
+/// own, compared as the entity types it; any other name only qualifies.
+// [spec:pgorm:req:python.pipeline+1]
 #[pyfunction]
 pub(super) fn pipeline_col(
     table: &Bound<'_, PyAny>,
     column: &Bound<'_, PyAny>,
 ) -> PyResult<PyPipelineExpr> {
-    PyPipelineExpr::compose(Recipe::Column(alias_name(table)?, alias_name(column)?), &[])
+    let table = alias_name(table)?;
+    let recipe = match column.extract::<PyRef<'_, PyEntityColumn>>() {
+        Ok(registered) => Recipe::Registered(
+            table,
+            registered
+                .entity
+                .pipeline_column(&registered.name)
+                .map_err(|error| ConstructionError::new_err(error.to_string()))?,
+        ),
+        Err(_) => Recipe::Column(table, alias_name(column)?),
+    };
+    PyPipelineExpr::compose(recipe, &[])
 }
 
 #[pyfunction]

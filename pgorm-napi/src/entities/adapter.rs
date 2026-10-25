@@ -10,7 +10,8 @@ use std::{any::Any, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{
-    Condition, Expr, NullOrdering, OnConflict, Order, SimpleExpr, Value, Values,
+    Condition, Expr, Name, NullOrdering, OnConflict, Order, SelectStatement, SimpleExpr, Value,
+    Values,
 };
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, Change as RustChange, ColumnTrait,
@@ -67,6 +68,38 @@ pub(crate) enum Written {
     Count(u64),
 }
 
+/// What a column's membership is tested against: values of the column's
+/// declared kind, or a subquery's rows.
+#[derive(Clone, Debug)]
+pub(crate) enum Members {
+    Values(Vec<Value>),
+    Subquery(Box<SelectStatement>),
+}
+
+/// A registered entity's column, written under whatever name a pipeline reads
+/// its relation by: the entity's own `Named::col`, so a column whose domain is
+/// over an enum compares as the enum.
+pub(crate) trait PipelineColumn: Debug + Send + Sync {
+    fn lower<'brand>(&self, qualifier: Name) -> pgorm::pipeline::Expr<'brand>;
+}
+
+/// One of `E`'s columns, resolved when the pipeline expression naming it was
+/// built, so lowering it cannot miss.
+struct RegisteredColumn<E: EntityTrait>(E::Column);
+
+impl<E: EntityTrait> Debug for RegisteredColumn<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RegisteredColumn").field(&self.0).finish()
+    }
+}
+
+// [spec:pgorm:req:napi.pipeline-expressions+2]
+impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
+    fn lower<'brand>(&self, qualifier: Name) -> pgorm::pipeline::Expr<'brand> {
+        pgorm::pipeline::named_runtime(E::default(), qualifier).col(self.0)
+    }
+}
+
 /// What `UpdateMany::col_expr` sets a column to: a value, written through
 /// the column's `save_as`, or an expression, as written.
 #[derive(Clone, Debug)]
@@ -110,6 +143,14 @@ pub(crate) trait EntityBackend: Debug + Send + Sync {
         comparison: Comparison,
         value: Value,
     ) -> Result<SimpleExpr, Failure>;
+    fn membership(
+        &self,
+        column: &str,
+        negated: bool,
+        members: Members,
+    ) -> Result<SimpleExpr, Failure>;
+    /// The column as a pipeline reads it, compared as the entity types it.
+    fn pipeline_column(&self, column: &str) -> Result<Arc<dyn PipelineColumn>, Failure>;
     fn versions<'a>(
         &'a self,
         db: Database<'a>,
@@ -204,6 +245,28 @@ where
             Comparison::Lt => column.lt(value),
             Comparison::Le => column.lte(value),
         })
+    }
+
+    // [spec:pgorm:req:napi.entity-reads+3]
+    fn membership(
+        &self,
+        name: &str,
+        negated: bool,
+        members: Members,
+    ) -> Result<SimpleExpr, Failure> {
+        let column = column::<E>(&self.info, name)?;
+        Ok(match (members, negated) {
+            (Members::Values(values), false) => column.is_in(values),
+            (Members::Values(values), true) => column.is_not_in(values),
+            (Members::Subquery(select), false) => column.in_subquery(*select),
+            (Members::Subquery(select), true) => column.not_in_subquery(*select),
+        })
+    }
+
+    fn pipeline_column(&self, name: &str) -> Result<Arc<dyn PipelineColumn>, Failure> {
+        Ok(Arc::new(RegisteredColumn::<E>(column::<E>(
+            &self.info, name,
+        )?)))
     }
 
     fn versions<'a>(
@@ -324,7 +387,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:napi.entity-reads+2]
+// [spec:pgorm:req:napi.entity-reads+3]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
