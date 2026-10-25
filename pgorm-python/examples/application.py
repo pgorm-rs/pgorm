@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 import json
 import os
 from typing import assert_type
@@ -10,6 +11,10 @@ from uuid import uuid4
 
 import pgorm as p
 from pgorm import pipeline as pl, schema as s
+
+
+class RolledBack(Exception):
+    """Raised to leave a block, so that its savepoint rolls back."""
 
 
 async def run(dsn: str) -> dict[str, object]:
@@ -66,11 +71,13 @@ async def exercise(
         assert_type(transaction, p.Transaction)
         changed = accounts.update({"visits": 1}).where_(accounts.key({"id": 1}))
         assert await changed.execute(transaction) == 1
-        child = await transaction.begin()
-        await accounts.insert({"id": 3, "name": "rolled back", "visits": 0}).execute(
-            child
-        )
-        await child.rollback()
+        with suppress(RolledBack):
+            async with transaction.transaction() as child:
+                assert_type(child, p.Transaction)
+                await accounts.insert(
+                    {"id": 3, "name": "rolled back", "visits": 0}
+                ).execute(child)
+                raise RolledBack
 
     a, e = accounts.table.as_("a"), events.as_("e")
     join = (

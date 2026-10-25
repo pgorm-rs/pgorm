@@ -20,7 +20,7 @@ use state::{Finished, Pending};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
-// [spec:pgorm:req:python.transactions+1]
+// [spec:pgorm:req:python.transactions+2]
 pub(crate) async fn begin(
     connection: Arc<ConnectionState>,
     mode: TransactionMode,

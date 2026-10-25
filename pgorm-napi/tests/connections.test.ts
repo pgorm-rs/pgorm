@@ -16,9 +16,10 @@ import {
   Pool,
   STATEMENT_CACHE_CHANNEL,
   TimeoutError,
+  type Transaction,
   Value,
 } from "../lib/index.js";
-import { dsn, runFixture, same, scratchDatabase, tlsCa } from "./support.ts";
+import { dsn, holdTransaction, runFixture, same, scratchDatabase, tlsCa } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -81,7 +82,7 @@ function withoutSslmode(text: string, host?: string): string {
   return url.toString();
 }
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("a pool sends nothing until used, and refuses an unusable option at construction", async () => {
   await using unreachable = new Pool("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable");
   assert.equal(unreachable.closed, false);
@@ -106,14 +107,14 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
   assert.throws(() => new Pool("postgres://["), ConstructionError);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("connect resolves with a pool whose server answered, and rejects when none does", async () => {
   await using connected = await connect(dsn());
   assert.equal(await connected.ping(), true);
   await assert.rejects(connect("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable"), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("closing a connection returns it to its pool at once, and a closed connection refuses work", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 1000 });
   const first = await single.acquire();
@@ -129,7 +130,7 @@ test("closing a connection returns it to its pool at once, and a closed connecti
   await first.close();
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 // [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    from JavaScript
 test("clearing the statement caches makes a connection that ran an insert prepare it again", async () => {
   await using single = new Pool(scratch(), { maxSize: 1 });
@@ -161,7 +162,7 @@ async function eventually(what: string, probe: () => Promise<boolean>): Promise<
   }
 }
 
-// [spec:pgorm:req:napi.connections+3/test]    a pool given statementCacheChannel listens from its
+// [spec:pgorm:req:napi.connections+4/test]    a pool given statementCacheChannel listens from its
 // first acquisition, clears on a notification there whatever its payload, and closes its
 // listening connection with the pool; a pool without it keeps its statements
 // [spec:pgorm:req:conn.pool.statement-cache.listen/test]    from JavaScript
@@ -198,7 +199,7 @@ test("a pool listening on statementCacheChannel clears when notified, and only t
   }
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 // [spec:pgorm:req:napi.errors+2/test]
 test("acquiring waits for a free connection within acquireTimeout, then fails with a TimeoutError", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 200 });
@@ -209,7 +210,7 @@ test("acquiring waits for a free connection within acquireTimeout, then fails wi
   assert.equal((await held.one("SELECT 3 AS n")).n, 3);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 // [spec:pgorm:req:napi.errors+2/test]
 test("a connection runs one operation at a time and refuses a second rather than racing it", async () => {
   await using connection = await pool().acquire();
@@ -224,13 +225,13 @@ test("a connection runs one operation at a time and refuses a second rather than
   assert.equal((await connection.one("SELECT 4 AS n")).n, 4);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 // [spec:pgorm:req:napi.cancellation/test]
 test("closing a pool cancels what runs on it and releases every connection", async () => {
   const closing = new Pool(scratch(), { maxSize: 3 });
   const busy = await closing.acquire();
   const idle = await closing.acquire();
-  const transaction = await (await closing.acquire()).begin();
+  const held = await holdTransaction(async (use) => await (await closing.acquire()).transaction(use));
   const running = busy.execute("SELECT pg_sleep(10)").then(
     () => assert.fail("the statement outlived its pool"),
     (error: unknown) => error,
@@ -241,13 +242,14 @@ test("closing a pool cancels what runs on it and releases every connection", asy
   lifecycle(/closed/)(await running);
   assert.equal(closing.closed, true);
   assert.equal(idle.closed, true);
-  assert.equal(transaction.closed, true);
+  assert.equal(held.transaction.closed, true);
+  await assert.rejects(held.end(), lifecycle(/closed/));
   await assert.rejects(idle.query("SELECT 1"), lifecycle(/closed/));
   await assert.rejects(closing.query("SELECT 1"), lifecycle(/closed/));
   await assert.rejects(closing.acquire(), lifecycle(/closed/));
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("collecting unreferenced handles never cuts work short, and rolls back and returns what is idle", async () => {
   const outcome = await runFixture("collected", 30_000, {}, { exposeGc: true });
   assert.equal(outcome.stderr, "");
@@ -258,13 +260,13 @@ test("collecting unreferenced handles never cuts work short, and rolls back and 
   );
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("verify-full TLS never falls back to plaintext", async () => {
   await using strict = new Pool(withoutSslmode(dsn()));
   await assert.rejects(strict.ping(), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("verify-full TLS connects through a configured CA, and checks the host name", async (context) => {
   const ca = tlsCa();
   if (ca === undefined) {
@@ -278,7 +280,7 @@ test("verify-full TLS connects through a configured CA, and checks the host name
   await assert.rejects(misnamed.ping(), ConnectionError);
 });
 
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("verify-full TLS binds SCRAM authentication to the server's certificate", async (context) => {
   const ca = tlsCa();
   if (ca === undefined || new URL(dsn()).password === "") {
@@ -338,7 +340,7 @@ test("every row terminal can give its columns tagged", async () => {
   assert.equal(all?.n?.isNull, true);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a callback transaction commits when it resolves and rolls back when it throws", async () => {
   await reset();
   const result = await pool().transaction(async (tx) => {
@@ -360,32 +362,50 @@ test("a callback transaction commits when it resolves and rolls back when it thr
   assert.deepEqual(await ids(), [1]);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
-test("an explicit transaction commits or rolls back once, and holds its connection until then", async () => {
+// [spec:pgorm:req:napi.transactions+2/test]
+test("a transaction holds its connection until its callback settles, and is closed after", async () => {
   await reset();
   await using connection = await pool().acquire();
-  const discarded = await connection.begin();
-  await discarded.execute("INSERT INTO items VALUES (1, 'x')");
-  await assert.rejects(connection.query("SELECT 1"), lifecycle(/busy/));
-  await discarded.rollback();
-  assert.equal(discarded.closed, true);
-  await assert.rejects(discarded.commit(), lifecycle(/closed/));
-  const kept = await connection.begin();
-  await kept.execute("INSERT INTO items VALUES (2, 'y')");
-  await kept.commit();
-  await assert.rejects(kept.rollback(), lifecycle(/closed/));
+  let kept = undefined as Transaction | undefined;
+  await connection.transaction(async (tx) => {
+    kept = tx;
+    assert.equal(tx.closed, false);
+    await tx.execute("INSERT INTO items VALUES (1, 'x')");
+    await assert.rejects(connection.query("SELECT 1"), lifecycle(/busy/));
+  });
+  assert.ok(kept);
+  assert.equal(kept.closed, true);
+  await assert.rejects(kept.query("SELECT 1"), lifecycle(/closed/));
   assert.equal((await connection.one("SELECT count(*)::int AS n FROM items")).n, 1);
-  assert.deepEqual(await ids(), [2]);
+  assert.deepEqual(await ids(), [1]);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
+test("a transaction opens only around a callback, which alone ends it", async () => {
+  await using connection = await pool().acquire();
+  // @ts-expect-error a transaction opens only through transaction(fn)
+  assert.equal(connection.begin, undefined);
+  await connection.transaction(async (tx) => {
+    // @ts-expect-error a savepoint opens only through transaction(fn)
+    assert.equal(tx.begin, undefined);
+    // @ts-expect-error the callback resolving commits
+    assert.equal(tx.commit, undefined);
+    // @ts-expect-error the callback throwing rolls back
+    assert.equal(tx.rollback, undefined);
+    // @ts-expect-error the transaction ends with its callback
+    assert.equal(tx.close, undefined);
+    assert.equal(Symbol.asyncDispose in tx, false);
+    // @ts-expect-error a transaction is not disposable
+    const disposable: AsyncDisposable = tx;
+    assert.ok(disposable);
+  });
+});
+
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a savepoint rolls back alone inside a transaction that commits", async () => {
   await reset();
   await pool().transaction(async (tx) => {
     await tx.execute("INSERT INTO items VALUES (1, 'outer')");
-    const savepoint = await tx.begin();
-    await savepoint.execute("INSERT INTO items VALUES (2, 'inner')");
-    await savepoint.rollback();
     await assert.rejects(
       tx.transaction(async (inner) => {
         await inner.execute("INSERT INTO items VALUES (3, 'inner')");
@@ -400,43 +420,50 @@ test("a savepoint rolls back alone inside a transaction that commits", async () 
   assert.deepEqual(await ids(), [1, 4]);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a rollback the server cannot answer rejects with its failure and discards the connection", async () => {
   await reset();
   const connection = await pool().acquire();
   const pid = (await connection.one("SELECT pg_backend_pid() AS pid")).pid as number;
-  const tx = await connection.begin();
-  await tx.execute("INSERT INTO items VALUES (1, 'lost')");
-  await pool().execute("SELECT pg_terminate_backend($1, 5000)", [pid]);
-  await assert.rejects(tx.rollback(), (error: unknown) => {
-    assert.ok(error instanceof ConnectionError || error instanceof DatabaseError, `${error}`);
-    return true;
-  });
-  assert.equal(tx.closed, true);
+  const failure = new Error("the callback failed");
+  let tx = undefined as Transaction | undefined;
+  await assert.rejects(
+    connection.transaction(async (opened) => {
+      tx = opened;
+      await opened.execute("INSERT INTO items VALUES (1, 'lost')");
+      await pool().execute("SELECT pg_terminate_backend($1, 5000)", [pid]);
+      throw failure;
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof SuppressedError, `${error}`);
+      assert.ok(error.error instanceof ConnectionError || error.error instanceof DatabaseError, `${error.error}`);
+      assert.equal(error.suppressed, failure);
+      return true;
+    },
+  );
+  assert.equal(tx?.closed, true);
   assert.equal(connection.closed, true);
   await connection.close();
   assert.deepEqual(await ids(), []);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a transaction is refused while its savepoint is open, not raced", async () => {
   await reset();
   await using connection = await pool().acquire();
-  const tx = await connection.begin();
-  const savepoint = await tx.begin();
-  await assert.rejects(within(tx.query("SELECT 1")), lifecycle(/savepoint of it is open/));
-  await assert.rejects(within(tx.commit()), lifecycle(/busy/));
-  await assert.rejects(within(tx.rollback()), lifecycle(/busy/));
-  await assert.rejects(within(tx.begin()), lifecycle(/busy/));
-  await assert.rejects(connection.query("SELECT 1"), lifecycle(/busy/));
-  await savepoint.execute("INSERT INTO items VALUES (1, 'savepoint')");
-  await savepoint.commit();
-  await tx.execute("INSERT INTO items VALUES (2, 'transaction')");
-  await tx.commit();
+  await connection.transaction(async (tx) => {
+    await tx.transaction(async (savepoint) => {
+      await assert.rejects(within(tx.query("SELECT 1")), lifecycle(/savepoint of it is open/));
+      await assert.rejects(within(tx.transaction(async () => {})), lifecycle(/busy/));
+      await assert.rejects(connection.query("SELECT 1"), lifecycle(/busy/));
+      await savepoint.execute("INSERT INTO items VALUES (1, 'savepoint')");
+    });
+    await tx.execute("INSERT INTO items VALUES (2, 'transaction')");
+  });
   assert.deepEqual(await ids(), [1, 2]);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a second statement on a transaction already running one is refused, not queued", async () => {
   await using connection = await pool().acquire();
   await connection.transaction(async (tx) => {
@@ -449,45 +476,57 @@ test("a second statement on a transaction already running one is refused, not qu
   });
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a callback that returns with its savepoint open fails, and nothing it wrote commits", async () => {
   await reset();
   const connection = await pool().acquire();
+  let savepoint: Promise<unknown> | undefined;
+  const release = Promise.withResolvers<void>();
   await assert.rejects(
     connection.transaction(async (tx) => {
       await tx.execute("INSERT INTO items VALUES (1, 'left open')");
-      await tx.begin();
+      const opened = Promise.withResolvers<void>();
+      savepoint = tx.transaction(async () => {
+        opened.resolve();
+        await release.promise;
+      });
+      await opened.promise;
     }),
     lifecycle(/busy/),
   );
+  release.resolve();
+  await assert.rejects(within(savepoint ?? Promise.resolve()), lifecycle(/closed/));
   assert.equal(connection.closed, true);
   await connection.close();
   assert.deepEqual(await ids(), []);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a failed statement aborts the transaction, and a savepoint recovers from one", async () => {
   await reset();
   await pool().transaction(async (tx) => {
     await tx.execute("INSERT INTO items VALUES (1, 'before')");
-    const savepoint = await tx.begin();
-    await assert.rejects(savepoint.execute("INSERT INTO items VALUES (1, 'duplicate')"), (error: unknown) => {
-      assert.ok(error instanceof DatabaseError);
-      assert.equal(error.sqlstate, "23505");
-      return true;
-    });
-    await assert.rejects(savepoint.query("SELECT 1"), (error: unknown) => {
-      assert.ok(error instanceof DatabaseError);
-      assert.equal(error.sqlstate, "25P02");
-      return true;
-    });
-    await savepoint.rollback();
+    await assert.rejects(
+      tx.transaction(async (savepoint) => {
+        await assert.rejects(savepoint.execute("INSERT INTO items VALUES (1, 'duplicate')"), (error: unknown) => {
+          assert.ok(error instanceof DatabaseError);
+          assert.equal(error.sqlstate, "23505");
+          return true;
+        });
+        await savepoint.query("SELECT 1");
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof DatabaseError);
+        assert.equal(error.sqlstate, "25P02");
+        return true;
+      },
+    );
     await tx.execute("INSERT INTO items VALUES (2, 'after')");
   });
   assert.deepEqual(await ids(), [1, 2]);
 });
 
-// [spec:pgorm:req:napi.transactions+1/test]
+// [spec:pgorm:req:napi.transactions+2/test]
 test("a transaction's mode and isolation level reach the server", async () => {
   const settings =
     "SELECT current_setting('transaction_isolation') AS isolation, current_setting('transaction_read_only') AS read_only, current_setting('transaction_deferrable') AS deferrable";
@@ -553,15 +592,19 @@ test("an already aborted signal rejects before anything is sent", async () => {
 test("aborting a statement in a transaction ends the transaction and nothing commits", async () => {
   await reset();
   const connection = await pool().acquire();
-  const tx = await connection.begin();
-  await tx.execute("INSERT INTO items VALUES (1, 'uncertain')");
+  let tx = undefined as Transaction | undefined;
   await assert.rejects(
-    tx.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(100) }),
+    connection.transaction(async (opened) => {
+      tx = opened;
+      await opened.execute("INSERT INTO items VALUES (1, 'uncertain')");
+      await opened.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(100) });
+    }),
     (error: unknown) => error instanceof DOMException && error.name === "TimeoutError",
   );
+  assert.ok(tx);
   assert.equal(tx.closed, true);
   assert.equal(connection.closed, true);
-  await assert.rejects(tx.commit(), lifecycle(/closed/));
+  await assert.rejects(tx.query("SELECT 1"), lifecycle(/closed/));
   await connection.close();
   assert.deepEqual(await ids(), []);
 });
@@ -653,11 +696,12 @@ test("closing a pool ends an idle stream and an idle transaction without waiting
   const closing = new Pool(scratch(), { maxSize: 2 });
   const stream = closing.stream("SELECT generate_series(1, 100000) AS n");
   await stream.next();
-  const tx = await (await closing.acquire()).begin();
+  const held = await holdTransaction(async (use) => await (await closing.acquire()).transaction(use));
   const started = performance.now();
   await closing.close();
   assert.ok(performance.now() - started < 2000);
   await assert.rejects(stream.next(), lifecycle(/closed/));
   assert.equal(stream.closed, true);
-  assert.equal(tx.closed, true);
+  assert.equal(held.transaction.closed, true);
+  await assert.rejects(held.end(), lifecycle(/closed/));
 });

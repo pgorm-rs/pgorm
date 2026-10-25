@@ -3,16 +3,16 @@
 // Pools, connections and transactions. Each holds a native handle and
 // releases what it holds when closed — `close()`, `await using`, the end of a
 // callback — never by waiting for garbage collection.
-// [spec:pgorm:req:napi.connections+3]
+// [spec:pgorm:req:napi.connections+4]
 // [spec:pgorm:req:napi.results]
-// [spec:pgorm:req:napi.transactions+1]
+// [spec:pgorm:req:napi.transactions+2]
 // [spec:pgorm:req:napi.copy+2]
 // [spec:pgorm:req:napi.listen]
 
 import { statementArgs } from "./builder.js";
 import { COPY, CopyRunner } from "./copy.js";
 import { Listener, LISTENER, listenerOptions, notifyJob } from "./listen.js";
-import { ABORT, abortable, native, queryOptions, row, scoped, signalOf, TRUSTED } from "./operations.js";
+import { abortable, native, queryOptions, row, scoped, signalOf, TRUSTED } from "./operations.js";
 import { RowStream } from "./streams.js";
 
 /** The statement runner each class implements, keyed privately. */
@@ -391,24 +391,8 @@ export class Connection extends Queryable {
   }
 
   /**
-   * Open a transaction, which holds the connection until it commits or rolls
-   * back.
-   *
-   * @param {import("./index.d.ts").TransactionOptions} [options]
-   * @returns {Promise<Transaction>}
-   */
-  async begin(options = {}) {
-    const { mode = "default", isolation = null, signal } = options;
-    const handle = await abortable(
-      signalOf(signal),
-      (token) => native.connectionBegin(this.#native, mode, isolation, token),
-    );
-    return new Transaction(handle, this, TRUSTED);
-  }
-
-  /**
-   * Run `use` in a transaction: committed when it resolves, rolled back when
-   * it throws.
+   * Run `use` in a transaction, which holds the connection until `use`
+   * settles: committed when it resolves, rolled back when it throws.
    *
    * @template T
    * @param {(transaction: Transaction) => Promise<T>} use
@@ -416,7 +400,12 @@ export class Connection extends Queryable {
    * @returns {Promise<T>}
    */
   async transaction(use, options = {}) {
-    return await scoped(await this.begin(options), use);
+    const { mode = "default", isolation = null, signal } = options;
+    const handle = await abortable(
+      signalOf(signal),
+      (token) => native.connectionBegin(this.#native, mode, isolation, token),
+    );
+    return await scoped(handle, new Transaction(handle, this, TRUSTED), use);
   }
 
   /**
@@ -496,8 +485,9 @@ export class Connection extends Queryable {
 }
 
 /**
- * A transaction, or a savepoint inside one. While a savepoint is open its
- * parent refuses statements, commits, rollbacks and other savepoints.
+ * A transaction, or a savepoint inside one, open for the callback
+ * `transaction(fn)` runs and ended as that callback settles. While a savepoint
+ * is open its parent refuses statements and other savepoints.
  */
 export class Transaction extends Queryable {
   /** @type {unknown} */
@@ -517,7 +507,7 @@ export class Transaction extends Queryable {
    */
   constructor(handle, parent, trusted) {
     super();
-    if (trusted !== TRUSTED) throw new TypeError("a Transaction comes from begin() or transaction()");
+    if (trusted !== TRUSTED) throw new TypeError("a Transaction comes from transaction()");
     this.#native = handle;
     this.#parent = parent;
   }
@@ -533,20 +523,8 @@ export class Transaction extends Queryable {
   }
 
   /**
-   * Open a savepoint, which holds this transaction until it finishes.
-   *
-   * @param {{ signal?: AbortSignal }} [options]
-   * @returns {Promise<Transaction>}
-   */
-  async begin(options = {}) {
-    const { signal } = queryOptions(options);
-    const handle = await abortable(signal, (token) => native.transactionBegin(this.#native, token));
-    return new Transaction(handle, this, TRUSTED);
-  }
-
-  /**
-   * Run `use` in a savepoint: released when it resolves, rolled back to when
-   * it throws.
+   * Run `use` in a savepoint, which holds this transaction until `use`
+   * settles: released when it resolves, rolled back to when it throws.
    *
    * @template T
    * @param {(transaction: Transaction) => Promise<T>} use
@@ -554,44 +532,9 @@ export class Transaction extends Queryable {
    * @returns {Promise<T>}
    */
   async transaction(use, options = {}) {
-    return await scoped(await this.begin(options), use);
-  }
-
-  /** @returns {Promise<void>} */
-  async commit() {
-    await native.transactionFinish(this.#native, true);
-  }
-
-  /** @returns {Promise<void>} */
-  async rollback() {
-    await native.transactionFinish(this.#native, false);
-  }
-
-  /**
-   * Roll back if still open, and resolve once the parent is free; a rollback
-   * that fails ends the transaction and discards its connection.
-   *
-   * @returns {Promise<void>}
-   */
-  async close() {
-    if (!this.closed) {
-      try {
-        await this.rollback();
-      } catch (error) {
-        await this[ABORT]();
-        throw error;
-      }
-    }
-    await native.transactionWaitClosed(this.#native);
-  }
-
-  [Symbol.asyncDispose]() {
-    return this.close();
-  }
-
-  /** @returns {Promise<void>} */
-  async [ABORT]() {
-    await native.transactionAbort(this.#native);
+    const { signal } = queryOptions(options);
+    const handle = await abortable(signal, (token) => native.transactionBegin(this.#native, token));
+    return await scoped(handle, new Transaction(handle, this, TRUSTED), use);
   }
 
   /**

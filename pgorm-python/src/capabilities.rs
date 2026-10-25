@@ -195,7 +195,7 @@ fn manifest() -> Value {
             "modes": ["default", "read_write", "read_only", "deferrable"],
             "isolation": ["read_uncommitted", "read_committed", "repeatable_read", "serializable"],
             "nested": "real native savepoints; each parent reserved until its child completes",
-            "contexts": "commit on normal exit; rollback on exceptional exit; uncertain state discarded",
+            "contexts": "async with only; commit on normal exit; rollback on exceptional exit; a failed ROLLBACK raised in place of the block's exception unless that is a cancellation; uncertain state discarded",
             "cancellation": "cancelled in-flight requests discard the entire connection; a cancelled write may have an unknown outcome",
             "abandoned_idle_rollback_timeout_seconds": 5,
             "registered": ["entity queries", "ActiveModel writes and hooks", "graphs", "cursors", "pipeline source tuples"],

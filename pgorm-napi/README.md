@@ -134,15 +134,18 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
 - **`Connection`** (from `pool.acquire()`) is the caller's until closed, and
   runs one operation at a time; another meanwhile is a `LifecycleError`, not a
   queue.
-- **`Transaction`** comes from `begin()` (then `commit()` or `rollback()`) or
-  `transaction(fn)`, which commits when `fn` resolves and rolls back when it
-  throws, rejecting with `fn`'s own error. On a transaction, `begin` and
-  `transaction` open savepoints. A transaction borrows its parent exclusively,
-  as in Rust: while a savepoint is open its transaction refuses statements,
-  commits and other savepoints, and while a transaction is open its connection
-  refuses other work — refused with a `LifecycleError`, never raced. `mode`
-  (`"readWrite"`, `"readOnly"`, `"deferrable"`) and `isolation` choose how it
-  opens.
+- **`Transaction`** exists only inside `transaction(fn)`, as a Rust
+  transaction exists only inside its closure: it commits when `fn` resolves
+  and rolls back when it throws, rejecting with `fn`'s own error, so throwing
+  is how a callback rolls back. A commit that fails rejects with its failure,
+  and a ROLLBACK that fails with a `SuppressedError` whose `error` is the
+  failure and whose `suppressed` is what `fn` threw; either discards the
+  connection. On a transaction, `transaction(fn)` opens a savepoint. A
+  transaction borrows its parent exclusively, as in Rust: while a savepoint
+  is open its transaction refuses statements and other savepoints, and while
+  a transaction is open its connection refuses other work — refused with a
+  `LifecycleError`, never raced. `mode` (`"readWrite"`, `"readOnly"`,
+  `"deferrable"`) and `isolation` choose how it opens.
 - **`execute`, `query`, `one`, `optional`** are on all three; `one` and
   `optional` reject a row count they do not admit with a `DecodeError`.
   `{ tagged: true }` gives `Value`s.
@@ -154,7 +157,8 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
   savepoint and pulling a stream's rows each take an `AbortSignal`. Aborting
   rejects with the signal's reason and discards the connection the operation
   ran on — its outcome is unknown — ending any transaction on it.
-- **Releasing**: every handle has `close()` and works with `await using`.
+- **Releasing**: a pool, a connection and a stream each have `close()` and
+  work with `await using`; a transaction ends with its callback.
   Closing a connection returns it to its pool at once; closing a pool cancels
   what runs and waits until every connection is released. Nothing waits on
   garbage collection: a handle collected unclosed releases only what is idle,

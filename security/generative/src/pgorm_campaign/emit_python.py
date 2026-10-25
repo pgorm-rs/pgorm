@@ -255,11 +255,16 @@ async def _stream(query, take, cancel, connection):
     return observation, paths, records
 
 
-async def _reacquire(connection, pool, open_transactions):
+# Raised through a scope's block, so that its transaction rolls back.
+class _RolledBack(Exception):
+    pass
+
+
+async def _reacquire(connection, pool, scoped):
     if not connection.closed:
         return connection
     # Stream cancellation can discard the root connection.
-    if open_transactions:
+    if scoped:
         raise RuntimeError("connection closed with outstanding transactions")
     return await pool.acquire()
 
@@ -359,12 +364,6 @@ OBSERVED = (
 )
 
 CLEANUP = """    finally:
-        for transaction in reversed(open_transactions):
-            try:
-                await transaction.close()
-            except Exception as error:
-                report["cleanup_errors"].append(_error(error))
-        open_transactions.clear()
         try:
             await connection.close()
         except Exception as error:
@@ -1005,35 +1004,6 @@ class Emitter:
                 )
             case "inspect":
                 result = f"_inspect({query})"
-            case "begin":
-                child = self.connection(d["child"])
-                if step["scope"] == "root":
-                    isolation = (
-                        "None"
-                        if d["isolation"] == "default"
-                        else literal(d["isolation"])
-                    )
-                    mode = f"mode={literal(d['mode'])}"
-                    opened = call(connection, "begin", [mode, f"isolation={isolation}"])
-                    path = "pgorm::DatabaseConnection::transaction_with"
-                else:
-                    opened = call(connection, "begin", [])
-                    path = "pgorm::TransactionTrait::transaction"
-                observation = {"kind": "transaction", "scope": d["child"]}
-                lines.append(f"{indent}{child} = await {opened}")
-                lines.append(f"{indent}open_transactions.append({child})")
-                lines.append(f"{indent}_paths = {literal([path])}")
-                lines.append(f"{indent}_observation = {literal(observation)}")
-                lines.append(indent + OBSERVED)
-                return
-            case "commit" | "rollback":
-                path = "pgorm::TransactionTrait::transaction"
-                lines.append(f"{indent}await " + call(connection, name, []))
-                lines.append(f"{indent}open_transactions.remove({connection})")
-                lines.append(f"{indent}_paths = {literal([path])}")
-                lines.append(f"{indent}_observation = {literal({'kind': 'unit'})}")
-                lines.append(indent + OBSERVED)
-                return
             case _:
                 raise UnsupportedInstruction("no public Python source for " + name)
         lines.append(f"{indent}_observation, _paths, _rows = {result}")
@@ -1041,9 +1011,57 @@ class Emitter:
             lines.append(f"{indent}r_{step['id']} = _rows")
         lines.append(indent + OBSERVED)
 
-    def steps(self, lines):
-        indent, body = "        ", "            "
-        for step in self.data["steps"]:
+    def observe(self, paths, observation, indent, lines):
+        lines.append(f"{indent}_paths = {literal(paths)}")
+        lines.append(f"{indent}_observation = {literal(observation)}")
+        lines.append(indent + OBSERVED)
+
+    def scope(self, step, remaining, indent, lines):
+        """A transaction scope: its steps run inside the ``async with`` block
+        that opens it, and the step that closes it is how the block exits,
+        normally to commit and by raising to roll back. How many of
+        ``remaining`` the scope consumed."""
+        body, inner = indent + "    ", indent + "        "
+        d = step["data"]
+        connection = self.connection(step["scope"])
+        if step["scope"] == "root":
+            isolation = (
+                "None" if d["isolation"] == "default" else literal(d["isolation"])
+            )
+            mode = f"mode={literal(d['mode'])}"
+            opened = call(connection, "transaction", [mode, f"isolation={isolation}"])
+            path = "pgorm::DatabaseConnection::transaction_with"
+        else:
+            opened = call(connection, "transaction", [])
+            path = "pgorm::TransactionTrait::transaction"
+        lines.append(indent + "try:")
+        for identity in self.required(parameters.input_ids(step["inputs"])):
+            self.node(self.nodes[identity], body, lines)
+        lines.append(f"{body}async with {opened} as {self.connection(d['child'])}:")
+        self.observe([path], {"kind": "transaction", "scope": d["child"]}, inner, lines)
+        consumed, closing = self.steps(remaining, inner, lines, True)
+        closed = (["pgorm::TransactionTrait::transaction"], {"kind": "unit"})
+        if closing is not None and closing["op"] == "commit":
+            self.observe(*closed, body, lines)
+        else:
+            lines.append(inner + "raise _RolledBack")
+            lines.append(indent + "except _RolledBack:")
+            if closing is None:
+                lines.append(body + "pass")
+            else:
+                self.observe(*closed, body, lines)
+        lines.append(indent + "except p.PgOrmError as error:")
+        lines.append(body + '_step.update(status="error", observation=_error(error))')
+        return consumed
+
+    def steps(self, remaining, indent, lines, scoped):
+        """Emit steps until the scope the caller opened closes: how many it
+        consumed, and the commit or rollback that closed it."""
+        body = indent + "    "
+        consumed = 0
+        while consumed < len(remaining):
+            step = remaining[consumed]
+            consumed += 1
             record = {
                 "id": step["id"],
                 "operation": step["op"],
@@ -1053,28 +1071,32 @@ class Emitter:
             lines.append("")
             lines.append(f"{indent}_step = {literal(record)}")
             lines.append(indent + 'report["steps"].append(_step)')
-            lines.append(indent + "try:")
-            for identity in self.required(parameters.input_ids(step["inputs"])):
-                self.node(self.nodes[identity], body, lines)
-            self.effect(step, body, lines)
-            lines.append(indent + "except p.PgOrmError as error:")
+            if step["op"] in ("commit", "rollback"):
+                return consumed, step
+            if step["op"] == "begin":
+                consumed += self.scope(step, remaining[consumed:], indent, lines)
+            else:
+                lines.append(indent + "try:")
+                for identity in self.required(parameters.input_ids(step["inputs"])):
+                    self.node(self.nodes[identity], body, lines)
+                self.effect(step, body, lines)
+                lines.append(indent + "except p.PgOrmError as error:")
+                lines.append(
+                    body + '_step.update(status="error", observation=_error(error))'
+                )
             lines.append(
-                body + '_step.update(status="error", observation=_error(error))'
+                f"{indent}connection = await _reacquire(connection, pool, {scoped})"
             )
-            lines.append(
-                indent + "connection = await _reacquire(connection, pool, "
-                "open_transactions)"
-            )
+        return consumed, None
 
     def program(self):
         lines = [
             "async def _run(pool, report):",
             "    connection = await pool.acquire()",
-            "    open_transactions = []",
             "    try:",
             "        await _apply_fixture(connection)",
         ]
-        self.steps(lines)
+        self.steps(self.data["steps"], "        ", lines, False)
         lines.append(CLEANUP)
         return "\n".join(lines)
 

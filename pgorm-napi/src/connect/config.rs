@@ -94,7 +94,7 @@ fn milliseconds<'cx>(
 
 impl PoolConfig {
     /// `dsn` and the pool options object, as JavaScript passes them.
-    // [spec:pgorm:req:napi.connections+3]
+    // [spec:pgorm:req:napi.connections+4]
     pub(crate) fn read<'cx>(
         cx: &mut Cx<'cx>,
         dsn: Handle<'cx, JsValue>,
@@ -140,7 +140,7 @@ impl PoolConfig {
     /// The pool. TLS verifies the server's certificate and host name unless
     /// the connection string says `sslmode=disable` or `tls` is `"disable"`;
     /// there is no silent fallback to plaintext.
-    // [spec:pgorm:req:napi.connections+3]
+    // [spec:pgorm:req:napi.connections+4]
     pub(crate) fn build(self) -> Result<Built, Failure> {
         let invalid = |message: &str| Failure::Construction(message.to_owned());
         if self.max_size == 0 || self.max_size > tokio::sync::Semaphore::MAX_PERMITS {

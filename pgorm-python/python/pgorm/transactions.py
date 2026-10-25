@@ -1,9 +1,9 @@
-"""Explicit transaction and savepoint ownership over native Rust scopes."""
+"""Transactions and savepoints, each open for exactly one ``async with`` block
+over a native Rust scope."""
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from types import TracebackType
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from . import _native
@@ -17,12 +17,66 @@ TransactionMode: TypeAlias = Literal["default", "read_write", "read_only", "defe
 IsolationLevel: TypeAlias = Literal["read_uncommitted", "read_committed", "repeatable_read", "serializable"]
 
 
-# [spec:pgorm:req:python.transactions+1]
-class Transaction:
-    """One native transaction; its parent is reserved until commit or rollback.
+# [spec:pgorm:req:python.transactions+2]
+@asynccontextmanager
+async def _scope(
+    opening: Callable[[], Awaitable[_native._Transaction]], parent: Connection | Transaction
+) -> AsyncIterator[Transaction]:
+    """Serve one block's transaction or savepoint, ending it as ``Transaction``
+    describes."""
+    native = await opening()
+    transaction = Transaction(native, parent)
+    try:
+        yield transaction
+    except BaseException as error:
+        await _roll_back(native, error)
+        raise
+    try:
+        await native.finish(True)
+    except BaseException:
+        await native.abort()
+        raise
 
-    ``async with await connection.begin() as tx`` commits on normal exit and
-    rolls back on exceptions. A nested ``tx.transaction()`` is a real savepoint.
+
+async def _roll_back(native: _native._Transaction, error: BaseException) -> None:
+    if not native.closed():
+        try:
+            await native.finish(False)
+        except _native.LifecycleError:
+            # The scope refused the rollback (a statement or savepoint still
+            # holds it, or it has just closed), so it cannot be recovered: it
+            # is discarded, and the block's exception stands.
+            await native.abort()
+            return
+        except _native.PgOrmError as failure:
+            await native.abort()
+            # asyncio's timeouts and task groups recognise a cancellation only
+            # as the CancelledError itself, so a failed ROLLBACK never
+            # replaces one.
+            if isinstance(error, Exception):
+                # An error a native future delivers is re-raised without
+                # implicit chaining, so the context is set here.
+                failure.__context__ = error
+                raise
+            return
+        except BaseException:
+            await native.abort()
+            raise
+    await native.wait_closed()
+
+
+# [spec:pgorm:req:python.transactions+2]
+class Transaction:
+    """One native transaction or savepoint, open for the ``async with`` block
+    that opened it and reserving its parent until that block exits.
+
+    ``connection.transaction()`` and ``pool.transaction()`` open one, and
+    ``tx.transaction()`` a real savepoint inside it. A clean exit commits, or
+    releases a savepoint; a commit that fails discards the connection and
+    raises. An exception rolls back and propagates. A ``ROLLBACK`` that fails
+    discards the connection too, and is raised in place of the block's
+    exception, which it carries as ``__context__``, unless that exception is a
+    cancellation or an interpreter exit, which propagates as itself.
     """
 
     def __init__(self, native: _native._Transaction, parent: Connection | Transaction) -> None:
@@ -35,14 +89,11 @@ class Transaction:
     def closed(self) -> bool:
         return self._native.closed()
 
-    async def begin(self) -> Transaction:
-        """Open a savepoint and reserve this parent until the child finishes."""
-        return Transaction(await self._native.begin(), self)
-
-    @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[Transaction]:
-        async with await self.begin() as transaction:
-            yield transaction
+    def transaction(self) -> AbstractAsyncContextManager[Transaction]:
+        """Open a savepoint for an ``async with`` block, reserving this
+        transaction until the block exits: a clean exit releases it, and an
+        exception rolls back to it."""
+        return _scope(self._native.begin, self)
 
     async def execute(self, query: Query) -> int:
         return await self._native.execute(query)
@@ -81,44 +132,6 @@ class Transaction:
     async def notify(self, channel: str, payload: str) -> None:
         """Send a notification delivered when this transaction commits, never if it rolls back."""
         await self._native.notify(channel, payload)
-
-    async def commit(self) -> None:
-        await self._native.finish(True)
-
-    async def rollback(self) -> None:
-        await self._native.finish(False)
-
-    async def close(self) -> None:
-        """Roll back an open transaction and wait for its scope to be released."""
-        if not self.closed:
-            try:
-                await self.rollback()
-            except BaseException:
-                await self._native.abort()
-                raise
-        await self._native.wait_closed()
-
-    aclose = close
-
-    async def __aenter__(self) -> Transaction:
-        if self.closed:
-            raise _native.LifecycleError("transaction is closed")
-        return self
-
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None) -> None:
-        if exc_type is None:
-            try:
-                await self.commit()
-            except BaseException:
-                await self._native.abort()
-                raise
-        else:
-            try:
-                await self.close()
-            except _native.PgOrmError:
-                # Cleanup must not replace the block's original exception.
-                # A failed/cancelled native finish discards the connection.
-                pass
 
     def __repr__(self) -> str:
         return f"Transaction(closed={self.closed})"

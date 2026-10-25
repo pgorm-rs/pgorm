@@ -13,8 +13,9 @@ independent Rust comparisons.
 
 Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
 or to generate schema statements from a registered Rust entity.
-Use [native transactions and savepoints](TRANSACTIONS.md) for explicit or
-context-managed commit and rollback across builders and registered models.
+Use [native transactions and savepoints](TRANSACTIONS.md), each open for one
+`async with` block that commits or rolls it back, across builders and
+registered models.
 The [typed application example](TYPING.md) combines schema, CRUD, a join,
 transactions, a pipeline and streaming in one runnable Python program.
 
@@ -186,8 +187,9 @@ Closing a pool rejects waiters and cancels operations on its checked-out
 connections. Closing a connection releases it. If an operation is cancelled
 while its database state is uncertain, its connection is discarded. Cancellation
 does not promise rollback of an already submitted write. Context managers close
-their resources on normal and exceptional exit; explicit `close()`/`aclose()`
-is also available. Resources cannot migrate to another event loop.
+their resources on normal and exceptional exit; pools, connections and streams
+also have an explicit `close()`/`aclose()`, while a transaction ends only with
+its block. Resources cannot migrate to another event loop.
 
 Construction, capability, connection, database, decode, timeout and lifecycle
 failures have distinct exception classes under `PgOrmError`. PostgreSQL server

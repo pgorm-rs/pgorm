@@ -9,8 +9,15 @@ import { Pool } from "../../lib/index.js";
 
 const pool = new Pool(process.env.PGORM_TEST_DSN ?? "", { maxSize: 2 });
 const connection = await pool.acquire();
-const transaction = await connection.begin();
-await transaction.execute("SELECT 1");
+const opened = Promise.withResolvers<boolean>();
+// The callback never settles, so its transaction is still open as the
+// process ends.
+void connection.transaction(async (transaction) => {
+  await transaction.execute("SELECT 1");
+  opened.resolve(transaction.closed);
+  await new Promise(() => {});
+});
+const closed = await opened.promise;
 const stream = pool.stream("SELECT generate_series(1, 1000) AS n");
 const first = await stream.next();
-console.log(`holding ${first.value?.n} ${transaction.closed}`);
+console.log(`holding ${first.value?.n} ${closed}`);

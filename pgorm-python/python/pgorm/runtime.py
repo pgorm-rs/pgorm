@@ -1,7 +1,8 @@
 """Asyncio ownership and context managers for the native PostgreSQL resources."""
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
@@ -9,7 +10,7 @@ from . import _native
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource, copy_in, copy_in_rows
 from .listen import Listener
 from .results import Query, Record, ResultStream
-from .transactions import Transaction, TransactionMode, IsolationLevel
+from .transactions import IsolationLevel, Transaction, TransactionMode, _scope
 
 
 STATEMENT_CACHE_CHANNEL: str = _native.STATEMENT_CACHE_CHANNEL
@@ -115,8 +116,10 @@ class Pool:
 
     @asynccontextmanager
     async def transaction(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> AsyncIterator[Transaction]:
+        """Open a transaction on a connection of its own for an ``async with``
+        block; see ``Connection.transaction``."""
         async with self.connection() as connection:
-            async with await connection.begin(mode=mode, isolation=isolation) as transaction:
+            async with connection.transaction(mode=mode, isolation=isolation) as transaction:
                 yield transaction
 
     async def execute(self, query: Query) -> int:
@@ -232,13 +235,13 @@ class Connection:
     def closed(self) -> bool:
         return self._native.closed()
 
-    async def begin(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> Transaction:
-        return Transaction(await self._native.begin(mode=mode, isolation=isolation), self)
-
-    @asynccontextmanager
-    async def transaction(self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None) -> AsyncIterator[Transaction]:
-        async with await self.begin(mode=mode, isolation=isolation) as transaction:
-            yield transaction
+    def transaction(
+        self, *, mode: TransactionMode = "default", isolation: IsolationLevel | None = None
+    ) -> AbstractAsyncContextManager[Transaction]:
+        """Open a transaction for an ``async with`` block, reserving this
+        connection until the block exits: a clean exit commits, and an
+        exception rolls back; see ``Transaction``."""
+        return _scope(partial(self._native.begin, mode=mode, isolation=isolation), self)
 
     async def ping(self) -> bool:
         return await self._native.ping()

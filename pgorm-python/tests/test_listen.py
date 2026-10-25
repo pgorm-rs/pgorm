@@ -73,9 +73,12 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
         async with await self.pool.listener() as listener:
             await listener.listen("py_rollback")
             async with self.pool.connection() as connection:
-                tx = await connection.begin()
-                await tx.notify("py_rollback", "discarded")
-                await tx.rollback()
+                marker = ValueError("roll the notification back")
+                with self.assertRaises(ValueError) as caught:
+                    async with connection.transaction() as tx:
+                        await tx.notify("py_rollback", "discarded")
+                        raise marker
+                self.assertIs(caught.exception, marker)
                 await connection.notify("py_rollback", "fence")
             self.assertEqual(await received(listener), ("py_rollback", "fence"))
 
@@ -84,13 +87,11 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
         async with await self.pool.listener() as listener:
             await listener.listen("py_order")
             async with self.pool.connection() as first, self.pool.connection() as second:
-                early = await first.begin()
-                late = await second.begin()
-                for payload in ("1", "2", "1", "3"):
-                    await early.notify("py_order", payload)
-                await late.notify("py_order", "first committed")
-                await late.commit()
-                await early.commit()
+                async with first.transaction() as early:
+                    async with second.transaction() as late:
+                        for payload in ("1", "2", "1", "3"):
+                            await early.notify("py_order", payload)
+                        await late.notify("py_order", "first committed")
             self.assertEqual(
                 [(await received(listener))[1] for _ in range(4)],
                 ["first committed", "1", "2", "3"],
