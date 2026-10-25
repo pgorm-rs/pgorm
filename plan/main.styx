@@ -14175,6 +14175,7 @@ children (
         id ident-oracle-load-flake
         title "The identifier oracle's live capture does not come back empty when the machine is slow"
         kind @test
+        sealed true
         log (
             {
                 at 2026-10-24T15:10:40.488977Z
@@ -14188,6 +14189,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:04:46.93252Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -74,7 +74,7 @@ pub async fn close(ctx: TestContext, db: DatabaseConnection) {
 }
 
 /// Every message in `err`'s source chain, joined.
-fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
+pub fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
     let mut text = err.to_string();
     let mut source = err.source();
     while let Some(cause) = source {
