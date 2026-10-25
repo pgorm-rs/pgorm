@@ -13926,6 +13926,7 @@ children (
         title "The Rust Value decode reads a multirange type a schema created"
         kind @feat
         deps (value-decode-created-ranges)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.590096Z
@@ -13939,6 +13940,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:08:16.108726Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
