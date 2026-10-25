@@ -11,7 +11,7 @@ use pgorm::pgorm_query::{
 };
 use pgorm::{
     ActiveModelTrait, ConnectionTrait, DatabasePool, DatabaseTransaction, Error, FromQueryResult,
-    Insert, Iterable, Name, TransactionTrait, set,
+    Insert, Iterable, Name, TransactionError, TransactionTrait, set,
 };
 
 /// The name of the ledger's nullable digest column, as PostgreSQL stores it.
@@ -660,10 +660,21 @@ where
     ) -> Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'b>>,
 {
     let mut conn = db.get().await?;
-    let transaction = conn.begin().await?;
-    let outcome = f(&transaction).await?;
-    transaction.commit().await?;
-    Ok(outcome)
+    match conn
+        .transaction(async |transaction| f(transaction).await)
+        .await
+    {
+        Ok(outcome) => Ok(outcome),
+        Err(TransactionError::Connection(error) | TransactionError::Transaction(error)) => {
+            Err(error)
+        }
+        // The connection's state is unknown once its ROLLBACK has failed, so
+        // the pool does not get it back.
+        Err(TransactionError::RollbackFailed { cause, .. }) => {
+            conn.discard();
+            Err(cause)
+        }
+    }
 }
 
 /// Applies the pending migrations inside `db`, answering how many it applied.

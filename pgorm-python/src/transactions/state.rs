@@ -131,7 +131,7 @@ impl State {
             InternalError::new_err("transaction owner ended during savepoint creation")
         })?;
         guard.complete();
-        result.map_err(|error| database_error(error, &self.connection.pool.secrets))?;
+        result?;
         Ok(child)
     }
 }

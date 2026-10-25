@@ -70,9 +70,9 @@ async fn committed_notification_arrives_with_sender() -> Result<(), Error> {
 
     let mut db = ctx.db.get().await?;
     let sender = backend_pid(&db).await?;
-    let txn = db.begin().await?;
-    notify(&txn, "jobs", "42").await?;
-    txn.commit().await?;
+    db.transaction(async |txn| notify(&txn, "jobs", "42").await)
+        .await
+        .expect("the transaction commits");
 
     let notification = next_notification(&mut notifications).await?;
     assert_eq!(
@@ -97,9 +97,13 @@ async fn rolled_back_notification_never_arrives() -> Result<(), Error> {
     listener.listen("jobs").await?;
 
     let mut db = ctx.db.get().await?;
-    let txn = db.begin().await?;
-    notify(&txn, "jobs", "discarded").await?;
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            notify(&txn, "jobs", "discarded").await?;
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     notify(&db, "jobs", "fence").await?;
 
     assert_eq!(next(&mut notifications).await?, pair("jobs", "fence"));
@@ -119,15 +123,24 @@ async fn notifications_arrive_in_commit_order() -> Result<(), Error> {
 
     let mut first = ctx.db.get().await?;
     let mut second = ctx.db.get().await?;
-    let early = first.begin().await?;
-    let late = second.begin().await?;
-    for payload in ["1", "2", "1", "3"] {
-        notify(&early, "a", payload).await?;
-    }
-    notify(&early, "b", "1").await?;
-    notify(&late, "a", "first committed").await?;
-    late.commit().await?;
-    early.commit().await?;
+    // The late transaction runs to its commit inside the early one, so it
+    // commits first though it began second.
+    first
+        .transaction(async |early| {
+            second
+                .transaction(async |late| {
+                    for payload in ["1", "2", "1", "3"] {
+                        notify(&early, "a", payload).await?;
+                    }
+                    notify(&early, "b", "1").await?;
+                    notify(&late, "a", "first committed").await
+                })
+                .await
+                .expect("the late transaction commits");
+            Ok::<_, Error>(())
+        })
+        .await
+        .expect("the early transaction commits");
 
     let mut received = Vec::new();
     for _ in 0..5 {
@@ -276,9 +289,13 @@ async fn payload_limit_is_the_servers_error() -> Result<(), Error> {
         .expect_err("the server refuses an 8000-byte payload");
     assert_eq!(sqlstate(&refused), Some(&SqlState::INVALID_PARAMETER_VALUE));
 
-    let txn = db.begin().await?;
-    assert!(notify(&txn, "jobs", &"p".repeat(8000)).await.is_err());
-    txn.rollback().await?;
+    let outcome = db
+        .transaction(async |txn| {
+            assert!(notify(&txn, "jobs", &"p".repeat(8000)).await.is_err());
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
     notify(&db, "jobs", "fence").await?;
     assert_eq!(next(&mut notifications).await?, pair("jobs", "fence"));
 
@@ -355,11 +372,14 @@ async fn overflow_closes_the_listener() -> Result<(), Error> {
     listener.listen("burst").await?;
     let mut db = ctx.db.get().await?;
 
-    let txn = db.begin().await?;
-    for payload in ["1", "2", "3", "4"] {
-        notify(&txn, "burst", payload).await?;
-    }
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        for payload in ["1", "2", "3", "4"] {
+            notify(&txn, "burst", payload).await?;
+        }
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the transaction commits");
 
     // Nothing reads the stream until the listener has closed, so the overflow
     // is decided by the capacity alone. Each probe is a round trip the
@@ -511,9 +531,9 @@ async fn instrumented_notify_is_an_execute() -> Result<(), Error> {
 
     let mut db = pool.get().await?;
     notify(&db, "metered", "1").await?;
-    let txn = db.begin_instrumented().await?;
-    notify(&txn, "metered", "2").await?;
-    txn.commit().await?;
+    db.transaction(async |txn| notify(&*txn, "metered", "2").await)
+        .await
+        .expect("the instrumented transaction commits");
     assert_eq!(next(&mut notifications).await?, pair("metered", "1"));
     assert_eq!(next(&mut notifications).await?, pair("metered", "2"));
     assert_eq!(

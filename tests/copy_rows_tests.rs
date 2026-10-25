@@ -590,37 +590,39 @@ async fn copy_rows_models_in_a_transaction() -> Result<(), Error> {
             qty: 4,
         },
     ];
-    {
-        let mut tx = db.begin().await?;
-        let copy = CopyFromStatement::new(n("item"), CopyBinary)
-            .columns([n("name"), n("id"), n("qty")])
-            .to_owned();
-        let mut sink = tx.copy_in_rows(&copy).await?;
-        for model in &models {
-            sink.send_model(model).await?;
-        }
-        assert_eq!(sink.finish().await?, 2);
+    let outcome = db
+        .transaction(async |tx| {
+            let copy = CopyFromStatement::new(n("item"), CopyBinary)
+                .columns([n("name"), n("id"), n("qty")])
+                .to_owned();
+            let mut sink = tx.copy_in_rows(&copy).await?;
+            for model in &models {
+                sink.send_model(model).await?;
+            }
+            assert_eq!(sink.finish().await?, 2);
 
-        // The table's own column order, and a column the entity lacks.
-        let read: Vec<item::Model> = tx
-            .copy_out_rows(&CopyToStatement::new(n("item"), CopyBinary))
-            .await?
-            .models::<item::Entity>()
-            .try_collect()
-            .await?;
-        assert_eq!(read, models);
+            // The table's own column order, and a column the entity lacks.
+            let read: Vec<item::Model> = tx
+                .copy_out_rows(&CopyToStatement::new(n("item"), CopyBinary))
+                .await?
+                .models::<item::Entity>()
+                .try_collect()
+                .await?;
+            assert_eq!(read, models);
 
-        let mut notes = tx
-            .copy_in_rows(&CopyFromStatement::new(n("item"), CopyBinary))
-            .await?;
-        let unknown = notes.send_model(&models[0]).await;
-        assert!(
-            matches!(&unknown, Err(Error::Type(message)) if message.contains("`note`")),
-            "{unknown:?}"
-        );
-        drop(notes);
-        tx.rollback().await?;
-    }
+            let mut notes = tx
+                .copy_in_rows(&CopyFromStatement::new(n("item"), CopyBinary))
+                .await?;
+            let unknown = notes.send_model(&models[0]).await;
+            assert!(
+                matches!(&unknown, Err(Error::Type(message)) if message.contains("`note`")),
+                "{unknown:?}"
+            );
+            drop(notes);
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     let partial = CopyToStatement::new(
         Query::select()

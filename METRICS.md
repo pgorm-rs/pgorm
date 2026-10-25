@@ -83,7 +83,7 @@ pub trait MetricsCollector: Clone + Send + Sync + 'static {
 Two of the hooks mean slightly less than their names suggest, and the difference decides what a counter built on them measures:
 
 - `record_transaction_commit` is **success only**.
-- `record_transaction_rollback` means **the transaction ended without committing** — by an explicit `rollback()` *or* by a failed `commit()`, since PostgreSQL aborts a transaction whose `COMMIT` fails. A counter on this hook counts transactions that did not take effect, which is the number worth having; it is not a count of `rollback()` calls.
+- `record_transaction_rollback` means **the transaction ended without committing** — by a closure that returned `Err` *or* by a failed `COMMIT`, since PostgreSQL aborts a transaction whose `COMMIT` fails. A counter on this hook counts transactions that did not take effect, which is the number worth having; it is not a count of closures that failed.
 
 A failed transaction round trip never gets a hook of its own. `begin`, `commit` and `rollback` each report their failure through `record_query_error` under their own operation name, so the error reaches a collector in all three cases. Seven hooks with no defaults is a hard contract — adding an eighth would break every implementor to say what the existing one already says.
 
@@ -188,31 +188,36 @@ A listener is not instrumented. `DatabasePool::listener` (reached through `Instr
 
 ### Transactions
 
-`TransactionTrait::begin` on `InstrumentedConnection` times the `BEGIN` and reports `record_transaction_begin` on success. A *failed* begin is reported through `record_query_error`, with a context whose `operation()` is `"begin"` and whose `sql()` is `None` — not through a dedicated hook.
-
-Begin returns a plain `DatabaseTransaction` — it is **not** auto-instrumented. To keep per-statement metrics inside the transaction, wrap it yourself:
+`transaction` on an `InstrumentedConnection` gives its closure an `InstrumentedTransaction` sharing the connection's collector, so every statement, COPY and savepoint inside it is instrumented too. Opening the transaction is timed and reports `record_transaction_begin` on success. A *failed* `BEGIN` is reported through `record_query_error`, with a context whose `operation()` is `"begin"` and whose `sql()` is `None` — not through a dedicated hook.
 
 ```rust
-use pgorm::{ConnectionTrait, TransactionTrait};
-use pgorm::metric::InstrumentedTransaction;
+use pgorm::{ConnectionTrait, Error, TransactionTrait};
 
 let mut conn = instrumented.get().await?;
-let metrics = conn.metrics().clone();
 
-let tx = conn.begin().await?;                       // record_transaction_begin
-let tx = InstrumentedTransaction::new(tx, metrics);
-
-tx.execute("INSERT INTO users (name) VALUES ($1)", &[&"John"]).await?;
-
-tx.commit().await?;                                 // record_transaction_commit
+conn.transaction(async |tx| {                       // record_transaction_begin
+    tx.execute("INSERT INTO users (name) VALUES ($1)", &[&"John"])
+        .await?;                                    // record_query_success
+    tx.transaction(async |savepoint| {              // record_transaction_begin
+        savepoint
+            .execute("INSERT INTO audit (what) VALUES ($1)", &[&"user"])
+            .await
+    })
+    .await                                          // record_transaction_commit
+    .map_err(|error| Error::Custom(error.to_string()))
+})
+.await?;                                            // record_transaction_commit
 ```
 
-Two behaviours to plan around:
+A savepoint is a transaction to the collector: it reports its own begin, and its own commit or rollback.
 
-- A failed `commit` reports **both** `record_query_error` (with `operation() == "commit"` and `sql() == None`) and `record_transaction_rollback`, in that order — PostgreSQL aborts the transaction when a commit fails, so it ended without committing, and the error itself still reaches an error hook. A failed `rollback` reports the same pair under `"rollback"`. A successful `commit` reports neither.
-- `InstrumentedTransaction`'s `Drop` impl records nothing. Dropping an uncommitted transaction still rolls back and still emits the inner `DatabaseTransaction`'s `tracing::warn!("Transaction dropped without committing!")`, but no rollback metric is produced. If you need rollbacks counted, call `record_transaction_rollback` yourself on the error path.
+Three behaviours to plan around:
 
-`InstrumentedTransaction` does not implement `TransactionTrait`, and `inner()` yields only a shared reference, so nested transactions (savepoints) are not reachable through the instrumented wrapper.
+- A closure that returns `Ok` is followed by a `COMMIT`. A failed commit reports **both** `record_query_error` (with `operation() == "commit"` and `sql() == None`) and `record_transaction_rollback`, in that order — PostgreSQL aborts the transaction when a commit fails, so it ended without committing, and the error itself still reaches an error hook. A successful commit reports neither.
+- A closure that returns `Err` is followed by an awaited `ROLLBACK`, which reports `record_transaction_rollback` whether or not the round trip succeeded, and a failed round trip also through `record_query_error` under `"rollback"`.
+- A transaction whose closure's future is dropped before it finishes — a timeout, a cancelled task — records no ending at all. It still rolls back, and the inner `DatabaseTransaction` still emits `tracing::warn!("Transaction dropped without committing!")`, but every hook is `async` and `Drop` is not, so no rollback metric is produced.
+
+`InstrumentedTransaction::inner()` reaches the plain `DatabaseTransaction` beneath, whose statements bypass the collector.
 
 ### Custom Collectors
 

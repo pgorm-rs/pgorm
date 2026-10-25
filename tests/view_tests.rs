@@ -591,11 +591,9 @@ async fn a_materialized_view_holds_rows_until_refreshed() -> Result<(), Error> {
         .unique()
         .to_string();
     db.batch_execute(&index).await?;
-    {
-        let txn = db.begin().await?;
-        txn.batch_execute(&concurrent).await?;
-        txn.commit().await?;
-    }
+    db.transaction(async |txn| txn.batch_execute(&concurrent).await)
+        .await
+        .expect("the concurrent refresh commits");
     assert_eq!(totals(&db).await?, [(false, 1), (true, 3)]);
 
     let written = account_total::ActiveModel {
@@ -770,26 +768,29 @@ async fn a_refused_body_is_never_sent() -> Result<(), Error> {
         ),
     ];
 
-    let tx = db.begin().await?;
-    for (body, refusal, _) in &cases {
-        let built = [
-            View::create(n("refused"), body.clone()).map(|view| view.to_string()),
-            View::create_recursive(n("refused"), n("id"), body.clone())
-                .map(|view| view.to_string()),
-            MaterializedView::create(n("refused"), body.clone()).map(|view| view.to_string()),
-            Table::create_as(n("refused"), body.clone()).map(|table| table.to_string()),
-        ];
-        for statement in built {
-            let sent = async { tx.batch_execute(&statement?).await }.await;
-            match sent {
-                Err(Error::QueryBuilder(error)) => assert_eq!(&error, refusal),
-                other => panic!("expected pgorm-query's refusal, got {other:?}"),
+    db.transaction(async |tx| {
+        for (body, refusal, _) in &cases {
+            let built = [
+                View::create(n("refused"), body.clone()).map(|view| view.to_string()),
+                View::create_recursive(n("refused"), n("id"), body.clone())
+                    .map(|view| view.to_string()),
+                MaterializedView::create(n("refused"), body.clone()).map(|view| view.to_string()),
+                Table::create_as(n("refused"), body.clone()).map(|table| table.to_string()),
+            ];
+            for statement in built {
+                let sent = async { tx.batch_execute(&statement?).await }.await;
+                match sent {
+                    Err(Error::QueryBuilder(error)) => assert_eq!(&error, refusal),
+                    other => panic!("expected pgorm-query's refusal, got {other:?}"),
+                }
             }
+            // A statement the server refused would have aborted the transaction.
+            assert_eq!(tx.query_one("SELECT 1", &[]).await?.get::<_, i32>(0), 1);
         }
-        // A statement the server refused would have aborted the transaction.
-        assert_eq!(tx.query_one("SELECT 1", &[]).await?.get::<_, i32>(0), 1);
-    }
-    tx.commit().await?;
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("nothing reached the server, so the transaction commits");
 
     for (body, _, state) in &cases {
         for kind in ["VIEW", "MATERIALIZED VIEW", "TABLE"] {

@@ -172,14 +172,14 @@ class Effects:
                 self.scopes[d["child"]] = child
                 self.open_transactions.append(d["child"])
                 return {"kind": "transaction", "scope": d["child"]}, [
-                    "pgorm::TransactionTrait::begin_with"
+                    "pgorm::DatabaseConnection::transaction_with"
                     if step["scope"] == "root"
-                    else "pgorm::TransactionTrait::begin"
+                    else "pgorm::TransactionTrait::transaction"
                 ]
             case "commit" | "rollback":
                 await getattr(connection, name)()
                 self.open_transactions.remove(step["scope"])
-                return {"kind": "unit"}, ["pgorm::DatabaseTransaction::" + name]
+                return {"kind": "unit"}, ["pgorm::TransactionTrait::transaction"]
             case "stream":
                 rows, state = await stream(query, d, connection)
                 self.resolution.results[step["id"]] = rows

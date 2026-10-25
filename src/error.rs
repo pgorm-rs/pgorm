@@ -288,13 +288,13 @@ impl SqlError {
 /// Implemented for [`Error`]; implement it for a domain error type to use that
 /// type as the closure error of
 /// [`DatabaseConnection::transaction_with_retry`](crate::DatabaseConnection::transaction_with_retry).
-// [spec:pgorm:sem:conn.tx.retry+1]    retryability predicate
+// [spec:pgorm:sem:conn.tx.retry+3]    retryability predicate
 pub trait RetryableError {
     /// Whether the transaction that produced this error is worth retrying.
     fn is_retryable(&self) -> bool;
 }
 
-// [spec:pgorm:sem:conn.tx.retry+1]
+// [spec:pgorm:sem:conn.tx.retry+3]
 impl RetryableError for Error {
     fn is_retryable(&self) -> bool {
         Error::is_retryable(self)
@@ -305,7 +305,7 @@ impl Error {
     /// Whether this is a transaction-rollback error PostgreSQL expects the
     /// client to retry: SQLSTATE `40001` (`serialization_failure`) or `40P01`
     /// (`deadlock_detected`).
-    // [spec:pgorm:sem:conn.tx.retry+1]    SQLSTATE classification
+    // [spec:pgorm:sem:conn.tx.retry+3]    SQLSTATE classification
     pub fn is_retryable(&self) -> bool {
         let Error::Postgres(error) = self else {
             return false;

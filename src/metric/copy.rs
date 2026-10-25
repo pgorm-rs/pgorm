@@ -69,7 +69,7 @@ impl<M: MetricsCollector> CopyTrait for InstrumentedTransaction<'_, M> {
     {
         let sql = statement.to_string();
         report!(self, "copy_in", Some(&sql),
-            open_transaction_mut!(self).copy_in(statement).await, _ => None)
+            self.transaction.copy_in(statement).await, _ => None)
     }
 
     async fn copy_out<F>(
@@ -81,7 +81,7 @@ impl<M: MetricsCollector> CopyTrait for InstrumentedTransaction<'_, M> {
     {
         let sql = statement.to_string();
         report!(self, "copy_out", Some(&sql),
-            open_transaction_mut!(self).copy_out(statement).await, _ => None)
+            self.transaction.copy_out(statement).await, _ => None)
     }
 
     async fn copy_in_columns<F>(
@@ -91,7 +91,7 @@ impl<M: MetricsCollector> CopyTrait for InstrumentedTransaction<'_, M> {
     where
         F: CopyFormat,
     {
-        open_transaction_mut!(self).copy_in_columns(statement).await
+        self.transaction.copy_in_columns(statement).await
     }
 
     async fn copy_out_columns<F>(
@@ -101,8 +101,6 @@ impl<M: MetricsCollector> CopyTrait for InstrumentedTransaction<'_, M> {
     where
         F: CopyFormat,
     {
-        open_transaction_mut!(self)
-            .copy_out_columns(statement)
-            .await
+        self.transaction.copy_out_columns(statement).await
     }
 }

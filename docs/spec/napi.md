@@ -287,10 +287,16 @@ handle, and each is released by being closed.
 > of a database or decode failure. `{ tagged: true }` gives each column as a
 > `Value`, as `napi.value-tags` describes.
 
-> [spec:pgorm:req:napi.transactions]
-> Transactions MUST run through pgorm's `DatabaseTransaction` and its
-> savepoints, a task on the runtime owning each borrowed scope and JavaScript
-> sending it owned commands. `begin` opens one explicitly, its `commit` or
+> [spec:pgorm:req:napi.transactions+1]
+> Transactions MUST run inside pgorm's closure transaction and its savepoints'
+> (`conn.tx.closure`), a task on the runtime serving each one's commands from
+> inside its closure and JavaScript sending it owned commands: a commit returns
+> `Ok` from the closure and a rollback `Err`, so pgorm issues the `COMMIT` or
+> `ROLLBACK`, and a connection given up mid-command drops the closure's future
+> rather than await a rollback on it. A failed `ROLLBACK`, which pgorm reports
+> as `TransactionError::RollbackFailed` (`conn.tx.closure`), rejects
+> `rollback` with its database error and discards the connection, as a failed
+> commit does; an abandoned frame whose `ROLLBACK` fails discards it too. `begin` opens one explicitly, its `commit` or
 > `rollback` usable once; `transaction(fn)` on a pool, a connection or a
 > transaction commits when `fn` resolves and rolls back when it throws,
 > rejecting with `fn`'s own error whatever the rollback does, and a commit

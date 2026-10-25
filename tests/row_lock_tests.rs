@@ -108,11 +108,15 @@ async fn of_names_lock_the_rows_they_answer_for(
         locking(sample, "s"),
     ] {
         assert!(!stock_is_locked(other).await?);
-        let txn = db.begin().await?;
-        let sql = statement.to_string();
-        assert_eq!(count(&txn, statement).await?, 2);
-        assert!(stock_is_locked(other).await?, "{sql}");
-        txn.rollback().await?;
+        let outcome = db
+            .transaction(async |txn| {
+                let sql = statement.to_string();
+                assert_eq!(count(&txn, statement).await?, 2);
+                assert!(stock_is_locked(other).await?, "{sql}");
+                roll_back::<()>()
+            })
+            .await;
+        assert_rolled_back(outcome);
     }
     Ok(())
 }

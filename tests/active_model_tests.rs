@@ -3,7 +3,7 @@
 pub mod common;
 
 pub use common::{TestContext, bakery_chain::*, setup::*};
-use pgorm::{Error, Schema, entity::prelude::*};
+use pgorm::{Error, Schema, TransactionError, entity::prelude::*};
 use pgorm_query::{IntoValueTuple, QueryBuilder, ValueTuple};
 use pretty_assertions::assert_eq;
 
@@ -1471,17 +1471,21 @@ async fn active_model_after_hook_error_keeps_the_write() -> Result<(), Error> {
 
     // The atomicity the hooks do not provide is the caller's to ask for: run the
     // operation in a transaction and the `Err` leaves it uncommitted.
-    {
-        let txn = db.begin().await?;
-        let err = after_hook_abort::ActiveModel {
-            id: NotSet,
-            name: set("Pear"),
+    let outcome = db
+        .transaction(async |txn| {
+            after_hook_abort::ActiveModel {
+                id: NotSet,
+                name: set("Pear"),
+            }
+            .insert(&txn)
+            .await
+        })
+        .await;
+    match outcome {
+        Err(TransactionError::Transaction(err)) => {
+            assert_eq!(err.to_string(), "Custom Error: after_save refused")
         }
-        .insert(&txn)
-        .await
-        .unwrap_err();
-        assert_eq!(err.to_string(), "Custom Error: after_save refused");
-        txn.rollback().await?;
+        other => panic!("expected the hook's refusal, got {other:?}"),
     }
     assert_eq!(after_hook_abort::Entity::find().all(&db).await?.len(), 0);
 

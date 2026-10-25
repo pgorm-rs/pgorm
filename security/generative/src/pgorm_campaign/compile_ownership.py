@@ -1,9 +1,10 @@
 """Borrows and brands: the contracts whose whole content is a compile refusal.
 
-`DatabaseTransaction<'a>` borrows the connection it began on, and `Binder`
-brands the expressions it mints with a lifetime the pipeline invents per call.
-Neither contract can be observed at runtime: a program that violates one never
-exists as a binary, and a program that respects one is indistinguishable from a
+A transaction exists only inside the closure `transaction` runs, and its
+`DatabaseTransaction` borrows the connection exclusively; `Binder` brands the
+expressions it mints with a lifetime the pipeline invents per call. Neither
+contract can be observed at runtime: a program that violates one never exists
+as a binary, and a program that respects one is indistinguishable from a
 program that had no such contract. The evidence is the rejection itself.
 """
 
@@ -14,7 +15,7 @@ OBLIGATION = "rust-ownership"
 
 CONN_PRELUDE = (
     "    use pgorm::{ConnectionTrait, DatabaseConnection, DatabasePool, "
-    "DatabaseTransaction, Error, TransactionTrait};"
+    "DatabaseTransaction, Error, TransactionError, TransactionTrait};"
 )
 
 PIPELINE_ENTITIES = "\n\n".join(
@@ -54,34 +55,47 @@ def _transaction(identity, body, *, verdict, phase, expects=None, note=""):
 def transaction_accept_cases():
     """The uses the borrow permits, so a rejection cannot be read as blanket."""
     commit = (
-        "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-        "        let tx = conn.begin().await?;\n"
-        "        tx.commit().await?;\n"
-        "        Ok(())\n    }"
+        "    pub async fn run(conn: &mut DatabaseConnection)\n"
+        "        -> Result<(), TransactionError<Error>> {\n"
+        '        conn.transaction(async |tx| tx.batch_execute("SELECT 1").await)\n'
+        "            .await\n    }"
     )
     sequential = (
-        "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-        "        let first = conn.begin().await?;\n"
-        "        first.rollback().await?;\n"
-        "        let second = conn.begin().await?;\n"
-        "        second.commit().await?;\n"
-        "        Ok(())\n    }"
+        "    pub async fn run(conn: &mut DatabaseConnection)\n"
+        "        -> Result<(), TransactionError<Error>> {\n"
+        '        conn.transaction(async |tx| tx.batch_execute("SELECT 1").await)\n'
+        "            .await?;\n"
+        '        conn.transaction(async |tx| tx.batch_execute("SELECT 2").await)\n'
+        "            .await\n    }"
     )
     savepoint = (
-        "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-        "        let mut tx = conn.begin().await?;\n"
-        "        let inner = tx.begin().await?;\n"
-        "        inner.commit().await?;\n"
-        "        tx.commit().await?;\n"
-        "        Ok(())\n    }"
+        "    pub async fn run(conn: &mut DatabaseConnection)\n"
+        "        -> Result<(), TransactionError<TransactionError<Error>>> {\n"
+        "        conn.transaction(async |tx| {\n"
+        '            tx.transaction(async |inner| inner.batch_execute("SELECT 1").await)\n'
+        "                .await\n"
+        "        })\n"
+        "        .await\n    }"
     )
     reborrow = (
         "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-        "        let tx = conn.begin().await?;\n"
-        '        tx.batch_execute("SELECT 1").await?;\n'
-        "        tx.commit().await?;\n"
-        '        conn.batch_execute("SELECT 2").await?;\n'
-        "        Ok(())\n    }"
+        '        let ended = conn.transaction(async |tx| tx.batch_execute("SELECT 1").await);\n'
+        "        ended.await.map_err(|error| Error::Custom(error.to_string()))?;\n"
+        '        conn.batch_execute("SELECT 2").await\n    }'
+    )
+    spawned = (
+        "    fn spawnable<F: std::future::Future + Send + 'static>(future: F) -> F {\n"
+        "        future\n    }\n\n"
+        "    pub fn run(pool: DatabasePool) {\n"
+        "        let _ = spawnable(async move {\n"
+        "            let mut conn = pool.get().await?;\n"
+        "            conn.transaction(async |tx: &mut DatabaseTransaction<'_>| {\n"
+        '                tx.transaction(async |inner| inner.batch_execute("SELECT 1").await)\n'
+        "                    .await\n"
+        "            })\n"
+        "            .await\n"
+        "            .map_err(|error| Error::Custom(error.to_string()))\n"
+        "        });\n    }"
     )
     return [
         _transaction(
@@ -89,14 +103,14 @@ def transaction_accept_cases():
             commit,
             verdict="accept",
             phase="borrowck",
-            note="one transaction, consumed by commit",
+            note="one transaction, ended by what its closure returns",
         ),
         _transaction(
             "txn-sequential",
             sequential,
             verdict="accept",
             phase="borrowck",
-            note="the borrow ends when the handle is consumed",
+            note="the borrow ends when the closure's transaction does",
         ),
         _transaction(
             "txn-savepoint",
@@ -112,6 +126,13 @@ def transaction_accept_cases():
             phase="borrowck",
             note="the connection is usable again once the transaction is gone",
         ),
+        _transaction(
+            "txn-spawned",
+            spawned,
+            verdict="accept",
+            phase="borrowck",
+            note="a transaction with a savepoint inside is a Send future",
+        ),
     ]
 
 
@@ -119,70 +140,69 @@ def transaction_reject_cases():
     """Each way the borrow can be broken, and the code that names the break."""
     variants = (
         (
-            "txn-commit-twice",
+            "txn-no-commit",
             (
-                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-                "        let tx = conn.begin().await?;\n"
-                "        tx.commit().await?;\n"
-                "        tx.rollback().await?;\n"
-                "        Ok(())\n    }"
+                "    pub async fn run(conn: &mut DatabaseConnection)\n"
+                "        -> Result<(), TransactionError<Error>> {\n"
+                "        conn.transaction(async |tx| {\n"
+                "            tx.commit().await?;\n"
+                "            Ok::<_, Error>(())\n"
+                "        })\n"
+                "        .await\n    }"
             ),
-            rejects("E0382"),
-            "commit consumes the handle, so there is no second outcome",
+            rejects("E0599"),
+            "what the closure returns is the only commit: the handle has none",
+            "typeck",
         ),
         (
             "txn-conn-while-open",
             (
-                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-                "        let tx = conn.begin().await?;\n"
-                '        conn.batch_execute("SELECT 1").await?;\n'
-                "        tx.commit().await?;\n"
-                "        Ok(())\n    }"
+                "    pub async fn run(conn: &mut DatabaseConnection)\n"
+                "        -> Result<(), TransactionError<Error>> {\n"
+                "        conn.transaction(async |tx| {\n"
+                '            conn.batch_execute("SELECT 1").await?;\n'
+                '            tx.batch_execute("SELECT 2").await\n'
+                "        })\n"
+                "        .await\n    }"
             ),
             rejects("E0502"),
             "the open transaction holds the connection exclusively",
+            "borrowck",
         ),
         (
             "txn-begin-twice",
             (
-                "    pub async fn run(conn: &mut DatabaseConnection) -> Result<(), Error> {\n"
-                "        let first = conn.begin().await?;\n"
-                "        let second = conn.begin().await?;\n"
-                "        second.commit().await?;\n"
-                "        first.commit().await?;\n"
-                "        Ok(())\n    }"
+                "    pub async fn run(conn: &mut DatabaseConnection)\n"
+                "        -> Result<(), TransactionError<TransactionError<Error>>> {\n"
+                "        conn.transaction(async |first| {\n"
+                '            first.batch_execute("SELECT 1").await.map_err(TransactionError::Connection)?;\n'
+                '            conn.transaction(async |second| second.batch_execute("SELECT 2").await)\n'
+                "                .await\n"
+                "        })\n"
+                "        .await\n    }"
             ),
-            rejects("E0499"),
-            "two live transactions on one connection is two mutable borrows",
+            rejects("E0501", "E0500"),
+            "two live transactions on one connection is two exclusive borrows",
+            "borrowck",
         ),
         (
-            "txn-escapes-connection",
+            "txn-escapes-closure",
             (
-                "    pub async fn run(pool: &DatabasePool)\n"
-                "        -> Result<DatabaseTransaction<'static>, Error> {\n"
-                "        let mut conn = pool.get().await?;\n"
-                "        let tx = conn.begin().await?;\n"
-                "        Ok(tx)\n    }"
+                "    pub async fn run(conn: &mut DatabaseConnection) {\n"
+                "        let mut held: Option<&DatabaseTransaction<'_>> = None;\n"
+                "        let _ = conn\n"
+                "            .transaction(async |tx| {\n"
+                "                held = Some(&*tx);\n"
+                "                Ok::<_, Error>(())\n"
+                "            })\n"
+                "            .await;\n"
+                "        drop(held);\n    }"
             ),
-            rejects("E0515"),
-            "a transaction cannot outlive the connection it began on",
-        ),
-        (
-            "txn-stored-past-connection",
-            (
-                "    pub async fn run(pool: &DatabasePool) -> Result<(), Error> {\n"
-                "        let mut held: Option<DatabaseTransaction<'_>> = None;\n"
-                "        {\n"
-                "            let mut conn = pool.get().await?;\n"
-                "            held = Some(conn.begin().await?);\n"
-                "        }\n"
-                "        if let Some(tx) = held {\n"
-                "            tx.commit().await?;\n"
-                "        }\n"
-                "        Ok(())\n    }"
-            ),
-            rejects("E0597", "E0505"),
-            "storing the handle does not extend the connection's life",
+            # The handle's lifetime is the closure's higher-ranked one, so the
+            # escape surfaces as a region error rustc assigns no code to.
+            rejects(message="lifetime may not live long enough"),
+            "the handle cannot outlive the closure it was given to",
+            "borrowck",
         ),
     )
     return [
@@ -190,11 +210,11 @@ def transaction_reject_cases():
             identity,
             body,
             verdict="reject",
-            phase="borrowck",
+            phase=phase,
             expects=expectation,
             note=note,
         )
-        for identity, body, expectation, note in variants
+        for identity, body, expectation, note, phase in variants
     ]
 
 

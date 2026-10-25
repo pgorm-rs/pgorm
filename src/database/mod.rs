@@ -4,12 +4,15 @@ mod copy_rows;
 mod db_connection;
 mod lifecycle;
 mod listen;
+mod transaction;
 
 pub use connection::*;
 pub use copy::{CopyInSink, CopyOutStream, CopyTrait};
 pub use copy_rows::{CopyColumn, CopyRowDecoder, CopyRowEncoder, CopyRowSink, CopyRowStream};
 pub use db_connection::*;
 pub use listen::{Listener, Notifications, connect_listener, notify};
+pub use transaction::{TransactionError, TransactionTrait};
+pub(crate) use transaction::{drive, rolled_back, sealed};
 
 /// What a [`Notifications`] stream yields: the channel, the payload, and the
 /// process id of the session that sent it.

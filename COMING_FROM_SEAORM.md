@@ -61,8 +61,8 @@ compiled.
 | `execute_unprepared` | `batch_execute` |
 | `db.stream(stmt)` | `query_raw` |
 | `query_one` (at most one row) | `query_opt` |
-| `begin_with_config` | `begin_with(TransactionMode)` |
-| `transaction_with_config` | `transaction_with` |
+| `db.begin()`, `txn.commit()` | `conn.transaction(async \|txn\| ..)`: `Ok` commits |
+| `begin_with_config`, `transaction_with_config` | `transaction_with(TransactionMode, ..)` |
 | `Set(value.to_owned())` | `set(value)` or `value.into()` |
 | `active_model.save(db)` | `insert(db)` or `update(db)` |
 | `Entity::insert(am)` | `Insert::one(am)` |
@@ -301,35 +301,20 @@ compile time, if you want a typo in hand-written SQL to fail the build.
 
 | SeaORM | pgorm |
 | --- | --- |
-| `db.begin()` on `&self` | `conn.begin()` on `&mut self` |
-| `txn.begin()` (savepoint) | the same |
+| `db.begin()`, then `txn.commit()` or `txn.rollback()` | `conn.transaction(async \|txn\| { .. })`: `Ok` commits, `Err` rolls back |
+| `txn.begin()` (savepoint) | `txn.transaction(async \|savepoint\| { .. })` |
 | `db.transaction::<_, _, E>(\|txn\| Box::pin(async move { .. }))` | `conn.transaction(async \|txn\| { .. })` |
-| `begin_with_config(isolation, access_mode)` | `begin_with(TransactionMode::..)` |
+| `begin_with_config(isolation, access_mode)` | `transaction_with(TransactionMode::.., async \|txn\| { .. })` |
 | `transaction_with_config` | `transaction_with` |
-| `TransactionError<E>` | the same name and variants |
+| `TransactionError<E>` | the same name and variants, and `RollbackFailed { cause, rollback }` for a `ROLLBACK` that failed after the closure's error |
 
-A transaction borrows its connection exclusively, so nothing else can run on
-that connection until the transaction ends, and the compiler checks it. A
-transaction dropped without `commit` rolls back.
-
-```rust,no_run
-use pgorm::{entity::prelude::*, tests_cfg::cake};
-
-async fn add(pool: &DatabasePool) -> Result<(), Error> {
-    let mut conn = pool.get().await?;
-    let txn = conn.begin().await?;
-    cake::ActiveModel {
-        name: set("Lemon"),
-        ..Default::default()
-    }
-    .insert(&txn)
-    .await?;
-    txn.commit().await
-}
-```
-
-The closure form is a method of `DatabaseConnection` and takes an async
-closure; there is no `Box::pin`:
+A transaction exists only inside a closure. There is no `begin` returning a
+handle, and no `commit` or `rollback` to call: what the closure returns ends
+the transaction, and a closure whose future is dropped before it finishes — a
+timeout, a cancelled task — rolls back. The closure's transaction borrows its
+connection exclusively, so nothing else can run on that connection until the
+transaction ends, and the compiler checks it. It takes an async closure;
+there is no `Box::pin`, and the call runs inside `tokio::spawn`:
 
 ```rust,no_run
 use pgorm::{TransactionError, entity::prelude::*, tests_cfg::cake};
@@ -341,14 +326,46 @@ async fn add(pool: &DatabasePool) -> Result<cake::Model, TransactionError<Error>
             name: set("Lemon"),
             ..Default::default()
         }
-        .insert(&*txn)
+        .insert(&txn)
         .await
     })
     .await
 }
 ```
 
-`begin_with` takes a `TransactionMode`, which lists only the combinations
+A savepoint is the same call on the transaction, and rolls back alone:
+
+```rust,no_run
+use pgorm::{TransactionError, entity::prelude::*, tests_cfg::cake};
+
+async fn add(pool: &DatabasePool) -> Result<(), TransactionError<Error>> {
+    let mut conn = pool.get().await.map_err(TransactionError::Connection)?;
+    conn.transaction(async |txn| {
+        let refused = txn
+            .transaction(async |savepoint| {
+                cake::ActiveModel {
+                    name: set("Lemon"),
+                    ..Default::default()
+                }
+                .insert(&savepoint)
+                .await
+            })
+            .await;
+        if refused.is_err() {
+            cake::ActiveModel {
+                name: set("Plain"),
+                ..Default::default()
+            }
+            .insert(&txn)
+            .await?;
+        }
+        Ok::<_, Error>(())
+    })
+    .await
+}
+```
+
+`transaction_with` takes a `TransactionMode`, which lists only the combinations
 PostgreSQL acts on: `Default`, `ReadWrite { isolation }`,
 `ReadOnly { isolation }` and `DeferrableSnapshot`.
 `transaction_with_retry` reruns a closure when a serializable transaction

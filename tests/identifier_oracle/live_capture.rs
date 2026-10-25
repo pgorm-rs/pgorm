@@ -418,7 +418,9 @@ fn judge_sequence(
         .filter(|_| hostile.name.len() > super::oracle::IDENTIFIER_BYTES);
     let mut verdict = Verdict::RoundTrip;
     for (index, reference) in references.iter().enumerate() {
-        if stop == Some(index) && captured.len() == index {
+        // The refusal fails the run's transaction closure, whose awaited
+        // ROLLBACK, naming nothing, is the one statement past the stop.
+        if stop == Some(index) && captured.get(index..) == Some(&["ROLLBACK".to_owned()][..]) {
             return Ok(Verdict::Refused("identifier too long"));
         }
         let Some(sql) = captured.get(index) else {

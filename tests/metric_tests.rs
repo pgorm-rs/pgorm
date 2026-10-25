@@ -6,7 +6,7 @@ pub use common::{TestContext, setup::*};
 
 use async_trait::async_trait;
 use pgorm::{
-    ConnectionTrait, Error, SqlText,
+    ConnectionTrait, Error, SqlText, TransactionTrait,
     metric::{
         InstrumentedConnection, InstrumentedPool, InstrumentedTransaction, LoggingMetrics,
         MetricsCollector, NoOpMetrics, QueryContext,
@@ -128,7 +128,7 @@ impl MetricsCollector for RecordingMetrics {
     }
 }
 
-// [spec:pgorm:sem:metric.layer.tx+3/test]    begin_instrumented + explicit rollback
+// [spec:pgorm:sem:metric.layer.tx+4/test]    a closure that fails reports its begin and its rollback, with the statements inside instrumented
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_rollback_metrictx").await;
@@ -139,11 +139,15 @@ pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     conn.execute("CREATE TABLE widget (id int primary key)", &[])
         .await?;
 
-    let txn = conn.begin_instrumented().await?;
-    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
-        .await?;
-    assert_eq!(txn.query_all("SELECT id FROM widget", &[]).await?.len(), 1);
-    txn.rollback().await?;
+    let outcome = conn
+        .transaction(async |txn| {
+            txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+                .await?;
+            assert_eq!(txn.query_all("SELECT id FROM widget", &[]).await?.len(), 1);
+            roll_back::<()>()
+        })
+        .await;
+    assert_rolled_back(outcome);
 
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 0);
 
@@ -166,7 +170,7 @@ pub async fn instrumented_begin_and_rollback() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+3/test]    begin_instrumented + commit
+// [spec:pgorm:sem:metric.layer.tx+4/test]    a closure that succeeds reports its begin and its commit
 #[pgorm_macros::test]
 pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_commit_metrictx").await;
@@ -177,10 +181,9 @@ pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
     conn.execute("CREATE TABLE widget (id int primary key)", &[])
         .await?;
 
-    let txn = conn.begin_instrumented().await?;
-    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
-        .await?;
-    txn.commit().await?;
+    conn.transaction(async |txn| txn.execute("INSERT INTO widget (id) VALUES (1)", &[]).await)
+        .await
+        .expect("the instrumented transaction commits");
 
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 1);
 
@@ -200,8 +203,8 @@ pub async fn instrumented_begin_and_commit() -> Result<(), Error> {
 /// A `COMMIT` the server refuses ends the transaction without committing, so
 /// it reports the rollback hook — and reports the error itself too, under the
 /// operation `"commit"`, rather than leaving a counter to imply it.
-// [spec:pgorm:sem:metric.layer.tx+3/test]    a failed commit reaches an error hook
-// [spec:pgorm:def:metric.layer.collector+2/test]    what the rollback hook counts
+// [spec:pgorm:sem:metric.layer.tx+4/test]    a failed commit reaches an error hook
+// [spec:pgorm:def:metric.layer.collector+3/test]    what the rollback hook counts
 #[pgorm_macros::test]
 pub async fn a_failed_commit_reports_error_and_rollback() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_commit_fails_metrictx").await;
@@ -218,14 +221,14 @@ pub async fn a_failed_commit_reports_error_and_rollback() -> Result<(), Error> {
     )
     .await?;
 
-    let txn = conn.begin_instrumented().await?;
-    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
-        .await?;
-    txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
-        .await?;
-    txn.commit()
-        .await
-        .expect_err("the deferred unique constraint must fail the commit");
+    commit_refused(
+        conn.transaction(async |txn| {
+            txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
+                .await?;
+            txn.execute("INSERT INTO widget (id) VALUES (1)", &[]).await
+        })
+        .await,
+    );
 
     // Nothing took effect, which is what the rollback hook is reporting.
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 0);
@@ -281,18 +284,21 @@ pub async fn query_opt_reports_one_row_or_zero() -> Result<(), Error> {
     let miss = conn.query_opt("SELECT id FROM widget WHERE id = 2", &[]);
     assert!(miss.await?.is_none());
 
-    let txn = conn.begin_instrumented().await?;
-    assert!(
-        txn.query_opt("SELECT id FROM widget WHERE id = 1", &[])
-            .await?
-            .is_some()
-    );
-    assert!(
-        txn.query_opt("SELECT id FROM widget WHERE id = 2", &[])
-            .await?
-            .is_none()
-    );
-    txn.commit().await?;
+    conn.transaction(async |txn| {
+        assert!(
+            txn.query_opt("SELECT id FROM widget WHERE id = 1", &[])
+                .await?
+                .is_some()
+        );
+        assert!(
+            txn.query_opt("SELECT id FROM widget WHERE id = 2", &[])
+                .await?
+                .is_none()
+        );
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the instrumented transaction commits");
 
     assert_eq!(
         metrics.count("query_success:query_opt:Some(1)"),
@@ -377,10 +383,12 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), Error> {
     )
     .await?;
 
-    let txn = conn.begin_instrumented().await?;
-    txn.batch_execute("INSERT INTO widget (id) VALUES (2); INSERT INTO widget (id) VALUES (3);")
-        .await?;
-    txn.commit().await?;
+    conn.transaction(async |txn| {
+        txn.batch_execute("INSERT INTO widget (id) VALUES (2); INSERT INTO widget (id) VALUES (3);")
+            .await
+    })
+    .await
+    .expect("the instrumented transaction commits");
 
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 3);
 
@@ -405,7 +413,7 @@ pub async fn instrumented_batch_execute_reports_no_rows() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:metric.layer.tx+3/test]    dropping an instrumented transaction records nothing
+// [spec:pgorm:sem:metric.layer.tx+4/test]    a dropped closure future records no ending
 #[pgorm_macros::test]
 pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), Error> {
     let ctx = TestContext::new("metric_layer_drop_metrictx").await;
@@ -416,17 +424,108 @@ pub async fn dropped_instrumented_transaction_records_nothing() -> Result<(), Er
     conn.execute("CREATE TABLE widget (id int primary key)", &[])
         .await?;
 
-    {
-        let txn = conn.begin_instrumented().await?;
+    let (inserted, ready) = tokio::sync::oneshot::channel();
+    let transaction = conn.transaction(async |txn| {
         txn.execute("INSERT INTO widget (id) VALUES (1)", &[])
             .await?;
+        inserted.send(()).expect("the test is waiting");
+        std::future::pending::<Result<(), Error>>().await
+    });
+    tokio::select! {
+        outcome = transaction => panic!("the transaction cannot finish: {outcome:?}"),
+        ready = ready => ready.expect("the closure signals its insert"),
     }
 
+    assert_eq!(metrics.count("transaction_begin"), 1);
     assert_eq!(metrics.count("transaction_rollback"), 0);
     assert_eq!(metrics.count("transaction_commit"), 0);
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 0);
 
     drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:metric.layer.tx+4/test]    a savepoint inside an instrumented transaction reports its own begin and ending
+#[pgorm_macros::test]
+pub async fn instrumented_savepoints_report_their_ends() -> Result<(), Error> {
+    let ctx = TestContext::new("metric_layer_savepoint_metrictx").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    let mut conn = pool.get().await?;
+    conn.execute("CREATE TABLE widget (id int primary key)", &[])
+        .await?;
+
+    conn.transaction(async |txn| {
+        txn.transaction(async |savepoint| {
+            savepoint
+                .execute("INSERT INTO widget (id) VALUES (1)", &[])
+                .await
+        })
+        .await
+        .expect("the savepoint is released");
+        let outcome = txn
+            .transaction(async |savepoint| {
+                savepoint
+                    .execute("INSERT INTO widget (id) VALUES (2)", &[])
+                    .await?;
+                roll_back::<()>()
+            })
+            .await;
+        assert_rolled_back(outcome);
+        Ok::<_, Error>(())
+    })
+    .await
+    .expect("the instrumented transaction commits");
+
+    assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 1);
+    assert_eq!(metrics.count("transaction_begin"), 3);
+    assert_eq!(metrics.count("transaction_commit"), 2);
+    assert_eq!(metrics.count("transaction_rollback"), 1);
+    assert_eq!(
+        metrics.count("query_success:execute:Some(1)"),
+        2,
+        "statements inside a savepoint stay instrumented: {:?}",
+        metrics.events()
+    );
+
+    drop(conn);
+    ctx.delete().await;
+
+    Ok(())
+}
+
+// [spec:pgorm:sem:metric.layer.tx+4/test]    an instrumented transaction runs in a spawned task
+#[pgorm_macros::test]
+pub async fn instrumented_transaction_runs_in_spawned_task() -> Result<(), Error> {
+    let ctx = TestContext::new("metric_layer_spawned_metrictx").await;
+    let metrics = RecordingMetrics::default();
+    let pool = InstrumentedPool::new(ctx.db.clone(), metrics.clone());
+
+    tokio::spawn(async move {
+        let mut conn = pool.get().await?;
+        conn.execute("CREATE TABLE widget (id int primary key)", &[])
+            .await?;
+        conn.transaction(async |txn| {
+            txn.transaction(async |savepoint| {
+                savepoint
+                    .execute("INSERT INTO widget (id) VALUES (1)", &[])
+                    .await
+            })
+            .await
+            .map_err(|e| Error::Custom(e.to_string()))
+        })
+        .await
+        .map_err(|e| Error::Custom(e.to_string()))
+    })
+    .await
+    .expect("the spawned task completes")?;
+
+    assert_eq!(metrics.count("transaction_begin"), 2);
+    assert_eq!(metrics.count("transaction_commit"), 2);
+
     ctx.delete().await;
 
     Ok(())
@@ -482,7 +581,7 @@ async fn drive_all_hooks<M: MetricsCollector>(metrics: &M) {
     metrics.record_transaction_rollback(elapsed).await;
 }
 
-// [spec:pgorm:def:metric.layer.collector+2/test]    seven hook points, all required of an implementor
+// [spec:pgorm:def:metric.layer.collector+3/test]    seven hook points, all required of an implementor
 #[pgorm_macros::test]
 pub async fn collector_defines_seven_async_hooks() {
     let metrics = RecordingMetrics::default();
@@ -503,7 +602,7 @@ pub async fn collector_defines_seven_async_hooks() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector+2/test]    NoOpMetrics observes nothing at all
+// [spec:pgorm:def:metric.layer.collector+3/test]    NoOpMetrics observes nothing at all
 #[pgorm_macros::test]
 pub async fn noop_metrics_hooks_do_nothing() {
     let captured = CapturedEvents::default();
@@ -522,7 +621,7 @@ pub async fn noop_metrics_hooks_do_nothing() {
     );
 }
 
-// [spec:pgorm:def:metric.layer.collector+2/test]    LoggingMetrics' tracing levels per hook
+// [spec:pgorm:def:metric.layer.collector+3/test]    LoggingMetrics' tracing levels per hook
 #[pgorm_macros::test]
 pub async fn logging_metrics_emits_expected_levels() {
     let captured = CapturedEvents::default();
@@ -608,20 +707,24 @@ pub async fn wrappers_expose_inner_and_metrics() -> Result<(), Error> {
         .await?;
     assert_eq!(metrics.count("query_success:execute"), 1);
 
-    let txn: InstrumentedTransaction<'_, RecordingMetrics> = conn.begin_instrumented().await?;
-    assert_eq!(txn.metrics().events(), metrics.events());
-    let inner_txn = txn.inner().expect("the transaction has not been consumed");
-    let before = metrics.events().len();
-    inner_txn
-        .execute("INSERT INTO widget (id) VALUES (2)", &[])
-        .await?;
-    assert_eq!(
-        metrics.events().len(),
-        before,
-        "the unwrapped transaction records nothing: {:?}",
-        metrics.events()
-    );
-    txn.commit().await?;
+    conn.transaction(
+        async |txn: &mut InstrumentedTransaction<'_, RecordingMetrics>| {
+            assert_eq!(txn.metrics().events(), metrics.events());
+            let before = metrics.events().len();
+            txn.inner()
+                .execute("INSERT INTO widget (id) VALUES (2)", &[])
+                .await?;
+            assert_eq!(
+                metrics.events().len(),
+                before,
+                "the unwrapped transaction records nothing: {:?}",
+                metrics.events()
+            );
+            Ok::<_, Error>(())
+        },
+    )
+    .await
+    .expect("the instrumented transaction commits");
 
     assert_eq!(conn.query_all("SELECT id FROM widget", &[]).await?.len(), 2);
     let prepared =

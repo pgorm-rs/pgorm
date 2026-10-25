@@ -450,21 +450,23 @@ pub trait ActiveModelTrait: Clone + Debug {
 /// owns and let the `Err` reach the rollback:
 ///
 /// ```no_run
-/// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, TransactionTrait};
+/// # use pgorm::{entity::*, error::*, query::*, tests_cfg::cake, DatabasePool, TransactionError, TransactionTrait};
 /// #
-/// # async fn example(pool: &DatabasePool) -> Result<(), Error> {
-/// let mut db = pool.get().await?;
-/// let txn = db.begin().await?;
+/// # async fn example(pool: &DatabasePool) -> Result<(), TransactionError<Error>> {
+/// let mut db = pool.get().await.map_err(TransactionError::Connection)?;
 ///
-/// let apple = cake::ActiveModel {
-///     name: set("Apple Pie"),
-///     ..Default::default()
-/// };
-///
-/// // An `Err` from `after_save` propagates out of this `?` with `txn` never
-/// // committed, so the insert is rolled back when `txn` drops.
-/// let apple = apple.insert(&txn).await?;
-/// txn.commit().await?;
+/// // An `Err` from `after_save` propagates out of the closure, so the
+/// // transaction rolls back and the insert with it.
+/// let apple = db
+///     .transaction(async |txn| {
+///         cake::ActiveModel {
+///             name: set("Apple Pie"),
+///             ..Default::default()
+///         }
+///         .insert(&txn)
+///         .await
+///     })
+///     .await?;
 /// # Ok(())
 /// # }
 /// ```

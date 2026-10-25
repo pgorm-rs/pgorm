@@ -1,5 +1,6 @@
 use pgorm::{
     ColumnTrait, ColumnType, ConnectionTrait, DatabasePool, EntityTrait, Error, Iterable, Schema,
+    TransactionError,
 };
 use pgorm_query::{
     Name, QueryBuilder, TableCreateStatement,
@@ -108,4 +109,31 @@ where
 pub fn rust_dec<T: ToString>(v: T) -> rust_decimal::Decimal {
     use std::str::FromStr;
     rust_decimal::Decimal::from_str(&v.to_string()).unwrap()
+}
+
+/// The error a test's transaction closure returns to roll its transaction back
+/// rather than commit it.
+const ROLL_BACK: &str = "the test rolls this transaction back";
+
+/// What a transaction closure returns to roll its transaction back.
+pub fn roll_back<T>() -> Result<T, Error> {
+    Err(Error::Custom(ROLL_BACK.to_owned()))
+}
+
+/// Assert that a closure transaction ended through [`roll_back`], and not
+/// through a failure of its own.
+pub fn assert_rolled_back<T: std::fmt::Debug>(outcome: Result<T, TransactionError<Error>>) {
+    match outcome {
+        Err(TransactionError::Transaction(Error::Custom(message))) if message == ROLL_BACK => {}
+        other => panic!("expected the closure's own rollback, got {other:?}"),
+    }
+}
+
+/// The error a closure transaction's `COMMIT` failed with, asserting that the
+/// commit failed and not the closure.
+pub fn commit_refused<T: std::fmt::Debug>(outcome: Result<T, TransactionError<Error>>) -> Error {
+    match outcome {
+        Err(TransactionError::Connection(error)) => error,
+        other => panic!("expected the COMMIT to fail, got {other:?}"),
+    }
 }

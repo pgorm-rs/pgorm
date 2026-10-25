@@ -62,13 +62,14 @@ pub async fn pool_parallel_transactions_poolpar() -> Result<(), Error> {
 
     let outcomes = join_all(conns.iter_mut().enumerate().map(|(i, conn)| async move {
         let name = format!("Parallel Bakery {i}");
-        let txn = conn.begin().await?;
+        conn.transaction(async |txn| {
+            insert_bakery(&txn, &name, i as f64).await?;
 
-        insert_bakery(&txn, &name, i as f64).await?;
+            assert_eq!(count_bakeries(&txn, &name).await?, 1);
 
-        assert_eq!(count_bakeries(&txn, &name).await?, 1);
-
-        txn.commit().await
+            Ok::<_, Error>(())
+        })
+        .await
     }))
     .await;
 
@@ -119,17 +120,26 @@ pub async fn pool_checkouts_are_distinct_sessions_poolpar() -> Result<(), Error>
     let mut first = ctx.db.get().await?;
     let mut second = ctx.db.get().await?;
 
-    let first_txn = first.begin().await?;
-    let second_txn = second.begin().await?;
+    // The two transactions are open at once, one inside the other's closure,
+    // and neither sees the other's uncommitted row.
+    first
+        .transaction(async |first_txn| {
+            second
+                .transaction(async |second_txn| {
+                    insert_bakery(&first_txn, "First Bakery", 10.4).await?;
+                    insert_bakery(&second_txn, "Second Bakery", 15.0).await?;
 
-    insert_bakery(&first_txn, "First Bakery", 10.4).await?;
-    insert_bakery(&second_txn, "Second Bakery", 15.0).await?;
+                    assert_eq!(count_bakeries(&first_txn, "Bakery").await?, 1);
+                    assert_eq!(count_bakeries(&second_txn, "Bakery").await?, 1);
 
-    assert_eq!(count_bakeries(&first_txn, "Bakery").await?, 1);
-    assert_eq!(count_bakeries(&second_txn, "Bakery").await?, 1);
-
-    first_txn.commit().await?;
-    second_txn.commit().await?;
+                    Ok::<_, Error>(())
+                })
+                .await
+                .expect("the second transaction commits");
+            Ok::<_, Error>(())
+        })
+        .await
+        .expect("the first transaction commits");
 
     let observer = ctx.db.get().await?;
     assert_eq!(count_bakeries(&observer, "Bakery").await?, 2);

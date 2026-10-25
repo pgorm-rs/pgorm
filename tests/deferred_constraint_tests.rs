@@ -13,7 +13,7 @@
 pub mod common;
 pub use common::{TestContext, setup::*};
 use pgorm::pgorm_query::{ColumnDef, Deferrability, ForeignKey, Name, Table};
-use pgorm::{ConnectionTrait, TransactionTrait, entity::prelude::*};
+use pgorm::{ConnectionTrait, TransactionError, TransactionTrait, entity::prelude::*};
 
 #[pgorm_macros::test]
 async fn main() -> Result<(), Error> {
@@ -103,9 +103,9 @@ async fn a_deferred_key_admits_the_cycle(db: &mut DatabaseConnection) -> Result<
     )
     .await?;
 
-    let txn = db.begin().await?;
-    insert_cycle(&txn, "deferred_node").await?;
-    txn.commit().await?;
+    db.transaction(async |txn| insert_cycle(&txn, "deferred_node").await)
+        .await
+        .expect("the deferred cycle commits");
 
     let row = db
         .query_one("SELECT count(*) FROM deferred_node", &[])
@@ -131,24 +131,24 @@ async fn an_initially_immediate_key_can_still_be_deferred(
     )
     .await?;
 
-    {
-        let txn = db.begin().await?;
-        let refused = insert_cycle(&txn, "immediate_deferrable_node").await;
-        assert!(
-            refused.is_err(),
-            "INITIALLY IMMEDIATE checked at commit rather than per statement"
-        );
-        txn.rollback().await?;
-    }
+    let refused = db
+        .transaction(async |txn| insert_cycle(&txn, "immediate_deferrable_node").await)
+        .await;
+    assert!(
+        matches!(refused, Err(TransactionError::Transaction(_))),
+        "INITIALLY IMMEDIATE checked at commit rather than per statement"
+    );
 
-    let txn = db.begin().await?;
-    txn.execute(
-        "SET CONSTRAINTS immediate_deferrable_node_next_fk DEFERRED",
-        &[],
-    )
-    .await?;
-    insert_cycle(&txn, "immediate_deferrable_node").await?;
-    txn.commit().await?;
+    db.transaction(async |txn| {
+        txn.execute(
+            "SET CONSTRAINTS immediate_deferrable_node_next_fk DEFERRED",
+            &[],
+        )
+        .await?;
+        insert_cycle(&txn, "immediate_deferrable_node").await
+    })
+    .await
+    .expect("the cycle commits once the check is deferred");
 
     let row = db
         .query_one("SELECT count(*) FROM immediate_deferrable_node", &[])

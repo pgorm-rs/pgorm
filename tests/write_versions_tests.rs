@@ -362,33 +362,39 @@ async fn a_raced_upsert_reports_its_update() -> Result<(), Error> {
     let mut first = ctx.db.get().await?;
     stocked(&first, &[]).await?;
 
-    let tx = first.begin().await?;
-    Insert::one(item(7, 70, Shelf::Front).into_active_model())
-        .exec(&tx)
-        .await?;
     let second = ctx.db.get().await?;
-    let racing = tokio::spawn(async move {
-        Insert::one(item(7, 71, Shelf::Back).into_active_model())
-            .on_conflict(upsert_count())
-            .exec_returning_upsert(&second)
-            .await
-    });
     let observer = ctx.db.get().await?;
-    while !racing.is_finished() {
-        let waiting: i64 = observer
-            .query_one(
-                "SELECT count(*) FROM pg_stat_activity \
-                 WHERE datname = current_database() AND wait_event_type = 'Lock'",
-                &[],
-            )
-            .await?
-            .get(0);
-        if waiting > 0 {
-            break;
-        }
-        tokio::task::yield_now().await;
-    }
-    tx.commit().await?;
+    // The racing upsert starts while this transaction holds the key, and the
+    // transaction commits once it is seen waiting on the lock.
+    let racing = first
+        .transaction(async |tx| {
+            Insert::one(item(7, 70, Shelf::Front).into_active_model())
+                .exec(&tx)
+                .await?;
+            let racing = tokio::spawn(async move {
+                Insert::one(item(7, 71, Shelf::Back).into_active_model())
+                    .on_conflict(upsert_count())
+                    .exec_returning_upsert(&second)
+                    .await
+            });
+            while !racing.is_finished() {
+                let waiting: i64 = observer
+                    .query_one(
+                        "SELECT count(*) FROM pg_stat_activity \
+                         WHERE datname = current_database() AND wait_event_type = 'Lock'",
+                        &[],
+                    )
+                    .await?
+                    .get(0);
+                if waiting > 0 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            Ok::<_, Error>(racing)
+        })
+        .await
+        .expect("the first insert commits");
 
     let raced = racing.await.expect("the racing upsert's task")?;
     assert_eq!(

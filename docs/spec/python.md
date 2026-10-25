@@ -454,7 +454,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > channel pgorm-migration's runner notifies. Credentials MUST be redacted from
 > representations, exceptions and default diagnostic logs.
 
-> [spec:pgorm:req:python.transactions]
+> [spec:pgorm:req:python.transactions+1]
 > Transactions MUST support explicit begin/commit/rollback and asynchronous
 > context managers, including supported nested savepoints. A successful block
 > commits; an exceptional or cancelled block rolls back or discards the
@@ -462,6 +462,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > foreign transaction handles MUST fail explicitly. Bindings MUST preserve
 > database error causes and MUST NOT retry writes or failed transactions
 > implicitly beyond the documented Rust behavior.
+>
+> Each transaction and savepoint MUST run inside pgorm's closure transaction
+> (`conn.tx.closure`), a task on the runtime serving its commands from inside
+> the closure: Python's commit returns `Ok` from it and a rollback `Err`, so
+> pgorm issues the `COMMIT` or `ROLLBACK`, and a connection given up mid-command
+> drops the closure's future rather than await a rollback on it. A failed
+> `COMMIT`, and a failed `ROLLBACK` — which pgorm reports as
+> `TransactionError::RollbackFailed` (`conn.tx.closure`) — each reach Python
+> with their database error and discard the connection, whose state is then
+> unknown; an abandoned frame whose `ROLLBACK` fails discards it too.
 
 > [spec:pgorm:req:python.cancellation]
 > Cancellation, timeout, iterator abandonment and pool shutdown MUST release

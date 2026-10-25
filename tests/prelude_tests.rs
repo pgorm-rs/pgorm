@@ -22,9 +22,12 @@ async fn _connection_vocabulary(
     conn: &mut DatabaseConnection,
 ) -> Result<(), Error> {
     let _: DatabaseConnection = pool.get().await?;
-    let txn: DatabaseTransaction<'_> = TransactionTrait::begin(conn).await?;
-    let _: u64 = txn.execute("SELECT 1", &[]).await?;
-    txn.rollback().await
+    TransactionTrait::transaction(conn, async |txn: &mut DatabaseTransaction<'_>| {
+        txn.execute("SELECT 1", &[]).await
+    })
+    .await
+    .map(|_: u64| ())
+    .map_err(|error| Error::Custom(error.to_string()))
 }
 
 /// The paginator and the loader are traits, so their methods are unreachable
