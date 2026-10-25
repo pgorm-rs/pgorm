@@ -468,7 +468,7 @@ impl<S, K> Cursor<S, K> {
     /// entry's casts, dropping any entry that restates one of the order
     /// columns: ordering a source by its own primary key would otherwise
     /// install that key twice.
-    // [spec:pgorm:sem:query.graph.cursor+3]
+    // [spec:pgorm:sem:query.graph.cursor+4]
     fn set_graph_tiebreaks(&mut self, tiebreaks: Tiebreaks) -> &mut Self {
         let table = self.table.to_string();
         let order: Vec<String> = self.order_columns.iter().map(|c| c.to_string()).collect();
@@ -608,7 +608,7 @@ fn pk_tiebreaks<T: EntityTrait>() -> Tiebreaks {
 
 /// A graph's rows are decoded by [`GraphRow`], so that is what its cursor
 /// selects.
-// [spec:pgorm:sem:query.graph.cursor+3]
+// [spec:pgorm:sem:query.graph.cursor+4]
 impl<E, S> CursorTrait for SelectGraph<E, S>
 where
     E: EntityTrait,
@@ -617,7 +617,8 @@ where
     type Selector = GraphRow<E, S>;
 }
 
-// [spec:pgorm:sem:query.graph.cursor+3]
+// [spec:pgorm:sem:query.graph.cursor+4]
+// [spec:pgorm:sem:query.graph.slice]
 impl<E, S> SelectGraph<E, S>
 where
     E: EntityTrait,
@@ -657,13 +658,18 @@ where
     /// The order columns are the root's; a slot's column is
     /// [`cursor_by_on`](Self::cursor_by_on)'s job.
     ///
+    /// Only an unsliced graph has a cursor: the window
+    /// ([`Cursor::first`] / [`Cursor::last`]) is the cursor's row limit, and
+    /// a graph's [`offset`](Self::offset) would skip rows past the boundary
+    /// on every page.
+    ///
     /// ```compile_fail,E0277
     /// # use pgorm::{entity::*, query::*, tests_cfg::{cake, fruit}};
     /// cake::Entity::graph()
     ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
     ///     .cursor_by(fruit::Column::Name);
     /// ```
-    // [spec:pgorm:sem:query.graph.cursor+3]
+    // [spec:pgorm:sem:query.graph.cursor+4]
     pub fn cursor_by<C>(self, order_columns: C) -> Cursor<GraphRow<E, S>, C::ValueType>
     where
         C: KeyOf<E>,
@@ -717,7 +723,7 @@ where
     ///     .join_maybe::<fruit::Entity>(cake::Relation::Fruit.def())
     ///     .cursor_by_on::<1, _>(cake::Column::Name);
     /// ```
-    // [spec:pgorm:sem:query.graph.cursor+3]
+    // [spec:pgorm:sem:query.graph.cursor+4]
     #[doc(alias = "cursor_by_other")]
     pub fn cursor_by_on<const I: usize, C>(
         self,
@@ -764,7 +770,7 @@ where
 mod cursor_bind;
 pub use cursor_bind::ValueHolder;
 
-// [spec:pgorm:sem:query.graph.cursor+3/test]    a graph's cursor orders on the
+// [spec:pgorm:sem:query.graph.cursor+4/test]    a graph's cursor orders on the
 // root and tiebreaks on every decoded slot's primary key — each qualified by
 // the slot's effective identifier, in declaration order — while
 // `cursor_by_on` orders on one slot chosen by position and tiebreaks on the
@@ -822,7 +828,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:sem:query.graph.cursor+3/test]    ordered on a root column
+    // [spec:pgorm:sem:query.graph.cursor+4/test]    ordered on a root column
     // that is not its key, the root's own primary key is installed between
     // the order columns and the slots' keys; ordered on that key as well, the
     // restated entry is dropped rather than installed twice

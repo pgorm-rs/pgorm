@@ -795,7 +795,7 @@ async fn domain_enum_relations_join_as_the_enum() -> Result<(), Error> {
 /// the order-column value.
 // [spec:pgorm:sem:exec.cursor.keyset+8/test]    a whole-keyset boundary casts a tiebreak column
 // whose domain is over an enum, and its value, to the enum, live
-// [spec:pgorm:sem:query.graph.cursor+3/test]    the root's key, a joined slot's key and the
+// [spec:pgorm:sem:query.graph.cursor+4/test]    the root's key, a joined slot's key and the
 // ordered slot's own key, each a domain over an enum, tiebreak a graph cursor live
 #[pgorm_macros::test]
 async fn domain_enum_graph_cursors_tiebreak_as_the_enum() -> Result<(), Error> {

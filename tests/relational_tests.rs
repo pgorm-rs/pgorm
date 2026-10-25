@@ -462,7 +462,7 @@ pub async fn having() {
 
 // [spec:pgorm:sem:query.graph.decode+1/test]    a two-source graph decoding
 // `(M, Option<N>)` through the `s0_` / `s1_` column prefixes, against real rows
-// [spec:pgorm:sem:query.graph.grouped+1/test]    `all_grouped` on a unary primary
+// [spec:pgorm:sem:query.graph.grouped+2/test]    `all_grouped` on a unary primary
 // key: children in row order, one entry per root key, and an empty `Vec` for a
 // root row the slot matched nothing for
 // [spec:pgorm:req:entity.relation+1/test]    `Related::find_related` inner-joins
@@ -1110,7 +1110,7 @@ mod composite_child {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:sem:query.graph.grouped+1/test]    grouping by a composite
+// [spec:pgorm:sem:query.graph.grouped+2/test]    grouping by a composite
 // (pair-arity) root primary key, in row order, with a childless parent still
 // producing an entry
 #[pgorm_macros::test]

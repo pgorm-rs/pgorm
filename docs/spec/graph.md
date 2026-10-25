@@ -19,10 +19,12 @@ chapter is stated twice anywhere else.
 
 ## Declaration
 
-> [spec:pgorm:def:query.graph]
-> `SelectGraph<E: EntityTrait, S = ()>` is a relational read declared as a
-> root entity plus a typed tuple `S` of joined, decoded sources — *slots* —
-> in join order. `EntityTrait::graph()` constructs it, as `find()` constructs
+> [spec:pgorm:def:query.graph+1]
+> `SelectGraph<E: EntityTrait, S = (), R = Unsliced>` is a relational read
+> declared as a root entity plus a typed tuple `S` of joined, decoded
+> sources — *slots* — in join order, and a marker `R` recording whether
+> `limit` or `offset` has cut the read to a window of rows
+> (`[spec:pgorm:sem:query.graph.slice]`). `EntityTrait::graph()` constructs it, as `find()` constructs
 > a `Select<E>`; `SelectGraph::<E>::new()` and `Default` are the same
 > construction. Construction initialises the statement with
 > `FROM E::default().table_ref()` and immediately projects `E`'s columns
@@ -57,7 +59,9 @@ chapter is stated twice anywhere else.
 > `apply_if` work as on every other builder. It deliberately does NOT
 > implement `QuerySelect`: the writer owns the projection, and the fluent
 > surface offers no way to edit it
-> (`[spec:pgorm:sem:query.graph.slots+1]`). `QueryTrait::query()` remains the
+> (`[spec:pgorm:sem:query.graph.slots+1]`). Its row range is set by its own
+> `limit` and `offset`, which re-type it
+> (`[spec:pgorm:sem:query.graph.slice]`). `QueryTrait::query()` remains the
 > raw escape hatch it is everywhere — a caller mutating the statement
 > through it stands outside every guarantee this family states, on the same
 > terms as handing a hand-built statement to `Selector::from_select`.
@@ -207,16 +211,18 @@ chapter is stated twice anywhere else.
 
 ## Terminals
 
-> [spec:pgorm:sem:query.graph.terminals+1]
+> [spec:pgorm:sem:query.graph.terminals+2]
 > The graph terminates by converting into `Selector<GraphRow<E, S>>`;
 > everything past that conversion is machinery specified elsewhere, and the
 > graph MUST NOT duplicate any of it. `all(db)` and `one_opt(db)` are
-> `Selector::all` / `one_opt` (`[spec:pgorm:sem:exec.crud.select+3]`:
-> `one_opt` injects `LIMIT 1` and answers `Ok(None)` for zero rows).
-> `stream(db)` is `Selector::stream`, yielding
+> `Selector::all` / `one_opt` (`[spec:pgorm:sem:exec.crud.select+4]`:
+> `one_opt` narrows the row limit to one row and answers `Ok(None)` for
+> zero rows). `stream(db)` is `Selector::stream`, yielding
 > `PinBoxSendStream<'db, Result<Item, Error>>` with lazy per-item decode
-> (`[spec:pgorm:sem:exec.stream.decode+1]`). Pagination and `count` reach
-> the graph through `PaginatorTrait` over the same selector
+> (`[spec:pgorm:sem:exec.stream.decode+1]`). These three exist on a sliced
+> graph as on an unsliced one, and read the window
+> `[spec:pgorm:sem:query.graph.slice]` states. Pagination and `count` reach
+> an unsliced graph through `PaginatorTrait` over the same selector
 > (`[spec:pgorm:def:exec.paginator+3]`); page boundaries fall between
 > *rows*, not between root models, so a root with several matching slot
 > rows spans pages exactly as the underlying SQL does — the grouped read
@@ -233,13 +239,16 @@ chapter is stated twice anywhere else.
 > a caller-shaped projection is `Select<E>`'s job (or the pipeline's), not
 > the graph's.
 
-> [spec:pgorm:sem:query.graph.grouped+1]
+> [spec:pgorm:sem:query.graph.grouped+2]
 > `all_grouped(db) -> Vec<(E::Model, Vec<F::Model>)>` exists on exactly one
-> shape: a graph whose slot tuple is `(Opt<F>,)` — one optional slot beside
-> the root, `via()` hops permitted (a junction-mediated has-many is this
-> shape). On any other tuple the method does not exist; asking for it is a
-> compile error, so a grouped read over two slots — whose meaning this rule
-> does not define — cannot be written.
+> shape: an unsliced graph whose slot tuple is `(Opt<F>,)` — one optional
+> slot beside the root, `via()` hops permitted (a junction-mediated has-many
+> is this shape). On any other tuple, and on a graph `limit` or `offset` has
+> sliced (`[spec:pgorm:sem:query.graph.slice]`), the method does not exist;
+> asking for it is a compile error, so a grouped read over two slots — whose
+> meaning this rule does not define — cannot be written, and neither can a
+> grouped read of a window of rows, whose first or last entry would hold
+> only part of its root's children.
 >
 > Caller ordering dominates. `all_grouped` appends `E`'s primary-key
 > columns, qualified with `E`'s table, ascending, as trailing ORDER BY
@@ -263,9 +272,11 @@ chapter is stated twice anywhere else.
 > root twice; adjacency is a property of primary-key ordering, not a
 > precondition of correctness.
 
-> [spec:pgorm:sem:query.graph.cursor+3]
+> [spec:pgorm:sem:query.graph.cursor+4]
 > `cursor_by<C: KeyOf<E>>(cols)` re-homes the joined keyset cursor
-> onto the graph: order columns on the root's table, then the root's own
+> onto an unsliced graph — the cursor's window is its row limit, so a
+> sliced one has neither method (`[spec:pgorm:sem:query.graph.slice]`):
+> order columns on the root's table, then the root's own
 > primary key, then the primary-key columns of every decoded slot
 > installed as unary secondary order entries — qualified with each slot's
 > *effective* identifier (its alias when the slot was declared `_as`, per
@@ -311,6 +322,71 @@ chapter is stated twice anywhere else.
 > are claims about `SelectGraph`, not about every value derived from it;
 > a column appended through the cursor is outside the decode's witness
 > set and is simply never read.
+
+## Slicing
+
+> [spec:pgorm:sem:query.graph.slice]
+> `limit(n)` and `offset(n)` cut a graph's read to a window of rows. Each
+> takes `impl Into<Option<u64>>`, as `QuerySelect`'s do, so `None` removes
+> a limit or offset set before; sets its clause on the graph's one
+> statement, replacing rather than accumulating, the count bound as a
+> parameter; and returns the graph re-typed `SelectGraph<E, S, Sliced>`. The
+> third parameter is `Unsliced` from construction, and the two markers are
+> uninhabited types: nothing converts a sliced graph back, and the type
+> records that the caller has taken charge of the row range whatever value
+> was passed. A sliced graph keeps every builder method — the edges,
+> `filter`, `order_by`, and `limit` and `offset` again — so a slice may be
+> written anywhere in the chain.
+>
+> The window counts rows of the join product, not roots. `all`, `one_opt`
+> and `stream` (`[spec:pgorm:sem:query.graph.terminals+2]`) answer exactly
+> the rows the SQL returns: a root whose many slot matched three rows
+> spends three of a limit, and an offset can start part-way through one
+> root's rows. `one_opt` narrows the limit as every selector does
+> (`[spec:pgorm:sem:exec.crud.select+4]`) — to one row, never wider, the
+> offset kept — so `limit(0)` reads none and `offset(k)` answers the row
+> after the first `k`.
+>
+> Three reads decide the row range themselves, and none of them exists on a
+> sliced graph. Asking for one is a compile error (E0599), and each absence
+> MUST be pinned by a compile_fail doctest:
+>
+> - `all_grouped` (`[spec:pgorm:sem:query.graph.grouped+2]`). A window of
+>   rows can start or end part-way through a root's children, and the entry
+>   holding the part is indistinguishable from a complete one.
+> - `PaginatorTrait`'s `paginate` and `count`
+>   (`[spec:pgorm:sem:query.graph.terminals+2]`). A page's LIMIT and OFFSET
+>   replace the slice's (`[spec:pgorm:sem:exec.paginator.fetch+3]`) and the
+>   count strips them (`[spec:pgorm:sem:exec.paginator.count]`), so both
+>   would drop it without a word.
+> - `cursor_by` and `cursor_by_on` (`[spec:pgorm:sem:query.graph.cursor+4]`).
+>   The cursor's window, `first` or `last`, is its row limit and replaces
+>   any other (`[spec:pgorm:sem:exec.cursor.window+1]`), and an OFFSET
+>   would skip rows past the boundary of every execution, rows the keyset
+>   places on the page.
+>
+> Nothing is lost by the refusals: an unsliced graph's page `k` at size `n`
+> is the slice `offset(k * n).limit(n)`, and its cursor's `first(n)` is
+> `limit(n)` under the cursor's order.
+>
+> `limit` is not given a per-root meaning on the grouped read. Its meaning
+> would then depend on the terminal reached later — rows for `all`, roots
+> for `all_grouped` — so the call site of `limit` could not say what it
+> counts; and the grouped read keys on each root's first occurrence under
+> the caller's ordering, which may order on slot columns and interleave
+> roots, so cutting it by roots in SQL means ranking those first
+> occurrences around the generated projection, an execution shape of its
+> own beside the one selector the terminals share. Nor are row-level
+> semantics on the grouped read documented and trusted: that returns a
+> value that looks complete and is not, which
+> `[dec:pgorm:invalid-states-unrepresentable]` rejects. The first `n` roots
+> with all of their related rows is a root read and a load —
+> `E::find().limit(n)`, then `load_many` or `load_many_via`
+> (`[spec:pgorm:req:query.loader+1]`).
+>
+> `QueryTrait::query()` remains the raw escape hatch it is everywhere
+> (`[spec:pgorm:def:query.graph+1]`): a limit written through it leaves the
+> graph `Unsliced` in its type, outside this rule's guarantees.
 
 ## Aliasing
 

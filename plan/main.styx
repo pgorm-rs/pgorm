@@ -14009,6 +14009,9 @@ children (
         id graph-limit-offset
         title "A graph takes limit and offset as the other SELECT builders do"
         kind @feat
+        implements {
+            main ([spec:pgorm:sem:query.graph.slice])
+        }
         log (
             {
                 at 2026-10-23T20:42:26.025853Z
@@ -14029,6 +14032,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by coming-from-seaorm. via() has no _as form, so a SeaORM linked chain that passes through the same table twice has no direct graph spelling except an alias on the last hop. Add via_as(rel, alias) with the same aliasing terms as join_maybe_as / join_one_as (query.graph.aliases), with live tests of a self-referencing path."
+            }
+
+            {
+                at 2026-10-25T22:09:45.337853Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

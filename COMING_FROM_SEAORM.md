@@ -83,6 +83,8 @@ compiled.
 | `find_with_related(F)` | `graph().related_maybe::<F>().all_grouped(db)` |
 | `find_also_linked(L)` | `graph()` with `via(..)` hops and `join_maybe` |
 | `find_with_linked(L)` | the same, then `all_grouped(db)` |
+| `find_also_related(F).limit(n)` | `graph().related_maybe::<F>().limit(n)`: `n` rows |
+| `find_with_related(F).limit(n)` | `find().limit(n)`, then `load_many(F, db)` |
 | `select_also(F)`, `select_with(F)` | `join_maybe::<F>(rel)` |
 | `SelectTwo`, `SelectTwoMany` | `SelectGraph` |
 | `cursor_by_other(col)` | `cursor_by_on::<1, _>(col)` |
@@ -782,14 +784,48 @@ same table twice needs the second visit aliased: `join_maybe_as` and
   and `into_model`.
 - A graph has no `one`, because one root can produce several rows. Use
   `one_opt` for the first row.
-- A graph has no `limit` or `offset` methods yet. `paginate` and the cursor
-  (`cursor_by(..).first(n)`) work on a graph; for a plain limit, set it on
-  the statement with `QueryTrait::query`, as in `graph.query().limit(10)`.
+- `limit` and `offset` work on a graph, and count rows rather than roots
+  (see below).
 - `cursor_by_other` is `cursor_by_on::<1, _>(column)`, where `1` is the slot's
   position (the root is `0`). The cursor adds every slot's primary key as a
   tiebreak, so rows that share an order value still page correctly.
 - `ModelTrait::find_related` and `find_linked`, which read one model's
   related rows, are unchanged.
+
+`limit` and `offset` on a graph count rows of the join, as they did on
+`SelectTwo`: a cake with three fruit uses three rows of `limit(10)`. A graph
+you have limited or offset has no `all_grouped`, `paginate`, `count` or
+`cursor_by`. Each of those sets the rows itself, and a grouped read of ten
+rows would end with a cake whose fruit list is cut short, which is what
+`find_with_related(..).limit(10)` silently gave you in SeaORM. To read ten
+cakes with all their fruit, limit the cakes and load the fruit:
+
+```rust,no_run
+use pgorm::{entity::prelude::*, tests_cfg::{cake, fruit}};
+
+async fn first_ten(db: &DatabaseConnection) -> Result<(), Error> {
+    // Ten rows: a cake appears once for each fruit it has.
+    let rows: Vec<(cake::Model, Option<fruit::Model>)> = cake::Entity::graph()
+        .related_maybe::<fruit::Entity>()
+        .order_by_asc(cake::Column::Id)
+        .limit(10)
+        .all(db)
+        .await?;
+
+    // Ten cakes, each with all of its fruit.
+    let cakes: Vec<cake::Model> = cake::Entity::find()
+        .order_by_asc(cake::Column::Id)
+        .limit(10)
+        .all(db)
+        .await?;
+    let fruit: Vec<Vec<fruit::Model>> = cakes.load_many(fruit::Entity, db).await?;
+    let _ = (rows, fruit);
+    Ok(())
+}
+```
+
+For pages, use `paginate` or `cursor_by(..).first(n)` on a graph without a
+limit; they count rows in the same way.
 
 ## Loading related rows in batches
 
