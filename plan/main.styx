@@ -13987,6 +13987,13 @@ children (
                 kind @note
                 text "Found by schema-fk-domain-enum (c8da47a9). create_table_from_entity now refuses a belongs_to over a column typed as a domain over an enum, and pgorm-python maps the refusal to ConstructionError from schema.from_entity, but nothing tests that path: it needs an application-binding entity with a domain-over-enum key. Add it, and bump python.schema if its text should say so."
             }
+
+            {
+                at 2026-10-25T22:09:47.077279Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -14066,12 +14073,20 @@ children (
         title "The statement-cache listener survives a server's idle_session_timeout without clearing every cache each time"
         kind @fix
         deps (statement-cache-cross-process)
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.586012Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by statement-cache-cross-process. A server with idle_session_timeout set ends the pool's idle listening connection; each reconnect clears every statement cache, since a notification may have been missed. Keep the connection from idling out (a periodic no-op query, or SET idle_session_timeout = 0 on the listener's session, which is the cheaper and exact fix if the role may set it) and test it against a server with the timeout set."
+            }
+
+            {
+                at 2026-10-25T22:49:56.472812Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14166,6 +14181,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found 2026-10-24 merging migration-ledger-schema: at load 40, identifier_oracle::live_capture::live_sites_hold_every_hostile_name failed after 226 s with \"site `pgorm/cursor.table`, name `zero-width-joiner`: the run stopped after 0 of 1 statements: []\"; alone it passes in 26 s. A capture that silently returns nothing under load hides real failures. Find what bounds the capture (a timeout, a log read racing the server) and make it wait for the statement or fail saying it timed out."
+            }
+
+            {
+                at 2026-10-25T22:09:46.652239Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

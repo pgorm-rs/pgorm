@@ -701,7 +701,7 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
 /// session in commit order.
 // [spec:pgorm:sem:migration.up+4/test]    a batch that applied a migration notifies the channel as
 // it commits, and a run that applied nothing, or a migrator naming no channel, does not
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    another pool listening on the default
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    another pool listening on the default
 // channel clears once the runner's batch commits
 #[tokio::test]
 async fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {

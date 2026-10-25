@@ -1250,6 +1250,9 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id cache-listener-keepalive, kind @complete, author "brendan@necessary.nu", at 2026-10-25T22:49:56.472812Z}
+    {id ident-oracle-load-flake, kind @doing, author "brendan@necessary.nu", at 2026-10-25T22:09:46.652239Z}
+    {id python-schema-refusal-test, kind @doing, author "brendan@necessary.nu", at 2026-10-25T22:09:47.077279Z}
 )
 
 impl_evidence (

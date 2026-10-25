@@ -588,14 +588,16 @@ pub struct ManagerConfig {
     /// channel, opened when the pool opens its first connection. It is not
     /// lent, counts against no size, and is reopened if it drops, the caches
     /// being cleared once each time its `LISTEN` takes effect, since a
-    /// notification sent while it was down reached nothing. A notification's
-    /// payload is ignored. [`STATEMENT_CACHE_CHANNEL`] is the channel
+    /// notification sent while it was down reached nothing. It sets its own
+    /// session's `idle_session_timeout` to 0, so a server that ends idle
+    /// sessions does not end it. A notification's payload is ignored.
+    /// [`STATEMENT_CACHE_CHANNEL`] is the channel
     /// pgorm-migration's runner notifies once a batch that applied a migration
     /// commits.
     ///
     /// [`StatementCaches::clear_before_reuse`]: super::StatementCaches::clear_before_reuse
     /// [`STATEMENT_CACHE_CHANNEL`]: super::STATEMENT_CACHE_CHANNEL
-    // [spec:pgorm:req:conn.pool.statement-cache.listen]    the setting, off by default
+    // [spec:pgorm:req:conn.pool.statement-cache.listen+1]    the setting, off by default
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub statement_cache_channel: Option<String>,
 }

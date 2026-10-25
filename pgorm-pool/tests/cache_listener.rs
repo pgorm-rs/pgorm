@@ -119,7 +119,7 @@ async fn cleared(pool: &Pool) -> Option<()> {
     (pool.get().await.unwrap().statement_cache.size() == 0).then_some(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a notification on the channel, whatever
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a notification on the channel, whatever
 // its payload, clears the cache of every connection before it is next lent
 #[tokio::test]
 async fn a_notification_clears_the_cache() {
@@ -137,7 +137,7 @@ async fn a_notification_clears_the_cache() {
     eventually("the clear", || cleared(&pool)).await;
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a terminated listener reconnects, clears
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a terminated listener reconnects, clears
 // once for the notifications it may have missed, and listens again
 #[tokio::test]
 async fn a_lost_listener_reconnects_and_clears() {
@@ -175,7 +175,7 @@ async fn a_lost_listener_reconnects_and_clears() {
     assert_eq!(listening_backend(&pool, &channel).await, second);
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    stopping the listener closes its
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    stopping the listener closes its
 // connection while the pool lives on
 #[tokio::test]
 async fn stopping_the_listener_closes_its_connection() {
@@ -190,7 +190,7 @@ async fn stopping_the_listener_closes_its_connection() {
     .await;
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    dropping the pool ends the listener and
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    dropping the pool ends the listener and
 // closes its connection
 #[tokio::test]
 async fn dropping_the_pool_closes_the_listener() {
