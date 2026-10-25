@@ -851,28 +851,26 @@ async fn a_ledger_schema_is_created_from_nothing() -> Result<(), Error> {
 async fn an_existing_ledger_schema_is_used_as_found() -> Result<(), Error> {
     use common::migrator::ledger_schema::{LEDGER_SCHEMA, Separate};
 
-    const ROLE: &str = "pgorm_migration_schema_owner";
-
     let ctx = TestContext::new("pgorm_migration_schema_existing").await;
-    ctx.create_role(ROLE).await;
+    let role = ctx.create_role("pgorm_migration_schema_owner").await;
 
     let conn = ctx.db.get().await?;
     conn.batch_execute(&format!(
-        "CREATE SCHEMA \"{LEDGER_SCHEMA}\" AUTHORIZATION {ROLE}; \
-         GRANT CREATE, USAGE ON SCHEMA public TO {ROLE}"
+        "CREATE SCHEMA \"{LEDGER_SCHEMA}\" AUTHORIZATION \"{role}\"; \
+         GRANT CREATE, USAGE ON SCHEMA public TO \"{role}\""
     ))
     .await?;
     let can_create: bool = conn
         .query_one(
             "SELECT has_database_privilege($1, current_database(), 'CREATE')",
-            &[&ROLE],
+            &[&role],
         )
         .await?
         .get(0);
     assert!(!can_create);
     drop(conn);
 
-    let owner = ctx.pool_as(ROLE);
+    let owner = ctx.pool_as(&role);
     Separate::up(owner.clone(), None).await?;
     Separate::up(owner.clone(), None).await?;
     drop(owner);
@@ -884,7 +882,7 @@ async fn an_existing_ledger_schema_is_used_as_found() -> Result<(), Error> {
     assert_eq!(count_rows(&ctx.db, "cake").await?, 2);
 
     ctx.delete().await;
-    ctx.drop_role(ROLE).await;
+    ctx.drop_role(&role).await;
     Ok(())
 }
 

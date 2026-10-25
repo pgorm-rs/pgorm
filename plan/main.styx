@@ -5507,6 +5507,14 @@ children (
                         text "Re-covered at query.graph.cursor +3 (the domain-over-enum tiebreak casts from 32ab45e8, described in the note above): the state's recorded version was still +2 until the migration-sql-files commit refreshed it; every site of the rule is pinned at +3 and none is stale."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-24T06:24:46.16168Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: query.graph.cursor+3 moved after this node's delivery (32ab45e8, a graph cursor's tiebreak on a key whose domain is over an enum compares as the enum), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 
@@ -7039,6 +7047,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-covered at python.schema +1 (truth testing refused on schema objects, 1c883ab5, re-checked in the note above): the state's recorded version was still the bare rule until the migration-sql-files commit refreshed it; every site of the rule is pinned at +1 and none is stale."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-24T06:24:46.635199Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: python.schema+1 moved after this node's delivery (1c883ab5, every Python schema object and Compiled refuse truth testing), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
                 )
@@ -10294,6 +10310,14 @@ children (
                         kind @status
                         text "Todo → Doing (nplan start)"
                     }
+
+                    {
+                        at 2026-10-24T06:25:32.569098Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: security.ident-oracle+15 moved after this node's delivery (53584a26, a tiebreak a caller installs on a cursor carries its column's cast), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 
@@ -12298,6 +12322,14 @@ children (
                         text "table-function-column-defs (9ad413aa) bumped napi.select+2 (tableFunction takes { call, columnDefinitions }, a non-empty list of [name, type] pairs) and napi.expressions+3 (call() reaches json_to_record, jsonb_to_record, json_to_recordset and jsonb_to_recordset); sites re-pinned, select-extras.test.ts and the record-functions parity case pass in Node and Deno."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-24T06:24:46.493586Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: napi.expressions+4 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                        after_done true
+                    }
                 )
             }
 
@@ -12389,6 +12421,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked 2026-10-19 at napi.entity-reads +1 (select-one-zero-limit, cfadc574): one and oneOpt narrow the row limit to one row as Rust does, a limit of zero staying zero; inspect and a live test in both runtimes hold it."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-24T06:24:46.338834Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered: napi.entity-reads+2 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
                 )
@@ -12746,6 +12786,14 @@ children (
                 text "Delivered again at sql.ast.copy +1, python.copy +1 and napi.copy +1 (copy-to-source-returning, be37b37f): a write without RETURNING no longer converts into a CopySource, and Python's CopyTo and JavaScript's copyTo refuse it with a ConstructionError."
                 after_done true
             }
+
+            {
+                at 2026-10-24T06:24:45.853709Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered: conn.copy+1, napi.copy+2, python.copy+2 and sql.ast.copy+2 moved after this node's delivery (59b37f92, a COPY TO over a SELECT runs the tie-limit and window checks before anything is sent), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                after_done true
+            }
         )
     }
 
@@ -12877,6 +12925,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-schema-truth-testing (9248d83a). After it, every schema object, Compiled, expression and statement refuses truth testing, but other native classes still evaluate as true: EntityUpdate, EntityUpdateMany, EntityInsert, EntityInsertMany (src/entities/versions.rs), Window, With, FromItem, Join, Table, Conflict, ConflictTarget, ConflictUpdate, the frame classes and the MERGE action classes. Add the refusal to each, and make one test enumerate every class pgorm._native defines (with an explicit, reasoned allow-list for value types where truthiness is meaningful, if any) so a new class without the refusal fails; extend python.statements / python.expressions text as needed (bump, re-deliver the feat owners in a separate feat commit). Waits on sql-select-extras, which adds Python classes in the same modules."
+            }
+
+            {
+                at 2026-10-24T06:25:48.479587Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered: python.truth-testing+1 moved after this node's delivery (b9ac84d3, every Python stream refuses truth testing, as Listener does), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
+                after_done true
             }
         )
     }
@@ -13891,12 +13947,22 @@ children (
         id test-run-isolation
         title "Concurrent test runs on one PostgreSQL server never touch each other's databases, roles or connections"
         kind @test
+        implements {
+            main ([spec:pgorm:req:testing.isolation])
+        }
         log (
             {
                 at 2026-10-23T20:42:25.599936Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-23: \"can't you design the tests so they can't conflict\". On 2026-10-23 the lead's full run and an agent's pgorm-migration run, from two checkouts on the shared server, dropped each other's databases: pgorm-migration names a test database after the test alone and drops \"any prior copy\" first (DROP DATABASE .. WITH (FORCE)), so 7 tests failed with 57P01, 3D000 and 23505 on pg_database. pgorm's tests/common/setup/mod.rs adds a hash of the checkout path (scoped_db_name), which separates worktrees but not two runs of one checkout. Design agreed with the operator: (1) every test database name carries a suffix unique to the test process, not only to the checkout, through one shared helper per language (Rust crates, pgorm-napi tests/support.ts), within the 63-byte limit; (2) a run never drops a database it did not create (the drop-a-prior-copy step goes); (3) leftovers of a crashed run are swept only when provably dead: the name records the creating process, and a database is dropped only when that process no longer exists and nobody is connected; (4) cluster-wide objects a test creates (roles: tests/view_tests.rs, pgorm-migration's role test) take the same per-run suffix, and every pg_terminate_backend (tests/listen_tests.rs, pgorm-pool/tests/postgres.rs, pgorm-napi listen/copy tests, pgorm-python test_listen.py) matches only its own database's connections; (5) live tests that run in the shared postgres database (pgorm-query, pgorm-pool) are checked for anything they leave or share there, and moved onto per-run databases if they do; (6) proof: the same suites run twice at once, from one checkout and from two worktrees, with zero failures, and the old naming shown to fail that test. pgorm-python's suite runs on its own disposable server and is out of scope; security/ harnesses keep their own containers."
+            }
+
+            {
+                at 2026-10-23T22:25:20.936686Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

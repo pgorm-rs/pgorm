@@ -620,7 +620,7 @@ test("a stream holds the server back while nothing pulls", async () => {
   let state;
   for (let attempt = 0; attempt < 50; attempt += 1) {
     state = await streaming.optional(
-      "SELECT state, wait_event FROM pg_stat_activity WHERE query LIKE '%generate_series(1, 50000000)%' AND pid <> pg_backend_pid()",
+      "SELECT state, wait_event FROM pg_stat_activity WHERE datname = current_database() AND query LIKE '%generate_series(1, 50000000)%' AND pid <> pg_backend_pid()",
     );
     if (state?.wait_event === "ClientWrite") break;
     await new Promise((resolve) => setTimeout(resolve, 20));

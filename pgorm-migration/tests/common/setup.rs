@@ -1,17 +1,14 @@
 use pgorm_migration::pgorm::{
-    Config, ConnectionTrait, DatabasePool, Error, ManagerConfig, NoTls, STATEMENT_CACHE_CHANNEL,
+    ConnectionTrait, DatabasePool, Error, ManagerConfig, NoTls, STATEMENT_CACHE_CHANNEL,
     types::ToSql,
 };
 
+use pgorm_test_support::{config, create_database, drop_database, scoped_name};
+
 const NO_PARAMS: [&(dyn ToSql + Sync); 0] = [];
 
-fn config(base_url: &str, db_name: &str) -> Config {
-    format!("{base_url}/{db_name}")
-        .parse()
-        .expect("DATABASE_URL is not a valid PostgreSQL connection string")
-}
-
-/// A throwaway database, dropped and recreated on construction.
+/// A throwaway database of this process's own, created on construction under
+/// a name no other run can hold (`pgorm_test_support`).
 pub struct TestContext {
     base_url: String,
     db_name: String,
@@ -19,32 +16,23 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub async fn new(db_name: &str) -> Self {
+    pub async fn new(test_name: &str) -> Self {
         dotenvy::from_filename(".env.local").ok();
         dotenvy::from_filename(".env").ok();
 
         let base_url =
             std::env::var("DATABASE_URL").expect("Environment variable 'DATABASE_URL' not set");
+        let db_name = scoped_name(test_name);
 
-        let maintenance = pgorm_migration::pgorm::connect(config(&base_url, "postgres"));
-        let conn = maintenance.get().await.expect("connect to maintenance db");
-
-        conn.execute_raw(
-            &format!("DROP DATABASE IF EXISTS \"{db_name}\" WITH (FORCE);"),
-            NO_PARAMS,
-        )
-        .await
-        .expect("drop test database");
-
-        conn.execute_raw(&format!("CREATE DATABASE \"{db_name}\";"), NO_PARAMS)
+        create_database(&base_url, &db_name)
             .await
             .expect("create test database");
 
-        let db = pgorm_migration::pgorm::connect(config(&base_url, db_name));
+        let db = pgorm_migration::pgorm::connect(config(&base_url, &db_name));
 
         Self {
             base_url,
-            db_name: db_name.to_owned(),
+            db_name,
             db,
         }
     }
@@ -78,18 +66,18 @@ impl TestContext {
         pgorm_migration::pgorm::connect(config)
     }
 
-    /// Create `role` afresh, without login and without any privilege a test
-    /// does not grant it. Roles belong to the cluster rather than to the test
-    /// database, so [`TestContext::drop_role`] removes it again.
-    pub async fn create_role(&self, role: &str) {
+    /// Create a role for `label`, without login and without any privilege a
+    /// test does not grant it, and answer its name. Roles belong to the cluster
+    /// rather than to the test database, so the name is this run's own
+    /// (`testing.isolation`), and [`TestContext::drop_role`] removes it again.
+    pub async fn create_role(&self, label: &str) -> String {
+        let role = scoped_name(label);
         let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
         let conn = maintenance.get().await.expect("connect to maintenance db");
-        conn.execute_raw(&format!("DROP ROLE IF EXISTS \"{role}\""), NO_PARAMS)
-            .await
-            .expect("drop test role");
         conn.execute_raw(&format!("CREATE ROLE \"{role}\" NOLOGIN"), NO_PARAMS)
             .await
             .expect("create test role");
+        role
     }
 
     /// Drop a role [`TestContext::create_role`] made, once the database whose
@@ -102,15 +90,12 @@ impl TestContext {
             .await;
     }
 
+    /// Drop the database. A failure is left to the sweep a later run makes once
+    /// this process has exited.
     pub async fn delete(&self) {
-        let maintenance = pgorm_migration::pgorm::connect(config(&self.base_url, "postgres"));
-        let conn = maintenance.get().await.expect("connect to maintenance db");
-        let _ = conn
-            .execute_raw(
-                &format!("DROP DATABASE IF EXISTS \"{}\" WITH (FORCE);", self.db_name),
-                NO_PARAMS,
-            )
-            .await;
+        if let Err(err) = drop_database(&self.base_url, &self.db_name).await {
+            tracing::warn!("test database {:?} outlived its test: {err}", self.db_name);
+        }
     }
 }
 

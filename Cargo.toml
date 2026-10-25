@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool", "pgorm-query", "pgorm-query/pgorm-query-attr", "pgorm-query/pgorm-query-derive", "pgorm-sql-macro"]
+members = [".", "pgorm-macros", "pgorm-codegen", "pgorm-migration", "pgorm-pool", "pgorm-query", "pgorm-query/pgorm-query-attr", "pgorm-query/pgorm-query-derive", "pgorm-sql-macro", "pgorm-test-support"]
 
 [package]
 name = "pgorm"
@@ -142,6 +142,9 @@ toml = "1.1"
 # The identifier render oracle registers the migration ledger's custom table
 # name, which only the migrator renders (tests/identifier_oracle/live_capture.rs).
 pgorm-migration = { path = "pgorm-migration" }
+# Run-scoped names for the databases and roles the live tests create, and the
+# sweep of crashed runs' leftovers (tests/common/setup).
+pgorm-test-support = { path = "pgorm-test-support" }
 
 [features]
 debug-print = []

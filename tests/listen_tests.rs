@@ -310,8 +310,17 @@ async fn terminated_connection_ends_the_stream() -> Result<(), Error> {
     // The listening session sends what it has pending before it answers a
     // request, so once this returns both are waiting in the stream.
     listener.listen("doomed").await?;
-    db.execute("SELECT pg_terminate_backend($1)", &[&pid])
+    let terminated = db
+        .execute(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity \
+             WHERE pid = $1 AND datname = current_database()",
+            &[&pid],
+        )
         .await?;
+    assert_eq!(
+        terminated, 1,
+        "the listening session is in this test's database"
+    );
 
     let mut received = Vec::new();
     let failure = loop {

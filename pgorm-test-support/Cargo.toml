@@ -1,0 +1,21 @@
+[package]
+name = "pgorm-test-support"
+version = "0.2.0"
+authors = []
+edition = "2024"
+rust-version = "1.89"
+description = "Run-scoped names for what pgorm's live tests create on a shared server, and the sweep of crashed runs' leftovers"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# No dependency on pgorm: pgorm takes this crate as a dev-dependency, and a
+# path back to pgorm would build its tests against a second copy of pgorm's
+# types. tokio-postgres is the workspace's own requirement, so the `Config`
+# returned here is the type `pgorm::connect` takes.
+[dependencies]
+tokio.workspace = true
+tokio-postgres.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+dotenvy = "0.15.7"
