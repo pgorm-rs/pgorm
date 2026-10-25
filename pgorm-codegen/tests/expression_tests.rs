@@ -5,7 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
+use pgorm_codegen::{entities_from_sql, parse_schema};
 use pgorm_query::{
     ColumnDef, ColumnSpec, Expr, Func, GeneratedKind, Name, Query, TableCreateStatement,
 };

@@ -5,9 +5,9 @@ files. The pipeline has two stages: `EntityTransformer::transform` converts a
 list of `TableCreateStatement`s into an in-memory `Entity` model, and
 `EntityWriter::generate` renders those entities into output files. Everything
 below describes what the code emits today; text-level shapes are pinned by the
-golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
-a live database reach the same pipeline through `sql_schema`, specified under
-[Schema from DDL text](#schema-from-ddl-text).
+golden fixtures under `pgorm-codegen/tests/`. A schema reaches the pipeline as
+DDL text, through `entities_from_sql` and `parse_schema` at the crate root,
+specified under [Schema from DDL text](#schema-from-ddl-text).
 
 > [spec:pgorm:def:codegen.entity+3]
 > The entity generator is the pipeline
@@ -978,22 +978,25 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema from DDL text
 
-`pgorm_codegen::sql_schema` reads a `schema.sql` — DDL text, with no database to
-inspect — using libpg_query, the PostgreSQL server's own parser, and bridges the
+`pgorm_codegen::entities_from_sql` reads a `schema.sql` — DDL text, with no
+database to inspect — using libpg_query, the PostgreSQL server's own parser, and bridges the
 parse tree into the statements the transformer already consumes. `pg_query` is a
 plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
 build-time tool nothing links into a running application, so the cost of
 compiling the C parser falls on people generating entities and on nobody else.
 
-> [spec:pgorm:def:codegen.ddl+3]
-> `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
+> [spec:pgorm:def:codegen.ddl+4]
+> `parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
 > parses DDL text with `pg_query::parse` and returns one statement per
 > `CREATE TABLE`, in file order, with every other statement it read folded into
 > the table that statement describes.
-> `sql_schema::entities_from_sql(&str, EntityWriterOptions) -> Result<WriterOutput, Error>`
+> `entities_from_sql(&str, EntityWriterOptions) -> Result<WriterOutput, Error>`
 > runs the whole pipeline: it builds the `EntityWriterContext` first — so an
 > unusable option is reported before the schema is read — then `parse_schema`,
-> `EntityTransformer::transform` and `EntityWriter::generate`.
+> `EntityTransformer::transform` and `EntityWriter::generate`. Both are
+> exported from the crate root, beside the `EntityWriterOptions`,
+> `WriterOutput`, `OutputFile` and `Error` they take and return, and the
+> crate root is their one path: the bridge's module is private.
 >
 > Both report failure as `Error::TransformError`, the channel the transform gate
 > already uses, and neither panics on any input: text the grammar rejects comes

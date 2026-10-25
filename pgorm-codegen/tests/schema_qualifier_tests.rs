@@ -5,8 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::sql_schema::entities_from_sql;
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql};
 
 fn from_sql(sql: &str, opts: Opts) -> Generated {
     Generated {
@@ -306,7 +305,7 @@ fn an_ambiguous_unqualified_index_is_refused() {
 // qualifier all along; it is the whole pipeline that now keeps it
 #[test]
 fn bridge_and_generated_entity_agree_on_schema() {
-    use pgorm_codegen::sql_schema::parse_schema;
+    use pgorm_codegen::parse_schema;
     use pgorm_query::TableName;
 
     let statements = parse_schema(QUALIFIED).expect("schema should parse");

@@ -6,8 +6,7 @@ mod common;
 
 use common::*;
 use pgorm::{ColumnTrait, ColumnTypeTrait, Iterable, StaticName};
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql, parse_schema};
 use pgorm_query::{
     ColumnType, Domain, Expr, Name, StringLen, TableCreateStatement,
     extension::{RangeDefinition, Type},
@@ -356,7 +355,7 @@ fn built() -> (Vec<String>, TableCreateStatement) {
     (statements, keyed_with("stock_line", &["id"], columns))
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    domains and a table of domain columns built with
+// [spec:pgorm:def:codegen.ddl+4/test]    domains and a table of domain columns built with
 // pgorm-query and rendered generate, read back, the entity the statement itself generates
 #[test]
 fn rendered_domain_columns_read_back_whole() {
