@@ -14076,6 +14076,13 @@ children (
                 kind @note
                 text "Found by coming-from-seaorm, statement-cache-cross-process and migration-sql-files (2026-10-23): EntityTrait's doc comment (src/entity/base_entity.rs) lists the deleted insert/update/delete shortcuts; the codegen.entity rule (docs/spec/codegen.md) names pgorm-cli and date_time_crate, deleted in 38096c9b; pgorm-codegen's README says entities can be introspected from a live database, which nothing does; src/entity/created_range.rs has two unresolved doc links (crate::Range, crate::Multirange) that cargo doc warns about; conn.pool says Box<dyn Connect> where the pool now holds an Arc; migration.sql-file.compile says the compile error names the line, which holds only when the parser's message names a token (macros.sql.ceiling). Rule text changes take bumps."
             }
+
+            {
+                at 2026-10-25T23:57:14.045655Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Updated 2026-10-26: codegen-root-export already fixed pgorm-codegen's README claim of live introspection; drop that item. Add: statement_cache_channel users behind a pooler or a network middlebox with an idle cutoff (an AWS NLB's 350 s) need TCP keepalives (keepalives_idle) shorter than it, since the listener's own SET idle_session_timeout = 0 (cache-listener-keepalive) covers only the server's timeout; say so in conn.pool.statement-cache.listen's prose or the connection docs."
+            }
         )
     }
 
@@ -14199,6 +14206,49 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-25, on hearing that tx-closure-only kept the bindings' APIs unchanged: do them too. Both bindings already have the scoped form beside the guard: Python `async with conn.transaction() as tx` (an asynccontextmanager; clean exit commits, an exception rolls back) and `async with tx.transaction() as sp` for a savepoint; JavaScript `conn.transaction(async (tx) => ..)` and `tx.transaction(async (sp) => ..)` (resolve commits or releases, a throw rolls back). Delete the guard forms from both public APIs: Python Connection.begin / Transaction.begin, Transaction.commit and Transaction.rollback (and the public __aenter__/__aexit__ on a Transaction a caller could hold); JavaScript Connection.begin, Transaction.begin, commit, rollback, close and [Symbol.asyncDispose] on Transaction, with their typings. Keep TransactionOptions/isolation on the scoped forms, the failed-ROLLBACK report (raised from the context manager exit / rejected from transaction()) and discard behaviour. Update stubs, capabilities, TRANSACTIONS.md, the napi README, python.transactions and napi.transactions, every test and example using the guard forms, and the security/generative Python and JavaScript emitters if they spell them."
+            }
+        )
+    }
+
+    {
+        id generative-killpg-eperm
+        title "The security campaign's process runner stops a child whose group holds only a zombie without raising"
+        kind @fix
+        log (
+            {
+                at 2026-10-25T23:57:13.230768Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-tx-closure-only (2026-10-26). security/generative/src/pgorm_campaign/process.py's _stop catches only ProcessLookupError, but on macOS os.killpg returns EPERM for a process group whose only member is a zombie, so test_process's test_timeout_and_output_limit_stop_children raises PermissionError under load (failed in two of four runs). Treat EPERM for a group whose leader has exited as already stopped (confirm the leader is reaped or a zombie of ours first, never swallow EPERM for a live group), and show the test passing repeatedly under load."
+            }
+        )
+    }
+
+    {
+        id napi-racing-fixture-timing
+        title "pgorm-napi's racing fixture does not depend on a query settling within 300 ms"
+        kind @test
+        log (
+            {
+                at 2026-10-25T23:57:13.543484Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-tx-closure-only (2026-10-26). pgorm-napi/tests/fixtures/racing.ts gives the first query 300 ms to settle and prints \"nothing settled\" under load, so exit.test.ts's \"exiting while settlements stream in\" failed once in a full Node run and passed alone. Make the fixture wait for the condition it needs (the first settlement) rather than a fixed delay, keeping what the test proves about exiting mid-stream."
+            }
+        )
+    }
+
+    {
+        id bindings-copy-created-multiranges
+        title "Python's and JavaScript's row COPY read and write created multiranges, tested"
+        kind @test
+        deps (value-decode-created-multiranges)
+        log (
+            {
+                at 2026-10-25T23:57:13.866647Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by value-decode-created-multiranges (2026-10-26). copy_in_columns / copy_out_columns now complete a created multirange's type from pg_range, and both bindings describe COPY columns through them and already decode Kind::Multirange for created types, so their copy_out_rows / copy_in_rows now read and write created multiranges as their created kinds, untested. Add a round-trip test in each binding (and through models where the binding has them), and update python.values (it says a created-multirange result column raises a decode error, still true for queries but not for a COPY column) and the napi value rule likewise."
             }
         )
     }
