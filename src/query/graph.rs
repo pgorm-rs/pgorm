@@ -509,6 +509,57 @@ impl<E: EntityTrait, S, R> SelectGraph<E, S, R> {
         self
     }
 
+    /// [`via`](Self::via) with the hop's joined side re-bound to a
+    /// caller-supplied alias, which is how a path passes through one table
+    /// twice.
+    ///
+    /// The alias is then the hop's one identifier: the `ON` condition's
+    /// right side, and the name the next edge along the path starts from.
+    /// Point that edge's relation at it with [`RelationDef::from_alias`];
+    /// left alone, its `ON` names the table under its own name, which is
+    /// the hop's first visit or no table in the query at all. The hop is
+    /// otherwise `via`'s: joined `LEFT`, projected nowhere, consuming no
+    /// prefix index. Distinctness is not checked client-side, on the terms
+    /// [`join_maybe_as`](Self::join_maybe_as) states.
+    ///
+    /// The cakes that share a filling with each cake pass through the
+    /// junction twice, and reach `cake` a second time:
+    ///
+    /// ```
+    /// use pgorm::{alias, entity::*, query::*, tests_cfg::{cake, cake_filling, filling}};
+    ///
+    /// let shared = alias("shared");
+    ///
+    /// assert_eq!(
+    ///     cake::Entity::graph()
+    ///         .via(cake_filling::Relation::Cake.def().rev())
+    ///         .via(cake_filling::Relation::Filling.def())
+    ///         .via_as(cake_filling::Relation::Filling.def().rev(), shared)
+    ///         .join_maybe_as::<cake::Entity>(
+    ///             cake_filling::Relation::Cake.def().from_alias(shared),
+    ///             alias("sibling"),
+    ///         )
+    ///         .as_query()
+    ///         .to_string(),
+    ///     [
+    ///         r#"SELECT "cake"."id" AS "s0_id", "cake"."name" AS "s0_name","#,
+    ///         r#""sibling"."id" AS "s1_id", "sibling"."name" AS "s1_name""#,
+    ///         r#"FROM "cake""#,
+    ///         r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
+    ///         r#"LEFT JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id""#,
+    ///         r#"LEFT JOIN "cake_filling" AS "shared" ON "filling"."id" = "shared"."filling_id""#,
+    ///         r#"LEFT JOIN "cake" AS "sibling" ON "shared"."cake_id" = "sibling"."id""#,
+    ///     ]
+    ///     .join(" ")
+    /// );
+    /// ```
+    // [spec:pgorm:req:query.graph.aliases+1]
+    #[doc(alias("find_also_linked", "find_with_linked"))]
+    pub fn via_as(mut self, rel: RelationDef, alias: impl IntoName) -> Self {
+        self.edge(JoinType::LeftJoin, rel, Some(alias.into_name()), None);
+        self
+    }
+
     /// Cut the read to its first `limit` rows — rows of the join product,
     /// not roots — or, given `None`, remove a limit set before.
     ///
@@ -613,7 +664,7 @@ impl<E: EntityTrait, S, R> SelectGraph<E, S, R> {
     /// is then projected ([`slot_edge`](Self::slot_edge)).
     // [spec:pgorm:def:query.graph+1]
     // [spec:pgorm:sem:query.graph.slots+2]
-    // [spec:pgorm:req:query.graph.aliases]
+    // [spec:pgorm:req:query.graph.aliases+1]
     fn edge(
         &mut self,
         join: JoinType,
@@ -639,7 +690,7 @@ impl<E: EntityTrait, S, R> SelectGraph<E, S, R> {
 
     /// Join a decoded source through [`edge`](Self::edge), then project it
     /// under the next prefix by the identifier the join bound it to.
-    // [spec:pgorm:req:query.graph.aliases]
+    // [spec:pgorm:req:query.graph.aliases+1]
     fn slot_edge<F: EntityTrait>(
         &mut self,
         join: JoinType,
@@ -696,7 +747,7 @@ macro_rules! grow {
             /// cursor tiebreak's qualifier. Distinctness is not checked
             /// client-side — joining a table the graph already names,
             /// unaliased, renders SQL PostgreSQL refuses.
-            // [spec:pgorm:req:query.graph.aliases]
+            // [spec:pgorm:req:query.graph.aliases+1]
             pub fn join_maybe_as<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -725,7 +776,7 @@ macro_rules! grow {
             /// query. There is no `join_one_filtered`: under an `INNER JOIN`
             /// the two placements select the same rows, and `filter` already
             /// spells it.
-            // [spec:pgorm:req:query.graph.aliases]
+            // [spec:pgorm:req:query.graph.aliases+1]
             pub fn join_maybe_filtered<F, C>(
                 mut self,
                 rel: RelationDef,
@@ -753,7 +804,7 @@ macro_rules! grow {
             /// [`join_one`](Self::join_one) with the joined side re-bound to a
             /// caller-supplied alias, on the terms
             /// [`join_maybe_as`](Self::join_maybe_as) states.
-            // [spec:pgorm:req:query.graph.aliases]
+            // [spec:pgorm:req:query.graph.aliases+1]
             pub fn join_one_as<F: EntityTrait>(
                 mut self,
                 rel: RelationDef,
@@ -886,9 +937,12 @@ impl<E: EntityTrait, S, R> QueryTrait for SelectGraph<E, S, R> {
 // grows to the generated ceiling
 // [spec:pgorm:sem:query.graph.writer+4/test]    one prefixed block per decoded
 // source, in declaration order, under the source's effective identifier
-// [spec:pgorm:req:query.graph.aliases/test]    an `_as` slot is named by its
+// [spec:pgorm:req:query.graph.aliases+1/test]    an `_as` slot is named by its
 // alias everywhere, and `join_maybe_filtered` composes with the relation's
 // own `on_condition` instead of replacing it
+// [spec:pgorm:req:query.graph.aliases+1/test]    a `via_as` hop is named by its
+// alias in its own `ON`, in an authored condition's right side and in the
+// next edge's `ON` once that relation starts `from_alias`, and takes no prefix
 // [spec:pgorm:sem:query.graph.slice/test]    `limit` and `offset` bind on the
 // graph's one statement and re-type it `Sliced`, `None` removes either, and a
 // sliced graph keeps every builder method
@@ -1172,6 +1226,76 @@ mod tests {
         assert_eq!(graph.qualifiers.len(), 7);
         let sql = graph.as_query().to_string();
         assert!(sql.contains(r#""f6"."cake_id" AS "s6_cake_id""#), "{sql}");
+    }
+
+    #[test]
+    fn via_as_names_the_hop_by_its_alias() {
+        let shared = alias("shared");
+        let graph = cake::Entity::graph()
+            .via(cake_filling::Relation::Cake.def().rev())
+            .via(cake_filling::Relation::Filling.def())
+            .via_as(cake_filling::Relation::Filling.def().rev(), shared)
+            .via_as(
+                cake_filling::Relation::Cake.def().from_alias(shared),
+                alias("sibling"),
+            );
+
+        assert_eq!(graph.qualifiers.len(), 1, "a hop takes no prefix index");
+        assert_renders(
+            graph.as_query().to_string(),
+            &[
+                r#"SELECT "cake"."id" AS "s0_id", "cake"."name" AS "s0_name""#,
+                r#"FROM "cake""#,
+                r#"LEFT JOIN "cake_filling" ON "cake"."id" = "cake_filling"."cake_id""#,
+                r#"LEFT JOIN "filling" ON "cake_filling"."filling_id" = "filling"."id""#,
+                r#"LEFT JOIN "cake_filling" AS "shared" ON "filling"."id" = "shared"."filling_id""#,
+                r#"LEFT JOIN "cake" AS "sibling" ON "shared"."cake_id" = "sibling"."id""#,
+            ],
+        );
+    }
+
+    #[test]
+    fn via_as_hands_the_alias_to_the_condition() {
+        let sql = cake::Entity::graph()
+            .via_as(
+                cake_filling::Relation::Cake
+                    .def()
+                    .rev()
+                    .on_condition(|_left, right| {
+                        Expr::col((right, cake_filling::Column::FillingId))
+                            .gt(5)
+                            .into_condition()
+                    }),
+                alias("cf"),
+            )
+            .as_query()
+            .to_string();
+
+        assert!(
+            sql.ends_with(
+                r#"LEFT JOIN "cake_filling" AS "cf" ON "cake"."id" = "cf"."cake_id" AND "cf"."filling_id" > 5"#
+            ),
+            "the authored predicate is qualified by the alias: {sql}"
+        );
+    }
+
+    #[test]
+    fn slot_after_aliased_hop_takes_next_prefix() {
+        let graph = cake::Entity::graph()
+            .via_as(cake_filling::Relation::Cake.def().rev(), alias("cf"))
+            .join_one::<filling::Entity>(
+                cake_filling::Relation::Filling
+                    .def()
+                    .from_alias(alias("cf")),
+            );
+
+        assert_eq!(graph.slot_qualifiers(), [Name::new(filling::Entity)]);
+        let sql = graph.as_query().to_string();
+        assert!(sql.contains(r#""filling"."id" AS "s1_id""#), "{sql}");
+        assert!(
+            sql.ends_with(r#"INNER JOIN "filling" ON "cf"."filling_id" = "filling"."id""#),
+            "{sql}"
+        );
     }
 
     #[test]

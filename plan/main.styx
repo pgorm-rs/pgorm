@@ -14026,6 +14026,7 @@ children (
         id graph-via-as
         title "A graph's via hop can be re-bound to an alias, so a path through one table twice can be written"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.167976Z
@@ -14039,6 +14040,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T22:56:58.951948Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -390,7 +390,7 @@ chapter is stated twice anywhere else.
 
 ## Aliasing
 
-> [spec:pgorm:req:query.graph.aliases]
+> [spec:pgorm:req:query.graph.aliases+1]
 > The same table enters a graph twice under a caller-bound alias:
 > `join_maybe_as::<F>(rel, alias)` / `join_one_as::<F>(rel, alias)` take
 > the alias as `impl IntoName` — the `AliasName` token for a static name
@@ -402,6 +402,29 @@ chapter is stated twice anywhere else.
 > renders SQL PostgreSQL refuses ("table name specified more than once"),
 > so the mistake errors at execution rather than silently self-joining —
 > the same ceiling the alias token carries everywhere.
+>
+> A hop is re-bound on the same terms. `via_as(rel, alias)` is `via(rel)`
+> (`[spec:pgorm:def:query.graph+1]`) with `rel.to_tbl` re-bound to the
+> alias: joined LEFT under `join_condition`, projected nowhere, consuming
+> no prefix index. It is how a path that passes through one table twice is
+> written — a self-referencing chain through a junction, or any `Linked`
+> chain whose hops revisit a table — and the alias is the hop's one
+> identifier: the ON condition's right side, and the identifier the next
+> edge along the path starts from. The graph MUST NOT re-point that next
+> edge itself. A graph's edges need not form one chain — each starts from
+> whatever its relation's `from_tbl` names, the root or any earlier source —
+> so which visit an edge leaves from is the relation's to state, through
+> `RelationDef::from_alias(alias)`; an edge left unbound names the table's
+> unaliased visit, or a table the query does not have, and the server
+> answers as it does for any such reference. Because the hop is never
+> projected, its alias is part of no result-column name: the slots reached
+> through it are projected under their own `s{i}_` prefixes, bounded to
+> PostgreSQL's 63-byte identifier limit as
+> `[spec:pgorm:sem:query.graph.writer+4]` states, however many times the
+> path revisits their table. Slots and hops, aliased or not, are one edge
+> walker: the alias binding, the relation's condition and any call-site
+> predicate are written once, and a slot is an edge whose joined side is
+> then projected.
 >
 > Call-site ON predicates have a general mechanism and a sugar. The
 > general mechanism is the relation's own: `rel.on_condition(f)` before

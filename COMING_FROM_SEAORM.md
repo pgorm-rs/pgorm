@@ -81,7 +81,7 @@ compiled.
 | `into_json()` | decode into a model and serialize it |
 | `find_also_related(F)` | `graph().related_maybe::<F>()` |
 | `find_with_related(F)` | `graph().related_maybe::<F>().all_grouped(db)` |
-| `find_also_linked(L)` | `graph()` with `via(..)` hops and `join_maybe` |
+| `find_also_linked(L)` | `graph()` with `via(..)` or `via_as(..)` hops and `join_maybe` |
 | `find_with_linked(L)` | the same, then `all_grouped(db)` |
 | `find_also_related(F).limit(n)` | `graph().related_maybe::<F>().limit(n)`: `n` rows |
 | `find_with_related(F).limit(n)` | `find().limit(n)`, then `load_many(F, db)` |
@@ -644,6 +644,7 @@ entity as a *slot*:
 | `join_maybe::<F>(rel)` | `LEFT JOIN` on one relation | `Option<F::Model>` |
 | `join_one::<F>(rel)` | `INNER JOIN` on one relation | `F::Model` |
 | `via(rel)` | a hop joined but not decoded, such as a junction table | nothing |
+| `via_as(rel, alias)` | the same, with the table under an alias | nothing |
 | `join_maybe_as`, `join_one_as` | the same, with the table under an alias | as above |
 
 A graph holds up to six slots, so one query can read a row with up to six
@@ -742,19 +743,57 @@ async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
 }
 ```
 
-If you already have `Linked` types, one small function turns any of them
-into a graph:
+A `via` hop joins its table under the table's own name, so a chain that
+passes through the same table twice needs the second visit aliased.
+`via_as` is `via` with an alias, as `join_maybe_as` and `join_one_as` are for
+a slot. The relation after an aliased hop starts from the alias, which you
+say with `from_alias`. Here each cake reads the other cakes that share a
+filling with it, through `cake_filling` twice:
 
 ```rust,no_run
-use pgorm::{Opt, SelectGraph, entity::prelude::*, tests_cfg::{cake, entity_linked, vendor}};
+use pgorm::{alias, entity::prelude::*, tests_cfg::{cake, cake_filling}};
+
+async fn sharing_a_filling(db: &DatabaseConnection) -> Result<(), Error> {
+    let shared = alias("shared");
+    let siblings: Vec<(cake::Model, Vec<cake::Model>)> = cake::Entity::graph()
+        .via(cake_filling::Relation::Cake.def().rev())
+        .via(cake_filling::Relation::Filling.def())
+        .via_as(cake_filling::Relation::Filling.def().rev(), shared)
+        .join_maybe_as::<cake::Entity>(
+            cake_filling::Relation::Cake.def().from_alias(shared),
+            alias("sibling"),
+        )
+        .all_grouped(db)
+        .await?;
+    let _ = siblings;
+    Ok(())
+}
+```
+
+If you already have `Linked` types, one small function turns any of them
+into a graph. Like SeaORM's linked joins, it gives every hop its own alias
+(`r0`, `r1`, ...), so a chain that visits a table twice works too:
+
+```rust,no_run
+use pgorm::{LinkedAlias, Opt, SelectGraph, entity::prelude::*, tests_cfg::{cake, entity_linked, vendor}};
 
 fn linked<L: Linked>(link: L) -> Option<SelectGraph<L::FromEntity, (Opt<L::ToEntity>,)>> {
     let mut hops = link.link();
     let last = hops.pop()?;
-    let graph = hops
-        .into_iter()
-        .fold(L::FromEntity::graph(), |graph, hop| graph.via(hop));
-    Some(graph.join_maybe::<L::ToEntity>(last))
+    let end = hops.len();
+    let mut graph = L::FromEntity::graph();
+    for (i, hop) in hops.into_iter().enumerate() {
+        graph = graph.via_as(from_previous(hop, i), LinkedAlias::hop(i));
+    }
+    Some(graph.join_maybe_as::<L::ToEntity>(from_previous(last, end), LinkedAlias::hop(end)))
+}
+
+// Hop `i` starts from the alias of hop `i - 1`; the first starts at the root.
+fn from_previous(hop: RelationDef, i: usize) -> RelationDef {
+    match i.checked_sub(1) {
+        Some(previous) => hop.from_alias(LinkedAlias::hop(previous)),
+        None => hop,
+    }
 }
 
 async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
@@ -769,10 +808,9 @@ async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
 }
 ```
 
-SeaORM gave every hop of a linked join an alias (`r0`, `r1`, ...). A `via`
-hop joins the table under its own name, so a chain that passes through the
-same table twice needs the second visit aliased: `join_maybe_as` and
-`join_one_as` do that for a slot.
+A filter or an ordering on an aliased table names the alias, as in
+`Expr::col((LinkedAlias::hop(2), vendor::Column::Name))`, as it did with
+SeaORM's `r0`, `r1` aliases.
 
 ### Moving the rest of the query over
 
