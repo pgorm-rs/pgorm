@@ -14002,6 +14002,7 @@ children (
         title "Codegen does not generate a relation that create_table_from_entity would refuse"
         kind @fix
         deps (schema-fk-domain-enum)
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:25.882865Z
@@ -14015,6 +14016,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T22:52:55.744846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

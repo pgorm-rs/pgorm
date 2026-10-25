@@ -290,7 +290,7 @@ fn a_column_filled_twice_is_refused() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    a caller-built statement's expressions are
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a caller-built statement's expressions are
 // read through the same subset, and what the entity could not hold is refused by name
 #[test]
 fn caller_built_expressions_pass_the_gate() {

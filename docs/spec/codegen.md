@@ -34,7 +34,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+14]
+> [spec:pgorm:sem:codegen.entity.transform+15]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -187,6 +187,23 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > for the tableless case is gone with the state it guarded
 > (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and MUST NOT come back: the
 > conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
+>
+> A foreign key PostgreSQL cannot implement is refused with them: one
+> matching, for equality, a column typed as a domain over an enum — directly
+> or through further domains — on either side, which the server answers
+> `42804` whatever the other side is (`schema.from-entity`). The bridge reads
+> DDL that is never run, so a `REFERENCES` the server would refuse reaches
+> the gate as written, and a statement the caller built may hold one too;
+> generated, it would be a relation `Schema::create_table_from_entity`
+> refuses in turn. It is ``TransformError("table `<table>`: relation to `<ref
+> table>` matches column `<column>` with `<ref column>`, and PostgreSQL
+> implements no foreign key with a column typed as a domain over an enum on
+> either side (42804)")``, naming the first such pair. Every pairing the
+> server keys generates its relation: an enum with itself, a domain over any
+> other base with that base or itself, and a domain over an array of an enum
+> with itself. The pair's types are read from the columns themselves, so
+> every key is checked; a relation `ColumnPairs` names by bare names, which
+> schema generation cannot check, is not one codegen writes.
 >
 > The reference and collision checks run over the tables as read, before
 > inverse and conjunct relations are synthesised: those are the gate's own

@@ -1086,7 +1086,7 @@ fn a_composite_foreign_key_joins_on_both_pairs() {
 // NOT ENFORCED, declared on its column or at table level, ride on the statement
 // [spec:pgorm:sem:codegen.entity.relations+3/test]    and reach the relation the
 // entity declares, which generates the same key back
-// [spec:pgorm:sem:codegen.entity.transform+14/test]
+// [spec:pgorm:sem:codegen.entity.transform+15/test]
 #[test]
 fn a_foreign_keys_check_reaches_the_relation() {
     let generated = from_sql(KEY_STAY);
@@ -1246,7 +1246,7 @@ fn temporal_key_and_period_relation_round_trip() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    a temporal key whose period the table
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a temporal key whose period the table
 // declares before another key column is refused, its entity's key following its fields' order
 #[test]
 fn a_period_declared_before_the_key_is_refused() {
