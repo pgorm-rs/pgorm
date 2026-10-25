@@ -99,6 +99,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWindowFunction>()?;
     module.add_function(wrap_pyfunction!(window::window_function, module)?)?;
     module.add_class::<PySelect>()?;
+    module.add_function(wrap_pyfunction!(select::subquery_array, module)?)?;
     module.add_class::<Join>()?;
     module.add_class::<PyInsert>()?;
     module.add_class::<PyUpdate>()?;

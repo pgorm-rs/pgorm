@@ -3,9 +3,10 @@
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+4/test]
+// [spec:pgorm:req:napi.expressions+5/test]
 
 import {
+  array,
   bind,
   type Builder,
   call,
@@ -165,6 +166,10 @@ export const cases: Record<string, () => Builder> = {
       .from(account)
       .join(latest.as("l"), Condition.all(), { kind: "left", lateral: true })
       .where(exists(select(bind(1)).from(new Table("flag")).where(col("account").eq(account.col("id")))));
+  },
+  "array-subquery": () => {
+    const events = select(col("id")).from(new Table("event")).where(col("account").eq(account.col("id")));
+    return select(account.col("id"), array(events).as("events")).from(account).where(array(events).contains([4n]));
   },
   "from-subquery": () => {
     const inner = select(col("id"), col("kind")).from(t).where(col("kind").ne("x"));

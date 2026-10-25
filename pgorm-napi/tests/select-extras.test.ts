@@ -201,7 +201,7 @@ test("GROUP BY DISTINCT groups each grouping set its elements reach once", async
   }
 });
 
-// [spec:pgorm:req:napi.expressions+4/test]
+// [spec:pgorm:req:napi.expressions+5/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]
 test("SIMILAR TO matches a whole string against its pattern, the pattern bound and its escape honoured", async () => {
   const words = async (predicate: Expr) =>
@@ -221,7 +221,7 @@ test("SIMILAR TO matches a whole string against its pattern, the pattern bound a
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+4/test]
+// [spec:pgorm:req:napi.expressions+5/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("unnest WITH ORDINALITY numbers each element, reading a column of the item before it", async () => {
   const letters = tableFunction(call("unnest", bind(["x", "y", "z"]).cast("text", { array: true })), {
@@ -243,7 +243,7 @@ test("unnest WITH ORDINALITY numbers each element, reading a column of the item 
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+4/test]
+// [spec:pgorm:req:napi.expressions+5/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("ROWS FROM reads its calls side by side, padding the shorter with NULL", async () => {
   const zipped = tableFunction(
@@ -279,7 +279,7 @@ test("ROWS FROM reads its calls side by side, padding the shorter with NULL", as
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+4/test]
+// [spec:pgorm:req:napi.expressions+5/test]
 // [spec:pgorm:req:sql.ast.select.column-definitions/test]
 test("a call returning record reads through its column definitions, alone or inside ROWS FROM", async () => {
   const one = tableFunction({

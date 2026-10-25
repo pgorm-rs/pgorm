@@ -393,6 +393,11 @@ quality {
         // chooses the action. Python reaches an action only through its own
         // entry point; folding them into one function taking the action as a
         // string would trade three typed names for one untyped argument
-        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null)
+        //
+        // subquery_array is pgorm-python's binding of Expr::array, Python's
+        // array(select): like json_scalar, ARRAY(..) has no clause to apply,
+        // so its body is the Rust constructor over the embedded subquery, and
+        // the entry point is the only way Python reaches it
+        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null subquery_array)
     }
 }

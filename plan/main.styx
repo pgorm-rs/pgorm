@@ -13927,6 +13927,7 @@ children (
         title "Python and JavaScript expressions take ARRAY(subquery), as Rust's Expr::array does"
         kind @feat
         deps (in-subquery-enum-shapes)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.381794Z
@@ -13940,6 +13941,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:53:58.290968Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

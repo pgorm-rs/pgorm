@@ -483,7 +483,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+4]
+> [spec:pgorm:req:napi.expressions+5]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -518,8 +518,12 @@ SQL text running a built statement.
 > record-returning ones it reads through a column definition list.
 > A cast names its type by identifier or `TypeName`; `collate` names a
 > collation, schema-qualifiable; `at` and `slice` subscript an array; a
-> searched or simple `CASE` exists only once it has an arm; `exists` and
-> `scalar` take a `Select`.
+> searched or simple `CASE` exists only once it has an arm; `exists`,
+> `scalar` and `array` take a `Select`, `array` lowering through
+> `Expr::array` to `ARRAY(select)`: the subquery's one column as one array
+> value, empty when it yields no row, which casts and compares as a value
+> (`sql.ast.expr`), the server refusing a subquery of more than one column
+> (`42601`).
 
 > [spec:pgorm:req:napi.select+2]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of

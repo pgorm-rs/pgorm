@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement, UnionType};
+use pgorm::pgorm_query::{Asterisk, Expr, JoinType, Query, SelectStatement, UnionType};
 use pyo3::{prelude::*, types::PyTuple};
 
 use super::{
@@ -7,7 +7,11 @@ use super::{
     grouping::{self, Grouped},
     window::window_definition,
 };
-use crate::{errors::ConstructionError, expressions::Compiled, identifiers::PyIdentifier};
+use crate::{
+    errors::ConstructionError,
+    expressions::{Compiled, PyExpr},
+    identifiers::PyIdentifier,
+};
 
 /// Join kinds which require an ON condition; CROSS JOIN has its own method.
 #[pyclass(name = "Join", module = "pgorm", eq, from_py_object)]
@@ -287,4 +291,14 @@ impl PySelect {
     fn __repr__(&self) -> &'static str {
         "Select(...)"
     }
+}
+
+/// `array(select)`: `ARRAY(select)`, the subquery's one column collected into
+/// one array value through Rust's `Expr::array`, which can be cast and
+/// compared as a value where a subquery's rows cannot. The subquery is read
+/// as any embedded one is, so it is checked as `embedded` checks it.
+// [spec:pgorm:req:python.expressions+3]
+#[pyfunction(name = "array")]
+pub(crate) fn subquery_array(select: PyRef<'_, PySelect>) -> PyResult<PyExpr> {
+    Ok(PyExpr::from_rust(Expr::array(select.embedded()?)))
 }
