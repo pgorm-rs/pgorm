@@ -170,7 +170,7 @@ pub trait EntityTrait: EntityName {
     /// either direction: a graph's projection is generated from its
     /// declaration, never inherited from a builder whose select list a caller
     /// may have edited.
-    // [spec:pgorm:def:query.graph]
+    // [spec:pgorm:def:query.graph+1]
     #[doc(alias(
         "find_also_related",
         "find_with_related",

@@ -916,7 +916,7 @@ async fn related_and_linked_walk_composite_keys() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:query.graph.cursor+3/test]    a graph rooted at a composite
+// [spec:pgorm:sem:query.graph.cursor+4/test]    a graph rooted at a composite
 // key completes its cursor key with both key columns, so `after_with` resumes
 // at arity three from inside a run of equal labels
 #[pgorm_macros::test]

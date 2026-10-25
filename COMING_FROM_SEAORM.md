@@ -81,8 +81,10 @@ compiled.
 | `into_json()` | decode into a model and serialize it |
 | `find_also_related(F)` | `graph().related_maybe::<F>()` |
 | `find_with_related(F)` | `graph().related_maybe::<F>().all_grouped(db)` |
-| `find_also_linked(L)` | `graph()` with `via(..)` hops and `join_maybe` |
+| `find_also_linked(L)` | `graph()` with `via(..)` or `via_as(..)` hops and `join_maybe` |
 | `find_with_linked(L)` | the same, then `all_grouped(db)` |
+| `find_also_related(F).limit(n)` | `graph().related_maybe::<F>().limit(n)`: `n` rows |
+| `find_with_related(F).limit(n)` | `find().limit(n)`, then `load_many(F, db)` |
 | `select_also(F)`, `select_with(F)` | `join_maybe::<F>(rel)` |
 | `SelectTwo`, `SelectTwoMany` | `SelectGraph` |
 | `cursor_by_other(col)` | `cursor_by_on::<1, _>(col)` |
@@ -642,6 +644,7 @@ entity as a *slot*:
 | `join_maybe::<F>(rel)` | `LEFT JOIN` on one relation | `Option<F::Model>` |
 | `join_one::<F>(rel)` | `INNER JOIN` on one relation | `F::Model` |
 | `via(rel)` | a hop joined but not decoded, such as a junction table | nothing |
+| `via_as(rel, alias)` | the same, with the table under an alias | nothing |
 | `join_maybe_as`, `join_one_as` | the same, with the table under an alias | as above |
 
 A graph holds up to six slots, so one query can read a row with up to six
@@ -740,19 +743,57 @@ async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
 }
 ```
 
-If you already have `Linked` types, one small function turns any of them
-into a graph:
+A `via` hop joins its table under the table's own name, so a chain that
+passes through the same table twice needs the second visit aliased.
+`via_as` is `via` with an alias, as `join_maybe_as` and `join_one_as` are for
+a slot. The relation after an aliased hop starts from the alias, which you
+say with `from_alias`. Here each cake reads the other cakes that share a
+filling with it, through `cake_filling` twice:
 
 ```rust,no_run
-use pgorm::{Opt, SelectGraph, entity::prelude::*, tests_cfg::{cake, entity_linked, vendor}};
+use pgorm::{alias, entity::prelude::*, tests_cfg::{cake, cake_filling}};
+
+async fn sharing_a_filling(db: &DatabaseConnection) -> Result<(), Error> {
+    let shared = alias("shared");
+    let siblings: Vec<(cake::Model, Vec<cake::Model>)> = cake::Entity::graph()
+        .via(cake_filling::Relation::Cake.def().rev())
+        .via(cake_filling::Relation::Filling.def())
+        .via_as(cake_filling::Relation::Filling.def().rev(), shared)
+        .join_maybe_as::<cake::Entity>(
+            cake_filling::Relation::Cake.def().from_alias(shared),
+            alias("sibling"),
+        )
+        .all_grouped(db)
+        .await?;
+    let _ = siblings;
+    Ok(())
+}
+```
+
+If you already have `Linked` types, one small function turns any of them
+into a graph. Like SeaORM's linked joins, it gives every hop its own alias
+(`r0`, `r1`, ...), so a chain that visits a table twice works too:
+
+```rust,no_run
+use pgorm::{LinkedAlias, Opt, SelectGraph, entity::prelude::*, tests_cfg::{cake, entity_linked, vendor}};
 
 fn linked<L: Linked>(link: L) -> Option<SelectGraph<L::FromEntity, (Opt<L::ToEntity>,)>> {
     let mut hops = link.link();
     let last = hops.pop()?;
-    let graph = hops
-        .into_iter()
-        .fold(L::FromEntity::graph(), |graph, hop| graph.via(hop));
-    Some(graph.join_maybe::<L::ToEntity>(last))
+    let end = hops.len();
+    let mut graph = L::FromEntity::graph();
+    for (i, hop) in hops.into_iter().enumerate() {
+        graph = graph.via_as(from_previous(hop, i), LinkedAlias::hop(i));
+    }
+    Some(graph.join_maybe_as::<L::ToEntity>(from_previous(last, end), LinkedAlias::hop(end)))
+}
+
+// Hop `i` starts from the alias of hop `i - 1`; the first starts at the root.
+fn from_previous(hop: RelationDef, i: usize) -> RelationDef {
+    match i.checked_sub(1) {
+        Some(previous) => hop.from_alias(LinkedAlias::hop(previous)),
+        None => hop,
+    }
 }
 
 async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
@@ -767,10 +808,9 @@ async fn cake_vendors(db: &DatabaseConnection) -> Result<(), Error> {
 }
 ```
 
-SeaORM gave every hop of a linked join an alias (`r0`, `r1`, ...). A `via`
-hop joins the table under its own name, so a chain that passes through the
-same table twice needs the second visit aliased: `join_maybe_as` and
-`join_one_as` do that for a slot.
+A filter or an ordering on an aliased table names the alias, as in
+`Expr::col((LinkedAlias::hop(2), vendor::Column::Name))`, as it did with
+SeaORM's `r0`, `r1` aliases.
 
 ### Moving the rest of the query over
 
@@ -782,14 +822,48 @@ same table twice needs the second visit aliased: `join_maybe_as` and
   and `into_model`.
 - A graph has no `one`, because one root can produce several rows. Use
   `one_opt` for the first row.
-- A graph has no `limit` or `offset` methods yet. `paginate` and the cursor
-  (`cursor_by(..).first(n)`) work on a graph; for a plain limit, set it on
-  the statement with `QueryTrait::query`, as in `graph.query().limit(10)`.
+- `limit` and `offset` work on a graph, and count rows rather than roots
+  (see below).
 - `cursor_by_other` is `cursor_by_on::<1, _>(column)`, where `1` is the slot's
   position (the root is `0`). The cursor adds every slot's primary key as a
   tiebreak, so rows that share an order value still page correctly.
 - `ModelTrait::find_related` and `find_linked`, which read one model's
   related rows, are unchanged.
+
+`limit` and `offset` on a graph count rows of the join, as they did on
+`SelectTwo`: a cake with three fruit uses three rows of `limit(10)`. A graph
+you have limited or offset has no `all_grouped`, `paginate`, `count` or
+`cursor_by`. Each of those sets the rows itself, and a grouped read of ten
+rows would end with a cake whose fruit list is cut short, which is what
+`find_with_related(..).limit(10)` silently gave you in SeaORM. To read ten
+cakes with all their fruit, limit the cakes and load the fruit:
+
+```rust,no_run
+use pgorm::{entity::prelude::*, tests_cfg::{cake, fruit}};
+
+async fn first_ten(db: &DatabaseConnection) -> Result<(), Error> {
+    // Ten rows: a cake appears once for each fruit it has.
+    let rows: Vec<(cake::Model, Option<fruit::Model>)> = cake::Entity::graph()
+        .related_maybe::<fruit::Entity>()
+        .order_by_asc(cake::Column::Id)
+        .limit(10)
+        .all(db)
+        .await?;
+
+    // Ten cakes, each with all of its fruit.
+    let cakes: Vec<cake::Model> = cake::Entity::find()
+        .order_by_asc(cake::Column::Id)
+        .limit(10)
+        .all(db)
+        .await?;
+    let fruit: Vec<Vec<fruit::Model>> = cakes.load_many(fruit::Entity, db).await?;
+    let _ = (rows, fruit);
+    Ok(())
+}
+```
+
+For pages, use `paginate` or `cursor_by(..).first(n)` on a graph without a
+limit; they count rows in the same way.
 
 ## Loading related rows in batches
 

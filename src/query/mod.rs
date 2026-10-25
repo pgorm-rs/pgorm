@@ -9,7 +9,7 @@ mod traits;
 mod update;
 
 pub use delete::*;
-pub use graph::{Opt, Req, SelectGraph, Slot, SlotAt, Slots};
+pub use graph::{Opt, Req, SelectGraph, Sliced, Slot, SlotAt, Slots, Unsliced};
 pub use helper::*;
 pub use insert::*;
 pub use loader::*;
