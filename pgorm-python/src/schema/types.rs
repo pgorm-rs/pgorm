@@ -37,7 +37,7 @@ impl PyDataType {
 
 #[pymethods]
 impl PyDataType {
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     #[new]
     #[pyo3(signature=(kind, *, length=None, precision=None, scale=None))]
     fn new(

@@ -1,4 +1,4 @@
-// [spec:pgorm:req:python.schema+1]
+// [spec:pgorm:req:python.schema+2]
 // [spec:pgorm:req:python.schema-views+2]
 // [spec:pgorm:req:python.schema-schemas]
 // [spec:pgorm:req:python.schema-domains]

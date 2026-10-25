@@ -29,7 +29,7 @@ fn label(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(text.to_owned())
 }
 
-// [spec:pgorm:req:python.schema+1]
+// [spec:pgorm:req:python.schema+2]
 #[pyfunction]
 pub(super) fn create_enum(
     name: &Bound<'_, PyAny>,

@@ -36,7 +36,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         registrations = p.capabilities()["registrations"]["entities"]
         self.assertEqual([r["name"] for r in registrations],
                          ["app.Account", "app.Booking", "app.Membership", "app.Note", "app.Old", "app.Room",
-                          "app.Stay"])
+                          "app.Stay", "app.Temper"])
         info = self.account.describe()
         self.assertTrue(info["rust_entity"].endswith("account::Entity"))
         self.assertTrue(info["rust_model"].endswith("account::Model"))

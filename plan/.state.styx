@@ -1252,7 +1252,7 @@ assertions (
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
     {id cache-listener-keepalive, kind @complete, author "brendan@necessary.nu", at 2026-10-25T22:49:56.472812Z}
     {id ident-oracle-load-flake, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:04:46.93252Z}
-    {id python-schema-refusal-test, kind @doing, author "brendan@necessary.nu", at 2026-10-25T22:09:47.077279Z}
+    {id python-schema-refusal-test, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:20:32.030006Z}
 )
 
 impl_evidence (

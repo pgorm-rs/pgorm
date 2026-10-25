@@ -13980,6 +13980,7 @@ children (
         title "Python's schema.from_entity raises ConstructionError for a foreign key PostgreSQL cannot build, tested"
         kind @test
         deps (schema-fk-domain-enum)
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:25.740008Z
@@ -13993,6 +13994,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:20:32.030006Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
