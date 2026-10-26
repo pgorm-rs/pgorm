@@ -12836,6 +12836,14 @@ children (
                 kind @note
                 text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. A notification arrives on the connection that ran LISTEN, as an AsyncMessage on tokio-postgres's Connection future, which pgorm-pool's manager polls internally and pooled connections recycle, so LISTEN cannot work on a pooled connection. Build a dedicated listener: created from the pool's config (or from a tokio_postgres::Config plus a TLS connector, as connect_with is), owning its connection outright, with listen(channel) / unlisten(channel) / unlisten_all and a Stream of notifications (channel, payload, sender pid). Channel names are quoted identifiers; NOTIFY gets a typed helper too (NOTIFY channel, 'payload' or pg_notify with a bound payload). Decide and document what happens when the connection drops (the stream ends with an error; no silent reconnect that would miss notifications) and how backpressure works (bounded buffer, an overflow error rather than unbounded growth). Live tests on 18.6: a notification sent from a pooled connection inside a committed transaction arrives, one from a rolled-back transaction does not, unlisten stops delivery, a quoted channel name with odd characters works, payload limits. Python and JavaScript get the listener as an async iterator, with stubs, .d.ts and live tests. sql.scope's LISTEN entry graduates (bump; query-second-tier re-delivers). Waits on conn-copy, which changes the same connection surfaces in three languages."
             }
+
+            {
+                at 2026-10-26T10:11:17.477625Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at python.listen +1 (python-listen-header-duplicate, 0337e941): the rule's marker line is written once, so its body no longer begins with a copy of it; every reference is pinned at +1."
+                after_done true
+            }
         )
     }
 
@@ -13824,6 +13832,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:11:17.607085Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at migration.sql-file.compile +1 (docs-stale-cleanup, f5ef4843): the error names a line and reprints it with a caret only when the parser's diagnostic quotes a token the file holds, and a unit test now holds the case of a diagnostic quoting none; every reference is pinned at +1."
+                after_done true
             }
         )
     }

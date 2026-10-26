@@ -1384,10 +1384,6 @@ impl_evidence (
         {impl_name main, rule conn.listen}
         {impl_name main, rule napi.listen}
         {impl_name main, rule python.listen}
-    ), rule_versions_seen (
-        {id conn.listen, version 0}
-        {id napi.listen, version 0}
-        {id python.listen, version 0}
     )}
     {id copy-binary-rows, covered_rules (
         conn.copy.rows
