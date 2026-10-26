@@ -372,7 +372,7 @@ fn read_multirange(
 
 /// A column of a range type a schema created: read in binary through the
 /// subtype's codec, and held as the text form that type's values travel as.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 fn created_text(ty: &Type, kind: &CreatedKind, raw: &[u8]) -> Result<String, CodecError> {
     let (Kind::Range(subtype) | Kind::Multirange(subtype)) = ty.kind() else {
         return Err("expected a range".into());

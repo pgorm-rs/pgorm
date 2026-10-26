@@ -601,7 +601,8 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   so a value a statement carries — a `DEFAULT`, a `CHECK`'s operands, an enum
   label, a comment — is written as pgorm-query's escaped literal, and
   `inspect()` gives `{ sql, values: [] }`. Names are identifiers, quoted.
-  Nothing runs until a terminal runs it.
+  Nothing runs until a terminal runs it. Every complete statement is a `Ddl`
+  (pgorm-python's `DDL`), a `Statement` the terminals take.
 - **Schemas**: `createSchema(name, { ifNotExists })`, `dropSchema(names, {
   ifExists, behavior })` over one name or several, and `renameSchema(name,
   newName)`. A schema is named by one string, never a `Table`. A drop of a

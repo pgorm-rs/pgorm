@@ -37,7 +37,7 @@ fn tagged<'cx>(
 
 /// `valueNew(data, kind?)`: a value of the declared kind, or of the kind
 /// `data` infers as.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 fn value_new(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
     let data = cx.argument::<JsValue>(0)?;
     let kind = cx.argument_opt(1);
@@ -70,7 +70,7 @@ fn value_null(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
 
 /// `valueJson(data)`: a JSON document, `null` being JSON's null rather than
 /// SQL NULL.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 fn value_json(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
     let data = cx.argument::<JsValue>(0)?;
     let codec = Codec::get(&mut cx)?;
@@ -83,7 +83,7 @@ fn value_json(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
 /// `valueArray(kind, items)`: an array of the element kind, `null` items SQL
 /// NULLs; `items` `null` is an SQL NULL array that still names its element
 /// kind.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 fn value_array(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
     let kind = cx.argument::<JsValue>(0)?;
     let items = cx.argument::<JsValue>(1)?;

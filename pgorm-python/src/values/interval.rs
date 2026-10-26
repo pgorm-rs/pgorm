@@ -11,7 +11,7 @@ use pyo3::{prelude::*, types::PyInt};
 use crate::errors::ConstructionError;
 
 /// Months, days and microseconds, each independently signed.
-// [spec:pgorm:req:python.values+4]
+// [spec:pgorm:req:python.values+5]
 #[pyclass(name = "Interval", module = "pgorm", frozen, eq, hash, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyInterval(pub(crate) Interval);

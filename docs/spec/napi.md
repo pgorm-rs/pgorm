@@ -130,6 +130,7 @@ first rule: a value reaches JavaScript exactly or not at all.
 | a built-in range or multirange | `int4range` … `tstzmultirange` | the module's `Range`, `Multirange` |
 | an enum | its type | `string` |
 | a created range | its type | `Range`, its kind a `CreatedRange` |
+| a created multirange | its type, in a binary COPY | `Multirange`, its kind a `CreatedMultirange` |
 
 > [spec:pgorm:req:napi.values]
 > Every kind of pgorm `Value`, and `interval`, MUST cross into and out of
@@ -188,7 +189,7 @@ first rule: a value reaches JavaScript exactly or not at all.
 > signs agree and throws a `RangeError` where they do not. `timetz` MUST be a
 > `DecodeError`: no Temporal type holds a time of day at a fixed offset.
 
-> [spec:pgorm:req:napi.value-tags]
+> [spec:pgorm:req:napi.value-tags+2]
 > The module's `Value` MUST declare what plain JavaScript cannot:
 > `new Value(data, kind)` takes a kind named as pgorm-python names it, a
 > `TypeName` for an enum, or a `CreatedRange` or `CreatedMultirange`;
@@ -210,8 +211,15 @@ first rule: a value reaches JavaScript exactly or not at all.
 > newtype converts into, bound as text for the statement to cast,
 > `CAST($1::text AS name)`, as `Expr::as_range` writes it. A column of one
 > MUST decode, through its subtype's binary codec, to a `Range` whose kind is
-> named as the column's type is. Arrays of a created range are refused both
-> ways.
+> named as the column's type is. A created multirange's kind is a
+> `CreatedMultirange`, and its value is bound the same way, but the driver
+> reports a query's result column of one with no subtype, so that column
+> MUST be a `DecodeError`, left to be read cast to text. A binary COPY's
+> column of one is described with its subtype, which pgorm completes from
+> the catalogue (`conn.copy.rows`), so `copyOutRows` MUST decode it through
+> the subtype's codec to a `Multirange`, and `copyInRows` MUST write one back
+> from a `Value` of its kind or from its text form. Arrays of a created range
+> or multirange are refused both ways, in a COPY as anywhere else.
 
 > [spec:pgorm:req:napi.inference]
 > A plain JavaScript parameter MUST be bound as the one kind its type leaves:
@@ -828,7 +836,7 @@ JavaScript builds DDL through pgorm-query's DDL builders as pgorm-python's
 schema surface does, and further: every statement `sql-ddl.md` specifies that
 a schema is made of, in the builder conventions the statements above use.
 
-> [spec:pgorm:req:napi.schema]
+> [spec:pgorm:req:napi.schema+2]
 > Tables, their columns, keys and constraints and their alterations, indexes,
 > types, sequences, extensions and comments MUST be built through
 > pgorm-query's DDL builders, each JavaScript object owning the builder state
@@ -839,6 +847,12 @@ a schema is made of, in the builder conventions the statements above use.
 > not know among them, so that a misspelt option is never left out of a
 > statement. Constructing one does no I/O, and nothing runs DDL but a
 > terminal.
+>
+> Every complete DDL statement MUST be a `Ddl`, the class the module exports
+> for one as pgorm-python exports `DDL`, and a member of the `Statement`
+> union the terminals take; only the module's DDL functions construct one.
+> A schema is a database schema alone (`napi.schema-schemas`), as it is in
+> pgorm-query (`sql.ddl`), so no export is named `SchemaStatement`.
 >
 > PostgreSQL takes no parameters in DDL, so a DDL statement MUST render
 > through pgorm-query's own rendering, which writes every value it carries —

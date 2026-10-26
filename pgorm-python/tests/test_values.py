@@ -16,7 +16,7 @@ def bits(value):
     return struct.pack(">d", value).hex()
 
 
-# [spec:pgorm:req:python.values+4/test]
+# [spec:pgorm:req:python.values+5/test]
 # [spec:pgorm:req:python.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
@@ -208,7 +208,7 @@ class ValueTests(unittest.TestCase):
         with self.assertRaises(AttributeError):
             value.kind = "text"
 
-    # [spec:pgorm:req:python.values+4/test]
+    # [spec:pgorm:req:python.values+5/test]
     def test_interval_keeps_three_signed_fields(self):
         interval = Interval(1, -2, 3_000_004)
         self.assertEqual((interval.months, interval.days, interval.microseconds), (1, -2, 3_000_004))

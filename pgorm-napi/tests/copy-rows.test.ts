@@ -12,11 +12,13 @@ import {
   ConstructionError,
   copyFrom,
   copyTo,
+  CreatedMultirange,
   DatabaseError,
   Decimal,
   DecodeError,
   insert,
   Interval,
+  Multirange,
   type Param,
   Pool,
   Range,
@@ -228,4 +230,82 @@ test("a description the server refuses keeps the connection, and an undecodable 
   same(await stream.next(), { done: true, value: undefined });
   await connection.execute("DROP TABLE pts").catch(() => undefined);
   assert.equal((await pool().one("SELECT 1 AS n")).n, 1);
+});
+
+/**
+ * The multiranges created beside a range over `float8` and one over `int4`
+ * named apart from its range, which has no canonical function and so keeps
+ * `[1,5]` as written; a domain over one; and a table of them and an array of
+ * one.
+ */
+const MULTISPANS = [
+  "CREATE SCHEMA geo",
+  "CREATE TYPE geo.floatrange AS RANGE (subtype = float8)",
+  `CREATE TYPE geo.slot AS RANGE (subtype = int4, multirange_type_name = geo."Slot Set")`,
+  "CREATE DOMAIN geo.reaches AS geo.floatmultirange",
+  `CREATE TABLE geo.spans (id int PRIMARY KEY, reach geo.floatmultirange NOT NULL, slots geo."Slot Set", kept geo.reaches)`,
+  `INSERT INTO geo.spans VALUES
+    (1, '{[1.5,2.5), [3,4]}', '{[1,5], [7,9)}', '{[0,1)}'),
+    (2, '{}', NULL, NULL),
+    (3, '{[-Infinity,0]}', '{(,7)}', '{}')`,
+  `CREATE TABLE geo.many (slots geo."Slot Set"[])`,
+  `INSERT INTO geo.many VALUES ('{"{[1,3)}"}')`,
+];
+
+// [spec:pgorm:req:napi.copy.rows/test]    a multirange type a schema created reads as a Multirange and writes back from a Value of its kind or from its text
+// [spec:pgorm:req:napi.value-tags+2/test]
+test("a multirange type a schema created reads out of a binary COPY and writes back in", async () => {
+  for (const statement of MULTISPANS) await pool().execute(statement);
+  const spans = new Table("spans", { schema: "geo" });
+  const reach = new CreatedMultirange("floatmultirange", "f64", { schema: "geo" });
+  const slots = new CreatedMultirange("Slot Set", "i32", { schema: "geo" });
+  const ordered = copyTo(select(spans.star()).from(spans).orderBy(spans.col("id").asc()), "binary");
+
+  const stream = await pool().copyOutRows(ordered);
+  assert.deepEqual(stream.columns, ["id", "reach", "slots", "kept"]);
+  const rows = await rowsOf(stream);
+  same(rows, [
+    [
+      1,
+      new Multirange([new Range(1.5, 2.5), new Range(3, 4, "[]")]),
+      new Multirange([new Range(1, 5, "[]"), new Range(7, 9)]),
+      new Multirange([new Range(0, 1)]),
+    ],
+    [2, new Multirange([]), null, null],
+    [3, new Multirange([new Range(-Infinity, 0, "[]")]), new Multirange([new Range(null, 7, "()")]), new Multirange([])],
+  ]);
+  // A query's column of one has no subtype the driver reports, so only a COPY, whose description completes it, reads one.
+  await assert.rejects(pool().one("SELECT reach FROM geo.spans WHERE id = 1"), DecodeError);
+
+  const [first, second] = rows;
+  const written: Param[][] = [
+    [11, new Value(first?.[1], reach), new Value(first?.[2], slots), new Value(first?.[3], reach)],
+    [12, new Value(second?.[1], reach), null, null],
+    [13, "{[-Infinity,0]}", "{(,7)}", "{}"],
+  ];
+  assert.equal(await pool().copyInRows(copyFrom(spans, "binary"), written), 3);
+  const compared = await pool().one(
+    `SELECT count(*)::int AS n FROM geo.spans a JOIN geo.spans b ON b.id = a.id + 10
+     WHERE a.reach = b.reach AND a.slots IS NOT DISTINCT FROM b.slots
+       AND a.kept::geo.floatmultirange IS NOT DISTINCT FROM b.kept::geo.floatmultirange`,
+  );
+  assert.equal(compared.n, 3);
+
+  const copy = copyFrom(spans, "binary").columns(["id", "reach"]);
+  for (const text of ["{[a,b)}", "[1,2)"]) {
+    await assert.rejects(
+      pool().copyInRows(copy, [[20, text]]),
+      refusedWith(/COPY column `reach` of type `geo.floatmultirange`/),
+    );
+  }
+  assert.equal((await pool().one("SELECT count(*)::int AS n FROM geo.spans")).n, 6);
+
+  const many = await pool().copyOutRows(copyTo(new Table("many", { schema: "geo" }), "binary"));
+  await assert.rejects(many.next(), (error: unknown) => {
+    assert.ok(error instanceof DecodeError, `expected a DecodeError, got ${error}`);
+    assert.match(error.message, /created range/);
+    return true;
+  });
+  assert.equal(many.closed, true);
+  await pool().execute("DROP SCHEMA geo CASCADE");
 });

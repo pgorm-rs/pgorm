@@ -112,7 +112,7 @@ pub(crate) enum Ddl {
 impl Ddl {
     /// The statement's SQL, every value in it an escaped literal: pgorm-query's
     /// one rendering of a DDL statement that runs.
-    // [spec:pgorm:req:napi.schema]
+    // [spec:pgorm:req:napi.schema+2]
     fn sql(&self) -> String {
         match self {
             Self::CreateSchema(statement) => statement.to_string(),
@@ -172,7 +172,7 @@ impl Part {
     /// What the part is, as an error names it.
     pub(crate) fn describe(&self) -> &'static str {
         match self {
-            Self::Statement(_) => "a schema statement",
+            Self::Statement(_) => "a DDL statement",
             Self::Column(_) => "a ColumnDef",
             Self::PendingAlterTable(..) => "an ALTER TABLE with no action",
             Self::PendingAlterType(_) => "an ALTER TYPE with no change",
@@ -183,7 +183,7 @@ impl Part {
 
     /// The SQL the part runs as, or why it runs as none: PostgreSQL parses no
     /// `ALTER` without an action, and a column is no statement.
-    // [spec:pgorm:req:napi.schema]
+    // [spec:pgorm:req:napi.schema+2]
     pub(crate) fn statement(&self) -> Result<String, &'static str> {
         match self {
             Self::Statement(ddl) => Ok(ddl.sql()),

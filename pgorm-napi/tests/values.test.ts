@@ -355,7 +355,7 @@ test("a range's lower bound is written as its lower bound", async () => {
   same(range, new Range(3, 10));
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () => {
   const typed = Value.null("i64");
   assert.equal(typed.kind, "i64");
@@ -376,7 +376,7 @@ test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () =>
   assert.equal(row.json_null?.kind, "json");
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 // [spec:pgorm:req:napi.rows/test]
 test("tagged rows carry each column's kind, an integer's width and an enum's type included", async () => {
   const [row] = await db().query(
@@ -399,7 +399,7 @@ test("tagged rows carry each column's kind, an integer's width and an enum's typ
   assert.equal(row.f?.items(), null);
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 test("an enum label binds as a string and reads back with its type", async () => {
   assert.equal(await roundTrip("app.mood", "calm"), "calm");
   assert.equal(await roundTrip("app.mood", new Value('a "quoted", label', mood)), 'a "quoted", label');
@@ -417,7 +417,7 @@ test("an enum label binds as a string and reads back with its type", async () =>
   throwsConstruction(() => new TypeName("x".repeat(64)), /1–63 UTF-8 bytes/);
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 test("an empty array and an SQL NULL array still name their element kind", async () => {
   const empty = Value.array("i32", []);
   assert.equal(empty.kind, "array");
@@ -434,7 +434,7 @@ test("an empty array and an SQL NULL array still name their element kind", async
   throwsConstruction(() => Value.array("i32", [new Value(1, "i64")]), /i64 value is not a value of kind i32/);
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 test("a created range converts each bound through its subtype and travels as its text", async () => {
   const value = new Value(new Range(1.5, 2.5), floatrange);
   assert.equal(value.kind, "created_range");
@@ -462,7 +462,7 @@ test("a created range converts each bound through its subtype and travels as its
   throwsConstruction(() => new CreatedRange("r", "bool" as "i32"), /subtype/);
 });
 
-// [spec:pgorm:req:napi.value-tags/test]
+// [spec:pgorm:req:napi.value-tags+2/test]
 test("a Value converts at construction, can be bound again, and hands out independent copies", async () => {
   const value = new Value([1, 2, 3]);
   assert.equal(value.kind, "array");

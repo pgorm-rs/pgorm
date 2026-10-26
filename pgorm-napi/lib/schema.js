@@ -5,7 +5,7 @@
 // takes no parameters, so each renders with its values as pgorm-query's
 // escaped literals and runs as SQL text; `inspect()` gives that SQL and no
 // values. Every builder is immutable, as the query builders are.
-// [spec:pgorm:req:napi.schema]
+// [spec:pgorm:req:napi.schema+2]
 
 import { arg, Builder, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -26,23 +26,23 @@ export function relations(relations) {
 }
 
 /** A complete DDL statement: it inspects as it runs, with no values. */
-export class SchemaStatement extends Builder {
+export class Ddl extends Builder {
   /**
    * @param {unknown} handle
    * @param {symbol} [token]
    */
   constructor(handle, token) {
-    trusted(token, "schema statement", "the module's schema functions");
+    trusted(token, "DDL statement", "the module's DDL functions");
     super(handle);
   }
 }
 
 /**
  * @param {unknown} handle
- * @returns {SchemaStatement}
+ * @returns {Ddl}
  */
 export function statement(handle) {
-  return new SchemaStatement(handle, TRUSTED);
+  return new Ddl(handle, TRUSTED);
 }
 
 /** @type {(handle: unknown) => ColumnDef} */
@@ -122,7 +122,7 @@ export class ColumnDef extends Handle {
 }
 
 /** `CREATE TABLE`: its columns, keys, foreign keys and `CHECK`s. */
-export class CreateTable extends SchemaStatement {
+export class CreateTable extends Ddl {
   /** @param {ColumnDef} column */
   column(column) {
     return new CreateTable(native.ddlCreateTableColumn(arg(this), arg(column)), TRUSTED);

@@ -360,7 +360,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             )
 
     # [spec:pgorm:req:python.models/test]
-    # [spec:pgorm:req:python.values+4/test]
+    # [spec:pgorm:req:python.values+5/test]
     async def test_created_range_columns_keep_their_type(self):
         await self.pool.execute(
             p.RawSQL("CREATE TYPE python_models.floatrange AS RANGE (SUBTYPE = float8)")

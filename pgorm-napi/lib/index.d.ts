@@ -9,7 +9,7 @@
 import type { Select } from "./select.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
-import type { SchemaStatement } from "./schema.d.ts";
+import type { Ddl } from "./schema.d.ts";
 import type { Pipeline } from "./pipeline.d.ts";
 import type { CopyFrom, CopyOutStream, CopyRows, CopyRowStream, CopySource, CopyTo } from "./copy.d.ts";
 import type { Listener, ListenerOptions } from "./listen.d.ts";
@@ -378,7 +378,7 @@ export declare class Multirange<T = PlainValue> implements Iterable<Range<T>> {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 /**
  * A value with its kind declared: what plain JavaScript cannot tell apart —
  * an integer's width, a typed SQL NULL, JSON's null, an empty array, an enum's
@@ -497,7 +497,7 @@ export interface TransactionOptions extends OperationOptions {
  * A statement a builder made, which a terminal runs as `inspect()` builds it,
  * its values bound.
  */
-export type Statement = Select | Insert | Update | Delete | Merge | SchemaStatement | Pipeline;
+export type Statement = Select | Insert | Update | Delete | Merge | Ddl | Pipeline;
 
 /**
  * What a pool, a connection and a transaction run bound SQL through: SQL text
