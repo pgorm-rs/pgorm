@@ -99,6 +99,25 @@ async with pool.connection() as connection:
     affected = await updated.into_active().delete(connection)
 ```
 
+A column's `eq`, `ne`, `gt`, `gte`, `lt` and `lte` (and the operators) are
+its `ColumnTrait` comparisons: the value converts to the column's declared
+kind and is written through its `save_as`, so an enum's label is cast to its
+type. `is_in` and `is_not_in` are the trait's membership: `is_in` /
+`is_not_in` over a list or tuple of values, each converted the same way, and
+`in_subquery` / `not_in_subquery` over a `Select`'s rows, so a column whose
+domain is over an enum is a member as the enum — the only way PostgreSQL
+compares one — and the subquery's projection is cast beside it:
+
+```python
+Temper = p.entity("app.Temper")
+settled = p.Select(p.col("settles_into")).from_(p.Table("tempers", schema="python_entities"))
+query = Temper.find().filter(Temper.col("mood").is_in(settled))
+```
+
+The column takes values only; `col(name).expr()` is its plain expression,
+which composes with any `Expr` method, a list of expressions or `any_(..)`
+included, compared as written.
+
 Entity terminals currently require an acquired `Connection`. They return
 native asyncio awaitables; calling a terminal schedules its operation. Await
 each operation before reusing the connection. An outstanding operation can be

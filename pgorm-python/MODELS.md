@@ -63,7 +63,9 @@ The joined query projects the selected fields from its root descriptor. Use
 the native statement APIs when selecting an arbitrary cross-source
 shape. `col(field)` validates the field and converts comparison inputs through
 its declared native Value tag. `eq`, `ne`, ordering comparisons, `is_in`,
-`is_null` and `is_not_null` produce native expressions; `asc`/`desc` produce
+`is_not_in`, `is_null` and `is_not_null` produce native expressions — a
+comparison takes `any_(..)` or `all_(..)` as written, and membership a list or
+tuple of values or a `Select`'s rows; `asc`/`desc` produce
 native orderings. `col(field).expr()` exposes the native expression for further
 composition. Explicit native expressions keep their existing binding semantics.
 Use `is_null()` for a NULL test on a non-nullable declaration.

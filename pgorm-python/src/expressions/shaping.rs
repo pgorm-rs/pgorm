@@ -10,7 +10,7 @@ use crate::{
     values::PyTypeName,
 };
 
-// [spec:pgorm:req:python.expressions+5]
+// [spec:pgorm:req:python.expressions+6]
 #[pymethods]
 impl PyExpr {
     #[pyo3(signature = (type_name, *, array=false))]

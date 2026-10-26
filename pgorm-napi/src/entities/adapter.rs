@@ -247,7 +247,7 @@ where
         })
     }
 
-    // [spec:pgorm:req:napi.entity-reads+3]
+    // [spec:pgorm:req:napi.entity-reads+4]
     fn membership(
         &self,
         name: &str,
@@ -387,7 +387,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:napi.entity-reads+3]
+// [spec:pgorm:req:napi.entity-reads+4]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,

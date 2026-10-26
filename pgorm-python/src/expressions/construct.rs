@@ -59,9 +59,15 @@ fn value_expr(value: &Bound<'_, PyAny>, literal: bool) -> PyResult<PyExpr> {
     Ok(PyExpr::from_rust(value.typed(inner)))
 }
 
+/// An operand: an expression, or a value to bind. `ANY (..)` and `ALL (..)`
+/// are refused by name, since only a comparison takes them.
 pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     if let Ok(expr) = value.extract::<PyRef<'_, PyExpr>>() {
         Ok(expr.clone())
+    } else if value.is_instance_of::<crate::statements::PyQuantified>() {
+        Err(ConstructionError::new_err(
+            "ANY and ALL are the right operand of a comparison: eq, ne, gt, gte, lt or lte",
+        ))
     } else {
         bind(value)
     }
@@ -168,7 +174,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         .map_err(|_| ConstructionError::new_err("expected a query expression"))
 }
 
-// [spec:pgorm:req:python.expressions+5]
+// [spec:pgorm:req:python.expressions+6]
 #[pyfunction]
 #[pyo3(signature = (name, *arguments))]
 pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExpr> {

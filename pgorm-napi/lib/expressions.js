@@ -3,9 +3,9 @@
 // Expressions over pgorm-query's builders. An operand that is not an
 // expression is a value, bound as a parameter: nothing a caller passes becomes
 // SQL text, and an identifier is quoted wherever it appears.
-// [spec:pgorm:req:napi.expressions+6]
+// [spec:pgorm:req:napi.expressions+7]
 
-import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
+import { arg, args, Builder, Handle, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
 import { Predicate } from "./predicates.js";
 import { Windowed } from "./windows.js";
@@ -173,4 +173,41 @@ export function scalar(select) {
  */
 export function array(select) {
   return new Expr(native.exprSubquery("array", arg(select)), TRUSTED);
+}
+
+/**
+ * `ANY (..)` or `ALL (..)`, the right operand of a comparison and nothing
+ * else, as PostgreSQL's grammar reads it: `col("id").eq(any(ids))`. It has
+ * no SQL of its own to inspect.
+ */
+export class Quantified extends Handle {
+  /**
+   * @param {unknown} handle
+   * @param {symbol} [token]
+   */
+  constructor(handle, token) {
+    trusted(token, "quantified operand", "any() or all()");
+    super(handle);
+  }
+}
+
+/**
+ * `ANY (..)`: true when the comparison holds for some element of an array —
+ * an expression, or a value bound as one array parameter — or some row of a
+ * subquery. Over an empty array or no rows it is false.
+ *
+ * @param {import("./select.js").Select | unknown} source
+ */
+export function any(source) {
+  return new Quantified(native.exprQuantified("any", arg(source)), TRUSTED);
+}
+
+/**
+ * `ALL (..)`: true when the comparison holds for every element of an array,
+ * or every row of a subquery. Over an empty array or no rows it is true.
+ *
+ * @param {import("./select.js").Select | unknown} source
+ */
+export function all(source) {
+  return new Quantified(native.exprQuantified("all", arg(source)), TRUSTED);
 }

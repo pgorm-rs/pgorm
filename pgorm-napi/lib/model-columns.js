@@ -7,7 +7,7 @@
 
 import { TRUSTED } from "./builder.js";
 import { ConstructionError } from "./errors.js";
-import { Expr } from "./expressions.js";
+import { Expr, Quantified } from "./expressions.js";
 import { native } from "./operations.js";
 import { Select } from "./select.js";
 import { CreatedMultirange, CreatedRange, TypeName, Value } from "./values.js";
@@ -199,7 +199,8 @@ export function columnValue(column, field, input) {
  * A model's column as an expression, qualified as the model's table is
  * named. A value it is compared with converts to the column's declared kind,
  * as pgorm's `ColumnTrait` comparisons cast through the column's type, so an
- * enum's label binds cast to its type; an expression is compared as written.
+ * enum's label binds cast to its type; an expression, and `any(..)` or
+ * `all(..)`, are compared as written.
  */
 export class ModelColumn extends Expr {
   /** @type {Column} */
@@ -231,6 +232,7 @@ export class ModelColumn extends Expr {
 
   /** @param {unknown} value */
   #operand(value) {
+    if (value instanceof Quantified) return value;
     if (value === null) {
       throw new ConstructionError(`${this.#field} compared with null is never true: test it with isNull()`);
     }

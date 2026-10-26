@@ -25,7 +25,7 @@ pub(crate) struct EntityAdapter<E> {
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:req:python.entities+3]
+// [spec:pgorm:req:python.entities+4]
 impl<E> EntityBackend for EntityAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -103,6 +103,17 @@ where
             Comparison::Ge => column.gte(value),
             Comparison::Lt => column.lt(value),
             Comparison::Le => column.lte(value),
+        })
+    }
+
+    // [spec:pgorm:req:python.entities+4]
+    fn membership(&self, name: &str, negated: bool, members: Members) -> Result<SimpleExpr, Error> {
+        let column = column::<E>(name)?;
+        Ok(match (members, negated) {
+            (Members::Values(values), false) => column.is_in(values),
+            (Members::Values(values), true) => column.is_not_in(values),
+            (Members::Subquery(select), false) => column.in_subquery(*select),
+            (Members::Subquery(select), true) => column.not_in_subquery(*select),
         })
     }
 

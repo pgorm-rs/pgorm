@@ -9,6 +9,7 @@ from ._expr_patterns import _ExprPatterns
 from ._expr_ranges import _ExprRanges
 from ._expr_search import _ExprSearch
 from ._expr_shaping import _ExprShaping
+from ._expr_subscripts import _ExprSubscripts
 
 class Expr(
     _ExprComparison,
@@ -19,6 +20,7 @@ class Expr(
     _ExprRanges,
     _ExprSearch,
     _ExprShaping,
+    _ExprSubscripts,
 ):
     def __init__(self, _native_only: Never, /) -> None: ...
 

@@ -99,7 +99,8 @@ const first = await query.oneOpt(pool);      // Select::one_opt, LIMIT 1
 - `col(name)` names a column as the entity's `ColumnTrait` does. Its
   comparisons are that trait's: a value converts to the column's declared
   kind and is written through its `save_as`, so an enum's label is cast to
-  its type; an expression is compared as written; `null` is refused. Its
+  its type; an expression, and `any(..)` or `all(..)`, are compared as
+  written; `null` is refused. Its
   `isIn` and `isNotIn` are the trait's too, over a list of values converted
   the same way or over a `Select`'s rows (`in_subquery`), so a column whose
   domain is over an enum is a member as the enum, which is the only way

@@ -179,7 +179,7 @@ fn pipelines() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:napi.entity-reads+3/test]
+// [spec:pgorm:req:napi.entity-reads+4/test]
 // [spec:pgorm:req:napi.entity-graphs/test]
 // [spec:pgorm:req:napi.pipeline-sources/test]
 #[test]

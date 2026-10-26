@@ -1,7 +1,7 @@
 // The entity family's parity cases, built through the binding from the
 // application's registrations and held to `parity.json`, which the
 // application crate's Rust test builds with its entities directly.
-// [spec:pgorm:req:napi.entity-reads+3/test]
+// [spec:pgorm:req:napi.entity-reads+4/test]
 
 import { type Compiled, entity, graph, pipeline as pl, select, Table } from "../../../lib/index.js";
 

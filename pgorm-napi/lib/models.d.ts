@@ -7,7 +7,7 @@
 // [spec:pgorm:req:napi.typing]
 // [spec:pgorm:req:napi.models]
 
-import type { Compiled, Condition, Expr, Operand, OrderBy, Predicate } from "./expressions.d.ts";
+import type { Compiled, Condition, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
 import type { Select, Table } from "./select.d.ts";
 import type { Conflict, ConflictUpdate, Delete, Insert, Update } from "./writes.d.ts";
 import type {
@@ -245,12 +245,13 @@ export declare class ModelColumn<V = unknown, I extends Operand = Operand> exten
   readonly column: Column;
   /** The type its field reads as, for the types alone. */
   readonly [declared]?: V;
-  eq(other: I): Expr;
-  ne(other: I): Expr;
-  lt(other: I): Expr;
-  lte(other: I): Expr;
-  gt(other: I): Expr;
-  gte(other: I): Expr;
+  /** Equal to a value of the column's kind, or to an expression or `any(..)` / `all(..)`, as written. */
+  eq(other: I | Quantified): Expr;
+  ne(other: I | Quantified): Expr;
+  lt(other: I | Quantified): Expr;
+  lte(other: I | Quantified): Expr;
+  gt(other: I | Quantified): Expr;
+  gte(other: I | Quantified): Expr;
   isDistinctFrom(other: I): Expr;
   isNotDistinctFrom(other: I): Expr;
   contains(other: I): Expr;

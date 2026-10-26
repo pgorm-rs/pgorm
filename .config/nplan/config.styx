@@ -394,10 +394,12 @@ quality {
         // entry point; folding them into one function taking the action as a
         // string would trade three typed names for one untyped argument
         //
-        // subquery_array is pgorm-python's binding of Expr::array, Python's
-        // array(select): like json_scalar, ARRAY(..) has no clause to apply,
-        // so its body is the Rust constructor over the embedded subquery, and
-        // the entry point is the only way Python reaches it
-        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null subquery_array)
+        // subquery_array and subquery_exists are pgorm-python's bindings of
+        // Expr::array and Expr::exists, Python's array(select) and
+        // exists(select): like json_scalar, ARRAY(..) and EXISTS(..) have no
+        // clause to apply, so each body is the Rust constructor over the
+        // embedded subquery, and the entry point is the only way Python
+        // reaches it
+        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null subquery_array subquery_exists)
     }
 }

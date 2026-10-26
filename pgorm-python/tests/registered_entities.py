@@ -31,7 +31,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     def active(self, identity, name="Nora"):
         return self.account.active().set("id", identity).set("display name", name)
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_registration_declares_real_types_and_mapping(self):
         registrations = p.capabilities()["registrations"]["entities"]
         self.assertEqual([r["name"] for r in registrations],
@@ -50,7 +50,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.ConstructionError):
             self.account.col("missing")
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_registration_declares_its_reachable_terminals(self):
         terminals = self.account.describe()["terminals"]
         self.assertEqual(terminals, [
@@ -80,7 +80,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.subTest(write=type(write).__name__), self.assertRaises(p.ConstructionError):
                 bool(write)
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_active_values_and_hooks_use_rust_states(self):
         initial = self.account.active()
         self.assertEqual(initial.get("id").state, p.ActiveState.NotSet)
@@ -108,7 +108,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await self.account.find().one_opt(connection))
         self.assertEqual(model.tagged("mood").type_name, p.TypeName("Mood", schema="python_entities"))
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     # [spec:pgorm:req:python.values+5/test]
     async def test_created_ranges_round_trip_through_an_entity(self):
         booking = p.entity("app.Booking")
@@ -138,7 +138,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 booking.active().set("span", p.Range(1, 2))
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_typed_select_reuses_real_entity_projection(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2, 3):
@@ -158,7 +158,42 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(query.inspect().sql, query.inspect(terminal="one").sql)
             self.assertEqual(query.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]    a registered column is a member of values and of
+    # a Select's rows through its ColumnTrait, a column whose domain is over an enum as the enum,
+    # where the column's plain expression is refused with 42883
+    async def test_column_membership_runs_through_column_trait(self):
+        await self.pool.execute(p.RawSQL('CREATE DOMAIN python_entities.temper AS python_entities."Mood"'))
+        await self.pool.execute(p.RawSQL(
+            "CREATE TABLE python_entities.tempers "
+            "(mood python_entities.temper PRIMARY KEY, settles_into python_entities.temper NOT NULL)"))
+        await self.pool.execute(p.RawSQL(
+            "INSERT INTO python_entities.tempers VALUES ('calm', 'busy'), ('busy', 'busy')"))
+        temper = p.entity("app.Temper")
+        mood = temper.col("mood")
+        tempers = p.Table("tempers", schema="python_entities")
+        settled = p.Select(tempers.col("settles_into")).from_(tempers)
+        async with self.pool.connection() as connection:
+            async def moods(predicate):
+                return sorted(row["mood"] for row in await temper.find().filter(predicate).all(connection))
+
+            self.assertEqual(await moods(mood.is_in(["busy"])), ["busy"])
+            self.assertEqual(await moods(mood.is_not_in(("busy",))), ["calm"])
+            self.assertEqual(await moods(mood.is_in(settled)), ["busy"])
+            self.assertEqual(await moods(mood.is_not_in(settled)), ["calm"])
+            self.assertEqual(await moods(mood.is_in([])), [])
+            with self.assertRaises(p.DatabaseError) as refused:
+                await temper.find().filter(mood.expr().is_in(settled)).all(connection)
+            self.assertEqual(refused.exception.sqlstate, "42883")
+            for identity in (1, 2, 3):
+                await self.active(identity, f"account{identity}").insert(connection)
+            chosen = self.account.find().filter(self.account.col("id").is_in((1, 3)))
+            self.assertEqual(sorted(row["id"] for row in await chosen.all(connection)), [1, 3])
+        for refused_values in ["busy", [p.col("x")]]:
+            with self.subTest(values=refused_values):
+                with self.assertRaises(p.ConstructionError):
+                    mood.is_in(refused_values)
+
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_one_never_widens_a_zero_limit(self):
         async with self.pool.connection() as connection:
             await self.active(1).insert(connection)
@@ -173,7 +208,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await self.account.find().limit(5).one(connection))["id"], 1)
             self.assertEqual(self.account.find().limit(5).inspect(terminal="one").params[-1].value, 1)
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_composite_key_entity_writes_by_whole_key(self):
         membership = p.entity("app.Membership")
         self.assertEqual(membership.describe()["primary_keys"], ["tenant_id", "id"])
@@ -213,7 +248,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 {"tenant_id": 1, "id": shared, "role": "admin"},
             ])
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_invalid_types_and_foreign_handles_are_rejected(self):
         for column, value in (("id", True), ("id", 2**31), ("id", "1"), ("mood", "unknown"), ("display name", None)):
             with self.subTest(column=column, value=value), self.assertRaises(p.ConstructionError):
@@ -232,7 +267,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.ConstructionError):
             self.account.find().limit(True)
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_model_setter_preserves_rust_conversion_checks(self):
         async with self.pool.connection() as connection:
             model = await self.active(1).insert(connection)
@@ -245,7 +280,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             model.with_value(self.note.col("id"), 2)
         self.assertEqual(changed.into_active().get("display name").state, p.ActiveState.Unchanged)
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_before_and_after_hooks_keep_write_outcomes(self):
         async with self.pool.connection() as connection:
             with self.assertRaises(p.DatabaseError):
@@ -263,7 +298,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 await after.into_active().delete(connection)
             self.assertIsNone(await self.account.find().filter(self.account.col("id") == 98).one_opt(connection))
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     # [spec:pgorm:req:python.errors+1/test]
     async def test_decode_failure_does_not_become_absence(self):
         async with self.pool.connection() as connection:
@@ -279,7 +314,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 await connection.fetch_one(p.RawSQL("SELECT $1::integer AS n", p.Value("text", "text")))
             self.assertTrue(await connection.ping())
 
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_cancellation_interrupts_an_active_rust_hook(self):
         async with self.pool.connection() as connection:
             future = self.active(1, "wait_before").insert(connection)

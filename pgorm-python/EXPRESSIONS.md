@@ -40,6 +40,11 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 | `expr.cast(type_name, array=False)` | `SimpleExpr::cast_as_type` |
 | `expr.collate(name, schema=...)` | `Expr::collate`; a validated `Name`, schema-qualified when `schema` is given |
 | `array(select)` | `Expr::array`; `ARRAY(select)`, the subquery's one column as one array value |
+| `exists(select)` | `Expr::exists`; `EXISTS (select)` |
+| `scalar(select)` | `SimpleExpr::SubQuery`; `(select)`, the subquery's one value |
+| `any_(source)` / `all_(source)` | `Expr::any` / `Expr::all` over a `Select`, `Func::any` / `Func::all` over an array |
+| `expr.at(index)` | `Expr::index`; `a[index]` |
+| `expr.slice(lower, upper)` | `Expr::subscript(Subscript::Slice)`; `a[lower:upper]`, `None` an open end |
 | `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape`; `escape=""` is `no_escape` |
 | `expr.as_(name)` | owned projection expression plus validated `Name` |
 | `expr.asc()` / `expr.desc()` | owned expression plus Rust `Order` |
@@ -82,7 +87,8 @@ the left. These lower to the corresponding Rust `BinOper` through
 Combine expressions with `&`, `|` and `~`. Parenthesize comparisons because
 Python's operator precedence still applies. SQL expressions, conditions,
 projection aliases, orderings, `format_json`'s `JsonInput`, `window_function`'s
-`WindowFunction`, a windowed call, a `LikePattern`, `Direction`, `Nulls` and
+`WindowFunction`, a windowed call, a `LikePattern`, `any_` and `all_`'s
+`Quantified`, `Direction`, `Nulls` and
 the SQL/JSON kinds, behaviours, defaults and `JSON_TABLE` columns raise
 `ConstructionError` on Python truth testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
 tests cannot compose SQL.
@@ -94,7 +100,9 @@ flattening and negation follow the Rust condition implementation.
 
 `is_null`, `is_not_null`, `between`, `not_between`, `is_in` and `is_not_in`
 invoke the corresponding Rust `Expr` methods. Membership accepts a list or
-tuple of values/expressions, including an empty list. The empty-list
+tuple of values/expressions, including an empty list, or a `Select`, whose
+rows it tests through Rust's `in_subquery` / `not_in_subquery`, the subquery
+checked as any embedded one is. The empty-list
 implementation remains Rust's constant comparison, which `build()` renders
 as `$1 = $2` with `("a", "b")` for IN and `("a", "a")` for NOT IN.
 Use `is_null()` explicitly; an equality against a typed NULL retains ordinary
@@ -104,6 +112,45 @@ not NULL, when it yields no row — which casts and compares as a value where th
 subquery's rows cannot: `array(names).cast(TypeName("text"), array=True)`. The
 subquery is checked as any embedded one is, and PostgreSQL refuses one of more
 than one column (`42601`).
+
+`exists(select)` is `EXISTS (select)`, whether the subquery yields a row, and
+`scalar(select)` is `(select)`, its one row's one value, NULL for no row; the
+server refuses a scalar subquery of more than one column (`42601`) and, as it
+runs, one yielding more than one row (`21000`). Both read the subquery as any
+embedded one is read.
+
+`any_(source)` and `all_(source)` are `ANY (..)` and `ALL (..)`, named with a
+trailing underscore so they do not shadow Python's builtins. Each is the right
+operand of a comparison — `==`, `!=`, `<`, `<=`, `>`, `>=` or their methods —
+and of nothing else, as PostgreSQL's grammar reads it: another operator, a
+membership list or `bind` refuses it with `ConstructionError`, and it has no
+`inspect` of its own. The source is a `Select`, whose rows it ranges over
+(Rust's `Expr::any` / `Expr::all`), or an array (Rust's `Func::any` /
+`Func::all`): an expression, such as an array column or `array(select)`, or a
+value bound as one array parameter, which names its kind as an array always
+does:
+
+```python
+from pgorm import Value, all_, any_, array, col, select, Table
+
+ids = Value.array("i64", [1, 3])
+col("id") == any_(ids)                 # "id" = ANY($1), one parameter however long
+col("id") != all_(ids)                 # "id" <> ALL($1)
+col("id") > all_(select(col("id")).from_(Table("t")))   # > ALL (SELECT ..)
+col("id") == any_(array(select(col("id")).from_(Table("t"))))
+```
+
+`= ANY` over one array parameter is the membership `IN` tests, with one
+placeholder for any length, so the statement's text, and the prepared
+statement a connection caches for it, is the same at every length. Over an
+empty array, or a subquery with no row, `ANY` is false and `ALL` true.
+
+`expr.at(index)` is one array element, `a[index]`, which counts from 1 and is
+NULL outside the array's bounds; `expr.slice(lower, upper)` is the slice
+`a[lower:upper]`, both bounds inclusive, `None` leaving an end open, so
+`slice(2)` is `a[2:]`, `slice(upper=3)` `a[:3]` and `slice()` `a[:]`. Each
+bound is bound unless it is an expression. `Expr` has no `__getitem__`: one
+would make every expression look iterable to Python.
 
 PostgreSQL's other binary operators are methods, each the Rust builder of its
 meaning, the other operand bound unless it is an expression — the same set

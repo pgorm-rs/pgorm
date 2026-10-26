@@ -2,7 +2,9 @@ use crate::execution::Database;
 use std::{fmt::Debug, sync::Arc};
 
 use futures_util::future::BoxFuture;
-use pgorm::pgorm_query::{Condition, NullOrdering, OnConflict, Order, SimpleExpr, Value, Values};
+use pgorm::pgorm_query::{
+    Condition, NullOrdering, OnConflict, Order, SelectStatement, SimpleExpr, Value, Values,
+};
 use pgorm::{ActiveValue, Error};
 
 use super::metadata::EntityInfo;
@@ -19,6 +21,14 @@ pub(crate) enum Comparison {
     Ge,
     Lt,
     Le,
+}
+
+/// What a column's membership is tested against: values of the column's
+/// declared kind, or a subquery's rows.
+#[derive(Clone, Debug)]
+pub(crate) enum Members {
+    Values(Vec<Value>),
+    Subquery(Box<SelectStatement>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,6 +66,12 @@ pub(crate) trait EntityBackend: Debug + Send + Sync {
         column: &str,
         comparison: Comparison,
         value: Value,
+    ) -> Result<SimpleExpr, Error>;
+    fn membership(
+        &self,
+        column: &str,
+        negated: bool,
+        members: Members,
     ) -> Result<SimpleExpr, Error>;
     fn versions<'a>(
         &'a self,

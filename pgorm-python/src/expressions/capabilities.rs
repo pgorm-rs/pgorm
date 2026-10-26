@@ -40,8 +40,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("expr.not", "pgorm_query::SimpleExpr::not"),
         ("expr.is_null", "pgorm_query::Expr::is_null"),
         ("expr.is_not_null", "pgorm_query::Expr::is_not_null"),
-        ("expr.is_in", "pgorm_query::Expr::is_in"),
-        ("expr.is_not_in", "pgorm_query::Expr::is_not_in"),
+        ("expr.is_in", "pgorm_query::Expr::is_in, Expr::in_subquery"),
+        (
+            "expr.is_not_in",
+            "pgorm_query::Expr::is_not_in, Expr::not_in_subquery",
+        ),
         (
             "expr.between",
             "pgorm_query::Expr::between, Expr::between_symmetric",
@@ -49,6 +52,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         (
             "expr.not_between",
             "pgorm_query::Expr::not_between, Expr::not_between_symmetric",
+        ),
+        ("expr.at", "pgorm_query::Expr::index"),
+        (
+            "expr.slice",
+            "pgorm_query::Expr::subscript(Subscript::Slice)",
         ),
         ("expr.cast", "pgorm_query::SimpleExpr::cast_as_type"),
         ("expr.collate", "pgorm_query::Expr::collate"),

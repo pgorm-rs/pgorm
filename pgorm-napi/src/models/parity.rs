@@ -477,7 +477,7 @@ fn cursors() -> Vec<(&'static str, (String, Values))> {
 }
 
 // [spec:pgorm:req:napi.models/test]
-// [spec:pgorm:req:napi.model-reads/test]
+// [spec:pgorm:req:napi.model-reads+1/test]
 // [spec:pgorm:req:napi.model-writes/test]
 // [spec:pgorm:req:napi.relations/test]
 // [spec:pgorm:req:napi.graphs/test]

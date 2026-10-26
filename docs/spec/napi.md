@@ -497,7 +497,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+6]
+> [spec:pgorm:req:napi.expressions+7]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -522,7 +522,9 @@ SQL text running a built statement.
 > off (`sql.ast.expr.similar-to`); `regex` (`~`), `notRegex` (`!~`),
 > `iregex` (`~*`) and `notIregex` (`!~*`) match a POSIX regular expression,
 > an operand bound unless it is an expression, each the `BinOper` of that
-> meaning; `pathExists` (`@?`) takes a `jsonpath` string, bound as
+> meaning; `matches` (`@@`) is `BinOper::Matches`, full-text search or a
+> `jsonpath` predicate, its operand bound unless it is an expression;
+> `pathExists` (`@?`) takes a `jsonpath` string, bound as
 > pgorm-query's `json_path_exists` binds it, as text cast to `jsonpath`, and
 > anything else is a `ConstructionError`; `startsWith`,
 > `endsWith` and `containsText` read their argument as
@@ -542,7 +544,13 @@ SQL text running a built statement.
 > `Expr::array` to `ARRAY(select)`: the subquery's one column as one array
 > value, empty when it yields no row, which casts and compares as a value
 > (`sql.ast.expr`), the server refusing a subquery of more than one column
-> (`42601`).
+> (`42601`). `any(source)` and `all(source)` MUST be `ANY (..)` and
+> `ALL (..)`: pgorm-query's `Expr::any` / `Expr::all` over a `Select`'s rows,
+> and `Func::any` / `Func::all` over an array, an expression or a value bound
+> as one array parameter. Each is a `Quantified`, no expression: the right
+> operand of `eq`, `ne`, `lt`, `lte`, `gt` and `gte` alone, as PostgreSQL's
+> grammar reads it, and any other operator or operand position MUST refuse it
+> with a `ConstructionError`.
 
 > [spec:pgorm:req:napi.select+2]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of
@@ -732,7 +740,7 @@ graphs, cursors and pages follow pgorm's own `RelationDef`, `SelectGraph`,
 > `DecodeError`, never a value. A model's rows stream from a pool or a
 > connection as records, through the same decode.
 
-> [spec:pgorm:req:napi.model-reads]
+> [spec:pgorm:req:napi.model-reads+1]
 > `find()` MUST select every field, `select(..)` the fields it names, and
 > `findByKey(key)` the row of a primary key, through pgorm-query's
 > `SelectStatement`; `where` ANDs a condition, `orderBy`, `limit` and
@@ -741,8 +749,9 @@ graphs, cursors and pages follow pgorm's own `RelationDef`, `SelectGraph`,
 > columns. `col(field)` MUST be the field's column as an expression whose
 > comparisons convert a value through the field's declared kind — an enum's
 > label bound cast to its type, as pgorm's column comparisons cast through
-> `save_as` — and take an expression as written, a `Value` only of the
-> field's own kind, and `null` never, which `isNull()` tests. `key(values)`
+> `save_as` — and take an expression, or `any(..)` / `all(..)`, as written,
+> a `Value` only of the field's own kind, and `null` never, which `isNull()`
+> tests. `key(values)`
 > MUST match every primary-key field and no other. `all`, `one`,
 > `optional` and `count` run on a pool, a connection or a transaction —
 > `one` exactly one row and `optional` at most one, any other count a
@@ -1179,7 +1188,7 @@ the ones compiled in.
 > its state unknown — and a failure from PostgreSQL anywhere in its causes is
 > the error `napi.errors` classifies.
 
-> [spec:pgorm:req:napi.entity-reads+3]
+> [spec:pgorm:req:napi.entity-reads+4]
 > `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
 > and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
 > `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
@@ -1190,8 +1199,8 @@ the ones compiled in.
 > MUST be that trait's methods, a value converted to the column's declared
 > kind and written through the column's `save_as` — an enum's label cast to
 > its type, and a column whose domain is over an enum compared as the enum,
-> the column and the label each cast to it — an expression compared as
-> written, and `null` refused. Its `isIn` and `isNotIn` MUST be the trait's
+> the column and the label each cast to it — an expression, or `any(..)` /
+> `all(..)`, compared as written, and `null` refused. Its `isIn` and `isNotIn` MUST be the trait's
 > `is_in` / `is_not_in` over a list of values, each converted as a compared
 > value is, and its `in_subquery` / `not_in_subquery` over a `Select`, so a
 > column whose domain is over an enum is a member as the enum and the

@@ -123,6 +123,22 @@ class ModelConstruction(unittest.TestCase):
             model.col("id").is_in([1, 2]).inspect().params,
             [p.Value(1, "i32"), p.Value(2, "i32")],
         )
+        ids = p.Select(model.table.col("id")).from_(model.table)
+        for method in ("is_in", "is_not_in"):
+            self.assertEqual(
+                getattr(model.col("id"), method)(ids).inspect().sql,
+                getattr(model.table.col("id"), method)(ids).inspect().sql,
+            )
+        self.assertEqual(
+            model.col("id").is_not_in((1,)).inspect().params, [p.Value(1, "i32")]
+        )
+        quantified = p.any_(p.Value.array("i32", [1, 2]))
+        self.assertEqual(
+            model.col("id").eq(quantified).inspect().sql,
+            (model.table.col("id") == quantified).inspect().sql,
+        )
+        with self.assertRaises(p.ConstructionError):
+            model.col("id").is_in("12")
         self.assertIn("IS NULL", model.col("note").is_null().inspect().sql)
         for value in (model.col("id"), query, accounts().delete()):
             with self.assertRaises(p.ConstructionError):

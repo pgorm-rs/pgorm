@@ -3,9 +3,11 @@
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+6/test]
+// [spec:pgorm:req:napi.expressions+7/test]
 
 import {
+  all,
+  any,
   array,
   bind,
   type Builder,
@@ -115,6 +117,20 @@ export const cases: Record<string, () => Builder> = {
         col("doc").pathExists('$.tags[*] ? (@ == "blue")'),
       ),
     ),
+  "matches-and-quantifiers": () => {
+    const ids = (name: string) => select(col("id")).from(new Table(name));
+    return select().from(t).where(
+      Condition.all(
+        col("body").matches("fat & rat"),
+        col("doc").matches(bind("$.a == 1").cast("jsonpath")),
+        col("id").eq(any([1, 2])),
+        col("id").ne(all(array(ids("u")))),
+        col("score").gt(all(ids("v"))),
+        col("id").lte(any(ids("w"))),
+        col("a").gte(any(col("b"))),
+      ),
+    );
+  },
   "casts-collations-subscripts": () =>
     select(
       col("a").cast("integer"),

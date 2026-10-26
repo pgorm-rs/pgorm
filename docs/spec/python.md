@@ -120,14 +120,27 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions+5]
+> [spec:pgorm:req:python.expressions+6]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
 > LIKE and SIMILAR TO patterns, function calls and qualified casts through
-> Rust builders. `array(select)` MUST be Rust's `Expr::array` over the
+> Rust builders. `is_in` and `is_not_in` MUST take a `Select` as well as a
+> list or tuple, Rust's `in_subquery` / `not_in_subquery` over its rows.
+> `array(select)` MUST be Rust's `Expr::array` over the
 > subquery as it embeds (`ARRAY(select)`, one array value, empty for no
-> rows, which casts and compares as a value), checked as any embedded
-> subquery is.
+> rows, which casts and compares as a value), `exists(select)` Rust's
+> `Expr::exists`, and `scalar(select)` the scalar subquery `(select)`, each
+> subquery checked as any embedded subquery is. `any_(source)` and
+> `all_(source)` MUST be `ANY (..)` and `ALL (..)`: Rust's `Expr::any` /
+> `Expr::all` over a `Select`'s rows, and `Func::any` / `Func::all` over an
+> array, an expression or a value bound as one array parameter. Each is a
+> `Quantified`, the right operand of the six comparisons and their Python
+> operators alone, as PostgreSQL's grammar reads it; any other operator, a
+> membership list and `bind` MUST refuse it with `ConstructionError`.
+> `at(index)` MUST be Rust's `Expr::index` (`a[index]`) and
+> `slice(lower, upper)` its `Subscript::Slice` (`a[lower:upper]`), `None`
+> leaving an end open and each bound bound unless it is an expression;
+> `Expr` has no `__getitem__`, which would make it iterable to Python.
 > Every binary operator JavaScript's expressions spell (`napi.expressions`,
 > `napi.ranges`) MUST have its Python method, the Rust builder of that
 > meaning, the other operand bound unless it is an expression:
@@ -296,10 +309,16 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > MUST be explicit errors. Dynamic descriptors MUST NOT claim to instantiate
 > Rust derives, EntityTrait implementations or ActiveModelBehavior hooks.
 
-> [spec:pgorm:req:python.entities+3]
+> [spec:pgorm:req:python.entities+4]
 > Concrete compiled entity registrations MUST expose their actual Rust entity,
 > model, column and ActiveModel operations, including write-state and hook
-> semantics. Registration MUST declare its types and supported terminals, the
+> semantics. A registered column's comparisons MUST be its `ColumnTrait`
+> methods, and its `is_in` and `is_not_in` the trait's membership: `is_in` /
+> `is_not_in` over a list or tuple of values, each converted to the column's
+> declared kind as a compared value is, and `in_subquery` /
+> `not_in_subquery` over a `Select`'s rows, so a column whose domain is over
+> an enum is a member as the enum and the subquery's projection is cast
+> beside it; anything else is a `ConstructionError`. Registration MUST declare its types and supported terminals, the
 > declared attributes that change what a key or a join by a relation means —
 > a key ending `WITHOUT OVERLAPS`, and each relation's columns, `PERIOD` pair,
 > condition type and whether an `on_condition` adds its own condition, a Rust

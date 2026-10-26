@@ -65,7 +65,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(await query.one_opt(connection))
 
     # [spec:pgorm:req:python.codegen+2/test]
-    # [spec:pgorm:req:python.entities+3/test]
+    # [spec:pgorm:req:python.entities+4/test]
     async def test_generated_views_return_typed_versions(self):
         def active(identity, name):
             return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
