@@ -210,7 +210,7 @@ const MAX_PARAMETERS: usize = 65_535;
 // [spec:pgorm:req:napi.windows+2]
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
-        Node::Select(select) => match args::checked(select) {
+        Node::Select(select) => match select.check_clauses() {
             Ok(()) => select.build(),
             Err(error) => return refuse(cx, error.to_string()),
         },

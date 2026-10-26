@@ -587,7 +587,7 @@ today, including panicking edges and deliberate failsafes.
 > the type cannot tell from a table's, and sampling one is the server's
 > refusal (`0A000`).
 
-> [spec:pgorm:req:sql.ast.select.tie-limit+1]
+> [spec:pgorm:req:sql.ast.select.tie-limit+2]
 > `limit_with_ties(count)` sets a tie limit, `FETCH FIRST count ROWS WITH
 > TIES`: the first `count` rows in the statement's ORDER BY and every further
 > row equal to the last of them on all its keys. It shares one slot with
@@ -619,6 +619,14 @@ today, including panicking edges and deliberate failsafes.
 > that `42601`. The check reads the statement's own clauses: a SELECT nested
 > in it — a subquery, a CTE body, a set operation's arm — carrying a refused
 > shape is the server's refusal.
+>
+> `check_clauses` is the one public check a caller about to render a
+> `SELECT` as it stands calls: it runs `check_tie_limit` and then
+> `check_windows` (`sql.ast.window-statement`), the first refusal found its
+> error. Every pgorm executor, the Python and JavaScript builders, a stored
+> definition's body (`sql.ddl.view`) and a COPY TO's source (`sql.ast.copy`)
+> call it rather than pairing the two themselves, so each reports the same
+> refusal for the same statement.
 
 > [spec:pgorm:req:sql.ast.select.group-distinct]
 > `group_by_distinct()` sets the GROUP BY list's set quantifier to

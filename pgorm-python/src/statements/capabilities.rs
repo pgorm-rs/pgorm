@@ -97,7 +97,7 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         (
             "select.inspect",
-            "pgorm_query::SelectStatement::{check_tie_limit, check_windows, build}",
+            "pgorm_query::SelectStatement::{check_clauses, build}",
         ),
         (
             "insert",

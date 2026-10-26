@@ -13941,12 +13941,27 @@ children (
         title "Every caller pairing the tie-limit and window checks calls one public check"
         kind @refactor
         deps (view-check-dedup)
+        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.811222Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by view-check-dedup, which added the crate-private SelectStatement::check_clauses for the view and COPY-source checks. PySelect::check, pgorm-napi's checked and the executor's ensure_select_list still pair check_tie_limit and check_windows themselves. Making check_clauses public (an addition, with a sql.surface entry) would let all of them share it."
+            }
+
+            {
+                at 2026-10-25T23:58:04.696792Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:24:00.568357Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14127,6 +14142,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by boolean-operator-parens. The grammar ranks generic operators (@>, &&, ~ ..) above comparison, IS, IN and LIKE, but such an operator under one of them keeps parentheses, e.g. (\"a\" @> $1) = TRUE. Only redundant, never a wrong grouping; low priority."
+            }
+
+            {
+                at 2026-10-25T23:58:04.072088Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

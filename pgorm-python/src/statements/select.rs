@@ -51,12 +51,11 @@ pub struct PySelect {
 impl PySelect {
     // [spec:pgorm:req:python.statements+10]
     /// Refuse a tie limit, and a WINDOW clause or a reference to one, that
-    /// PostgreSQL would refuse, with Rust's `check_tie_limit` and
-    /// `check_windows`, which rendering leaves to its caller.
+    /// PostgreSQL would refuse, with Rust's `check_clauses`, which rendering
+    /// leaves to its caller.
     fn check(&self) -> PyResult<()> {
         self.inner
-            .check_tie_limit()
-            .and_then(|()| self.inner.check_windows())
+            .check_clauses()
             .map_err(|error| ConstructionError::new_err(error.to_string()))
     }
 

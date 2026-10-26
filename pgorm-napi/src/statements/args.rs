@@ -293,18 +293,10 @@ pub(crate) fn embedded<'cx>(
     cx: &mut Cx<'cx>,
     select: SelectStatement,
 ) -> NeonResult<SelectStatement> {
-    match checked(&select) {
+    match select.check_clauses() {
         Ok(()) => Ok(select),
         Err(error) => refuse(cx, error.to_string()),
     }
-}
-
-/// pgorm-query's two checks of a SELECT that rendering leaves to its caller:
-/// its tie limit and its WINDOW clause.
-// [spec:pgorm:req:napi.windows+2]
-pub(crate) fn checked(select: &SelectStatement) -> pgorm::pgorm_query::error::Result<()> {
-    select.check_tie_limit()?;
-    select.check_windows()
 }
 
 /// The `Select` at `index`.

@@ -21,7 +21,7 @@ fn ordered() -> SelectStatement {
         .take()
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tie limit renders in LIMIT's place and
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the tie limit renders in LIMIT's place and
 // parses as PostgreSQL's WITH TIES limit, its count bound
 // [spec:pgorm:req:sql.render.tie-limit/test]
 #[test]
@@ -46,7 +46,7 @@ fn tie_limit_renders_fetch_first_with_ties() {
     assert_eq!(query.check_tie_limit(), Ok(()));
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `limit` and `limit_with_ties` share one slot,
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    `limit` and `limit_with_ties` share one slot,
 // the last call winning, and `reset_limit` clears either
 #[test]
 fn row_limits_replace_each_other() {
@@ -77,7 +77,7 @@ fn row_limits_replace_each_other() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `narrow_limit_to_one` narrows every row
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    `narrow_limit_to_one` narrows every row
 // limit to a plain LIMIT of at most one, keeping a limit of zero and the OFFSET
 #[test]
 fn narrowing_keeps_a_zero_limit() {
@@ -108,7 +108,7 @@ fn narrowing_keeps_a_zero_limit() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two shapes the grammar refuses are refused by
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the two shapes the grammar refuses are refused by
 // `check_tie_limit`, and the grammar does refuse what they render
 // [spec:pgorm:req:sql.render.oracle+4/test]    the one render held rejected by design
 // [spec:pgorm:req:sql.render.tie-limit/test]
