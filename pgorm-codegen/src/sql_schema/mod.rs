@@ -12,18 +12,6 @@
 //! Anything else in the file is a named error rather than a silent omission:
 //! a schema that generates entities is a schema the bridge understood in
 //! full.
-//!
-//! ```
-//! use pgorm_codegen::{EntityWriterOptions, sql_schema};
-//!
-//! let files = sql_schema::entities_from_sql(
-//!     "CREATE TABLE cake (id serial PRIMARY KEY, name text NOT NULL);",
-//!     EntityWriterOptions::default(),
-//! )
-//! .expect("a supported schema");
-//!
-//! assert!(files.files.iter().any(|file| file.name == "cake.rs"));
-//! ```
 #![deny(
     clippy::expect_used,
     clippy::indexing_slicing,
@@ -72,7 +60,7 @@ type Declared = BTreeMap<TypeIdentity, DeclaredType>;
 /// Enum types are resolved into the column types that name them, and indexes
 /// and comments are folded into the table they describe, so the returned
 /// statements stand alone.
-// [spec:pgorm:def:codegen.ddl+3]
+// [spec:pgorm:def:codegen.ddl+4]
 // [spec:pgorm:req:codegen.ddl.unsupported+17]
 pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
     let parsed = pg_query::parse(sql, pg_query::ParserOptions::DEFAULT)
@@ -85,7 +73,7 @@ pub fn parse_schema(sql: &str) -> Result<Vec<TableCreateStatement>, Error> {
 /// The whole pipeline: parse, bridge, [`EntityTransformer::transform`],
 /// [`crate::EntityWriter::generate`]. Options are validated first, so an
 /// unusable option is reported before the schema is read.
-// [spec:pgorm:def:codegen.ddl+3]
+// [spec:pgorm:def:codegen.ddl+4]
 pub fn entities_from_sql(sql: &str, options: EntityWriterOptions) -> Result<WriterOutput, Error> {
     let context = EntityWriterContext::new(options)?;
     let writer = EntityTransformer::transform(parse_schema(sql)?)?;

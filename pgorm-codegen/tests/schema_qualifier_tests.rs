@@ -5,8 +5,7 @@
 mod common;
 
 use common::*;
-use pgorm_codegen::sql_schema::entities_from_sql;
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql};
 
 fn from_sql(sql: &str, opts: Opts) -> Generated {
     Generated {
@@ -33,7 +32,7 @@ fn assert_error(sql: &str, expected: &str) {
 
 const QUALIFIED: &str = "CREATE TABLE tenant_a.item (id int PRIMARY KEY);";
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    the source table's schema
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    the source table's schema
 // survives transformation and reaches the compact entity
 // [spec:pgorm:def:codegen.entity.compact+1/test]
 #[test]
@@ -67,7 +66,7 @@ fn expanded_entity_name_carries_the_source_schema() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    an unqualified table
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    an unqualified table
 // still generates no schema of its own
 #[test]
 fn an_unqualified_table_carries_no_schema() {
@@ -172,7 +171,7 @@ fn qualified_item() -> pgorm_query::TableCreateStatement {
         .to_owned()
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    a qualified foreign key
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a qualified foreign key
 // resolves to the table it names, across schemas
 #[test]
 fn a_foreign_key_resolves_across_schemas() {
@@ -196,7 +195,7 @@ fn a_foreign_key_resolves_across_schemas() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    an unqualified reference
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    an unqualified reference
 // resolves to the one table with that bare name, whatever schema it is in
 #[test]
 fn an_unqualified_key_reaches_a_qualified_table() {
@@ -216,7 +215,7 @@ fn an_unqualified_key_reaches_a_qualified_table() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    a key onto another
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a key onto another
 // schema's table is a key onto a table this schema does not define
 #[test]
 fn a_key_onto_another_schemas_table_is_unresolved() {
@@ -227,7 +226,7 @@ fn a_key_onto_another_schemas_table_is_unresolved() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    self-reference is decided
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    self-reference is decided
 // on identity: a qualified table keying itself is still `SelfRef`
 #[test]
 fn a_qualified_table_can_reference_itself() {
@@ -243,7 +242,7 @@ fn a_qualified_table_can_reference_itself() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    the gate names a table by
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    the gate names a table by
 // its identity, so a failure in one of two schemas' tables says which
 #[test]
 fn a_refusal_names_the_qualified_table() {
@@ -306,7 +305,7 @@ fn an_ambiguous_unqualified_index_is_refused() {
 // qualifier all along; it is the whole pipeline that now keeps it
 #[test]
 fn bridge_and_generated_entity_agree_on_schema() {
-    use pgorm_codegen::sql_schema::parse_schema;
+    use pgorm_codegen::parse_schema;
     use pgorm_query::TableName;
 
     let statements = parse_schema(QUALIFIED).expect("schema should parse");

@@ -5,8 +5,7 @@ mod common;
 
 use common::*;
 use pgorm::{ColumnTrait, ColumnTypeTrait, EntityTrait, QueryTrait};
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql, parse_schema};
 use pgorm_query::{ColumnType, Name};
 use std::sync::Arc;
 

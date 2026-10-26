@@ -1,22 +1,23 @@
+use super::column::under_domains;
 use crate::{
     ActiveEnum, Column, ConjunctRelation, CreatedRangeType, Entity, EntityWriter, Error,
     PrimaryKey, Relation, RelationType, TableIdent,
     util::{escape_rust_keyword, repeated_column},
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use pgorm_query::{GeneratedKind, TableCreateStatement};
+use pgorm_query::{ColumnType, GeneratedKind, TableCreateStatement};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// The most columns an entity's primary key can have: its `ValueType` is a
 /// tuple for a composite key, and pgorm's key traits stop at 12 parts.
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 const MAX_KEY_COLUMNS: usize = 12;
 
 #[derive(Clone, Debug)]
 pub struct EntityTransformer;
 
 impl EntityTransformer {
-    // [spec:pgorm:sem:codegen.entity.transform+14]
+    // [spec:pgorm:sem:codegen.entity.transform+15]
     // [spec:pgorm:sem:codegen.entity.transform.inverse+1]
     // [spec:pgorm:sem:codegen.entity.transform.conjunct+1]
     // [spec:pgorm:req:codegen.entity.collisions+2]
@@ -238,6 +239,7 @@ impl EntityTransformer {
             }
         }
         validate_references(&entities)?;
+        refuse_unkeyable_references(&entities)?;
         validate_identities(&entities, &enums, &ranges)?;
         for (tbl_name, relations) in inverse_relations.into_iter() {
             if let Some(entity) = entities.get_mut(&tbl_name) {
@@ -350,7 +352,7 @@ impl EntityTransformer {
 /// that bare name — the reading `search_path` would give it in any schema that
 /// generates at all, since two tables sharing a bare name are refused before
 /// this is reached (`validate_distinct_names`).
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 pub(crate) fn resolve_reference<'a>(
     declared: &'a [TableIdent],
     reference: &TableIdent,
@@ -372,7 +374,7 @@ pub(crate) fn resolve_reference<'a>(
 /// single columns, and a key ending `WITHOUT OVERLAPS` has two at least, so
 /// read as its columns it would claim a uniqueness the table does not have.
 /// A temporal primary key and a `PERIOD` foreign key the entity holds.
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let temporal_unique = table
         .get_unique_keys()
@@ -391,7 +393,7 @@ fn refuse_temporal_constraints(table: &TableCreateStatement, name: &str) -> Resu
 /// would generate a `PrimaryKey` enum with one variant twice, which does not
 /// compile, and a unique key over `(a, a)` would mark `a` unique on its own;
 /// so it is refused by name, never read as the key without its repeat.
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 fn refuse_repeated_key_columns(table: &TableCreateStatement, name: &str) -> Result<(), Error> {
     let primary = table
         .get_primary_key()
@@ -462,7 +464,7 @@ fn refuse_unwritable_expressions(
 /// column: an entity's key is its key fields in the order they are written,
 /// and the derive takes `WITHOUT OVERLAPS` on the last of them alone, so the
 /// generated entity would not compile.
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 fn refuse_period_before_key(
     columns: &[Column],
     primary_keys: &[PrimaryKey],
@@ -511,7 +513,7 @@ fn validate_distinct_names(declared: &[TableIdent]) -> Result<(), Error> {
 /// Every relation joins tables and columns this schema has: a generated file
 /// names its target's module and columns, so a foreign key onto a table the
 /// caller did not pass would generate Rust that does not compile.
-// [spec:pgorm:sem:codegen.entity.transform+14]
+// [spec:pgorm:sem:codegen.entity.transform+15]
 fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
     for (table_name, entity) in entities.iter() {
         for relation in entity.relations.iter() {
@@ -546,6 +548,50 @@ fn validate_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Er
         }
     }
     Ok(())
+}
+
+/// A foreign key PostgreSQL cannot implement: one matching a column typed as
+/// a domain over an enum, on either side, which the server refuses (`42804`)
+/// whatever the other side is. DDL text is never run, so the server's refusal
+/// cannot have kept one out; generated, it would be a relation
+/// `Schema::create_table_from_entity` refuses in turn.
+// [spec:pgorm:sem:codegen.entity.transform+15]
+fn refuse_unkeyable_references(entities: &BTreeMap<TableIdent, Entity>) -> Result<(), Error> {
+    for (table_name, entity) in entities.iter() {
+        for relation in entity.relations.iter() {
+            let Some(ref_entity) = entities.get(&relation.ref_ident()) else {
+                continue;
+            };
+            let pairs = relation.columns.iter().zip(relation.ref_columns.iter());
+            for (column, ref_column) in pairs {
+                if over_enum_domain(entity, column) || over_enum_domain(ref_entity, ref_column) {
+                    return Err(Error::TransformError(format!(
+                        "table `{table_name}`: relation to `{}` matches column `{column}` with \
+                         `{ref_column}`, and PostgreSQL implements no foreign key with a column \
+                         typed as a domain over an enum on either side (42804)",
+                        relation.ref_ident()
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether `entity`'s column `name` is typed as a domain over an enum,
+/// through any further domains; a domain over an array of one is keyed.
+// [spec:pgorm:sem:codegen.entity.transform+15]
+fn over_enum_domain(entity: &Entity, name: &str) -> bool {
+    entity
+        .columns
+        .iter()
+        .find(|column| column.name == name)
+        .is_some_and(|column| match &column.col_type {
+            ColumnType::Domain { base, .. } => {
+                matches!(under_domains(base), ColumnType::Enum { .. })
+            }
+            _ => false,
+        })
 }
 
 /// Every identity the writer derives from a DB name belongs to one name alone.

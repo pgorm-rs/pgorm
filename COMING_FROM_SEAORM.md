@@ -104,7 +104,7 @@ compiled.
 | `SchemaManager` in migrations | the `DatabaseTransaction` itself |
 | `down`, `fresh`, `refresh`, `reset` | gone: migrations run forward only |
 | `seaql_migrations` | `pgorm_migrations`, adopted on the first `up` |
-| `sea-orm-cli generate entity` | `pgorm_codegen::sql_schema::entities_from_sql` |
+| `sea-orm-cli generate entity` | `pgorm_codegen::entities_from_sql` |
 | `sea-orm-cli migrate` | a small binary of your own |
 | `MockDatabase` | `build()` to check the SQL, or a real database |
 | `set_metric_callback` | `metric::InstrumentedPool` |
@@ -1019,12 +1019,12 @@ that runs `up` and `status`.
 ## Generating entities
 
 There is no CLI. Entity generation is the `pgorm-codegen` library: give it
-your schema as SQL, for example the output of `pg_dump --schema-only`, and
+your schema as SQL, the `CREATE` statements for its tables and types, and
 write the files it returns. It is a separate crate, so this example is not
 compiled here:
 
 ```ignore
-use pgorm_codegen::{EntityWriterOptions, WithSerde, sql_schema::entities_from_sql};
+use pgorm_codegen::{EntityWriterOptions, WithSerde, entities_from_sql};
 
 let ddl = std::fs::read_to_string("schema.sql")?;
 let output = entities_from_sql(&ddl, EntityWriterOptions {
@@ -1036,9 +1036,12 @@ for file in output.files {
 }
 ```
 
-The schema is read with PostgreSQL's own parser, so anything PostgreSQL 18
-accepts is read as the server reads it. Enums are told apart by schema as
-well as name.
+The schema is read with PostgreSQL's own parser, so it is read as
+PostgreSQL 18 reads it. Enums are told apart by schema as well as name.
+What it cannot carry into an entity is refused by name rather than skipped,
+and that includes the output of `pg_dump --schema-only`, which adds its keys
+with `ALTER TABLE` and opens with `SET`s. Write the keys into each
+`CREATE TABLE` instead.
 
 ## Testing without a database
 

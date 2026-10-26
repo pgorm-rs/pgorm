@@ -325,7 +325,7 @@ including panic semantics and quirks inherited from sea-query.
 
 ## Range types a schema creates
 
-> [spec:pgorm:def:sql.value.created-range+3]
+> [spec:pgorm:def:sql.value.created-range+4]
 > A range type a schema creates with `CREATE TYPE ... AS RANGE`
 > (`[spec:pgorm:req:sql.ddl.type-range+2]`) is named by that schema, so no
 > `RangeType` variant can carry it, and `Value` does not: it stays one pointer
@@ -381,7 +381,7 @@ including panic semantics and quirks inherited from sea-query.
 > input function reads it, every spelling the type takes; a bare `$1` there is
 > typed as the range, and a `String` bound to it is read by pgorm instead,
 > through the subtype's Rust parsing
-> (`[spec:pgorm:req:exec.cursor.binding-range+2]`). Inline it is an escaped
+> (`[spec:pgorm:req:exec.cursor.binding-range+3]`). Inline it is an escaped
 > string literal, and the two renderings are one value. A bound holding the
 > literal's syntax, a quote or a placeholder is read back as the text it is.
 >
@@ -400,7 +400,8 @@ including panic semantics and quirks inherited from sea-query.
 > (`[spec:pgorm:def:exec.decode.range+3]`), and the newtype decodes through it.
 > Where a column is read into `Value`s, as a binary COPY reads one, a range
 > type a schema created over a `RangeSubtype` reads as the `String` of its
-> text form, the value its newtype converts into (`conn.copy.rows`).
+> text form, the value its newtype converts into, and so does the multirange
+> beside it (`conn.copy.rows`).
 >
 > pgorm cannot author the C function a canonical function is
 > (`[spec:pgorm:req:sql.ddl.type-range+2]`), so a range type a schema creates
@@ -433,7 +434,12 @@ including panic semantics and quirks inherited from sea-query.
 > that reads as no multirange of its subtype. The cast rides the read path an
 > enum already has, so `find`, the graph and the pipeline's `select_sources`
 > all read it, a `NULL` stays `NULL`, and the server's sorted, merged form is
-> what reads back. `ARRAY(SELECT unnest(col))`, which the driver types as an
+> what reads back. A binary COPY casts nothing, so it reads such a column
+> through the catalogue instead: its description completes the multirange's
+> kind with the range's subtype, and its field reads as the `String` of the
+> text form `Multirange<T>`'s `Display` writes (`conn.copy.rows`), which the
+> server reads back as the same value, as for a range.
+> `ARRAY(SELECT unnest(col))`, which the driver types as an
 > array of the range and could read in binary, was the other route and is
 > not taken: it reads `NULL` as `{}`, and it is not a cast, so the pipeline,
 > which reads only a cast off `select_as`, would project the bare column. The

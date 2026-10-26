@@ -5,9 +5,9 @@ files. The pipeline has two stages: `EntityTransformer::transform` converts a
 list of `TableCreateStatement`s into an in-memory `Entity` model, and
 `EntityWriter::generate` renders those entities into output files. Everything
 below describes what the code emits today; text-level shapes are pinned by the
-golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
-a live database reach the same pipeline through `sql_schema`, specified under
-[Schema from DDL text](#schema-from-ddl-text).
+golden fixtures under `pgorm-codegen/tests/`. A schema reaches the pipeline as
+DDL text, through `entities_from_sql` and `parse_schema` at the crate root,
+specified under [Schema from DDL text](#schema-from-ddl-text).
 
 > [spec:pgorm:def:codegen.entity+3]
 > The entity generator is the pipeline
@@ -34,7 +34,7 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema discovery → Entity model
 
-> [spec:pgorm:sem:codegen.entity.transform+14]
+> [spec:pgorm:sem:codegen.entity.transform+15]
 > `EntityTransformer::transform` builds one `Entity` per input
 > `TableCreateStatement`. A table's identity is the `TableIdent` its
 > `TableName` spells: the bare name, and the schema qualifying it when the
@@ -187,6 +187,23 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > for the tableless case is gone with the state it guarded
 > (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and MUST NOT come back: the
 > conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
+>
+> A foreign key PostgreSQL cannot implement is refused with them: one
+> matching, for equality, a column typed as a domain over an enum — directly
+> or through further domains — on either side, which the server answers
+> `42804` whatever the other side is (`schema.from-entity`). The bridge reads
+> DDL that is never run, so a `REFERENCES` the server would refuse reaches
+> the gate as written, and a statement the caller built may hold one too;
+> generated, it would be a relation `Schema::create_table_from_entity`
+> refuses in turn. It is ``TransformError("table `<table>`: relation to `<ref
+> table>` matches column `<column>` with `<ref column>`, and PostgreSQL
+> implements no foreign key with a column typed as a domain over an enum on
+> either side (42804)")``, naming the first such pair. Every pairing the
+> server keys generates its relation: an enum with itself, a domain over any
+> other base with that base or itself, and a domain over an array of an enum
+> with itself. The pair's types are read from the columns themselves, so
+> every key is checked; a relation `ColumnPairs` names by bare names, which
+> schema generation cannot check, is not one codegen writes.
 >
 > The reference and collision checks run over the tables as read, before
 > inverse and conjunct relations are synthesised: those are the gate's own
@@ -978,22 +995,25 @@ a live database reach the same pipeline through `sql_schema`, specified under
 
 ## Schema from DDL text
 
-`pgorm_codegen::sql_schema` reads a `schema.sql` — DDL text, with no database to
-inspect — using libpg_query, the PostgreSQL server's own parser, and bridges the
+`pgorm_codegen::entities_from_sql` reads a `schema.sql` — DDL text, with no
+database to inspect — using libpg_query, the PostgreSQL server's own parser, and bridges the
 parse tree into the statements the transformer already consumes. `pg_query` is a
 plain dependency of `pgorm-codegen` rather than an optional one: the crate is a
 build-time tool nothing links into a running application, so the cost of
 compiling the C parser falls on people generating entities and on nobody else.
 
-> [spec:pgorm:def:codegen.ddl+3]
-> `sql_schema::parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
+> [spec:pgorm:def:codegen.ddl+4]
+> `parse_schema(&str) -> Result<Vec<TableCreateStatement>, Error>`
 > parses DDL text with `pg_query::parse` and returns one statement per
 > `CREATE TABLE`, in file order, with every other statement it read folded into
 > the table that statement describes.
-> `sql_schema::entities_from_sql(&str, EntityWriterOptions) -> Result<WriterOutput, Error>`
+> `entities_from_sql(&str, EntityWriterOptions) -> Result<WriterOutput, Error>`
 > runs the whole pipeline: it builds the `EntityWriterContext` first — so an
 > unusable option is reported before the schema is read — then `parse_schema`,
-> `EntityTransformer::transform` and `EntityWriter::generate`.
+> `EntityTransformer::transform` and `EntityWriter::generate`. Both are
+> exported from the crate root, beside the `EntityWriterOptions`,
+> `WriterOutput`, `OutputFile` and `Error` they take and return, and the
+> crate root is their one path: the bridge's module is private.
 >
 > Both report failure as `Error::TransformError`, the channel the transform gate
 > already uses, and neither panics on any input: text the grammar rejects comes

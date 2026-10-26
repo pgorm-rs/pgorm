@@ -13933,6 +13933,20 @@ children (
                 kind @note
                 text "Found by value-decode-created-ranges. Created multiranges still have no Value decode in COPY or elsewhere in Rust, because tokio-postgres reports them as simple types. Decode them by a catalogue lookup of the multirange's range type or by a text cast, as created ranges decode to their text form."
             }
+
+            {
+                at 2026-10-25T22:09:46.305493Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:08:16.108726Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14002,6 +14016,20 @@ children (
                 kind @note
                 text "Found by schema-fk-domain-enum (c8da47a9). pgorm-codegen reads DDL text and can emit a belongs_to over columns typed as a domain over an enum, which create_table_from_entity now refuses (PostgreSQL itself refuses such a key with 42804, so a dump cannot contain one as a constraint, but codegen may infer relations otherwise). Check whether codegen can produce one; if it can, refuse or annotate it as unsupported, as codegen does for other unsupported domain features. Also: a relation whose ColumnPairs are built from bare names records no types and is not checked by generation."
             }
+
+            {
+                at 2026-10-25T22:09:45.861751Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T22:52:55.744846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14026,7 +14054,6 @@ children (
         id graph-via-as
         title "A graph's via hop can be re-bound to an alias, so a path through one table twice can be written"
         kind @feat
-        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.167976Z
@@ -14061,6 +14088,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by coming-from-seaorm. entities_from_sql is reachable only as pgorm_codegen::sql_schema::entities_from_sql. Re-export it (and whatever a caller needs beside it) at the crate root and update the docs and guide."
+            }
+
+            {
+                at 2026-10-25T22:39:08.488559Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -8,8 +8,7 @@ use pgorm::{
     ColumnTrait, ColumnTypeTrait, EntityTrait, JoinType, ModelTrait, PrimaryKeyTrait, QuerySelect,
     QueryTrait, RelationTrait,
 };
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql, parse_schema};
 use pgorm_query::extension::Type;
 use pgorm_query::{ColumnSpec, ColumnType, Deferrability, Enforcement, TableName};
 
@@ -113,7 +112,7 @@ fn assert_error(sql: &str, expected: &str) {
     assert_eq!(error(sql), expected);
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    the whole pipeline runs from DDL text:
+// [spec:pgorm:def:codegen.ddl+4/test]    the whole pipeline runs from DDL text:
 // one entity file per CREATE TABLE, plus index, prelude and active enums
 #[test]
 fn schema_sql_generates_one_file_per_table() {
@@ -630,7 +629,7 @@ fn unsupported_types_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    a type the builder can spell but codegen
+// [spec:pgorm:def:codegen.ddl+4/test]    a type the builder can spell but codegen
 // cannot render passes the bridge and is refused by the transform gate
 #[test]
 fn types_codegen_cannot_render_reach_the_gate() {
@@ -809,7 +808,7 @@ fn unresolved_foreign_keys_are_named() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    text the PostgreSQL grammar rejects
+// [spec:pgorm:def:codegen.ddl+4/test]    text the PostgreSQL grammar rejects
 // comes back as the parser's own message
 #[test]
 fn invalid_sql_reports_the_parser_message() {
@@ -824,7 +823,7 @@ fn invalid_sql_reports_the_parser_message() {
     );
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    the bridge is the inverse of the DDL
+// [spec:pgorm:def:codegen.ddl+4/test]    the bridge is the inverse of the DDL
 // builder: statements rendered to text and parsed back generate the same
 // entities as the statements themselves
 #[test]
@@ -1087,7 +1086,7 @@ fn a_composite_foreign_key_joins_on_both_pairs() {
 // NOT ENFORCED, declared on its column or at table level, ride on the statement
 // [spec:pgorm:sem:codegen.entity.relations+3/test]    and reach the relation the
 // entity declares, which generates the same key back
-// [spec:pgorm:sem:codegen.entity.transform+14/test]
+// [spec:pgorm:sem:codegen.entity.transform+15/test]
 #[test]
 fn a_foreign_keys_check_reaches_the_relation() {
     let generated = from_sql(KEY_STAY);
@@ -1247,7 +1246,7 @@ fn temporal_key_and_period_relation_round_trip() {
     );
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    a temporal key whose period the table
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a temporal key whose period the table
 // declares before another key column is refused, its entity's key following its fields' order
 #[test]
 fn a_period_declared_before_the_key_is_refused() {

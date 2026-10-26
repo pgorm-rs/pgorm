@@ -7,8 +7,7 @@ mod common;
 
 use common::*;
 use pgorm::{ColumnTrait, ColumnTypeTrait, Iterable, StaticName};
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql, parse_schema};
 use pgorm_query::{ColumnType, IntervalPrecision, IntervalSpec, PgInterval, TableCreateStatement};
 use std::sync::Arc;
 
@@ -246,7 +245,7 @@ fn the_expanded_writer_spells_each_qualifier() {
     }
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    a table of interval columns built
+// [spec:pgorm:def:codegen.ddl+4/test]    a table of interval columns built
 // with pgorm-query and rendered generates, read back, the entity the
 // statement itself generates
 #[test]

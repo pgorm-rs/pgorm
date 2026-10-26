@@ -13,8 +13,7 @@
 
 use std::io::{Read, Write};
 
-use pgorm_codegen::sql_schema::entities_from_sql;
-use pgorm_codegen::{EntityWriterOptions, WithSerde};
+use pgorm_codegen::{EntityWriterOptions, WithSerde, entities_from_sql};
 use serde::{Deserialize, Serialize};
 
 /// One generation request: DDL text plus every `EntityWriterOptions` field.

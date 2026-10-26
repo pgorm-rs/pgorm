@@ -6,8 +6,7 @@ mod common;
 
 use common::*;
 use pgorm::{ColumnTrait, ColumnTypeTrait, EntityName, Iterable, StaticName};
-use pgorm_codegen::sql_schema::entities_from_sql;
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql};
 use pgorm_query::extension::Type;
 use pgorm_query::{ColumnDef, ColumnType, Name, Schema, Table, TableCreateStatement};
 use std::sync::Arc;
@@ -230,7 +229,7 @@ fn built() -> (Vec<String>, TableCreateStatement) {
     (statements, table)
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    a schema, an enum and a table built with
+// [spec:pgorm:def:codegen.ddl+4/test]    a schema, an enum and a table built with
 // pgorm-query and rendered generate, read back, the entity the table statement itself
 // generates
 #[test]

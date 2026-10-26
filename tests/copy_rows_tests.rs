@@ -22,7 +22,7 @@ use pgorm::{
         ArrayType, Asterisk, CopyBinary, CopyFromStatement, CopySource, CopyToStatement, Expr,
         Name, Order, Query, Value, Values,
     },
-    types::Type,
+    types::{Kind, Type},
 };
 use pretty_assertions::assert_eq;
 use tokio_postgres::error::SqlState;
@@ -234,7 +234,7 @@ fn ordered_kinds() -> CopyToStatement<CopyBinary> {
     )
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    every value kind pgorm binds is written as binary rows and read back, as the server reads the same literals
+// [spec:pgorm:req:conn.copy.rows+3/test]    every value kind pgorm binds is written as binary rows and read back, as the server reads the same literals
 #[pgorm_macros::test]
 async fn copy_rows_round_trip_every_kind() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_round_trip_every_kind").await;
@@ -289,7 +289,7 @@ async fn copy_rows_round_trip_every_kind() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    a row of the wrong width or a value its column cannot take is refused, and the sink goes on
+// [spec:pgorm:req:conn.copy.rows+3/test]    a row of the wrong width or a value its column cannot take is refused, and the sink goes on
 #[pgorm_macros::test]
 async fn copy_rows_refuse_wrong_width_or_type() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_refuse_wrong_width").await;
@@ -358,7 +358,7 @@ async fn copy_rows_refuse_wrong_width_or_type() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    the columns come from the server: a list, a whole table without its generated columns, a query's result
+// [spec:pgorm:req:conn.copy.rows+3/test]    the columns come from the server: a list, a whole table without its generated columns, a query's result
 #[pgorm_macros::test]
 async fn copy_rows_columns_from_the_server() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_columns_from_server").await;
@@ -450,7 +450,7 @@ async fn answers_in_step(db: &DatabaseConnection) -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    a description the server refuses leaves the connection as it was; a type no value holds fails its row
+// [spec:pgorm:req:conn.copy.rows+3/test]    a description the server refuses leaves the connection as it was; a type no value holds fails its row
 #[pgorm_macros::test]
 async fn copy_rows_refusals_before_and_after_start() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_refusals").await;
@@ -504,7 +504,7 @@ async fn copy_rows_refusals_before_and_after_start() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    a list naming a generated column is described, since a SELECT reads one, and refused at the start, closing the connection
+// [spec:pgorm:req:conn.copy.rows+3/test]    a list naming a generated column is described, since a SELECT reads one, and refused at the start, closing the connection
 #[pgorm_macros::test]
 async fn copy_rows_naming_a_generated_column_closes() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_generated_column").await;
@@ -567,7 +567,7 @@ mod item {
     impl ActiveModelBehavior for ActiveModel {}
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    models are written and read by column name, in a transaction and through the metrics wrapper
+// [spec:pgorm:req:conn.copy.rows+3/test]    models are written and read by column name, in a transaction and through the metrics wrapper
 #[pgorm_macros::test]
 async fn copy_rows_models_in_a_transaction() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_models_transaction").await;
@@ -739,7 +739,7 @@ fn entries() -> Vec<entry::Model> {
     ]
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    models with enum and JSON fields: a schema's enum, an enum through a domain, an enum array, JSON structs
+// [spec:pgorm:req:conn.copy.rows+3/test]    models with enum and JSON fields: a schema's enum, an enum through a domain, an enum array, JSON structs
 #[pgorm_macros::test]
 async fn copy_rows_models_with_enum_and_json() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_models_enum_json").await;
@@ -859,7 +859,7 @@ fn slots(items: Option<&[&str]>) -> Value {
     )
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    a range type a schema created reads as its text form, writes back from it, and agrees with a raw query's decode
+// [spec:pgorm:req:conn.copy.rows+3/test]    a range type a schema created reads as its text form, writes back from it, and agrees with a raw query's decode
 #[pgorm_macros::test]
 async fn copy_rows_created_ranges_round_trip() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_created_ranges").await;
@@ -976,7 +976,7 @@ async fn copy_rows_created_ranges_round_trip() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.copy.rows+2/test]    text that spells no range of the subtype is refused as its row is written, and a subtype no RangeSubtype reads has no value
+// [spec:pgorm:req:conn.copy.rows+3/test]    text that spells no range of the subtype is refused as its row is written, and a subtype no RangeSubtype reads has no value
 #[pgorm_macros::test]
 async fn copy_rows_created_range_refusals() -> Result<(), Error> {
     let ctx = TestContext::new("copy_rows_created_range_refusals").await;
@@ -1007,6 +1007,342 @@ async fn copy_rows_created_range_refusals() -> Result<(), Error> {
     assert!(
         matches!(&first, Some(Err(Error::Type(message)))
             if message.contains("COPY column `net` of type `geo.netrange`")
+                && message.contains("inet")),
+        "{first:?}"
+    );
+    assert!(rows.next().await.is_none());
+    drop(rows);
+    answers_in_step(&db).await?;
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// Multirange types a schema created, read and written through a model by
+/// the newtypes that name them.
+mod multispan {
+    use pgorm::entity::prelude::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveCreatedRange)]
+    #[pgorm(multirange_name = "floatmultirange", schema_name = "geo")]
+    pub struct Reach(pub Multirange<f64>);
+
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveCreatedRange)]
+    #[pgorm(multirange_name = "Slot Set", schema_name = "geo")]
+    pub struct Slots(pub Multirange<i32>);
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[pgorm(schema_name = "geo", table_name = "spans")]
+    pub struct Model {
+        #[pgorm(primary_key, auto_increment = false)]
+        pub id: i32,
+        pub reach: Reach,
+        pub slots: Option<Slots>,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+/// The multiranges created beside two range types over a subtype a
+/// `RangeSubtype` reads, one named apart from its range and one over `int4`,
+/// which has no canonical function and so keeps `[1,5]` as written; a domain
+/// over one; the multirange beside a range over `inet`, which none reads,
+/// and beside one over a domain; and a table of them and an array of one.
+const MULTISPANS: &str = "CREATE SCHEMA geo;
+    CREATE TYPE geo.floatrange AS RANGE (subtype = float8);
+    CREATE TYPE geo.slot AS RANGE (subtype = int4, multirange_type_name = geo.\"Slot Set\");
+    CREATE TYPE geo.netrange AS RANGE (subtype = inet);
+    CREATE DOMAIN geo.height AS float8;
+    CREATE TYPE geo.heightrange AS RANGE (subtype = geo.height);
+    CREATE DOMAIN geo.reaches AS geo.floatmultirange;
+    CREATE TABLE geo.spans (
+        id int PRIMARY KEY, reach geo.floatmultirange NOT NULL, slots geo.\"Slot Set\",
+        many geo.\"Slot Set\"[], kept geo.reaches
+    );
+    INSERT INTO geo.spans VALUES
+        (1, '{[1.5,2.5), [3,4]}', '{[1,5], [7,9)}', '{\"{[1,3)}\",\"{}\"}', '{[0,1)}'),
+        (2, '{}', NULL, '{}', NULL),
+        (3, '{[-Infinity,0]}', '{(,7)}', NULL, '{}')";
+
+fn multispans() -> (Name, Name) {
+    (n("geo"), n("spans"))
+}
+
+fn ordered_multispans() -> CopyToStatement<CopyBinary> {
+    CopyToStatement::new(
+        Query::select()
+            .column(Asterisk)
+            .from(multispans())
+            .order_by(n("id"), Order::Asc)
+            .to_owned(),
+        CopyBinary,
+    )
+}
+
+// [spec:pgorm:req:conn.copy.rows+3/test]    a multirange type a schema created is described
+// over its subtype, reads as its text form, writes back from it, and agrees with a raw
+// query's read of its text
+#[pgorm_macros::test]
+async fn copy_rows_created_multiranges_round_trip() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_rows_created_multiranges").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(MULTISPANS).await?;
+
+    let columns = db.copy_out_columns(&ordered_multispans()).await?;
+    let described: Vec<_> = columns
+        .iter()
+        .map(|column| match column.type_().kind() {
+            Kind::Multirange(subtype) => format!("{} over {subtype}", column.type_()),
+            Kind::Array(member) => match member.kind() {
+                Kind::Multirange(subtype) => {
+                    format!("{} of {member} over {subtype}", column.type_())
+                }
+                _ => column.type_().to_string(),
+            },
+            _ => column.type_().to_string(),
+        })
+        .collect();
+    assert_eq!(
+        described,
+        [
+            "int4",
+            "geo.floatmultirange over float8",
+            "geo.Slot Set over int4",
+            "geo._Slot Set of geo.Slot Set over int4",
+            "geo.floatmultirange over float8",
+        ]
+    );
+
+    let rows = rows_of(&mut db, &ordered_multispans()).await?;
+    assert_eq!(
+        rows,
+        vec![
+            vec![
+                int(1),
+                "{[1.5,2.5),[3,4]}".into(),
+                "{[1,5],[7,9)}".into(),
+                slots(Some(&["{[1,3)}", "{}"])),
+                "{[0,1)}".into(),
+            ],
+            vec![
+                int(2),
+                "{}".into(),
+                Value::String(None),
+                slots(Some(&[])),
+                Value::String(None),
+            ],
+            vec![
+                int(3),
+                "{[-inf,0]}".into(),
+                "{(,7)}".into(),
+                slots(None),
+                "{}".into(),
+            ],
+        ]
+    );
+
+    // Each row back in under another key: the server holds the copy equal
+    // to the row it was read from.
+    let mut sink = db
+        .copy_in_rows(&CopyFromStatement::new(multispans(), CopyBinary))
+        .await?;
+    for (at, mut row) in rows.clone().into_iter().enumerate() {
+        row[0] = int(11 + i32::try_from(at).unwrap());
+        sink.send(row).await?;
+    }
+    assert_eq!(sink.finish().await?, 3);
+    let same = db
+        .query_one(
+            "SELECT count(*) AS n FROM geo.spans a JOIN geo.spans b ON b.id = a.id + 10 \
+             WHERE a.reach = b.reach AND a.slots IS NOT DISTINCT FROM b.slots \
+             AND a.many IS NOT DISTINCT FROM b.many \
+             AND a.kept::geo.floatmultirange IS NOT DISTINCT FROM b.kept::geo.floatmultirange",
+            &[],
+        )
+        .await?;
+    assert_eq!(same.get::<_, i64>("n"), 3);
+
+    // A raw query reads the column through its text, the server's own
+    // output, which spells the multirange the COPY's text spells.
+    let (reach, kept): (String, String) = (
+        "SELECT reach::text, kept::text FROM geo.spans WHERE id = $1",
+        Values(vec![int(3)]),
+    )
+        .into_tuple()
+        .one(&db)
+        .await?;
+    assert_eq!(reach, "{[-Infinity,0]}");
+    assert_eq!(
+        reach.parse::<Multirange<f64>>().ok(),
+        "{[-inf,0]}".parse::<Multirange<f64>>().ok()
+    );
+    assert_eq!(kept, "{}");
+
+    // A model's newtype fields read and write through the same text.
+    let models: Vec<multispan::Model> = db
+        .copy_out_rows(&ordered_multispans())
+        .await?
+        .models::<multispan::Entity>()
+        .try_collect()
+        .await?;
+    assert_eq!(
+        models[0],
+        multispan::Model {
+            id: 1,
+            reach: multispan::Reach(
+                [Range::from(1.5..2.5), Range::from(3.0..=4.0)]
+                    .into_iter()
+                    .collect()
+            ),
+            slots: Some(multispan::Slots(
+                [Range::from(1..=5), Range::from(7..9)]
+                    .into_iter()
+                    .collect()
+            )),
+        }
+    );
+    let mut sink = db
+        .copy_in_rows(
+            &CopyFromStatement::new(multispans(), CopyBinary)
+                .columns([n("id"), n("reach"), n("slots")])
+                .to_owned(),
+        )
+        .await?;
+    sink.send_model(&multispan::Model {
+        id: 20,
+        reach: multispan::Reach([Range::from(0.25..)].into_iter().collect()),
+        slots: None,
+    })
+    .await?;
+    assert_eq!(sink.finish().await?, 1);
+    let written = db
+        .query_one(
+            "SELECT reach::text AS reach FROM geo.spans WHERE id = 20",
+            &[],
+        )
+        .await?;
+    assert_eq!(written.get::<_, String>("reach"), "{[0.25,)}");
+
+    // A subtype that is a domain is resolved by the driver, and the field
+    // reads as the domain's base does.
+    let heights = CopyToStatement::new(
+        Query::select()
+            .expr_as(Expr::raw("'{[1.5,2)}'::geo.heightmultirange"), n("h"))
+            .to_owned(),
+        CopyBinary,
+    );
+    let columns = db.copy_out_columns(&heights).await?;
+    assert!(
+        matches!(columns[0].type_().kind(), Kind::Multirange(subtype)
+            if subtype.name() == "height" && matches!(subtype.kind(), Kind::Domain(base) if *base == Type::FLOAT8)),
+        "{columns:?}"
+    );
+    assert_eq!(
+        rows_of(&mut db, &heights).await?,
+        vec![vec![Value::from("{[1.5,2)}")]]
+    );
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:exec.cursor.binding-range+3/test]    the text a COPY reads binds as a
+// parameter cast to the multirange, as the ORM writes it; a placeholder the server types as
+// the multirange arrives with no subtype, so a String bound to it is refused, never guessed
+#[pgorm_macros::test]
+async fn created_multirange_text_binds_through_a_cast() -> Result<(), Error> {
+    let ctx = TestContext::new("created_multirange_text_binds").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(MULTISPANS).await?;
+    let rows = rows_of(&mut db, &ordered_multispans()).await?;
+
+    let found: Vec<i32> = (
+        "SELECT id FROM geo.spans WHERE reach = CAST($1::text AS geo.floatmultirange) \
+         ORDER BY id",
+        Values(vec![rows[2][1].clone()]),
+    )
+        .into_tuple()
+        .all(&db)
+        .await?;
+    assert_eq!(found, [3]);
+
+    let bare = (
+        "SELECT id FROM geo.spans WHERE reach = $1",
+        Values(vec![rows[2][1].clone()]),
+    )
+        .into_tuple::<i32>()
+        .all(&db)
+        .await
+        .unwrap_err();
+    assert!(
+        bare.to_string()
+            .contains("cannot bind a `String` value to Postgres type `geo.floatmultirange`"),
+        "{bare}"
+    );
+    answers_in_step(&db).await?;
+
+    drop(db);
+    ctx.delete().await;
+    Ok(())
+}
+
+// [spec:pgorm:req:conn.copy.rows+3/test]    text that spells no multirange of the subtype is
+// refused as its row is written and the sink goes on, and a multirange over a subtype no
+// RangeSubtype reads has no value
+#[pgorm_macros::test]
+async fn copy_rows_created_multirange_refusals() -> Result<(), Error> {
+    let ctx = TestContext::new("copy_rows_created_multirange_refusals").await;
+    let mut db = ctx.db.get().await?;
+    db.batch_execute(MULTISPANS).await?;
+
+    let copy = CopyFromStatement::new(multispans(), CopyBinary)
+        .columns([n("id"), n("reach"), n("slots")])
+        .to_owned();
+    let mut sink = db.copy_in_rows(&copy).await?;
+    for (row, column) in [
+        (
+            ["{[a,b)}", "{}"],
+            "COPY column `reach` of type `geo.floatmultirange`",
+        ),
+        (
+            ["[1,2)", "{}"],
+            "COPY column `reach` of type `geo.floatmultirange`",
+        ),
+        (
+            ["{}", "{[1.5,2)}"],
+            "COPY column `slots` of type `geo.Slot Set`",
+        ),
+    ] {
+        let refused = sink.send([int(30), row[0].into(), row[1].into()]).await;
+        assert!(
+            matches!(&refused, Err(Error::Type(message))
+                if message.contains(column) && message.contains("is the text of no multirange")),
+            "{row:?}: {refused:?}"
+        );
+    }
+    sink.send([int(31), "{(1,2)}".into(), Value::String(None)])
+        .await?;
+    assert_eq!(sink.finish().await?, 1);
+
+    let nets = CopyToStatement::new(
+        Query::select()
+            .expr_as(
+                Expr::raw("'{[10.0.0.1,10.0.0.9]}'::geo.netmultirange"),
+                n("net"),
+            )
+            .to_owned(),
+        CopyBinary,
+    );
+    let mut rows = db.copy_out_rows(&nets).await?;
+    let first = rows.next().await;
+    assert!(
+        matches!(&first, Some(Err(Error::Type(message)))
+            if message.contains("COPY column `net` of type `geo.netmultirange`")
                 && message.contains("inet")),
         "{first:?}"
     );

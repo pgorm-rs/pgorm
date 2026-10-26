@@ -12,8 +12,7 @@ use pgorm::entity::prelude::{
     Date, DateTime, DateTimeWithTimeZone, Decimal, Interval, Multirange, Range,
 };
 use pgorm::{ActiveModelTrait, ActiveValue, Iterable, ModelTrait};
-use pgorm_codegen::WithSerde;
-use pgorm_codegen::sql_schema::entities_from_sql;
+use pgorm_codegen::{WithSerde, entities_from_sql};
 use serde_json::{Value, json};
 
 const SCHEMA: &str = include_str!("sql/serde_values/schema.sql");
