@@ -1243,6 +1243,14 @@ children (
                         text "conn.pool.statement-cache (+3) and conn.pool.lifecycle (+2) now name StatementCaches::clear_before_reuse and recycle's clear of a cache behind the pool's generation, which statement-cache-after-ddl added (conn.pool.statement-cache.clear, 2adf99d1)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-26T10:10:15.601786Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at conn.pool +4 (docs-stale-cleanup, f5ef4843): the rule says the pool's Manager holds its TLS connector as an Arc<dyn Connect> rather than a Box; every reference is pinned at +4."
+                        after_done true
+                    }
                 )
             }
 
@@ -1710,6 +1718,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked at codegen.entity.types +9 and codegen.entity.expanded +4 (codegen-enum-array-expanded, 9a8a6c61): an enum inside an array or a domain is spelled <Enum>::db_type().get_column_type().clone() by both writers, an enum column itself <Enum>::db_type(); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-26T10:10:15.435645Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at codegen.entity +4 (docs-stale-cleanup, f5ef4843): the rule no longer names the retired pgorm-cli or the deleted date_time_crate option, and its option list lost a repeated enum_extra_derives; every reference is pinned at +4."
                         after_done true
                     }
                 )
@@ -12820,6 +12836,14 @@ children (
                 kind @note
                 text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. A notification arrives on the connection that ran LISTEN, as an AsyncMessage on tokio-postgres's Connection future, which pgorm-pool's manager polls internally and pooled connections recycle, so LISTEN cannot work on a pooled connection. Build a dedicated listener: created from the pool's config (or from a tokio_postgres::Config plus a TLS connector, as connect_with is), owning its connection outright, with listen(channel) / unlisten(channel) / unlisten_all and a Stream of notifications (channel, payload, sender pid). Channel names are quoted identifiers; NOTIFY gets a typed helper too (NOTIFY channel, 'payload' or pg_notify with a bound payload). Decide and document what happens when the connection drops (the stream ends with an error; no silent reconnect that would miss notifications) and how backpressure works (bounded buffer, an overflow error rather than unbounded growth). Live tests on 18.6: a notification sent from a pooled connection inside a committed transaction arrives, one from a rolled-back transaction does not, unlisten stops delivery, a quoted channel name with odd characters works, payload limits. Python and JavaScript get the listener as an async iterator, with stubs, .d.ts and live tests. sql.scope's LISTEN entry graduates (bump; query-second-tier re-delivers). Waits on conn-copy, which changes the same connection surfaces in three languages."
             }
+
+            {
+                at 2026-10-26T10:11:17.477625Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at python.listen +1 (python-listen-header-duplicate, 0337e941): the rule's marker line is written once, so its body no longer begins with a copy of it; every reference is pinned at +1."
+                after_done true
+            }
         )
     }
 
@@ -13722,6 +13746,20 @@ children (
                 kind @note
                 text "Found by python-stream-truth-testing (0ace12e8). In docs/spec/python.md the python.listen rule's marker line is written twice in a row, and nspec reads the second as the first line of the rule's body. Removing it changes the body, so the rule takes a bump, its owner (conn-listen) is re-covered, and its annotations are re-pinned."
             }
+
+            {
+                at 2026-10-25T23:58:03.546339Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:02:49.425118Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13808,6 +13846,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:11:17.607085Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at migration.sql-file.compile +1 (docs-stale-cleanup, f5ef4843): the error names a line and reprints it with a caret only when the parser's diagnostic quotes a token the file holds, and a unit test now holds the case of a diagnostic quoting none; every reference is pinned at +1."
+                after_done true
             }
         )
     }
@@ -14159,6 +14205,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Updated 2026-10-26: codegen-root-export already fixed pgorm-codegen's README claim of live introspection; drop that item. Add: statement_cache_channel users behind a pooler or a network middlebox with an idle cutoff (an AWS NLB's 350 s) need TCP keepalives (keepalives_idle) shorter than it, since the listener's own SET idle_session_timeout = 0 (cache-listener-keepalive) covers only the server's timeout; say so in conn.pool.statement-cache.listen's prose or the connection docs."
+            }
+
+            {
+                at 2026-10-26T00:24:31.094846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

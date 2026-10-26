@@ -959,6 +959,7 @@ assertions (
     {id distinct-drops-sort-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T13:12:26.319579Z}
     {id distinct-sort-range-rows, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:40.28601Z}
     {id distinct-star-projection, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:38:14.626726Z}
+    {id docs-stale-cleanup, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:24:31.094846Z}
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id domain-enum-predicates, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:44:09.79938Z}
     {id domain-enum-remaining, kind @complete, author "brendan@necessary.nu", at 2026-10-19T08:40:19.506203Z}
@@ -1129,6 +1130,7 @@ assertions (
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
     {id python-datatype-export, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:56:06.241222Z}
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
+    {id python-listen-header-duplicate, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:02:49.425118Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
     {id python-schema-refusal-test, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:20:32.030006Z}
@@ -1391,10 +1393,6 @@ impl_evidence (
         {impl_name main, rule conn.listen}
         {impl_name main, rule napi.listen}
         {impl_name main, rule python.listen}
-    ), rule_versions_seen (
-        {id conn.listen, version 0}
-        {id napi.listen, version 0}
-        {id python.listen, version 0}
     )}
     {id copy-binary-rows, covered_rules (
         conn.copy.rows
@@ -1588,8 +1586,6 @@ impl_evidence (
         conn.pool.no-conn-trait
         conn.pool.recycle
         conn.pool.statement-cache
-        conn.statement
-        conn.statement.disabled-types
         conn.tx
         conn.tx.guard
     ), covered_claims (
@@ -1602,8 +1598,6 @@ impl_evidence (
         {impl_name main, rule conn.pool.no-conn-trait}
         {impl_name main, rule conn.pool.recycle}
         {impl_name main, rule conn.pool.statement-cache}
-        {impl_name main, rule conn.statement}
-        {impl_name main, rule conn.statement.disabled-types}
         {impl_name main, rule conn.tx}
         {impl_name main, rule conn.tx.guard}
     )}

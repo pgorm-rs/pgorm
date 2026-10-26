@@ -132,7 +132,7 @@ fn check_statement_cache_channel(manager: &ManagerConfig) -> Result<(), Error> {
 /// pool — deadpool rejects a pool configured with timeouts but no runtime —
 /// or if `statement_cache_channel` is empty or longer than the 63 bytes of an
 /// identifier.
-// [spec:pgorm:req:conn.pool+3]    the general entry point
+// [spec:pgorm:req:conn.pool+4]    the general entry point
 #[doc(alias = "ConnectOptions")]
 pub fn connect_with<T>(
     config: Config,
@@ -173,7 +173,7 @@ where
 /// [`connect_with_builder`] for a fallible pool whose shape the caller chooses,
 /// or [`connect_with`] for one whose TLS and manager configuration it chooses
 /// too.
-// [spec:pgorm:req:conn.pool+3]
+// [spec:pgorm:req:conn.pool+4]
 #[doc(alias = "Database")]
 pub fn connect(config: Config) -> DatabasePool {
     connect_with(config, NoTls, simple_manager_config(None), identity)
@@ -187,7 +187,7 @@ pub fn connect(config: Config) -> DatabasePool {
 ///
 /// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
 /// pool — deadpool rejects a pool configured with timeouts but no runtime.
-// [spec:pgorm:req:conn.pool+3]    builder customization
+// [spec:pgorm:req:conn.pool+4]    builder customization
 #[doc(alias = "ConnectOptions")]
 pub fn connect_with_builder(
     config: Config,

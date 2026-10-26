@@ -145,7 +145,7 @@ pub enum ListenError {
 ///
 /// The default type parameter lets callers write `pgorm::Result<Model>` for
 /// the common case while still naming a foreign error type — as
-/// [`DatabaseConnection::transaction`](crate::DatabaseConnection::transaction)
+/// [`DatabaseConnection::transaction_with`](crate::DatabaseConnection::transaction_with)
 /// does — where the closure carries its own.
 ///
 /// ```

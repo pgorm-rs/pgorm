@@ -45,7 +45,7 @@ pub(crate) struct Script {
 /// The file's name and checked text as literals, with the file itself included
 /// so that editing it rebuilds the calling crate.
 // [spec:pgorm:def:migration.sql-file]
-// [spec:pgorm:req:migration.sql-file.compile]    the file is an input of the calling crate's build
+// [spec:pgorm:req:migration.sql-file.compile+1]    the file is an input of the calling crate's build
 pub(crate) fn expand(input: &MigrationInput) -> Result<TokenStream, Error> {
     let literal = &input.path;
     let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| {
@@ -72,7 +72,7 @@ pub(crate) fn expand(input: &MigrationInput) -> Result<TokenStream, Error> {
 
 /// Read the file `literal` names under `manifest_dir`, and hold it to the
 /// grammar.
-// [spec:pgorm:req:migration.sql-file.compile]    resolved against the manifest directory, refused at compile time
+// [spec:pgorm:req:migration.sql-file.compile+1]    resolved against the manifest directory, refused at compile time
 // [spec:pgorm:req:migration.sql-file.checksum]    line endings are LF before anything sees the text
 pub(crate) fn load(literal: &LitStr, manifest_dir: &Path) -> Result<Script, Error> {
     let relative = literal.value();
@@ -101,8 +101,9 @@ pub(crate) fn load(literal: &LitStr, manifest_dir: &Path) -> Result<Script, Erro
     Ok(Script { name, text, path })
 }
 
-/// The message for a file the grammar refused: the parser's diagnostic, the
-/// line it stopped on, and that line with a caret under the token it named.
+/// The message for a file the grammar refused: the parser's diagnostic and,
+/// when it quotes a token the file holds, that token's line, reprinted with a
+/// caret under it. A diagnostic quoting no token carries no position.
 fn rejection(relative: &str, text: &str, message: &str) -> String {
     let offset = oracle::token_offset(text, message);
     let mut rendered = format!("PostgreSQL rejected {relative}: {message}");
@@ -185,7 +186,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:migration.sql-file.compile/test]    the refusal names the file and the line
+    // [spec:pgorm:req:migration.sql-file.compile+1/test]    the refusal names the file and the line
     #[test]
     fn a_grammar_refusal_names_file_and_line() -> std::io::Result<()> {
         let files = Files::new(
@@ -208,7 +209,25 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:migration.sql-file.compile/test]    unusable files are refused, not run
+    // [spec:pgorm:req:migration.sql-file.compile+1/test]    a refusal quoting no token names no line
+    #[test]
+    fn a_refusal_quoting_no_token_names_no_line() -> std::io::Result<()> {
+        let files = Files::new(
+            "end-of-input",
+            &[(
+                "m20260101_000001_cut.sql",
+                b"CREATE TABLE note (id int);\nSELECT (",
+            )],
+        )?;
+
+        assert_eq!(
+            files.refusal("m20260101_000001_cut.sql"),
+            "PostgreSQL rejected m20260101_000001_cut.sql: syntax error at end of input"
+        );
+        Ok(())
+    }
+
+    // [spec:pgorm:req:migration.sql-file.compile+1/test]    unusable files are refused, not run
     #[test]
     fn unreadable_files_are_refused() -> std::io::Result<()> {
         let files = Files::new("unusable", &[("latin1.sql", b"SELECT '\xe9';")])?;

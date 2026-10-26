@@ -2,8 +2,8 @@ use pgorm_query::{Expr, SimpleExpr, TypeName, Value};
 
 /// A Rust type standing for a range type a schema created with `CREATE TYPE
 /// ... AS RANGE`, or for the multirange PostgreSQL creates beside it: a
-/// newtype over [`Range<T>`](crate::Range) or
-/// [`Multirange<T>`](crate::Multirange), named the way an
+/// newtype over [`Range<T>`](pgorm_query::Range) or
+/// [`Multirange<T>`](pgorm_query::Multirange), named the way an
 /// [`ActiveEnum`](crate::ActiveEnum) names its enum type, because the type's
 /// name is what PostgreSQL needs to read a value of it and no [`Value`] can
 /// carry one.

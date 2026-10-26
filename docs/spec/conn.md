@@ -7,7 +7,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Pool construction and access
 
-> [spec:pgorm:req:conn.pool+3]
+> [spec:pgorm:req:conn.pool+4]
 > `connect_with(config, tls, manager, build)` is the general pool constructor,
 > and the only one: every other entry point delegates to it. It takes the
 > `tokio_postgres::Config`, a TLS connector bounded exactly as
@@ -20,7 +20,8 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > It exists because `DatabasePool` wraps a crate-private `pgorm_pool::Pool` and
 > has no other constructor, which made two things unreachable rather than merely
-> inconvenient. `Pool` is TLS-erased (`Box<dyn Connect>`), so a TLS pool was
+> inconvenient. `Pool` is TLS-erased (its `Manager` holds the connector as an
+> `Arc<dyn Connect>`), so a TLS pool was
 > always buildable inside `pgorm-pool` and never assignable to a `DatabasePool`
 > — leaving every managed PostgreSQL that requires TLS unusable through pgorm.
 > And the `Manager` was fully built before any caller hook could run, so
