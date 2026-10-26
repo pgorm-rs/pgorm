@@ -14628,4 +14628,60 @@ children (
             }
         )
     }
+
+    {
+        id python-case-expressions
+        title "Python expressions take CASE, as JavaScript's caseWhen and caseOf do"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T17:38:14.409574Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-expression-gaps (2026-10-26). JavaScript has caseWhen / caseOf; Python has no CASE. Using a CASE wherever an Expr goes needs either the CASE to be an Expr (a constructor function returning Expr, as array/exists/scalar do) or Python's Expr pyclass made subclassable; prefer the first unless something needs the second, and say why. Stubs, capabilities, parity against the Rust builder (sql.ast.case), live tests."
+            }
+        )
+    }
+
+    {
+        id python-select-gaps
+        title "Python's Select takes a subquery as a FROM item, lateral joins and row locks, as JavaScript's does"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T17:38:14.570625Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-expression-gaps (2026-10-26). JavaScript's Select has a subquery as a FROM item (Select.as(alias)), lateral joins and lock(..); Python's has none. Close each in Python's Select with stubs, capabilities, parity cases and live tests."
+            }
+        )
+    }
+
+    {
+        id python-model-column-operators
+        title "Python's declared model columns take the operators JavaScript's do"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T17:38:14.718235Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-expression-gaps (2026-10-26). JavaScript's ModelColumn overrides between, is_distinct_from, contains / contained_by / overlaps and the range position operators, binding operands through the column's declared kind; Python's declared ModelColumn (pgorm-python/python/pgorm/models/columns.py) lacks them. Add them the same way, with typing cases and live tests."
+            }
+        )
+    }
+
+    {
+        id quantifier-beyond-comparisons
+        title "ANY and ALL follow LIKE, regex and containment operators too, as PostgreSQL allows"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T17:38:14.856956Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-expression-gaps (2026-10-26). Both bindings accept a quantifier (ANY / ALL) only as the right operand of the six comparisons; PostgreSQL also reads it after LIKE / ILIKE, the regex operators and other boolean operators (x LIKE ANY(array)). Check what pgorm-query's renderer supports, extend the bindings' operator table to the operators PostgreSQL takes a quantifier after, and test each against hand-written SQL."
+            }
+        )
+    }
 )
