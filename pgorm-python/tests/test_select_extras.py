@@ -26,7 +26,7 @@ def text_array(values):
 
 
 # [spec:pgorm:req:python.statements+10/test]
-# [spec:pgorm:req:python.expressions+3/test]
+# [spec:pgorm:req:python.expressions+4/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

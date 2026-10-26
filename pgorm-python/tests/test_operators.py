@@ -1,4 +1,4 @@
-"""The regular-expression, range position and JSON path operators against PostgreSQL,
+"""Expr's binary operators beyond comparison and arithmetic against PostgreSQL,
 through the installed wheel: each selects the rows the server's own operator,
 written as SQL text, selects."""
 
@@ -21,7 +21,8 @@ def int4multirange(*ranges):
     return p.Value(p.Multirange([p.Range(lower, upper) for lower, upper in ranges]), "int4multirange")
 
 
-# [spec:pgorm:req:python.expressions+3/test]
+# [spec:pgorm:req:python.expressions+4/test]    every operator method selects what PostgreSQL's
+# own operator selects, on rows where it holds and rows where it does not
 class OperatorTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -30,12 +31,13 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
         self.name = f"operands {uuid4().hex[:8]}"
         await self.connection.execute(p.RawSQL(
             f"CREATE TEMP TABLE {quoted(self.name)} (id int PRIMARY KEY, label text NOT NULL, "
-            "doc jsonb NOT NULL, span int4range NOT NULL, spans int4multirange NOT NULL)"))
+            "note text, doc jsonb NOT NULL, span int4range NOT NULL, "
+            "spans int4multirange NOT NULL, tags text[] NOT NULL)"))
         await self.connection.execute(p.RawSQL(
             f"INSERT INTO {quoted(self.name)} VALUES "
-            "(1, 'pgorm', '{\"a\": 1}', '[1,5)', '{[1,3),[7,9)}'), "
-            "(2, 'PGORM', '{\"b\": 2}', '[5,8)', '{[5,8)}'), "
-            "(3, 'sql', '{\"a\": \"x\"}', '[10,12)', '{[20,30)}')"))
+            "(1, 'pgorm', 'a', '{\"a\": 1}', '[1,5)', '{[1,3),[7,9)}', '{a,b}'), "
+            "(2, 'PGORM', NULL, '{\"b\": 2}', '[5,8)', '{[5,8)}', '{c}'), "
+            "(3, 'sql', 'b', '{\"a\": \"x\"}', '[10,12)', '{[20,30)}', '{}')"))
         self.table = p.Table(self.name)
 
     async def asyncTearDown(self):
@@ -56,12 +58,28 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
         return [row["id"] for row in rows]
 
     async def test_each_operator_answers_as_postgres_does(self):
+        jsonpath = p.bind("$.a == 1").cast(p.TypeName("jsonpath"))
         cases = [
+            (self.c("note").is_distinct_from("a"), "note IS DISTINCT FROM 'a'", [2, 3]),
+            (self.c("note").is_not_distinct_from(p.Value.null("text")),
+             "note IS NOT DISTINCT FROM NULL", [2]),
+            (self.c("label").concat("!").eq("sql!"), "label || '!' = 'sql!'", [3]),
+            (self.c("id").between(3, 2, symmetric=True), "id BETWEEN SYMMETRIC 3 AND 2", [2, 3]),
+            (self.c("id").not_between(3, 2, symmetric=True), "id NOT BETWEEN SYMMETRIC 3 AND 2", [1]),
             (self.c("label").regex("^pg"), "label ~ '^pg'", [1]),
             (self.c("label").not_regex("^pg"), "label !~ '^pg'", [2, 3]),
-            (self.c("label").regex("^pg", case_insensitive=True), "label ~* '^pg'", [1, 2]),
-            (self.c("label").not_regex("^pg", case_insensitive=True), "label !~* '^pg'", [3]),
-            (self.c("doc").path_exists("$.a"), "doc @? '$.a'", [1, 3]),
+            (self.c("label").iregex("^pg"), "label ~* '^pg'", [1, 2]),
+            (self.c("label").not_iregex("^pg"), "label !~* '^pg'", [3]),
+            (self.c("span").contains(p.literal(3)), "span @> 3", [1]),
+            (self.c("span").contained_by(int4range(0, 9)), "span <@ '[0,9)'::int4range", [1, 2]),
+            (self.c("spans").overlaps(int4multirange((2, 6))),
+             "spans && '{[2,6)}'::int4multirange", [1, 2]),
+            (self.c("tags").contains(p.Value.array("text", ["a"])), "tags @> '{a}'", [1]),
+            (self.c("tags").contained_by(p.Value.array("text", ["a", "b", "c"])),
+             "tags <@ '{a,b,c}'", [1, 2, 3]),
+            (self.c("tags").overlaps(p.Value.array("text", ["a", "c"])), "tags && '{a,c}'", [1, 2]),
+            (self.c("span").strictly_left_of(int4range(9, 20)), "span << '[9,20)'::int4range", [1, 2]),
+            (self.c("span").strictly_right_of(int4range(1, 5)), "span >> '[1,5)'::int4range", [2, 3]),
             (self.c("span").not_extend_right_of(int4range(1, 6)), "span &< '[1,6)'::int4range", [1]),
             (self.c("span").not_extend_left_of(int4range(5, 6)), "span &> '[5,6)'::int4range", [2, 3]),
             (self.c("span").adjacent_to(int4range(8, 9)), "span -|- '[8,9)'::int4range", [2]),
@@ -69,6 +87,9 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
              "spans &< '{[1,10)}'::int4multirange", [1, 2]),
             (self.c("spans").adjacent_to(int4multirange((9, 20))),
              "spans -|- '{[9,20)}'::int4multirange", [1, 3]),
+            (self.c("label").matches("pgorm"), "label @@ 'pgorm'", [1, 2]),
+            (self.c("doc").matches(jsonpath), "doc @@ '$.a == 1'", [1]),
+            (self.c("doc").path_exists("$.a"), "doc @? '$.a'", [1, 3]),
         ]
         for predicate, written, expected in cases:
             with self.subTest(written=written):

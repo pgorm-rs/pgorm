@@ -115,19 +115,33 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions+3]
+> [spec:pgorm:req:python.expressions+4]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
 > LIKE and SIMILAR TO patterns, function calls and qualified casts through
 > Rust builders.
-> The regular-expression matches `regex` (`~`) and `not_regex` (`!~`), each
-> with `case_insensitive` (`~*`, `!~*`), the range position tests
+> Every binary operator JavaScript's expressions spell (`napi.expressions`,
+> `napi.ranges`) MUST have its Python method, the Rust builder of that
+> meaning, the other operand bound unless it is an expression:
+> `is_distinct_from` and `is_not_distinct_from`; `concat` (`||`); the
+> regular-expression matches `regex` (`~`), `not_regex` (`!~`), `iregex`
+> (`~*`) and `not_iregex` (`!~*`); over ranges, multiranges and arrays,
+> `contains` (`@>`), `contained_by` (`<@`) and `overlaps` (`&&`); over ranges
+> and multiranges, `strictly_left_of` (`<<`), `strictly_right_of` (`>>`),
 > `not_extend_right_of` (`&<`), `not_extend_left_of` (`&>`) and `adjacent_to`
-> (`-|-`), and `path_exists` (`@?`) MUST each be the `BinOper` of that
-> meaning, the other operand bound unless it is an expression; a range
-> operand needs its kind, as a range value always does (`python.values`).
-> `path_exists` takes a `str`, bound as Rust's `json_path_exists` binds it,
-> as text cast to `jsonpath`, and anything else is a `ConstructionError`.
+> (`-|-`); `matches` (`@@`), full-text search or a `jsonpath` predicate; and
+> `path_exists` (`@?`), which takes a `str`, bound as Rust's
+> `json_path_exists` binds it, as text cast to `jsonpath`, anything else a
+> `ConstructionError`. `between` and `not_between` take `symmetric`, Rust's
+> `BETWEEN SYMMETRIC`. A range operand needs its kind, as a range value
+> always does (`python.values`).
+>
+> `Expr`'s native methods are one `#[pymethods]` block per operator family,
+> each in its own module (PyO3's `multiple-pymethods`), and its stub inherits
+> one stub-only mixin per family, each in its own `.pyi`: the mixins exist for
+> the type checker alone, so the runtime class has no base but `object` and
+> defines every method itself, and the signature test checks each mixin's
+> methods against it.
 > SQL/JSON's query functions, constructors, `FORMAT JSON` and `IS JSON` MUST
 > lower into the corresponding `pgorm_query` builders, each clause applied
 > through the builder's own method. Their behaviours MUST be typed per

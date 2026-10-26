@@ -42,8 +42,14 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("expr.is_not_null", "pgorm_query::Expr::is_not_null"),
         ("expr.is_in", "pgorm_query::Expr::is_in"),
         ("expr.is_not_in", "pgorm_query::Expr::is_not_in"),
-        ("expr.between", "pgorm_query::Expr::between"),
-        ("expr.not_between", "pgorm_query::Expr::not_between"),
+        (
+            "expr.between",
+            "pgorm_query::Expr::between, Expr::between_symmetric",
+        ),
+        (
+            "expr.not_between",
+            "pgorm_query::Expr::not_between, Expr::not_between_symmetric",
+        ),
         ("expr.cast", "pgorm_query::SimpleExpr::cast_as_type"),
         ("expr.collate", "pgorm_query::Expr::collate"),
         ("expr.starts_with", "pgorm_query::Func::starts_with"),
@@ -67,11 +73,39 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         (
             "expr.regex",
-            "pgorm_query::SimpleExpr::binary(BinOper::Regex, BinOper::RegexCaseInsensitive)",
+            "pgorm_query::SimpleExpr::binary(BinOper::Regex)",
         ),
         (
             "expr.not_regex",
-            "pgorm_query::SimpleExpr::binary(BinOper::NotRegex, BinOper::NotRegexCaseInsensitive)",
+            "pgorm_query::SimpleExpr::binary(BinOper::NotRegex)",
+        ),
+        (
+            "expr.iregex",
+            "pgorm_query::SimpleExpr::binary(BinOper::RegexCaseInsensitive)",
+        ),
+        (
+            "expr.not_iregex",
+            "pgorm_query::SimpleExpr::binary(BinOper::NotRegexCaseInsensitive)",
+        ),
+        (
+            "expr.contains",
+            "pgorm_query::SimpleExpr::binary(BinOper::Contains)",
+        ),
+        (
+            "expr.contained_by",
+            "pgorm_query::SimpleExpr::binary(BinOper::Contained)",
+        ),
+        (
+            "expr.overlaps",
+            "pgorm_query::SimpleExpr::binary(BinOper::Overlap)",
+        ),
+        (
+            "expr.strictly_left_of",
+            "pgorm_query::SimpleExpr::binary(BinOper::LShift)",
+        ),
+        (
+            "expr.strictly_right_of",
+            "pgorm_query::SimpleExpr::binary(BinOper::RShift)",
         ),
         (
             "expr.not_extend_right_of",
@@ -84,6 +118,22 @@ pub(crate) fn operations() -> Map<String, Value> {
         (
             "expr.adjacent_to",
             "pgorm_query::SimpleExpr::binary(BinOper::AdjacentTo)",
+        ),
+        (
+            "expr.matches",
+            "pgorm_query::SimpleExpr::binary(BinOper::Matches)",
+        ),
+        (
+            "expr.concat",
+            "pgorm_query::SimpleExpr::binary(BinOper::Concatenate)",
+        ),
+        (
+            "expr.is_distinct_from",
+            "pgorm_query::Expr::is_distinct_from",
+        ),
+        (
+            "expr.is_not_distinct_from",
+            "pgorm_query::Expr::is_not_distinct_from",
         ),
         ("expr.path_exists", "pgorm_query::Expr::json_path_exists"),
         (
