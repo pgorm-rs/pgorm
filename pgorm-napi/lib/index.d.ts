@@ -378,7 +378,7 @@ export declare class Multirange<T = PlainValue> implements Iterable<Range<T>> {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 /**
  * A value with its kind declared: what plain JavaScript cannot tell apart —
  * an integer's width, a typed SQL NULL, JSON's null, an empty array, an enum's

@@ -525,12 +525,30 @@ async def rows_of(stream):
         return [row async for row in stream]
 
 
+# The multiranges created beside a range over float8 and one over int4 named
+# apart from its range, which has no canonical function and so keeps [1,5] as
+# written; a domain over one; and a table of them and an array of one.
+MULTISPANS = (
+    "CREATE SCHEMA python_copy_geo",
+    "CREATE TYPE python_copy_geo.floatrange AS RANGE (subtype = float8)",
+    'CREATE TYPE python_copy_geo.slot AS RANGE (subtype = int4, multirange_type_name = python_copy_geo."Slot Set")',
+    "CREATE DOMAIN python_copy_geo.reaches AS python_copy_geo.floatmultirange",
+    "CREATE TABLE python_copy_geo.spans (id int PRIMARY KEY, reach python_copy_geo.floatmultirange NOT NULL, "
+    'slots python_copy_geo."Slot Set", kept python_copy_geo.reaches)',
+    "INSERT INTO python_copy_geo.spans VALUES (1, '{[1.5,2.5), [3,4]}', '{[1,5], [7,9)}', '{[0,1)}'), "
+    "(2, '{}', NULL, NULL), (3, '{[-Infinity,0]}', '{(,7)}', '{}')",
+    'CREATE TABLE python_copy_geo.many (slots python_copy_geo."Slot Set"[])',
+    """INSERT INTO python_copy_geo.many VALUES ('{"{[1,3)}"}')""",
+)
+
+
 class CopyRows(unittest.IsolatedAsyncioTestCase):
     async def drop(self):
         for statement in (
             "DROP TABLE IF EXISTS python_copy_kinds, python_copy_rows, python_copy_points",
             "DROP TYPE IF EXISTS python_copy_mood",
             "DROP DOMAIN IF EXISTS python_copy_positive",
+            "DROP SCHEMA IF EXISTS python_copy_geo CASCADE",
         ):
             await self.pool.execute(p.RawSQL(statement))
 
@@ -668,6 +686,57 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(StopAsyncIteration):
             await anext(stream)
         self.assertEqual((await self.pool.fetch_one(p.RawSQL("SELECT 3 AS n")))["n"], 3)
+
+    # [spec:pgorm:req:python.copy.rows/test]    a created multirange reads as a Multirange and writes back from a Value of its kind or from its text
+    # [spec:pgorm:req:python.values+5/test]
+    async def test_created_multiranges_round_trip(self):
+        for statement in MULTISPANS:
+            await self.pool.execute(p.RawSQL(statement))
+        spans = p.Table("spans", schema="python_copy_geo")
+        reach = p.CreatedMultirange("floatmultirange", "f64", schema="python_copy_geo")
+        slots = p.CreatedMultirange("Slot Set", "i32", schema="python_copy_geo")
+        ordered = p.CopyTo(p.select(spans.star()).from_(spans).order_by(spans.col("id").asc()), "binary")
+
+        stream = await self.pool.copy_out_rows(ordered)
+        self.assertEqual(stream.columns, ("id", "reach", "slots", "kept"))
+        rows = await rows_of(stream)
+        self.assertEqual(rows, [
+            (1, p.Multirange([p.Range(1.5, 2.5), p.Range(3.0, 4.0, "[]")]),
+             p.Multirange([p.Range(1, 5, "[]"), p.Range(7, 9)]), p.Multirange([p.Range(0.0, 1.0)])),
+            (2, p.Multirange([]), None, None),
+            (3, p.Multirange([p.Range(float("-inf"), 0.0, "[]")]), p.Multirange([p.Range(None, 7, "()")]),
+             p.Multirange([])),
+        ])
+        # A query's column of one has no subtype the driver reports, so only a
+        # COPY, whose description completes it, reads one.
+        with self.assertRaises(p.DecodeError):
+            await self.pool.fetch_one(p.RawSQL("SELECT reach FROM python_copy_geo.spans WHERE id = 1"))
+
+        written = [
+            (11, p.Value(rows[0][1], reach), p.Value(rows[0][2], slots), p.Value(rows[0][3], reach)),
+            (12, p.Value(rows[1][1], reach), None, None),
+            (13, "{[-Infinity,0]}", "{(,7)}", "{}"),
+        ]
+        self.assertEqual(await self.pool.copy_in_rows(p.CopyFrom(spans, "binary"), written), 3)
+        compared = await self.pool.fetch_one(p.RawSQL(
+            "SELECT count(*) AS n FROM python_copy_geo.spans a JOIN python_copy_geo.spans b ON b.id = a.id + 10 "
+            "WHERE a.reach = b.reach AND a.slots IS NOT DISTINCT FROM b.slots "
+            "AND a.kept::python_copy_geo.floatmultirange IS NOT DISTINCT FROM b.kept::python_copy_geo.floatmultirange"
+        ))
+        self.assertEqual(compared["n"], 3)
+
+        copy = p.CopyFrom(spans, "binary").columns("id", "reach")
+        for text in ("{[a,b)}", "[1,2)"):
+            with self.subTest(text=text), self.assertRaises(p.ConstructionError) as caught:
+                await self.pool.copy_in_rows(copy, [(20, text)])
+            self.assertIn("COPY column `reach` of type `python_copy_geo.floatmultirange`", str(caught.exception))
+        count = await self.pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_geo.spans"))
+        self.assertEqual(count["n"], 6)
+
+        many = await self.pool.copy_out_rows(p.CopyTo(p.Table("many", schema="python_copy_geo"), "binary"))
+        with self.assertRaisesRegex(p.DecodeError, "created range"):
+            await anext(many)
+        self.assertTrue(many.closed)
 
 
 if __name__ == "__main__":

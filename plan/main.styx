@@ -14284,12 +14284,27 @@ children (
         title "Python's and JavaScript's row COPY read and write created multiranges, tested"
         kind @test
         deps (value-decode-created-multiranges)
+        sealed true
         log (
             {
                 at 2026-10-25T23:57:13.866647Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by value-decode-created-multiranges (2026-10-26). copy_in_columns / copy_out_columns now complete a created multirange's type from pg_range, and both bindings describe COPY columns through them and already decode Kind::Multirange for created types, so their copy_out_rows / copy_in_rows now read and write created multiranges as their created kinds, untested. Add a round-trip test in each binding (and through models where the binding has them), and update python.values (it says a created-multirange result column raises a decode error, still true for queries but not for a COPY column) and the napi value rule likewise."
+            }
+
+            {
+                at 2026-10-26T10:10:14.945182Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:21:29.151829Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

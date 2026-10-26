@@ -73,7 +73,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > explicitly before execution. Runtime-generated compositions within those
 > capabilities MUST NOT invoke rustc, Cargo, Maturin or a code-generation build.
 
-> [spec:pgorm:req:python.values+4]
+> [spec:pgorm:req:python.values+5]
 > Conversions MUST preserve supported Rust value variants and nullability in
 > both directions. The conversion table MUST cover booleans, signed and
 > unsigned integer bounds, floating-point values including signed zero and
@@ -84,10 +84,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > schema-qualifiable, and its subtype, which converts each bound. A created
 > range converts both ways, a result column of one decoding through its
 > subtype's codec to its own kind. A created multirange converts as a value,
-> but the driver reports its column's type with no subtype, so reading a
-> result column of one MUST raise a decode error, leaving it to be read cast
-> to text; an array of a created range or multirange MUST be refused both
-> ways.
+> but the driver reports a query's result column of one with no subtype, so
+> reading that column MUST raise a decode error, leaving it to be read cast
+> to text. A binary COPY's column of one is described with its subtype,
+> which pgorm completes from the catalogue (`conn.copy.rows`), so
+> `copy_out_rows` MUST decode it through the subtype's codec to a
+> `Multirange`, as a created range's column decodes, and `copy_in_rows` MUST
+> write one back from a `Value` of its kind or from its text form. An array
+> of a created range or multirange MUST be refused both ways, in a COPY as
+> anywhere else.
 > An interval is `pgorm.Interval(months, days, microseconds)`, immutable and
 > hashable, each field an exact `int` within its width and with its own
 > sign, inferred as the `interval` kind, decoded from an `interval` column
