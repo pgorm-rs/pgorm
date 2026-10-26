@@ -464,7 +464,7 @@ today, including panicking edges and deliberate failsafes.
 > a `TableSample` (`sql.ast.select.table-sample`), which `from` takes as it
 > is.
 >
-> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+6]`) gets no
+> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+7]`) gets no
 > shorthand of its own. Its constructor returns `Result`, and a shorthand
 > would have to either return `Result` — breaking the `&mut Self` chain every
 > other builder method keeps — or swallow the failure; instead it is built
@@ -1094,7 +1094,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+3]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -1302,7 +1302,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a FROM relation list, a WHERE
 > `ConditionHolder` (per `sql.ast.condition.holder`), an optional
@@ -1336,7 +1336,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+4]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+6]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a USING relation list, a WHERE `ConditionHolder` shared with the
 > condition rules, and an optional `ReturningClause`. Like the other three
@@ -1360,7 +1360,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:req:sql.ast.merge+1]
 > `MergeStatement` is the MERGE AST node. It holds a target `NamedTable`
-> (`[spec:pgorm:def:sql.types.table-ref+6]`: a name, bare or
+> (`[spec:pgorm:def:sql.types.table-ref+7]`: a name, bare or
 > schema-qualified, with an optional alias), an `only` flag, a source
 > `FromItem`, the join condition, an optional plain `WithClause`, its
 > `WHEN` arms, and an optional RETURNING list. `Query::merge(target, source,

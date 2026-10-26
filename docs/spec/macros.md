@@ -290,13 +290,14 @@ known limitations.
 > `PrimaryKeyToColumn` impl whose `into_column`/`from_column` map variants to the
 > same-named variants of a sibling type hard-coded as `Column`.
 
-> [spec:pgorm:sem:macros.derive.entity+2]
+> [spec:pgorm:sem:macros.derive.entity+3]
 > `DeriveEntity` wires up the entity unit struct. It always generates
 > `impl EntityTrait` with associated types `Model`, `ActiveModel`, `Column`,
 > `PrimaryKey`, `Relation` — each identifier defaulting to those names but overridable
 > via struct-level `#[pgorm(model = Ident, active_model = Ident, column = Ident,
 > primary_key = Ident, relation = Ident)]` — plus `SqlName` and `StaticName` impls that
-> render `EntityName::table_name`. An `EntityName` impl (with optional `schema_name`)
+> render `EntityName::table_name`, the `SqlName` answering `EntityName::schema_name` as
+> its `table_schema` (`[spec:pgorm:def:sql.types.table-ref+7]`). An `EntityName` impl (with optional `schema_name`)
 > is generated only when a `table_name` attribute is present; the `DeriveEntityModel`
 > path omits it because the composite writes its own `EntityName` impl.
 

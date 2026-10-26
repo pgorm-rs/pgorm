@@ -64,7 +64,7 @@ fn every_column_ref_form_renders() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoTableName` maps iden / 2-tuple
+// [spec:pgorm:def:sql.types.table-ref+7/test]    `IntoTableName` maps iden / 2-tuple
 #[test]
 fn into_table_name_maps_the_two_forms() {
     assert_eq!(
@@ -77,7 +77,80 @@ fn into_table_name_maps_the_two_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoNamedTable` maps the same spellings to an
+/// A table name that knows its schema, as an entity's does.
+struct Ledger;
+
+impl SqlName for Ledger {
+    fn unquoted(&self, s: &mut dyn std::fmt::Write) {
+        write!(s, "ledger").unwrap();
+    }
+
+    fn table_schema(&self) -> Option<&str> {
+        Some("books")
+    }
+}
+
+// [spec:pgorm:def:sql.types.table-ref+7/test]    a bare name that answers a schema is qualified
+// by it in every table position, a column of it staying qualified by the table alone
+#[test]
+fn a_name_with_a_schema_qualifies_every_table() {
+    assert_eq!(
+        Ledger.into_table_name(),
+        TableName::SchemaTable(Name::runtime("books"), Ledger.into_name())
+    );
+    assert_eq!(
+        Ledger.into_name().into_table_name(),
+        Ledger.into_table_name()
+    );
+    assert_eq!(
+        (Name::runtime("other"), Ledger).into_table_name(),
+        TableName::SchemaTable(Name::runtime("other"), Ledger.into_name())
+    );
+    assert_eq!(
+        Query::select()
+            .column((Ledger, Glyph::Id))
+            .from(Ledger)
+            .inner_join(
+                Glyph::Table,
+                Expr::col((Glyph::Table, Glyph::Id)).equals((Ledger, Glyph::Id))
+            )
+            .to_string(),
+        r#"SELECT "ledger"."id" FROM "books"."ledger" INNER JOIN "glyph" ON "glyph"."id" = "ledger"."id""#
+    );
+    assert_eq!(
+        Query::select()
+            .column(Asterisk)
+            .from(Glyph::Table)
+            .left_join(Ledger, Expr::val(true).eq(true))
+            .to_string(),
+        r#"SELECT * FROM "glyph" LEFT JOIN "books"."ledger" ON TRUE = TRUE"#
+    );
+    assert_eq!(
+        Query::insert()
+            .into_table(Ledger)
+            .columns([Glyph::Id])
+            .values_panic([1.into()])
+            .to_string(),
+        r#"INSERT INTO "books"."ledger" ("id") VALUES (1)"#
+    );
+    assert_eq!(
+        Query::update()
+            .table(Ledger)
+            .value(Glyph::Id, 2)
+            .to_string(),
+        r#"UPDATE "books"."ledger" SET "id" = 2"#
+    );
+    assert_eq!(
+        Query::delete().from_table(Ledger).to_string(),
+        r#"DELETE FROM "books"."ledger""#
+    );
+    assert_eq!(
+        Table::truncate(Ledger).to_string(),
+        r#"TRUNCATE TABLE "books"."ledger""#
+    );
+}
+
+// [spec:pgorm:def:sql.types.table-ref+7/test]    `IntoNamedTable` maps the same spellings to an
 // unaliased named table, and a `TableName` or `NamedTable` passes through
 #[test]
 fn into_named_table_maps_the_named_forms() {
@@ -111,7 +184,7 @@ fn into_named_table_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    `IntoFromItem` widens every named spelling, and
+// [spec:pgorm:def:sql.types.table-ref+7/test]    `IntoFromItem` widens every named spelling, and
 // a `TableName` or `NamedTable` converts infallibly
 #[test]
 fn into_from_item_maps_the_named_forms() {
@@ -139,7 +212,7 @@ fn into_from_item_maps_the_named_forms() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    `alias` binds an alias and replaces an existing
+// [spec:pgorm:def:sql.types.table-ref+7/test]    `alias` binds an alias and replaces an existing
 // one, on the named form and on the value-producing forms alike
 #[test]
 fn from_item_alias_adds_or_replaces() {
@@ -182,7 +255,7 @@ fn from_item_alias_adds_or_replaces() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    a column of a from item is qualified by its
+// [spec:pgorm:def:sql.types.table-ref+7/test]    a column of a from item is qualified by its
 // alias when it has one, otherwise by the table it names
 #[test]
 fn from_item_qualifier_prefers_the_alias() {
@@ -217,7 +290,7 @@ fn from_item_qualifier_prefers_the_alias() {
     assert_eq!(template.table_name(), None);
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    the named form renders as dotted, quoted parts
+// [spec:pgorm:def:sql.types.table-ref+7/test]    the named form renders as dotted, quoted parts
 // with an optional alias
 #[test]
 fn named_from_item_forms_render() {
@@ -246,7 +319,7 @@ fn named_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    the write statements take the same named table,
+// [spec:pgorm:def:sql.types.table-ref+7/test]    the write statements take the same named table,
 // and PostgreSQL accepts the alias each of them renders
 // [spec:pgorm:def:sql.ast.insert+3/test]
 // [spec:pgorm:req:sql.ast.update+5/test]
@@ -284,7 +357,7 @@ fn aliased_dml_targets_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    the three value-producing forms, all with a
+// [spec:pgorm:def:sql.types.table-ref+7/test]    the three value-producing forms, all with a
 // mandatory alias
 #[test]
 fn value_producing_from_item_forms_render() {
@@ -334,7 +407,7 @@ fn value_producing_from_item_forms_render() {
     );
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6/test]    a fragment in relation position keeps its
+// [spec:pgorm:def:sql.types.table-ref+7/test]    a fragment in relation position keeps its
 // non-marker text verbatim and renumbers its markers into the enclosing statement's parameter
 // space, so it composes with a statement that binds values of its own
 // [spec:pgorm:req:sql.render.subquery+5/test]

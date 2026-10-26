@@ -20,7 +20,7 @@ pub use strum::IntoEnumIterator as Iterable;
 pub use pgorm_query::StaticName;
 
 /// A Trait for mapping an Entity to a database table
-// [spec:pgorm:req:entity.traits.entity-name+2]
+// [spec:pgorm:req:entity.traits.entity-name+3]
 pub trait EntityName: StaticName + Default {
     /// Method to get the name for the schema, defaults to [Option::None] if not set
     fn schema_name(&self) -> Option<&str> {

@@ -709,7 +709,7 @@ including panic semantics and quirks inherited from sea-query.
 > Asterisk)` to `TableAsterisk`, `(ReturningRow, name)` to `RowColumn`, and
 > `(ReturningRow, Asterisk)` to `RowAsterisk`.
 
-> [spec:pgorm:def:sql.types.table-ref+6]
+> [spec:pgorm:def:sql.types.table-ref+7]
 > Table references are split by position, so that a reference which names no
 > table cannot reach a statement that needs one. There are three positions,
 > and each takes the widest type its position admits: DDL targets a name,
@@ -719,10 +719,18 @@ including panic semantics and quirks inherited from sea-query.
 > `TableName` is the DDL-position reference and has exactly two forms:
 > `Table(Name)` and `SchemaTable(Name, Name)`. There is no
 > database-qualified form — Postgres rejects a cross-database reference at
-> execution, so the shape is not offered. `IntoTableName` maps a bare name to
-> `Table` and a 2-tuple to `SchemaTable`, and accepts a `TableName`
-> unchanged. `TableName::table()` returns the table name;
-> `TableName::schema()` returns the schema name when the name carries one.
+> execution, so the shape is not offered. `IntoTableName` maps a 2-tuple to
+> `SchemaTable` and accepts a `TableName` unchanged. It maps a bare name to
+> `Table`, unless the name knows its table's schema: `SqlName::table_schema`,
+> `None` unless an implementor answers it, names the schema that qualifies a
+> name wherever it names a table, and a bare name answering `Some` maps to
+> `SchemaTable` of that schema (a `Name::runtime`) and the name, erased to a
+> `Name` first or not. An entity is such a name
+> (`[spec:pgorm:req:entity.traits.entity-name+3]`). The schema qualifies the
+> table and nothing else: a column of it is still qualified by the table
+> name alone, which the qualified table exposes. `TableName::table()`
+> returns the table name; `TableName::schema()` returns the schema name when
+> the name carries one.
 >
 > `NamedTable` is the DML-position reference: a struct of a `name: TableName`
 > and an `alias: Option<Name>`, which is exactly what PostgreSQL's write

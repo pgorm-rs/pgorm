@@ -754,7 +754,7 @@ fn derive_primary_key_emits_iden_and_mapping() {
     );
 }
 
-// [spec:pgorm:sem:macros.derive.entity+2/test]    EntityTrait associated types and the SqlName pair
+// [spec:pgorm:sem:macros.derive.entity+3/test]    EntityTrait associated types and the SqlName pair
 #[test]
 fn derive_entity_wires_up_the_entity_trait() {
     // The five associated types default to the conventional names.
@@ -777,12 +777,17 @@ fn derive_entity_wires_up_the_entity_trait() {
     fn assert_relation<E: EntityTrait<Relation = filling::Relation>>() {}
     assert_relation::<filling::Entity>();
 
-    // `SqlName` and `StaticName` both render `EntityName::table_name`.
+    // `SqlName` and `StaticName` both render `EntityName::table_name`, and the
+    // `SqlName` answers `EntityName::schema_name` as its table's schema.
     assert_eq!(pgorm::StaticName::as_str(&filling::Entity), "filling");
     assert_eq!(filling::Entity.to_string(), "filling");
+    assert_eq!(
+        pgorm::SqlName::table_schema(&filling::Entity),
+        Some("baking")
+    );
 }
 
-// [spec:pgorm:sem:macros.derive.entity+2/test]    EntityName only when table_name is present
+// [spec:pgorm:sem:macros.derive.entity+3/test]    EntityName only when table_name is present
 #[test]
 fn derive_entity_omits_entity_name_without_table_name() {
     // `no_table_name::Entity` carries `DeriveEntity` with no `table_name`, and a
@@ -791,6 +796,7 @@ fn derive_entity_omits_entity_name_without_table_name() {
     assert_eq!(no_table_name::Entity.table_name(), "hand_written");
     assert_eq!(no_table_name::Entity.schema_name(), None);
     assert_eq!(no_table_name::Entity.to_string(), "hand_written");
+    assert_eq!(pgorm::SqlName::table_schema(&no_table_name::Entity), None);
     // The composite still produced Column / PrimaryKey without an Entity struct
     // of its own.
     assert_eq!(no_table_name::Column::Id.to_string(), "id");

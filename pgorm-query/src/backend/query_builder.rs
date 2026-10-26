@@ -2261,7 +2261,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`NamedTable`] into SQL statement.
-    // [spec:pgorm:def:sql.types.table-ref+6]
+    // [spec:pgorm:def:sql.types.table-ref+7]
     fn prepare_named_table(&self, table: &NamedTable, sql: &mut dyn SqlWriter) {
         self.prepare_table_name(&table.name, sql);
         if let Some(alias) = &table.alias {

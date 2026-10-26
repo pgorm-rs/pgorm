@@ -1049,7 +1049,7 @@ an ideal Postgres renderer would emit.
 > `SqlTemplate::from_sql(sql, values)` is the second constructor, for text
 > that is real SQL rather than a template authored for this machinery — a
 > caller's own statement, which is where relation-position fragments come
-> from (`[spec:pgorm:def:sql.types.table-ref+6]`). It differs in the `$`
+> from (`[spec:pgorm:def:sql.types.table-ref+7]`). It differs in the `$`
 > grammar and in nothing else: only `$N` is a substitution, and every other
 > `$` is reproduced verbatim — `$$` included, because in real SQL `$$` opens
 > a dollar-quoted body rather than standing in for a literal `$`. This is

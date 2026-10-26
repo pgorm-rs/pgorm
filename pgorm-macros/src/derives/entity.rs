@@ -115,6 +115,7 @@ impl DeriveEntity {
         )
     }
 
+    // [spec:pgorm:sem:macros.derive.entity+3]
     fn impl_iden(&self) -> TokenStream {
         let ident = &self.ident;
 
@@ -123,6 +124,10 @@ impl DeriveEntity {
             impl pgorm::SqlName for #ident {
                 fn unquoted(&self, s: &mut dyn std::fmt::Write) {
                     write!(s, "{}", pgorm::StaticName::as_str(self)).unwrap();
+                }
+
+                fn table_schema(&self) -> Option<&str> {
+                    <Self as pgorm::EntityName>::schema_name(self)
                 }
             }
         )
@@ -142,7 +147,7 @@ impl DeriveEntity {
     }
 }
 
-// [spec:pgorm:sem:macros.derive.entity+2]
+// [spec:pgorm:sem:macros.derive.entity+3]
 pub fn expand_derive_entity(input: syn::DeriveInput) -> syn::Result<TokenStream> {
     Ok(DeriveEntity::new(input)?.expand())
 }

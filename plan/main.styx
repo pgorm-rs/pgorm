@@ -14493,6 +14493,7 @@ children (
         id query-from-entity-schema
         title "Query::select().from(entity) keeps the entity's schema, as Entity::find() does"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-26T13:39:21.268023Z
@@ -14506,6 +14507,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T15:06:55.399539Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

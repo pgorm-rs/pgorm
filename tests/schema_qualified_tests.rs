@@ -71,7 +71,10 @@ async fn main() -> Result<(), Error> {
         db.execute_raw(statement, NO_PARAMS).await?;
     }
 
-    let result = generated_entity_targets_its_own_schema(&db).await;
+    let mut result = generated_entity_targets_its_own_schema(&db).await;
+    if result.is_ok() {
+        result = raw_builders_target_the_entitys_schema(&db).await;
+    }
 
     drop(db);
     ctx.delete().await;
@@ -117,6 +120,96 @@ async fn generated_entity_targets_its_own_schema(db: &DatabaseConnection) -> Res
     .insert(db)
     .await?;
 
+    assert_eq!(qualified::Entity::find().all(db).await?.len(), 2);
+    assert_eq!(unqualified::Entity::find().all(db).await?.len(), 1);
+
+    Ok(())
+}
+
+/// `statement` built, with its values bound, as a caller runs a raw write.
+async fn run<S>(db: &DatabaseConnection, statement: &S) -> Result<u64, Error>
+where
+    S: pgorm::pgorm_query::QueryStatementBuilder,
+{
+    let (sql, values) = statement.build();
+    db.execute_raw(&sql, values.into_iter().map(pgorm::ValueHolder))
+        .await
+}
+
+// [spec:pgorm:req:entity.traits.entity-name+3/test]    an entity handed straight to a raw
+// builder's table position is qualified as `table_ref` qualifies it, so a select, a join and
+// each write reach `tenant_a.item` and never the `public.item` the `search_path` holds
+// [spec:pgorm:def:sql.types.table-ref+7/test]
+async fn raw_builders_target_the_entitys_schema(db: &DatabaseConnection) -> Result<(), Error> {
+    use pgorm::pgorm_query::{Expr, Name, Order, Query};
+    use qualified::{Column, Entity};
+
+    let insert = Query::insert()
+        .into_table(Entity)
+        .columns([Column::Id, Column::Label])
+        .values_panic([3.into(), "raw".into()])
+        .to_owned();
+    assert_eq!(
+        insert.to_string(),
+        r#"INSERT INTO "tenant_a"."item" ("id", "label") VALUES (3, 'raw')"#
+    );
+    assert_eq!(run(db, &insert).await?, 1);
+
+    let update = Query::update()
+        .table(Entity)
+        .value(Column::Label, "raw, updated")
+        .and_where(Expr::col(Column::Id).eq(3))
+        .to_owned();
+    assert_eq!(
+        update.to_string(),
+        r#"UPDATE "tenant_a"."item" SET "label" = 'raw, updated' WHERE "id" = 3"#
+    );
+    assert_eq!(run(db, &update).await?, 1);
+
+    let labels = Query::select()
+        .column((Entity, Column::Label))
+        .from(Entity)
+        .order_by((Entity, Column::Id), Order::Asc)
+        .to_owned();
+    assert_eq!(
+        labels.to_string(),
+        r#"SELECT "item"."label" FROM "tenant_a"."item" ORDER BY "item"."id" ASC"#
+    );
+    assert_eq!(
+        labels.into_tuple::<String>().all(db).await?,
+        ["tenant_a", "also tenant_a", "raw, updated"]
+    );
+
+    // Both tables are named `item`, so the one read through `search_path`
+    // takes an alias to be told apart from the joined one.
+    let public = Name::runtime("p");
+    let joined = Query::select()
+        .column((public.clone(), Column::Label))
+        .column((Entity, Column::Label))
+        .from_as(unqualified::Entity, public.clone())
+        .inner_join(
+            Entity,
+            Expr::col((Entity, Column::Id)).equals((public, Column::Id)),
+        )
+        .to_owned();
+    assert_eq!(
+        joined.to_string(),
+        r#"SELECT "p"."label", "item"."label" FROM "item" AS "p" INNER JOIN "tenant_a"."item" ON "item"."id" = "p"."id""#
+    );
+    assert_eq!(
+        joined.into_tuple::<(String, String)>().all(db).await?,
+        [("public".to_owned(), "tenant_a".to_owned())]
+    );
+
+    let delete = Query::delete()
+        .from_table(Entity)
+        .and_where(Expr::col(Column::Id).eq(3))
+        .to_owned();
+    assert_eq!(
+        delete.to_string(),
+        r#"DELETE FROM "tenant_a"."item" WHERE "id" = 3"#
+    );
+    assert_eq!(run(db, &delete).await?, 1);
     assert_eq!(qualified::Entity::find().all(db).await?.len(), 2);
     assert_eq!(unqualified::Entity::find().all(db).await?.len(), 1);
 

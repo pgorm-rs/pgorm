@@ -35,6 +35,18 @@ pub trait SqlName: Any + Send + Sync {
     }
 
     fn unquoted(&self, s: &mut dyn fmt::Write);
+
+    /// The schema that qualifies this name wherever it names a table, so
+    /// that [`IntoTableName`] reads it as `"schema"."name"`; `None` for a
+    /// name that names its table bare. A name that knows its table's schema
+    /// answers it here: pgorm's `DeriveEntity` answers the entity's
+    /// `schema_name`, which is how an entity handed straight to `from`, a
+    /// join or a write target reads the table its own queries do, rather than
+    /// whichever one `search_path` finds first.
+    // [spec:pgorm:def:sql.types.table-ref+7]
+    fn table_schema(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// A name whose text is fixed by the program, and which therefore hands that
@@ -204,7 +216,7 @@ pub trait IntoColumnRef {
 ///
 /// Table::truncate(Glyph::Table.into_named_table().alias(Name::runtime("g")));
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 // [spec:pgorm:sem:sql.ddl.panics+4/test]    the DDL-position panics are gone because the shapes
 // that reached them no longer typecheck
 /// A type name in cast or column-type position: optionally
@@ -399,7 +411,7 @@ pub enum TableName {
 }
 
 /// Conversion into the [`TableName`] a DDL statement targets.
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 pub trait IntoTableName {
     /// Consume `self` and produce a [`TableName`]
     fn into_table_name(self) -> TableName;
@@ -461,7 +473,7 @@ pub trait IntoTableName {
 /// );
 /// Query::delete().from_table(func);
 /// ```
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedTable {
     /// The table this reference names
@@ -471,7 +483,7 @@ pub struct NamedTable {
 }
 
 /// Conversion into the [`NamedTable`] a DML statement targets.
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 pub trait IntoNamedTable {
     /// Consume `self` and produce a [`NamedTable`]
     fn into_named_table(self) -> NamedTable;
@@ -482,7 +494,7 @@ pub trait IntoNamedTable {
 /// A named table carries its alias beside it rather than in the variant, so
 /// aliasing is orthogonal to how the name is qualified; the value-producing
 /// forms carry the alias Postgres requires of them.
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 #[doc(alias = "TableRef")]
@@ -542,7 +554,7 @@ pub enum FromItem {
 }
 
 /// Conversion into a [`FromItem`].
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 pub trait IntoFromItem {
     /// Consume `self` and produce a [`FromItem`]
     fn into_from_item(self) -> FromItem;
@@ -878,12 +890,17 @@ impl IntoTableName for TableName {
     }
 }
 
+// [spec:pgorm:def:sql.types.table-ref+7]
 impl<T: 'static> IntoTableName for T
 where
     T: IntoName,
 {
     fn into_table_name(self) -> TableName {
-        TableName::Table(self.into_name())
+        let name = self.into_name();
+        match name.table_schema().map(Name::runtime) {
+            Some(schema) => TableName::SchemaTable(schema, name),
+            None => TableName::Table(name),
+        }
     }
 }
 
@@ -897,7 +914,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 impl TableName {
     /// The table identifier, without its schema
     pub fn table(&self) -> &Name {
@@ -933,7 +950,7 @@ where
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 impl NamedTable {
     /// Bind an alias to the name, replacing any alias already bound
     pub fn alias<A>(self, alias: A) -> Self
@@ -986,7 +1003,7 @@ impl From<TableName> for FromItem {
     }
 }
 
-// [spec:pgorm:def:sql.types.table-ref+6]
+// [spec:pgorm:def:sql.types.table-ref+7]
 impl FromItem {
     /// Add or replace the current alias
     pub fn alias<A>(self, alias: A) -> Self
