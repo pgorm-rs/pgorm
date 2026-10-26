@@ -291,7 +291,7 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 - **Builders never change.** Each method returns a new builder from a copy of
   its receiver's pgorm-query state, so a base query can be extended in two
   directions. Builders come from the module's functions (`select`, `col`,
-  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `tuple`,
+  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `array`, `tuple`,
   `groupingSet`, `rollup`, `cube`, `groupingSets`, `tableFunction`) and the
   `Table` and `With` constructors.
 - **Values are bound, identifiers quoted.** An operand that is not an
@@ -309,8 +309,9 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   (`uuidv7` and its shift among them, the set-returning `generate_series`
   and `unnest`, whose overloads need a bound argument typed:
   `bind(1).cast("int8")`, and the record-returning `json_to_record`,
-  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`
-  and `scalar`.
+  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`,
+  `scalar`, and `array(select)`, `ARRAY(select)`: the subquery's one column as
+  one array value, empty for no rows, to cast and compare as a value.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
@@ -691,10 +692,13 @@ await pool.query(top);
   its bound values with it — or `pl.source(relation).named(name)`, which is
   how a relation meets itself.
 - **Expressions** are the pipeline's own, not the statement builders':
-  `pl.col(table, column)` (prqlc has no catalog, so columns are qualified),
-  `pl.alias(name)` for a name a stage introduces, `pl.thisColumn` and
-  `pl.thatColumn` for a join's sides, the comparison, logical and arithmetic
-  methods, `coalesce`, `isNull`, `inArray`, `cast`, `as`, `asc`/`desc`,
+  `pl.col(table, column)` (prqlc has no catalog, so columns are qualified;
+  a registered entity's column, `entity.col(name)`, is compared as the
+  entity types it), `pl.alias(name)` for a name a stage introduces,
+  `pl.thisColumn` and `pl.thatColumn` for a join's sides, the comparison,
+  logical and arithmetic methods, `coalesce`, `isNull`, `inArray`, `cast`,
+  `comparesAs(type)` — the enum a column whose domain is over one compares
+  as, which PostgreSQL needs and no catalog tells prqlc —, `as`, `asc`/`desc`,
   `pl.caseWhen`, the aggregates (`sum`, `min`, `max`, `average`, `stddev`,
   `count`, `countDistinct`, `countRows`) and the window functions
   (`rowNumber`, `rank`, `rankDense`, `lag`, `lead`, `first`, `last`) over

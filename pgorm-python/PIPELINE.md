@@ -33,6 +33,21 @@ table metadata. `pl.col(table_alias, physical_column_name)` creates a qualified
 reference; it does not translate a runtime model's logical field names. Use
 `pl.source(model)` when passing a model to `join`, `append`, `intersect` or `remove`.
 
+`pl.col(table_alias, entity.col(name))` reads a registered entity's column under
+`table_alias` — the entity's table, or the name a source was read by — and compares
+it as the entity's own column does: a column whose domain is over an enum is cast
+to the enum in every comparison, `in_array`, `coalesce`, `min` and `max`, because
+PostgreSQL has no operator for the domain itself (`42883`). A column named by text
+carries no type. Where a column of that kind has no registration — a `Table`, an
+alias naming a projection — `expr.compares_as(p.TypeName(name, schema=...))` names
+the enum it compares as:
+
+```python
+lines = pl.col("lines", "mood").compares_as(p.TypeName("mood"))
+query = pl.from_(p.Table("lines")).filter(lines == "glad")
+assert query.inspect().sql == "SELECT * FROM lines WHERE CAST(mood AS mood) = 'glad'"
+```
+
 Every stage returns a new pipeline. `filter`, `derive`, `select`, `group`,
 `aggregate`, `window`, `sort` and `join` have `*_with` counterparts. Projection,
 grouping and ordering methods accept positional expressions; their callbacks
@@ -64,8 +79,9 @@ callbacks cannot be combined, and a bound expression cannot enter an `Over` or a
 plain stage.
 
 Qualified enum and enum-array `Value` tags are rejected by the pipeline binder:
-Rust's pipeline has no qualified enum cast API. A plain string can use PostgreSQL
-type inference when that is intended. Other supported `Value` kinds, including
+Rust's pipeline binds a value bare and has no cast for a value of a named type. A
+plain string can use PostgreSQL type inference when that is intended; compared with
+a column that compares as an enum, it is inferred as that enum. Other supported `Value` kinds, including
 typed nulls, are available through the binder; literal conversion is limited to
 the native pipeline's scalar literal vocabulary. The SQL builder expression API
 (`p.Expr`) and pipeline expression API (`pl.Expr`) are separate native types.

@@ -1,6 +1,6 @@
 //! Independent Rust construction checks the Python lowering's SQL and Values.
 
-use pgorm::pgorm_query::Name;
+use pgorm::pgorm_query::{Name, TypeName};
 use pgorm::{
     pgorm_query::Values,
     pipeline::{self as pl, ExprOps, IntoSource, Pipeline},
@@ -208,10 +208,18 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
                     .as_runtime(Name::runtime("out β")),
             ),
         ),
+        (
+            "compares_as",
+            Pipeline::from(Name::runtime("items")).filter_with(|b| {
+                pl::col(Name::runtime("items"), Name::runtime("category"))
+                    .compares_as(TypeName::new(Name::runtime("Mood")).schema(Name::runtime("app")))
+                    .in_array([b.bind("glad"), "calm".into()])
+            }),
+        ),
     ])
 }
 
-// [spec:pgorm:req:python.pipeline/test]
+// [spec:pgorm:req:python.pipeline+1/test]
 #[test]
 fn pipeline_sql_and_parameters_match_rust() -> Result<(), Box<dyn std::error::Error>> {
     Python::initialize();

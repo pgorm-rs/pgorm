@@ -483,7 +483,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+4]
+> [spec:pgorm:req:napi.expressions+5]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -518,8 +518,12 @@ SQL text running a built statement.
 > record-returning ones it reads through a column definition list.
 > A cast names its type by identifier or `TypeName`; `collate` names a
 > collation, schema-qualifiable; `at` and `slice` subscript an array; a
-> searched or simple `CASE` exists only once it has an arm; `exists` and
-> `scalar` take a `Select`.
+> searched or simple `CASE` exists only once it has an arm; `exists`,
+> `scalar` and `array` take a `Select`, `array` lowering through
+> `Expr::array` to `ARRAY(select)`: the subquery's one column as one array
+> value, empty when it yields no row, which casts and compares as a value
+> (`sql.ast.expr`), the server refusing a subquery of more than one column
+> (`42601`).
 
 > [spec:pgorm:req:napi.select+2]
 > `select` MUST build pgorm-query's `SelectStatement`: a projection of
@@ -1063,14 +1067,20 @@ placeholders belong to the stage that minted them.
 > `ConstructionError` from `inspect()` or the terminal, before anything is
 > sent.
 
-> [spec:pgorm:req:napi.pipeline-expressions+1]
+> [spec:pgorm:req:napi.pipeline-expressions+2]
 > Pipeline expressions MUST be their own objects, lowered into
 > `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
 > statement builders' `Expr`: `col(table, column)`, qualified as prqlc
-> requires; `alias(name)`, a name a stage introduces, read back unqualified;
+> requires, and when `column` is a registered entity's column
+> (`entity.col(name)`) lowered through the registration's own `Named::col`,
+> so it compares as the entity types it; `alias(name)`, a name a stage
+> introduces, read back unqualified;
 > `thisColumn` and `thatColumn`, a join's two sides; the operators `eq` ..
 > `lte`, `and`, `or`, `not`, `neg`, `add` .. `rem`, `coalesce`, `isNull`,
-> `isNotNull`, `inArray`, `cast` over pgorm's closed `CastType` set, `as`,
+> `isNotNull`, `inArray`, `cast` over pgorm's closed `CastType` set,
+> `comparesAs(type)` — a string or a `TypeName`, lowered through
+> `ExprOps::compares_as`, the enum a column no registration types compares
+> as (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`) —, `as`,
 > `asc` and `desc`; `caseWhen(arms, otherwise)`; and the aggregates and
 > window functions pgorm's pipeline has, each at the argument count it takes.
 > `over()` builds a window's partition, ordering and `rows` or `range`
@@ -1142,7 +1152,7 @@ the ones compiled in.
 > its state unknown — and a failure from PostgreSQL anywhere in its causes is
 > the error `napi.errors` classifies.
 
-> [spec:pgorm:req:napi.entity-reads+2]
+> [spec:pgorm:req:napi.entity-reads+3]
 > `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
 > and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
 > `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
@@ -1154,7 +1164,12 @@ the ones compiled in.
 > kind and written through the column's `save_as` — an enum's label cast to
 > its type, and a column whose domain is over an enum compared as the enum,
 > the column and the label each cast to it — an expression compared as
-> written, and `null` refused.
+> written, and `null` refused. Its `isIn` and `isNotIn` MUST be the trait's
+> `is_in` / `is_not_in` over a list of values, each converted as a compared
+> value is, and its `in_subquery` / `not_in_subquery` over a `Select`, so a
+> column whose domain is over an enum is a member as the enum and the
+> subquery's projection is cast beside it; a list holding an expression is a
+> member as written.
 
 > [spec:pgorm:req:napi.entity-writes]
 > `active()` MUST be the entity's `ActiveModelBehavior::new`, its defaults

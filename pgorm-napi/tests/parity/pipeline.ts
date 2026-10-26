@@ -2,10 +2,10 @@
 // are to theirs: the Rust test builds each with pgorm::pipeline directly,
 // every value a binder binds there bound by the same stage here.
 // [spec:pgorm:req:napi.pipeline/test]
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 // [spec:pgorm:req:napi.pipeline-binder/test]
 
-import { type Builder, pipeline as pl, Table, Value } from "../../lib/index.js";
+import { type Builder, pipeline as pl, Table, TypeName, Value } from "../../lib/index.js";
 
 const items = new Table("items");
 const base = pl.from(items);
@@ -88,5 +88,10 @@ export const cases: Record<string, () => Builder> = {
       category.inArray(["a", pl.literal("b")]).not().as("other"),
       id.isNotNull().or(id.gte(0)).as("present"),
       amount.coalesce(pl.literal(null)).as("filled"),
+    ),
+  "compares-as": () =>
+    base.filter(
+      category.comparesAs(new TypeName("Mood", { schema: "app" })).inArray(["glad", pl.literal("calm")])
+        .and(pl.alias("m").comparesAs("mood").lt("glad")),
     ),
 };

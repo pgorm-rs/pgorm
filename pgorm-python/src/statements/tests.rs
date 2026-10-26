@@ -1170,3 +1170,60 @@ fn set_operation_arms_are_checked_when_read() -> PyResult<()> {
         Ok(())
     })
 }
+
+// [spec:pgorm:req:python.expressions+3/test]    array(select) is Rust's Expr::array over the
+// subquery as it embeds, projected and compared as one value, and an ordered-with-ties subquery
+// is refused as any embedded one is
+#[test]
+fn array_subquery_matches_rust_expr_array() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let events = || {
+            Query::select()
+                .expr(Expr::col((Name::runtime("e"), Name::runtime("id"))))
+                .from(
+                    Name::runtime("event")
+                        .into_named_table()
+                        .alias(Name::runtime("e")),
+                )
+                .cond_where(
+                    Expr::col((Name::runtime("e"), Name::runtime("account_id")))
+                        .eq(Expr::col((Name::runtime("a"), Name::runtime("id")))),
+                )
+                .to_owned()
+        };
+        let collected = Expr::array(events());
+        let expected = Query::select()
+            .expr(Expr::col((Name::runtime("a"), Name::runtime("id"))))
+            .expr_as(collected.clone(), Name::runtime("events"))
+            .from(
+                Name::runtime("account")
+                    .into_named_table()
+                    .alias(Name::runtime("a")),
+            )
+            .cond_where(
+                Expr::expr(collected.cast_as_type(
+                    pgorm::pgorm_query::TypeName::new(Name::runtime("int8")).array(),
+                ))
+                .is_not_null(),
+            )
+            .build();
+        parity(
+            py,
+            &globals,
+            "(lambda a, e: p.Select(a.col('id'), p.array(p.Select(e.col('id')).from_(e).where_(e.col('account_id') == a.col('id'))).as_('events')).from_(a).where_(p.array(p.Select(e.col('id')).from_(e).where_(e.col('account_id') == a.col('id'))).cast(p.TypeName('int8'), array=True).is_not_null()))(p.Table('account').as_('a'), p.Table('event').as_('e'))",
+            expected,
+        )?;
+        let refused = py.eval(
+            c"p.array(p.Select(p.col('id')).from_(p.Table('t')).limit_with_ties(1))",
+            Some(&globals),
+            None,
+        );
+        assert!(
+            refused
+                .is_err_and(|error| error.is_instance_of::<crate::errors::ConstructionError>(py))
+        );
+        Ok(())
+    })
+}

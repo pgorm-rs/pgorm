@@ -99,7 +99,12 @@ const first = await query.oneOpt(pool);      // Select::one_opt, LIMIT 1
 - `col(name)` names a column as the entity's `ColumnTrait` does. Its
   comparisons are that trait's: a value converts to the column's declared
   kind and is written through its `save_as`, so an enum's label is cast to
-  its type; an expression is compared as written; `null` is refused.
+  its type; an expression is compared as written; `null` is refused. Its
+  `isIn` and `isNotIn` are the trait's too, over a list of values converted
+  the same way or over a `Select`'s rows (`in_subquery`), so a column whose
+  domain is over an enum is a member as the enum, which is the only way
+  PostgreSQL compares one; a list holding an expression is a member as
+  written.
 - A record is a frozen plain object keyed by SQL column name. The module
   keeps the Rust model behind it, so `Account.intoActive(record)` is the real
   `IntoActiveModel`, `Account.withValue(record, column, value)` is
@@ -189,6 +194,13 @@ const rows = await pl.from(Account)
   .selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] })
   .all(pool);                                 // [account | null, note | null][]
 ```
+
+A registered column a pipeline reads is `pl.col(qualifier, Entity.col(name))`:
+the entity's own column under the qualifier its relation is read by — its
+table's name, or the name of a `pl.source(entity).named(..)` — compared as the
+entity types it, so a column whose domain is over an enum compares as the enum.
+`pl.col(qualifier, "name")` only qualifies, and such a column needs
+`.comparesAs(new TypeName(name, { schema }))` to be compared at all.
 
 Each source is projected under the qualifier given for it, or its table's
 name. A row's source that the join left empty is `null`, read through the

@@ -49,6 +49,8 @@ pub(crate) trait EntityBackend: Debug + Send + Sync {
     fn select(&self) -> Select;
     fn active(&self) -> Active;
     fn expression(&self, column: &str) -> Result<SimpleExpr, Error>;
+    /// The column as a pipeline reads it, compared as the entity types it.
+    fn pipeline_column(&self, column: &str) -> Result<Arc<dyn PipelineColumn>, Error>;
     fn compare(
         &self,
         column: &str,
@@ -90,6 +92,13 @@ pub(crate) enum VersionWrite {
 pub(crate) struct Versions {
     pub(crate) old: Option<Model>,
     pub(crate) new: Model,
+}
+
+/// A registered entity's column, written under whatever name a pipeline reads
+/// its relation by: the entity's own `Named::col`, so a column whose domain is
+/// over an enum compares as the enum.
+pub(crate) trait PipelineColumn: Debug + Send + Sync {
+    fn lower<'brand>(&self, qualifier: &str) -> pgorm::pipeline::Expr<'brand>;
 }
 
 pub(crate) trait SelectBackend: Debug + Send + Sync {

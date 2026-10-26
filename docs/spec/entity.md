@@ -146,7 +146,7 @@ explicit limitations.
 > (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
 > definition meets when its schema is created.
 
-> [spec:pgorm:sem:entity.traits.column.enum-cast+11]
+> [spec:pgorm:sem:entity.traits.column.enum-cast+12]
 > Enum-typed columns are transparently cast at the SQL boundary
 > (`src/entity/column.rs`). On read, `select_as` / `select_enum_as` casts an enum
 > column to `text` — or `text[]` when the column type is `Array` of an enum — and
@@ -238,10 +238,24 @@ explicit limitations.
 > comparisons, `in_array`, its operand and each member, `coalesce` and
 > `is_null` among them — casts every side that carries one, as the `min` and
 > `max` aggregates cast their argument; sorting, grouping, projecting and
-> `count` keep the bare column. Only an
-> entity column carries the type: a column named by `col(table, column)`, or
-> an alias token naming such a column's projection, compares as the domain,
-> which the server refuses (`42883`).
+> `count` keep the bare column. The type comes from the entity wherever one
+> is known: a relation read under a name of its own keeps it, its columns
+> written `Named::col(column)`, qualified by the name and carrying what the
+> entity column carries. Where none is — `col(table, column)` over a table no
+> entity describes, an alias token naming a projection — the column compares
+> as the type the server gives it, the domain, which the server refuses
+> (`42883`), until `compares_as(enum)` names the enum it compares as, a
+> structured `TypeName` schema-qualified where the enum is; the operators then
+> cast it as they cast an entity column so typed. The Python and JavaScript
+> pipelines take the same two routes: a registered entity's column read
+> under a qualifier (`col(table, entity.col(name))`) lowers through the
+> registration's own `Named::col`, and `compares_as` / `comparesAs` names
+> the enum where no registration types the column. JavaScript's registered
+> column is a member — of a list of values, each converted to its declared
+> kind, or of a subquery's rows — through its `ColumnTrait`'s `is_in`,
+> `is_not_in`, `in_subquery` and `not_in_subquery`, so it is cast as Rust's
+> is; a statement builder's own expression is SQL as written, and is cast
+> by the caller where it needs one.
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
 > `save_as`, but under a column whose domain is over an enum, where it is cast

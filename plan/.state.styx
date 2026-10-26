@@ -888,6 +888,7 @@ assertions (
     {id api-doc-honesty, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:16:04.02923Z}
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
+    {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id boolean-operator-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:11.56594Z}
     {id bound-datetime-max-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:21.710443Z}
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}
@@ -1093,6 +1094,7 @@ assertions (
     {id pipeline-read-cast-verbatim, kind @complete, author "brendan@necessary.nu", at 2026-09-24T22:19:07.367803Z}
     {id pipeline-rejects-backtick-name, kind @complete, author "brendan@necessary.nu", at 2026-09-16T23:33:44.99552Z}
     {id pipeline-renamed-column-order, kind @complete, author "brendan@necessary.nu", at 2026-09-15T00:59:38.820334Z}
+    {id pipeline-untyped-enum-casts, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:33:44.800678Z}
     {id pipeline-unused-parameters, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:16:03.581143Z}
     {id polish.bare-gates, kind @complete, author "brendan@necessary.nu", at 2026-09-03T22:43:45.696061Z}
     {id polish.conn-acquire, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:17:54.023277Z}

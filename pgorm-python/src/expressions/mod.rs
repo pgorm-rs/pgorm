@@ -22,7 +22,7 @@ use construct::sequence;
 pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
-// [spec:pgorm:req:python.expressions+2]
+// [spec:pgorm:req:python.expressions+3]
 // [spec:pgorm:req:python.ownership]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
 #[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]
@@ -234,7 +234,7 @@ impl PyExpr {
             Expr::expr(self.inner.clone()).not_ilike(options::pattern(pattern)?),
         ))
     }
-    // [spec:pgorm:req:python.expressions+2]
+    // [spec:pgorm:req:python.expressions+3]
     /// `SIMILAR TO`: a whole-string match in SQL's regular-expression
     /// dialect, the pattern bound and its ESCAPE carried as LIKE's are.
     fn similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -242,7 +242,7 @@ impl PyExpr {
             self.inner.clone().similar_to(options::pattern(pattern)?),
         ))
     }
-    // [spec:pgorm:req:python.expressions+2]
+    // [spec:pgorm:req:python.expressions+3]
     fn not_similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_rust(
             self.inner

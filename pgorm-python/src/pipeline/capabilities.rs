@@ -6,6 +6,8 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
             "pipeline.expression",
             "Expr / ExprOps / native aggregate and window functions",
         ),
+        ("pipeline.compares_as", "ExprOps::compares_as"),
+        ("pipeline.registered_column", "Named::col"),
         (
             "pipeline.bind",
             "Binder::bind inside branded Rust stage closures",
@@ -41,7 +43,10 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
             name.to_owned(),
             serde_json::json!({
                 "rust_api": format!("pgorm::pipeline::{api}"), "features": [],
-                "registration_required": name == "pipeline.select_sources"
+                "registration_required": matches!(
+                    name,
+                    "pipeline.select_sources" | "pipeline.registered_column"
+                )
             }),
         )
     })

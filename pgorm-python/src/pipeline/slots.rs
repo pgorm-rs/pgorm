@@ -17,7 +17,7 @@ pub struct SourceBindings {
 
 /// A registered tuple of one to six concrete Rust entity types.
 /// Each output position is optional, including the first under right/full joins.
-// [spec:pgorm:req:python.pipeline]
+// [spec:pgorm:req:python.pipeline+1]
 pub trait SourceTypes: sealed::Sealed + Send + Sync + 'static {
     #[doc(hidden)]
     type Selection: pl::SourceList + Send + Sync + 'static;

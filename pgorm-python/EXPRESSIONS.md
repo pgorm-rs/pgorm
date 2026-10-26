@@ -39,6 +39,7 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 | `TypeName(name, schema=...)` | identifier-only Rust `TypeName` |
 | `expr.cast(type_name, array=False)` | `SimpleExpr::cast_as_type` |
 | `expr.collate(name, schema=...)` | `Expr::collate`; a validated `Name`, schema-qualified when `schema` is given |
+| `array(select)` | `Expr::array`; `ARRAY(select)`, the subquery's one column as one array value |
 | `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape`; `escape=""` is `no_escape` |
 | `expr.as_(name)` | owned projection expression plus validated `Name` |
 | `expr.asc()` / `expr.desc()` | owned expression plus Rust `Order` |
@@ -98,6 +99,11 @@ implementation remains Rust's constant comparison, which `build()` renders
 as `$1 = $2` with `("a", "b")` for IN and `("a", "a")` for NOT IN.
 Use `is_null()` explicitly; an equality against a typed NULL retains ordinary
 SQL equality semantics. `tuple_expr(*items)` constructs a nonempty Rust tuple.
+`array(select)` collects a `Select`'s one column into one array value — empty,
+not NULL, when it yields no row — which casts and compares as a value where the
+subquery's rows cannot: `array(names).cast(TypeName("text"), array=True)`. The
+subquery is checked as any embedded one is, and PostgreSQL refuses one of more
+than one column (`42601`).
 
 ## Text and functions
 

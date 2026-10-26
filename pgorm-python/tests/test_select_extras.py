@@ -26,7 +26,7 @@ def text_array(values):
 
 
 # [spec:pgorm:req:python.statements+10/test]
-# [spec:pgorm:req:python.expressions+2/test]
+# [spec:pgorm:req:python.expressions+3/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -273,6 +273,34 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(unaliased.alias, self.many)
         count = p.Select(p.call("count", unaliased.col("id"))).from_(unaliased)
         self.assertEqual(await self.rows(count), [(200,)])
+
+    # [spec:pgorm:req:python.expressions+3/test]    array(select) collects a subquery's one
+    # column into an array value, empty for no rows, cast as one value, and the server refuses a
+    # subquery of two columns with 42601
+    async def test_array_collects_a_subquery_column(self):
+        s = self.scores
+        pairs = p.Table(self.pairs).as_("x")
+        partners = p.Select(pairs.col("b")).from_(pairs).where_(pairs.col("a") == s.col("id"))
+        collected = await self.rows(
+            p.Select(s.col("id"), p.array(partners).as_("partners"))
+            .from_(s)
+            .order_by(s.col("id").asc())
+        )
+        self.assertEqual(
+            [(key, sorted(values)) for key, values in collected],
+            [(1, [2, 3]), (2, []), (3, []), (4, [])],
+        )
+        nines = p.Select(s.col("name")).from_(s).where_(s.col("score") == 9)
+        spelled = p.array(nines).cast(p.TypeName("text"), array=True)
+        [(names,)] = await self.rows(p.Select(spelled))
+        self.assertEqual(sorted(names), ["Bob", "Cy"])
+        self.assertEqual(
+            p.capabilities()["operations"]["array"]["rust_api"], "pgorm_query::Expr::array"
+        )
+        wide = p.Select(s.col("id"), s.col("name")).from_(s)
+        with self.assertRaises(p.DatabaseError) as caught:
+            await self.rows(p.Select(p.array(wide)))
+        self.assertEqual(caught.exception.sqlstate, "42601")
 
 
 if __name__ == "__main__":

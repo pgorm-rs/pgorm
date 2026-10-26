@@ -119,7 +119,7 @@ fn scope_close(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// A value to bind: any parameter, inferred or declared with `Value`, but none
 /// whose kind needs a cast pgorm's pipeline cannot write, or `null`, which has
 /// no kind.
-// [spec:pgorm:req:napi.pipeline-expressions+1]
+// [spec:pgorm:req:napi.pipeline-expressions+2]
 pub(super) fn bindable<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<Value> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {

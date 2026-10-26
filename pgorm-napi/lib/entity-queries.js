@@ -3,9 +3,9 @@
 // A registered entity's reads: its columns as expressions whose
 // comparisons are the column's own `ColumnTrait` methods, and its
 // `Select<E>` with Rust's terminals.
-// [spec:pgorm:req:napi.entity-reads+2]
+// [spec:pgorm:req:napi.entity-reads+3]
 
-import { arg, TRUSTED } from "./builder.js";
+import { arg, Handle, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";
 import { predicateOf, recordsOf } from "./entities.js";
 import { Expr, OrderBy } from "./expressions.js";
@@ -15,9 +15,19 @@ import { native } from "./operations.js";
 export const QUERIES = Symbol("pgorm-napi entity query");
 
 /**
+ * The registered entity and column name `value` is, when it is an
+ * `EntityColumn`: what a pipeline reads a registered column by.
+ *
+ * @type {(value: unknown) => [unknown, string] | undefined}
+ */
+export let registeredColumn;
+
+/**
  * A registered entity's column. A value it is compared with converts to the
  * column's declared kind and is written through its `save_as`, by the
- * column's own `ColumnTrait` method; an expression is compared as written.
+ * column's own `ColumnTrait` method, and so do the values of a list it is
+ * tested for membership in; a subquery's rows are compared by the trait's
+ * `in_subquery`; an expression is compared as written.
  */
 export class EntityColumn extends Expr {
   /** @type {unknown} */
@@ -37,9 +47,44 @@ export class EntityColumn extends Expr {
     this.#column = column;
   }
 
+  static {
+    registeredColumn = (value) => value instanceof EntityColumn ? [value.#entity, value.#column] : undefined;
+  }
+
   /** The column's SQL name. */
   get name() {
     return this.#column;
+  }
+
+  /**
+   * Membership through the column's `ColumnTrait`, or `null` for a list
+   * holding an expression, which is a member as written.
+   *
+   * @param {boolean} negated
+   * @param {readonly unknown[] | import("./select.js").Select} source
+   */
+  #membership(negated, source) {
+    if (Array.isArray(source)) {
+      if (source.some((item) => item instanceof Handle)) return null;
+      return new Expr(native.entityIn(this.#entity, this.#column, negated, source), TRUSTED);
+    }
+    return new Expr(native.entityIn(this.#entity, this.#column, negated, arg(source)), TRUSTED);
+  }
+
+  /**
+   * @override
+   * @param {readonly unknown[] | import("./select.js").Select} source
+   */
+  isIn(source) {
+    return this.#membership(false, source) ?? super.isIn(source);
+  }
+
+  /**
+   * @override
+   * @param {readonly unknown[] | import("./select.js").Select} source
+   */
+  isNotIn(source) {
+    return this.#membership(true, source) ?? super.isNotIn(source);
   }
 
   /**

@@ -294,14 +294,18 @@ of the crate, compiled in every build. Rules are grouped under
 
 ## Self-joins
 
-> [spec:pgorm:sem:pipeline.self-join]
+> [spec:pgorm:sem:pipeline.self-join+1]
 > A relation meets itself by being read twice under two names.
 > `IntoSource::named(name)` is a provided method on the trait every relation
 > position already takes, so `join(side, employee::Entity.named(manager),
 > condition)` needs no second spelling of `join`, no aliased table type and
 > no new expression form: the name is an `AliasName` token, and
 > `col(manager, ID)` — the disambiguating reference that already existed —
-> is how the far side's columns are written. It lowers to PRQL's own operand
+> is how the far side's columns are written. The `Named` an entity's
+> `named` returns keeps the entity's type, so `Named::col(column)` writes
+> its column under the name and compared as the entity types it
+> (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`), where `col` only
+> qualifies. It lowers to PRQL's own operand
 > alias (`join m=employee`) and renders as SQL's, `employee AS manager`,
 > with no CTE: the employee-manager query is one join stage, selecting
 > `Column::Name` beside `col(manager, NAME)`.

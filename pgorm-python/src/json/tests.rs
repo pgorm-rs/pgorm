@@ -57,7 +57,7 @@ fn doc() -> Expr {
     Expr::col(Name::runtime("doc"))
 }
 
-// [spec:pgorm:req:python.expressions+2/test]
+// [spec:pgorm:req:python.expressions+3/test]
 #[test]
 fn query_functions_match_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -153,7 +153,7 @@ fn query_functions_match_the_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+2/test]
+// [spec:pgorm:req:python.expressions+3/test]
 #[test]
 fn constructors_match_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -254,7 +254,7 @@ fn constructors_match_the_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+2/test]
+// [spec:pgorm:req:python.expressions+3/test]
 #[test]
 fn unrepresentable_choices_are_refused() -> PyResult<()> {
     Python::initialize();

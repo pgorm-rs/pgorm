@@ -52,7 +52,7 @@ fn entries<'py>(
         .collect()
 }
 
-// [spec:pgorm:req:python.expressions+2]
+// [spec:pgorm:req:python.expressions+3]
 #[pyfunction]
 #[pyo3(signature = (entries=None, /, *, absent_on_null=false, unique_keys=false, returning=None))]
 pub(crate) fn json_object(
