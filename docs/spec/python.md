@@ -548,8 +548,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > decode raises a decode error and closes the stream, discarding its
 > connection; its end and closing behave as a `CopyOutStream`'s do.
 
-> [spec:pgorm:req:python.listen]
-> [spec:pgorm:req:python.listen]
+> [spec:pgorm:req:python.listen+1]
 > `pool.listener(capacity=1024)` MUST open a listener through `conn.listen`'s
 > `DatabasePool::listener`, a connection of its own with the pool's
 > configuration and TLS, outside the pool's size, and closing the pool MUST
