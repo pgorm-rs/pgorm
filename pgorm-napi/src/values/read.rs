@@ -27,7 +27,7 @@ use super::{
 };
 use crate::{
     codec::{Codec, Description},
-    errors::Failure,
+    errors::{Failure, throw},
 };
 
 /// Throw a `ConstructionError`: the argument cannot become the value pgorm
@@ -168,7 +168,7 @@ pub(crate) fn tagged<'cx>(
     tag: &Tag,
 ) -> NeonResult<Tagged> {
     if data.is_a::<JsNull, _>(cx) {
-        return Ok(Tagged::null(tag.clone()));
+        return Tagged::null(tag.clone()).or_else(|failure| throw(cx, failure));
     }
     if let Some(description) = describe(cx, codec, data)?
         && description.tag == "value"
@@ -176,13 +176,11 @@ pub(crate) fn tagged<'cx>(
         let value = description.field(cx, 0);
         let value = boxed(cx, value)?;
         if value.tag != *tag {
+            let names = value.tag.name().and_then(|given| Ok((given, tag.name()?)));
+            let (given, declared) = names.or_else(|failure| throw(cx, failure))?;
             return refuse(
                 cx,
-                format!(
-                    "a {} value is not a value of kind {}",
-                    value.tag.name(),
-                    tag.name()
-                ),
+                format!("a {given} value is not a value of kind {declared}"),
             );
         }
         return Ok(value);
@@ -391,7 +389,8 @@ fn temporal<'cx>(
                 ArrayType::DateTime => "Temporal.PlainDateTime",
                 _ => "Temporal.Instant",
             };
-            return refuse(cx, format!("{} takes a {class}", scalar_name(kind)));
+            let name = scalar_name(kind).or_else(|failure| throw(cx, failure))?;
+            return refuse(cx, format!("{name} takes a {class}"));
         }
     };
     temporal_value(cx, &description)
@@ -612,10 +611,8 @@ fn created_text<'cx>(
         match created::ranges(&kind.subtype, &text, kind.multirange) {
             Some(ranges) => ranges,
             None => {
-                return refuse(
-                    cx,
-                    format!("{text:?} is no {label} over {}", scalar_name(&kind.subtype)),
-                );
+                let subtype = scalar_name(&kind.subtype).or_else(|failure| throw(cx, failure))?;
+                return refuse(cx, format!("{text:?} is no {label} over {subtype}"));
             }
         }
     } else {
@@ -695,20 +692,20 @@ fn scalar<'cx>(
             };
             Value::Vector(Some(Box::new(Vector::from(values))))
         }
-        ArrayType::Range(range_type) => Value::Range(
-            *range_type,
-            Some(Box::new(range(
-                cx,
-                codec,
-                data,
-                &range_element(*range_type),
-            )?)),
-        ),
+        ArrayType::Range(range_type) => {
+            let element = range_element(*range_type).or_else(|failure| throw(cx, failure))?;
+            Value::Range(
+                *range_type,
+                Some(Box::new(range(cx, codec, data, &element)?)),
+            )
+        }
         ArrayType::Multirange(range_type) => {
-            let ranges = ranges(cx, codec, data, &range_element(*range_type), true)?;
+            let element = range_element(*range_type).or_else(|failure| throw(cx, failure))?;
+            let ranges = ranges(cx, codec, data, &element, true)?;
             Value::Multirange(*range_type, Some(Box::new(Multirange::from(ranges))))
         }
         ArrayType::Interval => Value::from(interval(cx, codec, data)?),
+        _ => return throw(cx, super::unrepresented()),
     })
 }
 
@@ -734,29 +731,40 @@ pub(crate) fn infer<'cx>(
     if data.is_a::<JsUndefined, _>(cx) {
         return refuse(cx, "undefined is no SQL value: pass null for NULL");
     }
-    if let Ok(number) = data.downcast::<JsNumber, _>(cx) {
-        return Ok(Some(Tagged::value(infer_number(number.value(cx)))));
-    }
-    if let Ok(flag) = data.downcast::<JsBoolean, _>(cx) {
-        return Ok(Some(Tagged::value(Value::Bool(Some(flag.value(cx))))));
-    }
-    if let Ok(big) = data.downcast::<JsBigInt, _>(cx) {
-        return match big.to_i64(cx) {
-            Ok(value) => Ok(Some(Tagged::value(Value::BigInt(Some(value))))),
-            Err(_) => refuse(
-                cx,
-                "the bigint is outside i64; an unsigned 64-bit value needs new Value(value, \"u64\")",
-            ),
-        };
-    }
-    if data.is_a::<JsString, _>(cx) {
-        let text = string(cx, data)?;
-        return Ok(Some(Tagged::value(Value::String(Some(Box::new(text))))));
-    }
-    if let Ok(bytes) = data.downcast::<JsUint8Array, _>(cx) {
-        let bytes = bytes.as_slice(cx).to_vec();
-        return Ok(Some(Tagged::value(Value::Bytes(Some(Box::new(bytes))))));
-    }
+    let value = if let Ok(number) = data.downcast::<JsNumber, _>(cx) {
+        infer_number(number.value(cx))
+    } else if let Ok(flag) = data.downcast::<JsBoolean, _>(cx) {
+        Value::Bool(Some(flag.value(cx)))
+    } else if let Ok(big) = data.downcast::<JsBigInt, _>(cx) {
+        match big.to_i64(cx) {
+            Ok(value) => Value::BigInt(Some(value)),
+            Err(_) => {
+                return refuse(
+                    cx,
+                    "the bigint is outside i64; an unsigned 64-bit value needs new Value(value, \"u64\")",
+                );
+            }
+        }
+    } else if data.is_a::<JsString, _>(cx) {
+        Value::String(Some(Box::new(string(cx, data)?)))
+    } else if let Ok(bytes) = data.downcast::<JsUint8Array, _>(cx) {
+        Value::Bytes(Some(Box::new(bytes.as_slice(cx).to_vec())))
+    } else {
+        return infer_described(cx, codec, data);
+    };
+    Tagged::value(value)
+        .map(Some)
+        .or_else(|failure| throw(cx, failure))
+}
+
+/// What a plain JavaScript value that is neither a primitive nor binary data
+/// is when no kind is declared: an array, or an object the codec describes.
+// [spec:pgorm:req:napi.inference]
+fn infer_described<'cx>(
+    cx: &mut Cx<'cx>,
+    codec: Codec<'cx>,
+    data: Handle<'cx, JsValue>,
+) -> NeonResult<Option<Tagged>> {
     if data.is_a::<JsArray, _>(cx) {
         return infer_array(cx, codec, data).map(Some);
     }
@@ -798,7 +806,9 @@ pub(crate) fn infer<'cx>(
         }
         _ => return refuse(cx, "a kind is not a value"),
     };
-    Ok(Some(Tagged::value(value)))
+    Tagged::value(value)
+        .map(Some)
+        .or_else(|failure| throw(cx, failure))
 }
 
 /// A number with no declared kind: an `i64` when it is a safe integer other
@@ -859,7 +869,7 @@ fn infer_array<'cx>(
         let mut elements = Vec::with_capacity(items.len());
         for (item, value) in items.iter().zip(&values) {
             elements.push(match value {
-                None => scalar_null(&kind),
+                None => scalar_null(&kind).or_else(|failure| throw(cx, failure))?,
                 Some(value) if all_integers => value.datum.clone(),
                 Some(_) => {
                     let number = item.downcast_or_throw::<JsNumber, _>(cx)?.value(cx);
@@ -897,13 +907,14 @@ fn infer_array<'cx>(
     let elements = values
         .into_iter()
         .map(|value| match value {
-            Some(value) => value.datum,
+            Some(value) => Ok(value.datum),
             None => match &element {
-                Tag::Enum(_) => Value::String(None),
+                Tag::Enum(_) => Ok(Value::String(None)),
                 _ => scalar_null(&kind),
             },
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .or_else(|failure| throw(cx, failure))?;
     let datum = Value::Array(kind, Some(Box::new(elements)));
     Ok(Tagged {
         datum,

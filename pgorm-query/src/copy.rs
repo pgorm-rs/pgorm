@@ -81,6 +81,7 @@ pub struct CopyIgnore {
 
 /// `LOG_VERBOSITY`: how much a COPY that ignores errors reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CopyLogVerbosity {
     /// `verbose`: a `NOTICE` per skipped row, naming its line and column.
     Verbose,

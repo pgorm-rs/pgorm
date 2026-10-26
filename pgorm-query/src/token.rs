@@ -25,6 +25,7 @@ struct Delimited {
 
 // [spec:pgorm:def:sql.token+1] (the four token classes)
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Token {
     Quoted(String),
     Unquoted(String),

@@ -11,9 +11,9 @@ mod baseline;
 mod source;
 mod spec;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use source::Source;
+use source::{Source, crate_sources};
 use spec::{Register, Rule, code_spans, defined_rule_ids, is_item_shaped};
 
 /// The phrase that opens `sql.surface`'s register of additions.
@@ -37,6 +37,13 @@ const NESTED_PUBLIC_MODULES: [&str; 1] = ["value::with_array"];
 /// The `#[doc(hidden)]` exports the rule names: reachable, because narrowing
 /// them would only make them dead code, and kept out of the rendered API.
 const RESIDUE: [&str; 3] = ["SelectDistinct", "Token", "Tokenizer"];
+
+/// The phrase that ends the rule's open enums and opens its exhaustive ones,
+/// in the one paragraph that classifies every exported enum.
+const EXHAUSTIVE_OPENS: &str = "An enum stays exhaustive";
+
+/// The phrase that ends the rule's exhaustive enums.
+const EXHAUSTIVE_ENDS: &str = "A match on an open enum";
 
 fn surface_rule() -> Rule {
     Rule::read("sql-ast.md", "sql.surface")
@@ -65,7 +72,7 @@ fn register_span(text: &str) -> &str {
     &text[start..start + end]
 }
 
-// [spec:pgorm:req:sql.surface+37/test]    exactly `error`, `extension` and `value` are public,
+// [spec:pgorm:req:sql.surface+38/test]    exactly `error`, `extension` and `value` are public,
 // `tests_cfg` hidden behind its feature, no module inside them public but
 // `value::with_array`, `error` exporting what the rule names, and every item
 // `value` exports exported at the root as well
@@ -138,7 +145,7 @@ fn exactly_three_modules_are_public() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+37/test]    every export of lib.rs and of the three public
+// [spec:pgorm:req:sql.surface+38/test]    every export of lib.rs and of the three public
 // modules is a named item: none is a glob
 #[test]
 fn exports_are_named_never_globbed() {
@@ -160,7 +167,7 @@ fn exports_are_named_never_globbed() {
     }
 }
 
-// [spec:pgorm:req:sql.surface+37/test]    lib.rs's `#[doc(hidden)]` exports are the residue
+// [spec:pgorm:req:sql.surface+38/test]    lib.rs's `#[doc(hidden)]` exports are the residue
 // the rule names, and every export the rule's residue paragraph names is one of them
 #[test]
 fn doc_hidden_residue_is_the_named_list() {
@@ -188,7 +195,7 @@ fn doc_hidden_residue_is_the_named_list() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+37/test]    the register and the exports agree both ways: an
+// [spec:pgorm:req:sql.surface+38/test]    the register and the exports agree both ways: an
 // export of lib.rs or `extension` outside the baseline has an entry, each entry names an
 // export and ends with a rule the spec defines, and the baseline holds only what is still
 // exported
@@ -268,7 +275,66 @@ fn register_and_exports_agree_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+37/test]    the compiler refuses every path to `Write`, `Mode`,
+// [spec:pgorm:req:sql.surface+38/test]    every exported enum is named once, open or
+// exhaustive, and is `#[non_exhaustive]` exactly when the rule names it open
+#[test]
+fn exported_enums_are_open_or_closed_as_named() {
+    let exported: BTreeSet<String> = [
+        "src/lib.rs",
+        "src/error.rs",
+        "src/extension.rs",
+        "src/value.rs",
+    ]
+    .into_iter()
+    .flat_map(|file| Source::read(file).exported_names())
+    .collect();
+    let enums: BTreeMap<String, bool> = crate_sources()
+        .iter()
+        .flat_map(Source::public_enums)
+        .filter(|(name, _)| exported.contains(name))
+        .collect();
+
+    let rule = surface_rule();
+    let paragraph = rule.paragraph_with(EXHAUSTIVE_OPENS);
+    let (open, rest) = paragraph
+        .split_once(EXHAUSTIVE_OPENS)
+        .unwrap_or_else(|| panic!("sql.surface no longer contains {EXHAUSTIVE_OPENS:?}"));
+    let (closed, _) = rest
+        .split_once(EXHAUSTIVE_ENDS)
+        .unwrap_or_else(|| panic!("sql.surface no longer contains {EXHAUSTIVE_ENDS:?}"));
+    let named = |text: &str| -> BTreeSet<String> {
+        code_spans(text)
+            .filter(|span| enums.contains_key(*span))
+            .map(str::to_owned)
+            .collect()
+    };
+    let (open, closed) = (named(open), named(closed));
+
+    let mut problems = Vec::new();
+    for (name, non_exhaustive) in &enums {
+        match (open.contains(name), closed.contains(name)) {
+            (true, true) => problems.push(format!("`{name}` is named both open and exhaustive")),
+            (false, false) => problems.push(format!(
+                "`{name}` is exported but sql.surface names it neither open nor exhaustive: \
+                 decide which by the rule's test and name it in that list"
+            )),
+            (true, false) if !non_exhaustive => problems.push(format!(
+                "sql.surface names `{name}` open, but it is not `#[non_exhaustive]`"
+            )),
+            (false, true) if *non_exhaustive => problems.push(format!(
+                "sql.surface names `{name}` exhaustive, but it is `#[non_exhaustive]`"
+            )),
+            _ => {}
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "pgorm-query's exported enums and sql.surface's classification of them disagree:\n\n{}",
+        problems.join("\n")
+    );
+}
+
+// [spec:pgorm:req:sql.surface+38/test]    the compiler refuses every path to `Write`, `Mode`,
 // `Oper` and the clause shapes a statement holds internally
 //
 // The snapshot is rustc's own wording, and the refusal it records is the

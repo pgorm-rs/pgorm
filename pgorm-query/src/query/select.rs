@@ -73,6 +73,7 @@ pub(crate) struct JoinExpr {
 
 /// List of lock types that can be used in select statement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LockType {
     /// Exclusive lock
     Update,
@@ -84,6 +85,7 @@ pub enum LockType {
 
 /// List of lock behavior can be used in select statement
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LockBehavior {
     Nowait,
     SkipLocked,
@@ -108,6 +110,7 @@ pub(crate) struct LockClause {
 /// naming the operator, so `All` is UNION's `ALL` form and not a modifier that
 /// applies to the others.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UnionType {
     /// `UNION`
     Distinct,

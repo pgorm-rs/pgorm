@@ -73,6 +73,13 @@ impl Relation {
         {
             safe_ident(&context, &column.to_upper_camel_case())?;
         }
+        for action in self.on_update.iter().chain(&self.on_delete) {
+            if Self::get_foreign_key_action(action).is_none() {
+                return Err(Error::TransformError(format!(
+                    "{context}: foreign key action {action:?} is not supported by codegen"
+                )));
+            }
+        }
         if self.columns.len() != self.ref_columns.len() {
             return Err(Error::TransformError(format!(
                 "{context}: constrains {} column(s) against {} referenced column(s); a relation \
@@ -187,7 +194,7 @@ impl Relation {
                     self.get_src_ref_columns(map_src_column, map_ref_column, map_punctuated);
 
                 let on_update = if let Some(action) = &self.on_update {
-                    let action = Self::get_foreign_key_action(action);
+                    let action = Self::checked_foreign_key_action(action);
                     quote! {
                         on_update = #action,
                     }
@@ -195,7 +202,7 @@ impl Relation {
                     quote! {}
                 };
                 let on_delete = if let Some(action) = &self.on_delete {
-                    let action = Self::get_foreign_key_action(action);
+                    let action = Self::checked_foreign_key_action(action);
                     quote! {
                         on_delete = #action,
                     }
@@ -234,11 +241,11 @@ impl Relation {
     fn get_key_calls(&self) -> TokenStream {
         let mut calls = TokenStream::new();
         if let Some(action) = &self.on_update {
-            let action = format_ident!("{}", Self::get_foreign_key_action(action));
+            let action = format_ident!("{}", Self::checked_foreign_key_action(action));
             calls.extend(quote! { .on_update(ForeignKeyAction::#action) });
         }
         if let Some(action) = &self.on_delete {
-            let action = format_ident!("{}", Self::get_foreign_key_action(action));
+            let action = format_ident!("{}", Self::checked_foreign_key_action(action));
             calls.extend(quote! { .on_delete(ForeignKeyAction::#action) });
         }
         if let Some(deferrability) = self.deferrability {
@@ -307,15 +314,30 @@ impl Relation {
             .collect()
     }
 
-    pub fn get_foreign_key_action(action: &ForeignKeyAction) -> String {
-        match action {
+    /// The `ForeignKeyAction` variant naming `action`, as generated source
+    /// spells it, or `None` for an action codegen has no spelling of, which
+    /// [`validate`](Self::validate) refuses.
+    pub fn get_foreign_key_action(action: &ForeignKeyAction) -> Option<String> {
+        let action = match action {
             ForeignKeyAction::Restrict => "Restrict",
             ForeignKeyAction::Cascade => "Cascade",
             ForeignKeyAction::SetNull => "SetNull",
             ForeignKeyAction::NoAction => "NoAction",
             ForeignKeyAction::SetDefault => "SetDefault",
-        }
-        .to_owned()
+            _ => return None,
+        };
+        Some(action.to_owned())
+    }
+
+    /// [`get_foreign_key_action`](Self::get_foreign_key_action) of an action
+    /// a validated relation holds.
+    fn checked_foreign_key_action(action: &ForeignKeyAction) -> String {
+        Self::get_foreign_key_action(action).unwrap_or_else(|| {
+            unreachable!(
+                "foreign key action {action:?} reached the writer; \
+                 every relation is validated before it is written"
+            )
+        })
     }
 
     pub fn get_src_ref_columns<F1, F2, F3, T, I>(

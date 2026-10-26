@@ -218,7 +218,7 @@ fn manifest() -> Value {
     });
     // The release pgorm targets: 18 by default, 19 when it was built with
     // pg-19, through this crate's feature or any other's.
-    // [spec:pgorm:req:sql.target]
+    // [spec:pgorm:req:sql.target+1]
     if pgorm::pgorm_query::POSTGRES_TARGET == 19
         && let Some(features) = manifest["features"].as_array_mut()
     {
@@ -261,7 +261,7 @@ pub(crate) fn capabilities<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound
     let mut manifest = manifest();
     let registry_object = module.getattr("_registry")?;
     let registry = registry_object.extract::<PyRef<'_, crate::entities::NativeRegistry>>()?;
-    manifest["registrations"]["entities"] = registry.0.describe().into();
+    manifest["registrations"]["entities"] = registry.0.describe()?.into();
     manifest["registrations"]["graphs"] = registry
         .0
         .graphs

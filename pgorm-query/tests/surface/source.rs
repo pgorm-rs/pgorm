@@ -4,7 +4,10 @@
 //! rename, and an attribute can sit on its own line or not, so only a parser
 //! sees every export the compiler does however `rustfmt` lays the list out.
 
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use syn::{Attribute, Item, Meta, UseTree, Visibility};
 
@@ -81,6 +84,23 @@ impl Source {
             .collect()
     }
 
+    /// Each enum the file declares `pub` at its own level, and whether it is
+    /// `#[non_exhaustive]`.
+    pub fn public_enums(&self) -> Vec<(String, bool)> {
+        self.items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Enum(item) if is_pub(&item.vis) => Some((
+                    item.ident.to_string(),
+                    item.attrs
+                        .iter()
+                        .any(|attr| attr.path().is_ident("non_exhaustive")),
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Every `pub mod` reachable from the file through public modules alone,
     /// nested inline modules included.
     pub fn public_modules(&self) -> Vec<PublicModule> {
@@ -88,6 +108,32 @@ impl Source {
         collect_public_modules(&self.items, "", &mut found);
         found
     }
+}
+
+/// Every file under `pgorm-query/src`, parsed, its path relative to the
+/// crate.
+pub fn crate_sources() -> Vec<Source> {
+    fn walk(dir: &Path, root: &Path, found: &mut Vec<Source>) {
+        let entries =
+            fs::read_dir(dir).unwrap_or_else(|error| panic!("listing {}: {error}", dir.display()));
+        for entry in entries {
+            let path = entry
+                .unwrap_or_else(|error| panic!("listing {}: {error}", dir.display()))
+                .path();
+            if path.is_dir() {
+                walk(&path, root, found);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                let relative = path
+                    .strip_prefix(root)
+                    .unwrap_or_else(|_| panic!("{} is outside {}", path.display(), root.display()));
+                found.push(Source::read(&relative.to_string_lossy()));
+            }
+        }
+    }
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut found = Vec::new();
+    walk(&root.join("src"), &root, &mut found);
+    found
 }
 
 fn is_pub(vis: &Visibility) -> bool {

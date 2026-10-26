@@ -13,7 +13,7 @@ use super::{
 use crate::{
     codec::Codec,
     connect::job::Settled,
-    errors::{Failure, Redactions, failure},
+    errors::{Failure, Redactions, failure, throw},
     rows,
     values::{Tag, Tagged, read, value_tag},
 };
@@ -56,7 +56,7 @@ pub(crate) fn column_value<'cx>(
 /// A column's value with the kind it reads as: the column's own where it
 /// names a type — an enum's, a created range's — that the value, a string,
 /// does not carry, and otherwise the value's.
-pub(crate) fn tagged(column: &ColumnInfo, value: Value) -> Tagged {
+pub(crate) fn tagged(column: &ColumnInfo, value: Value) -> Result<Tagged, Failure> {
     let named = match (&column.tag, &value) {
         (Some(tag @ (Tag::Enum(_) | Tag::Created(_))), Value::String(_)) => Some(tag.clone()),
         (Some(tag @ Tag::Array(element)), Value::Array(ArrayType::String, _))
@@ -66,10 +66,11 @@ pub(crate) fn tagged(column: &ColumnInfo, value: Value) -> Tagged {
         }
         _ => None,
     };
-    Tagged {
-        tag: named.unwrap_or_else(|| value_tag(&value)),
-        datum: value,
-    }
+    let tag = match named {
+        Some(tag) => tag,
+        None => value_tag(&value)?,
+    };
+    Ok(Tagged { tag, datum: value })
 }
 
 /// A model's columns as plain JavaScript values, in column order.
@@ -85,7 +86,8 @@ pub(crate) fn values<'cx>(cx: &mut Cx<'cx>, model: &Model) -> JsResult<'cx, JsAr
                 return cx.throw(error);
             }
         };
-        let value = rows::value(cx, codec, tagged(column, value), false)?;
+        let value = tagged(column, value).or_else(|failure| throw(cx, failure))?;
+        let value = rows::value(cx, codec, value, false)?;
         array.set(cx, u32::try_from(index).unwrap_or(u32::MAX), value)?;
     }
     Ok(array)

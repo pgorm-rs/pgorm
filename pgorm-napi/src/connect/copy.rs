@@ -43,7 +43,7 @@ use super::{
     abort_argument,
 };
 use crate::{
-    errors::{Failure, Redactions, failure},
+    errors::{Failure, Redactions, failure, throw},
     settle,
     statements::{CopyFrom, CopyTo},
 };
@@ -573,11 +573,6 @@ fn in_state(cx: &mut FunctionContext) -> NeonResult<Arc<InState>> {
     Ok(cx.argument::<JsBox<CopyInHandle>>(0)?.0.clone())
 }
 
-fn thrown<T>(cx: &mut FunctionContext, failure: Failure) -> NeonResult<T> {
-    let error = failure.into_js(cx)?;
-    cx.throw(error)
-}
-
 /// The budget a chunk of `length` bytes takes: all of it, or the whole
 /// budget for a chunk past it, which then waits for the queue to empty.
 fn permits(length: usize) -> u32 {
@@ -597,12 +592,12 @@ fn copy_in_write(mut cx: FunctionContext) -> JsResult<JsBoolean> {
         Ok(permit) => {
             permit.forget();
             if state.data.send(InMessage::Data(chunk, permits)).is_err() {
-                return thrown(&mut cx, state.ending.failure());
+                return throw(&mut cx, state.ending.failure());
             }
             Ok(cx.boolean(true))
         }
         Err(TryAcquireError::NoPermits) => Ok(cx.boolean(false)),
-        Err(TryAcquireError::Closed) => thrown(&mut cx, state.ending.failure()),
+        Err(TryAcquireError::Closed) => throw(&mut cx, state.ending.failure()),
     }
 }
 

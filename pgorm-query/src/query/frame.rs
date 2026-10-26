@@ -53,6 +53,7 @@ use crate::expr::SimpleExpr;
 /// ```
 // [spec:pgorm:def:sql.ast.window-statement+8]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FrameType {
     /// Offsets are values, compared against the ordering column: every peer of
     /// a row is inside the frame with it. An offset's type is the one
@@ -323,6 +324,7 @@ impl FrameClause {
 /// current row and its peers — the rows its window's `ORDER BY` ties with it.
 // [spec:pgorm:def:sql.ast.window-statement+8]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FrameExclusion {
     /// `EXCLUDE CURRENT ROW` — the current row, but not its peers.
     CurrentRow,

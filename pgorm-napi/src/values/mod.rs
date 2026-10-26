@@ -10,7 +10,15 @@ pub(crate) mod write;
 
 use pgorm::pgorm_query::{ArrayType, RangeType, Value};
 
+use crate::errors::Failure;
 pub(crate) use value::export;
+
+/// The refusal of a value, or value kind, of pgorm's that this binding has no
+/// JavaScript form of. pgorm's value vocabulary grows, and a kind added after
+/// the binding was written is reported rather than read as another.
+pub(crate) fn unrepresented() -> Failure {
+    Failure::Internal("a kind of pgorm value pgorm-napi does not represent".to_owned())
+}
 
 /// A PostgreSQL type named by identifier: an enum, or a range type a schema
 /// created.
@@ -59,15 +67,16 @@ pub(crate) const RANGE_TYPES: [RangeType; 6] = [
 ];
 
 /// The scalar kind a built-in range type's bounds are.
-pub(crate) fn range_element(range: RangeType) -> ArrayType {
-    match range {
+pub(crate) fn range_element(range: RangeType) -> Result<ArrayType, Failure> {
+    Ok(match range {
         RangeType::Int4 => ArrayType::Int,
         RangeType::Int8 => ArrayType::BigInt,
         RangeType::Numeric => ArrayType::Decimal,
         RangeType::Date => ArrayType::Date,
         RangeType::Timestamp => ArrayType::DateTime,
         RangeType::TimestampTz => ArrayType::DateTimeWithTimeZone,
-    }
+        _ => return Err(unrepresented()),
+    })
 }
 
 /// The value kinds a created range can range over: pgorm's `RangeSubtype`.
@@ -90,12 +99,13 @@ macro_rules! scalar_kinds {
     ($( $variant:ident => $name:literal ),+ $(,)?) => {
         /// A kind's name, spelled as pgorm-python spells it: `i64`,
         /// `datetime_utc`, `int4range`.
-        pub(crate) fn scalar_name(kind: &ArrayType) -> &'static str {
-            match kind {
+        pub(crate) fn scalar_name(kind: &ArrayType) -> Result<&'static str, Failure> {
+            Ok(match kind {
                 $(ArrayType::$variant => $name,)+
                 ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(ty) => ty.multirange_type_name(),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         pub(crate) fn parse_scalar(name: &str) -> Option<ArrayType> {
@@ -113,31 +123,34 @@ macro_rules! scalar_kinds {
             }
         }
 
-        pub(crate) fn scalar_null(kind: &ArrayType) -> Value {
-            match kind {
+        pub(crate) fn scalar_null(kind: &ArrayType) -> Result<Value, Failure> {
+            Ok(match kind {
                 $(ArrayType::$variant => Value::$variant(None),)+
                 ArrayType::Range(ty) => Value::Range(*ty, None),
                 ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         /// The kind a pgorm value declares itself.
-        pub(crate) fn value_tag(value: &Value) -> Tag {
-            match value {
+        pub(crate) fn value_tag(value: &Value) -> Result<Tag, Failure> {
+            Ok(match value {
                 $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
                 Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
                 Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
-        pub(crate) fn value_is_null(value: &Value) -> bool {
-            match value {
+        pub(crate) fn value_is_null(value: &Value) -> Result<bool, Failure> {
+            Ok(match value {
                 $(Value::$variant(value) => value.is_none(),)+
                 Value::Array(_, value) => value.is_none(),
                 Value::Range(_, value) => value.is_none(),
                 Value::Multirange(_, value) => value.is_none(),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
     };
 }
@@ -155,40 +168,40 @@ scalar_kinds! {
 impl Tag {
     /// The kind's name: a scalar's own, or `enum`, `created_range`,
     /// `created_multirange` or `array`.
-    pub(crate) fn name(&self) -> &'static str {
-        match self {
-            Self::Scalar(kind) => scalar_name(kind),
+    pub(crate) fn name(&self) -> Result<&'static str, Failure> {
+        Ok(match self {
+            Self::Scalar(kind) => scalar_name(kind)?,
             Self::Enum(_) => "enum",
             Self::Created(kind) if kind.multirange => "created_multirange",
             Self::Created(_) => "created_range",
             Self::Array(_) => "array",
-        }
+        })
     }
 }
 
 impl Tagged {
     /// SQL NULL of a scalar kind.
-    pub(crate) fn null(tag: Tag) -> Self {
+    pub(crate) fn null(tag: Tag) -> Result<Self, Failure> {
         let datum = match &tag {
-            Tag::Scalar(kind) => scalar_null(kind),
+            Tag::Scalar(kind) => scalar_null(kind)?,
             Tag::Enum(_) | Tag::Created(_) => Value::String(None),
             Tag::Array(element) => match element.as_ref() {
                 Tag::Scalar(kind) => Value::Array(kind.clone(), None),
                 _ => Value::Array(ArrayType::String, None),
             },
         };
-        Self { datum, tag }
+        Ok(Self { datum, tag })
     }
 
     /// A pgorm value, tagged with the kind it declares itself.
-    pub(crate) fn value(value: Value) -> Self {
-        Self {
-            tag: value_tag(&value),
+    pub(crate) fn value(value: Value) -> Result<Self, Failure> {
+        Ok(Self {
+            tag: value_tag(&value)?,
             datum: value,
-        }
+        })
     }
 
-    pub(crate) fn is_null(&self) -> bool {
+    pub(crate) fn is_null(&self) -> Result<bool, Failure> {
         value_is_null(&self.datum)
     }
 }

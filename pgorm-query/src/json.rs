@@ -44,6 +44,7 @@ pub use value_type::JsonValueType;
 /// only what its builder could set.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum SqlJson {
     Exists(JsonExists),
     Value(JsonValue),

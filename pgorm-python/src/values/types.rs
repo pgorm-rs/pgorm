@@ -2,7 +2,14 @@ use pgorm::pgorm_query::{ArrayType, Name, TypeName, Value};
 use pyo3::prelude::*;
 
 use super::created::CreatedKind;
-use crate::errors::ConstructionError;
+use crate::{UnsupportedCapabilityError, errors::ConstructionError};
+
+/// The refusal of a value, or value kind, of pgorm's that this package has no
+/// Python form of. pgorm's value vocabulary grows, and a kind added after the
+/// binding was written is reported rather than read as another.
+pub(crate) fn unrepresented() -> PyErr {
+    UnsupportedCapabilityError::new_err("a kind of pgorm value pgorm-python does not represent")
+}
 
 // [spec:pgorm:req:python.value-tags]
 /// An owned, identifier-only PostgreSQL type name, optionally schema qualified.
@@ -60,12 +67,13 @@ macro_rules! scalar_kinds {
     ($( $variant:ident => $name:literal ),+ $(,)?) => {
         pub const SCALAR_NAMES: &[&str] = &[$($name),+];
 
-        pub fn scalar_name(kind: &ArrayType) -> &'static str {
-            match kind {
+        pub fn scalar_name(kind: &ArrayType) -> PyResult<&'static str> {
+            Ok(match kind {
                 $(ArrayType::$variant => $name,)+
                 ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(ty) => ty.multirange_type_name(),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         pub fn parse_scalar(name: &str) -> PyResult<ArrayType> {
@@ -76,30 +84,33 @@ macro_rules! scalar_kinds {
             }
         }
 
-        pub fn scalar_null(kind: &ArrayType) -> Value {
-            match kind {
+        pub fn scalar_null(kind: &ArrayType) -> PyResult<Value> {
+            Ok(match kind {
                 $(ArrayType::$variant => Value::$variant(None),)+
                 ArrayType::Range(ty) => Value::Range(*ty, None),
                 ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
-        pub fn rust_tag(value: &Value) -> Tag {
-            match value {
+        pub fn rust_tag(value: &Value) -> PyResult<Tag> {
+            Ok(match value {
                 $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
                 Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
                 Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
-        pub fn is_null(value: &Value) -> bool {
-            match value {
+        pub fn is_null(value: &Value) -> PyResult<bool> {
+            Ok(match value {
                 $(Value::$variant(value) => value.is_none(),)+
                 Value::Array(_, value) => value.is_none(),
                 Value::Range(_, value) => value.is_none(),
                 Value::Multirange(_, value) => value.is_none(),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
     };
 }
@@ -133,13 +144,13 @@ impl Tag {
         }
     }
 
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Scalar(kind) => scalar_name(kind),
+    pub fn name(&self) -> PyResult<&'static str> {
+        Ok(match self {
+            Self::Scalar(kind) => scalar_name(kind)?,
             Self::Enum(_) => "enum",
             Self::Created(kind) => kind.kind_name(),
             Self::Array(_) => "array",
-        }
+        })
     }
 
     pub fn array_type(&self) -> PyResult<ArrayType> {
@@ -156,7 +167,7 @@ impl Tag {
         match self {
             Self::Enum(name) => Ok(Py::new(py, name.clone())?.into_any()),
             Self::Created(kind) => kind.to_python(py),
-            _ => Ok(self.name().into_pyobject(py)?.into_any().unbind()),
+            _ => Ok(self.name()?.into_pyobject(py)?.into_any().unbind()),
         }
     }
 }

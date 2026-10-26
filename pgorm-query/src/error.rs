@@ -4,6 +4,7 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// Column and value vector having different length
     ColValNumMismatch { col_len: usize, val_len: usize },
@@ -79,6 +80,7 @@ pub enum Error {
 /// — see [`SqlTemplate::new`](crate::SqlTemplate::new) and
 /// [`inject_parameters`](crate::inject_parameters).
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TemplateError {
     /// A `$` is followed by neither `$` nor a placeholder index.
     MalformedPlaceholder {

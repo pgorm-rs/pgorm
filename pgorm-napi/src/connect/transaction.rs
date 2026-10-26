@@ -591,6 +591,15 @@ impl Frame {
                 },
                 result: Err(failure(&rollback, &self.secrets)),
             },
+            // A failure with no arm here leaves the connection in a state
+            // nobody knows, as a failed ROLLBACK does.
+            Err(_) => Completion {
+                healthy: false,
+                reply: self.committed.take(),
+                result: Err(Failure::Internal(
+                    "the transaction failed in a way pgorm-napi does not represent".to_owned(),
+                )),
+            },
         })
     }
 }

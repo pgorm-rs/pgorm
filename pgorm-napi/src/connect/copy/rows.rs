@@ -13,11 +13,11 @@ use neon::{prelude::*, types::JsUint8Array};
 use pgorm::{CopyColumn, CopyRowDecoder, CopyRowEncoder, CopyTrait};
 use tokio::sync::oneshot;
 
-use super::{OutState, Pull, abort_argument, in_state, out_state, thrown};
+use super::{OutState, Pull, abort_argument, in_state, out_state};
 use crate::{
     codec::Codec,
     decode,
-    errors::Failure,
+    errors::{Failure, throw},
     params, settle,
     statements::{CopyFrom, CopyTo, copy_from_at, copy_to_at},
     values::{Tagged, read::refuse, write},
@@ -138,7 +138,7 @@ pub(super) fn copy_rows_encode(mut cx: FunctionContext) -> JsResult<JsUint8Array
         return cx.throw_type_error("copyRowsEncode writes the rows of copyInRows");
     };
     let Some(encoder) = rows.encoder.get() else {
-        return thrown(&mut cx, state.ending.failure());
+        return throw(&mut cx, state.ending.failure());
     };
     let batch = cx.argument::<JsArray>(1)?.to_vec(&mut cx)?;
     let codec = Codec::get(&mut cx)?;

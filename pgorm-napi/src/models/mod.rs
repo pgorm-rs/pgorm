@@ -16,6 +16,7 @@ use pgorm::pgorm_query::{Asterisk, Expr, Func, Name, Query, SelectStatement};
 
 use crate::{
     codec::Codec,
+    errors::{Failure, throw},
     statements::{self, Node},
     values::{Tag, TypeName, read, scalar_name},
 };
@@ -33,9 +34,9 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
 /// it, a created range's type and subtype, and an array's element followed
 /// by `[]`.
 // [spec:pgorm:req:napi.model-records]
-pub(crate) fn kind_key(tag: &Tag) -> String {
-    match tag {
-        Tag::Scalar(kind) => crate::values::scalar_name(kind).to_owned(),
+pub(crate) fn kind_key(tag: &Tag) -> Result<String, Failure> {
+    Ok(match tag {
+        Tag::Scalar(kind) => crate::values::scalar_name(kind)?.to_owned(),
         Tag::Enum(name) => format!("enum {}", quoted(name)),
         Tag::Created(kind) => format!(
             "{} {} of {}",
@@ -45,10 +46,10 @@ pub(crate) fn kind_key(tag: &Tag) -> String {
                 "range"
             },
             quoted(&kind.name),
-            scalar_name(&kind.subtype)
+            scalar_name(&kind.subtype)?
         ),
-        Tag::Array(element) => format!("{}[]", kind_key(element)),
-    }
+        Tag::Array(element) => format!("{}[]", kind_key(element)?),
+    })
 }
 
 fn quoted(name: &TypeName) -> String {
@@ -74,7 +75,8 @@ fn kind_key_of_kind(mut cx: FunctionContext) -> JsResult<JsString> {
     } else {
         tag
     };
-    Ok(cx.string(kind_key(&tag)))
+    let key = kind_key(&tag).or_else(|failure| throw(&mut cx, failure))?;
+    Ok(cx.string(key))
 }
 
 /// `modelValueKey(value)`: the key of the kind a `Value` declares.
@@ -82,7 +84,10 @@ fn kind_key_of_value(mut cx: FunctionContext) -> JsResult<JsString> {
     let value = cx.argument::<JsValue>(0)?;
     let codec = Codec::get(&mut cx)?;
     match read::infer(&mut cx, codec, value)? {
-        Some(tagged) => Ok(cx.string(kind_key(&tagged.tag))),
+        Some(tagged) => {
+            let key = kind_key(&tagged.tag).or_else(|failure| throw(&mut cx, failure))?;
+            Ok(cx.string(key))
+        }
         None => read::refuse(&mut cx, "null declares no kind"),
     }
 }

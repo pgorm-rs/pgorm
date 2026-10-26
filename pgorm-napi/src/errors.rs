@@ -177,6 +177,20 @@ impl Failure {
     }
 }
 
+/// Throw `failure` as the error class it names.
+pub(crate) fn throw<'cx, T>(cx: &mut Cx<'cx>, failure: Failure) -> NeonResult<T> {
+    let error = failure.into_js(cx)?;
+    cx.throw(error)
+}
+
+impl std::fmt::Display for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl std::error::Error for Failure {}
+
 /// Classify a pgorm error. A PostgreSQL error anywhere in its cause chain
 /// decides the class, so a server's refusal during connection (a bad password,
 /// a missing database) carries its SQLSTATE like any other.

@@ -326,6 +326,7 @@ fn combine(op: UnionType, left: &[i32], right: &[i32]) -> Vec<i32> {
             UnionType::IntersectAll => a.min(b),
             UnionType::Except => usize::from(a > 0 && b == 0),
             UnionType::ExceptAll => a.saturating_sub(b),
+            other => panic!("no bag model is known for {other:?}"),
         }
     };
     let mut values: Vec<i32> = l.keys().chain(r.keys()).copied().collect();

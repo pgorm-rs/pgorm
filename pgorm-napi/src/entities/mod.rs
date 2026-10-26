@@ -48,7 +48,7 @@ pub use sources::{SourceBindings, SourceModel, SourceTypes};
 use crate::{
     codec::Codec,
     connect::job::{JobHandle, Output},
-    errors::Failure,
+    errors::{Failure, throw},
     rows,
     statements::{self, Node},
     values::read,
@@ -112,11 +112,6 @@ const EXPORTS: &[(&str, Export)] = &[
     ("entityActiveJob", active_job),
 ];
 
-fn throw<'cx, T>(cx: &mut Cx<'cx>, failure: Failure) -> NeonResult<T> {
-    let error = failure.into_js(cx)?;
-    cx.throw(error)
-}
-
 /// A list of names as a JavaScript array.
 fn strings<'cx>(
     cx: &mut Cx<'cx>,
@@ -139,7 +134,8 @@ pub(crate) fn inspected<'cx>(
     let codec = Codec::get(cx)?;
     let list = JsArray::new(cx, values.0.len());
     for (at, value) in values.0.into_iter().enumerate() {
-        let value = rows::value(cx, codec, crate::values::Tagged::value(value), true)?;
+        let value = crate::values::Tagged::value(value).or_else(|failure| throw(cx, failure))?;
+        let value = rows::value(cx, codec, value, true)?;
         list.set(cx, u32::try_from(at).unwrap_or(u32::MAX), value)?;
     }
     let pair = JsArray::new(cx, 2);
@@ -217,7 +213,11 @@ fn entity_get(mut cx: FunctionContext) -> JsResult<JsValue> {
 /// `entityDescribe(entity)`: the registration as JSON text.
 fn entity_describe(mut cx: FunctionContext) -> JsResult<JsValue> {
     let entity = held!(cx, EntityHandle, 0);
-    Ok(cx.string(entity.info().describe().to_string()).upcast())
+    let described = entity
+        .info()
+        .describe()
+        .or_else(|failure| throw(&mut cx, failure))?;
+    Ok(cx.string(described.to_string()).upcast())
 }
 
 fn entity_columns(mut cx: FunctionContext) -> JsResult<JsValue> {
@@ -445,7 +445,8 @@ fn model_tagged(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(failure) => return throw(&mut cx, failure),
     };
     let codec = Codec::get(&mut cx)?;
-    rows::value(&mut cx, codec, convert::tagged(&info, value), true)
+    let value = convert::tagged(&info, value).or_else(|failure| throw(&mut cx, failure))?;
+    rows::value(&mut cx, codec, value, true)
 }
 
 /// `entityActiveName(active)`: the registration that made the ActiveModel.
@@ -474,7 +475,8 @@ fn active_get(mut cx: FunctionContext) -> JsResult<JsValue> {
     let state = cx.string(state);
     pair.set(&mut cx, 0, state)?;
     if let Some(value) = value {
-        let value = rows::value(&mut cx, codec, convert::tagged(&info, value), false)?;
+        let value = convert::tagged(&info, value).or_else(|failure| throw(&mut cx, failure))?;
+        let value = rows::value(&mut cx, codec, value, false)?;
         pair.set(&mut cx, 1, value)?;
     }
     Ok(pair.upcast())

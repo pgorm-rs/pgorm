@@ -40,7 +40,7 @@ use pgorm::pgorm_query::{
     Values, WindowStatement,
 };
 
-use crate::{codec::Codec, rows, values::Tagged};
+use crate::{codec::Codec, errors::throw, rows, values::Tagged};
 pub(crate) use args::node;
 use args::refuse;
 pub(crate) use args::select as embedded_select;
@@ -289,7 +289,8 @@ fn inspect(mut cx: FunctionContext) -> JsResult<JsArray> {
     let codec = Codec::get(&mut cx)?;
     let list = JsArray::new(&mut cx, values.0.len());
     for (at, value) in values.0.into_iter().enumerate() {
-        let value = rows::value(&mut cx, codec, Tagged::value(value), true)?;
+        let value = Tagged::value(value).or_else(|failure| throw(&mut cx, failure))?;
+        let value = rows::value(&mut cx, codec, value, true)?;
         list.set(&mut cx, u32::try_from(at).unwrap_or(u32::MAX), value)?;
     }
     let pair = JsArray::new(&mut cx, 2);

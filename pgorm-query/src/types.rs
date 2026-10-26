@@ -151,6 +151,7 @@ impl fmt::Debug for dyn SqlName {
 // [spec:pgorm:def:sql.types.column-ref+1]
 // [spec:pgorm:def:sql.ast.keywords+6]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ColumnRef {
     Column(Name),
     TableColumn(Name, Name),
@@ -498,6 +499,7 @@ pub trait IntoNamedTable {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 #[doc(alias = "TableRef")]
+#[non_exhaustive]
 pub enum FromItem {
     /// A table name with an optional alias
     Table(NamedTable),
@@ -563,6 +565,7 @@ pub trait IntoFromItem {
 /// Unary operator
 // [spec:pgorm:def:sql.types.opers+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum UnOper {
     Not,
 }
@@ -570,6 +573,7 @@ pub enum UnOper {
 /// Binary operator
 // [spec:pgorm:def:sql.types.opers+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BinOper {
     And,
     Or,
@@ -726,6 +730,7 @@ pub(crate) enum JoinOn {
 /// Ordering options
 // [spec:pgorm:req:sql.ast.order+3]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Order {
     Asc,
     Desc,
@@ -793,6 +798,7 @@ pub struct Asterisk;
 /// SQL Keywords
 // [spec:pgorm:def:sql.ast.keywords+6]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Keyword {
     Null,
     CurrentDate,
@@ -829,6 +835,7 @@ pub trait IntoLikeExpr {
 /// SubQuery operators
 // [spec:pgorm:def:sql.ast.expr+7]
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum SubQueryOper {
     Exists,
     Any,

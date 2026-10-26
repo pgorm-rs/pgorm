@@ -194,7 +194,10 @@ mod tests {
                 .graph::<gadget::Entity, (), _>("app.Gadgets", |_| gadget::Entity::graph())
                 .is_err()
         );
-        let described = registry.entities["app.Widget"].info().describe();
+        let described = registry.entities["app.Widget"]
+            .info()
+            .describe()
+            .unwrap_or_else(|failure| panic!("{failure}"));
         assert_eq!(described["schema"], "app");
         assert_eq!(described["primaryKey"], serde_json::json!(["id"]));
         assert_eq!(described["columns"][1]["nullable"], true);

@@ -10,7 +10,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Overview
 
-> [spec:pgorm:req:sql.ast+3]
+> [spec:pgorm:req:sql.ast+4]
 > pgorm-query MUST provide a programmatic AST for building SQL statements,
 > comprising `SelectStatement`, `InsertStatement`, `UpdateStatement`,
 > `DeleteStatement` and `MergeStatement`, plus the `Query` shorthand whose
@@ -25,8 +25,10 @@ today, including panicking edges and deliberate failsafes.
 > `IntoSubQueryStatement::into_sub_query_statement`. It wraps the statement
 > in the `SubQueryStatement` enum (`SelectStatement`, `InsertStatement`,
 > `UpdateStatement`, `DeleteStatement`, `MergeStatement`), which is what a
-> common table expression and an expression subquery hold. Every kind is a
-> CTE body on PostgreSQL 18. A MERGE body yields the rows of its RETURNING
+> common table expression and an expression subquery hold, and which
+> displays as the statement it wraps, values inlined as that statement's
+> `Display` writes them, so a dependent renders one without matching it.
+> Every kind is a CTE body on PostgreSQL 18. A MERGE body yields the rows of its RETURNING
 > list, and without one it still runs, as an UPDATE does, while reading the
 > CTE is refused (`0A000`); the AST leaves that to the server as it does for
 > the other write statements (`sql.ast.with`). Only a SELECT nests as an
@@ -52,7 +54,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+37]
+> [spec:pgorm:req:sql.surface+38]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -81,6 +83,52 @@ today, including panicking edges and deliberate failsafes.
 > suite calls. Each of those MUST be named
 > individually in `lib.rs` rather than left to a glob, so the residue is a list
 > a later pass can work through rather than a category.
+>
+> A public enum is `#[non_exhaustive]` when its variants name members of a
+> vocabulary that can grow past what the enum holds: what PostgreSQL defines —
+> operators, functions, types and values, statement kinds, the clauses,
+> actions, options and behaviours a statement takes, the objects a statement
+> names — and the kinds of failure a crate reports. Adding a member to one, as
+> PostgreSQL 19 (`sql.target`) or wider coverage of 18 does, is then not a
+> breaking change. That is `SimpleExpr`, `Function`, `UnOper`, `BinOper`,
+> `SubQueryOper`, `Keyword`, `ColumnRef`, `FromItem`, `SubQueryStatement`,
+> `Value`, `ArrayType`, `RangeType`, `ColumnType`, `JsonValueType`, `SqlJson`,
+> `JsonExistsBehavior`, `JsonValueBehavior`, `JsonQueryBehavior`,
+> `JsonTableBehavior`, `Order`, `UnionType`, `LockType`, `LockBehavior`,
+> `FrameType`, `FrameExclusion`, `SampleMethod`, `OnConflict`,
+> `ConflictAction`, `ConflictAssignment`, `MatchedAction`, `NotMatchedAction`,
+> `TableAlterOption`, `ColumnSpec`, `ConstraintChange`, `ForeignKeyAction`,
+> `IndexType`, `SequenceType`, `SequenceOption`, `CommentTarget`,
+> `CopyLogVerbosity`, `Token`, `ValueTupleError`, `error`'s `Error` and
+> `TemplateError`, and `extension`'s `TypeAs`, `TypeAlterOpt` and
+> `AttributeChange`. Three are open for a reason beyond their present
+> variants: `Order` lacks `USING`'s operator sort, `SequenceType` lists the
+> three types PostgreSQL chooses to count in rather than all a count could be,
+> and `OnConflict` pairs a conflict's arbiter with an action whose vocabulary
+> grows. An enum stays exhaustive when its variants partition a choice by
+> construction, so that another would change what it means rather than extend
+> it and a caller is meant to match every arm: the two sides of a binary
+> choice (`NullOrdering`, `IndexOrder`, `ReturningRow`, `Overriding`,
+> `IdentityGeneration`, `GeneratedKind`, `Enforcement`, `DropBehavior`,
+> `TableDropOpt`, `ConditionType`, `IndexKind`, `ViewCheckOption`,
+> `SearchOrder`, and `extension`'s `ExtensionDropOpt`, `TypeDropOpt` and
+> `TypeAlterAddOpt`), every combination of independent settings PostgreSQL
+> acts on (`Deferrability`), the alternatives of a shape (`TableName`,
+> `Subscript`, `IndexColumnTarget`, `ConflictElement`, `ConflictArbiter`,
+> `ConditionExpression`, `AnyWithClause`, `WindowSelectType`,
+> `WindowDefinition`, `SelectDistinct`, `StringLen`, `IntervalSpec`, `Range`,
+> and `extension`'s `TypeRef`), a set fixed by what it measures
+> (`IntervalPrecision`, the microsecond's six digits; `PgInterval`, the field
+> ranges an interval has; `JsonKind`, the values JSON defines and their union),
+> `JoinType`, whose variants are the four answers to which sides keep their
+> unmatched rows, and the uninhabited frame-side markers `FramePreceding`,
+> `FrameCurrentRow` and `FrameFollowing`. A match on an open
+> enum outside the crate ends in an arm for a member it does not know, and in
+> this workspace that arm refuses it with the matching crate's own typed error
+> — pgorm's, codegen's `TransformError`, a binding's error class — rather than
+> reading it as a member it knows. pgorm, pgorm-pool, pgorm-migration and
+> pgorm-codegen hold their own public enums to the same test, each recorded
+> with the rule that specifies it.
 >
 > The list grows only by a named item that a rule specifies, and so does
 > `extension`; each addition to either is recorded here with that rule:
@@ -336,7 +384,7 @@ today, including panicking edges and deliberate failsafes.
 
 ## Target release
 
-> [spec:pgorm:req:sql.target]
+> [spec:pgorm:req:sql.target+1]
 > A build of pgorm targets one PostgreSQL major release. 18 is the floor and
 > the default: a build that names no release targets 18, there is no `pg-18`
 > feature to say so, and nothing older is kept working. The `pg-19` cargo
@@ -354,7 +402,9 @@ today, including panicking edges and deliberate failsafes.
 > 19 accepts and MAY change which release's answers the live suite holds, and
 > it MUST NOT remove or reshape anything the default build has that 19 still
 > accepts. 19-only surface therefore arrives as new items — a type, a method,
-> a constructor, each marked `doc(cfg(feature = "pg-19"))` — and never as a
+> a constructor, or a variant of a `#[non_exhaustive]` public enum, whose
+> dependents already match it with an arm for what they do not know
+> (`sql.surface`), each marked `doc(cfg(feature = "pg-19"))` — and never as a
 > new variant of an exhaustive public enum, a new public field or a changed
 > signature, any of which breaks a dependent that compiles today. A builder
 > value renders the same SQL under either target: what the server does with

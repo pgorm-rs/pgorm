@@ -220,7 +220,7 @@ impl PendingTableAlter {
 /// let moved: TableAlterStatement = alter.take();
 /// ```
 // [spec:pgorm:req:sql.ddl.alter-table+13]
-// [spec:pgorm:req:sql.ast+3]
+// [spec:pgorm:req:sql.ast+4]
 #[derive(Debug, Clone)]
 pub struct TableAlterStatement {
     pub(crate) table: TableName,
@@ -244,6 +244,7 @@ pub struct AddColumnOption {
 #[allow(clippy::large_enum_variant)]
 // [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum TableAlterOption {
     AddColumn(AddColumnOption),
     ModifyColumn(ColumnDef),

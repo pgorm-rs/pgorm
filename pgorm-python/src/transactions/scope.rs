@@ -313,6 +313,15 @@ impl Frame {
                 },
                 result: Err(rollback),
             },
+            // A failure with no arm here leaves the connection in a state
+            // nobody knows, as a failed ROLLBACK does.
+            Err(_) => Completion {
+                healthy: false,
+                reply: self.committed.take(),
+                result: Err(Error::Custom(
+                    "the transaction failed in a way pgorm-python does not represent".to_owned(),
+                )),
+            },
         })
     }
 }

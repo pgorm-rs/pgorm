@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, str::FromStr};
 use syn::{punctuated::Punctuated, token::Comma};
 use tracing::info;
 
-// [spec:pgorm:def:codegen.entity+4]
+// [spec:pgorm:def:codegen.entity+5]
 #[derive(Clone, Debug)]
 pub struct EntityWriter {
     pub(crate) entities: Vec<Entity>,

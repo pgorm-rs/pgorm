@@ -12,7 +12,7 @@ mod writer;
 pub use active_enum::*;
 pub use base_entity::*;
 pub use column::*;
-pub(crate) use column_expr::{CastType, ColumnExpr, Operator};
+pub(crate) use column_expr::{CastType, ColumnExpr, CurrentKeyword, Operator};
 pub use conjunct_relation::*;
 pub use created_range::*;
 pub use primary_key::*;

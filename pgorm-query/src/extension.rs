@@ -505,6 +505,7 @@ pub struct TypeCreateStatement {
 /// What a `CREATE TYPE` defines, when it defines more than a shell type.
 // [spec:pgorm:req:sql.ddl.type-enum+7]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum TypeAs {
     /// `AS (..)`, a composite carrying its attributes, the marker and the
     /// attributes one fact as an enumeration's marker and labels are.
@@ -585,6 +586,7 @@ pub enum TypeDropOpt {
 /// renders as.
 // [spec:pgorm:req:sql.render.ddl.enum-type+5]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum TypeAlterOpt {
     Add(String, Option<TypeAlterAddOpt>),
     Rename(Name),

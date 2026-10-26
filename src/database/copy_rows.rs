@@ -28,8 +28,7 @@ use jiff::{
 use pgorm_pool::GenericClient;
 use pgorm_query::{
     ArrayType, Asterisk, CopyFormat, CopyFromStatement, CopyToStatement, Interval, IpNetwork,
-    MacAddress, Multirange, Query, Range, RangeType, StaticName, SubQueryStatement, Value, Vector,
-    base_type,
+    MacAddress, Multirange, Query, Range, RangeType, StaticName, Value, Vector, base_type,
 };
 use postgres_protocol::types::{self as wire, RangeBound};
 use rust_decimal::Decimal;
@@ -147,19 +146,7 @@ where
     let Some(query) = source.get_query() else {
         return Err(query_err("a COPY TO source is a table or a statement"));
     };
-    described(client, &rendered(query), false).await
-}
-
-/// A source statement's rendering, its values inlined as the COPY's own
-/// rendering inlines them.
-fn rendered(query: &SubQueryStatement) -> String {
-    match query {
-        SubQueryStatement::SelectStatement(statement) => statement.to_string(),
-        SubQueryStatement::InsertStatement(statement) => statement.to_string(),
-        SubQueryStatement::UpdateStatement(statement) => statement.to_string(),
-        SubQueryStatement::DeleteStatement(statement) => statement.to_string(),
-        SubQueryStatement::MergeStatement(statement) => statement.to_string(),
-    }
+    described(client, &query.to_string(), false).await
 }
 
 /// The result columns of `sql`, prepared and never run, so a write is
@@ -512,7 +499,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
     let Kind::Array(member) = ty.kind() else {
         let kind = kind(ty)?;
         return match raw {
-            None => Ok(null(&kind)),
+            None => null(&kind),
             Some(raw) => scalar(ty, &kind, raw),
         };
     };
@@ -526,7 +513,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
     let values = elements
         .into_iter()
         .map(|element| match element {
-            None => Ok(null(&kind)),
+            None => null(&kind),
             Some(Element(raw)) => scalar(member, &kind, raw),
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -601,8 +588,8 @@ fn kind(ty: &Type) -> Result<ArrayType, WireError> {
 }
 
 /// SQL NULL as a value of `kind`.
-fn null(kind: &ArrayType) -> Value {
-    match kind {
+fn null(kind: &ArrayType) -> Result<Value, WireError> {
+    Ok(match kind {
         ArrayType::Bool => Value::Bool(None),
         ArrayType::TinyInt => Value::TinyInt(None),
         ArrayType::SmallInt => Value::SmallInt(None),
@@ -628,7 +615,8 @@ fn null(kind: &ArrayType) -> Value {
         ArrayType::Interval => Value::Interval(None),
         ArrayType::Range(range) => Value::Range(*range, None),
         ArrayType::Multirange(range) => Value::Multirange(*range, None),
-    }
+        _ => return Err("no pgorm value holds this kind".into()),
+    })
 }
 
 /// A non-NULL value of `kind`, from its binary form, through the driver's
@@ -683,9 +671,9 @@ fn scalar(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, WireError> {
             };
             Value::Multirange(*range, Some(Box::new(read_multirange(subtype, raw)?)))
         }
-        ArrayType::BigUnsigned | ArrayType::Char => {
-            return Err("no PostgreSQL type reads as this kind".into());
-        }
+        // `kind` answers neither `BigUnsigned` nor `Char`, nor any kind it
+        // does not name.
+        _ => return Err("no PostgreSQL type reads as this kind".into()),
     })
 }
 

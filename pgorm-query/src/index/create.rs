@@ -109,7 +109,7 @@ use super::common::*;
 /// ```
 ///
 // [spec:pgorm:req:sql.ddl.index-create+11]
-// [spec:pgorm:req:sql.ast+3]
+// [spec:pgorm:req:sql.ast+4]
 #[derive(Debug, Clone)]
 pub struct IndexCreateStatement {
     pub(crate) table: TableName,
@@ -137,6 +137,7 @@ pub enum IndexKind {
 
 /// The access method an index is built with — PostgreSQL's `USING <method>`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum IndexType {
     BTree,
     Gin,

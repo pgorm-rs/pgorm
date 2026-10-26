@@ -66,6 +66,7 @@ use crate::{
 // shape of the clause rather than a payload to box away.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum OnConflict {
     /// `ON CONFLICT DO NOTHING`: no arbiter, so a conflict on any constraint
     /// is swallowed.
@@ -146,6 +147,7 @@ pub struct ConflictTarget {
 /// One assignment of a `DO UPDATE SET`.
 // [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ConflictAssignment {
     /// Take the column's value from the row that failed to insert:
     /// `"col" = "excluded"."col"`.
@@ -179,6 +181,7 @@ pub struct ConflictAssignments {
 /// after `DO UPDATE SET ..`.
 // [spec:pgorm:req:sql.ast.on-conflict+4]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ConflictAction {
     /// `DO NOTHING`.
     DoNothing,

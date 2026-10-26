@@ -61,6 +61,7 @@ pub trait TryGetable: Sized {
 
 /// An error from trying to get a row from a Model
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum TryGetError {
     /// A database error was encountered as defined in [crate::Error]
     Db(Error),

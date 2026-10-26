@@ -280,6 +280,7 @@ impl ColumnType {
 
 /// All column specification keywords
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ColumnSpec {
     Null,
     /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: the column's one not-null

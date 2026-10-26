@@ -20,6 +20,7 @@ pub struct Comment;
 
 /// The object a [`CommentStatement`] is attached to.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum CommentTarget {
     /// A whole table
     Table(TableName),
