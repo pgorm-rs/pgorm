@@ -14557,4 +14557,33 @@ children (
             }
         )
     }
+
+    {
+        id public-enums-non-exhaustive
+        title "Public enums whose variants grow are #[non_exhaustive], so adding one is not a breaking change"
+        kind @refactor
+        log (
+            {
+                at 2026-10-26T16:12:26.747137Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Operator 2026-10-26, asked whether BinOper and SubQueryOper should be #[non_exhaustive] after binoper-missing-variants added six BinOper variants and in-subquery-enum-shapes added SubQueryOper::Array without marking either breaking: \"public enums yes\". Survey the public enums of pgorm, pgorm-query, pgorm-pool, pgorm-migration and pgorm-codegen; mark #[non_exhaustive] every one whose set of variants is an open vocabulary that can grow (operators, functions, column and value types, statement and DDL options, error kinds, capabilities), and leave exhaustive the closed sets a caller is meant to match completely (e.g. ascending/descending, a two-state status), stating the criterion in the rule. Add the wildcard arms that code and tests outside the defining crate then need. This is a breaking change once: mark the commit breaking, and record the list in sql.surface (or the crates' surface rules) and CLAUDE.md's pg-19 note, which today forbids adding a variant to an exhaustive public enum."
+            }
+        )
+    }
+
+    {
+        id domain-unwrap-shared
+        title "One helper looks through a type's domains, where six places each spell it"
+        kind @refactor
+        deps (python-created-range-domain-subtype)
+        log (
+            {
+                at 2026-10-26T16:12:26.942652Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-created-range-domain-subtype (2026-10-26). The same few lines that look through a type's (possibly nested) domains to its base exist in about six places: src/database/copy_rows.rs wire_type, src/executor/cursor_bind.rs wire_type, src/executor/query_domain.rs without_domains, the loop in src/executor/created_range.rs, pgorm-napi's wire_type and pgorm-python's over_domains. Give pgorm one public helper (a free function over tokio_postgres::types::Type, re-exported for the bindings) and use it everywhere, with no behaviour change."
+            }
+        )
+    }
 )
