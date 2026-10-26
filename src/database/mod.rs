@@ -33,7 +33,7 @@ pub use pgorm_pool::{ManagerConfig, PoolBuilder, RecyclingMethod, StatementCache
 /// migration commits: the one to give
 /// [`ManagerConfig::statement_cache_channel`] for a pool to clear its
 /// statement caches after another process's migration.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]
 pub use pgorm_pool::STATEMENT_CACHE_CHANNEL;
 
 /// The TLS connector types [`connect_with`]'s bounds are written in, plus the
@@ -77,7 +77,7 @@ const CHANNEL_BYTES: usize = 63;
 /// Refuse a [`ManagerConfig::statement_cache_channel`] no notification could
 /// reach: an empty name, which `LISTEN` refuses, or one longer than an
 /// identifier, which it truncates while `pg_notify` refuses it whole.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]    an unusable channel is refused at construction
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    an unusable channel is refused at construction
 fn check_statement_cache_channel(manager: &ManagerConfig) -> Result<(), Error> {
     match &manager.statement_cache_channel {
         Some(channel) if channel.is_empty() || channel.len() > CHANNEL_BYTES => {

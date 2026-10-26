@@ -903,6 +903,7 @@ assertions (
     {id bug.relation-pairing, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:11:36.703806Z}
     {id bug.test-harness, kind @complete, author "brendan@necessary.nu", at 2026-09-02T19:15:03.593799Z}
     {id bug.window-position, kind @complete, author "brendan@necessary.nu", at 2026-09-02T17:26:32.961595Z}
+    {id cache-listener-keepalive, kind @complete, author "brendan@necessary.nu", at 2026-10-25T22:49:56.472812Z}
     {id campaign-evidence-durable, kind @complete, author "brendan@necessary.nu", at 2026-09-17T12:43:20.982163Z}
     {id campaign-refuses-stale-build, kind @complete, author "brendan@necessary.nu", at 2026-09-17T00:41:30.128736Z}
     {id codegen-accepts-create-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:26:07.721992Z}
@@ -995,6 +996,7 @@ assertions (
     {id graph-related-one, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:05.348074Z}
     {id graph-unicode-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T21:59:36.946216Z}
     {id graph-via-as, kind @complete, author "brendan@necessary.nu", at 2026-10-25T22:56:58.951948Z}
+    {id ident-oracle-load-flake, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:04:46.93252Z}
     {id identifier-bypass-surfaces, kind @complete, author "brendan@necessary.nu", at 2026-09-24T23:28:56.9273Z}
     {id identity-arity-collapse, kind @complete, author "brendan@necessary.nu", at 2026-09-07T11:24:33.746636Z}
     {id in-subquery-enum-shapes, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:22:25.129436Z}
@@ -1129,6 +1131,7 @@ assertions (
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
+    {id python-schema-refusal-test, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:20:32.030006Z}
     {id python-schema-truth-testing, kind @complete, author "brendan@necessary.nu", at 2026-10-18T17:14:57.542945Z}
     {id python-select-set-operations, kind @complete, author "brendan@necessary.nu", at 2026-10-18T19:03:35.403663Z}
     {id python-select-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:54:27.016683Z}

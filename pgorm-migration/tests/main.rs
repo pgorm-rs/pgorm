@@ -701,20 +701,19 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
 /// session in commit order.
 // [spec:pgorm:sem:migration.up+4/test]    a batch that applied a migration notifies the channel as
 // it commits, and a run that applied nothing, or a migrator naming no channel, does not
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    another pool listening on the default
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    another pool listening on the default
 // channel clears once the runner's batch commits
-#[tokio::test]
-async fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
+#[test]
+fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
     use common::migrator::domain_default::{Created, Defaulted, Unannounced};
     use futures::StreamExt;
     use pgorm_migration::pgorm::{Listener, Notifications, STATEMENT_CACHE_CHANNEL, notify};
+    use pgorm_test_support::ListenerClears;
     use std::time::Duration;
 
     const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
     const PREPARED: &str = "SELECT count(*) FROM pg_prepared_statements \
                             WHERE statement = 'INSERT INTO line (id) VALUES ($1) RETURNING qty'";
-    const LISTENING: &str = "SELECT count(*) FROM pg_stat_activity \
-                             WHERE datname = current_database() AND query = $1 AND state = 'idle'";
     const ARRIVAL: Duration = Duration::from_secs(10);
 
     async fn payload(notifications: &mut Notifications) -> Result<String, Error> {
@@ -726,68 +725,54 @@ async fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
         Ok(notification.payload().to_owned())
     }
 
-    let ctx = TestContext::new("pgorm_migration_notifies_listening_pools").await;
-    let db = &ctx.db;
-    let (listener, mut notifications) = db.listener(Listener::DEFAULT_CAPACITY).await?;
-    listener.listen(STATEMENT_CACHE_CHANNEL).await?;
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let ctx = TestContext::new("pgorm_migration_notifies_listening_pools").await;
+        let db = &ctx.db;
+        let (listener, mut notifications) = db.listener(Listener::DEFAULT_CAPACITY).await?;
+        listener.listen(STATEMENT_CACHE_CHANNEL).await?;
 
-    Created::up(db.clone(), None).await?;
-    assert_eq!(payload(&mut notifications).await?, "");
+        Created::up(db.clone(), None).await?;
+        assert_eq!(payload(&mut notifications).await?, "");
 
-    // Opened after `Created`'s notification, so only `Defaulted`'s can clear it.
-    let elsewhere = ctx.listening_pool();
-    drop(elsewhere.get().await?);
-    let listen = format!("LISTEN \"{STATEMENT_CACHE_CHANNEL}\"");
-    let deadline = tokio::time::Instant::now() + ARRIVAL;
-    while db
-        .get()
-        .await?
-        .query_one(LISTENING, &[&listen])
-        .await?
-        .get::<_, i64>(0)
-        < 2
-    {
-        assert!(tokio::time::Instant::now() < deadline, "the pool listens");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
-    let conn = elsewhere.get().await?;
-    assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
-    drop(conn);
-    let conn = elsewhere.get().await?;
-    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
-    drop(conn);
-
-    Defaulted::up(db.clone(), None).await?;
-    assert_eq!(payload(&mut notifications).await?, "");
-    let deadline = tokio::time::Instant::now() + ARRIVAL;
-    loop {
+        // Opened after `Created`'s notification, so only `Defaulted`'s can
+        // clear it once its `LISTEN` has.
+        let elsewhere = ctx.listening_pool();
+        drop(elsewhere.get().await?);
+        clears.reach(1).await;
         let conn = elsewhere.get().await?;
-        if conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0) == 0 {
-            assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
-            break;
-        }
+        assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
         drop(conn);
-        assert!(tokio::time::Instant::now() < deadline, "the pool clears");
-        tokio::time::sleep(Duration::from_millis(10)).await;
-    }
+        let conn = elsewhere.get().await?;
+        assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
+        drop(conn);
 
-    Defaulted::up(db.clone(), None).await?;
-    Unannounced::up(db.clone(), None).await?;
-    assert_eq!(
-        db.get()
-            .await?
-            .query_one(INSERT, &[&3])
-            .await?
-            .get::<_, i32>(0),
-        3,
-        "the runner still clears its own pool"
-    );
-    notify(&db.get().await?, STATEMENT_CACHE_CHANNEL, "fence").await?;
-    assert_eq!(payload(&mut notifications).await?, "fence");
+        Defaulted::up(db.clone(), None).await?;
+        assert_eq!(payload(&mut notifications).await?, "");
+        clears.reach(2).await;
+        let conn = elsewhere.get().await?;
+        assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 0);
+        assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
+        drop(conn);
 
-    drop((listener, notifications, elsewhere));
-    ctx.delete().await;
-    Ok(())
+        Defaulted::up(db.clone(), None).await?;
+        Unannounced::up(db.clone(), None).await?;
+        assert_eq!(
+            db.get()
+                .await?
+                .query_one(INSERT, &[&3])
+                .await?
+                .get::<_, i32>(0),
+            3,
+            "the runner still clears its own pool"
+        );
+        notify(&db.get().await?, STATEMENT_CACHE_CHANNEL, "fence").await?;
+        assert_eq!(payload(&mut notifications).await?, "fence");
+
+        drop((listener, notifications, elsewhere));
+        ctx.delete().await;
+        Ok(())
+    })
 }
 
 /// A ledger given a schema starts from a database holding neither: reads leave

@@ -165,7 +165,7 @@ impl PoolConfig {
             "fast" => pgorm::RecyclingMethod::Fast,
             _ => return Err(invalid("recycle is \"verified\" or \"fast\"")),
         };
-        // [spec:pgorm:req:conn.pool.statement-cache.listen]    refused here, by name, rather than
+        // [spec:pgorm:req:conn.pool.statement-cache.listen+1]    refused here, by name, rather than
         // as connect_with's anonymous invalid configuration
         if self
             .statement_cache_channel

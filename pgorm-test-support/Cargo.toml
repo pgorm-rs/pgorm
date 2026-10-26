@@ -4,7 +4,7 @@ version = "0.2.0"
 authors = []
 edition = "2024"
 rust-version = "1.89"
-description = "Run-scoped names for what pgorm's live tests create on a shared server, and the sweep of crashed runs' leftovers"
+description = "Run-scoped names for what pgorm's live tests create on a shared server, the sweep of crashed runs' leftovers, and a count of a pool's statement-cache clears"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -16,6 +16,7 @@ publish = false
 tokio.workspace = true
 tokio-postgres.workspace = true
 tracing.workspace = true
+tracing-subscriber = "0.3.23"
 
 [dev-dependencies]
 dotenvy = "0.15.7"

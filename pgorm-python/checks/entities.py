@@ -259,6 +259,7 @@ def main():
                     "app.Old",
                     "app.Room",
                     "app.Stay",
+                    "app.Temper",
                 ],
                 "graph_source_arities": list(range(1, 8)),
                 "pipeline_source_arities": list(range(1, 7)),

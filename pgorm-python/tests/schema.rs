@@ -652,7 +652,7 @@ fn views(table: &TableName) -> error::Result<BTreeMap<&'static str, String>> {
     ]))
 }
 
-// [spec:pgorm:req:python.schema+1/test]
+// [spec:pgorm:req:python.schema+2/test]
 // [spec:pgorm:req:python.schema-collation/test]    a column's collation, qualified or bare and a
 // later call replacing an earlier, renders as the Rust builder renders it in each position
 // [spec:pgorm:req:python.schema-views+2/test]    every view, materialized view and CREATE TABLE AS

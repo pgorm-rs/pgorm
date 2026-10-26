@@ -176,7 +176,7 @@ impl Manager {
     /// [`Pool::close`] does not reach the manager, so a pool closed without
     /// this keeps listening until it is dropped; pgorm's
     /// `DatabasePool::close` calls both.
-    // [spec:pgorm:req:conn.pool.statement-cache.listen]    closing the pool ends the listener
+    // [spec:pgorm:req:conn.pool.statement-cache.listen+1]    closing the pool ends the listener
     pub fn stop_statement_cache_listener(&self) {
         self.listener.stop();
     }
@@ -197,7 +197,7 @@ impl Manager {
     }
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen]    a dropped pool does not leak the listener
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    a dropped pool does not leak the listener
 impl Drop for Manager {
     fn drop(&mut self) {
         self.listener.stop();

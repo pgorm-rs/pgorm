@@ -370,7 +370,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > (`conn.pool.statement-cache.listen`), and `up` sends one as its batch
 > commits.
 
-> [spec:pgorm:req:conn.pool.statement-cache.listen]
+> [spec:pgorm:req:conn.pool.statement-cache.listen+1]
 > `ManagerConfig::statement_cache_channel: Option<String>` carries a clear
 > between processes. A pool given a channel keeps one connection of its own
 > `LISTEN`ing on it (`conn.listen`) and, whenever a notification arrives
@@ -408,10 +408,23 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > reached none, and a connection the pool opened before the first `LISTEN`
 > may have prepared statements before a notification it could not hear. Each
 > loss is logged through `tracing` as a warning, and each clear it makes at
-> debug level. Two servers keep it from settling: a hot standby refuses
-> `LISTEN`, and receives no notification anyway, so the listener retries
-> there at its longest wait; and a server whose `idle_session_timeout` ends
-> idle sessions ends this one, so each reconnection clears the pool once more.
+> debug level. A hot standby keeps it from settling: it refuses `LISTEN`,
+> and receives no notification anyway, so the listener retries there at its
+> longest wait.
+>
+> Its session MUST NOT idle out. Before its `LISTEN` it sends `SET
+> idle_session_timeout = 0`, which reaches that session alone and which any
+> role may send, the setting's context being `user`; a server, database or
+> role whose timeout ends idle sessions would otherwise end this one each
+> period, and each reconnection would clear the pool once more. A periodic
+> no-op would also keep it alive, at a round trip each period and a period
+> that must undercut a timeout it does not know. A `SET` the server refuses
+> is logged as a warning and the `LISTEN` goes ahead without it. The
+> `LISTEN` is sent alone and last, so it is the statement
+> `pg_stat_activity` shows for the session. What ends an idle connection
+> outside the server, a pooler's or a network middlebox's timeout, still
+> ends this one; TCP keepalives in the pool's `Config` reach the listener
+> as they reach the pool's own connections.
 >
 > `DatabasePool::close` MUST stop the listener, closing its connection,
 > through `Manager::stop_statement_cache_listener`, which also keeps a pool

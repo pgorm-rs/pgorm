@@ -217,7 +217,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     # from its first acquisition, clears on a notification there whatever its payload, and
     # closes its listening connection when it closes; a pool without the setting keeps its
     # statements
-    # [spec:pgorm:req:conn.pool.statement-cache.listen/test]    from Python
+    # [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    from Python
     async def test_a_notified_pool_writes_the_new_default(self):
         p.require_capability("pool.statement_cache_channel")
         self.assertEqual(p.STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches")

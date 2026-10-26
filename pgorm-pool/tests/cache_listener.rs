@@ -5,10 +5,15 @@
 //! Every test runs in the shared `postgres` database, so each listens on a
 //! channel named after the test and this process, which no concurrent run
 //! notifies.
+//!
+//! A test waits for each clear through [`ListenerClears`], never through the
+//! server: the clear a `LISTEN` makes lands after the server already shows
+//! the `LISTEN`, and would empty a cache filled in between.
 
 use std::{env, future::Future, sync::Once, time::Duration};
 
 use pgorm_pool::{Client, ManagerConfig, Pool, PoolConfig, RecyclingMethod, StatementCacheSize};
+use pgorm_test_support::ListenerClears;
 
 static DOTENV: Once = Once::new();
 
@@ -101,8 +106,8 @@ async fn backend_alive(client: &Client, pid: i32) -> bool {
         .get(0)
 }
 
-/// Cache [`PROBE`] on the pool's one connection, once the listener's first
-/// clear has reached it, and show that it stays cached across a return.
+/// Cache [`PROBE`] on the pool's one connection, after every clear the
+/// listener has made so far, and show that it stays cached across a return.
 async fn cache_probe(pool: &Pool) {
     let client = pool.get().await.unwrap();
     drop(client.prepare_cached(PROBE).await.unwrap());
@@ -115,67 +120,78 @@ async fn cache_probe(pool: &Pool) {
     );
 }
 
-async fn cleared(pool: &Pool) -> Option<()> {
-    (pool.get().await.unwrap().statement_cache.size() == 0).then_some(())
+/// Wait until the listener has made `made` clears, and show that the pool's
+/// connection is lent with its cache emptied.
+async fn cleared(pool: &Pool, clears: &ListenerClears, made: usize) {
+    clears.reach(made).await;
+    assert_eq!(pool.get().await.unwrap().statement_cache.size(), 0);
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a notification on the channel, whatever
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a notification on the channel, whatever
 // its payload, clears the cache of every connection before it is next lent
-#[tokio::test]
-async fn a_notification_clears_the_cache() {
-    let channel = channel("cache_listener_notified");
-    let pool = listening_pool(&channel);
-    listening_backend(&pool, &channel).await;
-    cache_probe(&pool).await;
+#[test]
+fn a_notification_clears_the_cache() {
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let channel = channel("cache_listener_notified");
+        let pool = listening_pool(&channel);
+        listening_backend(&pool, &channel).await;
+        cleared(&pool, &clears, 1).await;
+        cache_probe(&pool).await;
 
-    pool.get()
-        .await
-        .unwrap()
-        .execute("SELECT pg_notify($1, 'any payload')", &[&channel])
-        .await
-        .unwrap();
-    eventually("the clear", || cleared(&pool)).await;
-}
-
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a terminated listener reconnects, clears
-// once for the notifications it may have missed, and listens again
-#[tokio::test]
-async fn a_lost_listener_reconnects_and_clears() {
-    let channel = channel("cache_listener_reconnected");
-    let pool = listening_pool(&channel);
-    let first = listening_backend(&pool, &channel).await;
-    cache_probe(&pool).await;
-
-    let terminated: bool = pool
-        .get()
-        .await
-        .unwrap()
-        .query_one("SELECT pg_terminate_backend($1)", &[&first])
-        .await
-        .unwrap()
-        .get(0);
-    assert!(terminated);
-
-    let second = eventually("the reconnection", || async {
-        listener_backend(&pool.get().await.unwrap(), &channel)
+        pool.get()
             .await
-            .filter(|pid| *pid != first)
-    })
-    .await;
-    eventually("the reconnection's clear", || cleared(&pool)).await;
-
-    cache_probe(&pool).await;
-    pool.get()
-        .await
-        .unwrap()
-        .execute("SELECT pg_notify($1, '')", &[&channel])
-        .await
-        .unwrap();
-    eventually("the clear after reconnecting", || cleared(&pool)).await;
-    assert_eq!(listening_backend(&pool, &channel).await, second);
+            .unwrap()
+            .execute("SELECT pg_notify($1, 'any payload')", &[&channel])
+            .await
+            .unwrap();
+        cleared(&pool, &clears, 2).await;
+    });
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    stopping the listener closes its
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a terminated listener reconnects, clears
+// once for the notifications it may have missed, and listens again
+#[test]
+fn a_lost_listener_reconnects_and_clears() {
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let channel = channel("cache_listener_reconnected");
+        let pool = listening_pool(&channel);
+        let first = listening_backend(&pool, &channel).await;
+        cleared(&pool, &clears, 1).await;
+        cache_probe(&pool).await;
+
+        let terminated: bool = pool
+            .get()
+            .await
+            .unwrap()
+            .query_one("SELECT pg_terminate_backend($1)", &[&first])
+            .await
+            .unwrap()
+            .get(0);
+        assert!(terminated);
+
+        let second = eventually("the reconnection", || async {
+            listener_backend(&pool.get().await.unwrap(), &channel)
+                .await
+                .filter(|pid| *pid != first)
+        })
+        .await;
+        cleared(&pool, &clears, 2).await;
+
+        cache_probe(&pool).await;
+        pool.get()
+            .await
+            .unwrap()
+            .execute("SELECT pg_notify($1, '')", &[&channel])
+            .await
+            .unwrap();
+        cleared(&pool, &clears, 3).await;
+        assert_eq!(listening_backend(&pool, &channel).await, second);
+    });
+}
+
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    stopping the listener closes its
 // connection while the pool lives on
 #[tokio::test]
 async fn stopping_the_listener_closes_its_connection() {
@@ -190,7 +206,7 @@ async fn stopping_the_listener_closes_its_connection() {
     .await;
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    dropping the pool ends the listener and
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    dropping the pool ends the listener and
 // closes its connection
 #[tokio::test]
 async fn dropping_the_pool_closes_the_listener() {

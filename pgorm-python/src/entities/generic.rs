@@ -36,7 +36,7 @@ where
         &self.info
     }
 
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error> {
         use crate::schema::{PyCreateIndex, PyCreateTable, PyDDL, PyEntitySchema, Statement};
         let schema = pgorm::Schema::new();

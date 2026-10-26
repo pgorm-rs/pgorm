@@ -7,7 +7,7 @@ from pgorm import schema as s
 
 
 class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_registered_entity_schema_executes_explicitly(self):
         account = p.entity("app.Account")
         generated = s.from_entity(account)
@@ -37,6 +37,25 @@ class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(dict(comments), {"table_comment": "Accounts' native schema", "column_comment": "The user's display name"})
                 indexes = await pool.fetch_all(p.RawSQL("SELECT indexname FROM pg_indexes WHERE schemaname = 'python_entities' ORDER BY indexname"))
                 self.assertEqual([row["indexname"] for row in indexes], ["accounts_pkey", "idx-accounts-display name"])
+            finally:
+                await pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))
+
+    # [spec:pgorm:req:python.schema+2/test]
+    async def test_unbuildable_foreign_key_is_refused(self):
+        with self.assertRaises(p.ConstructionError) as refused:
+            s.from_entity(p.entity("app.Temper"))
+        for part in ("Settles", "settles_into", "42804"):
+            self.assertIn(part, str(refused.exception))
+        # The key refused is one the server cannot build either, written by hand.
+        async with p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1) as pool:
+            await pool.execute(p.RawSQL("CREATE SCHEMA python_entities"))
+            try:
+                await pool.execute(p.RawSQL('CREATE TYPE python_entities."Mood" AS ENUM (\'calm\', \'busy\')'))
+                await pool.execute(p.RawSQL('CREATE DOMAIN python_entities.temper AS python_entities."Mood"'))
+                await pool.execute(p.RawSQL("CREATE TABLE python_entities.tempers (mood python_entities.temper PRIMARY KEY, settles_into python_entities.temper NOT NULL)"))
+                with self.assertRaises(p.DatabaseError) as answered:
+                    await pool.execute(p.RawSQL("ALTER TABLE python_entities.tempers ADD FOREIGN KEY (settles_into) REFERENCES python_entities.tempers (mood)"))
+                self.assertEqual(answered.exception.sqlstate, "42804")
             finally:
                 await pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))
 

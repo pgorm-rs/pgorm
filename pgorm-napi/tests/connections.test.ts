@@ -165,7 +165,7 @@ async function eventually(what: string, probe: () => Promise<boolean>): Promise<
 // [spec:pgorm:req:napi.connections+4/test]    a pool given statementCacheChannel listens from its
 // first acquisition, clears on a notification there whatever its payload, and closes its
 // listening connection with the pool; a pool without it keeps its statements
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    from JavaScript
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    from JavaScript
 test("a pool listening on statementCacheChannel clears when notified, and only that pool", async () => {
   assert.equal(STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches");
   await using quiet = new Pool(scratch(), { maxSize: 1 });
