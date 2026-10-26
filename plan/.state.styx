@@ -989,6 +989,7 @@ assertions (
     {id ergo.with-carry, kind @complete, author "brendan@necessary.nu", at 2026-09-03T21:27:18.318285Z}
     {id from-json-serialization, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:10.825951Z}
     {id generative-interval-kind, kind @complete, author "brendan@necessary.nu", at 2026-10-18T17:11:32.48455Z}
+    {id generative-killpg-eperm, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:24:07.526807Z}
     {id generative-live-wire-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-18T18:33:19.713463Z}
     {id generative.design, kind @complete, author "brendan@necessary.nu", at 2026-09-08T15:32:47.579599Z}
     {id graph-alias-collisions, kind @complete, author "brendan@necessary.nu", at 2026-09-07T17:40:27.266491Z}
@@ -1048,6 +1049,7 @@ assertions (
     {id minimal-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:31:55.569282Z}
     {id napi-addon-size, kind @complete, author "brendan@necessary.nu", at 2026-10-18T14:41:20.074691Z}
     {id napi-domain-entity-test, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:48:59.551771Z}
+    {id napi-racing-fixture-timing, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:16:03.973045Z}
     {id nested-source-from-entry, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:14.356897Z}
     {id nopanic.codegen-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:09:12.032584Z}
     {id nopanic.connect-builders, kind @complete, author "brendan@necessary.nu", at 2026-09-02T15:44:54.028454Z}
