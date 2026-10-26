@@ -52,7 +52,7 @@ fn where_grouping(sql: &str) -> String {
     grouping(&select["where_clause"])
 }
 
-// [spec:pgorm:def:sql.render.precedence+12/test]    every boolean-valued operator outside the
+// [spec:pgorm:def:sql.render.precedence+13/test]    every boolean-valued operator outside the
 // comparison, BETWEEN, IN, LIKE and IS families renders bare under AND, OR and NOT, and the grammar
 // groups the bare render as the condition was built
 #[test]
@@ -68,8 +68,14 @@ fn boolean_operators_render_bare_under_logic() {
         (BinOper::HasJsonKey, "?"),
         (BinOper::HasAnyJsonKeys, "?|"),
         (BinOper::HasAllJsonKeys, "?&"),
+        (BinOper::JsonPathExists, "@?"),
         (BinOper::Regex, "~"),
         (BinOper::RegexCaseInsensitive, "~*"),
+        (BinOper::NotRegex, "!~"),
+        (BinOper::NotRegexCaseInsensitive, "!~*"),
+        (BinOper::NotExtendRightOf, "&<"),
+        (BinOper::NotExtendLeftOf, "&>"),
+        (BinOper::AdjacentTo, "-|-"),
     ];
     for (operator, lexeme) in operators {
         let test = |column: Char, value: i32| Expr::col(column).binary(operator, value);
@@ -100,7 +106,7 @@ fn boolean_operators_render_bare_under_logic() {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence+12/test]    the BETWEEN family renders bare under AND, OR
+// [spec:pgorm:def:sql.render.precedence+13/test]    the BETWEEN family renders bare under AND, OR
 // and NOT, negated and symmetric forms included, as its left and its right operand, and the
 // grammar takes each AND after a lower bound as BETWEEN's own and the next as the logical one
 #[test]

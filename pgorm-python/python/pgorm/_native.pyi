@@ -115,9 +115,10 @@ from ._query_types import (
     Compiled as Compiled, LikePattern as LikePattern,
     AliasedExpr as AliasedExpr, OrderBy as OrderBy,
 )
-from ._expressions import (
-    Expr as Expr, Condition as Condition, col as col, bind as bind,
-    literal as literal, call as call, tuple_expr as tuple_expr, domain_value as domain_value,
+from ._expressions import Expr as Expr, Condition as Condition
+from ._expression_functions import (
+    col as col, bind as bind, literal as literal, call as call, tuple_expr as tuple_expr,
+    domain_value as domain_value,
 )
 from ._statements import (
     Table as Table, FromItem as FromItem, Select as Select, Join as Join,

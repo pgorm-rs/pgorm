@@ -769,7 +769,7 @@ including panic semantics and quirks inherited from sea-query.
 > position is a type error for the same reason
 > (`[spec:pgorm:sem:sql.ddl.panics+4]`).
 
-> [spec:pgorm:def:sql.types.opers+5]
+> [spec:pgorm:def:sql.types.opers+6]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
 > operator vocabulary: logical `And`/`Or`; pattern `Like`/`NotLike` plus
 > Postgres `ILike`/`NotILike` and the regular-expression `SimilarTo`/
@@ -781,12 +781,16 @@ including panic semantics and quirks inherited from sea-query.
 > `GreaterThan`, `SmallerThanOrEqual`, `GreaterThanOrEqual`; arithmetic
 > `Add`/`Sub`/`Mul`/`Div`/`Mod`; shifts `LShift`/`RShift`; `As`;
 > full-text/containment `Matches`, `Contains`, `Contained`; `Concatenate`,
-> `Overlap`; pg_trgm similarity operators (`Similarity`, `WordSimilarity`,
+> `Overlap`; the range position tests `NotExtendRightOf` (`&<`),
+> `NotExtendLeftOf` (`&>`) and `AdjacentTo` (`-|-`); pg_trgm similarity
+> operators (`Similarity`, `WordSimilarity`,
 > `StrictWordSimilarity` and their `*Distance` forms); JSON access
 > `GetJsonField` (`->`), `CastJsonField` (`->>`), `GetJsonPath` (`#>`) and
 > `CastJsonPath` (`#>>`); JSON key existence `HasJsonKey` (`?`),
-> `HasAnyJsonKeys` (`?|`) and `HasAllJsonKeys` (`?&`); regex `Regex` (`~`) and
-> `RegexCaseInsensitive` (`~*`); temporal `AtTimeZone`; pgvector distances
+> `HasAnyJsonKeys` (`?|`) and `HasAllJsonKeys` (`?&`), and JSON path
+> existence `JsonPathExists` (`@?`); regex `Regex` (`~`) and
+> `RegexCaseInsensitive` (`~*`) and their complements `NotRegex` (`!~`) and
+> `NotRegexCaseInsensitive` (`!~*`); temporal `AtTimeZone`; pgvector distances
 > `EuclideanDistance`,
 > `NegativeInnerProduct`, `CosineDistance`; and an escape hatch
 > `Raw(&'static str)`. There is no `Escape` operator: `ESCAPE` is
@@ -798,7 +802,10 @@ including panic semantics and quirks inherited from sea-query.
 > JSON containment and merge get no variants of their own: `Contains`,
 > `Contained` and `Concatenate` already render `@>`, `<@` and `||`, which are
 > the operators PostgreSQL defines for `jsonb` as well as for arrays and
-> ranges (`sql.ast.expr.operators`).
+> ranges (`sql.ast.expr.operators`). Nor do the range tests strictly left of
+> and strictly right of: they are the operators `<<` and `>>`, which
+> `LShift` and `RShift` render and which bind as the shifts do, and the
+> jsonpath match `@@` is `Matches`, the full-text operator's lexeme.
 >
 > `BetweenSymmetric` and `NotBetweenSymmetric` are variants rather than
 > `Raw("BETWEEN SYMMETRIC")` because the renderer classifies the *variant*,
@@ -810,7 +817,11 @@ including panic semantics and quirks inherited from sea-query.
 > though there the cost of missing the family is only parentheses. It is the
 > general rule for this enum: an operator whose parenthesisation differs from
 > the default MUST have a variant, and `Raw` is for operators the renderer has
-> no reason to look at.
+> no reason to look at. Every operator that answers a boolean is such an
+> operator, since the renderer drops parentheses around a boolean operand
+> (`sql.render.precedence`) and cannot know a `Raw` operator's result: that is
+> why `!~`, `!~*`, `@?`, `&<`, `&>` and `-|-` are variants, where through
+> `Raw` they kept parentheses `~`, `?` and `&&` drop.
 
 ## Column type vocabulary
 

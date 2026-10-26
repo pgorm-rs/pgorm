@@ -2,7 +2,7 @@
 // frames and the window functions — and the range operators', held to
 // `windows.json` as `select.ts`'s are to theirs.
 // [spec:pgorm:req:napi.windows+2/test]
-// [spec:pgorm:req:napi.ranges/test]
+// [spec:pgorm:req:napi.ranges+1/test]
 
 import {
   bind,
@@ -91,5 +91,13 @@ export const cases: Record<string, () => Builder> = {
         .and(col("spans").overlaps(new Value(new Multirange([new Range(1, 3), new Range(5, 8)]), "int4multirange")))
         .and(col("tags").contains(["a", "b"]))
         .and(col("weights").overlaps(new Value(new Range(0.5, 1.5), new CreatedRange("floatrange", "f64", { schema: "app" })))),
+    ),
+  "range-positions": () =>
+    select().from(new Table("booking")).where(
+      col("seats").strictlyLeftOf(new Value(new Range(5, 8), "int4range"))
+        .and(col("seats").strictlyRightOf(new Value(new Range(0, 1), "int4range")))
+        .and(col("seats").notExtendRightOf(new Value(new Range(1, 6), "int4range")))
+        .and(col("spans").notExtendLeftOf(new Value(new Multirange([new Range(0, 2)]), "int4multirange")))
+        .and(col("spans").adjacentTo(new Value(new Multirange([new Range(6, 7)]), "int4multirange"))),
     ),
 };

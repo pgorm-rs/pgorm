@@ -44,7 +44,7 @@ impl Expr {
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" -> 'a'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn get_json_field<T>(self, right: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -73,7 +73,7 @@ impl Expr {
     ///     r#"SELECT "variant" FROM "font" WHERE "variant" ->> 'a'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn cast_json_field<T>(self, right: T) -> SimpleExpr
     where
         T: Into<SimpleExpr>,
@@ -117,7 +117,7 @@ impl Expr {
     /// );
     /// assert_eq!(values.0.len(), 1);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn get_json_path<S, I>(self, path: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -148,7 +148,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE ("user_data" #>> ARRAY ['a','b']) = 'x'"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn cast_json_path<S, I>(self, path: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -188,7 +188,7 @@ impl Expr {
     /// let (sql, values) = query.build();
     /// assert_eq!(sql, r#"SELECT "id" FROM "character" WHERE "user_data" ? $1"#);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn has_json_key<S>(self, key: S) -> SimpleExpr
     where
         S: Into<String>,
@@ -233,7 +233,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE "user_data" ?| ARRAY []::text[]"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn has_any_json_keys<S, I>(self, keys: I) -> SimpleExpr
     where
         S: Into<String>,
@@ -270,13 +270,50 @@ impl Expr {
     /// assert_eq!(sql, r#"SELECT "id" FROM "character" WHERE "user_data" ?& $1"#);
     /// assert_eq!(values.0.len(), 1);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.json+1]
+    // [spec:pgorm:req:sql.ast.expr.json+2]
     pub fn has_all_json_keys<S, I>(self, keys: I) -> SimpleExpr
     where
         S: Into<String>,
         I: IntoIterator<Item = S>,
     {
         self.bin_op(BinOper::HasAllJsonKeys, text_array(keys))
+    }
+
+    /// Express a postgres JSON path existence test (`@?`): whether the
+    /// `jsonpath` returns any item for the `jsonb` operand.
+    ///
+    /// The path is a value, bound as `text` and cast to `jsonpath` as
+    /// [`Func::json_exists`] binds its path, so it never becomes part of the
+    /// statement's text, and the driver, which writes a value in the format
+    /// of the type it is, never has to write a `jsonpath`. The operator is not
+    /// a spelling of `JSON_EXISTS`: a GIN index on the column serves `@?` and
+    /// serves no `JSON_EXISTS`, and where a strict-mode path raises an error
+    /// the operator answers NULL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{tests_cfg::*, *};
+    ///
+    /// let query = Query::select()
+    ///     .column(Char::Id)
+    ///     .from(Char::Table)
+    ///     .and_where(Expr::col(Char::UserData).json_path_exists(r#"$.tags[*] ? (@ == "blue")"#))
+    ///     .to_owned();
+    ///
+    /// assert_eq!(
+    ///     query.build().0,
+    ///     r#"SELECT "id" FROM "character" WHERE "user_data" @? CAST($1::text AS jsonpath)"#
+    /// );
+    /// ```
+    // [spec:pgorm:req:sql.ast.expr.json+2]
+    pub fn json_path_exists<P>(self, path: P) -> SimpleExpr
+    where
+        P: Into<String>,
+    {
+        let path =
+            SimpleExpr::from(path.into()).cast_as_type(TypeName::new(Name::runtime("jsonpath")));
+        self.bin_op(BinOper::JsonPathExists, path)
     }
 
     /// Mark this expression as JSON text for an SQL/JSON position:

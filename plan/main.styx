@@ -13641,6 +13641,13 @@ children (
                 kind @note
                 text "Folded into spec-prose-unversioned-refs by the operator's 2026-10-23 decision; completes with it."
             }
+
+            {
+                at 2026-10-26T10:26:16.873766Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "check-clauses-shared (f72f55ea) bumped sql.ast.select.tie-limit to +2: it now names check_clauses as the one check every executor, both bindings, a stored definition's body and a COPY TO's source call. The tie-limit half of this node is done by that text; sql.ast.window-statement (+8) still names only the executors and the bindings."
+            }
         )
     }
 
@@ -14121,12 +14128,20 @@ children (
         title "The regex-mismatch, JSON-path and range-position operators have BinOper variants, so they render with their real precedence"
         kind @feat
         deps (boolean-operator-parens)
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.726332Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by boolean-operator-parens. !~, !~*, @?, -|- and the range position operators &< and &> have no BinOper variant and arrive only as BinOper::Raw, whose result type is unknown, so they keep parentheses under the logical operators. sql.types.opers asks for a variant where an operator's parenthesisation differs from the default. Add them (and their binding spellings) with oracle-checked grouping tests."
+            }
+
+            {
+                at 2026-10-26T10:26:17.005467Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

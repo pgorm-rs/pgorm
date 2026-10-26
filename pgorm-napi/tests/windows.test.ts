@@ -1,7 +1,7 @@
 // Windows and range operators built from JavaScript against a live server, in
 // either runtime: calls over inline and named windows, frames and their
-// typestate, the window-only functions, and containment and overlap over
-// ranges, multiranges and arrays.
+// typestate, the window-only functions, containment and overlap over ranges,
+// multiranges and arrays, and the position of one range against another.
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -268,7 +268,7 @@ test("OVER follows only a call, a frame only ends after its start, and a window-
   assert.throws(() => FrameType.rows.currentRow().exclude("others" as never), refused(/exclusion/));
 });
 
-// [spec:pgorm:req:napi.ranges/test]
+// [spec:pgorm:req:napi.ranges+1/test]
 test("contains, containedBy and overlaps compare ranges, multiranges and arrays", async () => {
   const ids = async (predicate: ReturnType<typeof col>) =>
     (await pool().query(select(booking.col("id")).from(booking).where(predicate).orderBy(booking.col("id").asc())))
@@ -293,7 +293,31 @@ test("contains, containedBy and overlaps compare ranges, multiranges and arrays"
   assert.deepStrictEqual(await ids(booking.col("weights").containedBy(new Value(new Range(0.0, 1.0, "[]"), floats))), [1n]);
 });
 
-// [spec:pgorm:req:napi.ranges/test]
+// [spec:pgorm:req:napi.ranges+1/test]
+test("strictlyLeftOf, strictlyRightOf, notExtendRightOf, notExtendLeftOf and adjacentTo answer as PostgreSQL's operators", async () => {
+  const built = async (where: ReturnType<typeof col>) =>
+    (await pool().query(select(booking.col("id")).from(booking).where(where).orderBy(booking.col("id").asc())))
+      .map((row) => row.id);
+  const written = async (where: string) =>
+    (await pool().query(`SELECT id FROM app.booking WHERE ${where} ORDER BY id`)).map((row) => row.id);
+  const seats = (lower: number, upper: number) => new Value(new Range(lower, upper), "int4range");
+  const spans = (lower: number, upper: number) => new Value(new Multirange([new Range(lower, upper)]), "int4multirange");
+  const cases: [ReturnType<typeof col>, string, bigint[]][] = [
+    [booking.col("seats").strictlyLeftOf(seats(5, 8)), "seats << '[5,8)'::int4range", [1n]],
+    [booking.col("seats").strictlyRightOf(seats(5, 8)), "seats >> '[5,8)'::int4range", [2n]],
+    [booking.col("seats").notExtendRightOf(seats(1, 6)), "seats &< '[1,6)'::int4range", [1n]],
+    [booking.col("seats").notExtendLeftOf(seats(3, 9)), "seats &> '[3,9)'::int4range", [2n]],
+    [booking.col("seats").adjacentTo(seats(5, 8)), "seats -|- '[5,8)'::int4range", [1n, 2n]],
+    [booking.col("spans").adjacentTo(spans(6, 7)), "spans -|- '{[6,7)}'::int4multirange", [2n]],
+    [booking.col("spans").notExtendRightOf(spans(0, 7)), "spans &< '{[0,7)}'::int4multirange", [2n]],
+  ];
+  for (const [predicate, sql, expected] of cases) {
+    assert.deepStrictEqual(await built(predicate), expected, sql);
+    assert.deepStrictEqual(await written(sql), expected, sql);
+  }
+});
+
+// [spec:pgorm:req:napi.ranges+1/test]
 test("a range is bound only as a Value that declares its kind", () => {
   assert.throws(() => col("seats").contains(new Range(1, 5) as never), refused(/Value/));
   assert.throws(() => col("seats").contains(new Multirange([new Range(1, 5)]) as never), refused(/Value/));

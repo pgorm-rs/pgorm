@@ -6,7 +6,18 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
-import { column, Conflict, ConstructionError, DecodeError, model, type Pool, Range, TypeName, Value } from "../lib/index.js";
+import {
+  column,
+  Conflict,
+  ConstructionError,
+  CreatedRange,
+  DecodeError,
+  model,
+  type Pool,
+  Range,
+  TypeName,
+  Value,
+} from "../lib/index.js";
 import { Account, modelDatabase, truncate, Version } from "./model-fixtures.ts";
 
 let database: { pool: Pool; drop(): Promise<void> } | undefined;
@@ -199,6 +210,11 @@ test("a column compares through its declared kind, and refuses what it cannot bi
   const glad = await Account.select("name").where(Account.col("mood").eq("glad")).all(pool());
   assert.deepStrictEqual(glad, [{ name: "Cy" }]);
   assert.match(Account.col("mood").eq("glad").inspect().sql, /CAST\(\$1::text AS app\.mood\)/);
+  assert.match(
+    Account.col("span").adjacentTo(new Value(new Range(2.5, 3.0), new CreatedRange("floatrange", "f64", { schema: "app" })))
+      .inspect().sql,
+    /"span" -\|- CAST\(\$1::text AS app\.floatrange\)$/,
+  );
   assert.equal(Account.col("id").eq(1).inspect().values[0]?.kind, "i64");
   assert.deepStrictEqual(
     await Account.select("name").where(Account.col("mood").isIn(["calm", "glad"])).orderBy(byId).all(pool()),

@@ -431,7 +431,7 @@ fn template_from_sql_reads_real_sql() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+5/test]    `Not` is the only unary operator
+// [spec:pgorm:def:sql.types.opers+6/test]    `Not` is the only unary operator
 #[test]
 fn the_only_unary_operator_is_not() {
     let not_true = SimpleExpr::Unary(UnOper::Not, Box::new(SimpleExpr::from(true)));
@@ -442,7 +442,7 @@ fn the_only_unary_operator_is_not() {
     );
 }
 
-// [spec:pgorm:def:sql.types.opers+5/test]    the whole binary operator vocabulary, including the
+// [spec:pgorm:def:sql.types.opers+6/test]    the whole binary operator vocabulary, including the
 // `Custom` escape hatch
 #[test]
 fn the_binary_operator_vocabulary_is_complete() {
@@ -501,8 +501,14 @@ fn the_binary_operator_vocabulary_is_complete() {
         (BinOper::HasJsonKey, "?"),
         (BinOper::HasAnyJsonKeys, "?|"),
         (BinOper::HasAllJsonKeys, "?&"),
+        (BinOper::JsonPathExists, "@?"),
         (BinOper::Regex, "~"),
         (BinOper::RegexCaseInsensitive, "~*"),
+        (BinOper::NotRegex, "!~"),
+        (BinOper::NotRegexCaseInsensitive, "!~*"),
+        (BinOper::NotExtendRightOf, "&<"),
+        (BinOper::NotExtendLeftOf, "&>"),
+        (BinOper::AdjacentTo, "-|-"),
         (BinOper::AtTimeZone, "AT TIME ZONE"),
         (BinOper::EuclideanDistance, "<->"),
         (BinOper::NegativeInnerProduct, "<#>"),

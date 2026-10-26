@@ -187,6 +187,30 @@ fn ranges() -> (String, Values) {
         .build()
 }
 
+fn range_positions() -> (String, Values) {
+    let int4 = |lower: i32, upper: i32| {
+        Range::new(Bound::Included(lower.into()), Bound::Excluded(upper.into()))
+    };
+    let seats = |lower, upper| Value::Range(RangeType::Int4, Some(Box::new(int4(lower, upper))));
+    let spans = |lower, upper| {
+        Value::Multirange(
+            RangeType::Int4,
+            Some(Box::new(Multirange::from(vec![int4(lower, upper)]))),
+        )
+    };
+    let condition = col!("seats")
+        .binary(BinOper::LShift, seats(5, 8))
+        .and(col!("seats").binary(BinOper::RShift, seats(0, 1)))
+        .and(col!("seats").binary(BinOper::NotExtendRightOf, seats(1, 6)))
+        .and(col!("spans").binary(BinOper::NotExtendLeftOf, spans(0, 2)))
+        .and(col!("spans").binary(BinOper::AdjacentTo, spans(6, 7)));
+    SelectStatement::new()
+        .column(pgorm::pgorm_query::Asterisk)
+        .from(table!("booking"))
+        .cond_where(condition)
+        .build()
+}
+
 /// A WINDOW clause of three entries, each extended window built on the one
 /// before it.
 fn clause_entries() -> (String, Values) {
@@ -248,5 +272,6 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("window-functions", functions()),
         ("window-json-aggregates", json_aggregates()),
         ("ranges", ranges()),
+        ("range-positions", range_positions()),
     ]
 }

@@ -9,7 +9,7 @@
 //! `IS DISTINCT FROM` answers, and `BETWEEN` silently matches nothing where
 //! `BETWEEN SYMMETRIC` sorts the pair. All but `AT TIME ZONE` depend on
 //! [`crate::BinOper`] family membership to render correctly — see
-//! `[spec:pgorm:def:sql.types.opers+5]`.
+//! `[spec:pgorm:def:sql.types.opers+6]`.
 
 use super::*;
 

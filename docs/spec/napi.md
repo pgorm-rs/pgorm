@@ -483,7 +483,7 @@ SQL text running a built statement.
 > to run. A statement binding more than 65,535 values MUST be refused with a
 > `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:napi.expressions+4]
+> [spec:pgorm:req:napi.expressions+5]
 > An expression MUST lower into pgorm-query's own builders. `col` is a
 > column, qualified by a table and its schema; an operand that is not an
 > expression is a value bound as a parameter, never interpolated — inferred as
@@ -505,7 +505,12 @@ SQL text running a built statement.
 > pgorm-query's `Condition`, empty ones true and false. `like`, `ilike`,
 > `similarTo` and their negations take a pattern string, bound, and an
 > optional escape of one character, or the empty string, which turns escaping
-> off (`sql.ast.expr.similar-to`); `startsWith`,
+> off (`sql.ast.expr.similar-to`); `regex` (`~`), `notRegex` (`!~`),
+> `iregex` (`~*`) and `notIregex` (`!~*`) match a POSIX regular expression,
+> an operand bound unless it is an expression, each the `BinOper` of that
+> meaning; `pathExists` (`@?`) takes a `jsonpath` string, bound as
+> pgorm-query's `json_path_exists` binds it, as text cast to `jsonpath`, and
+> anything else is a `ConstructionError`; `startsWith`,
 > `endsWith` and `containsText` read their argument as
 > text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
 > `_` match themselves. `call` reaches only the functions pgorm-query has a
@@ -651,10 +656,12 @@ SQL text running a built statement.
 > argument counts each takes, usable only through `over`, which the server
 > requires of them; another name or count is a `ConstructionError`.
 
-> [spec:pgorm:req:napi.ranges]
+> [spec:pgorm:req:napi.ranges+1]
 > `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`) MUST compare
 > ranges, multiranges and arrays through pgorm-query's operators of that
-> meaning. A range or multirange operand is bound as the `Value` that declares
+> meaning, and `strictlyLeftOf` (`<<`), `strictlyRightOf` (`>>`),
+> `notExtendRightOf` (`&<`), `notExtendLeftOf` (`&>`) and `adjacentTo`
+> (`-|-`) MUST place ranges and multiranges through them. A range or multirange operand is bound as the `Value` that declares
 > its kind — a built-in range or multirange kind, or a `CreatedRange` or
 > `CreatedMultirange`, whose text is cast to its type through
 > `Expr::as_range` — and a `Range` or `Multirange` passed without one MUST be a

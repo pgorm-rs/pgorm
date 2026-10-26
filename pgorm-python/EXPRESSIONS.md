@@ -99,6 +99,25 @@ as `$1 = $2` with `("a", "b")` for IN and `("a", "a")` for NOT IN.
 Use `is_null()` explicitly; an equality against a typed NULL retains ordinary
 SQL equality semantics. `tuple_expr(*items)` constructs a nonempty Rust tuple.
 
+Regular expressions, a range's position against another and JSON paths are
+methods, each the Rust `BinOper` of its meaning, the other operand bound
+unless it is an expression:
+
+| Method | Operator | Reads |
+| --- | --- | --- |
+| `regex(pattern)`, `not_regex(pattern)` | `~`, `!~` | text against a POSIX regular expression |
+| the same with `case_insensitive=True` | `~*`, `!~*` | the same with case ignored |
+| `not_extend_right_of(other)`, `not_extend_left_of(other)` | `&<`, `&>` | ranges and multiranges |
+| `adjacent_to(other)` | `-\|-` | ranges and multiranges |
+| `path_exists(path)` | `@?` | a `jsonb` against a `jsonpath` |
+
+A range or multirange operand binds as a `Value` naming its kind,
+`Value(Range(1, 5), "int4range")`, as a range always does. `path_exists`
+takes a `str`, bound as text cast to `jsonpath` (Rust's `json_path_exists`),
+so the path never becomes statement text; anything else is a
+`ConstructionError`. Unlike `json_exists`, `@?` is served by a GIN index on
+the column, and a strict-mode path that would raise answers NULL.
+
 ## Text and functions
 
 `starts_with`, `ends_with` and `contains_text` treat their arguments as text,

@@ -66,6 +66,27 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::SimpleExpr::not_similar_to",
         ),
         (
+            "expr.regex",
+            "pgorm_query::SimpleExpr::binary(BinOper::Regex, BinOper::RegexCaseInsensitive)",
+        ),
+        (
+            "expr.not_regex",
+            "pgorm_query::SimpleExpr::binary(BinOper::NotRegex, BinOper::NotRegexCaseInsensitive)",
+        ),
+        (
+            "expr.not_extend_right_of",
+            "pgorm_query::SimpleExpr::binary(BinOper::NotExtendRightOf)",
+        ),
+        (
+            "expr.not_extend_left_of",
+            "pgorm_query::SimpleExpr::binary(BinOper::NotExtendLeftOf)",
+        ),
+        (
+            "expr.adjacent_to",
+            "pgorm_query::SimpleExpr::binary(BinOper::AdjacentTo)",
+        ),
+        ("expr.path_exists", "pgorm_query::Expr::json_path_exists"),
+        (
             "expr.inspect",
             "pgorm_query::SelectStatement::expr, SelectStatement::build",
         ),

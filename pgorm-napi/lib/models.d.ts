@@ -256,6 +256,11 @@ export declare class ModelColumn<V = unknown, I extends Operand = Operand> exten
   contains(other: I): Expr;
   containedBy(other: I): Expr;
   overlaps(other: I): Expr;
+  strictlyLeftOf(other: I): Expr;
+  strictlyRightOf(other: I): Expr;
+  notExtendRightOf(other: I): Expr;
+  notExtendLeftOf(other: I): Expr;
+  adjacentTo(other: I): Expr;
   isIn(source: readonly I[] | Select): Expr;
   isNotIn(source: readonly I[] | Select): Expr;
   between(lower: I, upper: I, options?: { readonly symmetric?: boolean }): Expr;

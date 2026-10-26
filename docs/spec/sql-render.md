@@ -296,7 +296,7 @@ an ideal Postgres renderer would emit.
 
 ## Operators, precedence, and parentheses
 
-> [spec:pgorm:def:sql.render.operators+7]
+> [spec:pgorm:def:sql.render.operators+8]
 > `prepare_bin_oper` defines the operator lexicon. Logical/predicate:
 > `AND`, `OR`, `LIKE`, `NOT LIKE`, `ILIKE`, `NOT ILIKE`, `SIMILAR TO`,
 > `NOT SIMILAR TO`, `IS`, `IS NOT`,
@@ -305,19 +305,22 @@ an ideal Postgres renderer would emit.
 > `NOT BETWEEN SYMMETRIC`, `AS`. Comparison: `=`, `<>`,
 > `<`, `>`, `<=`, `>=`. Arithmetic: `+`, `-`, `*`, `/`, `%`. Shift: `<<`,
 > `>>`. PostgreSQL-specific: `@@` (Matches), `@>` (Contains), `<@`
-> (Contained), `||` (Concatenate), `&&` (Overlap), `%` (Similarity), `<%`
+> (Contained), `||` (Concatenate), `&&` (Overlap), `&<` (NotExtendRightOf),
+> `&>` (NotExtendLeftOf), `-|-` (AdjacentTo), `%` (Similarity), `<%`
 > (WordSimilarity), `<<%` (StrictWordSimilarity), `<->`
 > (SimilarityDistance), `<<->` (WordSimilarityDistance), `<<<->`
 > (StrictWordSimilarityDistance), `->` (GetJsonField), `->>` (CastJsonField),
 > `#>` (GetJsonPath), `#>>` (CastJsonPath), `?` (HasJsonKey), `?|`
-> (HasAnyJsonKeys), `?&` (HasAllJsonKeys), `~` (Regex), `~*`
-> (RegexCaseInsensitive), `AT TIME ZONE` (AtTimeZone), and pgvector's `<->`
+> (HasAnyJsonKeys), `?&` (HasAllJsonKeys), `@?` (JsonPathExists), `~`
+> (Regex), `~*` (RegexCaseInsensitive), `!~` (NotRegex), `!~*`
+> (NotRegexCaseInsensitive), `AT TIME ZONE` (AtTimeZone), and pgvector's `<->`
 > (EuclideanDistance), `<#>`
 > (NegativeInnerProduct), `<=>` (CosineDistance).
 > `BinOper::Raw(op)` emits its operator text verbatim. Note the deliberate
 > lexeme collisions: `%` serves both Mod and Similarity, `<->` both
-> SimilarityDistance and EuclideanDistance. The only unary operator is
-> `UnOper::Not` → `NOT`.
+> SimilarityDistance and EuclideanDistance, and `<<` and `>>` are the shifts
+> and the range tests strictly left of and strictly right of alike. The only
+> unary operator is `UnOper::Not` → `NOT`.
 >
 > The `?` family's lexemes are operator text like any other and carry no
 > placeholder meaning: parameters are numbered `$N`
@@ -330,7 +333,7 @@ an ideal Postgres renderer would emit.
 > escape character as an inline constant, or ` ESCAPE ''` when escaping is
 > off — and there is no `BinOper` that could place it anywhere else.
 
-> [spec:pgorm:def:sql.render.precedence+12]
+> [spec:pgorm:def:sql.render.precedence+13]
 > Parenthesis elision is driven by
 > `inner_expr_well_known_greater_precedence(inner, outer)`, which returns true
 > (safe to drop parens around `inner`) when: the inner expression is an atom —
@@ -365,18 +368,21 @@ an ideal Postgres renderer would emit.
 > bounds are operands of the BETWEEN rather than of that `AND`
 > (`sql.render.parens`).
 > The Postgres-specific extension also
-> treats an inner `@>`, `<@`, `&&`, `%` (similarity), `<%`, `<<%`, `@@`, `?`,
-> `?|`, `?&`, `~` or `~*` comparison as higher precedence than a logical outer
+> treats an inner `@>`, `<@`, `&&`, `&<`, `&>`, `-|-`, `%` (similarity), `<%`,
+> `<<%`, `@@`, `?`, `?|`, `?&`, `@?`, `~`, `~*`, `!~` or `!~*` comparison as
+> higher precedence than a logical outer
 > operator — the membership of that set is "returns boolean", which is why the
 > JSON existence operators join it and the JSON *accessors* (`->`, `->>`,
 > `#>`, `#>>`, which return JSON or text) do not. Every member is a generic
 > operator, which the grammar ranks above the comparisons (the similarity `%`
 > ranks with `*`), so its bare form under `AND`, `OR` and `NOT` groups as the
 > expression was built; a boolean-valued variant missing from the set keeps
-> parentheses its peers drop. An operator with no `BinOper` variant (`!~`,
-> `!~*`, `@?`, `-|-`) reaches the renderer only as `BinOper::Raw`, whose
-> result the renderer cannot know, and keeps its parentheses. All other
-> combinations are considered unknown and keep their parentheses.
+> parentheses its peers drop. The range tests strictly left of and strictly
+> right of are the shifts' `<<` and `>>`, already bare there as shifts. An
+> operator with no `BinOper` variant reaches the renderer only as
+> `BinOper::Raw`, whose result the renderer cannot know, and keeps its
+> parentheses. All other combinations are considered unknown and keep their
+> parentheses.
 
 > [spec:pgorm:req:sql.render.parens+4]
 > `binary_expr` renders `left op right` and MUST parenthesize each operand by

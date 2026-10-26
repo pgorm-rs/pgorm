@@ -946,13 +946,24 @@ today, including panicking edges and deliberate failsafes.
 > functions: `Func::any`/`some`/`all` render SQL only in that position, and are
 > the escape hatch for the operators these two do not name.
 
-> [spec:pgorm:req:sql.ast.expr.json+1]
+> [spec:pgorm:req:sql.ast.expr.json+2]
 > `Expr` MUST provide the JSON *operator* vocabulary as typed combinators:
 > field access `get_json_field` (`->`) and `cast_json_field` (`->>`), path
-> access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), and key existence
+> access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), key existence
 > `has_json_key` (`?`), `has_any_json_keys` (`?|`) and `has_all_json_keys`
-> (`?&`). They live in a child module of `expr` rather than in `Expr`'s main
-> block, as the membership family does.
+> (`?&`), and path existence `json_path_exists` (`@?`). They live in a child
+> module of `expr` rather than in `Expr`'s main block, as the membership
+> family does.
+>
+> `json_path_exists` binds its path as `text` cast to `jsonpath`, as
+> `JSON_EXISTS` binds its own (`[spec:pgorm:def:sql.ast.expr.sql-json+2]`):
+> the path never becomes statement text, and the driver, which writes a
+> value in the format of the type it is, is never asked to write a
+> `jsonpath`. Its bound is `Into<String>`, a path being text. It is not
+> `JSON_EXISTS` under another name: checked on PostgreSQL 18.6, a GIN index
+> on the column, `jsonb_ops` or `jsonb_path_ops`, serves `@?` and no index
+> serves `JSON_EXISTS`, and where a strict-mode path raises an error, as
+> `strict $.b` over a document without `b` does, `@?` answers NULL.
 >
 > PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
 > and the constructors — are the neighbouring vocabulary,
@@ -969,8 +980,9 @@ today, including panicking edges and deliberate failsafes.
 > the rest — are ordinary function applications a caller already spells with
 > `Func::named`, and naming each one here would be a second, worse function-call
 > syntax. The operators pgorm does not name (`-` and `#-` key/path deletion,
-> the jsonpath operators `@?` and `@@`) stay reachable through `binary` with
-> `BinOper::Raw`; only `@@` has a variant, shared with full-text `matches`.
+> and the jsonpath match `@@`) stay reachable through `binary`: the deletions
+> with `BinOper::Raw`, `@@` with `BinOper::Matches`, the variant full-text
+> `matches` renders.
 >
 > Containment (`@>`, `<@`) and concatenation (`||`) MUST NOT be duplicated
 > here: PostgreSQL defines one operator each across every type that has them,

@@ -189,6 +189,20 @@ fn patterns() -> SelectStatement {
         .to_owned()
 }
 
+fn regex_and_json_path() -> SelectStatement {
+    star!()
+        .from(table!("t"))
+        .cond_where(
+            Condition::any()
+                .add(col!("a").binary(BinOper::Regex, "^x"))
+                .add(col!("b").binary(BinOper::NotRegex, col!("c")))
+                .add(col!("d").binary(BinOper::RegexCaseInsensitive, "y$"))
+                .add(col!("e").binary(BinOper::NotRegexCaseInsensitive, "z"))
+                .add(Expr::expr(col!("doc")).json_path_exists(r#"$.tags[*] ? (@ == "blue")"#)),
+        )
+        .to_owned()
+}
+
 fn casts() -> SelectStatement {
     let mood = TypeName::new(n("Mood")).schema(n("app")).array();
     let twice: SimpleExpr = Expr::expr(col!("f")).index(1i64).into();
@@ -545,6 +559,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("membership", membership().build()),
         ("between", between().build()),
         ("patterns", patterns().build()),
+        ("regex-and-json-path", regex_and_json_path().build()),
         ("casts-collations-subscripts", casts().build()),
         ("case", case().build()),
         ("values", values().build()),

@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+4]
+// [spec:pgorm:req:napi.expressions+5]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -67,6 +67,26 @@ export declare class Expr extends Builder {
   containedBy(other: Operand): Expr;
   /** `&&`: sharing a value with the other. */
   overlaps(other: Operand): Expr;
+  /** `<<`: a range or multirange lying wholly left of the other. */
+  strictlyLeftOf(other: Operand): Expr;
+  /** `>>`: a range or multirange lying wholly right of the other. */
+  strictlyRightOf(other: Operand): Expr;
+  /** `&<`: extending no further right than the other. */
+  notExtendRightOf(other: Operand): Expr;
+  /** `&>`: extending no further left than the other. */
+  notExtendLeftOf(other: Operand): Expr;
+  /** `-|-`: adjacent to the other, sharing no value with nothing between. */
+  adjacentTo(other: Operand): Expr;
+  /** `~`: the text matches a POSIX regular expression, case sensitively; the pattern is bound unless it is an expression. */
+  regex(pattern: Operand): Expr;
+  /** `!~`: the text does not match the regular expression. */
+  notRegex(pattern: Operand): Expr;
+  /** `~*`: the text matches the regular expression, case ignored. */
+  iregex(pattern: Operand): Expr;
+  /** `!~*`: the text does not match the regular expression, case ignored. */
+  notIregex(pattern: Operand): Expr;
+  /** `@?`: a `jsonpath` returns an item for this `jsonb`; the path is bound as text cast to `jsonpath`. */
+  pathExists(path: string): Expr;
   isDistinctFrom(other: Operand): Expr;
   isNotDistinctFrom(other: Operand): Expr;
   and(other: Expr): Expr;

@@ -66,7 +66,7 @@ impl QueryBuilder {
     /// BETWEEN, IN, LIKE and the logical operators; anything that returns a
     /// boolean, BETWEEN included, binds tighter than `AND`/`OR`/`NOT`. Every
     /// other pairing is unknown and keeps its parentheses.
-    // [spec:pgorm:def:sql.render.precedence+12]
+    // [spec:pgorm:def:sql.render.precedence+13]
     pub(super) fn inner_expr_well_known_greater_precedence(
         &self,
         inner: &SimpleExpr,
@@ -136,7 +136,7 @@ impl QueryBuilder {
 /// boolean", which is why the JSON *existence* tests are here and the JSON
 /// accessors — `->`, `->>`, `#>`, `#>>`, which return JSON or text — are not;
 /// a boolean-valued variant missing here keeps parentheses its peers drop.
-// [spec:pgorm:def:sql.render.precedence+12]
+// [spec:pgorm:def:sql.render.precedence+13]
 fn returns_boolean(b: &BinOper) -> bool {
     matches!(
         b,
@@ -150,7 +150,13 @@ fn returns_boolean(b: &BinOper) -> bool {
             | BinOper::HasJsonKey
             | BinOper::HasAnyJsonKeys
             | BinOper::HasAllJsonKeys
+            | BinOper::JsonPathExists
             | BinOper::Regex
             | BinOper::RegexCaseInsensitive
+            | BinOper::NotRegex
+            | BinOper::NotRegexCaseInsensitive
+            | BinOper::NotExtendRightOf
+            | BinOper::NotExtendLeftOf
+            | BinOper::AdjacentTo
     )
 }

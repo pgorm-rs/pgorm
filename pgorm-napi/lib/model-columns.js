@@ -327,6 +327,46 @@ export class ModelColumn extends Expr {
 
   /**
    * @override
+   * @param {unknown} other
+   */
+  strictlyLeftOf(other) {
+    return super.strictlyLeftOf(this.#operand(other));
+  }
+
+  /**
+   * @override
+   * @param {unknown} other
+   */
+  strictlyRightOf(other) {
+    return super.strictlyRightOf(this.#operand(other));
+  }
+
+  /**
+   * @override
+   * @param {unknown} other
+   */
+  notExtendRightOf(other) {
+    return super.notExtendRightOf(this.#operand(other));
+  }
+
+  /**
+   * @override
+   * @param {unknown} other
+   */
+  notExtendLeftOf(other) {
+    return super.notExtendLeftOf(this.#operand(other));
+  }
+
+  /**
+   * @override
+   * @param {unknown} other
+   */
+  adjacentTo(other) {
+    return super.adjacentTo(this.#operand(other));
+  }
+
+  /**
+   * @override
    * @param {readonly unknown[] | Select} source
    */
   isIn(source) {

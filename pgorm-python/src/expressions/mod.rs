@@ -22,7 +22,7 @@ use construct::sequence;
 pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
-// [spec:pgorm:req:python.expressions+2]
+// [spec:pgorm:req:python.expressions+3]
 // [spec:pgorm:req:python.ownership]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
 #[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]
@@ -234,7 +234,7 @@ impl PyExpr {
             Expr::expr(self.inner.clone()).not_ilike(options::pattern(pattern)?),
         ))
     }
-    // [spec:pgorm:req:python.expressions+2]
+    // [spec:pgorm:req:python.expressions+3]
     /// `SIMILAR TO`: a whole-string match in SQL's regular-expression
     /// dialect, the pattern bound and its ESCAPE carried as LIKE's are.
     fn similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -242,12 +242,59 @@ impl PyExpr {
             self.inner.clone().similar_to(options::pattern(pattern)?),
         ))
     }
-    // [spec:pgorm:req:python.expressions+2]
+    // [spec:pgorm:req:python.expressions+3]
     fn not_similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_rust(
             self.inner
                 .clone()
                 .not_similar_to(options::pattern(pattern)?),
+        ))
+    }
+
+    // [spec:pgorm:req:python.expressions+3]
+    /// `~`, or `~*` with `case_insensitive`: whether the text matches a POSIX
+    /// regular expression. The pattern is an operand, bound unless it is an
+    /// expression.
+    #[pyo3(signature = (pattern, *, case_insensitive=false))]
+    fn regex(&self, pattern: &Bound<'_, PyAny>, case_insensitive: bool) -> PyResult<Self> {
+        let operator = if case_insensitive {
+            BinOper::RegexCaseInsensitive
+        } else {
+            BinOper::Regex
+        };
+        self.binary(operator, pattern)
+    }
+    // [spec:pgorm:req:python.expressions+3]
+    /// `!~`, or `!~*` with `case_insensitive`: the complement of `regex`.
+    #[pyo3(signature = (pattern, *, case_insensitive=false))]
+    fn not_regex(&self, pattern: &Bound<'_, PyAny>, case_insensitive: bool) -> PyResult<Self> {
+        let operator = if case_insensitive {
+            BinOper::NotRegexCaseInsensitive
+        } else {
+            BinOper::NotRegex
+        };
+        self.binary(operator, pattern)
+    }
+    // [spec:pgorm:req:python.expressions+3]
+    fn not_extend_right_of(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        self.binary(BinOper::NotExtendRightOf, other)
+    }
+    fn not_extend_left_of(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        self.binary(BinOper::NotExtendLeftOf, other)
+    }
+    fn adjacent_to(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        self.binary(BinOper::AdjacentTo, other)
+    }
+    // [spec:pgorm:req:python.expressions+3]
+    /// `@?`: whether a `jsonpath` returns any item for this `jsonb`. The path
+    /// is a `str`, bound as text cast to `jsonpath` by Rust's
+    /// `json_path_exists`, so it never becomes statement text.
+    fn path_exists(&self, path: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let path: String = path
+            .extract()
+            .map_err(|_| ConstructionError::new_err("a JSON path is a str"))?;
+        Ok(Self::from_rust(
+            Expr::expr(self.inner.clone()).json_path_exists(path),
         ))
     }
 
