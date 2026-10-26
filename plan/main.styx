@@ -13258,7 +13258,7 @@ children (
         id spec-prose-unversioned-refs
         title "Rule text cites other rules without a version pin, so a bump does not leave stale numbers in prose"
         kind @docs
-        deps (domain-enum-predicates)
+        deps (domain-enum-predicates binding-spec-consolidation)
         log (
             {
                 at 2026-10-19T07:41:29.162922Z
@@ -14662,6 +14662,7 @@ children (
         id python-case-expressions
         title "Python expressions take CASE, as JavaScript's caseWhen and caseOf do"
         kind @feat
+        deps (binding-spec-consolidation)
         log (
             {
                 at 2026-10-26T17:38:14.409574Z
@@ -14676,6 +14677,7 @@ children (
         id python-select-gaps
         title "Python's Select takes a subquery as a FROM item, lateral joins and row locks, as JavaScript's does"
         kind @feat
+        deps (binding-spec-consolidation)
         log (
             {
                 at 2026-10-26T17:38:14.570625Z
@@ -14690,6 +14692,7 @@ children (
         id python-model-column-operators
         title "Python's declared model columns take the operators JavaScript's do"
         kind @feat
+        deps (binding-spec-consolidation)
         log (
             {
                 at 2026-10-26T17:38:14.718235Z
@@ -14704,6 +14707,7 @@ children (
         id quantifier-beyond-comparisons
         title "ANY and ALL follow LIKE, regex and containment operators too, as PostgreSQL allows"
         kind @feat
+        deps (binding-spec-consolidation)
         log (
             {
                 at 2026-10-26T17:38:14.856956Z
@@ -14740,6 +14744,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by public-enums-non-exhaustive (81eeeac8). The scalar_kinds! value-kind macro exists in three near-identical copies: pgorm-python, pgorm-napi and security/generative's replay harness. Give it one home (pgorm or pgorm-query, as a macro or a table the three expand from) and use it in all three, with no behaviour change."
+            }
+        )
+    }
+
+    {
+        id binding-spec-consolidation
+        title "The Python and JavaScript bindings answer to one shared spec, with only language differences kept per binding"
+        kind @refactor
+        log (
+            {
+                at 2026-10-26T19:22:18.705199Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-26: \"subagent: review and consolidate the specs\", after asking why Python and JavaScript have different spec rules. docs/spec/python.md (2026-09-08) and docs/spec/napi.md (2026-10-09) each restate the bindings' shared behaviour in their own words, and nothing holds them to each other beyond python.expressions' operator sentence (d9dd0959), so the bindings drift: Python has an expression literal() and JavaScript binds every value (napi.expressions), while both pipelines have a literal; Python lacks CASE, subqueries as FROM items, lateral joins, row locks and the declared-column operators JavaScript has. Move every rule describing behaviour both bindings offer into one shared spec file, written once and annotated by both bindings' code and tests; keep in python.md and napi.md only what differs by language (naming, async shape, native types, typing stubs, packaging, runtimes). Add a test comparing both bindings' public surface that fails when one offers what the other lacks outside a short declared list of language-only differences. Where the bindings differ by choice rather than by a missing feature, the operator decides; where one simply lacks a feature, the shared rule requires it of both and the existing gap nodes (python-case-expressions, python-select-gaps, python-model-column-operators, quantifier-beyond-comparisons) build it."
             }
         )
     }
