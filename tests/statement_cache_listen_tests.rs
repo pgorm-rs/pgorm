@@ -1,9 +1,12 @@
 #![allow(unused_imports, dead_code)]
 
 //! Two pools on one database, as two processes would hold them: one given a
-//! `statement_cache_channel` and one not. A domain's changed default is the
-//! DDL a prepared insert does not see, so which default an insert writes says
-//! whether its pool cleared.
+//! `statement_cache_channel` and one not. Whether a pool cleared is judged by
+//! the insert its connection holds prepared ([`PREPARED_STATEMENT`]): a clear
+//! closes it, and the next insert prepares another. The default an insert
+//! writes cannot say, since PostgreSQL re-plans a kept statement whenever the
+//! session's caches are reset; it shows only what a clear is for, a domain's
+//! changed default written by the insert prepared again.
 //!
 //! A test that prepares a statement and then asks whether the pool cleared
 //! waits for the listener's clears through [`ListenerClears`] first: the
@@ -20,7 +23,7 @@ use pgorm::{
     ConnectionTrait, DatabaseConnection, DatabasePool, Error, ManagerConfig, NoTls,
     RecyclingMethod, STATEMENT_CACHE_CHANNEL, StatementCacheSize, notify,
 };
-use pgorm_test_support::ListenerClears;
+use pgorm_test_support::{ListenerClears, PREPARED_STATEMENT};
 use pretty_assertions::assert_eq;
 
 /// How long a change the listener makes is waited for.
@@ -143,18 +146,25 @@ async fn a_session_idles_out(ctx: &TestContext, watcher: &DatabasePool) -> Resul
     .await
 }
 
-async fn prepared_inserts(db: &DatabaseConnection) -> Result<i64, Error> {
+/// The insert `db`'s session holds prepared, or `None` once a clear has
+/// closed it.
+async fn prepared_insert(db: &DatabaseConnection) -> Result<Option<String>, Error> {
     Ok(db
-        .query_one(
-            "SELECT count(*) FROM pg_prepared_statements WHERE statement = $1",
-            &[&INSERT],
-        )
+        .query_opt(PREPARED_STATEMENT, &[&INSERT])
         .await?
-        .get(0))
+        .map(|row| row.get(0)))
 }
 
-async fn insert(pool: &DatabasePool, id: i32) -> Result<i32, Error> {
-    Ok(pool.get().await?.query_one(INSERT, &[&id]).await?.get(0))
+/// Insert through `db`, answering the default written and the prepared
+/// statement that wrote it.
+async fn insert_on(db: &DatabaseConnection, id: i32) -> Result<(i32, String), Error> {
+    let qty = db.query_one(INSERT, &[&id]).await?.get(0);
+    let statement = prepared_insert(db).await?.expect("the insert is prepared");
+    Ok((qty, statement))
+}
+
+async fn insert(pool: &DatabasePool, id: i32) -> Result<(i32, String), Error> {
+    insert_on(&pool.get().await?, id).await
 }
 
 /// Once the listener has made `made` clears, insert through `pool`'s
@@ -164,24 +174,25 @@ async fn insert_after_clears(
     clears: &ListenerClears,
     made: usize,
     id: i32,
-) -> Result<i32, Error> {
+) -> Result<(i32, String), Error> {
     clears.reach(made).await;
     let db = pool.get().await?;
     assert_eq!(
-        prepared_inserts(&db).await?,
-        0,
+        prepared_insert(&db).await?,
+        None,
         "the clear closed the insert"
     );
-    Ok(db.query_one(INSERT, &[&id]).await?.get(0))
+    insert_on(&db, id).await
 }
 
 /// A notification on the channel clears the pool that listens there, and
-/// only that pool: its next insert writes the new default, while the pool
-/// without the setting keeps writing the default its insert was planned with.
+/// only that pool: the listening pool's insert is closed, and prepared again
+/// it writes the new default, while the pool without the setting keeps the
+/// insert it prepared.
 // [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a notification, whatever its payload,
 // clears the listening pool's statements, and a pool without the setting keeps its own
 #[test]
-fn only_the_listening_pool_writes_the_new_default() -> Result<(), Error> {
+fn only_the_listening_pool_clears() -> Result<(), Error> {
     let clears = ListenerClears::default();
     clears.run(async {
         let ctx = TestContext::new("statement_cache_listen_notified").await;
@@ -190,18 +201,25 @@ fn only_the_listening_pool_writes_the_new_default() -> Result<(), Error> {
         let listening = listening_pool(&ctx)?;
         first_clear(&listening, &clears).await?;
 
-        assert_eq!(insert(&listening, 1).await?, 1);
-        assert_eq!(prepared_inserts(&listening.get().await?).await?, 1);
-        assert_eq!(insert(quiet, 2).await?, 1);
+        let (qty, notified) = insert(&listening, 1).await?;
+        assert_eq!(qty, 1);
+        assert_eq!(insert(&listening, 2).await?.1, notified);
+        let (qty, kept) = insert(quiet, 3).await?;
+        assert_eq!(qty, 1);
 
         let db = quiet.get().await?;
         db.batch_execute(SET_DEFAULT).await?;
         notify(&db, STATEMENT_CACHE_CHANNEL, "the payload is not read").await?;
         drop(db);
 
-        assert_eq!(insert_after_clears(&listening, &clears, 2, 3).await?, 2);
-        assert_eq!(insert(quiet, 4).await?, 1);
-        assert_eq!(prepared_inserts(&quiet.get().await?).await?, 1);
+        let (qty, prepared_again) = insert_after_clears(&listening, &clears, 2, 4).await?;
+        assert_eq!(qty, 2, "the insert prepared again writes the new default");
+        assert_ne!(prepared_again, notified);
+        assert_eq!(
+            insert(quiet, 5).await?.1,
+            kept,
+            "the quiet pool kept its insert"
+        );
 
         drop(listening);
         ctx.delete().await;
@@ -224,13 +242,14 @@ fn a_reconnected_listener_clears_the_pool() -> Result<(), Error> {
         first_clear(&listening, &clears).await?;
         let lost = listening_backend(&listening, watcher).await?;
 
-        assert_eq!(insert(&listening, 1).await?, 1);
+        let (qty, before) = insert(&listening, 1).await?;
+        assert_eq!(qty, 1);
         let db = watcher.get().await?;
         db.batch_execute(SET_DEFAULT).await?;
         assert_eq!(
-            insert(&listening, 2).await?,
-            1,
-            "unnotified, the planned default stands"
+            insert(&listening, 2).await?.1,
+            before,
+            "unnotified, the pool keeps its insert"
         );
         db.execute("SELECT pg_terminate_backend($1)", &[&lost])
             .await?;
@@ -242,7 +261,9 @@ fn a_reconnected_listener_clears_the_pool() -> Result<(), Error> {
                 .filter(|pid| *pid != lost))
         })
         .await?;
-        assert_eq!(insert_after_clears(&listening, &clears, 2, 3).await?, 2);
+        let (qty, after) = insert_after_clears(&listening, &clears, 2, 3).await?;
+        assert_eq!(qty, 2);
+        assert_ne!(after, before);
 
         drop(listening);
         ctx.delete().await;
@@ -252,8 +273,8 @@ fn a_reconnected_listener_clears_the_pool() -> Result<(), Error> {
 
 /// A database that ends idle sessions does not end the listener's: once a
 /// session opened after its `LISTEN` has idled out, the listener is the
-/// backend it was, and the pool has not cleared, so the insert it prepared
-/// still writes the default it was planned with.
+/// backend it was, and the pool has not cleared, its connection holding the
+/// insert it prepared before.
 // [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    the listening session outlives the
 // database's idle_session_timeout, and the pool does not clear
 #[test]
@@ -282,8 +303,7 @@ fn an_idle_timeout_spares_the_listener() -> Result<(), Error> {
         first_clear(&listening, &clears).await?;
         let listener = listening_backend(&listening, &watcher).await?;
 
-        assert_eq!(insert(&listening, 1).await?, 1);
-        watcher.get().await?.batch_execute(SET_DEFAULT).await?;
+        let before = insert(&listening, 1).await?.1;
         a_session_idles_out(&ctx, &watcher).await?;
 
         assert_eq!(
@@ -292,8 +312,11 @@ fn an_idle_timeout_spares_the_listener() -> Result<(), Error> {
             "the listener's session outlives the timeout"
         );
         assert_eq!(clears.count(), 1, "the listener cleared only as it began");
-        assert_eq!(insert(&listening, 2).await?, 1, "nothing cleared the pool");
-        assert_eq!(prepared_inserts(&listening.get().await?).await?, 1);
+        assert_eq!(
+            insert(&listening, 2).await?.1,
+            before,
+            "nothing cleared the pool"
+        );
 
         drop(listening);
         drop(watcher);

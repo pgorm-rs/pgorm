@@ -1637,7 +1637,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 ## Domains
 
-> [spec:pgorm:req:sql.ddl.domain+2]
+> [spec:pgorm:req:sql.ddl.domain+3]
 > `Domain` builds the statements a domain takes: `create(name, base)`,
 > `alter(name)` and `drop(name)`. A domain is a type, so each name is an
 > `IntoTypeRef` — a bare name or a `(schema, name)` pair — rendered as
@@ -1716,9 +1716,21 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > plan, so a statement a connection prepared before the change keeps writing
 > the default it was planned with — and pgorm prepares each statement once per
 > pooled connection and reuses it — while the same statement prepared after
-> it, or sent unprepared, writes the new one. A check or a `NOT NULL` added at
-> the same point holds at once, being tested as each value is written; the
-> suite holds both on 18.6. `DatabasePool::clear_statement_caches`
+> it, or sent unprepared, writes the new one. Only a re-plan for another
+> reason ends it, and none can be counted on: a reset of the session's caches
+> re-plans every statement the session keeps prepared, under its old name,
+> and comes with `DISCARD PLANS`, with a schema created in its database, or
+> with the session falling behind the server's shared invalidation queue,
+> which catalogue churn in any database on the server causes. The stale
+> default is therefore intermittent, and no proof that a pool kept its
+> statements, nor the new default proof that it cleared them: the suite tells
+> a clear by the statement a session holds, its name and preparation time in
+> `pg_prepared_statements`, which a clear closes and a re-plan keeps. A check
+> or a `NOT NULL` added at the same point holds at once, being tested as each
+> value is written; the suite holds both on 18.6, the old default whenever
+> the session is shown not to have re-planned, by an immutable function the
+> planner folded into a plan of its own.
+> `DatabasePool::clear_statement_caches`
 > (`conn.pool.statement-cache.clear`) is the remedy: after it, a connection
 > that already ran the insert prepares it again once it is next lent and
 > writes the new default, which the suite holds too. pgorm-migration's `up`

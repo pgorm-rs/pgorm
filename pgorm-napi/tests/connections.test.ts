@@ -14,6 +14,7 @@ import {
   DecodeError,
   LifecycleError,
   Pool,
+  type Queryable,
   STATEMENT_CACHE_CHANNEL,
   TimeoutError,
   type Transaction,
@@ -130,6 +131,23 @@ test("closing a connection returns it to its pool at once, and a closed connecti
   await first.close();
 });
 
+/**
+ * The statement the connection `db` runs on holds prepared for `sql`, as the
+ * server names and stamps it, or null. A clear closes it and the next use prepares it
+ * again under a new name, which is how a test tells whether a pool cleared.
+ * What the statement writes cannot tell: PostgreSQL re-plans a statement a
+ * session keeps whenever the session's caches are reset, and an insert
+ * re-planned so writes a domain's new default under its old name.
+ */
+async function preparedStatement(db: Queryable, sql: string): Promise<string | null> {
+  const row = await db.optional(
+    `SELECT name || ' prepared at ' || prepare_time AS statement
+      FROM pg_prepared_statements WHERE starts_with(statement, $1)`,
+    [sql],
+  );
+  return row === null ? null : (row.statement as string);
+}
+
 // [spec:pgorm:req:napi.connections+4/test]
 // [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    from JavaScript
 test("clearing the statement caches makes a connection that ran an insert prepare it again", async () => {
@@ -137,17 +155,20 @@ test("clearing the statement caches makes a connection that ran an insert prepar
   await single.execute("CREATE DOMAIN stock AS integer DEFAULT 1");
   await single.execute("CREATE TABLE shelf (id int PRIMARY KEY, stock stock)");
   const insert = "INSERT INTO shelf (id) VALUES ($1) RETURNING stock";
-  const prepared =
-    "SELECT count(*)::int AS n FROM pg_prepared_statements WHERE statement = 'INSERT INTO shelf (id) VALUES ($1) RETURNING stock'";
 
   assert.equal((await single.one(insert, [1])).stock, 1);
+  const before = await preparedStatement(single, insert);
+  assert.notEqual(before, null);
   await single.execute("ALTER DOMAIN stock SET DEFAULT 2");
-  assert.equal((await single.one(insert, [2])).stock, 1, "the planned default");
-  assert.equal((await single.one(prepared)).n, 1);
+  await single.one(insert, [2]);
+  assert.equal(await preparedStatement(single, insert), before, "nothing has cleared the connection");
 
   single.clearStatementCaches();
-  assert.equal((await single.one(prepared)).n, 0, "the old statement is closed on the server");
+  assert.equal(await preparedStatement(single, insert), null, "the old statement is closed on the server");
   assert.equal((await single.one(insert, [3])).stock, 2);
+  const after = await preparedStatement(single, insert);
+  assert.notEqual(after, null);
+  assert.notEqual(after, before);
 
   await single.close();
   single.clearStatementCaches();
@@ -166,31 +187,48 @@ async function eventually(what: string, probe: () => Promise<boolean>): Promise<
 // first acquisition, clears on a notification there whatever its payload, and closes its
 // listening connection with the pool; a pool without it keeps its statements
 // [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    from JavaScript
+//
+// The clear the listener makes as its LISTEN takes effect can land after the server shows the
+// LISTEN, closing the insert as the notification's clear does, and JavaScript sees no clear to
+// wait for. Each insert is read back on the connection that ran it, which no clear reaches
+// before it is next lent, and no assertion depends on which clear closed it, so the late one
+// changes no outcome; the Rust suites count the clears.
 test("a pool listening on statementCacheChannel clears when notified, and only that pool", async () => {
   assert.equal(STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches");
   await using quiet = new Pool(scratch(), { maxSize: 1 });
   await quiet.execute("CREATE DOMAIN crate AS integer DEFAULT 1");
   await quiet.execute("CREATE TABLE pallet (id int PRIMARY KEY, crate crate)");
   const insert = "INSERT INTO pallet (id) VALUES ($1) RETURNING crate";
-  const prepared =
-    "SELECT count(*)::int AS n FROM pg_prepared_statements WHERE statement = 'INSERT INTO pallet (id) VALUES ($1) RETURNING crate'";
   const listening = `SELECT count(*)::int AS n FROM pg_stat_activity
     WHERE datname = current_database() AND query = $1 AND state = 'idle'`;
   const listen = [`LISTEN "${STATEMENT_CACHE_CHANNEL}"`];
+
+  /** Insert on one connection of `pool`, answering the crate written and the statement that wrote it. */
+  async function inserted(pool: Pool, id: number): Promise<[unknown, string | null]> {
+    await using connection = await pool.acquire();
+    const crate = (await connection.one(insert, [id])).crate;
+    return [crate, await preparedStatement(connection, insert)];
+  }
 
   const notified = new Pool(scratch(), { maxSize: 1, statementCacheChannel: STATEMENT_CACHE_CHANNEL });
   try {
     assert.equal(await notified.ping(), true);
     await eventually("the listener's LISTEN", async () => (await quiet.one(listening, listen)).n === 1);
-    assert.equal((await notified.one(insert, [1])).crate, 1);
-    assert.equal((await notified.one(prepared)).n, 1);
-    assert.equal((await quiet.one(insert, [2])).crate, 1);
+    const [first, closed] = await inserted(notified, 1);
+    assert.equal(first, 1);
+    assert.notEqual(closed, null);
+    const [second, kept] = await inserted(quiet, 2);
+    assert.equal(second, 1);
+    assert.notEqual(kept, null);
 
     await quiet.execute("ALTER DOMAIN crate SET DEFAULT 2");
     await quiet.execute("SELECT pg_notify($1, 'not read')", [STATEMENT_CACHE_CHANNEL]);
-    await eventually("the clear", async () => (await notified.one(prepared)).n === 0);
-    assert.equal((await notified.one(insert, [3])).crate, 2);
-    assert.equal((await quiet.one(insert, [4])).crate, 1, "the planned default");
+    await eventually("the clear", async () => (await preparedStatement(notified, insert)) === null);
+    const [third, again] = await inserted(notified, 3);
+    assert.equal(third, 2);
+    assert.notEqual(again, null);
+    assert.notEqual(again, closed);
+    assert.equal((await inserted(quiet, 4))[1], kept, "the quiet pool kept its insert");
 
     await notified.close();
     await eventually("the listener's close", async () => (await quiet.one(listening, listen)).n === 0);

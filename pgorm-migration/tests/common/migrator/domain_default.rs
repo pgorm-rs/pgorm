@@ -1,4 +1,16 @@
 use pgorm_migration::prelude::*;
+use pgorm_test_support::PREPARED_STATEMENT;
+
+pub const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
+
+/// The [`INSERT`] `db`'s session holds prepared, or `None` once a clear has
+/// closed it.
+pub async fn prepared_insert(db: &impl ConnectionTrait) -> Result<Option<String>, Error> {
+    Ok(db
+        .query_opt(PREPARED_STATEMENT, &[&INSERT])
+        .await?
+        .map(|row| row.get(0)))
+}
 
 /// A migration that runs one script, its name pinned by hand.
 pub struct Script {

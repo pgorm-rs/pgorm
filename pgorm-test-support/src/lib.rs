@@ -31,7 +31,9 @@
 //! same names, so each suite can reclaim the others' leftovers.
 //!
 //! [`ListenerClears`] counts the clears a pool's statement-cache listener
-//! makes, for the tests of it in pgorm, pgorm-pool and pgorm-migration.
+//! makes, for the tests of it in pgorm, pgorm-pool and pgorm-migration, and
+//! [`PREPARED_STATEMENT`] names the statement a session holds prepared, which
+//! is how a test tells whether a pool cleared it.
 
 use std::{
     future::Future,
@@ -46,8 +48,10 @@ use std::{
 use tokio_postgres::{Client, Config, Error, NoTls, error::SqlState};
 
 mod clears;
+mod prepared;
 
 pub use clears::ListenerClears;
+pub use prepared::PREPARED_STATEMENT;
 
 /// The longest identifier PostgreSQL stores without truncating it.
 const MAX_IDENTIFIER_LEN: usize = 63;
