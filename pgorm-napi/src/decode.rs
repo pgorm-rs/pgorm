@@ -18,6 +18,7 @@ use pgorm::{
     CopyColumn,
     pgorm_query::{
         ArrayType, Interval, IpNetwork, MacAddress, Multirange, Range, RangeType, Value, Vector,
+        base_type,
     },
 };
 use postgres_protocol::types::{self as wire, RangeBound};
@@ -30,7 +31,7 @@ use uuid::Uuid;
 
 use crate::{
     errors::Failure,
-    values::{CreatedKind, Tag, Tagged, TypeName, created, json::ExactJson, wire_type},
+    values::{CreatedKind, Tag, Tagged, TypeName, created, json::ExactJson},
 };
 
 type CodecError = Box<dyn Error + Send + Sync>;
@@ -107,11 +108,11 @@ pub(crate) fn field(column: &CopyColumn, raw: Option<&[u8]>) -> Result<Tagged, F
 /// A value of `ty`, an array of a supported type included.
 // [spec:pgorm:req:napi.values]
 fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
-    let ty = wire_type(ty);
+    let ty = base_type(ty);
     let Kind::Array(member) = ty.kind() else {
         return scalar(ty, raw);
     };
-    let member = wire_type(member);
+    let member = base_type(member);
     let element = tag(member)?;
     if matches!(element, Tag::Created(_)) {
         return Err("arrays of a created range type are not supported".into());
@@ -156,7 +157,7 @@ fn built_in(ty: &Type) -> Option<RangeType> {
 
 /// The value kind of a created range's subtype.
 fn subtype_kind(subtype: &Type) -> Option<ArrayType> {
-    Some(match *wire_type(subtype) {
+    Some(match *base_type(subtype) {
         Type::INT2 => ArrayType::SmallInt,
         Type::INT4 => ArrayType::Int,
         Type::INT8 => ArrayType::BigInt,
@@ -177,7 +178,7 @@ fn subtype_kind(subtype: &Type) -> Option<ArrayType> {
 // [spec:pgorm:req:napi.values]
 // [spec:pgorm:req:napi.temporal]
 fn tag(ty: &Type) -> Result<Tag, CodecError> {
-    let ty = wire_type(ty);
+    let ty = base_type(ty);
     match ty.kind() {
         Kind::Enum(_) => {
             return Ok(Tag::Enum(TypeName {
@@ -247,7 +248,7 @@ fn tag(ty: &Type) -> Result<Tag, CodecError> {
 }
 
 fn scalar(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
-    let ty = wire_type(ty);
+    let ty = base_type(ty);
     let tag = tag(ty)?;
     let Some(raw) = raw else {
         return Ok(Tagged::null(tag));
@@ -332,7 +333,7 @@ fn read_i32(raw: &mut &[u8]) -> Result<i32, CodecError> {
 /// the codec of `subtype`. The empty flag is the empty range and nothing
 /// else; a NULL bound is a malformed message, never no bound.
 fn read_range(subtype: &Type, raw: &[u8], element: &ArrayType) -> Result<Range<Value>, CodecError> {
-    let subtype = wire_type(subtype);
+    let subtype = base_type(subtype);
     let bound = |bound: RangeBound<Option<&[u8]>>| -> Result<Bound<Value>, CodecError> {
         Ok(match bound {
             RangeBound::Inclusive(Some(raw)) => Bound::Included(value(subtype, element, raw)?),

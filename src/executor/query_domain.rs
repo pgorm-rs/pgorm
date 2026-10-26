@@ -1,5 +1,6 @@
 //! Reading an array of a domain as an array of the type the domain is over.
 
+use pgorm_query::base_type;
 use std::borrow::Cow;
 use tokio_postgres::types::{FromSql, Kind, Type};
 
@@ -17,22 +18,20 @@ pub(super) struct Transparent<T>(pub(super) T);
 /// `ty` with every domain under it replaced by the type it is over.
 // [spec:pgorm:def:exec.decode.array+2]
 fn without_domains(ty: &Type) -> Cow<'_, Type> {
-    match ty.kind() {
-        Kind::Domain(base) => without_domains(base),
-        Kind::Array(member) => {
-            let element = without_domains(member);
-            if std::ptr::eq(element.as_ref(), member) {
-                return Cow::Borrowed(ty);
-            }
-            Cow::Owned(Type::new(
-                ty.name().to_owned(),
-                ty.oid(),
-                Kind::Array(element.into_owned()),
-                ty.schema().to_owned(),
-            ))
-        }
-        _ => Cow::Borrowed(ty),
+    let ty = base_type(ty);
+    let Kind::Array(member) = ty.kind() else {
+        return Cow::Borrowed(ty);
+    };
+    let element = without_domains(member);
+    if std::ptr::eq(element.as_ref(), member) {
+        return Cow::Borrowed(ty);
     }
+    Cow::Owned(Type::new(
+        ty.name().to_owned(),
+        ty.oid(),
+        Kind::Array(element.into_owned()),
+        ty.schema().to_owned(),
+    ))
 }
 
 impl<'a, T: FromSql<'a>> FromSql<'a> for Transparent<T> {

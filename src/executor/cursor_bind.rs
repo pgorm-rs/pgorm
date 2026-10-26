@@ -21,6 +21,12 @@ impl std::fmt::Debug for ValueHolder {
 
 use crate::executor::created_range::{is_created_multirange, is_created_range};
 use bytes::BytesMut;
+// A domain is transparent on the wire: its values are sent in the
+// representation of the type it is built over, so the whole binding decision,
+// the acceptance check and the encoding alike, is made against `base_type`,
+// and only a refusal names the type as the schema declares it.
+// [spec:pgorm:req:exec.cursor.binding-accepts+3]
+use pgorm_query::base_type;
 use rust_decimal::Decimal;
 
 #[path = "cursor_bind_range.rs"]
@@ -40,19 +46,6 @@ fn out_of_range(
 // [spec:pgorm:req:exec.cursor.binding-accepts+3]
 fn mismatch(kind: &'static str, ty: &Type) -> Box<dyn std::error::Error + Sync + Send> {
     format!("cannot bind a `{kind}` value to Postgres type `{ty}`").into()
-}
-
-/// The type a value is actually written in. A domain is transparent on the
-/// wire — its values are sent in the representation of the type it is built
-/// over — so the whole binding decision, the acceptance check and the
-/// encoding alike, is made against the base type.
-// [spec:pgorm:req:exec.cursor.binding-accepts+3]
-fn wire_type(ty: &Type) -> &Type {
-    let mut ty = ty;
-    while let Kind::Domain(base) = ty.kind() {
-        ty = base;
-    }
-    ty
 }
 
 /// The types whose binary representation is the value's text: the four
@@ -120,7 +113,7 @@ fn bind_civil_datetime(
 ) -> BindResult {
     match value {
         None => Ok(IsNull::Yes),
-        Some(_) if !is_timestamp(wire_type(ty)) => Err(mismatch("DateTime", ty)),
+        Some(_) if !is_timestamp(base_type(ty)) => Err(mismatch("DateTime", ty)),
         Some(value) => match civil_micros_since_pg_epoch(value) {
             Some(micros) => {
                 postgres_protocol::types::timestamp_to_sql(micros, out);
@@ -170,7 +163,7 @@ fn zero_numeric_to_sql(scale: u16, out: &mut BytesMut) {
 // [spec:pgorm:req:exec.cursor.binding-gaps+3]
 fn numeric_to_sql(value: &Decimal, ty: &Type, out: &mut BytesMut) -> BindResult {
     if !value.is_zero() {
-        return value.to_sql(wire_type(ty), out);
+        return value.to_sql(base_type(ty), out);
     }
     match u16::try_from(value.scale()) {
         Ok(scale) if scale <= MAX_NUMERIC_DSCALE => {
@@ -187,7 +180,7 @@ fn numeric_to_sql(value: &Decimal, ty: &Type, out: &mut BytesMut) -> BindResult 
 fn bind_decimal(value: Option<&Decimal>, ty: &Type, out: &mut BytesMut) -> BindResult {
     match value {
         None => Ok(IsNull::Yes),
-        Some(_) if *wire_type(ty) != Type::NUMERIC => Err(mismatch("Decimal", ty)),
+        Some(_) if *base_type(ty) != Type::NUMERIC => Err(mismatch("Decimal", ty)),
         Some(value) => numeric_to_sql(value, ty, out),
     }
 }
@@ -209,7 +202,7 @@ fn bind_exact<T>(
 where
     T: ToSql,
 {
-    let target = wire_type(ty);
+    let target = base_type(ty);
     match value {
         None => Ok(IsNull::Yes),
         Some(value) if accepted(target) => value.to_sql(target, out),
@@ -224,7 +217,7 @@ where
 /// integer representation to receive, and is refused.
 // [spec:pgorm:req:exec.cursor.binding-coerce+2]
 fn integer_to_sql(value: i64, kind: &'static str, ty: &Type, out: &mut BytesMut) -> BindResult {
-    let target = wire_type(ty);
+    let target = base_type(ty);
     if *target == Type::INT2 {
         match i16::try_from(value) {
             Ok(value) => value.to_sql(target, out),
@@ -264,7 +257,7 @@ fn integer_to_sql(value: i64, kind: &'static str, ty: &Type, out: &mut BytesMut)
 /// than a lie.
 // [spec:pgorm:req:exec.cursor.binding-coerce+2]
 fn float_to_sql(value: f64, kind: &'static str, ty: &Type, out: &mut BytesMut) -> BindResult {
-    let target = wire_type(ty);
+    let target = base_type(ty);
     if *target == Type::FLOAT4 {
         let narrowed = value as f32;
         if value.is_finite() && !narrowed.is_finite() {
@@ -351,7 +344,7 @@ impl ToSql for ValueHolder {
             Value::Float(x) => bind_float(*x, "Float", ty, out),
             Value::Double(x) => bind_float(*x, "Double", ty, out),
             Value::String(Some(text))
-                if is_created_range(wire_type(ty)) || is_created_multirange(wire_type(ty)) =>
+                if is_created_range(base_type(ty)) || is_created_multirange(base_type(ty)) =>
             {
                 range::bind_created_text(text, ty, out)
             }
@@ -380,7 +373,7 @@ impl ToSql for ValueHolder {
                 // `Vec<T>`'s own impl panics on a non-array type rather than
                 // erroring, so the shape has to be established here first.
                 // Each element then re-enters this impl with the member type.
-                let target = wire_type(ty);
+                let target = base_type(ty);
                 match target.kind() {
                     Kind::Array(_) => x
                         .iter()
@@ -396,7 +389,7 @@ impl ToSql for ValueHolder {
             }
             Value::IpNetwork(x) => match x.as_deref() {
                 None => Ok(IsNull::Yes),
-                Some(_) if !matches!(*wire_type(ty), Type::INET | Type::CIDR) => {
+                Some(_) if !matches!(*base_type(ty), Type::INET | Type::CIDR) => {
                     Err(mismatch("IpNetwork", ty))
                 }
                 Some(x) => {
@@ -406,7 +399,7 @@ impl ToSql for ValueHolder {
             },
             Value::MacAddress(x) => match x.as_deref() {
                 None => Ok(IsNull::Yes),
-                Some(_) if *wire_type(ty) != Type::MACADDR => Err(mismatch("MacAddress", ty)),
+                Some(_) if *base_type(ty) != Type::MACADDR => Err(mismatch("MacAddress", ty)),
                 Some(x) => {
                     postgres_protocol::types::macaddr_to_sql(x.bytes(), out);
                     Ok(IsNull::No)
@@ -415,7 +408,7 @@ impl ToSql for ValueHolder {
             // [spec:pgorm:req:exec.cursor.binding-interval]
             Value::Interval(x) => match x.as_deref() {
                 None => Ok(IsNull::Yes),
-                Some(_) if *wire_type(ty) != Type::INTERVAL => Err(mismatch("Interval", ty)),
+                Some(_) if *base_type(ty) != Type::INTERVAL => Err(mismatch("Interval", ty)),
                 Some(x) => {
                     out.extend_from_slice(&x.to_binary());
                     Ok(IsNull::No)

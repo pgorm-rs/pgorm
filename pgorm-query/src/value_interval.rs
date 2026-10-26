@@ -2,10 +2,10 @@
 
 use std::{error::Error, fmt};
 
-use postgres_types::{FromSql, Kind, Type};
+use postgres_types::{FromSql, Type};
 
 use crate::{
-    ArrayType, ColumnType, IntervalSpec, Nullable, Value, ValueType, ValueTypeError,
+    ArrayType, ColumnType, IntervalSpec, Nullable, Value, ValueType, ValueTypeError, base_type,
     value::with_array::NotU8,
 };
 
@@ -120,11 +120,7 @@ impl fmt::Display for Interval {
 /// Whether `ty` is `interval`, or a domain over it, which is sent in the
 /// representation of the type it is built over.
 fn is_interval(ty: &Type) -> bool {
-    let mut ty = ty;
-    while let Kind::Domain(base) = ty.kind() {
-        ty = base;
-    }
-    *ty == Type::INTERVAL
+    *base_type(ty) == Type::INTERVAL
 }
 
 /// The binary form [`Interval::to_binary`] writes.
@@ -204,6 +200,7 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use postgres_types::Kind;
 
     // [spec:pgorm:def:sql.value.interval+2/test]
     #[test]

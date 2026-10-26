@@ -52,7 +52,7 @@ today, including panicking edges and deliberate failsafes.
 > `MergeStatement` do not, and a caller who wants a second copy of one writes
 > `.to_owned()`.
 
-> [spec:pgorm:req:sql.surface+36]
+> [spec:pgorm:req:sql.surface+37]
 > The crate's exports are an explicit list, not a set of module globs.
 > `pgorm-query/src/lib.rs` MUST name every exported item in `pub use` statements
 > grouped by what the items are for — names, expressions, values, query
@@ -187,8 +187,10 @@ today, including panicking edges and deliberate failsafes.
 > `TableFunction`, a set-returning function in `FROM` with its ordinal column,
 > column names and `ROWS FROM` (`sql.ast.select.table-function`);
 > `TableSample`, a table read through `TABLESAMPLE`, and `SampleMethod`, the
-> method that draws it (`sql.ast.select.table-sample`); and
-> `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`). An
+> method that draws it (`sql.ast.select.table-sample`);
+> `POSTGRES_TARGET`, the PostgreSQL release a build targets (`sql.target`);
+> and `base_type`, the type a value of a domain travels as, every domain
+> looked through to the type at the bottom (`sql.value.base-type`). An
 > item leaves the list with the state it described: `Frame` went when a
 > frame's bounds stopped being one enum, the frame builder replacing it
 > (`sql.ast.window-statement`), `StandaloneIndexKind` when the primary-key

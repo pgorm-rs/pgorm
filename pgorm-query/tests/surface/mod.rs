@@ -65,7 +65,7 @@ fn register_span(text: &str) -> &str {
     &text[start..start + end]
 }
 
-// [spec:pgorm:req:sql.surface+36/test]    exactly `error`, `extension` and `value` are public,
+// [spec:pgorm:req:sql.surface+37/test]    exactly `error`, `extension` and `value` are public,
 // `tests_cfg` hidden behind its feature, no module inside them public but
 // `value::with_array`, `error` exporting what the rule names, and every item
 // `value` exports exported at the root as well
@@ -138,7 +138,7 @@ fn exactly_three_modules_are_public() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+36/test]    every export of lib.rs and of the three public
+// [spec:pgorm:req:sql.surface+37/test]    every export of lib.rs and of the three public
 // modules is a named item: none is a glob
 #[test]
 fn exports_are_named_never_globbed() {
@@ -160,7 +160,7 @@ fn exports_are_named_never_globbed() {
     }
 }
 
-// [spec:pgorm:req:sql.surface+36/test]    lib.rs's `#[doc(hidden)]` exports are the residue
+// [spec:pgorm:req:sql.surface+37/test]    lib.rs's `#[doc(hidden)]` exports are the residue
 // the rule names, and every export the rule's residue paragraph names is one of them
 #[test]
 fn doc_hidden_residue_is_the_named_list() {
@@ -188,7 +188,7 @@ fn doc_hidden_residue_is_the_named_list() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+36/test]    the register and the exports agree both ways: an
+// [spec:pgorm:req:sql.surface+37/test]    the register and the exports agree both ways: an
 // export of lib.rs or `extension` outside the baseline has an entry, each entry names an
 // export and ends with a rule the spec defines, and the baseline holds only what is still
 // exported
@@ -268,7 +268,7 @@ fn register_and_exports_agree_both_ways() {
     );
 }
 
-// [spec:pgorm:req:sql.surface+36/test]    the compiler refuses every path to `Write`, `Mode`,
+// [spec:pgorm:req:sql.surface+37/test]    the compiler refuses every path to `Write`, `Mode`,
 // `Oper` and the clause shapes a statement holds internally
 //
 // The snapshot is rustc's own wording, and the refusal it records is the

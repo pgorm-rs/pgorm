@@ -14598,12 +14598,28 @@ children (
         title "One helper looks through a type's domains, where six places each spell it"
         kind @refactor
         deps (python-created-range-domain-subtype)
+        sealed true
         log (
             {
                 at 2026-10-26T16:12:26.942652Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-created-range-domain-subtype (2026-10-26). The same few lines that look through a type's (possibly nested) domains to its base exist in about six places: src/database/copy_rows.rs wire_type, src/executor/cursor_bind.rs wire_type, src/executor/query_domain.rs without_domains, the loop in src/executor/created_range.rs, pgorm-napi's wire_type and pgorm-python's over_domains. Give pgorm one public helper (a free function over tokio_postgres::types::Type, re-exported for the bindings) and use it everywhere, with no behaviour change."
+            }
+
+            {
+                at 2026-10-26T17:28:37.205426Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-26T17:28:54.600221Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Seven copies, not six: pgorm-query's Interval acceptance check (value_interval.rs is_interval) spelled the same loop, and pgorm-query sits beneath pgorm, so the one helper lives there as pgorm_query::base_type (private module value_domain.rs, re-exported at the root, recorded in sql.surface's register, specified by the new sql.value.base-type). pgorm and both bindings reach it as pgorm_query::base_type / pgorm::pgorm_query::base_type with no new dependency. query_domain.rs keeps without_domains for what base_type deliberately does not do (rewriting an array type whose element is a domain, which postgres-types checks by identity); its top step now asks base_type."
+                after_done true
             }
         )
     }

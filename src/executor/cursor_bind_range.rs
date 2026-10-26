@@ -24,7 +24,7 @@ type WireResult<T> = Result<T, WireError>;
 /// all the same. Any other inferred type is refused.
 // [spec:pgorm:req:exec.cursor.binding-range+3]
 pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) -> BindResult {
-    match wire_type(ty).kind() {
+    match base_type(ty).kind() {
         Kind::Range(subtype) => {
             write_range(range, subtype, out)?;
             Ok(IsNull::No)
@@ -41,7 +41,7 @@ pub(super) fn bind_range(range: &Range<Value>, ty: &Type, out: &mut BytesMut) ->
 /// no `RangeSubtype` reads, are a mismatch.
 // [spec:pgorm:req:exec.cursor.binding-range+3]
 pub(super) fn bind_created_text(text: &str, ty: &Type, out: &mut BytesMut) -> BindResult {
-    let target = wire_type(ty);
+    let target = base_type(ty);
     let refused =
         |error: WireError| -> WireError { format!("{}: {error}", mismatch("String", ty)).into() };
     match target.kind() {
@@ -72,7 +72,7 @@ pub(super) fn bind_multirange(
     ty: &Type,
     out: &mut BytesMut,
 ) -> BindResult {
-    let Kind::Multirange(subtype) = wire_type(ty).kind() else {
+    let Kind::Multirange(subtype) = base_type(ty).kind() else {
         return Err(mismatch("Multirange", ty));
     };
     write_multirange(multirange, subtype, out)?;
