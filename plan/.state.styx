@@ -1576,8 +1576,6 @@ impl_evidence (
         conn.pool.no-conn-trait
         conn.pool.recycle
         conn.pool.statement-cache
-        conn.statement
-        conn.statement.disabled-types
         conn.tx
         conn.tx.guard
     ), covered_claims (
@@ -1590,8 +1588,6 @@ impl_evidence (
         {impl_name main, rule conn.pool.no-conn-trait}
         {impl_name main, rule conn.pool.recycle}
         {impl_name main, rule conn.pool.statement-cache}
-        {impl_name main, rule conn.statement}
-        {impl_name main, rule conn.statement.disabled-types}
         {impl_name main, rule conn.tx}
         {impl_name main, rule conn.tx.guard}
     )}

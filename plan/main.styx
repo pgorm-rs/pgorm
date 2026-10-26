@@ -1243,6 +1243,14 @@ children (
                         text "conn.pool.statement-cache (+3) and conn.pool.lifecycle (+2) now name StatementCaches::clear_before_reuse and recycle's clear of a cache behind the pool's generation, which statement-cache-after-ddl added (conn.pool.statement-cache.clear, 2adf99d1)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-26T10:10:15.601786Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at conn.pool +4 (docs-stale-cleanup, f5ef4843): the rule says the pool's Manager holds its TLS connector as an Arc<dyn Connect> rather than a Box; every reference is pinned at +4."
+                        after_done true
+                    }
                 )
             }
 
@@ -1710,6 +1718,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked at codegen.entity.types +9 and codegen.entity.expanded +4 (codegen-enum-array-expanded, 9a8a6c61): an enum inside an array or a domain is spelled <Enum>::db_type().get_column_type().clone() by both writers, an enum column itself <Enum>::db_type(); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-26T10:10:15.435645Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at codegen.entity +4 (docs-stale-cleanup, f5ef4843): the rule no longer names the retired pgorm-cli or the deleted date_time_crate option, and its option list lost a repeated enum_extra_derives; every reference is pinned at +4."
                         after_done true
                     }
                 )
