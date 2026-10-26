@@ -5,8 +5,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.sql-json]
 
 import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Expr, Operand, OrderBy, Predicate } from "./expressions.d.ts";

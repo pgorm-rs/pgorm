@@ -30,7 +30,7 @@ pub struct PyActiveModel {
     pub(crate) inner: Active,
 }
 
-// [spec:pgorm:req:python.entities+4]
+// [spec:pgorm:req:bindings.entity-writes]
 #[pymethods]
 impl PyActiveModel {
     #[getter]

@@ -30,7 +30,7 @@ pub enum PyJsonTableBehavior {
 
 #[pymethods]
 impl PyJsonTableBehavior {
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "SQL/JSON clauses cannot be tested as Python booleans",
@@ -38,7 +38,7 @@ impl PyJsonTableBehavior {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.sql-json]
 /// One column of a `JSON_TABLE`, built by one of five static constructors,
 /// each taking only the clauses PostgreSQL admits for that kind of column.
 #[pyclass(name = "JsonTableColumn", module = "pgorm", frozen, from_py_object)]
@@ -206,7 +206,7 @@ impl PyJsonTableColumn {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.sql-json]
 /// `JSON_TABLE(context, path COLUMNS (..)) AS alias`, a FROM item. The first
 /// column and the alias are required, because PostgreSQL refuses an empty
 /// column list and pgorm names every FROM item that is not a table.

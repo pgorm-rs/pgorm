@@ -36,7 +36,7 @@ pub struct SourceModel(pub(crate) Model);
 
 /// A tuple of one to six concrete entity types a pipeline's rows decode as.
 /// pgorm's own `SourceList` fixes the arities; this is sealed the same way.
-// [spec:pgorm:req:napi.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources]
 pub trait SourceTypes: sealed::Sealed + Send + Sync + 'static {
     #[doc(hidden)]
     type Selection: SourceList + Send + Sync + 'static;
@@ -213,7 +213,7 @@ impl<T> fmt::Debug for Query<T> {
     }
 }
 
-// [spec:pgorm:req:napi.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources]
 impl<T: SourceTypes> SelectedBackend for Query<T>
 where
     <T::Selection as SourceList>::Row: Send,
@@ -261,7 +261,7 @@ where
 impl Registry {
     /// Register a tuple of one to six entity types a pipeline's
     /// `select_sources` decodes rows as, each entity registered first.
-    // [spec:pgorm:req:napi.pipeline-sources]
+    // [spec:pgorm:req:bindings.pipeline-sources]
     pub fn sources<T: SourceTypes>(&mut self, name: &str) -> Result<&mut Self, RegistrationError>
     where
         <T::Selection as SourceList>::Row: Send,

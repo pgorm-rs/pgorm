@@ -58,7 +58,7 @@ fn with(
 
 /// `ddlColumnNew(name, type)`: a column, its type left out for a
 /// `modifyColumn` that does not retype it.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn column_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let kind = arg(cx, 1);
@@ -73,7 +73,7 @@ fn column_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlColumnNotNull(column, { name, noInherit })`: the column's one `NOT
 /// NULL` constraint, named and kept from inheriting tables as asked; a later
 /// call changes it where it stands.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn column_not_null(cx: &mut FunctionContext) -> NeonResult<Node> {
     with(cx, |cx, column| {
         let options = object(cx, 1, &["name", "noInherit"])?;
@@ -110,7 +110,7 @@ fn column_default(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// A `CHECK` over the expression at `index`, named, enforced or not and kept
 /// from inheriting tables as the options object after it says: what a
 /// column's, a table's and an added `CHECK` each are.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 pub(super) fn check<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -145,7 +145,7 @@ fn column_check(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlColumnGenerated(column, expression, kind)`: the kind is always named,
 /// PostgreSQL 17 refusing a generated column without one and 18 reading it as
 /// virtual.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn column_generated(cx: &mut FunctionContext) -> NeonResult<Node> {
     with(cx, |cx, column| {
         let expr = arg(cx, 1);
@@ -167,7 +167,7 @@ fn column_generated(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlColumnIdentity(column, generation, options)`: `GENERATED { ALWAYS |
 /// BY DEFAULT } AS IDENTITY`, with its sequence's options when there are any.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn column_identity(cx: &mut FunctionContext) -> NeonResult<Node> {
     with(cx, |cx, column| {
         let generation = arg(cx, 1);

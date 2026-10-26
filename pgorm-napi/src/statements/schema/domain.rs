@@ -59,7 +59,7 @@ fn with(
 /// A domain's `CHECK` over the expression at `index`, named as the options
 /// object after it says, and whether it is added `NOT VALID` where `extra`
 /// lets the options say so.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn check(
     cx: &mut FunctionContext,
     index: usize,
@@ -80,7 +80,7 @@ fn check(
 
 /// `ddlCreateDomain(name, base)`: the domain and the type it is over, which
 /// the grammar requires both of.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn create_domain(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = type_ref(cx, name)?;
@@ -101,7 +101,7 @@ fn domain_collate(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlDomainDefault(create, value)`: an expression, or a value written as
 /// pgorm-query's literal; a later default replaces it.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn domain_default(cx: &mut FunctionContext) -> NeonResult<Node> {
     with(cx, |cx, create| {
         let value = operand_at(cx, 1)?;
@@ -128,7 +128,7 @@ fn domain_null(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlDomainCheck(create, condition, { name })`: a check appended, which
 /// takes no `notValid`, PostgreSQL having no `NOT VALID` at `CREATE DOMAIN`.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn domain_check(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (check, _) = check(cx, 1, &[])?;
     with(cx, |_, create| {
@@ -138,7 +138,7 @@ fn domain_check(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlAlterDomain(name)`: the domain, with no action yet.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn alter_domain(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = type_ref(cx, name)?;
@@ -176,7 +176,7 @@ fn domain_drop_not_null(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlDomainAddCheck(alter, condition, { name, notValid })`: `notValid`
 /// leaves the values columns of the domain already hold unchecked until the
 /// constraint is validated.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn domain_add_check(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pending = pending(cx)?;
     let (check, not_valid) = check(cx, 1, &["notValid"])?;
@@ -189,7 +189,7 @@ fn domain_add_check(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlDomainDropConstraint(alter, name, { ifExists, behavior })`.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn domain_drop_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pending = pending(cx)?;
     let name = name_at(cx, 1)?;
@@ -229,7 +229,7 @@ fn domain_rename_to(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlDropDomain(names, { ifExists, behavior })`: one domain, or a
 /// non-empty array of them.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn drop_domain(cx: &mut FunctionContext) -> NeonResult<Node> {
     let names = arg(cx, 0);
     let names = match names.downcast::<JsArray, _>(cx) {
@@ -262,7 +262,7 @@ fn drop_domain(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `exprDomainValue()`: `VALUE`, which PostgreSQL reads inside a domain's
 /// `CHECK` as the value tested and anywhere else as a column named `value`.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 fn domain_value(_: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Expr(Expr::domain_value().into()))
 }

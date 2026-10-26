@@ -30,14 +30,14 @@ pub(crate) enum Arbiter {
 }
 
 /// `conflictDoNothing()`: `ON CONFLICT DO NOTHING`, answering any conflict.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn conflict_do_nothing(_: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Conflict(OnConflict::do_nothing()))
 }
 
 /// `conflictOn(items)`: an inference target of columns, named by string, and
 /// index expressions; at least one.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn conflict_on(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut target: Option<ConflictTarget> = None;
     for item in list(cx, 0)? {

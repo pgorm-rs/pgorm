@@ -5,7 +5,7 @@
 // one set to NULL; RETURNING the fields as records; and the terminals that
 // read a written row's two versions, as pgorm's `exec_returning_change(s)`
 // and `exec_returning_upsert(s)` read them.
-// [spec:pgorm:req:napi.model-writes]
+// [spec:pgorm:req:bindings.model-writes]
 
 import { runStatement } from "./connections.js";
 import { ConstructionError, DecodeError } from "./errors.js";

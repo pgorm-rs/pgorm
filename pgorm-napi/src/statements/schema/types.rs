@@ -57,7 +57,7 @@ fn type_at(cx: &mut FunctionContext, index: usize) -> NeonResult<ColumnType> {
 }
 
 /// `ddlCreateType(name)`: a shell type until a kind is chosen.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn create_type(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = type_ref(cx, name)?;
@@ -72,7 +72,7 @@ fn type_as_enum(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlTypeValues(type, labels)`: labels appended to an enumeration, which
 /// the type becomes. A label is data, written as a literal.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_values(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut statement = created(cx)?;
     let labels = arg(cx, 1);
@@ -95,7 +95,7 @@ fn type_as_composite(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlTypeAttribute(type, name, type, { collation })`: an attribute appended
 /// to a composite, which the type becomes.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_attribute(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut statement = created(cx)?;
     let name = name_at(cx, 1)?;
@@ -111,7 +111,7 @@ fn type_attribute(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlTypeAsRange(type, subtype, options)`: a range over `subtype`, the one
 /// option PostgreSQL requires, with the operator class, collation,
 /// difference function and multirange name the options give.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_as_range(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut statement = created(cx)?;
     let subtype = type_at(cx, 1)?;
@@ -143,7 +143,7 @@ fn type_as_range(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlAlterType(name)`: the type, with no change yet.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn alter_type(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = type_ref(cx, name)?;
@@ -159,7 +159,7 @@ fn pending(cx: &mut FunctionContext) -> NeonResult<PendingTypeAlter> {
 
 /// `ddlTypeAddValue(alter, label, { before, after })`: a label added to an
 /// enumeration, at its end or beside one, never both.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_add_value(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pending = pending(cx)?;
     let value = arg(cx, 1);
@@ -201,7 +201,7 @@ fn type_rename_value(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlTypeRenameAttribute(alter, name, newName)`: a statement of its own,
 /// PostgreSQL taking `RENAME` as an `ALTER TYPE`'s sole action.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_rename_attribute(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pending = pending(cx)?;
     let from = name_at(cx, 1)?;
@@ -236,7 +236,7 @@ macro_rules! change {
 }
 
 /// `ddlCompositeAdd(alter, name, type, { collation })`.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn composite_add(cx: &mut FunctionContext) -> NeonResult<Node> {
     let composite = composite(cx)?;
     let name = name_at(cx, 1)?;
@@ -272,7 +272,7 @@ fn composite_alter(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlTypeBehavior(alter, behavior)`: `CASCADE` or `RESTRICT` after a
 /// composite's changes or an attribute's rename, the last call winning.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn type_behavior(cx: &mut FunctionContext) -> NeonResult<Node> {
     let receiver = this(cx, 0)?;
     let behavior = arg(cx, 1);
@@ -299,7 +299,7 @@ fn type_behavior(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlDropType(names, { ifExists, behavior })`.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 fn drop_type(cx: &mut FunctionContext) -> NeonResult<Node> {
     let names = arg(cx, 0);
     let names = match names.downcast::<JsArray, _>(cx) {

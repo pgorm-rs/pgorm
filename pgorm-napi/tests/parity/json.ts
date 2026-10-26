@@ -1,6 +1,6 @@
 // The SQL/JSON family's parity cases — query functions, constructors, IS JSON
 // and JSON_TABLE — held to `json.json` as `select.ts`'s are to theirs.
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 
 import {
   bind,

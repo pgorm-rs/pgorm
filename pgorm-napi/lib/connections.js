@@ -3,11 +3,14 @@
 // Pools, connections and transactions. Each holds a native handle and
 // releases what it holds when closed — `close()`, `await using`, the end of a
 // callback — never by waiting for garbage collection.
-// [spec:pgorm:req:napi.connections+4]
-// [spec:pgorm:req:napi.results]
-// [spec:pgorm:req:napi.transactions+2]
-// [spec:pgorm:req:napi.copy+2]
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:napi.lifecycle]
+// [spec:pgorm:req:bindings.results]
+// [spec:pgorm:req:napi.raw]
+// [spec:pgorm:req:bindings.transactions]
+// [spec:pgorm:req:napi.transactions+3]
+// [spec:pgorm:req:bindings.copy]
+// [spec:pgorm:req:bindings.listen]
 
 import { statementArgs } from "./builder.js";
 import { COPY, CopyRunner } from "./copy.js";
@@ -135,7 +138,7 @@ export class Queryable extends CopyRunner {
  * Run a built statement and resolve with its result as the addon gives it,
  * `[names, rows, kinds]` — each row an array of values in column order, and
  * each column's kind — for a model to decode against its declaration.
- * [spec:pgorm:req:napi.model-records]
+ * [spec:pgorm:req:bindings.model-records]
  *
  * @param {unknown} db
  * @param {"execute" | "all" | "one" | "optional"} terminal
@@ -157,7 +160,8 @@ export async function runStatement(db, terminal, statement, options) {
  * addon — on a pool's connection, a connection or a transaction, with the
  * operation a statement gets around it: the busy refusal, the abort, the
  * discard of a connection an abort left in an unknown state.
- * [spec:pgorm:req:napi.entities]
+ * [spec:pgorm:req:bindings.entities]
+ * [spec:pgorm:req:bindings.registered-pools]
  *
  * @param {unknown} db
  * @param {unknown} job

@@ -100,7 +100,7 @@ fn kept(failure: &Failure) -> Settle {
 
 /// What ends a session from outside: the caller's abort, or what the COPY
 /// runs on closing.
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:bindings.cancellation]
 pub(crate) struct Stop {
     abort: Abort,
     ends: Vec<(CancellationToken, &'static str)>,
@@ -313,7 +313,7 @@ where
 /// Run a `COPY … FROM STDIN` on `db`: open it, report the opening on
 /// `opened`, feed it what JavaScript writes and finish it when JavaScript
 /// says, returning whether `db`'s connection is kept.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 pub(crate) async fn copy_in<C>(
     db: &mut C,
     copy: &CopyFrom,
@@ -512,7 +512,7 @@ where
 /// `poolCopyIn(pool, copy, abort, rows)`: a COPY FROM on a connection the pool
 /// lends it alone, returned when the COPY finishes or is abandoned and
 /// discarded when it is cut off.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn pool_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let pool = cx.argument::<JsBox<PoolHandle>>(0)?.0.clone();
     let (copy, rows) = copy_from_rows_at(&mut cx, 1, 3)?;
@@ -539,7 +539,7 @@ fn pool_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `connectionCopyIn(connection, copy, abort, rows)`: a COPY FROM holding the
 /// connection, which refuses other work until it ends.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn connection_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
     let (copy, rows) = copy_from_rows_at(&mut cx, 1, 3)?;
@@ -582,7 +582,7 @@ fn permits(length: usize) -> u32 {
 /// `copyInWrite(copyIn, chunk)`: queue a copy of `chunk` for the COPY, and
 /// `true`; or `false`, queuing nothing, while the budget is spent. Throws
 /// once the COPY has ended.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_in_write(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let state = in_state(&mut cx)?;
     let chunk = cx.argument::<JsUint8Array>(1)?;
@@ -626,7 +626,7 @@ fn copy_in_ready(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `copyInFinish(copyIn)`: complete the COPY and resolve with the rows it
 /// wrote, once its connection is free again. A row the server refused is
 /// reported here.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_in_finish(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
     if let Some(rows) = &state.rows {
@@ -650,7 +650,7 @@ fn copy_in_finish(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `copyInAbort(copyIn)`: abandon the COPY because its source failed, and
 /// resolve once its connection is free again: outside a transaction nothing
 /// was written; inside one, the transaction is aborted.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_in_abort(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
     state.abandon.cancel();
@@ -666,8 +666,8 @@ fn copy_in_abort(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// transaction closing — so that `copyIn` stops waiting on its source. In
 /// flight for the COPY's whole length, it holds the event loop as the COPY
 /// does.
-// [spec:pgorm:req:napi.copy+2]
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:bindings.copy]
+// [spec:pgorm:req:bindings.cancellation]
 fn copy_in_ended(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = in_state(&mut cx)?;
     let work = async move {
@@ -809,7 +809,7 @@ async fn gather(
 /// `opened`, and answer each pull with the data that has arrived, returning
 /// whether `db`'s connection is kept: at the end, or after a failure the
 /// server reported, and not when the stream closes before its end.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 pub(crate) async fn copy_out<C>(
     db: &mut C,
     copy: &CopyTo,
@@ -918,7 +918,7 @@ where
 
 /// `poolCopyOut(pool, copy, abort, rows)`: a COPY TO on a connection of its own,
 /// returned to the pool at its end and discarded if it closes before.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn pool_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let pool = cx.argument::<JsBox<PoolHandle>>(0)?.0.clone();
     let (copy, rows) = copy_to_rows_at(&mut cx, 1, 3)?;
@@ -945,7 +945,7 @@ fn pool_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `connectionCopyOut(connection, copy, abort, rows)`: a COPY TO holding the
 /// connection, which refuses other work until the stream ends or closes.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn connection_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
     let (copy, rows) = copy_to_rows_at(&mut cx, 1, 3)?;
@@ -982,7 +982,7 @@ fn out_state(cx: &mut FunctionContext) -> NeonResult<Arc<OutState>> {
 /// `copyOutNext(stream, abort)`: the next piece of data as a `Uint8Array`,
 /// or `null` at the end, which resolves once the connection is free again.
 /// One pull runs at a time.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_out_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = out_state(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
@@ -1031,7 +1031,7 @@ fn chunk_to_js<'cx>(cx: &mut Cx<'cx>, chunk: Option<Bytes>) -> JsResult<'cx, JsV
 
 /// `copyOutClose(stream)`: end the stream, discarding its connection if data
 /// remained, and resolve once it is released.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_out_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = out_state(&mut cx)?;
     state.close.cancel();

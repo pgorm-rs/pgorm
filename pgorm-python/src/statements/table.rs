@@ -62,7 +62,7 @@ impl PyTable {
         )
     }
 
-    // [spec:pgorm:req:python.statements+10]
+    // [spec:pgorm:req:bindings.select]
     /// This table read through `TABLESAMPLE`, a `FromItem` qualified by the
     /// table's alias, or by its unqualified name: `method` draws each row
     /// (or page) with probability `percentage` out of 100, and `repeatable`
@@ -101,7 +101,7 @@ impl PyTable {
         )
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "SQL tables cannot be tested as Python booleans",

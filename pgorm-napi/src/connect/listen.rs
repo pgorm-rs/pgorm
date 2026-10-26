@@ -116,7 +116,7 @@ fn listener(cx: &mut FunctionContext) -> NeonResult<Arc<ListenerState>> {
 /// `poolListener(pool, capacity, abort)`: a listener on a connection of its
 /// own, opened with the pool's configuration, holding at most `capacity`
 /// notifications unread.
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.listen]
 fn pool_listener(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let capacity = cx.argument::<JsNumber>(1)?.value(&mut cx);
@@ -177,8 +177,8 @@ enum Verb {
 /// `listenerSend(listener, verb, channel, abort)`: `LISTEN`, `UNLISTEN` or
 /// `UNLISTEN *`. An abort closes the listener: the statement may have
 /// reached the server, leaving the channels it listens on unknown.
-// [spec:pgorm:req:napi.listen]
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.cancellation]
 fn listener_send(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
     let verb = cx.argument::<JsString>(1)?.value(&mut cx);
@@ -271,7 +271,7 @@ async fn next(
 
 /// `listenerNext(listener, abort)`: `[channel, payload, processId]`, or
 /// `null` once the listener is closed.
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.listen]
 fn listener_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
@@ -297,7 +297,7 @@ fn listener_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `listenerClose(listener)`: close the listener's connection, ending a pull
 /// in flight, and resolve once it is released.
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.listen]
 fn listener_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
     state.closed.cancel();
@@ -327,7 +327,7 @@ impl Settled for Notified {
 
 /// `notifyJob(channel, payload)`: pgorm's `notify` as a job, which the pool,
 /// connection or transaction it runs on runs as it runs a statement.
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.listen]
 fn notify_job(mut cx: FunctionContext) -> JsResult<JsBox<JobHandle>> {
     let channel = cx.argument::<JsString>(0)?.value(&mut cx);
     let payload = cx.argument::<JsString>(1)?.value(&mut cx);

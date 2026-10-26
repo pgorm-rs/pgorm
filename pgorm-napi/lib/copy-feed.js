@@ -4,7 +4,7 @@
 // source as the COPY takes its data, queueing pieces within the addon's
 // budget, and abandoning the COPY when the source fails or the COPY is cut
 // off.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 
 import { native } from "./operations.js";
 

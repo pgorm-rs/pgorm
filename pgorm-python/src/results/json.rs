@@ -97,7 +97,7 @@ fn canonical(text: &str) -> Result<(bool, String, i64), CodecError> {
 mod tests {
     use super::*;
 
-    // [spec:pgorm:req:python.results/test]
+    // [spec:pgorm:req:bindings.values/test]
     #[test]
     fn json_numbers_reject_rounding_and_integer_loss() -> Result<(), CodecError> {
         for text in [

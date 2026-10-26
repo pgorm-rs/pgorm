@@ -2,7 +2,7 @@
 
 // INSERT, UPDATE and DELETE, and the RETURNING list that reads a written
 // row's old and new versions.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 
 import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

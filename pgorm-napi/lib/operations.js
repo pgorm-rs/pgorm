@@ -3,7 +3,7 @@
 // What the connection classes share: the addon they call, the abort tokens an
 // `AbortSignal` fires, how a row's values become an object, and how a
 // callback's transaction ends.
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:napi.cancellation+1]
 
 import { LifecycleError } from "./errors.js";
 
@@ -63,7 +63,7 @@ export async function abortable(signal, start) {
  * `Object.fromEntries`, which defines its keys, so a column named
  * `__proto__` is a property like any other rather than the object's
  * prototype.
- * [spec:pgorm:req:napi.rows]
+ * [spec:pgorm:req:napi.records]
  *
  * @param {string[]} names
  * @param {unknown[]} values
@@ -90,7 +90,7 @@ export function queryOptions(options) {
  * transaction, discarding its connection, and rejects with its failure; a
  * ROLLBACK that fails does too, rejecting with a `SuppressedError` over the
  * rollback's failure and what `use` threw.
- * [spec:pgorm:req:napi.transactions+2]
+ * [spec:pgorm:req:napi.transactions+3]
  *
  * @template T
  * @param {unknown} handle

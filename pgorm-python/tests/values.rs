@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{ArrayType, Interval, Value};
 use pgorm_python::values::{PyInterval, PyTypeName, PyValue};
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.values+5/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     Python::initialize();
@@ -51,7 +51,7 @@ fn python_scalars_preserve_rust_variants() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+5/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn python_interval_is_the_rust_interval() -> PyResult<()> {
     Python::initialize();
@@ -99,7 +99,7 @@ fn python_interval_is_the_rust_interval() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.value-tags/test]
+// [spec:pgorm:req:python.values+6/test]
 #[test]
 fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     Python::initialize();
@@ -121,8 +121,8 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+5/test]
-// [spec:pgorm:req:python.value-tags/test]
+// [spec:pgorm:req:bindings.values/test]
+// [spec:pgorm:req:bindings.value-tags/test]
 #[test]
 fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
     Python::initialize();
@@ -162,7 +162,7 @@ fn arrays_and_json_null_keep_rust_identity() -> PyResult<()> {
 
 // [spec:pgorm:def:sql.value.range+5/test]    a range or multirange reaches Python as a
 // `pgorm.Range` or `pgorm.Multirange`, tagged with its range type, and converts back unchanged
-// [spec:pgorm:req:python.values+5/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     use pgorm::pgorm_query::{Multirange, Range, RangeType};
@@ -208,7 +208,7 @@ fn rust_ranges_round_trip_through_python() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+5/test]    a created range's Python value is the Value its Rust
+// [spec:pgorm:req:bindings.created-ranges/test]    a created range's Python value is the Value its Rust
 // newtype converts into, written as the newtype writes itself, and reads back as the range
 #[test]
 fn created_ranges_match_their_rust_newtypes() -> PyResult<()> {

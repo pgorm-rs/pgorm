@@ -93,7 +93,7 @@ impl Plan {
 /// The plan for `expressions`, taken by a stage whose `With` function had
 /// `scope`, or by a plain stage when it is `None`: a placeholder from any
 /// other scope is refused, as pgorm's brand refuses it.
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-binder]
 fn plan<'cx>(
     cx: &mut Cx<'cx>,
     expressions: Vec<PlExpr>,
@@ -250,8 +250,8 @@ fn pipeline_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<p
 /// A relation: a `Table`, read under its alias when it has one, a table's
 /// name, a `Pipeline` embedded whole, a `Source`, or a registered entity's
 /// table, its schema from the registration.
-// [spec:pgorm:req:napi.pipeline]
-// [spec:pgorm:req:napi.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline]
+// [spec:pgorm:req:bindings.pipeline-sources]
 fn relation<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Source> {
     if let Some(entity) = crate::entities::entity_source(cx, value) {
         return Ok(Source {
@@ -304,7 +304,7 @@ fn source(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `pipelineNamed(source, name)`: the relation read under a name of its own,
 /// which replaces any it had.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn named(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut source = relation_at(cx, 0)?;
     let name = super::super::args::name_at(cx, 1)?;
@@ -313,14 +313,14 @@ fn named(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `pipelineFrom(source)`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn from(cx: &mut FunctionContext) -> NeonResult<Node> {
     let source = relation_at(cx, 0)?;
     Ok(source.pipeline().into())
 }
 
 /// `pipelineFilter(pipeline, predicate, scope)`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn filter(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pipeline = pipeline_at(cx, 0)?;
     let predicate = arg(cx, 1);
@@ -377,7 +377,7 @@ fn list_stage(
 }
 
 /// `pipelineList(pipeline, "derive" | "select" | "sort", expressions, scope)`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn list(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pipeline = pipeline_at(cx, 0)?;
     let stage = super::super::args::choice(cx, 1, "a stage", &["derive", "select", "sort"])?;
@@ -398,7 +398,7 @@ fn window(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `pipelineGroup(pipeline, keys, scope)`: a grouping, no relation until it
 /// is aggregated.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn group(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pipeline = pipeline_at(cx, 0)?;
     let plan = plan_at(cx, 1)?;
@@ -467,7 +467,7 @@ fn rows<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<i64> {
 /// `pipelineTake(pipeline, count)` or `pipelineTake(pipeline, start, end)`,
 /// the inclusive 1-based range PRQL takes. A count is no expression: PRQL
 /// refuses a bound `LIMIT`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn take(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pipeline = pipeline_at(cx, 0)?;
     let start = rows(cx, 1)?;
@@ -480,7 +480,7 @@ fn take(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `pipelineJoin(pipeline, kind, source, on, scope)`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 fn join(cx: &mut FunctionContext) -> NeonResult<Node> {
     let pipeline = pipeline_at(cx, 0)?;
     let side =
@@ -550,7 +550,7 @@ fn over(_: &mut FunctionContext) -> NeonResult<Node> {
 /// `pipelineOverKeys(over, "by" | "sortBy", keys)`: a window's partition or
 /// ordering, which take no value: pgorm's `Over` takes only expressions that
 /// bind nothing.
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-binder]
 fn over_keys(cx: &mut FunctionContext) -> NeonResult<Node> {
     let over = over_at(cx, 0)?;
     let which = super::super::args::choice(cx, 1, "a window's keys", &["by", "sortBy"])?;

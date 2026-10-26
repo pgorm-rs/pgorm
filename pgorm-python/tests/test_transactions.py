@@ -31,7 +31,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
     def rows(self):
         return p.select(p.col("id")).from_(self.table).order_by(p.col("id").asc())
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_block_commits_and_reserves_its_connection(self):
         async with self.pool.connection() as connection:
             async with connection.transaction() as tx:
@@ -51,7 +51,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
                     raise RolledBack
             self.assertEqual([r["id"] for r in await connection.fetch_all(self.rows())], [1])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:python.transactions+3/test]
     async def test_transactions_open_only_for_a_block(self):
         async with self.pool.connection() as connection:
             self.assertFalse(hasattr(connection, "begin"))
@@ -64,7 +64,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
                 await tx.execute(self.insert(1))
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:python.transactions+3/test]
     async def test_contexts_commit_and_preserve_original_exception(self):
         async with self.pool.transaction() as tx:
             await tx.execute(self.insert(1))
@@ -78,7 +78,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(tx.closed)
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_savepoints_reserve_parents_and_recover_database_errors(self):
         async with self.pool.connection() as connection:
             async with connection.transaction() as tx:
@@ -103,7 +103,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await connection.ping())
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1, 3, 4])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_options_and_foreign_parent_rejection(self):
         async with self.pool.connection() as connection, self.pool.connection() as other:
             for mode, isolation in (("read_only", "repeatable_read"), ("read_write", "serializable"), ("deferrable", None)):
@@ -124,7 +124,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(caught.exception.sqlstate, "25006")
             self.assertTrue(await connection.ping())
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:python.transactions+3/test]
     async def test_failed_rollback_raises_from_exit_and_discards(self):
         marker = ValueError("the block failed")
         async with self.pool.connection() as connection:
@@ -139,7 +139,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(connection.closed)
         self.assertEqual(await self.pool.fetch_all(self.rows()), [])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:python.transactions+3/test]
     async def test_failed_rollback_never_replaces_a_cancellation(self):
         entered = asyncio.Event()
         connection = await self.pool.acquire()
@@ -159,7 +159,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
         await connection.close()
         self.assertEqual(await self.pool.fetch_all(self.rows()), [])
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:python.cancellation+1/test]
     async def test_cancelled_request_discards_scope_within_two_seconds(self):
         marker = RolledBack("leave the discarded scope")
         async with self.pool.connection() as connection:
@@ -183,7 +183,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(connection.closed)
             self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:bindings.cancellation/test]
     async def test_cancelled_idle_context_rolls_back_cleanly(self):
         entered = asyncio.Event()
         async def work():
@@ -198,7 +198,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(task, 2)
         self.assertEqual(await self.pool.fetch_all(self.rows()), [])
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:bindings.cancellation/test]
     async def test_pool_shutdown_releases_idle_transaction(self):
         connection = await self.pool.acquire()
         entered, release = asyncio.Event(), asyncio.Event()
@@ -216,7 +216,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.LifecycleError):
             await asyncio.wait_for(task, 2)
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_abandoned_savepoint_rolls_back_and_releases_parent(self):
         async with self.pool.transaction() as tx:
             block = tx.transaction()
@@ -234,7 +234,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             await tx.execute(self.insert(2))
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [2])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:python.runtime+1/test]
     async def test_foreign_event_loop_fails_before_query(self):
         async with self.pool.transaction() as tx:
             async def use_transaction():
@@ -243,7 +243,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
                 await asyncio.to_thread(lambda: asyncio.run(use_transaction()))
             await tx.execute(self.insert(1))
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:bindings.cancellation/test]
     async def test_exception_with_background_query_discards_scope(self):
         pending = None
         marker = ValueError("block failed during concurrent query")

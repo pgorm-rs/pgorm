@@ -5,7 +5,8 @@
 // takes no parameters, so each renders with its values as pgorm-query's
 // escaped literals and runs as SQL text; `inspect()` gives that SQL and no
 // values. Every builder is immutable, as the query builders are.
-// [spec:pgorm:req:napi.schema+2]
+// [spec:pgorm:req:bindings.schema]
+// [spec:pgorm:req:napi.schema-api]
 
 import { arg, Builder, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -112,6 +113,7 @@ export class ColumnDef extends Handle {
     return columnOf(native.ddlColumnAutoIncrement(arg(this)));
   }
 
+  // [spec:pgorm:req:bindings.collations]
   /**
    * @param {string} collation
    * @param {{ schema?: string }} [options]

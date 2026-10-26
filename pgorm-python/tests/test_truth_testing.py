@@ -110,7 +110,7 @@ def other_samples():
 
 
 class TruthTesting(unittest.TestCase):
-    # [spec:pgorm:req:python.truth-testing+1/test]
+    # [spec:pgorm:req:python.truth-testing+2/test]
     def test_every_query_class_refuses_truth_testing(self):
         samples = statement_samples() + expression_samples() + other_samples()
         for sample in samples:
@@ -127,7 +127,7 @@ class TruthTesting(unittest.TestCase):
             with self.subTest(kind=kind):
                 self.assertIn("__bool__", vars(kind))
 
-    # [spec:pgorm:req:python.truth-testing+1/test]
+    # [spec:pgorm:req:python.truth-testing+2/test]
     def test_exempt_values_keep_python_truth(self):
         self.assertTrue(p.Value(0))
         self.assertTrue(p.Identifier("id"))

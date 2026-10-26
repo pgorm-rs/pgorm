@@ -3,9 +3,9 @@
 // CREATE INDEX and DROP INDEX; sequences, created, altered over pgorm-query's
 // typestate, dropped and renamed; extensions; and schemas, created, dropped
 // and renamed.
-// [spec:pgorm:req:napi.schema-indexes]
-// [spec:pgorm:req:napi.schema-sequences]
-// [spec:pgorm:req:napi.schema-schemas]
+// [spec:pgorm:req:bindings.schema-indexes]
+// [spec:pgorm:req:bindings.schema-sequences]
+// [spec:pgorm:req:bindings.schema-schemas]
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

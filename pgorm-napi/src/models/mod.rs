@@ -33,7 +33,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
 /// a scalar kind's name (`i32`, `tstzrange`), an enum's type as SQL quotes
 /// it, a created range's type and subtype, and an array's element followed
 /// by `[]`.
-// [spec:pgorm:req:napi.model-records]
+// [spec:pgorm:req:bindings.model-records]
 pub(crate) fn kind_key(tag: &Tag) -> Result<String, Failure> {
     Ok(match tag {
         Tag::Scalar(kind) => crate::values::scalar_name(kind)?.to_owned(),
@@ -101,7 +101,7 @@ const IDENT_MAX_BYTES: usize = 63;
 /// bytes, padded with `_` to 47, and the 64-bit FNV-1a hash of the whole name
 /// in 16 hex digits. The parity tests hold this to the aliases pgorm's own
 /// `SelectGraph` writes.
-// [spec:pgorm:req:napi.graphs]
+// [spec:pgorm:req:bindings.graphs]
 pub(crate) fn result_column_name(prefix: &str, column: &str) -> String {
     let full = format!("{prefix}{column}");
     if full.len() < IDENT_MAX_BYTES {
@@ -128,7 +128,7 @@ fn result_name(mut cx: FunctionContext) -> JsResult<JsString> {
 /// The statement counting the rows `query` reads, as pgorm's paginator
 /// counts them: its limit, offset and ordering dropped, and the rest read as
 /// a subquery, `SELECT COUNT(*) AS "num_items" FROM (..) AS "sub_query"`.
-// [spec:pgorm:req:napi.pagination]
+// [spec:pgorm:req:bindings.pagination]
 pub(crate) fn counted(mut query: SelectStatement) -> SelectStatement {
     query.reset_limit().reset_offset().clear_order_by();
     Query::select()

@@ -96,7 +96,7 @@ function throwsConstruction(make: () => unknown, pattern?: RegExp): void {
   });
 }
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("SQL NULL reads as null, and an untyped null binds to any type", async () => {
   const row = await one("SELECT $1::int4 AS a, $2::text AS b, $3::jsonb AS c, NULL::numeric AS d, $4::int4[] AS e", [
     null,
@@ -107,14 +107,14 @@ test("SQL NULL reads as null, and an untyped null binds to any type", async () =
   same(row, { a: null, b: null, c: null, d: null, e: null });
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("booleans round trip, and only a boolean binds as bool", async () => {
   assert.equal(await roundTrip("bool", true), true);
   assert.equal(await roundTrip("bool", false), false);
   await refused(roundTrip("bool", 1), /cannot bind a `BigInt` value to Postgres type `bool`/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("int8 reads as an exact bigint at both ends of its range", async () => {
   for (const value of [9007199254740993n, -(2n ** 63n), 2n ** 63n - 1n, 0n]) {
     assert.equal(await roundTrip("int8", value), value);
@@ -124,7 +124,7 @@ test("int8 reads as an exact bigint at both ends of its range", async () => {
   assert.equal(String(row.v), row.t);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("int2, int4, oid and \"char\" read as numbers", async () => {
   same(await one(`SELECT 32767::int2 AS a, (-2147483648)::int4 AS b, 4294967295::oid AS c, 'x'::"char" AS d`), {
     a: 32767,
@@ -134,7 +134,8 @@ test("int2, int4, oid and \"char\" read as numbers", async () => {
   });
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("an integer kind holds exactly its range, and a number past 2^53 is no exact integer", async () => {
   throwsConstruction(() => new Value(32768, "i16"), /outside i16's range/);
   throwsConstruction(() => new Value(-1, "u32"), /outside u32's range/);
@@ -148,14 +149,14 @@ test("an integer kind holds exactly its range, and a number past 2^53 is no exac
   await refused(roundTrip("int8", 2 ** 60), /without loss/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("float8 round trips signed zero, the infinities, NaN and every finite double", async () => {
   for (const value of [0.1, -0, 0, Infinity, -Infinity, NaN, 5e-324, Number.MAX_VALUE, 1 / 3]) {
     assert.ok(Object.is(await roundTrip("float8", value), value), `${value}`);
   }
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("float4 reads exactly, and f32 refuses a number it would round", async () => {
   assert.equal((await one("SELECT 0.1::float4 AS v")).v, Math.fround(0.1));
   throwsConstruction(() => new Value(0.1, "f32"), /no exact f32 form/);
@@ -163,7 +164,7 @@ test("float4 reads exactly, and f32 refuses a number it would round", async () =
   assert.ok(Object.is(await roundTrip("float4", new Value(-0, "f32")), -0));
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("text round trips any Unicode, and a lone surrogate or NUL is refused", async () => {
   for (const text of ["", "plain", `quotes ' " and \\ backslash`, "100% _like_", "日本語 ✓ 🦀", "é"]) {
     assert.equal(await roundTrip("text", text), text);
@@ -180,7 +181,7 @@ test("text round trips any Unicode, and a lone surrogate or NUL is refused", asy
   throwsConstruction(() => new Value("ab", "char"), /exactly one code point/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("bytea round trips every byte value as a Uint8Array", async () => {
   const every = Uint8Array.from({ length: 256 }, (_, index) => index);
   same(await roundTrip("bytea", every), every);
@@ -189,7 +190,7 @@ test("bytea round trips every byte value as a Uint8Array", async () => {
   same(fromBuffer, new Uint8Array([1, 2, 3]));
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("numeric reads as an exact Decimal that keeps its scale", async () => {
   for (const text of ["19.9900", "-0.000001", "79228162514264337593543950335", "0.0000000000000000000000000001", "0"]) {
     const value = await roundTrip("numeric", new Decimal(text));
@@ -204,7 +205,7 @@ test("numeric reads as an exact Decimal that keeps its scale", async () => {
   await undecodable("SELECT 'Infinity'::numeric AS v", /NaN or infinite/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("a Decimal is made only from exact text or a bigint, and never becomes a number implicitly", () => {
   // deno-lint-ignore no-explicit-any
   throwsConstruction(() => new Decimal(1.5 as any), /never a number/);
@@ -219,7 +220,7 @@ test("a Decimal is made only from exact text or a bigint, and never becomes a nu
   assert.equal(JSON.stringify({ decimal }), '{"decimal":"1.5"}');
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("uuid reads as a Uuid, and a UUID string binds only when declared", async () => {
   const text = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
   const value = await roundTrip("uuid", new Uuid(text.toUpperCase()));
@@ -231,7 +232,7 @@ test("uuid reads as a Uuid, and a UUID string binds only when declared", async (
   throwsConstruction(() => new Uuid("not-a-uuid"), /not a UUID/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:napi.values+1/test]
 test("json and jsonb read as JavaScript values, an integer past the safe range as a bigint", async () => {
   const text = `{"big": 12345678901234567890, "small": -7, "half": 0.5, "s": "x\\"y", "n": null, "a": [true, false]}`;
   for (const type of ["json", "jsonb"]) {
@@ -247,7 +248,7 @@ test("json and jsonb read as JavaScript values, an integer past the safe range a
   await undecodable(`SELECT '18446744073709551616'::json AS v`, /exceeds 64 bits/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("a plain object binds as JSON, and anything JSON cannot hold is refused", async () => {
   const document = { a: 1, b: [1, "x", null, true], c: { d: 9007199254740993n, e: 0.25 } };
   same(await roundTrip("jsonb", document), { a: 1, b: [1, "x", null, true], c: { d: 9007199254740993n, e: 0.25 } });
@@ -264,7 +265,7 @@ test("a plain object binds as JSON, and anything JSON cannot hold is refused", a
   await refused(roundTrip("text", { a: 1 }), /cannot bind a `Json` value to Postgres type `text`/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("inet, cidr and macaddr round trip", async () => {
   assert.equal(await roundTrip("inet", new Value("10.1.2.3/8", "ipnetwork")), "10.1.2.3/8");
   assert.equal(await roundTrip("cidr", new Value("10.0.0.0/8", "ipnetwork")), "10.0.0.0/8");
@@ -275,7 +276,7 @@ test("inet, cidr and macaddr round trip", async () => {
   throwsConstruction(() => new Value("10.0.0.0/33", "ipnetwork"), /not an IP network/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("vector round trips as a Float32Array where pgvector is installed", async (context) => {
   const rows = await db().query("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'");
   if (rows.length === 0) {
@@ -288,13 +289,13 @@ test("vector round trips as a Float32Array where pgvector is installed", async (
   throwsConstruction(() => new Value([0.1], "vector"), /no exact f32 form/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("a type the binding has no JavaScript form for is a DecodeError, never a string", async () => {
   await undecodable("SELECT point(1, 2) AS v", /`point`/);
   await undecodable("SELECT 1::money AS v", /`money`/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("arrays read as JavaScript arrays, a NULL item as null", async () => {
   same(await one("SELECT '{1,NULL,3}'::int4[] AS v"), { v: [1, null, 3] });
   same(await one("SELECT ARRAY['a', NULL]::text[] AS v"), { v: ["a", null] });
@@ -321,7 +322,7 @@ test("a plain array infers its items' one kind", async () => {
   await refused(roundTrip("int4[]", [[1]]), /nested arrays/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("the built-in ranges and multiranges round trip with their bounds", async () => {
   same(await roundTrip("int4range", new Value(new Range(1, 5, "[]"), "int4range")), new Range(1, 6));
   same(await roundTrip("int8range", new Value(new Range(null, 2n ** 62n), "int8range")), new Range(null, 2n ** 62n));
@@ -347,7 +348,7 @@ test("the built-in ranges and multiranges round trip with their bounds", async (
   throwsConstruction(() => new Value(new Range(1.5, 2), "int4range"), /not an integer/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("a range's lower bound is written as its lower bound", async () => {
   await assert.rejects(roundTrip("int4range", new Value(new Range(5, 1), "int4range")), (error: unknown) => {
     assert.ok(error instanceof DatabaseError);
@@ -358,7 +359,7 @@ test("a range's lower bound is written as its lower bound", async () => {
   same(range, new Range(3, 10));
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
+// [spec:pgorm:req:bindings.value-tags/test]
 test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () => {
   const typed = Value.null("i64");
   assert.equal(typed.kind, "i64");
@@ -379,8 +380,8 @@ test("a typed NULL keeps its kind, and JSON's null is not SQL NULL", async () =>
   assert.equal(row.json_null?.kind, "json");
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
-// [spec:pgorm:req:napi.rows/test]
+// [spec:pgorm:req:bindings.value-tags/test]
+// [spec:pgorm:req:napi.records/test]
 test("tagged rows carry each column's kind, an integer's width and an enum's type included", async () => {
   const [row] = await db().query(
     "SELECT 1::int2 AS a, 1::int8 AS b, NULL::int4 AS c, 'calm'::app.mood AS d, ARRAY[]::int4[] AS e, NULL::int4[] AS f",
@@ -402,7 +403,7 @@ test("tagged rows carry each column's kind, an integer's width and an enum's typ
   assert.equal(row.f?.items(), null);
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
+// [spec:pgorm:req:bindings.value-tags/test]
 test("an enum label binds as a string and reads back with its type", async () => {
   assert.equal(await roundTrip("app.mood", "calm"), "calm");
   assert.equal(await roundTrip("app.mood", new Value('a "quoted", label', mood)), 'a "quoted", label');
@@ -420,7 +421,7 @@ test("an enum label binds as a string and reads back with its type", async () =>
   throwsConstruction(() => new TypeName("x".repeat(64)), /1–63 UTF-8 bytes/);
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
+// [spec:pgorm:req:bindings.value-tags/test]
 test("an empty array and an SQL NULL array still name their element kind", async () => {
   const empty = Value.array("i32", []);
   assert.equal(empty.kind, "array");
@@ -437,7 +438,7 @@ test("an empty array and an SQL NULL array still name their element kind", async
   throwsConstruction(() => Value.array("i32", [new Value(1, "i64")]), /i64 value is not a value of kind i32/);
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
+// [spec:pgorm:req:bindings.created-ranges/test]
 test("a created range converts each bound through its subtype and travels as its text", async () => {
   const value = new Value(new Range(1.5, 2.5), floatrange);
   assert.equal(value.kind, "created_range");
@@ -465,7 +466,7 @@ test("a created range converts each bound through its subtype and travels as its
   throwsConstruction(() => new CreatedRange("r", "bool" as "i32"), /subtype/);
 });
 
-// [spec:pgorm:req:napi.value-tags+2/test]
+// [spec:pgorm:req:bindings.value-tags/test]
 test("a Value converts at construction, can be bound again, and hands out independent copies", async () => {
   const value = new Value([1, 2, 3]);
   assert.equal(value.kind, "array");
@@ -484,7 +485,7 @@ test("a Value converts at construction, can be bound again, and hands out indepe
   throwsConstruction(() => new Value(1, "no-such-kind" as "i32"), /not a value kind/);
 });
 
-// [spec:pgorm:req:napi.values/test]
+// [spec:pgorm:req:bindings.values/test]
 test("a domain decodes and binds as the type it is built over", async () => {
   assert.equal((await one("SELECT 'a@b'::app.email AS v")).v, "a@b");
   const [height] = await db().query("SELECT '[1.5,2)'::app.heightrange AS v", [], { tagged: true });
@@ -518,7 +519,7 @@ test("undefined, a function, a symbol and an unknown object are refused; null is
   assert.equal(await roundTrip("int4", null), null);
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:napi.temporal+1/test]
 test("date, time and timestamp read as Temporal plain values, to the microsecond", async () => {
   for (const date of ["2026-10-09", "0001-01-01", "9999-12-31", "-000100-01-01"]) {
     same(await roundTrip("date", Temporal.PlainDate.from(date)), Temporal.PlainDate.from(date));
@@ -531,7 +532,7 @@ test("date, time and timestamp read as Temporal plain values, to the microsecond
   same(await roundTrip("date", Temporal.PlainDate.from("2026-10-09").withCalendar("japanese")), Temporal.PlainDate.from("2026-10-09"));
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:napi.temporal+1/test]
 test("timestamptz reads as the same Temporal.Instant whatever the session time zone", async () => {
   const instant = Temporal.Instant.from("2026-01-01T12:00:00.000001Z");
   same(await roundTrip("timestamptz", instant), instant);
@@ -545,7 +546,7 @@ test("timestamptz reads as the same Temporal.Instant whatever the session time z
   assert.equal(row.t, "2026-01-01 17:30:00.000001+05:30");
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:napi.temporal+1/test]
 test("a value finer than PostgreSQL's microseconds is refused, never truncated", async () => {
   await refused(roundTrip("time", Temporal.PlainTime.from("12:00:00.0000001")), /sub-microsecond/);
   await refused(roundTrip("timestamp", Temporal.PlainDateTime.from("2026-01-01T00:00:00.000000001")), /sub-microsecond/);
@@ -556,7 +557,7 @@ test("a value finer than PostgreSQL's microseconds is refused, never truncated",
   same(await roundTrip("timestamptz", rounded), Temporal.Instant.fromEpochNanoseconds(1_000_000_000n));
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:napi.temporal+1/test]
 test("a civil date-time and an instant bind only to their own type", async () => {
   await refused(roundTrip("timestamptz", Temporal.PlainDateTime.from("2026-01-01T00:00")), /does not bind to timestamptz/);
   await refused(roundTrip("timestamp", Temporal.Instant.from("2026-01-01T00:00Z")), /does not bind to timestamp/);
@@ -568,7 +569,8 @@ test("a civil date-time and an instant bind only to their own type", async () =>
   throwsConstruction(() => new Value(new Date(0), "datetime_utc"), /a Date is refused/);
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:napi.temporal+1/test]
+// [spec:pgorm:req:bindings.values/test]
 test("dates beyond pgorm's years and PostgreSQL's infinities are refused both ways", async () => {
   await refused(roundTrip("date", new Temporal.PlainDate(10000, 1, 1)), /-9999 to 9999/);
   await undecodable("SELECT '10000-01-01'::date AS v");
@@ -577,7 +579,8 @@ test("dates beyond pgorm's years and PostgreSQL's infinities are refused both wa
   await undecodable("SELECT '24:00'::time AS v");
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:bindings.values/test]
+// [spec:pgorm:req:napi.temporal+1/test]
 test("an interval keeps its months, days and microseconds, each with its own sign", async () => {
   same((await one("SELECT '1 mon -2 days 03:00:00.000001'::interval AS v")).v, new Interval({
     months: 1,
@@ -602,12 +605,13 @@ test("an interval keeps its months, days and microseconds, each with its own sig
   throwsConstruction(() => new Interval({ months: 2 ** 31 }), /32-bit/);
 });
 
-// [spec:pgorm:req:napi.temporal/test]
+// [spec:pgorm:req:bindings.values/test]
 test("timetz is refused with a DecodeError naming why", async () => {
   await undecodable("SELECT '12:00+05'::timetz AS v", /no Temporal type/);
 });
 
-// [spec:pgorm:req:napi.rows/test]
+// [spec:pgorm:req:bindings.rows/test]
+// [spec:pgorm:req:napi.records/test]
 test("rows are objects keyed by column name, in column order", async () => {
   const rows = await db().query("SELECT 1 AS b, 2 AS a, 3 AS c UNION ALL SELECT 4, 5, 6");
   assert.equal(rows.length, 2);
@@ -617,7 +621,7 @@ test("rows are objects keyed by column name, in column order", async () => {
   assert.deepEqual(await db().query("SELECT 1 AS a WHERE false"), []);
 });
 
-// [spec:pgorm:req:napi.rows/test]
+// [spec:pgorm:req:napi.records/test]
 test("a column named __proto__ is a property of its row, not the row's prototype", async () => {
   const row = await one(`SELECT '{"x": 1}'::jsonb AS "__proto__", 2 AS constructor`);
   assert.equal(Object.getPrototypeOf(row), Object.prototype);
@@ -626,7 +630,7 @@ test("a column named __proto__ is a property of its row, not the row's prototype
   assert.equal(row.constructor, 2);
 });
 
-// [spec:pgorm:req:napi.rows/test]
+// [spec:pgorm:req:bindings.rows/test]
 test("two columns of one name are a DecodeError, not one key for both", async () => {
   await undecodable("SELECT 1 AS a, 2 AS a", /more than one column named "a"/);
 });

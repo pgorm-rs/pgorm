@@ -21,7 +21,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:python.statements+10/test]
+# [spec:pgorm:req:bindings.windows/test]
 class WindowTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -147,7 +147,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
         self.assertEqual(rows, [(1, 1, 1, 1), (2, 2, 3, 1), (3, 5, 6, 2), (4, 10, 12, 2)])
 
-    # [spec:pgorm:req:python.statements+10/test]    an inline ExtendedWindow builds on any entry of
+    # [spec:pgorm:req:bindings.windows/test]    an inline ExtendedWindow builds on any entry of
     # the WINDOW clause, held to what an extended entry is held to
     async def test_inline_window_builds_on_a_named_one(self):
         query = (p.Select(self.r("id"),

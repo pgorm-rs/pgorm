@@ -6,7 +6,7 @@
 // The generator computes it as it writes the module, and the module checks
 // it as it loads, so a module meeting a native build its declarations no
 // longer describe fails at once rather than mistyping a record.
-// [spec:pgorm:req:napi.codegen]
+// [spec:pgorm:req:bindings.codegen]
 
 import { createHash } from "node:crypto";
 

@@ -79,7 +79,7 @@ async function sessionEnds(sql: string): Promise<void> {
   }
 }
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("a pooled transaction's notification arrives at commit with its sender's process id", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_jobs");
@@ -93,7 +93,7 @@ test("a pooled transaction's notification arrives at commit with its sender's pr
   assert.ok(Object.isFrozen(notification));
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("a rolled-back transaction's notification never arrives", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_rolled_back");
@@ -110,7 +110,7 @@ test("a rolled-back transaction's notification never arrives", async () => {
   assert.deepEqual(await heard(listener), ["napi_rolled_back", "fence"]);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("notifications arrive in commit order, a repeated payload once", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_order");
@@ -127,7 +127,7 @@ test("notifications arrive in commit order, a repeated payload once", async () =
   assert.deepEqual(received, ["first committed", "1", "2", "3"]);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("unlisten and unlistenAll stop delivery", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_unlisten");
@@ -147,7 +147,7 @@ test("unlisten and unlistenAll stop delivery", async () => {
   assert.deepEqual(await heard(listener), ["napi_after", "2"]);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("a channel name is exact: case, spaces and quotes kept", async () => {
   await using listener = await pool().listener();
   const odd = 'Napi Mixed "quoted"; DROP';
@@ -161,7 +161,7 @@ test("a channel name is exact: case, spaces and quotes kept", async () => {
   assert.equal(await sessions('LISTEN "napi_exact_fence"'), 1, "the LISTEN was sent quoted");
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("a channel name past 63 bytes is a ConstructionError, sent nothing", async () => {
   await using listener = await pool().listener();
   const longest = `é${"c".repeat(61)}`;
@@ -178,7 +178,7 @@ test("a channel name past 63 bytes is a ConstructionError, sent nothing", async 
   await assert.rejects(pool().notify("napi_typed", 7 as unknown as string), TypeError);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("the payload bound is the server's: 7999 bytes arrive, 8000 are refused", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_payload");
@@ -188,7 +188,7 @@ test("the payload bound is the server's: 7999 bytes arrive, 8000 are refused", a
   await assert.rejects(pool().notify("napi_payload", "p".repeat(8000)), databaseError("22023"));
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("a terminated backend ends iteration with its error, after what had arrived", async () => {
   const listener = await pool().listener();
   await listener.listen("napi_doomed");
@@ -217,7 +217,7 @@ test("a terminated backend ends iteration with its error, after what had arrived
   await assert.rejects(listener.listen("napi_doomed"), LifecycleError);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("past its capacity the listener closes with a ConnectionError", async () => {
   const listener = await pool().listener({ capacity: 2 });
   await listener.listen("napi_burst");
@@ -247,7 +247,7 @@ test("past its capacity the listener closes with a ConnectionError", async () =>
   await assert.rejects(pool().listener({ capacity: 1.5 }), RangeError);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("one pull runs at a time, and listen runs while it waits", async () => {
   await using listener = await pool().listener();
   const first = listener.next({ signal: AbortSignal.timeout(ARRIVAL) });
@@ -259,8 +259,8 @@ test("one pull runs at a time, and listen runs while it waits", async () => {
   assert.equal(result.value?.payload, "1");
 });
 
-// [spec:pgorm:req:napi.listen/test]
-// [spec:pgorm:req:napi.cancellation/test]
+// [spec:pgorm:req:bindings.listen/test]
+// [spec:pgorm:req:bindings.cancellation/test]
 test("an aborted pull leaves the listener open; an aborted listen closes it", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_aborted");
@@ -284,8 +284,7 @@ test("an aborted pull leaves the listener open; an aborted listen closes it", as
   await assert.rejects(listener.listen("napi_aborted"), LifecycleError);
 });
 
-// [spec:pgorm:req:napi.listen/test]
-// [spec:pgorm:req:napi.connections+4/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("closing the pool closes its listeners, ending a pull in flight", async () => {
   const closing = new Pool(scratch(), { maxSize: 1 });
   const listener = await closing.listener();
@@ -299,7 +298,7 @@ test("closing the pool closes its listeners, ending a pull in flight", async () 
   await assert.rejects(closing.listener(), LifecycleError);
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 test("closing a listener ends its session and its pull; leaving a for await loop closes it", async () => {
   const closed = await pool().listener();
   await closed.listen("napi_closed");
@@ -321,7 +320,7 @@ test("closing a listener ends its session and its pull; leaving a for await loop
   await sessionEnds('LISTEN "napi_loop"');
 });
 
-// [spec:pgorm:req:napi.listen/test]
+// [spec:pgorm:req:bindings.listen/test]
 // [spec:pgorm:req:napi.exit/test]
 test("a collected listener releases its session, and an open one holds no process up", async () => {
   const outcome = await runFixture("listening", 30_000, { PGORM_TEST_DSN: scratch() }, { exposeGc: true });

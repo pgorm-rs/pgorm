@@ -25,7 +25,7 @@ pub(crate) struct EntityAdapter<E> {
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:req:python.entities+4]
+// [spec:pgorm:req:bindings.entities]
 impl<E> EntityBackend for EntityAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -36,7 +36,7 @@ where
         &self.info
     }
 
-    // [spec:pgorm:req:python.schema+2]
+    // [spec:pgorm:req:bindings.schema-from-entity]
     fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error> {
         use crate::schema::{PyCreateIndex, PyCreateTable, PyDDL, PyEntitySchema, Statement};
         let schema = pgorm::Schema::new();
@@ -84,7 +84,7 @@ where
         Ok(Expr::col(column::<E>(name)?.as_column_ref()).into())
     }
 
-    // [spec:pgorm:req:python.pipeline+1]
+    // [spec:pgorm:req:bindings.pipeline-sources]
     fn pipeline_column(&self, name: &str) -> Result<Arc<dyn PipelineColumn>, Error> {
         Ok(Arc::new(RegisteredColumn::<E>(column::<E>(name)?)))
     }
@@ -106,7 +106,7 @@ where
         })
     }
 
-    // [spec:pgorm:req:python.entities+4]
+    // [spec:pgorm:req:bindings.entity-reads]
     fn membership(&self, name: &str, negated: bool, members: Members) -> Result<SimpleExpr, Error> {
         let column = column::<E>(name)?;
         Ok(match (members, negated) {
@@ -136,7 +136,7 @@ impl<E: EntityTrait> std::fmt::Debug for RegisteredColumn<E> {
     }
 }
 
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline-sources]
 impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
     fn lower<'brand>(&self, qualifier: &str) -> pgorm::pipeline::Expr<'brand> {
         pgorm::pipeline::named_runtime(E::default(), Name::runtime(qualifier)).col(self.0)

@@ -102,7 +102,7 @@ pub(super) struct BoundPlan {
 }
 
 impl BoundPlan {
-    // [spec:pgorm:req:python.pipeline+1]
+    // [spec:pgorm:req:bindings.pipeline-binder]
     pub(super) fn lower<'brand, const N: usize>(
         &self,
         binder: &mut pl::Binder<'brand>,
@@ -117,7 +117,7 @@ impl BoundPlan {
     }
 }
 
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline-binder]
 pub(super) fn callback(function: &Bound<'_, PyAny>, single: bool) -> PyResult<BoundPlan> {
     if !function.is_callable() {
         return Err(ConstructionError::new_err(

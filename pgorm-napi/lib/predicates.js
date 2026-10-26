@@ -2,7 +2,7 @@
 
 // The predicates over an expression: NULL tests, membership, ranges of
 // values, patterns and text tests.
-// [spec:pgorm:req:napi.expressions+7]
+// [spec:pgorm:req:bindings.expressions]
 
 import { arg, args, made } from "./builder.js";
 import { native } from "./operations.js";

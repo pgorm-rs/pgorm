@@ -166,7 +166,7 @@ impl Frame {
     /// Serve the frame's commands inside its transaction, a savepoint's frame
     /// nested inside while it is open: `Ok` once Python commits, an `Exit`
     /// once it rolls back or the handle is abandoned.
-    // [spec:pgorm:req:python.transactions+2]
+    // [spec:pgorm:req:bindings.transactions]
     pub(super) fn serve<'a>(
         &'a mut self,
         tx: &'a mut DatabaseTransaction<'_>,
@@ -199,7 +199,7 @@ impl Frame {
                             return self.halt.discard().await;
                         }
                     }
-                    // [spec:pgorm:req:python.copy+2]
+                    // [spec:pgorm:req:bindings.copy]
                     Command::CopyIn {
                         statement,
                         rows,

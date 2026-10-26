@@ -4,8 +4,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.merge]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.merge]
 
 import type { Builder, Operand, Predicate } from "./expressions.d.ts";
 import type { Source, Table, With } from "./select.d.ts";

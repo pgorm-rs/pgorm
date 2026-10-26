@@ -243,7 +243,7 @@ async fn pump_out(
 
 /// Start a COPY FROM on a Connection or Transaction and answer the handle
 /// its data is written through.
-// [spec:pgorm:req:python.copy+2]
+// [spec:pgorm:req:bindings.copy]
 #[pyfunction]
 #[pyo3(name = "_copy_in", signature = (target, statement, rows = false))]
 pub(crate) fn copy_in<'py>(
@@ -299,7 +299,7 @@ pub(crate) fn copy_in<'py>(
 
 /// Start a COPY TO on a Connection or Transaction and answer the stream its
 /// data is read from.
-// [spec:pgorm:req:python.copy+2]
+// [spec:pgorm:req:bindings.copy]
 #[pyfunction]
 #[pyo3(name = "_copy_out", signature = (target, statement, rows = false))]
 pub(crate) fn copy_out<'py>(
@@ -369,8 +369,8 @@ pub(crate) fn copy_out<'py>(
     })
 }
 
-// [spec:pgorm:req:python.copy+2]
-// [spec:pgorm:req:python.cancellation]
+// [spec:pgorm:req:bindings.copy]
+// [spec:pgorm:req:bindings.cancellation]
 /// The data side of a COPY FROM: `write` each chunk, then `finish`, or
 /// `abort` to send `CopyFail`.
 #[pyclass(name = "_CopyIn", module = "pgorm._native", frozen)]
@@ -460,7 +460,7 @@ impl NativeCopyIn {
     /// as `write` queues data. A row of another width, or a value its
     /// column's type does not take, raises a construction error naming the
     /// column, and nothing of the batch is queued.
-    // [spec:pgorm:req:python.copy.rows]
+    // [spec:pgorm:req:bindings.copy-rows]
     fn write_rows<'py>(
         &self,
         py: Python<'py>,
@@ -682,8 +682,8 @@ impl OutState {
     }
 }
 
-// [spec:pgorm:req:python.copy+2]
-// [spec:pgorm:req:python.cancellation]
+// [spec:pgorm:req:bindings.copy]
+// [spec:pgorm:req:bindings.cancellation]
 /// The data side of a COPY TO. The end of the data frees the connection or
 /// transaction; closing before it discards the connection.
 #[pyclass(name = "_CopyOut", module = "pgorm._native", frozen)]
@@ -753,7 +753,7 @@ impl NativeCopyOut {
     /// The rows that have arrived, at least one, as a list of tuples of
     /// values; `None` at the end. A field that does not decode raises a
     /// decode error and closes the stream, discarding its connection.
-    // [spec:pgorm:req:python.copy.rows]
+    // [spec:pgorm:req:bindings.copy-rows]
     fn next_rows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.state.connection.pool.check_owner(py)?;
         if self.state.rows.is_none() {
@@ -832,7 +832,7 @@ impl NativeCopyOut {
 
     /// The names of the columns each row holds, in order, as the server
     /// describes them.
-    // [spec:pgorm:req:python.copy.rows]
+    // [spec:pgorm:req:bindings.copy-rows]
     fn columns(&self) -> PyResult<Vec<String>> {
         let rows =
             self.state.rows.as_ref().ok_or_else(|| {

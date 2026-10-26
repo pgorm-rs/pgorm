@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use super::table::PyTable;
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.select]
 /// A FROM item that is not a plain named table, owned by Rust's `FromItem`.
 /// A value-producing item is always aliased, as PostgreSQL requires, so its
 /// columns are qualified by a name the caller chose; a sampled table is
@@ -43,7 +43,7 @@ impl PyFromItem {
         format!("FromItem(alias={:?})", self.alias())
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "FROM items cannot be tested as Python booleans",

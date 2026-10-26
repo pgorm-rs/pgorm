@@ -7,7 +7,7 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 use super::{merge::PyMerge, select::PySelect};
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.with]
 /// One common table expression. Its body is a SELECT, or a MERGE, whose rows
 /// are those its RETURNING list yields.
 fn expression(
@@ -52,7 +52,7 @@ impl PyWith {
         format!("With(ctes={})", self.inner.ctes().count())
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "WITH clauses cannot be tested as Python booleans",

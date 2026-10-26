@@ -2,8 +2,8 @@
 // with the JavaScript API, and `select.json` holds the SQL and values it must
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
-// [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.select/test]
+// [spec:pgorm:req:bindings.expressions/test]
 
 import {
   all,

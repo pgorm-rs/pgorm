@@ -6,7 +6,8 @@
 // columns, their nullability and an enum's labels, a graph's and a source
 // tuple's rows. The module checks the library against what it was written
 // from as it loads.
-// [spec:pgorm:req:napi.codegen]
+// [spec:pgorm:req:bindings.codegen]
+// [spec:pgorm:req:napi.codegen+1]
 // [spec:pgorm:req:napi.codegen-types]
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

@@ -9,7 +9,7 @@
 // scaffold writes the project's crate and a copy of the binding's ES module;
 // build compiles the crate and places its library as the module's addon;
 // emit writes the typed module of the application's registrations.
-// [spec:pgorm:req:napi.codegen]
+// [spec:pgorm:req:napi.codegen+1]
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, rmSync } from "node:fs";

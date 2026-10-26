@@ -10,7 +10,7 @@ use crate::{
     values::PyTypeName,
 };
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.expressions]
 #[pymethods]
 impl PyExpr {
     #[pyo3(signature = (type_name, *, array=false))]
@@ -26,7 +26,7 @@ impl PyExpr {
     /// Rust's `Expr::collate`. It stays an operand, so it goes on to be
     /// compared, and `asc` or `desc` over it writes the clause into the sort
     /// key, where PostgreSQL reads an `ORDER BY`'s collation.
-    // [spec:pgorm:req:python.expr-collate]
+    // [spec:pgorm:req:bindings.collations]
     #[pyo3(signature = (name, *, schema=None))]
     fn collate(
         &self,

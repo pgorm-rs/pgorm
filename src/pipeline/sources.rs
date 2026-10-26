@@ -492,7 +492,7 @@ impl<S: SelectableSource> Named<S> {
 /// Read a relation under an owned identifier computed at runtime.
 /// Like [`IntoSource::named`], this preserves the relation's source type
 /// for [`Pipeline::select_sources`].
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline]
 pub fn named_runtime<R: IntoSource>(relation: R, name: Name) -> Named<R> {
     Named {
         relation,

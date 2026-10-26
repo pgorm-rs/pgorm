@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 
 use crate::errors::ConstructionError;
 
-// [spec:pgorm:req:python.input-boundaries]
+// [spec:pgorm:req:bindings.identifiers]
 /// One owned PostgreSQL identifier; punctuation is never parsed as SQL.
 #[pyclass(name = "Identifier", module = "pgorm", frozen, eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,7 +71,7 @@ pub enum Direction {
 
 #[pymethods]
 impl Direction {
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "sort directions cannot be tested as Python booleans",

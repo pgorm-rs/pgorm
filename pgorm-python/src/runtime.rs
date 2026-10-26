@@ -55,7 +55,7 @@ impl PoolState {
 
     /// Record `listener` so that closing the pool closes it; a listener
     /// opened while the pool closed is closed here instead.
-    // [spec:pgorm:req:python.listen+1]
+    // [spec:pgorm:req:bindings.listen]
     pub(crate) fn register_listener(&self, listener: &Arc<ListenerState>) -> PyResult<()> {
         let mut registry = self
             .listeners
@@ -102,8 +102,8 @@ fn running_loop(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         })
 }
 
-// [spec:pgorm:req:python.runtime]
-// [spec:pgorm:req:python.connections+3]
+// [spec:pgorm:req:python.runtime+1]
+// [spec:pgorm:req:bindings.connections]
 #[derive(Debug)]
 #[pyclass(name = "_Pool", module = "pgorm._native", frozen)]
 pub(crate) struct NativePool {
@@ -213,7 +213,7 @@ impl NativePool {
     /// Mark every connection's cached prepared statements stale, as
     /// `DatabasePool::clear_statement_caches` does. Nothing is sent, so a
     /// closed pool or another event loop is no reason to refuse it.
-    // [spec:pgorm:req:python.connections+3]
+    // [spec:pgorm:req:bindings.connections]
     // [spec:pgorm:req:conn.pool.statement-cache.clear+1]
     fn clear_statement_caches(&self) {
         self.state.pool.clear_statement_caches();
@@ -450,7 +450,7 @@ impl Drop for NativeConnection {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    // [spec:pgorm:req:python.connections+3]    the channel pgorm-migration's runner notifies
+    // [spec:pgorm:req:bindings.connections]    the channel pgorm-migration's runner notifies
     module.add("STATEMENT_CACHE_CHANNEL", pgorm::STATEMENT_CACHE_CHANNEL)?;
     module.add_class::<NativePool>()?;
     module.add_class::<NativeConnection>()?;

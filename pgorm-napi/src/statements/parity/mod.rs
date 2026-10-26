@@ -134,8 +134,8 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
     }
 }
 
-// [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.select/test]
+// [spec:pgorm:req:bindings.expressions/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -144,7 +144,7 @@ fn select_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.writes/test]
+// [spec:pgorm:req:bindings.writes/test]
 #[test]
 fn writes_family_matches_its_golden_file() {
     check(
@@ -153,7 +153,7 @@ fn writes_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.merge/test]
+// [spec:pgorm:req:bindings.merge/test]
 #[test]
 fn merge_family_matches_its_golden_file() {
     check(
@@ -162,7 +162,7 @@ fn merge_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn json_family_matches_its_golden_file() {
     check(
@@ -171,8 +171,8 @@ fn json_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.windows+2/test]
-// [spec:pgorm:req:napi.ranges+1/test]
+// [spec:pgorm:req:bindings.windows/test]
+// [spec:pgorm:req:bindings.ranges/test]
 #[test]
 fn window_and_range_family_matches_its_golden_file() {
     check(
@@ -181,15 +181,15 @@ fn window_and_range_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.schema+2/test]
-// [spec:pgorm:req:napi.schema-tables/test]
-// [spec:pgorm:req:napi.schema-alter/test]
-// [spec:pgorm:req:napi.schema-indexes/test]
-// [spec:pgorm:req:napi.schema-types/test]
-// [spec:pgorm:req:napi.schema-sequences/test]
-// [spec:pgorm:req:napi.schema-views/test]
-// [spec:pgorm:req:napi.schema-schemas/test]
-// [spec:pgorm:req:napi.schema-domains/test]
+// [spec:pgorm:req:bindings.schema/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-indexes/test]
+// [spec:pgorm:req:bindings.schema-types/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-views/test]
+// [spec:pgorm:req:bindings.schema-schemas/test]
+// [spec:pgorm:req:bindings.schema-domains/test]
 #[test]
 fn schema_family_matches_its_golden_file() {
     let mut cases = schema::cases();
@@ -197,9 +197,9 @@ fn schema_family_matches_its_golden_file() {
     check(include_str!("../../../tests/parity/schema.json"), cases);
 }
 
-// [spec:pgorm:req:napi.pipeline/test]
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]
-// [spec:pgorm:req:napi.pipeline-binder/test]
+// [spec:pgorm:req:bindings.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline-expressions/test]
+// [spec:pgorm:req:bindings.pipeline-binder/test]
 #[test]
 fn pipeline_family_matches_its_golden_file() {
     check(
@@ -208,7 +208,7 @@ fn pipeline_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.copy+2/test]
+// [spec:pgorm:req:bindings.copy/test]
 #[test]
 fn copy_family_matches_its_golden_file() {
     check(

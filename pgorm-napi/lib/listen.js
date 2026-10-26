@@ -2,7 +2,7 @@
 
 // A dedicated listening connection: the channels it listens on, and the
 // notifications it receives, pulled one at a time.
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:bindings.listen]
 
 import { LifecycleError } from "./errors.js";
 import { abortable, native, signalOf } from "./operations.js";

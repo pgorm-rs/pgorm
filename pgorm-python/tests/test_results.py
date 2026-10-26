@@ -17,7 +17,8 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.pool.close()
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.results/test]
+    # [spec:pgorm:req:python.row-count/test]
     async def test_cardinality_and_database_errors_are_distinct(self):
         empty = p.Select(p.literal(1).as_("n")).where_(p.literal(False))
         self.assertEqual(await self.pool.fetch_all(empty), [])
@@ -37,7 +38,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.sqlstate, "22012")
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.results/test]
     async def test_builder_writes_return_counts_and_records(self):
         name = "python_result_" + uuid4().hex
         table = p.Table(name)
@@ -61,7 +62,8 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(field.table_oid)
             self.assertEqual(field.column_id, 1)
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.rows/test]
+    # [spec:pgorm:req:python.records/test]
     async def test_records_are_detached_and_keep_unique_names(self):
         row = await self.pool.fetch_one(p.Select(p.bind(7).cast(p.TypeName("int8", schema="pg_catalog")).as_("num"), p.bind("text").as_("name")))
         await self.pool.close()
@@ -76,15 +78,15 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(AttributeError):
             row.fields[0].name = "changed"
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.rows/test]
+    # [spec:pgorm:req:bindings.values/test]
     async def test_duplicate_names_and_unsupported_types_fail(self):
         for query in ("SELECT 1 AS n, 2 AS n", "SELECT timetz '12:00+02' AS n", "SELECT NULL::timetz AS n"):
             with self.subTest(query=query), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_optional(p.RawSQL(query))
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:python.results/test]
-    # [spec:pgorm:req:python.value-tags/test]
+    # [spec:pgorm:req:bindings.value-tags/test]
     async def test_wire_scalar_tags_and_nulls(self):
         cases = [
             ("true::boolean", "bool", True), ("65::\"char\"", "i8", 65),
@@ -113,7 +115,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(row.tagged("sql_null").is_null)
         self.assertFalse(row.tagged("json_null").is_null)
 
-    # [spec:pgorm:req:python.values+5/test]
+    # [spec:pgorm:req:bindings.values/test]
     async def test_intervals_round_trip_through_statements(self):
         cases = [
             p.Interval(1, -2, 3_000_004), p.Interval(-1, 2, -3_000_004), p.Interval(),
@@ -157,7 +159,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(null["n"])
             self.assertEqual(null.tagged("n").kind, "interval")
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:python.values+6/test]
     async def test_floating_special_values_survive(self):
         row = await self.pool.fetch_one(p.RawSQL(
             "SELECT '-0'::float8 AS zero, 'NaN'::float8 AS nan, 'Infinity'::float4 AS inf"
@@ -166,7 +168,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(math.isnan(row["nan"]))
         self.assertEqual(row["inf"], float("inf"))
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.values/test]
     async def test_json_numeric_loss_is_explicit(self):
         for kind in ("json", "jsonb"):
             for text in ("18446744073709551616", "[0.10000000000000000001]", '{"n": 1e-400}'):
@@ -175,7 +177,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             row = await self.pool.fetch_one(p.RawSQL(f"SELECT '[0.1,18446744073709551615]'::{kind} AS value"))
             self.assertEqual(row["value"], [0.1, 2**64 - 1])
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.values/test]
     async def test_numeric_is_exact_or_rejected(self):
         for text in ("0.0000", "1.2300", "-42.001", "79228162514264337593543950335", "0.0000000000000000000000000001"):
             row = await self.pool.fetch_one(p.RawSQL(f"SELECT '{text}'::numeric AS value"))
@@ -184,7 +186,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(text=text), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_optional(p.RawSQL(f"SELECT '{text}'::numeric AS value"))
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:python.values+6/test]
     async def test_temporal_precision_and_timezone_policy(self):
         row = await self.pool.fetch_one(p.RawSQL(
             "SELECT DATE '2024-02-29' AS d, TIME '12:34:56.123456' AS t, "
@@ -200,7 +202,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(sql=sql), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_one(p.RawSQL(f"SELECT {sql} AS value"))
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.values/test]
     async def test_array_shape_and_elements_are_preserved(self):
         row = await self.pool.fetch_one(p.RawSQL(
             "SELECT ARRAY[1,NULL,3]::int4[] AS nums, '{}'::text[] AS empty, NULL::int4[] AS nil, "
@@ -216,7 +218,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(sql=sql), self.assertRaises(p.DecodeError):
                 await self.pool.fetch_one(p.RawSQL(f"SELECT {sql} AS value"))
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.value-tags/test]
     async def test_enum_identity_survives_scalars_and_arrays(self):
         schema = "python_enum_" + uuid4().hex
         async with self.pool.connection() as connection:
@@ -240,14 +242,14 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await connection.execute(p.RawSQL(f'DROP SCHEMA "{schema}" CASCADE'))
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:python.raw/test]
     async def test_execution_requires_an_explicit_query_object(self):
         with self.assertRaises(p.ConstructionError):
             await self.pool.fetch_all("SELECT 1")
         row = await self.pool.fetch_one(p.Select(p.literal("O'Brien").as_("value")).inspect())
         self.assertEqual(row["value"], "O'Brien")
 
-    # [spec:pgorm:req:python.results/test]
+    # [spec:pgorm:req:bindings.value-tags/test]
     async def test_absent_join_keeps_typed_null_fields(self):
         row = await self.pool.fetch_optional(p.RawSQL(
             "SELECT parent.id AS parent_id, child.id AS child_id, child.name AS child_name "

@@ -1,7 +1,8 @@
 // @ts-check
 
 // The error classes every failure rejects or throws with.
-// [spec:pgorm:req:napi.errors+2]
+// [spec:pgorm:req:bindings.errors]
+// [spec:pgorm:req:napi.errors+3]
 
 /** The base class of every error pgorm-napi rejects with. */
 export class PgormError extends Error {}

@@ -13,7 +13,7 @@ use crate::{
     errors::ConstructionError, execution::Target, expressions::Compiled, results, statements::Join,
 };
 
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline]
 /// An immutable wrapper owning the real Rust Pipeline, including its bound values.
 #[pyclass(name = "Pipeline", module = "pgorm.pipeline", frozen, from_py_object)]
 #[derive(Clone, Debug)]

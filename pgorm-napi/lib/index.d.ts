@@ -4,7 +4,7 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
+// [spec:pgorm:req:napi.typing+1]
 
 import type { Select } from "./select.d.ts";
 import type { Merge } from "./merge.d.ts";
@@ -31,7 +31,7 @@ export * from "./listen.d.ts";
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
 
-// [spec:pgorm:req:napi.connections+4]
+// [spec:pgorm:req:bindings.connections]
 /**
  * The channel pgorm-migration's runner notifies once a batch that applied a
  * migration commits: give it as {@link PoolOptions.statementCacheChannel} for
@@ -118,7 +118,7 @@ export declare class NotNullViolationError extends DatabaseError {}
 /** A row conflicting with another under an exclusion constraint or a `WITHOUT OVERLAPS` key (`23P01`). */
 export declare class ExclusionViolationError extends DatabaseError {}
 
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:bindings.values]
 
 /** The built-in range kinds, named as PostgreSQL names the types. */
 export type RangeKind = "int4range" | "int8range" | "numrange" | "daterange" | "tsrange" | "tstzrange";
@@ -251,7 +251,8 @@ export type Param =
   | { readonly [key: string]: JsonValue }
   | readonly Param[];
 
-// [spec:pgorm:req:napi.rows]
+// [spec:pgorm:req:bindings.rows]
+// [spec:pgorm:req:napi.records]
 /** A row: its columns' values by column name, in column order. */
 export type Row = { [column: string]: PlainValue };
 
@@ -378,7 +379,7 @@ export declare class Multirange<T = PlainValue> implements Iterable<Range<T>> {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.value-tags]
 /**
  * A value with its kind declared: what plain JavaScript cannot tell apart —
  * an integer's width, a typed SQL NULL, JSON's null, an empty array, an enum's
@@ -418,7 +419,7 @@ export declare class Value {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.connections+4]
+// [spec:pgorm:req:napi.lifecycle]
 /** How a {@link Pool} connects. Durations are in milliseconds. */
 export interface PoolOptions {
   /**
@@ -459,7 +460,7 @@ export interface PoolStatus {
   readonly waiting: number;
 }
 
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:napi.cancellation+1]
 /** Options of the operations that wait on the server or the pool: an `AbortSignal` that ends one. */
 export interface OperationOptions {
   /**
@@ -470,7 +471,7 @@ export interface OperationOptions {
   readonly signal?: AbortSignal;
 }
 
-// [spec:pgorm:req:napi.results]
+// [spec:pgorm:req:napi.records]
 /** Options of the row terminals. */
 export interface QueryOptions extends OperationOptions {
   /** Give each column as a {@link Value} carrying its kind. */
@@ -480,7 +481,7 @@ export interface QueryOptions extends OperationOptions {
 /** The row a terminal gives for its options. */
 export type RowFor<O extends QueryOptions> = O extends { readonly tagged: true } ? TaggedRow : Row;
 
-// [spec:pgorm:req:napi.transactions+2]
+// [spec:pgorm:req:napi.transactions+3]
 /** How a transaction opens; a savepoint inherits its transaction's. */
 export interface TransactionOptions extends OperationOptions {
   /**
@@ -492,7 +493,7 @@ export interface TransactionOptions extends OperationOptions {
   readonly isolation?: "readUncommitted" | "readCommitted" | "repeatableRead" | "serializable" | null;
 }
 
-// [spec:pgorm:req:napi.statements]
+// [spec:pgorm:req:bindings.statements]
 /**
  * A statement a builder made, which a terminal runs as `inspect()` builds it,
  * its values bound.
@@ -521,7 +522,7 @@ export declare abstract class Queryable {
     params?: readonly Param[],
     options?: O,
   ): Promise<RowFor<O> | null>;
-  // [spec:pgorm:req:napi.copy+2]
+  // [spec:pgorm:req:bindings.copy]
   /**
    * Run a `COPY … FROM STDIN`, writing the bytes `source` yields, and resolve
    * with the rows it wrote. The source is pulled only as the COPY takes its
@@ -541,7 +542,7 @@ export declare abstract class Queryable {
    * own.
    */
   copyOut(statement: CopyTo, options?: OperationOptions): Promise<CopyOutStream>;
-  // [spec:pgorm:req:napi.copy.rows]
+  // [spec:pgorm:req:bindings.copy-rows]
   /**
    * Run a binary `COPY … FROM STDIN` whose rows are arrays of values, one for
    * each column the server describes for the statement, in order, and
@@ -558,7 +559,7 @@ export declare abstract class Queryable {
    * decoded by its column's type as a result column of that type is.
    */
   copyOutRows(statement: CopyTo<"binary">, options?: OperationOptions): Promise<CopyRowStream>;
-  // [spec:pgorm:req:napi.listen]
+  // [spec:pgorm:req:bindings.listen]
   /**
    * Send `payload` on `channel` through `SELECT pg_notify($1, $2)`, both
    * bound; the channel is exact, as {@link Listener.listen} names it. In a
@@ -658,7 +659,7 @@ export declare class Transaction extends Queryable {
   transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: OperationOptions): Promise<T>;
 }
 
-// [spec:pgorm:req:napi.streams]
+// [spec:pgorm:req:bindings.streams]
 /**
  * A statement's rows as an async iterator, one row per pull. Its connection
  * is released at the last row, by `close()`, or when a `for await` loop leaves

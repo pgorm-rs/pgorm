@@ -18,7 +18,7 @@ Query: TypeAlias = (
 Mapping.register(Record)
 
 
-# [spec:pgorm:req:python.results]
+# [spec:pgorm:req:bindings.streams]
 class ResultStream:
     """An async iterator owning an active native query and its connection.
 
@@ -77,7 +77,7 @@ class ResultStream:
     async def __aexit__(self, *exc: Any) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+1]
+    # [spec:pgorm:req:python.truth-testing+2]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("result streams cannot be tested as Python booleans")
 

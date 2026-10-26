@@ -41,7 +41,7 @@ fn parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 #[test]
 fn select_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -91,7 +91,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.writes/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -128,7 +128,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.writes/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -161,7 +161,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.writes/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -219,7 +219,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.merge/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -288,7 +288,8 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.with/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -333,7 +334,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.writes/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -387,7 +388,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.merge/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -423,7 +424,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.windows/test]
 #[test]
 fn windows_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -492,7 +493,7 @@ w = (p.Window().partition_by(r.col('kind'), r.col('grade') + 1)
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.windows/test]
 #[test]
 fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     Python::initialize();
@@ -552,7 +553,7 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]    the WINDOW clause holds every window `window`
+// [spec:pgorm:req:bindings.windows/test]    the WINDOW clause holds every window `window`
 // declares, an `ExtendedWindow` among them, an item's inline window may build on one, and
 // `check_windows` refuses at inspection and as the statement is read into another
 #[test]
@@ -686,7 +687,7 @@ def over(name):
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the tie limit shares `limit`'s slot, either
 // replacing the other and `None` clearing both
 #[test]
@@ -740,7 +741,7 @@ fn tie_limits_share_the_rust_limit_slot() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    a tie limit with no ORDER BY is refused at
 // inspection, at execution's compile and as a CTE body or subquery reads it, and its count is
 // checked as `limit`'s is
@@ -817,7 +818,7 @@ fn tie_limits_without_order_are_refused() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:req:sql.ast.select.group-distinct/test]    grouping elements interleave with
 // expressions in call order, and DISTINCT quantifies the whole list
 #[test]
@@ -888,7 +889,7 @@ fn grouping_elements_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]    one call, ROWS FROM, ordinality and
 // column names, the lone plain call as Rust's FunctionCall item, and anything but a call refused
 #[test]
@@ -978,7 +979,7 @@ fn table_functions_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:req:sql.ast.select.table-sample/test]    both methods, the percentage and seed
 // bound as doubles, and numbers a double cannot hold exactly refused
 #[test]
@@ -1051,7 +1052,7 @@ fn table_samples_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]    each operator appends one parenthesised arm in
+// [spec:pgorm:req:bindings.select/test]    each operator appends one parenthesised arm in
 // call order, and the receiver's ORDER BY, limits and WITH clause cover the combined rows
 #[test]
 fn set_operations_match_rust_builders() -> PyResult<()> {
@@ -1123,7 +1124,7 @@ fn set_operations_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]    an arm is read into the statement, so its tie
+// [spec:pgorm:req:bindings.select/test]    an arm is read into the statement, so its tie
 // limit is checked as it is read; anything but a Select is a TypeError
 #[test]
 fn set_operation_arms_are_checked_when_read() -> PyResult<()> {
@@ -1172,7 +1173,7 @@ fn set_operation_arms_are_checked_when_read() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+6/test]    array(select) is Rust's Expr::array over the
+// [spec:pgorm:req:bindings.expressions/test]    array(select) is Rust's Expr::array over the
 // subquery as it embeds, projected and compared as one value, and an ordered-with-ties subquery
 // is refused as any embedded one is
 #[test]
@@ -1229,7 +1230,8 @@ fn array_subquery_matches_rust_expr_array() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+6/test]    exists, scalar, IN a Select and any_ / all_
+// [spec:pgorm:req:bindings.expressions/test]    exists, scalar, IN a Select and any_ / all_
+// [spec:pgorm:req:bindings.quantifiers/test]
 // are Rust's Expr::exists, the scalar SubQuery, in_subquery / not_in_subquery and Expr::any /
 // Expr::all over a subquery or Func::any / Func::all over an array, a quantifier taken by each
 // comparison and refused by every other operator

@@ -142,7 +142,8 @@ def graph_code(
     return code, stub
 
 
-# [spec:pgorm:req:python.codegen+2]
+# [spec:pgorm:req:bindings.codegen]
+# [spec:pgorm:req:python.codegen+3]
 def emit(project: str | PathLike[str]) -> Path:
     from .. import capabilities
 

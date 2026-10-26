@@ -16,8 +16,9 @@ def bits(value):
     return struct.pack(">d", value).hex()
 
 
-# [spec:pgorm:req:python.values+5/test]
-# [spec:pgorm:req:python.value-tags/test]
+# [spec:pgorm:req:bindings.values/test]
+# [spec:pgorm:req:python.values+6/test]
+# [spec:pgorm:req:bindings.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
         instant = dt.datetime(2024, 2, 29, 13, 14, 15, 123456)
@@ -67,6 +68,7 @@ class ValueTests(unittest.TestCase):
         self.assertEqual(Value(1).kind, "i64")
         self.assertNotEqual(Value(1, "i32"), Value(1, "i64"))
 
+    # [spec:pgorm:req:python.value-tags+1/test]
     def test_float_bits_survive_snapshots(self):
         numbers = [0.0, -0.0, math.inf, -math.inf, math.nan,
                    struct.unpack(">d", bytes.fromhex("7ff8000000000123"))[0],
@@ -208,7 +210,8 @@ class ValueTests(unittest.TestCase):
         with self.assertRaises(AttributeError):
             value.kind = "text"
 
-    # [spec:pgorm:req:python.values+5/test]
+    # [spec:pgorm:req:bindings.values/test]
+    # [spec:pgorm:req:python.values+6/test]
     def test_interval_keeps_three_signed_fields(self):
         interval = Interval(1, -2, 3_000_004)
         self.assertEqual((interval.months, interval.days, interval.microseconds), (1, -2, 3_000_004))
@@ -244,6 +247,7 @@ class ValueTests(unittest.TestCase):
         with self.assertRaises(ConstructionError):
             Value(dt.timedelta(days=1))
 
+    # [spec:pgorm:req:python.value-tags+1/test]
     def test_snapshot_is_json_compatible_and_detached(self):
         value = Value.array("f64", [math.nan, -0.0, None])
         snapshot = value.snapshot()

@@ -21,8 +21,9 @@ RANGES = {
 }
 
 
-# [spec:pgorm:req:python.values+5/test]
-# [spec:pgorm:req:python.value-tags/test]
+# [spec:pgorm:req:bindings.values/test]
+# [spec:pgorm:req:python.values+6/test]
+# [spec:pgorm:req:bindings.value-tags/test]
 class RangeTests(unittest.TestCase):
     def test_range_shapes_and_equality(self):
         self.assertEqual(Range(None, 5, "[]"), Range(None, 5, "(]"))
@@ -93,6 +94,7 @@ class RangeTests(unittest.TestCase):
         self.assertEqual([item.kind for item in value.items()], ["int4range"] * 3)
         self.assertNotEqual(Value.array("int4range", []), Value.array("int8range", []))
 
+    # [spec:pgorm:req:python.value-tags+1/test]
     def test_range_snapshots_are_tagged_and_lossless(self):
         value = Value(Range(Decimal("-1.50"), None, "[)"), "numrange")
         snapshot = value.snapshot()

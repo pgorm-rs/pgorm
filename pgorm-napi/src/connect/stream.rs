@@ -126,7 +126,7 @@ async fn open(
 
 /// `connectionStream(connection, sql, params, abort)`: open a stream, which
 /// holds the connection until the last row or `close`.
-// [spec:pgorm:req:napi.streams]
+// [spec:pgorm:req:bindings.streams]
 fn connection_stream(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let connection = cx.argument::<JsBox<ConnectionHandle>>(0)?.0.clone();
     let (sql, params) = super::sql_and_params(&mut cx, 1)?;
@@ -190,7 +190,7 @@ async fn next(
 
 /// `streamNext(stream, tagged, abort)`: `[values, names?, kinds?]`, the
 /// names and kinds on the first row, or `null` at the end. A failure, an abort or a decode error discards the connection.
-// [spec:pgorm:req:napi.streams]
+// [spec:pgorm:req:bindings.streams]
 fn stream_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = cx.argument::<JsBox<StreamHandle>>(0)?.0.clone();
     let tagged = cx.argument::<JsBoolean>(1)?.value(&mut cx);
@@ -223,7 +223,7 @@ fn stream_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `streamClose(stream)`: end the stream, discarding its connection if rows
 /// remained, and resolve once it is released.
-// [spec:pgorm:req:napi.streams]
+// [spec:pgorm:req:bindings.streams]
 fn stream_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = cx.argument::<JsBox<StreamHandle>>(0)?.0.clone();
     state.cancelled.cancel();

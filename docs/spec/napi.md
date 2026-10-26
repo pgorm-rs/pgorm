@@ -1,16 +1,14 @@
 # JavaScript API (Node-API)
 
-This chapter specifies pgorm's interface to JavaScript, implemented by the
+This chapter specifies what is particular to pgorm's JavaScript binding, the
 optional `pgorm-napi` companion crate: a native addon built with the Neon
-framework against Node-API, which both Node.js and Deno load. The WBS root is
-`napi`. It mirrors [python.md](python.md)'s structure in JavaScript
-conventions — camelCase, a Promise for anything asynchronous, typed errors —
-and these rules grow with it. What exists today is the foundation the rest of
-the binding is built on: the loading model, the runtime that runs pgorm's
-asynchronous work, the contract by which that work settles a Promise, and a
-process's clean exit in both runtimes.
+framework against Node-API, which both Node.js and Deno load. What both
+bindings offer is specified once in [bindings.md](bindings.md); this chapter
+keeps JavaScript's spelling, its Promises and disposal, its native types, its
+TypeScript declarations, its runtimes and packaging, and the choices still
+waiting on the operator. The WBS root is `napi`.
 
-## Package boundary
+## Package and spelling
 
 > [spec:pgorm:def:napi.api+1]
 > The JavaScript API is an ES module, `pgorm-napi/lib/index.js`, backed by a
@@ -19,15 +17,30 @@ process's clean exit in both runtimes.
 > classes it rejects with and builds values from, exports them, and is what an
 > application imports; the addon is not imported directly.
 
-> [spec:pgorm:req:napi.optional]
-> JavaScript support MUST live in an opt-in companion crate. Ordinary pgorm
-> builds, default workspace builds and Rust library users MUST NOT require
-> Node.js, Deno, Neon or a Node-API linker configuration. The companion crate
-> is its own Cargo workspace, and the rule `python.optional` states
-> for pinned dependency revisions holds for it unchanged: a revision pgorm
-> pins MUST reach the addon through pgorm's own dependency declarations, never
-> a `patch` table, and the crate's committed lockfile MUST resolve it to the
-> pinned revision.
+> [spec:pgorm:req:napi.naming]
+> JavaScript MUST spell a shared rule's neutral name in camelCase — functions,
+> methods and option keys — and a class as written. A closed choice is a
+> string literal in camelCase (`"inner"`, `"noKeyUpdate"`, `"skipLocked"`,
+> `"byDefault"`), and the options of a call are the keys of an options object,
+> its last argument. A class Python constructs by calling it, JavaScript
+> constructs through a factory function named for it in camelCase (`select`,
+> `insert`, `update`, `merge`, `column`, `model`, `copyFrom`, `copyTo`,
+> `tableFunction`, `jsonDefault`, `createTable`, `alterTable` and the other
+> DDL factories), its constructor private where the factory alone makes one.
+> The pipeline is the module's `pipeline` namespace.
+>
+> A reserved word is spelled otherwise: `deleteFrom` for `delete`, and
+> `thisColumn`, `thatColumn` and `caseWhen` for a pipeline's `this`, `that`
+> and `case`. These names differ from the neutral spelling by choice and wait
+> on the operator (`bindings.surface`): `PgormError`, the base error class;
+> `Ddl`; `Aliased` and `Windowed`; `RowStream`; `EntityGraph`,
+> `EntityGraphQuery` and `EntityGraphCursor` for a registered graph, its query
+> and its cursor; the grouping elements as the functions `groupingSet`,
+> `rollup`, `cube` and `groupingSets`; `Conflict.doNothing()`,
+> `Conflict.on(..)` and `Conflict.onConstraint(..)`; `MergeAction.update`,
+> `.insert`, `.delete`, `.doNothing` and `.insertDefaults`, and `set` on
+> MERGE's update and insert; `jsonObjectAgg` and `jsonArrayAgg`; and
+> `PipelineExpr`, the pipeline's expression class.
 
 ## Targeting and loading
 
@@ -54,15 +67,13 @@ process's clean exit in both runtimes.
 
 ## Runtime and threading
 
-> [spec:pgorm:req:napi.runtime]
-> pgorm's asynchronous work MUST run on one multi-threaded Tokio runtime per
-> process, built when the first instance of the addon loads and shared by
-> every instance after it — the main thread's and each worker thread's. A
-> runtime MUST NOT be created per call or per query. A JavaScript thread MUST
-> NOT block on the runtime. The runtime is never shut down: its idle threads
-> hold nothing a JavaScript event loop waits on, the process's exit ends them,
-> and shutting it down with an instance would cancel the work of the instances
-> still running.
+> [spec:pgorm:req:napi.runtime+1]
+> The shared runtime (`bindings.runtime`) MUST be built when the first
+> instance of the addon loads and shared by every instance after it — the
+> main thread's and each worker thread's. The runtime is never shut down: its
+> idle threads hold nothing a JavaScript event loop waits on, the process's
+> exit ends them, and shutting it down with an instance would cancel the work
+> of the instances still running.
 
 > [spec:pgorm:req:napi.promises]
 > Every operation that does I/O MUST return a Promise and MUST NOT throw
@@ -78,33 +89,28 @@ process's clean exit in both runtimes.
 > loop open, and Node.js finishes a loop with its deliveries still pending
 > where Deno delivers them first, so a promise left to it may never settle.
 
-> [spec:pgorm:req:napi.errors+2]
-> Failures MUST reject with instances of the module's error classes, all
-> derived from `PgormError` and `Error`: `DatabaseError` when PostgreSQL
-> reports an error, carrying its SQLSTATE as `sqlstate` with its severity and
-> optional diagnostic fields (`detail`, `hint`, `schema`, `table`, `column`,
-> `datatype`, `constraint`, each a string or `null`), and rejecting as the
-> subclass of `DatabaseError` named for a constraint violation pgorm's
-> `SqlError` classifies (`[spec:pgorm:sem:error.model.sql-class+4]`):
-> `UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),
-> `CheckViolationError` (`23514`), `NotNullViolationError` (`23502`) or
-> `ExclusionViolationError` (`23P01`), with the same fields, a domain's name
-> in `datatype`; `ConnectionError` when the server
-> cannot be reached or the connection breaks; `ConstructionError` for an
-> argument that cannot become the value pgorm sends; `DecodeError` for a result
-> that cannot become the JavaScript value asked for; `LifecycleError` for a
-> pool, connection, transaction or stream used after it closed or while
-> another operation holds it; `TimeoutError` when no connection becomes free
-> within a pool's acquire budget; `InternalError` when pgorm
-> or the binding fails in a way no input should cause, a panic on the runtime
-> above all, which MUST reject its promise rather than leave it pending or be
-> classified as an expected input rejection. An error from PostgreSQL
-> anywhere in a failure's cause chain makes it a `DatabaseError`, so a refusal
-> during connection carries its SQLSTATE too. Credentials MUST NOT appear in
-> an error, nested causes included. A failure is captured as data on the
-> runtime thread and becomes an error object on the JavaScript thread, built
-> by a factory the module registers with its instance; an instance with none
-> registered rejects with an `Error` of the same name and fields.
+> [spec:pgorm:req:napi.errors+3]
+> Failures MUST reject with instances of the module's error classes
+> (`bindings.errors`), all derived from `PgormError` and `Error`, a panic on
+> the runtime included, which MUST reject its promise rather than leave it
+> pending. A failure is captured as data on the runtime thread and becomes an
+> error object on the JavaScript thread, built by a factory the module
+> registers with its instance; an instance with none registered rejects with
+> an `Error` of the same name and fields.
+
+> [spec:pgorm:req:napi.argument-errors]
+> An argument of the wrong JavaScript shape MUST be refused with a
+> `TypeError`: a method's argument of another type; an options object holding
+> a key the builder does not know, so a misspelt option is never left out; a
+> parameter list passed beside a built statement; a COPY source that is a
+> string, rows that are a string or a `Uint8Array`, and a row that is no
+> array; a statement of another format given to `copyInRows` or
+> `copyOutRows`; a listener channel, or a channel or payload to `notify`,
+> that is not a string; a sequence option outside `SequenceOptions`; a check's
+> `notValid` at `createDomain`; and a binder function that returns a promise
+> or anything but an operand or a list of them. A listener's capacity that is
+> a number but not a positive whole one is a `RangeError`. A WINDOW entry that
+> is neither a `Window` nor an `ExtendedWindow` is a `ConstructionError`.
 
 ## Values
 
@@ -132,36 +138,22 @@ first rule: a value reaches JavaScript exactly or not at all.
 | a created range | its type | `Range`, its kind a `CreatedRange` |
 | a created multirange | its type, in a binary COPY | `Multirange`, its kind a `CreatedMultirange` |
 
-> [spec:pgorm:req:napi.values]
-> Every kind of pgorm `Value`, and `interval`, MUST cross into and out of
-> JavaScript as the one JavaScript type the table above declares for it, and
-> SQL NULL as `null`, both ways. A value MUST reach JavaScript exactly or not
-> at all: `int8` decodes as a `bigint`, never a number; `numeric` as a
-> `Decimal`, whose text keeps the value's scale, within pgorm's range of a
-> 96-bit coefficient and 28 fractional digits; `float4` widened exactly; a
-> JSON number exactly, an integer literal past `Number.MAX_SAFE_INTEGER` as a
-> `bigint` and a number serde_json would read as another refused. A value
-> with no exact JavaScript form — a `numeric` past pgorm's range, `NaN` or
-> infinite; a date or timestamp outside the years -9999 to 9999 pgorm holds,
-> or infinite; `24:00`; an array of more than one dimension or not starting
-> at 1; a type the table does not list — MUST be a `DecodeError`, never a
-> rounded value, a string, `null` or a missing column. A domain decodes as
-> the type it is built over.
+> [spec:pgorm:req:napi.values+1]
+> Every kind `bindings.values` names, and SQL NULL as `null`, MUST cross as
+> the JavaScript type the table above declares for it, exactly: `int8`
+> decodes as a `bigint`, never a number; `numeric` as a `Decimal`, whose text
+> keeps the value's scale; `float4` widened exactly; a JSON number exactly, an
+> integer literal past `Number.MAX_SAFE_INTEGER` as a `bigint` and a number
+> serde_json would read as another refused; and a date or timestamp within the
+> years -9999 to 9999 pgorm holds.
 >
-> In the other direction a value MUST become the pgorm value it declares or
-> be refused with a `ConstructionError`: an integer outside its kind's range,
-> a number past 2^53 - 1 declared as an integer, an `f32` that narrowing
-> would change, a string holding a lone surrogate, a `Decimal` outside pgorm's
-> range or in exponent notation, a `Decimal` made from a number, which may
-> already be rounded, and statement text holding NUL. A `Decimal` MUST NOT
-> become a number implicitly. Parameters are bound, never interpolated,
-> through pgorm's `ValueHolder`, which writes each against the type
-> PostgreSQL inferred for its placeholder and refuses a value that type
-> cannot receive; its coercions — an integer to any numeric type, a float
-> to `float4` rounding as PostgreSQL's own cast does — are pgorm's, and a
-> refusal names the parameter and the codec's reason.
+> In the other direction a number past 2^53 - 1 declared as an integer, an
+> `f32` that narrowing would change, a string holding a lone surrogate, a
+> `Decimal` in exponent notation, and a `Decimal` made from a number, which
+> may already be rounded, MUST be refused with a `ConstructionError`. A
+> `Decimal` MUST NOT become a number implicitly.
 
-> [spec:pgorm:req:napi.temporal]
+> [spec:pgorm:req:napi.temporal+1]
 > Dates and times MUST be Temporal's: `date` a `Temporal.PlainDate`, `time` a
 > `Temporal.PlainTime`, `timestamp` a `Temporal.PlainDateTime` and
 > `timestamptz` a `Temporal.Instant`, a `PlainDate` or `PlainDateTime` in
@@ -180,46 +172,12 @@ first rule: a value reaches JavaScript exactly or not at all.
 > exact, and a value written with a nonzero digit below the microsecond MUST
 > be a `ConstructionError`, never truncated or rounded by the binding.
 >
-> `interval` MUST keep PostgreSQL's three independently signed fields —
-> months, days and microseconds — as the module's `Interval`, because
 > `Temporal.Duration` requires every field to share one sign and so cannot
-> hold `1 mon -2 days`. `Interval.from` takes a `Duration`, years and months
+> hold `1 mon -2 days`, which is why an interval is the module's `Interval`
+> (`bindings.values`). `Interval.from` takes a `Duration`, years and months
 > becoming months, weeks and days days and the rest microseconds, and a
 > `Duration` parameter binds as one; `toDuration` gives one back where the
-> signs agree and throws a `RangeError` where they do not. `timetz` MUST be a
-> `DecodeError`: no Temporal type holds a time of day at a fixed offset.
-
-> [spec:pgorm:req:napi.value-tags+2]
-> The module's `Value` MUST declare what plain JavaScript cannot:
-> `new Value(data, kind)` takes a kind named as pgorm-python names it, a
-> `TypeName` for an enum, or a `CreatedRange` or `CreatedMultirange`;
-> `Value.null(kind)` is SQL NULL of a kind; `Value.json(data)` is a JSON
-> document, so JSON's `null` stays distinct from SQL NULL; and
-> `Value.array(kind, items)` is an array that names its element kind when it
-> is empty or NULL. Construction does no I/O and MUST convert at once,
-> throwing a `ConstructionError` for data the kind cannot hold exactly. A
-> `Value` is immutable and can be bound any number of times, and the plain
-> value it hands out is independently owned.
->
-> A result read with `{ tagged: true }` MUST give each column as a `Value`
-> carrying its kind: an integer's width, an enum's schema-qualified type, an
-> array's element kind, and SQL NULL apart from JSON's null.
->
-> A created range's kind MUST carry the type's name, schema-qualifiable, and
-> its subtype, one of the twelve pgorm's `RangeSubtype` admits, which
-> converts each bound. Its value is the text form a `DeriveCreatedRange`
-> newtype converts into, bound as text for the statement to cast,
-> `CAST($1::text AS name)`, as `Expr::as_range` writes it. A column of one
-> MUST decode, through its subtype's binary codec, to a `Range` whose kind is
-> named as the column's type is. A created multirange's kind is a
-> `CreatedMultirange`, and its value is bound the same way, but the driver
-> reports a query's result column of one with no subtype, so that column
-> MUST be a `DecodeError`, left to be read cast to text. A binary COPY's
-> column of one is described with its subtype, which pgorm completes from
-> the catalogue (`conn.copy.rows`), so `copyOutRows` MUST decode it through
-> the subtype's codec to a `Multirange`, and `copyInRows` MUST write one back
-> from a `Value` of its kind or from its text form. Arrays of a created range
-> or multirange are refused both ways, in a COPY as anywhere else.
+> signs agree and throws a `RangeError` where they do not.
 
 > [spec:pgorm:req:napi.inference]
 > A plain JavaScript parameter MUST be bound as the one kind its type leaves:
@@ -235,1037 +193,145 @@ first rule: a value reaches JavaScript exactly or not at all.
 > MUST be refused with a `ConstructionError` that names the explicit form,
 > never guessed at or turned into a string.
 
-> [spec:pgorm:req:napi.rows]
-> A result's rows MUST be decoded on the runtime thread and reach JavaScript
-> as plain objects, one per row, keyed by column name in column order, each
-> key an own data property, so that a column named `__proto__` is a property
-> rather than the row's prototype. Two columns of one name MUST be a
-> `DecodeError`, not one key for both. A statement that returns no rows
-> resolves with an empty array.
+> [spec:pgorm:req:napi.records]
+> A statement's rows MUST reach JavaScript as plain objects, one per row,
+> keyed by column name in column order, each key an own data property, so
+> that a column named `__proto__` is a property rather than the row's
+> prototype. `{ tagged: true }` among a terminal's options gives every column
+> as a `Value` carrying its kind (`bindings.value-tags`). A model's records are
+> plain objects keyed by field. A registered entity's records are frozen plain
+> objects keyed by SQL column name, behind each of which the module keeps the
+> Rust model it was read as; the entity operations on a record are the
+> entity's functions over it, `intoActive(record)`, `withValue(record,
+> column, value)` and `tagged(record, column)`. A change is `{ old, new }`,
+> an upsert `{ kind: "inserted", new }` or `{ kind: "updated", old, new }`, a
+> notification a frozen `{ channel, payload, processId }`, and a pool's status
+> a plain object.
+
+> [spec:pgorm:req:napi.row-count]
+> `one` finding no row or several, `optional` finding several, and the `one`,
+> `oneOpt` and `optional` of model, entity, graph and source queries finding a
+> count they do not take MUST reject with a `DecodeError`.
 
 ## Connections
 
-A `Pool` holds the connections, a `Connection` is one of them checked out, a
-`Transaction` is a transaction or savepoint on one, and a `RowStream` pulls a
-statement's rows over one. Each is a JavaScript object over a boxed native
-handle, and each is released by being closed — a transaction by the callback
-it was opened for settling.
+> [spec:pgorm:req:napi.lifecycle]
+> `new Pool(connectionString, options)` builds a pool, and `connect` resolves
+> with one whose server answered. The options are `tls` (`"verify-full"` or
+> `"disable"`), `ca`, PEM certificates as a string or `Uint8Array`,
+> `maxSize`, `connectTimeout` and `acquireTimeout` in milliseconds,
+> `statementCacheSize`, `recycle` (`"verified"` or `"fast"`) and
+> `statementCacheChannel`. Each pool, connection, stream and listener MUST be
+> closable by `close()` and by `await using`. A stream is an async iterator
+> whose `next()` pulls one row and whose `return()`, which a `for await` loop
+> leaving early calls, closes it as `close()` does. What each holds MUST be
+> released by that close, never left to garbage collection or Neon's drop
+> queue. A handle collected unclosed releases only what is idle — an idle
+> transaction rolled back, an idle connection returned to its pool, a
+> listener's connection closed — never cutting short work still running on
+> it, and a transaction keeps the connection or transaction it borrows
+> reachable. A pull pending when a listener closes rejects with a
+> `LifecycleError`, and a pull made after any iterator has closed or ended
+> resolves as done. A process that ends holding open handles still exits
+> (`napi.exit`).
 
-> [spec:pgorm:req:napi.connections+4]
-> A `Pool` MUST be built from a connection string and options — TLS mode, CA,
-> size, connect and acquire timeouts, statement-cache size, recycling and
-> statement-cache channel — by
-> a constructor that sends nothing and throws a `ConstructionError` for an
-> unusable string or option; `connect` resolves with a pool whose server
-> answered. TLS MUST default to `verify-full`, verifying the server's
-> certificate and host name against the CA given or the platform's trust
-> store, with no silent fallback to plaintext; only `sslmode=disable` or
-> `tls: "disable"` connects in plaintext. A pool lends a `Connection` with
-> `acquire`, and runs a statement of its own on a connection lent to it alone.
-> `clearStatementCaches()` marks every connection's cached statements stale
-> as `conn.pool.statement-cache.clear` describes; it sends nothing, returns
-> nothing, and is refused by no state of the pool. `statementCacheChannel`,
-> absent by default, names a channel the pool listens on, clearing on every
-> notification there as `conn.pool.statement-cache.listen` describes; an
-> empty name or one longer than 63 bytes is a `ConstructionError`, and
-> closing the pool closes the listening connection. `STATEMENT_CACHE_CHANNEL`,
-> exported by the package, is the channel pgorm-migration's runner notifies.
->
-> Each pool, connection and stream MUST be closable explicitly, by `close()`
-> or `await using`, and a transaction MUST end when its callback settles, as
-> `napi.transactions` describes; what each holds MUST be released by that
-> close or that end, never left to garbage collection or Neon's drop queue:
-> closing a connection returns it to its pool at once, and closing a pool
-> refuses new work, cancels what runs and resolves once every connection is
-> released. A handle collected unclosed releases only what is idle — an
-> idle transaction rolled back, an idle connection returned to its pool —
-> never cutting short work still running on it, and a transaction keeps the
-> connection or transaction it borrows reachable. A connection runs one
-> operation at a time: a second, or any while a transaction or stream holds
-> it, MUST be refused with a `LifecycleError` rather than queued or raced, as
-> is any use after close. Acquiring past `acquireTimeout` MUST reject with a
-> `TimeoutError`. Connections live on the runtime and hold nothing a
-> JavaScript event loop waits on, so a process that ends holding open
-> handles still exits.
+> [spec:pgorm:req:napi.raw]
+> `execute`, `query`, `one`, `optional` and `stream` on a pool, a connection
+> and a transaction MUST take SQL text and an array of parameters, each bound,
+> never interpolated, through the path a built statement takes
+> (`bindings.results`), and a built statement with its options second.
 
-> [spec:pgorm:req:napi.results]
-> A pool, a connection and a transaction MUST run bound SQL through pgorm's
-> cached `ConnectionTrait` path with the same terminals: `execute` resolves
-> with the affected-row count as an exact number; `query` with every row;
-> `one` with exactly one row; and `optional` with at most one, or `null`. Any
-> other count is a `DecodeError`, decided after the query and never in place
-> of a database or decode failure. `{ tagged: true }` gives each column as a
-> `Value`, as `napi.value-tags` describes.
+> [spec:pgorm:req:napi.transactions+3]
+> A transaction MUST open only through `transaction(fn, options)` on a pool
+> or a connection, and a savepoint only through `transaction(fn)` on a
+> transaction; a `Transaction` is not disposable. JavaScript sends the
+> closure transaction's task (`bindings.transactions`) owned commands. When
+> `fn` resolves the closure returns `Ok`, and when it throws `Err`.
+> `transaction(fn)` resolves with what `fn` resolved with and rejects with
+> what it threw, or with the failed commit's error. A failed `ROLLBACK`
+> rejects with a `SuppressedError` whose `error` is the rollback's database
+> error and whose `suppressed` is what `fn` threw. A callback that settles
+> with a savepoint still open fails, and commits nothing. The options `mode`
+> and `isolation` select pgorm's `TransactionMode`.
 
-> [spec:pgorm:req:napi.transactions+2]
-> Transactions MUST open only through `transaction(fn)` on a pool or a
-> connection, and savepoints only through `transaction(fn)` on a transaction,
-> as Rust's open only around a closure (`conn.tx.closure`): no method begins,
-> commits, rolls back or closes one, and a `Transaction` is not disposable.
-> Each MUST run inside pgorm's closure transaction and its savepoints'
-> (`conn.tx.closure`), a task on the runtime serving each one's commands from
-> inside its closure and JavaScript sending it owned commands: when `fn`
-> resolves the closure returns `Ok`, committing or releasing, and when it
-> throws `Err`, rolling back, so pgorm issues the `COMMIT` or `ROLLBACK`, and a
-> connection given up mid-command drops the closure's future rather than
-> await a rollback on it. `transaction(fn)` resolves with what `fn` resolved
-> with and rejects with what it threw; a commit that fails ends the
-> transaction, discards its connection and rejects with its error. A failed
-> `ROLLBACK`, which pgorm reports as `TransactionError::RollbackFailed`
-> (`conn.tx.closure`), discards the connection and rejects with a
-> `SuppressedError` whose `error` is the rollback's database error and whose
-> `suppressed` is what `fn` threw; an abandoned frame whose `ROLLBACK` fails
-> discards it too. pgorm's rule that a transaction borrows its parent
-> exclusively MUST hold: while a transaction is open its connection refuses
-> other work; while a savepoint is open its transaction refuses statements
-> and other savepoints; and a statement started while another runs on the
-> same transaction is refused — each with a `LifecycleError`, never queued or
-> raced. A callback that settles with a savepoint still open fails, and
-> commits nothing. `mode` and `isolation` select pgorm's `TransactionMode`,
-> the combinations PostgreSQL acts on; a savepoint takes neither. Nothing is
-> retried.
-
-> [spec:pgorm:req:napi.cancellation]
+> [spec:pgorm:req:napi.cancellation+1]
 > Acquiring a connection, running a statement, opening a transaction or a
-> savepoint, and pulling a stream's rows MUST each take an `AbortSignal`. An
-> aborted operation rejects with the signal's reason. Its outcome is unknown — a write may or may not
-> have happened — so the connection it ran on MUST be discarded rather than
-> returned to its pool, and a transaction it ran in ends with nothing
-> committed; an operation whose signal fired before it started sends nothing.
-> Closing a pool or a connection MUST likewise interrupt what runs on it,
-> idle transactions and streams included, without waiting for them.
-
-> [spec:pgorm:req:napi.streams]
-> `stream` on a pool or a connection MUST return an async iterator over a
-> bound statement's rows through pgorm's `query_raw`, pulling one row per
-> `next()`, so that the driver's bounded buffer and the socket hold the server
-> back while nothing pulls, and refusing a second pull while one is pending.
-> The stream holds its connection until its last row, which frees it, or
-> until `return()` — a `for await` loop leaving early — or `close()`, which
-> discard it if rows remained; a pool's stream returns or discards a
-> connection of its own. A connection's stream reserves that connection, which
-> refuses other work meanwhile. A transaction offers no stream, as
-> pgorm-python's does not.
-
-> [spec:pgorm:req:napi.copy+2]
-> `copyFrom(table, format)` and `copyTo(source, format)` MUST build
-> pgorm-query's `CopyFromStatement` and `CopyToStatement` in the format named,
-> `"text"`, `"csv"` or `"binary"`, a COPY TO reading a table or the rows of a
-> `Select`, or of an INSERT, UPDATE, DELETE or MERGE through its `RETURNING`
-> list. A write with no `RETURNING` list MUST be refused with a
-> `ConstructionError` when `copyTo` is called, as pgorm-query refuses to make
-> it a source (`sql.ast.copy`). A `Select` source is final once `copyTo` reads
-> it, so its tie limit and WINDOW clause MUST be checked then by pgorm-query's
-> `check_tie_limit` and `check_windows`, a refused one a `ConstructionError`,
-> as a method reading a `Select` into another statement checks them
-> (`napi.select`). They are immutable builders as `napi.statements`
-> describes, each option the pgorm-query method of its name offered exactly
-> where pgorm-query's typed statement has it: an option the statement's
-> format or direction does not take MUST be refused with a
-> `ConstructionError` as it is called, never written for the server to
-> refuse, and a one-character option takes a one-character string. COPY takes
-> no parameters, so `inspect()` gives pgorm-query's rendering, every value in
-> it a literal, and no values, and a statement terminal MUST refuse a COPY.
->
-> `copyIn(statement, source)` and `copyOut(statement)` MUST run a COPY through
-> pgorm's `CopyTrait` (`conn.copy`) on a pool, a connection and — unlike
-> `stream` — a transaction or savepoint, a task on the runtime owning the sink
-> or stream that borrows what the COPY runs on: a pool's COPY takes a
-> connection of its own, and a connection's or transaction's holds it,
-> refusing other work with a `LifecycleError` until the COPY ends. `copyIn`
-> writes a `Uint8Array`, or an iterable or async iterable of them, a string
-> refused with a `TypeError`, pulling the source only as the COPY takes its
-> data, so that a large one streams rather than accumulates, and resolves
-> with the rows written as an exact number. A source that throws or yields
-> anything else MUST abandon the COPY, so that nothing is written, and reject
-> with that error: outside a transaction the connection stays usable, and
-> inside one the transaction is aborted until it rolls back. A row the server
-> refuses rejects with its `DatabaseError` once the data is sent; a COPY FROM
-> it refuses before the data flow starts leaves its connection unusable, so
-> that connection is discarded and a transaction on it ends. `copyOut`
-> resolves, once the server accepts the statement, with an async iterator of
-> `Uint8Array` chunks, pulled one per `next()` with bounded buffering and
-> refusing a second pull while one is pending; its end frees what it holds,
-> and `close()` or `return()` before the end discards the connection, which
-> the server would otherwise go on sending to. A failure the server reports
-> part way leaves the connection as a failed statement does. An aborted COPY
-> MUST behave as `napi.cancellation` requires: it rejects with the signal's
-> reason, its connection is discarded and its transaction ends with nothing
-> committed.
-
-> [spec:pgorm:req:napi.copy.rows]
-> `copyInRows(statement, rows)` and `copyOutRows(statement)` MUST run a
-> binary COPY as rows of values through `conn.copy.rows`, on a pool, a
-> connection and a transaction or savepoint, held and released as `copyIn`
-> and `copyOut` are (`napi.copy`). The statement MUST be a `CopyFrom` or
-> `CopyTo` in the `"binary"` format, its type `CopyFrom<"binary">` or
-> `CopyTo<"binary">` and any other refused with a `TypeError`; the columns
-> are the ones pgorm describes, before the COPY starts, and a description
-> the server refuses rejects with its `DatabaseError`, the connection kept.
-> `rows` is an iterable or async iterable of arrays, each a row of its
-> columns' values in order; anything else, a `Uint8Array` or a string
-> included, is a `TypeError` before anything is sent, and an item that is no
-> array is a `TypeError` that abandons the COPY. Each value is read as a
-> parameter is (`napi.inference`) and written against its column's type as a
-> parameter is bound. A row of another width, and a value its column's type
-> does not take, MUST be refused with a `ConstructionError` naming the
-> columns or the column, abandoning the COPY as a source that throws does, so
-> nothing is written. Rows are pulled as the COPY takes them, a batch at a
-> time, and it resolves with the rows written. `copyOutRows` resolves with a
-> `CopyRowStream`, an async iterator of rows, each an array of plain values
-> decoded by its column's type as a result column of that type is
-> (`napi.values`), fetched as they arrive with bounded buffering, one pull
-> at a time; `columns` names the columns. A field no value holds rejects the
-> pull with a `DecodeError` naming the column and closes the stream, which
-> discards the connection; its end, `close()` and `return()` behave as a
-> `CopyOutStream`'s do.
-
-> [spec:pgorm:req:napi.listen]
-> [spec:pgorm:req:napi.listen]
-> `pool.listener({ capacity, signal })` MUST open a `Listener` through pgorm's
-> `DatabasePool::listener` (`conn.listen`): a connection of its own, opened
-> with the pool's configuration and TLS, never one the pool lends, holding at
-> most `capacity` notifications unread — a positive whole number, 1024 by
-> default, anything else refused with a `RangeError` or `TypeError` before
-> anything is sent. The listener belongs to its pool: closing the pool closes
-> it, and the pool's close resolves once its connection is released. Closing
-> the listener, a `for await` loop leaving it early, and collecting it unclosed
-> each close its connection; it holds nothing the event loop waits on unless a
-> pull is in flight.
->
-> `listen(channel)`, `unlisten(channel)` and `unlistenAll()` MUST send pgorm's
-> `LISTEN`, `UNLISTEN` and `UNLISTEN *`, the channel an exact name, and run
-> while a pull waits. A channel longer than 63 bytes MUST be refused with a
-> `ConstructionError`, nothing sent, and one that is not a string with a
-> `TypeError`. An aborted `listen`, `unlisten` or `unlistenAll` MUST close the
-> listener, since which channels the server listens on is then unknown.
->
-> The listener MUST be an async iterator of notifications, each a frozen `{
-> channel, payload, processId }`, pulled one per `next()` in the order the
-> server sent them, a second pull while one is pending refused with a
-> `LifecycleError`. An aborted pull MUST reject with the signal's reason and
-> leave the listener open, since the notification it waited for stays queued
-> for the next. Nothing reconnects a listener. When its connection fails or is
-> terminated, the pull that meets the end MUST yield the notifications already
-> received first and then reject with the failure, a `DatabaseError` carrying
-> the server's SQLSTATE where it sent one; when a notification arrives while
-> `capacity` wait unread, pgorm closes the connection and the pull past the
-> waiting ones MUST reject with a `ConnectionError`. Either closes the
-> listener. A pull pending when the listener or its pool closes MUST reject
-> with a `LifecycleError`, and one made after it closed resolves as done, as
-> does every iterator's after its end; `listen` and `unlisten` on a closed
-> listener reject with a `LifecycleError`.
->
-> `notify(channel, payload)` on a pool, a connection and a transaction MUST
-> run pgorm's `notify`, `SELECT pg_notify($1, $2)` with both bound, as a
-> statement runs there — a pool's on a connection of its own, a connection's
-> or transaction's refusing other work meanwhile — so in a transaction it is
-> delivered at commit and never after a rollback, and an abort discards the
-> connection as `napi.cancellation` requires. A channel or payload that is not
-> a string MUST be refused with a `TypeError`; the server's bounds — a payload
-> of 8000 bytes or more, an empty channel, one longer than 63 bytes — are its
-> `DatabaseError`, SQLSTATE `22023`.
-
-## Statements and expressions
-
-JavaScript builds pgorm-query's statements and expressions as pgorm-python
-does, in JavaScript's conventions: builder objects whose methods return new
-builders, closed choices spelled as strings, and the same terminals that run
-SQL text running a built statement.
-
-> [spec:pgorm:req:napi.statements]
-> JavaScript MUST build pgorm-query's statements and expressions through
-> builder objects that each own the pgorm-query builder state they stand for,
-> held by the addon. A builder MUST be immutable: each method returns a new
-> builder made from a copy of its receiver's state by the pgorm-query method
-> of the same meaning, so a builder reused, or extended in two directions,
-> leaves itself and each extension unchanged. A builder is made only by the
-> module's functions and the constructors it names; an argument a method
-> cannot use MUST be refused as the method is called — a `ConstructionError`,
-> or a `TypeError` for an argument of the wrong JavaScript shape — so a
-> statement that cannot be built never exists to be run.
->
-> `inspect()` MUST give the SQL and the bound values, in placeholder order and
-> each a `Value` carrying its kind, that running the builder sends: a
-> statement as it runs, an expression as the one item of a `SELECT` and a
-> condition as the `WHERE` of `SELECT TRUE`, as pgorm-python inspects them.
-> `execute`, `query`, `one`, `optional` and `stream`, on a pool, a connection
-> and a transaction, MUST take a built statement where they take SQL text,
-> its options second, and build it with the function `inspect()` uses,
-> binding its values as any parameter is bound; a parameter list passed
-> beside it is a `TypeError`, and an expression or a condition is no statement
-> to run. A statement binding more than 65,535 values MUST be refused with a
-> `ConstructionError` before anything is sent.
-
-> [spec:pgorm:req:napi.expressions+7]
-> An expression MUST lower into pgorm-query's own builders. `col` is a
-> column, qualified by a table and its schema; an operand that is not an
-> expression is a value bound as a parameter, never interpolated — inferred as
-> a parameter is, or declared with `Value`, an enum's label written cast to its
-> type and a created range's text cast to its range through
-> `Expr::as_range` — and `bind` makes one an expression. An `Interval`, or a
-> `Temporal.Duration` converted as `Interval.from` converts it, binds as
-> pgorm's interval value (`[spec:pgorm:def:sql.value.interval]`), its fields
-> kept apart. `null`, which has no kind to bind, MUST be a
-> `ConstructionError` naming the explicit form. Every identifier — of a column, table, schema,
-> alias, collation, common table expression or type — MUST be a string of
-> 1–63 UTF-8 bytes without NUL, minted with `Name::runtime`, so that it is
-> quoted wherever pgorm-query writes it, a dot in it part of the name.
->
-> Comparison and arithmetic, `||`, `IS [NOT] DISTINCT FROM`, AND, OR, NOT,
-> `IS [NOT] NULL`, `[NOT] BETWEEN [SYMMETRIC]` and `[NOT] IN` a list — an
-> empty one included, which no value is in — or a subquery MUST each be the
-> pgorm-query method of that meaning, and `Condition.all` and `Condition.any`
-> pgorm-query's `Condition`, empty ones true and false. `like`, `ilike`,
-> `similarTo` and their negations take a pattern string, bound, and an
-> optional escape of one character, or the empty string, which turns escaping
-> off (`sql.ast.expr.similar-to`); `regex` (`~`), `notRegex` (`!~`),
-> `iregex` (`~*`) and `notIregex` (`!~*`) match a POSIX regular expression,
-> an operand bound unless it is an expression, each the `BinOper` of that
-> meaning; `matches` (`@@`) is `BinOper::Matches`, full-text search or a
-> `jsonpath` predicate, its operand bound unless it is an expression;
-> `pathExists` (`@?`) takes a `jsonpath` string, bound as
-> pgorm-query's `json_path_exists` binds it, as text cast to `jsonpath`, and
-> anything else is a `ConstructionError`; `startsWith`,
-> `endsWith` and `containsText` read their argument as
-> text through PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and
-> `_` match themselves. `call` reaches only the functions pgorm-query has a
-> constructor for, at the argument counts each takes — `uuidv7` with or
-> without its shift among them — and another name or count is a
-> `ConstructionError`: the name selects a constructor and never reaches SQL;
-> `generate_series`, with or without its step, and `unnest` are the
-> set-returning ones a `tableFunction` reads, and `json_to_record`,
-> `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset` the
-> record-returning ones it reads through a column definition list.
-> A cast names its type by identifier or `TypeName`; `collate` names a
-> collation, schema-qualifiable; `at` and `slice` subscript an array; a
-> searched or simple `CASE` exists only once it has an arm; `exists`,
-> `scalar` and `array` take a `Select`, `array` lowering through
-> `Expr::array` to `ARRAY(select)`: the subquery's one column as one array
-> value, empty when it yields no row, which casts and compares as a value
-> (`sql.ast.expr`), the server refusing a subquery of more than one column
-> (`42601`). `any(source)` and `all(source)` MUST be `ANY (..)` and
-> `ALL (..)`: pgorm-query's `Expr::any` / `Expr::all` over a `Select`'s rows,
-> and `Func::any` / `Func::all` over an array, an expression or a value bound
-> as one array parameter. Each is a `Quantified`, no expression: the right
-> operand of `eq`, `ne`, `lt`, `lte`, `gt` and `gte` alone, as PostgreSQL's
-> grammar reads it, and any other operator or operand position MUST refuse it
-> with a `ConstructionError`.
-
-> [spec:pgorm:req:napi.select+2]
-> `select` MUST build pgorm-query's `SelectStatement`: a projection of
-> expressions and aliased expressions, `*` until one is given; FROM items —
-> a `Table`, schema-qualified and aliased, or a `FromItem`, which is always
-> aliased, a subquery among them, a `tableFunction` over calls — `ROWS FROM`
-> over several, `WITH ORDINALITY`, column names, and a call returning
-> `record` given as `{ call, columnDefinitions }`, its non-empty list of
-> `[name, type]` pairs lowered into pgorm-query's `column_definition`
-> (`sql.ast.select.column-definitions`) — and a table's
-> `tablesample` by `"bernoulli"` or `"system"` with a bound percentage and
-> optional seed (`sql.ast.select.table-function`,
-> `sql.ast.select.table-sample`) —; inner, left, right and full joins on a
-> predicate, a lateral subquery among them, and cross joins; WHERE and HAVING,
-> each call ANDed to what is there; GROUP BY over expressions and the grouping
-> elements `groupingSet`, `rollup`, `cube` and `groupingSets` — the last
-> taking its first element, an expression among its elements the set of
-> itself — with `groupByDistinct` (`sql.ast.select.grouping`,
-> `sql.ast.select.group-distinct`); ORDER BY with a direction and
-> NULLS FIRST or LAST; LIMIT and OFFSET, a non-negative integer number or
-> `bigint` within PostgreSQL's `bigint`, or `null` to remove one, anything
-> else a `ConstructionError`, and `limitWithTies`, the same count in LIMIT's
-> slot, which `inspect()` and every run refuse with a `ConstructionError`
-> when the statement has no ORDER BY or locks SKIP LOCKED, by pgorm-query's
-> `check_tie_limit` (`sql.ast.select.tie-limit`) — the order may come after
-> the limit, so the method cannot refuse it — and which a method reading the
-> statement into another — a subquery, a set operation's operand, an
-> INSERT's rows or a common table expression's body — refuses as it is
-> called, nothing being able to order it after; DISTINCT; UNION, INTERSECT
-> and EXCEPT, each with
-> its ALL form; a row lock of one of the four strengths, OF the items named,
-> each by the name it answers to in the statement, and with NOWAIT or SKIP
-> LOCKED; and a WITH clause of common table expressions with column lists and
-> materialization, or `WITH RECURSIVE` of exactly one, with SEARCH and CYCLE.
-
-> [spec:pgorm:req:napi.writes]
-> `insert`, `update` and `deleteFrom` MUST build pgorm-query's INSERT, UPDATE
-> and DELETE. An INSERT names its distinct columns before any row; each
-> `values` call adds one row of exactly as many operands, by pgorm-query's
-> arity check; `select` takes its rows from a `Select` of as many columns
-> instead; and `defaultValues` writes one row of defaults, mixed with
-> neither. `onConflict` takes only a completed action: `Conflict.doNothing()`,
-> answering any conflict, or an arbiter — `Conflict.on` a non-empty list of
-> columns and index expressions, with an optional partial-index predicate, or
-> `Conflict.onConstraint` a constraint by name, which takes no predicate —
-> followed by `doNothing()` or a non-empty update of columns taken from
-> EXCLUDED or set to expressions, with an optional `where`. An UPDATE has at
-> least one assignment, each column once. An INSERT with no row, an UPDATE
-> with no assignment and an UPDATE or DELETE with neither a `where` nor an
-> explicit `allRows()` MUST be refused with a `ConstructionError` when it is
-> inspected or run. `from` and `using` add the items an UPDATE or a DELETE
-> reads. `returning` gives the RETURNING list, every column when it is empty,
-> and reads a written row's old and new versions through `ReturningRow.old`
-> and `ReturningRow.new`, renamed with `oldAs` and `newAs`. Each statement
-> takes a WITH clause, and one with a RETURNING list is a common table
-> expression's body.
-
-> [spec:pgorm:req:napi.merge]
-> `merge(target, source, on)` MUST follow pgorm-query's MERGE typestate. It
-> gives a `PendingMerge`, which has no `inspect()` and which every terminal
-> refuses with a `ConstructionError`, because PostgreSQL refuses a MERGE with
-> no WHEN arm; its first arm gives the `Merge` statement. `whenMatched` and
-> `whenNotMatchedBySource` take an action on a target row —
-> `MergeAction.update`, which takes its first assignment and so is never
-> empty, `MergeAction.delete()` or `MergeAction.doNothing()` — and
-> `whenNotMatched` one on a source row — `MergeAction.insert`, likewise never
-> empty, `MergeAction.insertDefaults()` or `MergeAction.doNothing()`; any
-> other pairing MUST be a `ConstructionError`. Each arm takes an optional
-> condition; within a kind of row the unconditional arm renders after the
-> conditional ones and a later one replaces it, as pgorm-query orders them.
-> `returning` reads a row's versions as a write's does, `returningAction()`
-> puts `merge_action()` first in the list, its only form, and `only()` writes
-> `ONLY` before the target. A `Merge` takes a plain WITH clause — a recursive
-> one is refused, as PostgreSQL refuses it — and with a RETURNING list is a
-> common table expression's body.
-
-> [spec:pgorm:req:napi.sql-json]
-> SQL/JSON's query functions `jsonExists`, `jsonValue` and `jsonQuery`, its
-> constructors `jsonObject`, `jsonArray`, `jsonArrayQuery`, `jsonObjectAgg`,
-> `jsonArrayAgg`, `jsonParse` (`JSON(..)`), `jsonScalar` and `jsonSerialize`,
-> `formatJson`, and `isJson` and `isNotJson` MUST lower into pgorm-query's
-> SQL/JSON builders, each option applied through the builder's own method. A
-> path is a string pgorm-query binds as text cast to `jsonpath`; PASSING takes
-> an object of variable names, each an identifier, to values. Behaviours are
-> typed per function, and a choice PostgreSQL refuses for a function is a
-> `ConstructionError`: `jsonExists` takes `"true"`, `"false"`, `"unknown"` or
-> `"error"`; `jsonValue` `"null"`, `"error"` or a `jsonDefault(value)`;
-> `jsonQuery` those and `"emptyArray"` or `"emptyObject"`, and one `shaping`
-> of `"withWrapper"`, `"withConditionalWrapper"` or `"omitQuotes"`. A DEFAULT
-> value is written as an escaped literal, because PostgreSQL refuses a
-> parameter there, and one that carries an enum's or a created range's cast is
-> refused. RETURNING takes a `DataType` or a built-in type's name, and
-> `jsonValue` refuses `json` and `jsonb`. `jsonArrayAgg`'s ordering takes no
-> NULLS placement, and one that asks for it is refused rather than dropped.
->
-> `jsonTable(context, path, columns, { alias, .. })` MUST build a FROM item
-> through `Func::json_table`: its columns a non-empty list of
-> `JsonTableColumn.ordinality`, `.value`, `.query`, `.exists` and `.nested`,
-> each taking only the clauses its kind of column admits, its alias required,
-> its paths written as escaped literals and its PASSING values bound. Its
-> `onError` is `"error"` or `"empty"`.
-
-> [spec:pgorm:req:napi.windows+2]
-> `over` MUST attach a window only to what pgorm-query's `WindowFunction`
-> admits — a function call, or `jsonArrayAgg` or `jsonObjectAgg` — and
-> anything else is a `ConstructionError`; the call under it is a projection
-> item, named with `as`. Its window is a `Window` or an `ExtendedWindow(base)`
-> built on an entry of the SELECT's WINDOW clause, written inline, or the
-> name of one the clause declares. `window(name, window)` MUST
-> append an entry, the clause holding every one in call order as
-> pgorm-query's `SelectStatement::window` does: a `Window`, or an
-> `ExtendedWindow(base)`, which builds pgorm-query's `ExtendedWindow` on an
-> earlier entry with ORDER BY and a frame and has no `partitionBy`
-> (`sql.ast.window-statement`); anything else is a `ConstructionError`. A
-> clause PostgreSQL refuses — a name declared twice, an extended window whose
-> base is no earlier entry, has a frame, or already orders its rows when it
-> adds an ORDER BY — a call over a name the clause does not declare, and one
-> over an inline `ExtendedWindow` whose base no entry declares, has a frame,
-> or already orders its rows when it adds an ORDER BY are refused by
-> pgorm-query's `check_windows`, as a `ConstructionError`, where
-> the tie limit is checked: by `inspect()` and every run, and by a method
-> reading the statement into another as it is called. A `Window`
-> builds pgorm-query's `WindowStatement` with PARTITION BY, ORDER BY and a
-> frame, and a frame MUST follow pgorm-query's frame typestate: a start from
-> `FrameType.rows`, `.range` or `.groups` offers only the ends that may follow
-> it, so no frame whose end comes before its start can be built; a following
-> start does not stand alone as a frame; and `exclude` belongs to a frame.
-> `windowFunction` builds PostgreSQL's general-purpose window functions at the
-> argument counts each takes, usable only through `over`, which the server
-> requires of them; another name or count is a `ConstructionError`.
-
-> [spec:pgorm:req:napi.ranges+1]
-> `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`) MUST compare
-> ranges, multiranges and arrays through pgorm-query's operators of that
-> meaning, and `strictlyLeftOf` (`<<`), `strictlyRightOf` (`>>`),
-> `notExtendRightOf` (`&<`), `notExtendLeftOf` (`&>`) and `adjacentTo`
-> (`-|-`) MUST place ranges and multiranges through them. A range or multirange operand is bound as the `Value` that declares
-> its kind — a built-in range or multirange kind, or a `CreatedRange` or
-> `CreatedMultirange`, whose text is cast to its type through
-> `Expr::as_range` — and a `Range` or `Multirange` passed without one MUST be a
-> `ConstructionError`, a range's kind never being inferred.
-
-## Models
-
-A model is JavaScript data: a table and its columns' declarations, made by
-`model(name, { schema, columns })` and lowered into the statement builders,
-as pgorm-python's `Model` is Python data over its native builders. Its
-reads and writes decode into records of its fields, and its relations,
-graphs, cursors and pages follow pgorm's own `RelationDef`, `SelectGraph`,
-`Cursor` and `Paginator`.
-
-> [spec:pgorm:req:napi.models]
-> `model(name, { schema, columns })` MUST declare a model of a table,
-> schema-qualified when `schema` is given, from an object of fields, each a
-> `column(kind, options)`: a kind every result decodes as — any value kind
-> but `u64` and `char`, which no column decodes as — or a schema-qualified
-> `TypeName`, `CreatedRange` or `CreatedMultirange`, as a decoded row names
-> each type; and the options `name` (the SQL column, the field's own name by
-> default), `nullable`, `array`, `primaryKey`, `default`, `generated`
-> (`"always"` or `"byDefault"`) and an enum's `values`. Anything else — an
-> unknown option, a key column that is nullable, a generated column with a
-> default, labels on a column that is no enum, two fields of one column, an
-> enum or created range without its schema, an identifier pgorm would not
-> take — MUST be a `ConstructionError` thrown as the model is declared.
-> Declaring a model MUST send nothing, run no DDL and claim no Rust entity:
-> no derive, `EntityTrait` or ActiveModel hook is behind it. A model and its
-> columns never change; `as(alias)` gives another model reading the table
-> under an alias. Its columns are qualified as pgorm qualifies an entity's,
-> by the table's alias or else its name, never its schema. The TypeScript
-> declarations MUST type a model from its declaration alone: `RowOf`, a
-> record's fields and their types, a nullable column's `| null` and an array
-> column's items, an enum's listed values as a union of their labels;
-> `InsertOf`, requiring every field neither nullable, defaulted nor
-> generated and refusing a field generated always; `UpdateOf`; and `KeyOf`.
-
-> [spec:pgorm:req:napi.model-records]
-> A model's terminals MUST decode each row into a record: a plain object
-> keyed by field, in declaration order, its values those `napi.values`
-> declares. Each field MUST be found by the result column its statement
-> projected it under, and the result's columns MUST be exactly those; each
-> column's kind MUST be the kind its field declares, compared as the addon
-> spells a decoded column's kind — a scalar's name, an enum's
-> schema-qualified type, a created range's type and subtype, an array's
-> element — so an `int8` read into an `i32` field, or another schema's enum,
-> is a `DecodeError` rather than a value of the wrong type. A NULL in a field
-> not nullable, and a label an enum field does not list, MUST be a
-> `DecodeError`, never a value. A model's rows stream from a pool or a
-> connection as records, through the same decode.
-
-> [spec:pgorm:req:napi.model-reads+1]
-> `find()` MUST select every field, `select(..)` the fields it names, and
-> `findByKey(key)` the row of a primary key, through pgorm-query's
-> `SelectStatement`; `where` ANDs a condition, `orderBy`, `limit` and
-> `offset` are the builder's, and `join(relation)` joins a relation's far
-> end, from the query's model or a table it joined, without reading its
-> columns. `col(field)` MUST be the field's column as an expression whose
-> comparisons convert a value through the field's declared kind — an enum's
-> label bound cast to its type, as pgorm's column comparisons cast through
-> `save_as` — and take an expression, or `any(..)` / `all(..)`, as written,
-> a `Value` only of the field's own kind, and `null` never, which `isNull()`
-> tests. `key(values)`
-> MUST match every primary-key field and no other. `all`, `one`,
-> `optional` and `count` run on a pool, a connection or a transaction —
-> `one` exactly one row and `optional` at most one, any other count a
-> `DecodeError` — and `count` counts as `napi.pagination` does.
-
-> [spec:pgorm:req:napi.model-writes]
-> `insert(values)`, `insertMany(rows)`, `update(values)` and `delete()` MUST
-> build pgorm-query's INSERT, UPDATE and DELETE of a model's table. A field
-> left out of `values` MUST stay out of the statement — an insert takes the
-> table's default, an update leaves the column as it is — and a field set to
-> `null` MUST be written as SQL NULL, which only a nullable field takes; each
-> value converts through its field's declared kind as a comparison's does,
-> and the fields set are written in declaration order whatever order the
-> object names them in. An unknown field, an `undefined` value, a field
-> generated always, an insert leaving out a field neither nullable,
-> defaulted nor generated, an update setting nothing and rows of one insert
-> setting different fields MUST be `ConstructionError`s, and an insert into
-> an aliased model is refused. An insert of no rows sends nothing:
-> `execute` resolves with 0 and the returning terminals with no rows. An
-> UPDATE or DELETE MUST have a `where` or `allRows()` before it runs, as
-> `napi.writes` requires. `returning(..)` reads the fields written as
-> records. `returningChange` and `returningChanges` on an update, and
-> `returningUpsert` and `returningUpserts` on an insert, MUST read each
-> written row's two versions as pgorm's `exec_returning_change(s)` and
-> `exec_returning_upsert(s)` do: every field of both versions in a
-> `RETURNING WITH (OLD AS pgorm_old, NEW AS pgorm_new)` list, the old under
-> `o_` and the new under `n_`, a change being `{ old, new }` and an upsert
-> `{ kind: "inserted", new }` where the old version is NULL in every column
-> and `{ kind: "updated", old, new }` otherwise; a row an insert's conflict
-> clause did not write is `null` from `returningUpsert` and left out of
-> `returningUpserts`.
-
-> [spec:pgorm:req:napi.relations]
-> A model's `belongsTo`, `hasOne` and `hasMany` MUST make a relation to
-> another model pairing fields of each, one or a non-empty list of equal
-> length, in order. A join along it MUST be the condition pgorm's
-> `join_condition` writes for a relation's columns, each pair equal and the
-> pairs ANDed, between the tables as the join names them. `find(row)` MUST
-> read the far end's rows whose paired fields equal the row's, and none
-> when one of the row's is NULL. `load(db, rows)` MUST read the far end of
-> every row in one query of the distinct keys: a list of records per row for
-> `hasMany`; otherwise a record per row, or `null` where the row's key holds
-> a NULL; a key nothing at the far end matches, or that a `hasOne` relation
-> matches twice, MUST be a `DecodeError`, never a missing row.
-
-> [spec:pgorm:req:napi.graphs]
-> `graph()` MUST read a model's rows with the rows its relations reach as
-> pgorm's `SelectGraph` does, its SQL the SQL `SelectGraph` writes for the
-> same tables, relations and aliases. The slot kind MUST be the join type
-> and the decode shape: `joinOne` an INNER JOIN decoded as a record,
-> `joinMaybe` a LEFT JOIN decoded as a record or `null`, and `via` a LEFT
-> JOIN of a table no record reads. A relation is joined from the first
-> table of its model the graph reads, or the decoded source `from` names,
-> and a slot or hop answers to its table's name or the `alias` it is given;
-> a second table answering to a name already read MUST be a
-> `ConstructionError`. Every decoded source is projected under its own
-> prefix, `s0_` for the root and `s{i}_` for the i-th slot, each name
-> composed as pgorm's `result_column_name` composes it — under 63 bytes as
-> it stands, otherwise bounded with its FNV-1a hash. A slotless graph
-> decodes as the root's record and a graph with slots as a tuple of the
-> root's and each slot's, an optional slot `null` exactly where every
-> column it reads is NULL, as pgorm's absence witness reads it; a present
-> slot that does not decode MUST be a `DecodeError`, never an absent one.
-> `col(source, field)` qualifies a field as a decoded source is named.
-> `allGrouped` reads a graph of one slot as each root with its slot's
-> records, ordering by the root's primary key behind the graph's ordering
-> and grouping by the decoded root's key, as pgorm's `all_grouped` does.
-
-> [spec:pgorm:req:napi.cursors]
-> `cursor(..fields)` on a model query or a graph MUST page by keyset as
-> pgorm's `Cursor` does: ordered by its fields, then — on a graph — by the
-> root's primary key and each slot's, in declaration order, as tiebreaks, a
-> root key field already ordered by not repeated; that ordering replacing the
-> query's. `after` and `before` take a boundary of the order fields' values,
-> `afterWith` and `beforeWith` of the order fields' or the whole key's,
-> each converted through its field's declared kind and any other arity a
-> `ConstructionError`. A boundary of n values MUST be the row-value
-> comparison written out as n disjuncts, the k-th holding the first k-1
-> columns equal and comparing the k-th — greater past an ascending
-> cursor's `after`, less short of its `before`, the reverse when it
-> descends. `first(n)` and `last(n)` limit the window, a `last` window
-> read in the reversed order and returned in the cursor's own, and each
-> replaces the other; `asc()` and `desc()` choose the direction.
-
-> [spec:pgorm:req:napi.pagination]
-> `paginate(pageSize)` on a model query or a graph MUST read page `n` as
-> the query with a limit of `pageSize` and an offset of `pageSize × n`,
-> replacing its own, as pgorm's `Paginator` does, a page size of at least 1
-> and an offset past `Number.MAX_SAFE_INTEGER` refused. `numItems` and a
-> query's `count` MUST count the query's rows with its limit, offset and
-> ordering dropped, `SELECT COUNT(*) AS "num_items" FROM (..) AS
-> "sub_query"`, and resolve with an exact number; `numPages` rounds the
-> pages up; `pages` yields each page from the first until one is empty.
-
-## Schema
-
-JavaScript builds DDL through pgorm-query's DDL builders as pgorm-python's
-schema surface does, and further: every statement `sql-ddl.md` specifies that
-a schema is made of, in the builder conventions the statements above use.
-
-> [spec:pgorm:req:napi.schema+2]
-> Tables, their columns, keys and constraints and their alterations, indexes,
-> types, sequences, extensions and comments MUST be built through
-> pgorm-query's DDL builders, each JavaScript object owning the builder state
-> it stands for, immutable as a statement builder is: a method returns a new
-> builder from a copy, and an argument it cannot use is refused as it is
-> called — a `ConstructionError`, or a `TypeError` for an argument of the
-> wrong JavaScript shape, an options object holding a key the builder does
-> not know among them, so that a misspelt option is never left out of a
-> statement. Constructing one does no I/O, and nothing runs DDL but a
-> terminal.
->
-> Every complete DDL statement MUST be a `Ddl`, the class the module exports
-> for one as pgorm-python exports `DDL`, and a member of the `Statement`
-> union the terminals take; only the module's DDL functions construct one.
-> A schema is a database schema alone (`napi.schema-schemas`), as it is in
-> pgorm-query (`sql.ddl`), so no export is named `SchemaStatement`.
->
-> PostgreSQL takes no parameters in DDL, so a DDL statement MUST render
-> through pgorm-query's own rendering, which writes every value it carries —
-> a `DEFAULT`, a `CHECK`'s operands, an enum label, a comment, an extension's
-> version — as an escaped literal, and MUST run through `execute` and the
-> other terminals as that SQL text with no values beside it; `inspect()` gives
-> the same SQL and an empty value list. No name or value is concatenated into
-> SQL by the binding: every identifier is minted with `Name::runtime` and
-> quoted where pgorm-query writes it. A table or sequence is named by a
-> string or by a `Table`, whose schema qualifies it and which MUST NOT carry an
-> alias; a type by a string or a `TypeName`.
->
-> pgorm-query's typestates hold: `alterTable`, `alterType` and
-> `alterSequence` name their object and nothing more, since PostgreSQL parses
-> no `ALTER` without an action, so each MUST have no `inspect()`, every
-> terminal MUST refuse it with a `ConstructionError`, and its first action
-> gives the statement. A `ColumnDef` is no statement, and a terminal refuses
-> it likewise.
-
-> [spec:pgorm:req:napi.schema-tables]
-> `createTable(table)` MUST build pgorm-query's `TableCreateStatement`:
-> columns, each a `ColumnDef` with a type, `ifNotExists`, the table's one
-> primary key — a later `primaryKey` replacing it — any number of unique
-> keys, foreign keys and `CHECK` constraints. A key is a column or a
-> non-empty list of them, with a name, `INCLUDE`d columns, a deferrability
-> and PostgreSQL 18's `withoutOverlaps` column, which pgorm-query writes last
-> as `"c" WITHOUT OVERLAPS`; `nullsNotDistinct` is the unique key's alone. A
-> foreign key pairs its columns in order with as many referenced columns,
-> anything else refused, and takes a name, `onDelete` and `onUpdate`
-> actions, a deferrability, an enforcement and PostgreSQL 18's `PERIOD` pair,
-> written last on both sides. A `CHECK` is an expression with a name, an
-> enforcement and `noInherit`. Deferrability is `"notDeferrable"`,
-> `"deferrableInitiallyImmediate"` or `"deferrableInitiallyDeferred"`, and
-> enforcement `"enforced"` or `"notEnforced"`; neither is written unless it
-> is given.
->
-> `new ColumnDef(name, type)` takes a `DataType`, a built-in type's name, a
-> `TypeName` or a created range, and the clauses pgorm-query writes in the
-> order they are added: `notNull`, the column's one `NOT NULL` constraint,
-> with a name and `noInherit`; `null`; `default`, an expression or a value;
-> `check`; `generated(expression, "stored" | "virtual")`, whose kind MUST be
-> named, PostgreSQL 17 refusing a generated column without one and 18
-> reading it as virtual; `identity("always" | "byDefault", options)`, its
-> sequence's options those `napi.schema-sequences` gives; `autoIncrement`,
-> the serial family; and `collate`, the column's one collation. A column
-> with no type is refused where a table is created or a column added.
-> `dropTable` (one or more tables, `ifExists`, a behavior), `renameTable`,
-> whose new name is bare, `renameColumn`, `renameConstraint` and
-> `truncateTable` MUST build the statements pgorm-query has for each.
-
-> [spec:pgorm:req:napi.schema-alter]
-> The first action on `alterTable(table)` MUST give pgorm-query's
-> `TableAlterStatement`, which takes more, each the pgorm-query action of
-> its name: `addColumn` (with `ifNotExists`), `modifyColumn`, `dropColumn`,
-> `addPrimaryKey`, `addUnique`, `addForeignKey`, `addCheck`, `addNotNull`
-> (PostgreSQL 18's table-level `NOT NULL`, with a name and `noInherit`),
-> `dropConstraint` of any kind by name (with `ifExists` and a behavior),
-> `validateConstraint`, `alterConstraint` (`"inherit"`, `"noInherit"`,
-> `"enforced"` or `"notEnforced"`), `setExpression` and `dropExpression`
-> (with `ifExists`). `notValid` belongs to the three actions PostgreSQL takes
-> it on — `addForeignKey`, `addCheck` and `addNotNull` — and leaves the rows
-> already there unchecked until `validateConstraint` checks them, while new
-> rows are held to the constraint at once.
->
-> `modifyColumn` writes each aspect its column carries as pgorm-query writes
-> it — a retype with its collation, `SET` or `DROP NOT NULL`, a named `NOT
-> NULL` added, `SET DEFAULT`, a `CHECK` added, an identity added. An aspect
-> no such action writes MUST be refused rather than dropped: a generated
-> expression (which `setExpression` and `dropExpression` change), the serial
-> family, and a collation without the type it is given with; so MUST a
-> column that changes nothing.
-
-> [spec:pgorm:req:napi.schema-indexes]
-> `createIndex(table, entry, { name })` MUST build pgorm-query's
-> `IndexCreateStatement` over its first entry, and `column` appends more. An
-> entry is a column's name, an expression, or `{ on, order, operatorClass }`
-> over either, `order` being `"asc"` or `"desc"`. The index takes `unique`,
-> `nullsNotDistinct` — which PostgreSQL defines for a unique index alone, and
-> so makes the index unique rather than be written for nothing — `ifNotExists`,
-> `using(method)`, an access method by identifier, `include` and `where`, a
-> partial index's predicate ANDed to one already there. `CONCURRENTLY` is not
-> offered, PostgreSQL refusing it in a transaction. `dropIndex(table, name)`
-> drops the index from its table's schema, with `ifExists`.
-
-> [spec:pgorm:req:napi.schema-types]
-> `createType(name)` MUST build pgorm-query's `TypeCreateStatement`, a shell
-> type until a kind is chosen, its kind one slot as pgorm-query holds it:
-> `asEnum` and `values(labels)`, which appends; `asComposite` and
-> `attribute(name, type, { collation })`, which appends; or `asRange(subtype,
-> { subtypeOpclass, collation, subtypeDiff, multirangeTypeName })`. An enum
-> label is data, written as a literal, and MUST be at most 63 bytes without
-> NUL, as PostgreSQL stores it; the empty label is one.
->
-> The change on `alterType(name)` MUST give its statement: `addValue(label, {
-> before } | { after })`, never both; `renameTo`, whose new name is bare;
-> `renameValue`; `renameAttribute`, a statement of its own with a behavior; or
-> a composite's `addAttribute`, `dropAttribute` (with `ifExists`) and
-> `alterAttribute`, which give a statement that takes more of them and a
-> behavior, `"cascade"` carrying the changes into typed tables.
-> `dropType(names, { ifExists, behavior })` drops one or more types.
-> A collation is a name, or `{ name, schema }`.
-
-> [spec:pgorm:req:napi.schema-sequences]
-> A sequence's options MUST be one vocabulary for a standalone sequence and
-> an identity column, pgorm-query's `SequenceOptions`: `{ incrementBy,
-> minValue, maxValue, startWith, cache, cycle }`, each number a safe-integer
-> number or a `bigint` within `bigint`, a bound's `null` its `NO` form, and a
-> key outside them a `TypeError`. `createSequence(name)` takes
-> `ifNotExists`, `asType` (`"smallint"`, `"integer"` or `"bigint"`),
-> `options`, which merges at least one option into those set, and `ownedBy(table,
-> column)`, `ownedBy(null)` being `OWNED BY NONE`; the first clause on
-> `alterSequence(name)` gives its statement, which takes the same clauses,
-> `restart(value?)` and `ifExists`. `dropSequence` and `renameSequence` build
-> pgorm-query's statements. `createExtension(name, { ifNotExists, schema,
-> version, cascade })` and `dropExtension(name, { ifExists, behavior })` build
-> pgorm-query's extension statements, the version a literal; and
-> `commentOnTable` and `commentOnColumn` its `COMMENT ON`, the text a literal
-> pgorm-query escapes.
-
-> [spec:pgorm:req:napi.schema-views]
-> Views, materialized views and tables created from a query MUST be built
-> through pgorm-query's builders for them (`sql.ddl.view`,
-> `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each named as a
-> table is, under the contract `napi.schema` gives every DDL builder. Each
-> body is a `Select` the module built, and nothing else is taken: it renders
-> through pgorm-query's own rendering with every value written as an escaped
-> literal, because a definition is stored as SQL text and binds nothing.
->
-> - `createView(name, query)` takes `orReplace`, `columns(names)`, which
->   appends, `checkOption("local" | "cascaded")`, `securityBarrier` and
->   `securityInvoker`.
-> - `createRecursiveView(name, columns, query)` names one column or a
->   non-empty list of them, an empty list being refused, since PostgreSQL
->   refuses a recursive view without columns. It takes the same methods
->   except `checkOption`, which the grammar refuses on a recursive view and
->   the builder therefore does not have.
-> - `createMaterializedView(name, query)` and `createTableAs(name, query)`
->   take `ifNotExists`, `columns(names)` and `withNoData`. Neither has
->   `orReplace`, which PostgreSQL 18 has for neither, and a view has no
->   `ifNotExists`, which PostgreSQL does not have for one.
-> - `refreshMaterializedView(name, { concurrently, withNoData })` takes at
->   most one of the two: PostgreSQL refuses them together, pgorm-query holds
->   them in one slot, and asking for both MUST be refused with a
->   `ConstructionError` rather than one of them dropped.
-> - `dropView` and `dropMaterializedView` take one or more relations and `{
->   ifExists, behavior }`.
->
-> What only the server knows it refuses, by SQLSTATE, as a `DatabaseError`:
-> a check option on a view that cannot be updated (`0A000`), a row a check
-> option refuses (`44000`), an `OR REPLACE` that moves or drops a column
-> (`42P16`), a materialized view read before it is populated (`55000`), a
-> concurrent refresh without a unique index (`55000`) or of an unpopulated
-> view (`0A000`), and a drop of the other kind (`42809`).
-
-> [spec:pgorm:req:napi.schema-schemas]
-> The statements over a schema MUST be built through pgorm-query's `Schema`
-> (`sql.ddl.schema`), under the contract `napi.schema` gives every DDL
-> builder, each schema named by a string, one identifier, quoted; a `Table`
-> is refused, a schema having no schema of its own. `createSchema(name, {
-> ifNotExists })` creates one; `dropSchema(names, { ifExists, behavior })`
-> drops one name or a non-empty array of them, an empty array being refused
-> with a `ConstructionError`, `behavior` being `"cascade"` or `"restrict"`;
-> and `renameSchema(name, newName)` renames one, with no `ifExists`, which
-> PostgreSQL's grammar does not have for it. What only the server knows it
-> refuses by SQLSTATE, as a `DatabaseError`: a schema that exists (`42P06`),
-> a `pg_` name (`42939`), a missing schema (`3F000`) and a drop under
-> `RESTRICT`, said or unsaid, of a schema that holds anything (`2BP01`).
-
-> [spec:pgorm:req:napi.schema-domains]
-> The statements over a domain MUST be built through pgorm-query's `Domain`
-> (`sql.ddl.domain`), under the contract `napi.schema` gives every DDL
-> builder, each domain named as a type is, by a string or a `TypeName`.
-> `createDomain(name, base)` takes its base as a column takes its type — a
-> `DataType`, a built-in type's name, a `TypeName` (another domain's among
-> them) or a created range — and `collate`, `default`, an expression or a
-> value written as a literal, `notNull` and `null`, which share one slot,
-> and `check(condition, { name })`, appended; a check takes no `notValid`,
-> PostgreSQL having no `NOT VALID` at `CREATE DOMAIN`, so that option is a
-> `TypeError` there. `domainValue()` is `Expr::domain_value()`, the `VALUE` a
-> check's condition tests. `alterDomain(name)` names the domain and nothing
-> more, so, as `napi.schema` holds for every pending `ALTER`, it MUST have no
-> `inspect()` and every terminal MUST refuse it with a `ConstructionError`;
-> each of its actions — `setDefault`, `dropDefault`, `setNotNull`,
-> `dropNotNull`, `addCheck(condition, { name, notValid })`,
-> `dropConstraint(name, { ifExists, behavior })`, `renameConstraint`,
-> `validateConstraint` and `renameTo`, whose new name is bare — gives the
-> whole statement, PostgreSQL taking one action per `ALTER DOMAIN` and no
-> `IF EXISTS`. `dropDomain(names, { ifExists, behavior })` drops one name or a
-> non-empty array of them, an empty array being refused with a
-> `ConstructionError`. A registered entity's column whose type is a domain
-> (`ColumnType::Domain`) reports, binds and reads as the kind of the type it
-> is over, an enum's labels included, so its records and the declarations
-> generated for it are typed by its base. What only the server knows it
-> refuses by SQLSTATE, as a `DatabaseError`: a domain or constraint name
-> already taken (`42710`), a missing domain or constraint (`42704`), a value
-> a check refuses (`23514`) and a null under `NOT NULL` (`23502`), written to
-> a column of the domain or met among the values already there by `addCheck`,
-> `setNotNull` or `validateConstraint`, a collation on a base type without
-> one (`42804`), and a drop under `RESTRICT`, said or unsaid, of a domain a
-> column is typed with (`2BP01`).
+> savepoint, pulling a stream's rows, a COPY, a listener's operations and
+> `notify` MUST each take an `AbortSignal` as the `signal` option. An aborted
+> operation rejects with the signal's reason, and behaves as
+> `bindings.cancellation` requires.
 
 ## Pipelines
 
-JavaScript composes pgorm's PRQL-shaped pipeline — `pgorm::pipeline` — as
-pgorm-python does: relation-to-relation stages over sources, compiled through
-prqlc to PostgreSQL SQL, with runtime values entering through a binder whose
-placeholders belong to the stage that minted them.
+> [spec:pgorm:req:napi.pipeline-operands]
+> A value a pipeline operand is given that is not an expression MUST be bound:
+> inferred or declared with `Value` as a parameter is, an interval included,
+> and minted as a placeholder by the binder of the stage that takes it, never
+> written as a literal. Only `literal(value)` writes a value into the SQL. A
+> pipeline's source may also be a table's name as a string.
 
-> [spec:pgorm:req:napi.pipeline]
-> The module's `pipeline` namespace MUST compose `pgorm::pipeline::Pipeline`,
-> each JavaScript object owning the pgorm state it stands for and each stage
-> returning a new pipeline from a copy: `from(source)` and the stages
-> `filter`, `derive`, `select`, `group(..)` followed by `aggregate(..)`,
-> `window(over, ..)`, `sort`, `take(n)`, `takeRange(start, end)`,
-> `join(source, on, { kind })`, `append`, `intersect`, `remove` and
-> `distinct`. A source is a `Table`, schema-qualified and read under its
-> alias when it has one, a table's name, another `Pipeline` embedded whole
-> with its bound values, or `source(relation).named(name)`, which reads a
-> relation under a name of its own. A grouping is no pipeline until it is
-> aggregated, so `group` gives a `Grouped` whose only way back is
-> `aggregate`, and which no terminal runs. A row count is an integer, never
-> an expression, as PRQL refuses a bound `LIMIT`. A registered Rust entity
-> as a source, and the `select_sources` terminal that decodes one, wait on
-> entities registering with the binding and are not offered.
+## Schema
+
+> [spec:pgorm:req:napi.schema-api]
+> The module MUST spell the DDL `bindings.schema` describes as these
+> factories and builders, every complete statement a `Ddl` and a member of
+> the `Statement` union the terminals take; no export is named
+> `SchemaStatement`:
 >
-> A `Pipeline` is a statement for `execute`, `query`, `one`, `optional` and
-> `stream` on a pool, a connection and a transaction, compiled through
-> `Pipeline::into_sql` as `inspect()` compiles it, its values bound as any
-> statement's are, `one` and `optional` keeping their cardinality. What
-> pgorm's compile step judges — a name it cannot write as one, a reserved
-> alias, a relation or column prqlc cannot resolve — MUST be a
-> `ConstructionError` from `inspect()` or the terminal, before anything is
-> sent.
-
-> [spec:pgorm:req:napi.pipeline-expressions+2]
-> Pipeline expressions MUST be their own objects, lowered into
-> `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
-> statement builders' `Expr`: `col(table, column)`, qualified as prqlc
-> requires, and when `column` is a registered entity's column
-> (`entity.col(name)`) lowered through the registration's own `Named::col`,
-> so it compares as the entity types it; `alias(name)`, a name a stage
-> introduces, read back unqualified;
-> `thisColumn` and `thatColumn`, a join's two sides; the operators `eq` ..
-> `lte`, `and`, `or`, `not`, `neg`, `add` .. `rem`, `coalesce`, `isNull`,
-> `isNotNull`, `inArray`, `cast` over pgorm's closed `CastType` set,
-> `comparesAs(type)` — a string or a `TypeName`, lowered through
-> `ExprOps::compares_as`, the enum a column no registration types compares
-> as (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`) —, `as`,
-> `asc` and `desc`; `caseWhen(arms, otherwise)`; and the aggregates and
-> window functions pgorm's pipeline has, each at the argument count it takes.
-> `over()` builds a window's partition, ordering and `rows` or `range`
-> frame.
+> - `createTable(table)` gives a `CreateTable` with `column`, `primaryKey`,
+>   `unique`, `foreignKey`, `check` and `ifNotExists`, and
+>   `new ColumnDef(name, type)` a column;
+> - `alterTable(table)` gives a `PendingAlterTable`, whose first action gives
+>   an `AlterTable` that takes more; `dropTable`, `renameTable`,
+>   `renameColumn`, `renameConstraint` and `truncateTable` give statements;
+> - `createIndex(table, entry, { name })` gives a `CreateIndex` with
+>   `column`, `unique`, `nullsNotDistinct`, `ifNotExists`, `using`, `include`
+>   and `where`, an entry being a name, an expression or `{ on, order,
+>   operatorClass }`; `dropIndex(table, name)` gives a statement;
+> - `createType(name)` gives a `CreateType` with `asEnum`, `values`,
+>   `asComposite`, `attribute` and `asRange`; `alterType(name)` a
+>   `PendingAlterType` with `addValue`, `renameTo`, `renameValue`,
+>   `renameAttribute` (a `RenameAttribute`) and the composite's
+>   `addAttribute`, `dropAttribute` and `alterAttribute` (an
+>   `AlterComposite`); and `dropType(names, { ifExists, behavior })`;
+> - `createSequence(name)` gives a `CreateSequence` and `alterSequence(name)`
+>   a `PendingAlterSequence`, whose first clause gives an `AlterSequence`;
+>   `dropSequence`, `renameSequence`, `createExtension(name, { ifNotExists,
+>   schema, version, cascade })`, `dropExtension(name, { ifExists,
+>   behavior })`, `commentOnTable` and `commentOnColumn` give statements;
+> - `createView(name, query)` gives a `CreateView` with `orReplace`,
+>   `columns`, `checkOption`, `securityBarrier` and `securityInvoker`;
+>   `createRecursiveView(name, columns, query)` a `CreateRecursiveView` with
+>   the same methods but `checkOption`; `createMaterializedView(name, query)`
+>   and `createTableAs(name, query)` builders with `ifNotExists`, `columns`
+>   and `withNoData`; and `refreshMaterializedView(name, { concurrently,
+>   withNoData })`, `dropView` and `dropMaterializedView(names, { ifExists,
+>   behavior })` statements;
+> - `createSchema(name, { ifNotExists })`, `dropSchema(names, { ifExists,
+>   behavior })` and `renameSchema(name, newName)` give statements;
+> - `createDomain(name, base)` gives a `CreateDomain`; `alterDomain(name)` a
+>   `PendingAlterDomain` whose actions `setDefault`, `dropDefault`,
+>   `setNotNull`, `dropNotNull`, `addCheck(condition, { name, notValid })`,
+>   `dropConstraint(name, { ifExists, behavior })`, `renameConstraint`,
+>   `validateConstraint` and `renameTo` each give a statement; and
+>   `dropDomain(names, { ifExists, behavior })`.
 >
-> Values reach a pipeline's SQL by one of two routes, and the spelling says
-> which. `literal(value)` — `null`, a boolean, a safe-integer number or a
-> `bigint` within `bigint`, a finite number, a string — is written into the
-> SQL as pgorm's pipeline writes a literal. Any other value an operand is
-> given MUST be bound: inferred or declared with `Value` as a parameter is,
-> an interval included, and minted as a placeholder by the binder of the
-> stage that takes it, never written as a literal; a value with no kind
-> (`null`) and a value whose kind needs a cast pgorm's pipeline cannot write
-> (an enum's or a created range's) are refused with a `ConstructionError`
-> naming the explicit form. A window's partition and ordering take no value,
-> bound or not, as pgorm's `Over` takes none.
-
-> [spec:pgorm:req:napi.pipeline-binder]
-> Each expression-taking stage MUST have a `With` form — `filterWith`,
-> `deriveWith`, `selectWith`, `groupWith`, `aggregateWith`, `windowWith`,
-> `sortWith` and `joinWith` — that calls its function once, synchronously,
-> with a `Binder`, whose `bind(value)` mints one placeholder for one value,
-> reusable within the stage. A placeholder is branded with the scope of the
-> call that minted it, as pgorm's binder brands it with a lifetime: once its
-> function has returned or thrown, the binder MUST refuse to bind, and an
-> expression carrying a placeholder MUST be refused, each with a
-> `LifecycleError`, as any handle used after it closed is; so MUST one that
-> combines two scopes' placeholders, and one given to a stage other than the
-> one its function returns it to — a plain stage, another call's or another
-> pipeline's — or to a window's partition or ordering. The function MUST
-> return synchronously, a promise being a `TypeError`: an operand for a
-> filter or a join condition, and an expression or an array of operands for
-> a list-taking stage, anything else there a `TypeError`. An array of more
-> than 32 is a `ConstructionError`: pgorm's list-taking `_with` stages take a
-> fixed-size array, which the binding dispatches up to that bound, where a
-> stage that binds nothing takes a list of any length.
+> A list of names is one name or a non-empty array, an empty array a
+> `ConstructionError`; a behavior is `"cascade"` or `"restrict"`; and a
+> collation a name or `{ name, schema }`.
 
 ## Registered entities
 
-A Rust application that already has pgorm entities registers them with the
-binding and builds one native module carrying both: the binding's whole API
-and its registrations. JavaScript reaches each by name, and every operation
-on one is the entity's own Rust API, as pgorm-python's compiled entity
-registrations are; JavaScript cannot instantiate a Rust generic, only use
-the ones compiled in.
-
-> [spec:pgorm:req:napi.entities]
-> pgorm-napi MUST let a downstream application crate register its own
-> entities and `SelectGraph` shapes in a `Registry` — `entity::<E>(name)` for
-> any `E: EntityTrait` whose model converts into its ActiveModel, and
-> `graph::<E, S, _>(name, factory)` — and build one native module through
-> `install(cx, registry)`, called from the application's own `#[neon::main]`
-> with the binding's `standalone-module` feature off; the binding's own
-> module is that feature's, with an empty registry. A name or a Rust entity
-> registered twice, a name outside 1–255 bytes, and a graph whose source
-> entities are not registered MUST be refused as they are registered.
-> `entities()` and `graphs()` list the module's registrations and `entity(name)`
-> and `graph(name)` give one, a name the module does not register being a
-> `ConstructionError`. `describe()` reports a registration's table, each
-> column's SQL name, type, nullability, key membership and the kind its values
-> bind and read as, its primary key, whether that key ends `WITHOUT
-> OVERLAPS`, its relations with their columns, period, enforcement and
-> deferrability, and the Rust types behind it. A registered entity's records
-> MUST be frozen plain objects keyed by SQL column name, behind each of which
-> the module keeps the Rust model it was read as. Every operation runs on a
-> pool's connection, a connection or a transaction with the operation a
-> statement of SQL text gets — refused while another holds the connection,
-> aborted by its `AbortSignal`, the connection discarded when an abort leaves
-> its state unknown — and a failure from PostgreSQL anywhere in its causes is
-> the error `napi.errors` classifies.
-
-> [spec:pgorm:req:napi.entity-reads+4]
-> `find()` MUST be the entity's `E::find()`, and `where`, `orderBy`, `limit`
-> and `offset` the `Select<E>` methods of the same meaning; `all`, `one` and
-> `oneOpt` MUST be `Select::all`, `one` and `one_opt`, `one` and `oneOpt`
-> narrowing the row limit to one row as Rust does, and `one` finding no row a
-> `DecodeError`.
-> `inspect(terminal)` gives the SQL and values the terminal sends. `col(name)`
-> is the column as the entity's `ColumnTrait` names it, and its comparisons
-> MUST be that trait's methods, a value converted to the column's declared
-> kind and written through the column's `save_as` — an enum's label cast to
-> its type, and a column whose domain is over an enum compared as the enum,
-> the column and the label each cast to it — an expression, or `any(..)` /
-> `all(..)`, compared as written, and `null` refused. Its `isIn` and `isNotIn` MUST be the trait's
-> `is_in` / `is_not_in` over a list of values, each converted as a compared
-> value is, and its `in_subquery` / `not_in_subquery` over a `Select`, so a
-> column whose domain is over an enum is a member as the enum and the
-> subquery's projection is cast beside it; a list holding an expression is a
-> member as written.
-
-> [spec:pgorm:req:napi.entity-writes]
-> `active()` MUST be the entity's `ActiveModelBehavior::new`, its defaults
-> included, and `intoActive(record)` the real `IntoActiveModel` of the model
-> behind the record. An ActiveModel MUST report each column as `notSet`,
-> `set` or `unchanged`, and `set`, `notSet` and `reset` return a new one, a
-> value converted to the column's declared kind or refused. Its `insert`,
-> `update` and `delete` MUST be `ActiveModelTrait`'s, the application's
-> `ActiveModelBehavior` hooks running around them, and a hook's refusal a
-> `ConstructionError`. `withValue(record, column, value)` is
-> `ModelTrait::set` on a copy, writing nothing, and `tagged(record, column)`
-> a column's value with the kind the entity declares. A record or an
-> ActiveModel of another registration MUST be refused.
-
-> [spec:pgorm:req:napi.entity-versions]
-> `update(active).returningChange`, `updateMany().set(..).where(..)
-> .returningChanges`, `insert(active).returningUpsert` and
-> `insertMany(actives).returningUpserts` MUST be
-> `UpdateOne::exec_returning_change`, `UpdateMany::exec_returning_changes`,
-> `Insert::exec_returning_upsert` and `Insert::exec_returning_upserts`, the
-> statement terminals they are in Rust, so no `ActiveModelBehavior` hook runs
-> around them: a change `{ old, new }` of two records, an upsert `{ kind:
-> "inserted", new }` or `{ kind: "updated", old, new }`, and a row a conflict
-> clause held back `null` or left out. `updateMany().set` writes a value
-> through the column's `save_as` and takes an expression as written, and needs
-> `where` or `allRows()` before it runs.
-
-> [spec:pgorm:req:napi.entity-graphs]
-> `graph(name).find({ aliases })` MUST build the registered `SelectGraph` with
-> the application's factory, each joined slot under the alias given for it,
-> `g1`, `g2`, .. by default, an alias count other than the slots', an alias
-> repeated or naming the root's table refused. Its rows MUST be decoded by
-> `GraphRow`: a slotless graph's as the root's record, otherwise a tuple of
-> each source's record, an `Opt` slot `null` where it matched nothing and a
-> present slot that does not decode a `DecodeError`. `col(source, column)`
-> qualifies a column of a decoded source as the query names it; `where` and
-> `orderBy` are `SelectGraph`'s; `all` and `oneOpt` its terminals. `cursor(column)`
-> MUST be `SelectGraph::cursor_by` on a root column: `before` and `after`
-> bound that column, `beforeWith` and `afterWith` the whole key — the
-> column, the root's other key columns, then each slot's — each value
-> converted to its column's declared kind and any other count refused; `first`,
-> `last`, `asc` and `desc` are the cursor's own.
-
-> [spec:pgorm:req:napi.pipeline-sources]
-> A registered entity MUST be a pipeline source wherever a relation is, read
-> through its own `IntoSource`, so its table and schema are the ones its Rust
-> declaration names. A `Registry` MUST register source tuples of one to six
-> entity types — `sources::<T>(name)`, each entity registered first, a name
-> registered twice refused — and `pipeline.sources(name)` gives one, another
-> name a `ConstructionError`. `pipeline.selectSources(selection, {
-> qualifiers })` MUST be pgorm's `select_sources` as the pipeline's last
-> stage, each source projected under the qualifier given for it or its
-> table's name, a count of qualifiers other than the sources' refused; its
-> `all`, `one` and `oneOpt` are `SelectedSources`'s, `one` and `oneOpt` taking
-> one row, each row a tuple of the sources' records decoded through each
-> entity's absence witness, a source a row does not carry `null`, and a
-> pipeline reshaped before the selection is the `ConstructionError` pgorm's
-> refusal names, before anything is sent.
-
-> [spec:pgorm:req:napi.application]
+> [spec:pgorm:req:napi.application+1]
+> A downstream application crate registers its entities (`bindings.entities`)
+> in a `Registry` — `entity::<E>(name)`, `graph::<E, S, _>(name, factory)`
+> and `sources::<T>(name)` — and builds its module through
+> `install(cx, registry)`, called from the application's own
+> `#[neon::main]` with the binding's `standalone-module` feature off; the
+> binding's own module is that feature's, with an empty registry. A name
+> outside 1–255 bytes is refused as it is registered. `entities()`,
+> `graphs()` and `pipeline.sourceTuples()` list the module's registrations.
+>
 > An application crate outside the binding's workspace MUST build the module:
 > it depends on pgorm-napi without default features, on the same checkout's
 > pgorm and on Neon, registers its entities and graphs, and exports a
@@ -1277,29 +343,29 @@ the ones compiled in.
 > its library, and run its JavaScript suite against a live server under both
 > `node --test` and `deno test`, failing on any failure; CI runs it.
 
+> [spec:pgorm:req:napi.update-many-guard]
+> A registered entity's `updateMany()` MUST have `where` or `allRows()` before
+> it runs, a `ConstructionError` otherwise, as a statement's UPDATE does
+> (`bindings.writes`).
+
 ## Generated TypeScript
 
 An application's registrations are typed by a module generated from its
-built library, as pgorm-python generates typed wrappers for its compiled
-entities.
+built library (`bindings.codegen`).
 
-> [spec:pgorm:req:napi.codegen]
+> [spec:pgorm:req:napi.codegen+1]
 > `pgorm-napi/codegen` MUST generate an application's module from a build
 > description naming its entity crate and the entities, graphs and source
 > tuples to register, each under a registration name and a TypeScript
-> export, refusing — before anything is written — a description whose Rust
-> paths are not paths to items of the crate, whose names repeat within a
-> kind, whose exports repeat or are not public JavaScript identifiers, whose
-> entity is registered twice or whose source tuple lists an entity it does
-> not describe. `scaffold` MUST write, at a destination that does not exist,
-> a crate registering exactly what is described and installing it from its
-> own `#[neon::main]`, beside a copy of the binding's ES module; `build`
-> places the crate's library as that module's addon; `emit` MUST write the
+> export, refusing a description whose exports repeat or are not public
+> JavaScript identifiers. `scaffold` MUST write, at a destination that does
+> not exist, the crate installing what is described from its own
+> `#[neon::main]`, beside a copy of the binding's ES module; `build` places
+> the crate's library as that module's addon; `emit` MUST write the
 > TypeScript module and its declarations from what the built library
-> describes, the same bytes each time from the same library. The generated
-> module MUST check, as it loads, that the addon's version and every
-> registration it names describe as they did when it was written, and refuse
-> to load with a `ConstructionError` otherwise.
+> describes. The generated module refuses to load with a
+> `ConstructionError` when the addon's version or a registration it names no
+> longer describes as it did.
 
 > [spec:pgorm:req:napi.codegen-types]
 > The generated declarations MUST type each entity's records as their reads
@@ -1333,12 +399,18 @@ entities.
 
 ## Types and tests
 
-> [spec:pgorm:req:napi.typing]
+> [spec:pgorm:req:napi.typing+1]
 > The module MUST ship TypeScript declarations for every export, error classes
 > and their fields included, beside it as `lib/index.d.ts` and named by the
 > module's `@ts-self-types` directive so Deno finds them as Node.js tooling
 > does. `deno check` MUST type-check the declarations, the module and the test
-> suite, which uses the public API through them.
+> suite, which uses the public API through them. The declarations MUST type a
+> model from its declaration alone: `RowOf`, a record's fields and their
+> types, a nullable column's `| null` and an array column's items, an enum's
+> listed values as a union of their labels; `InsertOf`, requiring every field
+> neither nullable, defaulted nor generated and refusing a field generated
+> always; `UpdateOf`; and `KeyOf`. A COPY statement's format is a type
+> parameter, `CopyFrom<"binary">` or `CopyTo<"binary">` for the row COPY.
 
 > [spec:pgorm:req:napi.runtimes+1]
 > The binding targets runtimes that carry `Temporal` as a global, which its

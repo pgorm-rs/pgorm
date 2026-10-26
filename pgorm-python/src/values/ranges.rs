@@ -69,7 +69,7 @@ pub(super) fn element(range: RangeType) -> PyResult<ArrayType> {
     })
 }
 
-// [spec:pgorm:req:python.values+5]
+// [spec:pgorm:req:bindings.values]
 pub(super) fn multirange_from_python(data: &Bound<'_, PyAny>, range: RangeType) -> PyResult<Value> {
     let multirange = data
         .cast_exact::<PyMultirange>()
@@ -86,7 +86,7 @@ pub(super) fn multirange_from_python(data: &Bound<'_, PyAny>, range: RangeType) 
 
 /// A `pgorm.Range`'s bounds as values of the scalar kind `kind`, each
 /// converted with that kind's limits; `None` on a side is no bound.
-// [spec:pgorm:req:python.values+5]
+// [spec:pgorm:req:bindings.values]
 pub(super) fn read_bounds(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Range<Value>> {
     let data = data
         .cast_exact::<PyRange>()
@@ -113,7 +113,7 @@ pub(super) fn read_bounds(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
     ))
 }
 
-// [spec:pgorm:req:python.values+5]
+// [spec:pgorm:req:bindings.values]
 pub(super) fn multirange_to_python(
     py: Python<'_>,
     multirange: &Multirange<Value>,
@@ -127,7 +127,7 @@ pub(super) fn multirange_to_python(
 
 /// A Rust range as a `pgorm.Range`. A NULL bound is no bound, as it is to
 /// PostgreSQL's range constructors and to the Rust binding.
-// [spec:pgorm:req:python.values+5]
+// [spec:pgorm:req:bindings.values]
 pub(super) fn write(py: Python<'_>, range: &Range<Value>) -> PyResult<PyRange> {
     let side = |bound: &ops::Bound<Value>| -> PyResult<(Option<Py<PyAny>>, bool)> {
         Ok(match bound {

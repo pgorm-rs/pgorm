@@ -6,7 +6,7 @@
 // `GraphRow` — a slotless row as the root's record, otherwise a tuple of
 // each source's record, an absent `Opt` slot null — and paged by keyset
 // through `SelectGraph::cursor_by`.
-// [spec:pgorm:req:napi.entity-graphs]
+// [spec:pgorm:req:bindings.entity-graphs]
 
 import { arg, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";

@@ -26,7 +26,7 @@ SUBTYPES = [
 ]
 
 
-# [spec:pgorm:req:python.values+5/test]
+# [spec:pgorm:req:bindings.created-ranges/test]
 class CreatedRangeValueTests(unittest.TestCase):
     def test_kind_names_the_type_and_its_subtype(self):
         kind = p.CreatedRange('Span "雪"', "f64", schema="measure")
@@ -101,8 +101,7 @@ class CreatedRangeValueTests(unittest.TestCase):
             pipeline.literal(value)
 
 
-# [spec:pgorm:req:python.values+5/test]
-# [spec:pgorm:req:python.results/test]
+# [spec:pgorm:req:bindings.created-ranges/test]
 class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

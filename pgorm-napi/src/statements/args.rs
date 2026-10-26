@@ -69,7 +69,7 @@ pub(crate) fn items<'cx>(
 
 /// An identifier: a JavaScript string of 1–63 UTF-8 bytes without NUL,
 /// minted into a `Name`, which renders quoted — never SQL.
-// [spec:pgorm:req:napi.expressions+7]
+// [spec:pgorm:req:bindings.identifiers]
 pub(crate) fn name<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Name> {
     if !value.is_a::<JsString, _>(cx) {
         return refuse(cx, "an identifier is a string");
@@ -126,7 +126,7 @@ pub(crate) fn rust_type(named: &values::TypeName) -> TypeName {
 /// `Value`, written as its kind needs — an enum's label cast to the enum, a
 /// created range's text cast to its range type through `Expr::as_range`.
 /// Nothing here interpolates: the value is a placeholder's.
-// [spec:pgorm:req:napi.expressions+7]
+// [spec:pgorm:req:bindings.expressions]
 pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -287,8 +287,8 @@ fn unchecked<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<S
 /// LOCKED — and a WINDOW clause it refuses are refused here, as `compile`
 /// refuses them in a statement run on its own, rather than by the server
 /// once the outer statement is sent.
-// [spec:pgorm:req:napi.select+2]
-// [spec:pgorm:req:napi.windows+2]
+// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.windows]
 pub(crate) fn embedded<'cx>(
     cx: &mut Cx<'cx>,
     select: SelectStatement,

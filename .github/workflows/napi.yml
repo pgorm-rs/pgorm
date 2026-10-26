@@ -136,7 +136,7 @@ jobs:
       # An application's own module: the fixture crate registers its entities
       # and graphs, builds one native library with the binding's API, and runs
       # its suite against it in both runtimes.
-      # [spec:pgorm:req:napi.application]
+      # [spec:pgorm:req:napi.application+1]
       - name: Application module with registered entities
         run: |
           cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all -- --check
@@ -145,7 +145,7 @@ jobs:
       # TypeScript generated for an application's registrations: the codegen
       # fixture's project scaffolded, built and emitted, its declarations held
       # by deno check and its module by a live suite in both runtimes.
-      # [spec:pgorm:req:napi.codegen]
+      # [spec:pgorm:req:napi.codegen+1]
       - name: Generated application module
         run: |
           cargo fmt --manifest-path pgorm-napi/tests/codegen-entities/Cargo.toml --all -- --check

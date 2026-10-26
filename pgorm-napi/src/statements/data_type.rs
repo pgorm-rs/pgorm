@@ -44,7 +44,7 @@ fn size(cx: &mut FunctionContext, index: usize, what: &str, floor: f64) -> NeonR
 
 /// The built-in type `name`, sized as `length`, `precision` and `scale` say,
 /// each refused where the type takes none.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn builtin(
     name: &str,
     length: Option<u32>,
@@ -164,7 +164,7 @@ fn named<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Colum
 }
 
 /// `dataTypeNew(kind, length, precision, scale)`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn data_type_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let kind = arg(cx, 0);
     let length = size(cx, 1, "length", 1.0)?;

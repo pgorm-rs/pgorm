@@ -179,9 +179,9 @@ fn pipelines() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:napi.entity-reads+4/test]
-// [spec:pgorm:req:napi.entity-graphs/test]
-// [spec:pgorm:req:napi.pipeline-sources/test]
+// [spec:pgorm:req:bindings.entity-reads/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
+// [spec:pgorm:req:bindings.pipeline-sources/test]
 #[test]
 fn entity_statements_match_the_golden_file() {
     let golden: BTreeMap<String, Json> = serde_json::from_str(include_str!("../tests/parity.json"))

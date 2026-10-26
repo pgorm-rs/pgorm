@@ -11,7 +11,7 @@ from pgorm import (
 from pgorm import schema
 
 
-# [spec:pgorm:req:python.statements+10/test]
+# [spec:pgorm:req:bindings.identifiers/test]
 # [spec:pgorm:req:python.raw/test]
 class StatementTests(unittest.TestCase):
     def test_runtime_tables_and_aliases_preserve_identity(self):

@@ -169,7 +169,7 @@ pub(in crate::statements) fn names<'cx>(
 
 /// A key's columns: one name, or a non-empty array of them. The first is
 /// apart, as pgorm-query's key, index and foreign key take it.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 pub(super) fn columns<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
@@ -189,7 +189,7 @@ pub(super) fn columns<'cx>(
 
 /// The relation a statement names: a name, or a `Table` with no alias, its
 /// schema kept. A sequence is a relation too.
-// [spec:pgorm:req:napi.schema+2]
+// [spec:pgorm:req:bindings.schema]
 pub(in crate::statements) fn relation<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
@@ -236,7 +236,7 @@ pub(super) fn relations_at<'cx>(
 }
 
 /// The type a statement names: a name, or a `TypeName`, its schema kept.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 pub(super) fn type_ref<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<TypeRef> {
     if value.is_a::<JsString, _>(cx) {
         return Ok(TypeRef::Type(name(cx, value)?));
@@ -322,7 +322,7 @@ const SEQUENCE_OPTIONS: &[&str] = &[
 /// A sequence's options from the object at `index`, an identity column's and
 /// a standalone sequence's alike: `None` when it is left out or empty. A
 /// bound of `null` is its `NO` form.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 pub(super) fn sequence_options<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -379,7 +379,7 @@ pub(in crate::statements) fn text<'cx>(
 
 /// An enum label: data, written as a literal, of at most 63 bytes without
 /// NUL, which is what PostgreSQL stores; the empty label is one.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 pub(super) fn label<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<String> {
     let label = text(cx, value, "an enum label")?;
     if label.len() > 63 {

@@ -3,7 +3,7 @@ use pgorm::Schema;
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.schema+2/test]
+// [spec:pgorm:req:bindings.schema-from-entity/test]
 #[test]
 fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
     Python::initialize();
@@ -69,7 +69,7 @@ fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
 /// An entity whose table Rust refuses, Python refuses through the same path:
 /// `schema_from_entity` raises `ConstructionError` with Rust's message and
 /// returns no schema without the key.
-// [spec:pgorm:req:python.schema+2/test]    a foreign key PostgreSQL cannot build raises
+// [spec:pgorm:req:bindings.schema-from-entity/test]    a foreign key PostgreSQL cannot build raises
 // ConstructionError carrying the Rust refusal
 #[test]
 fn schema_generation_refuses_what_rust_refuses() -> PyResult<()> {

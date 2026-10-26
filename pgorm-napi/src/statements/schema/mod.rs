@@ -112,7 +112,7 @@ pub(crate) enum Ddl {
 impl Ddl {
     /// The statement's SQL, every value in it an escaped literal: pgorm-query's
     /// one rendering of a DDL statement that runs.
-    // [spec:pgorm:req:napi.schema+2]
+    // [spec:pgorm:req:bindings.schema]
     fn sql(&self) -> String {
         match self {
             Self::CreateSchema(statement) => statement.to_string(),
@@ -183,7 +183,7 @@ impl Part {
 
     /// The SQL the part runs as, or why it runs as none: PostgreSQL parses no
     /// `ALTER` without an action, and a column is no statement.
-    // [spec:pgorm:req:napi.schema+2]
+    // [spec:pgorm:req:bindings.schema]
     pub(crate) fn statement(&self) -> Result<String, &'static str> {
         match self {
             Self::Statement(ddl) => Ok(ddl.sql()),

@@ -78,7 +78,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 
 const byId = reading.col("id").asc();
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("a call runs over an inline window and over one the statement names", async () => {
   const running = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const rows = await pool().query(
@@ -98,7 +98,7 @@ test("a call runs over an inline window and over one the statement names", async
   ]);
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("the WINDOW clause holds every window it declares, an extended one among them", async () => {
   const rows = await pool().query(
     select(
@@ -122,7 +122,7 @@ test("the WINDOW clause holds every window it declares, an extended one among th
   ]);
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("an inline window builds on any entry of the WINDOW clause, held to what an extended entry is", async () => {
   const query = select(
     reading.col("id"),
@@ -162,7 +162,7 @@ test("an inline window builds on any entry of the WINDOW clause, held to what an
   assert.equal((await pool().query(accepted)).length, 5);
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("a WINDOW clause PostgreSQL refuses is refused before anything is sent", async () => {
   const over = (name: string) => select(call("count", reading.col("id")).over(name)).from(reading);
   const ordered = new Window().orderBy(byId);
@@ -191,7 +191,7 @@ test("a WINDOW clause PostgreSQL refuses is refused before anything is sent", as
   assert.throws(() => new ExtendedWindow("w").frame(FrameType.rows.following(1) as never), refused(/following start needs an end/));
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("a frame's mode, start, end and exclusion decide which rows a call reads", async () => {
   const ordered = new Window().partitionBy(reading.col("kind")).orderBy(byId);
   const sum = (frame: Parameters<Window["frame"]>[0]) => call("sum", reading.col("weight")).over(ordered.frame(frame));
@@ -217,7 +217,7 @@ test("a frame's mode, start, end and exclusion decide which rows a call reads", 
   ]);
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("the window-only functions and the JSON aggregates run over a window", async () => {
   const ordered = new Window().orderBy(reading.col("weight").desc());
   const rows = await pool().query(
@@ -244,7 +244,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
   );
 });
 
-// [spec:pgorm:req:napi.windows+2/test]
+// [spec:pgorm:req:bindings.windows/test]
 test("OVER follows only a call, a frame only ends after its start, and a window-only function needs its window", () => {
   const ordered = new Window().orderBy(byId);
   assert.throws(() => col("x").over(ordered), refused(/OVER follows only a function call/));
@@ -268,7 +268,7 @@ test("OVER follows only a call, a frame only ends after its start, and a window-
   assert.throws(() => FrameType.rows.currentRow().exclude("others" as never), refused(/exclusion/));
 });
 
-// [spec:pgorm:req:napi.ranges+1/test]
+// [spec:pgorm:req:bindings.ranges/test]
 test("contains, containedBy and overlaps compare ranges, multiranges and arrays", async () => {
   const ids = async (predicate: ReturnType<typeof col>) =>
     (await pool().query(select(booking.col("id")).from(booking).where(predicate).orderBy(booking.col("id").asc())))
@@ -293,7 +293,7 @@ test("contains, containedBy and overlaps compare ranges, multiranges and arrays"
   assert.deepStrictEqual(await ids(booking.col("weights").containedBy(new Value(new Range(0.0, 1.0, "[]"), floats))), [1n]);
 });
 
-// [spec:pgorm:req:napi.ranges+1/test]
+// [spec:pgorm:req:bindings.ranges/test]
 test("strictlyLeftOf, strictlyRightOf, notExtendRightOf, notExtendLeftOf and adjacentTo answer as PostgreSQL's operators", async () => {
   const built = async (where: ReturnType<typeof col>) =>
     (await pool().query(select(booking.col("id")).from(booking).where(where).orderBy(booking.col("id").asc())))
@@ -317,7 +317,7 @@ test("strictlyLeftOf, strictlyRightOf, notExtendRightOf, notExtendLeftOf and adj
   }
 });
 
-// [spec:pgorm:req:napi.ranges+1/test]
+// [spec:pgorm:req:bindings.ranges/test]
 test("a range is bound only as a Value that declares its kind", () => {
   assert.throws(() => col("seats").contains(new Range(1, 5) as never), refused(/Value/));
   assert.throws(() => col("seats").contains(new Multirange([new Range(1, 5)]) as never), refused(/Value/));

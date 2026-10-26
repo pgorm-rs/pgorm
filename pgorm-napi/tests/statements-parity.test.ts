@@ -25,12 +25,13 @@ for (const [family, cases] of Object.entries(families)) {
     Built
   >;
 
-  // [spec:pgorm:req:napi.statements/test]
+  // [spec:pgorm:req:bindings.statements/test]
   test(`the ${family} family's JavaScript cases are the golden file's`, () => {
     assert.deepStrictEqual(Object.keys(cases).sort(), Object.keys(golden).sort());
   });
 
   for (const [name, make] of Object.entries(cases)) {
+    // [spec:pgorm:req:bindings.delegation/test]
     test(`${family}: ${name} builds what pgorm-query builds`, () => {
       const expected = golden[name];
       assert.ok(expected, `${name} is in the golden file`);

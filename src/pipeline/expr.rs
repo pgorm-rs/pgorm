@@ -89,7 +89,6 @@ pub fn col<'brand>(table: impl IntoName, column: impl IntoName) -> Expr<'brand> 
 /// `that(ID)` is the joined relation's `id`. The qualification is scoped to
 /// the join condition; stages after the join refer to the column by its own
 /// name, renamed in the embedded pipeline's projection if it collides.
-// [spec:pgorm:req:pipeline.compose]
 pub fn that<'brand>(column: impl IntoName) -> Expr<'brand> {
     branded(adapter::ident_in(
         vec!["that".to_owned()],
@@ -143,7 +142,7 @@ impl<'brand> From<AliasName> for Expr<'brand> {
 }
 
 /// A runtime alias reads an introduced name under the same resolution rules.
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline-expressions]
 impl<'brand> From<Name> for Expr<'brand> {
     fn from(alias: Name) -> Self {
         name(&SqlName::to_string(&*alias))
@@ -373,7 +372,7 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
 
     /// Name a projection with an owned identifier computed at runtime.
     /// Reserved-name validation is identical to [`as_`](ExprOps::as_).
-    // [spec:pgorm:req:python.pipeline+1]
+    // [spec:pgorm:req:bindings.pipeline-expressions]
     fn as_runtime(self, name: Name) -> Expr<'brand> {
         branded(adapter::aliased(
             self.into().node,

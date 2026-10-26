@@ -125,7 +125,7 @@ impl Drop for Finished {
 /// A request whose outcome is unknown once abandoned: dropped before it
 /// completes — its caller aborted — it ends the whole transaction, whose
 /// connection is then discarded.
-// [spec:pgorm:req:napi.cancellation]
+// [spec:pgorm:req:bindings.cancellation]
 struct Pending {
     aborted: CancellationToken,
     complete: bool,
@@ -227,7 +227,7 @@ impl State {
     /// The frame's lock, refusing rather than waiting when a request or an
     /// open savepoint holds it. Taken on the JavaScript thread as each request
     /// is made, so requests are refused in the order JavaScript made them.
-    // [spec:pgorm:req:napi.transactions+2]
+    // [spec:pgorm:req:bindings.transactions]
     fn lock(&self) -> Result<OwnedMutexGuard<()>, Failure> {
         self.ensure_open()?;
         self.busy.clone().try_lock_owned().map_err(|_| {
@@ -309,7 +309,7 @@ impl State {
     /// statement JavaScript runs as the COPY settles finds it free. A COPY
     /// whose connection is discarded ends the whole transaction, nothing in
     /// it committed, as an aborted statement does, and the frame is told so.
-    // [spec:pgorm:req:napi.copy+2]
+    // [spec:pgorm:req:bindings.copy]
     fn after_copy(&self, settle: Settle, lock: OwnedMutexGuard<()>, release: Release) -> bool {
         drop(lock);
         let discarded = settle == Settle::Discard;
@@ -430,7 +430,7 @@ impl Frame {
     /// Serve the frame's commands inside its transaction, a savepoint's frame
     /// nested inside while it is open: `Ok` once JavaScript commits, an `Exit`
     /// once it rolls back or the handle is collected unfinished.
-    // [spec:pgorm:req:napi.transactions+2]
+    // [spec:pgorm:req:bindings.transactions]
     fn serve<'a>(
         &'a mut self,
         tx: &'a mut DatabaseTransaction<'_>,
@@ -607,7 +607,7 @@ impl Frame {
 /// Open a transaction on `connection`, which it holds until it finishes: a
 /// task takes the connection out of its slot and serves the transaction from
 /// inside the closure pgorm opens it around.
-// [spec:pgorm:req:napi.transactions+2]
+// [spec:pgorm:req:bindings.transactions]
 async fn begin(
     mut operation: Operation,
     mode: TransactionMode,
@@ -815,7 +815,8 @@ fn transaction_closed(mut cx: FunctionContext) -> JsResult<JsBoolean> {
 
 /// `transactionJob(transaction, job, abort)`: a registered entity's job in
 /// the transaction, holding its lock as a statement does.
-// [spec:pgorm:req:napi.entities]
+// [spec:pgorm:req:bindings.entities]
+// [spec:pgorm:req:bindings.registered-pools]
 fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let job = match taken(&mut cx, 1)? {
@@ -833,7 +834,7 @@ fn transaction_job(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `transactionCopyIn(transaction, copy, abort, rows)`: a COPY FROM in the
 /// transaction, holding its lock as a statement does until the COPY ends.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let (copy, rows) = copy::copy_from_rows_at(&mut cx, 1, 3)?;
@@ -858,7 +859,7 @@ fn transaction_copy_in(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `transactionCopyOut(transaction, copy, abort, rows)`: a COPY TO in the
 /// transaction, which refuses other work until the stream ends or closes.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn transaction_copy_out(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = state(&mut cx)?;
     let (copy, rows) = copy::copy_to_rows_at(&mut cx, 1, 3)?;

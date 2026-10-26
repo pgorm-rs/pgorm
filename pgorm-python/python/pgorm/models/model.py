@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .queries import ModelQuery, ModelWrite
 
 
-# [spec:pgorm:req:python.models]
+# [spec:pgorm:req:bindings.models]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class Model:
     table: p.Table

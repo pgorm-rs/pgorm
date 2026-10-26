@@ -17,7 +17,7 @@ pub struct PyCreateIndex {
 
 #[pymethods]
 impl PyCreateIndex {
-    // [spec:pgorm:req:python.schema+2]
+    // [spec:pgorm:req:bindings.schema-indexes]
     #[new]
     #[pyo3(signature=(table, first, *, name=None))]
     fn new(

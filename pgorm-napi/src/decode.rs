@@ -55,7 +55,7 @@ impl<'a> FromSql<'a> for Raw<'a> {
 
 /// A result's column names, which become the keys of its row objects: two
 /// columns of one name would leave one object key for both, and are refused.
-// [spec:pgorm:req:napi.rows]
+// [spec:pgorm:req:bindings.rows]
 pub(crate) fn names(row: &Row) -> Result<Vec<String>, Failure> {
     let names: Vec<String> = row
         .columns()
@@ -74,7 +74,7 @@ pub(crate) fn names(row: &Row) -> Result<Vec<String>, Failure> {
 }
 
 /// One row's values, in column order.
-// [spec:pgorm:req:napi.rows]
+// [spec:pgorm:req:bindings.rows]
 pub(crate) fn row(row: &Row) -> Result<Vec<Tagged>, Failure> {
     (0..row.len()).map(|index| column(row, index)).collect()
 }
@@ -94,7 +94,7 @@ fn column(row: &Row, index: usize) -> Result<Tagged, Failure> {
 }
 
 /// One field of a COPY of rows, read as a result column of its type is.
-// [spec:pgorm:req:napi.copy.rows]
+// [spec:pgorm:req:bindings.copy-rows]
 pub(crate) fn field(column: &CopyColumn, raw: Option<&[u8]>) -> Result<Tagged, Failure> {
     decode(column.type_(), raw).map_err(|error| {
         Failure::Decode(format!(
@@ -106,7 +106,7 @@ pub(crate) fn field(column: &CopyColumn, raw: Option<&[u8]>) -> Result<Tagged, F
 }
 
 /// A value of `ty`, an array of a supported type included.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:bindings.values]
 fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
     let ty = base_type(ty);
     let Kind::Array(member) = ty.kind() else {
@@ -175,8 +175,8 @@ fn subtype_kind(subtype: &Type) -> Option<ArrayType> {
 }
 
 /// The kind a column of `ty` decodes as.
-// [spec:pgorm:req:napi.values]
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:bindings.value-tags]
+// [spec:pgorm:req:napi.temporal+1]
 fn tag(ty: &Type) -> Result<Tag, CodecError> {
     let ty = base_type(ty);
     match ty.kind() {
@@ -373,7 +373,7 @@ fn read_multirange(
 
 /// A column of a range type a schema created: read in binary through the
 /// subtype's codec, and held as the text form that type's values travel as.
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.created-ranges]
 fn created_text(ty: &Type, kind: &CreatedKind, raw: &[u8]) -> Result<String, CodecError> {
     let (Kind::Range(subtype) | Kind::Multirange(subtype)) = ty.kind() else {
         return Err("expected a range".into());
@@ -389,7 +389,8 @@ fn created_text(ty: &Type, kind: &CreatedKind, raw: &[u8]) -> Result<String, Cod
 
 /// A `numeric` that rust_decimal, and so pgorm, holds exactly: its upstream
 /// decoder can round, so the value it reads is written back and compared.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:bindings.values]
+// [spec:pgorm:req:napi.values+1]
 #[derive(Debug)]
 pub(crate) struct ExactDecimal(pub(crate) Decimal);
 
@@ -474,7 +475,7 @@ mod tests {
         }
     }
 
-    // [spec:pgorm:req:napi.values/test]
+    // [spec:pgorm:req:bindings.values/test]
     #[test]
     fn numerics_decode_exactly_or_not_at_all() -> Result<(), CodecError> {
         assert_eq!(
@@ -492,7 +493,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:napi.values/test]
+    // [spec:pgorm:req:bindings.created-ranges/test]
     #[test]
     fn created_range_columns_read_as_text_form() -> Result<(), CodecError> {
         let kind = CreatedKind {

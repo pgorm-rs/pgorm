@@ -7,7 +7,7 @@ use super::codecs::{CheckedArray, ExactDecimal};
 
 type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
-// [spec:pgorm:req:python.results/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn exact_numeric_keeps_rust_decimal_bytes() -> TestResult {
     for text in [
@@ -27,7 +27,7 @@ fn exact_numeric_keeps_rust_decimal_bytes() -> TestResult {
     Ok(())
 }
 
-// [spec:pgorm:req:python.results/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn numeric_precision_loss_is_rejected() {
     // 1 + 1e-32: PostgreSQL base-10000 groups. Upstream Decimal rounds this.
@@ -38,7 +38,7 @@ fn numeric_precision_loss_is_rejected() {
     assert!(ExactDecimal::from_sql(&Type::NUMERIC, &[0; 7]).is_err());
 }
 
-// [spec:pgorm:req:python.results/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn array_codec_preserves_nullable_rust_elements() -> TestResult {
     let expected = vec![Some(1i32), None, Some(3)];
@@ -59,7 +59,7 @@ fn array_codec_preserves_nullable_rust_elements() -> TestResult {
     Ok(())
 }
 
-// [spec:pgorm:req:python.results/test]
+// [spec:pgorm:req:bindings.values/test]
 #[test]
 fn time_decode_rejects_values_outside_a_civil_day() -> TestResult {
     let valid = 45_296_123_456i64.to_be_bytes();

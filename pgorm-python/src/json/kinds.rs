@@ -13,7 +13,7 @@ use crate::{
     values::PyValue,
 };
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.sql-json]
 /// An operand marked as JSON text for an SQL/JSON position: `FORMAT JSON`.
 /// It is accepted only where SQL/JSON reads JSON, never as an expression.
 #[pyclass(name = "JsonInput", module = "pgorm", frozen, from_py_object)]
@@ -54,7 +54,7 @@ pub enum PyJsonKind {
 
 #[pymethods]
 impl PyJsonKind {
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "SQL/JSON clauses cannot be tested as Python booleans",

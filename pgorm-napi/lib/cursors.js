@@ -4,8 +4,8 @@
 // `Cursor` and `Paginator` read them: a cursor orders by its columns and
 // tiebreaks, and resumes past or short of a boundary row's key; a paginator
 // reads a page at a time by limit and offset and counts the rows it pages.
-// [spec:pgorm:req:napi.cursors]
-// [spec:pgorm:req:napi.pagination]
+// [spec:pgorm:req:bindings.cursors]
+// [spec:pgorm:req:bindings.pagination]
 
 import { Condition } from "./conditions.js";
 import { ConstructionError } from "./errors.js";

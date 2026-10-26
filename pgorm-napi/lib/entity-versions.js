@@ -3,7 +3,7 @@
 // A registered entity's writes that read each written row's two versions,
 // reached as the statement terminals they are in Rust, no
 // `ActiveModelBehavior` hook running around them.
-// [spec:pgorm:req:napi.entity-versions]
+// [spec:pgorm:req:bindings.entity-versions]
 
 import { arg } from "./builder.js";
 import { Condition } from "./conditions.js";
@@ -120,6 +120,7 @@ export class EntityUpdateMany {
     return new EntityUpdateMany(this.#entity, this.#name, this.#assignments, ALL_ROWS, VERSIONS);
   }
 
+  // [spec:pgorm:req:napi.update-many-guard]
   /**
    * Each row the update wrote, before and after, by
    * `UpdateMany::exec_returning_changes`; setting nothing is a

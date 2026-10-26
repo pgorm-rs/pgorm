@@ -7,7 +7,7 @@ from pgorm import schema as s
 
 
 class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
-    # [spec:pgorm:req:python.schema+2/test]
+    # [spec:pgorm:req:bindings.schema-from-entity/test]
     async def test_registered_entity_schema_executes_explicitly(self):
         account = p.entity("app.Account")
         generated = s.from_entity(account)
@@ -40,7 +40,7 @@ class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
             finally:
                 await pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))
 
-    # [spec:pgorm:req:python.schema+2/test]
+    # [spec:pgorm:req:bindings.schema-from-entity/test]
     async def test_unbuildable_foreign_key_is_refused(self):
         with self.assertRaises(p.ConstructionError) as refused:
             s.from_entity(p.entity("app.Temper"))

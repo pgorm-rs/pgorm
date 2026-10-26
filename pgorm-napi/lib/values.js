@@ -5,9 +5,10 @@
 // functions the addon reads and builds them with. Every judgement about a
 // value — its kind, its range, its precision — is the addon's; these classes
 // hold what it accepted.
-// [spec:pgorm:req:napi.values]
-// [spec:pgorm:req:napi.value-tags+2]
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:bindings.values]
+// [spec:pgorm:req:napi.values+1]
+// [spec:pgorm:req:bindings.value-tags]
+// [spec:pgorm:req:napi.temporal+1]
 
 import { ConstructionError, InternalError } from "./errors.js";
 

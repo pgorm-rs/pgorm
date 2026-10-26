@@ -54,7 +54,7 @@ pub(crate) struct Source {
 impl Source {
     /// A pipeline starting from the relation: a table by its name, its schema
     /// kept, or anything named or embedded as the source it is.
-    // [spec:pgorm:req:napi.pipeline]
+    // [spec:pgorm:req:bindings.pipeline]
     fn pipeline(&self) -> pl::Pipeline {
         match (&self.relation, &self.alias) {
             (Relation::Table(TableName::Table(table)), None) => pl::Pipeline::from(table.clone()),
@@ -128,7 +128,7 @@ impl From<pl::Pipeline> for Node {
 
 /// The SQL and values a pipeline compiles to, through pgorm's
 /// `Pipeline::into_sql`; what it judges is a `ConstructionError`.
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:bindings.pipeline]
 pub(super) fn compile<'cx>(cx: &mut Cx<'cx>, part: &Part) -> NeonResult<(String, Values)> {
     match part {
         Part::Pipeline(pipeline) => match pipeline.clone().into_sql() {
@@ -148,7 +148,7 @@ pub(super) fn compile<'cx>(cx: &mut Cx<'cx>, part: &Part) -> NeonResult<(String,
 
 /// An expression made of `operands` and their scopes: refused when two
 /// scopes meet, or one has ended, as pgorm's brand refuses it.
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-binder]
 fn compose<'cx>(cx: &mut Cx<'cx>, recipe: Recipe, operands: &[&PlExpr]) -> NeonResult<Node> {
     let mut scope: Option<Arc<Scope>> = None;
     for operand in operands {

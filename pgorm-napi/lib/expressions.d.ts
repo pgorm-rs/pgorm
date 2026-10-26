@@ -4,8 +4,10 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+7]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.quantifiers]
+// [spec:pgorm:req:bindings.case]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";

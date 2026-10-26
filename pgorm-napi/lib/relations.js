@@ -3,7 +3,7 @@
 // Relations between models: columns of one model's table equal to columns
 // of another's, which a query joins by, a graph decodes along, and `find`
 // and `load` read the far end of.
-// [spec:pgorm:req:napi.relations]
+// [spec:pgorm:req:bindings.relations]
 
 import { Condition } from "./conditions.js";
 import { ConstructionError, DecodeError } from "./errors.js";

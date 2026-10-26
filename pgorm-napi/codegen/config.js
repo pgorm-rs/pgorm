@@ -3,7 +3,7 @@
 // An application's build description, validated: the module to generate,
 // the Rust crate holding its entities, and the entities, graphs and source
 // tuples to register, each under a registration name and a TypeScript export.
-// [spec:pgorm:req:napi.codegen]
+// [spec:pgorm:req:bindings.codegen]
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";

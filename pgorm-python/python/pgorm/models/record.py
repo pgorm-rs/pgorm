@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from .model import Model
 
 
-# [spec:pgorm:req:python.models]
+# [spec:pgorm:req:bindings.model-records]
+# [spec:pgorm:req:python.records]
 @dataclass(frozen=True, eq=False, slots=True)
 class ModelRecord(Mapping[str, Any]):
     model: Model

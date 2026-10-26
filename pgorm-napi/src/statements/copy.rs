@@ -69,7 +69,7 @@ pub(crate) enum CopyTo {
 }
 
 /// The COPY one JavaScript builder owns.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 #[derive(Debug, Clone)]
 pub(crate) enum CopyStatement {
     CopyFrom(CopyFrom),
@@ -108,7 +108,7 @@ impl CopyStatement {
     /// The SQL the statement runs as, which `inspect()` gives with no
     /// values. A value written into it as a literal cannot carry NUL, which
     /// the protocol's NUL-terminated statement text cannot hold.
-    // [spec:pgorm:req:napi.copy+2]
+    // [spec:pgorm:req:bindings.copy]
     pub(crate) fn sql<'cx>(&self, cx: &mut Cx<'cx>) -> NeonResult<String> {
         let sql = self.rendered();
         if sql.contains('\0') {
@@ -247,7 +247,7 @@ macro_rules! apply {
 }
 
 /// `copyFromNew(table, format)`: COPY into `table` from the client.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = arg(cx, 0);
     let table = relation(cx, table)?;
@@ -266,7 +266,7 @@ fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// write the binding would refuse to run is refused here as well, and so is
 /// one with no `RETURNING` list, as pgorm-query's conversion into a
 /// `CopySource` refuses it.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn source<'cx>(
     cx: &mut FunctionContext<'cx>,
     value: Handle<'cx, JsValue>,
@@ -307,7 +307,7 @@ fn source<'cx>(
 
 /// `copyToNew(source, format)`: COPY a table's rows, or a statement's, to
 /// the client.
-// [spec:pgorm:req:napi.copy+2]
+// [spec:pgorm:req:bindings.copy]
 fn copy_to_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let source = source(cx, value)?;

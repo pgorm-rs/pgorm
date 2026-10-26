@@ -84,7 +84,7 @@ where
 
 /// The slot tuples a graph can register: Rust's own arities, from no slot to
 /// six. pgorm's `Slots` is sealed, so no other shape implements this.
-// [spec:pgorm:req:napi.entity-graphs]
+// [spec:pgorm:req:bindings.entity-graphs]
 pub trait GraphSlots<E: EntityTrait>: Slots + fmt::Debug + Send + Sync + Sized + 'static
 where
     GraphRow<E, Self>: SelectorTrait,
@@ -281,7 +281,7 @@ impl<E: EntityTrait, S> fmt::Debug for GraphQuery<E, S> {
     }
 }
 
-// [spec:pgorm:req:napi.entity-graphs]
+// [spec:pgorm:req:bindings.entity-graphs]
 impl<E, S> QueryBackend for GraphQuery<E, S>
 where
     E: EntityTrait + Send + Sync + 'static,

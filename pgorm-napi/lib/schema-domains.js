@@ -2,7 +2,7 @@
 
 // CREATE DOMAIN, ALTER DOMAIN over pgorm-query's typestate, and DROP DOMAIN;
 // and VALUE, the value a domain's CHECK tests.
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";

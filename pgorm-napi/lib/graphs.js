@@ -7,7 +7,7 @@
 // record or null, and `via` a LEFT JOIN through a table no record reads.
 // Every source is projected under its own prefix, `s0_` for the root and
 // `s{i}_` for the i-th slot, by the composition pgorm's graph writer uses.
-// [spec:pgorm:req:napi.graphs]
+// [spec:pgorm:req:bindings.graphs]
 
 import { cursorOver, paginatorOver } from "./cursors.js";
 import { ConstructionError } from "./errors.js";

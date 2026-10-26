@@ -4,8 +4,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.models]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.models]
 
 import type { Compiled, Condition, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
 import type { Select, Table } from "./select.d.ts";

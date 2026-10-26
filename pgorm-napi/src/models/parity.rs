@@ -476,13 +476,13 @@ fn cursors() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:napi.models/test]
-// [spec:pgorm:req:napi.model-reads+1/test]
-// [spec:pgorm:req:napi.model-writes/test]
-// [spec:pgorm:req:napi.relations/test]
-// [spec:pgorm:req:napi.graphs/test]
-// [spec:pgorm:req:napi.cursors/test]
-// [spec:pgorm:req:napi.pagination/test]
+// [spec:pgorm:req:bindings.models/test]
+// [spec:pgorm:req:bindings.model-reads/test]
+// [spec:pgorm:req:bindings.model-writes/test]
+// [spec:pgorm:req:bindings.relations/test]
+// [spec:pgorm:req:bindings.graphs/test]
+// [spec:pgorm:req:bindings.cursors/test]
+// [spec:pgorm:req:bindings.pagination/test]
 #[test]
 fn model_family_matches_its_golden_file() {
     let cases = [queries(), writes(), graphs(), cursors()].concat();

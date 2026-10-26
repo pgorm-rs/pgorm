@@ -3,7 +3,7 @@
 // Comparison, arithmetic and logic: the operators every expression has. An
 // operand that is not an expression is a value, bound as a parameter; a
 // comparison's may also be `any(..)` or `all(..)`.
-// [spec:pgorm:req:napi.expressions+7]
+// [spec:pgorm:req:bindings.expressions]
 
 import { arg, Builder, made } from "./builder.js";
 import { native } from "./operations.js";
@@ -81,7 +81,7 @@ export class Operand extends Builder {
 
   /**
    * `@>`: a range, multirange or array that contains the other.
-   * [spec:pgorm:req:napi.ranges+1]
+   * [spec:pgorm:req:bindings.ranges]
    *
    * @param {unknown} other
    */
@@ -109,7 +109,7 @@ export class Operand extends Builder {
 
   /**
    * `<<`: a range or multirange lying wholly left of the other.
-   * [spec:pgorm:req:napi.ranges+1]
+   * [spec:pgorm:req:bindings.ranges]
    *
    * @param {unknown} other
    */

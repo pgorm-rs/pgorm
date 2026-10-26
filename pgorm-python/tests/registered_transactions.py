@@ -27,7 +27,7 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_models_graphs_cursors_and_sources_share_transaction(self):
         async with self.pool.transaction() as tx:
             active = self.account.active().set("id", 1).set("display name", "Native").set("note", None)
@@ -56,7 +56,7 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
             await model.into_active().delete(tx)
             self.assertEqual(await self.account.find().all(tx), [])
 
-    # [spec:pgorm:req:python.transactions+2/test]
+    # [spec:pgorm:req:bindings.transactions/test]
     async def test_after_hook_exception_rolls_back_database_write(self):
         with self.assertRaises(p.DatabaseError):
             async with self.pool.transaction() as tx:
@@ -65,7 +65,7 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
         async with self.pool.connection() as connection:
             self.assertEqual(await self.account.find().all(connection), [])
 
-    # [spec:pgorm:req:python.cancellation/test]
+    # [spec:pgorm:req:bindings.cancellation/test]
     async def test_cancelled_hook_ends_native_transaction_owner(self):
         async with self.pool.connection() as connection:
             with self.assertRaises(asyncio.CancelledError):
