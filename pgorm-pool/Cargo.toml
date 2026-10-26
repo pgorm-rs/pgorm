@@ -37,3 +37,6 @@ futures = "0.3.34"
 futures-util = "0.3.34"
 serde_json = "1.0"
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
+# The statement-cache listener's tests wait for its clears through the
+# events it logs (tests/cache_listener.rs).
+pgorm-test-support = { path = "../pgorm-test-support" }

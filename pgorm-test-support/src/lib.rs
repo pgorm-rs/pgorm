@@ -29,6 +29,9 @@
 //! pgorm's and pgorm-migration's live tests take this crate as a
 //! dev-dependency, and pgorm-napi's `tests/support.ts` mints and sweeps the
 //! same names, so each suite can reclaim the others' leftovers.
+//!
+//! [`ListenerClears`] counts the clears a pool's statement-cache listener
+//! makes, for the tests of it in pgorm, pgorm-pool and pgorm-migration.
 
 use std::{
     future::Future,
@@ -41,6 +44,10 @@ use std::{
 };
 
 use tokio_postgres::{Client, Config, Error, NoTls, error::SqlState};
+
+mod clears;
+
+pub use clears::ListenerClears;
 
 /// The longest identifier PostgreSQL stores without truncating it.
 const MAX_IDENTIFIER_LEN: usize = 63;
