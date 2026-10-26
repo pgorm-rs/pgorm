@@ -967,6 +967,7 @@ assertions (
     {id doctest-repair, kind @complete, author "brendan@necessary.nu", at 2026-09-09T09:44:00.312706Z}
     {id domain-enum-predicates, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:44:09.79938Z}
     {id domain-enum-remaining, kind @complete, author "brendan@necessary.nu", at 2026-10-19T08:40:19.506203Z}
+    {id domain-unwrap-shared, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:28:37.205426Z}
     {id embedded-index-kinds, kind @complete, author "brendan@necessary.nu", at 2026-10-01T21:30:43.702126Z}
     {id empty-insert-batch, kind @complete, author "brendan@necessary.nu", at 2026-09-07T12:50:38.839369Z}
     {id entity-relation-not-enforced, kind @complete, author "brendan@necessary.nu", at 2026-10-08T20:35:57.343304Z}

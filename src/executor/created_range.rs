@@ -17,7 +17,7 @@ use jiff::{
     civil::{Date, DateTime, Time},
 };
 use pgorm_pool::GenericClient;
-use pgorm_query::{Multirange, Range, RangeSubtype, Value};
+use pgorm_query::{Multirange, Range, RangeSubtype, Value, base_type};
 use rust_decimal::Decimal;
 use tokio_postgres::types::{FromSql, Kind, Oid, Type};
 
@@ -92,10 +92,7 @@ impl<'a> CreatedRangeCodec<'a> {
         let (Kind::Range(subtype) | Kind::Multirange(subtype)) = ty.kind() else {
             return Err(format!("`{ty}` is not a range or multirange type").into());
         };
-        let mut base = subtype;
-        while let Kind::Domain(over) = base.kind() {
-            base = over;
-        }
+        let base = base_type(subtype);
         let codec: fn(&Type) -> CreatedRangeCodec<'_> = match *base {
             Type::INT2 => halves::<i16>,
             Type::INT4 => halves::<i32>,

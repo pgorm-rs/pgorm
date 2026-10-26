@@ -543,6 +543,26 @@ including panic semantics and quirks inherited from sea-query.
 > `text[]`, which an `interval[]` column refuses (`42804`). The literal and
 > the bound value are one triple, under every `IntervalStyle`.
 
+## Domains on the wire
+
+> [spec:pgorm:def:sql.value.base-type]
+> A domain's values travel in the representation of the type it is over, so
+> whatever reads, writes or accepts a value against a type the server
+> described looks through that type's domains first. `base_type(ty)`, a free
+> function over `postgres_types::Type`, is that one step, PostgreSQL's own
+> `getBaseType`: a domain, a domain over a domain included however deep, is
+> the type at the bottom, and any other type is `ty` itself, borrowed rather
+> than copied. It looks through `ty` and nothing inside it: an array, range or
+> multirange of a domain is its own type with its own representation, so it
+> is returned as it is, and a caller that reads one asks `base_type` of the
+> element or subtype it reaches. pgorm's parameter binding
+> (`exec.cursor.binding-accepts`), its array decode (`exec.decode.array`),
+> its binary COPY rows (`conn.copy.rows`), its range types a schema created
+> (`sql.value.created-range`), `Interval`'s acceptance check
+> (`sql.value.interval`) and the Python and JavaScript bindings' codecs all
+> ask it, reaching it as `pgorm::pgorm_query::base_type`, so none of them
+> spells the step alone.
+
 ## Value tuples
 
 > [spec:pgorm:def:sql.value.tuple+3]

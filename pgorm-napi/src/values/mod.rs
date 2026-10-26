@@ -9,18 +9,8 @@ mod value;
 pub(crate) mod write;
 
 use pgorm::pgorm_query::{ArrayType, RangeType, Value};
-use tokio_postgres::types::{Kind, Type};
 
 pub(crate) use value::export;
-
-/// The type a value is written in: a domain is transparent on the wire.
-pub(crate) fn wire_type(ty: &Type) -> &Type {
-    let mut ty = ty;
-    while let Kind::Domain(base) = ty.kind() {
-        ty = base;
-    }
-    ty
-}
 
 /// A PostgreSQL type named by identifier: an enum, or a range type a schema
 /// created.

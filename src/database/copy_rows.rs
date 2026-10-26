@@ -29,6 +29,7 @@ use pgorm_pool::GenericClient;
 use pgorm_query::{
     ArrayType, Asterisk, CopyFormat, CopyFromStatement, CopyToStatement, Interval, IpNetwork,
     MacAddress, Multirange, Query, Range, RangeType, StaticName, SubQueryStatement, Value, Vector,
+    base_type,
 };
 use postgres_protocol::types::{self as wire, RangeBound};
 use rust_decimal::Decimal;
@@ -490,15 +491,6 @@ impl CopyRowDecoder {
     }
 }
 
-/// The type a value is written in: a domain's base type, all the way down.
-fn wire_type(ty: &Type) -> &Type {
-    let mut ty = ty;
-    while let Kind::Domain(base) = ty.kind() {
-        ty = base;
-    }
-    ty
-}
-
 /// A field's bytes, whatever its type, so an array's elements can be read by
 /// the decoder of their own type.
 struct Element<'a>(&'a [u8]);
@@ -516,7 +508,7 @@ impl<'a> FromSql<'a> for Element<'a> {
 /// A field of `ty`, an array of a supported type included.
 // [spec:pgorm:req:conn.copy.rows+3]
 fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
-    let ty = wire_type(ty);
+    let ty = base_type(ty);
     let Kind::Array(member) = ty.kind() else {
         let kind = kind(ty)?;
         return match raw {
@@ -524,7 +516,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
             Some(raw) => scalar(ty, &kind, raw),
         };
     };
-    let member = wire_type(member);
+    let member = base_type(member);
     let kind = kind(member)?;
     let Some(raw) = raw else {
         return Ok(Value::Array(kind, None));
@@ -701,7 +693,7 @@ fn scalar(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, WireError> {
 /// the empty range and nothing else; a NULL bound is a malformed message,
 /// never no bound.
 fn read_range(subtype: &Type, raw: &[u8]) -> Result<Range<Value>, WireError> {
-    let subtype = wire_type(subtype);
+    let subtype = base_type(subtype);
     let kind = kind(subtype)?;
     let bound = |bound: RangeBound<Option<&[u8]>>| -> Result<Bound<Value>, WireError> {
         Ok(match bound {

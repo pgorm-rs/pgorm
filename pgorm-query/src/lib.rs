@@ -647,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+36]
-// [spec:pgorm:req:sql.surface+36/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+37]
+// [spec:pgorm:req:sql.surface+37/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.
@@ -683,6 +683,7 @@ mod template;
 mod token;
 mod types;
 pub mod value;
+mod value_domain;
 mod value_identity;
 mod value_interval;
 mod value_range;
@@ -731,12 +732,14 @@ pub use json::{
 };
 pub use types::{BinOper, IntoLikeExpr, Keyword, LikeExpr, SubQueryOper, UnOper};
 
-// Values: what a bound parameter carries, and the conversions in and out.
+// Values: what a bound parameter carries, the conversions in and out, and
+// the type a value of a domain travels as.
 pub use key::{IntoBoundary, IntoKey, Key};
 pub use value::{
     ArrayType, IntoValueTuple, IpNetwork, MacAddress, Nullable, TryFromValueTuple, Value,
     ValueTuple, ValueTupleError, ValueType, ValueTypeError, Values, Vector,
 };
+pub use value_domain::base_type;
 pub use value_interval::Interval;
 pub use value_range::{Multirange, Range, RangeElement, RangeType};
 pub use value_range_text::RangeSubtype;

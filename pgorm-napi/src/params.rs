@@ -8,14 +8,11 @@ use bytes::BytesMut;
 use neon::prelude::*;
 use pgorm::{
     ValueHolder,
-    pgorm_query::Value,
+    pgorm_query::{Value, base_type},
     types::{IsNull, Kind, ToSql, Type, to_sql_checked},
 };
 
-use crate::{
-    codec::Codec,
-    values::{read, wire_type},
-};
+use crate::{codec::Codec, values::read};
 
 type BindError = Box<dyn Error + Sync + Send>;
 
@@ -54,7 +51,7 @@ pub(crate) fn read<'cx>(
 /// reinterpretation, which the binding does not make.
 // [spec:pgorm:req:napi.temporal]
 fn check_temporal(value: &Value, ty: &Type) -> Result<(), BindError> {
-    let ty = wire_type(ty);
+    let ty = base_type(ty);
     match value {
         Value::DateTime(Some(_)) if *ty == Type::TIMESTAMPTZ => Err(
             "a Temporal.PlainDateTime has no time zone and does not bind to timestamptz: \
