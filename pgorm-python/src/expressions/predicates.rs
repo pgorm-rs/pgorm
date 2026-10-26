@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use super::{PyExpr, coerce, construct::sequence};
 
-// [spec:pgorm:req:python.expressions+4]
+// [spec:pgorm:req:python.expressions+5]
 #[pymethods]
 impl PyExpr {
     fn is_null(&self) -> Self {

@@ -60,7 +60,7 @@ def reject_execution_mismatch(project, output, environment):
 
 # [spec:pgorm:req:python.entities+3/test]
 # [spec:pgorm:req:python.graph/test]
-# [spec:pgorm:req:python.pipeline/test]
+# [spec:pgorm:req:python.pipeline+1/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-entities"))
@@ -259,6 +259,7 @@ def main():
                     "app.Old",
                     "app.Room",
                     "app.Stay",
+                    "app.Temper",
                 ],
                 "graph_source_arities": list(range(1, 8)),
                 "pipeline_source_arities": list(range(1, 7)),

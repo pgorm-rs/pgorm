@@ -38,14 +38,17 @@ use crate::{
     ActiveModelTrait, CopyInSink, CopyOutStream, EntityTrait, Error, Iterable, ModelTrait,
     TryIntoModel, ValueHolder,
     error::{query_err, type_err},
-    executor::created_range::{CreatedRangeCodec, created_range_text, is_created_range},
+    executor::created_range::{
+        CreatedRangeCodec, completed_multiranges, created_range_text, is_created_multirange,
+        is_created_range,
+    },
 };
 
 type WireError = Box<dyn StdError + Sync + Send>;
 
 /// One column of a COPY's rows: its name and its PostgreSQL type, as the
 /// server describes the statement.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CopyColumn {
     name: String,
@@ -68,7 +71,9 @@ impl CopyColumn {
     }
 
     /// The column's type. The server describes a domain column by the type
-    /// the domain is over, whose form its values travel in.
+    /// the domain is over, whose form its values travel in. A multirange type
+    /// a schema created, which the driver reports with no subtype, is
+    /// described over the subtype the catalogue names for it.
     pub fn type_(&self) -> &Type {
         &self.type_
     }
@@ -80,7 +85,7 @@ impl CopyColumn {
     ///
     /// [`Error::Type`] naming the column, when its type is one no `Value`
     /// holds or the bytes are not that type's binary form.
-    // [spec:pgorm:req:conn.copy.rows+2]
+    // [spec:pgorm:req:conn.copy.rows+3]
     pub fn decode(&self, raw: Option<&[u8]>) -> Result<Value, Error> {
         decode(&self.type_, raw).map_err(|error| {
             type_err(format!(
@@ -93,7 +98,7 @@ impl CopyColumn {
 
 /// The columns each row of a COPY FROM carries: the statement's column list
 /// from its table, or every column the server does not generate.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 pub(crate) async fn copy_in_columns<C, F>(
     client: &C,
     statement: &CopyFromStatement<F>,
@@ -120,7 +125,7 @@ where
 /// with no column list has them, or its statement's result columns. A
 /// `SELECT` source the server would refuse is refused first, as `copy_out`
 /// refuses it.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 pub(crate) async fn copy_out_columns<C, F>(
     client: &C,
     statement: &CopyToStatement<F>,
@@ -159,7 +164,9 @@ fn rendered(query: &SubQueryStatement) -> String {
 /// The result columns of `sql`, prepared and never run, so a write is
 /// described without writing. A whole table's `SELECT *` lists its generated
 /// columns, which COPY leaves out in both directions, so those are read from
-/// the catalog and dropped.
+/// the catalog and dropped, and each multirange type a schema created is
+/// completed with its subtype.
+// [spec:pgorm:req:conn.copy.rows+3]
 async fn described<C>(client: &C, sql: &str, whole_table: bool) -> Result<Vec<CopyColumn>, Error>
 where
     C: GenericClient,
@@ -184,10 +191,13 @@ where
                 .is_none_or(|attribute| !generated.contains(&attribute))
         });
     }
-    Ok(columns
-        .into_iter()
-        .map(|column| CopyColumn::new(column.name(), column.type_().clone()))
-        .collect())
+    let mut described = Vec::with_capacity(columns.len());
+    for column in columns {
+        let type_ = completed_multiranges(client, column.type_()).await?;
+        let type_ = type_.unwrap_or_else(|| column.type_().clone());
+        described.push(CopyColumn::new(column.name(), type_));
+    }
+    Ok(described)
 }
 
 /// The binary format's signature, the first eleven bytes of its header.
@@ -209,7 +219,7 @@ const CRITICAL_FLAGS: u32 = 0xFFFF_0000;
 /// so a value that type cannot take is refused before anything is sent.
 /// [`CopyRowSink`] is this over a [`CopyInSink`]; the bindings use it
 /// directly, with their own values.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 #[derive(Debug, Clone)]
 pub struct CopyRowEncoder {
     columns: Vec<CopyColumn>,
@@ -315,7 +325,7 @@ enum Framing {
 ///
 /// [`CopyRowStream`] is this over a [`CopyOutStream`]; the bindings use it
 /// directly, decoding each field into their own values.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 #[derive(Debug)]
 pub struct CopyRowDecoder {
     columns: Vec<CopyColumn>,
@@ -504,7 +514,7 @@ impl<'a> FromSql<'a> for Element<'a> {
 }
 
 /// A field of `ty`, an array of a supported type included.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
     let ty = wire_type(ty);
     let Kind::Array(member) = ty.kind() else {
@@ -544,13 +554,16 @@ fn range_type(ty: &Type) -> Option<RangeType> {
     })
 }
 
-/// The value kind a non-array type reads as: a range type a schema created
-/// reads as the `String` of its text form, the `Value` its newtype is.
-// [spec:pgorm:req:conn.copy.rows+2]
+/// The value kind a non-array type reads as: a range or multirange type a
+/// schema created reads as the `String` of its text form, the `Value` its
+/// newtype is.
+// [spec:pgorm:req:conn.copy.rows+3]
 fn kind(ty: &Type) -> Result<ArrayType, WireError> {
     match ty.kind() {
         Kind::Enum(_) => return Ok(ArrayType::String),
-        Kind::Range(_) if is_created_range(ty) => {
+        Kind::Range(_) | Kind::Multirange(_)
+            if is_created_range(ty) || is_created_multirange(ty) =>
+        {
             CreatedRangeCodec::of(ty)?;
             return Ok(ArrayType::String);
         }
@@ -643,7 +656,7 @@ fn scalar(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, WireError> {
         ArrayType::String if matches!(ty.kind(), Kind::Enum(_)) => {
             Value::String(Some(Box::new(String::from_sql(&Type::TEXT, raw)?)))
         }
-        ArrayType::String if matches!(ty.kind(), Kind::Range(_)) => {
+        ArrayType::String if matches!(ty.kind(), Kind::Range(_) | Kind::Multirange(_)) => {
             Value::String(Some(Box::new(created_range_text(ty, raw)?)))
         }
         ArrayType::String => Value::String(Some(Box::new(String::from_sql(ty, raw)?))),
@@ -741,7 +754,7 @@ const GATHER: usize = 64 * 1024;
 /// row refused is not written: the sink goes on taking rows. Rows are
 /// gathered and sent in chunks. Dropping the sink unfinished aborts the COPY
 /// as dropping a [`CopyInSink`] does: nothing is written.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 #[derive(Debug)]
 pub struct CopyRowSink<'a> {
     sink: CopyInSink<'a>,
@@ -842,7 +855,7 @@ fn entity_column<E: EntityTrait>(name: &str) -> Option<E::Column> {
 /// Rows are pulled as the stream is polled, as a [`CopyOutStream`]'s chunks
 /// are, and the stream ends after the last row; a failure, the server's or a
 /// field that does not decode, is an `Err` item, after which it ends.
-// [spec:pgorm:req:conn.copy.rows+2]
+// [spec:pgorm:req:conn.copy.rows+3]
 #[derive(Debug)]
 pub struct CopyRowStream<'a> {
     stream: CopyOutStream<'a>,
@@ -966,7 +979,7 @@ mod tests {
         Ok(rows)
     }
 
-    // [spec:pgorm:req:conn.copy.rows+2/test]    the framing reads rows split anywhere, a byte at a time included
+    // [spec:pgorm:req:conn.copy.rows+3/test]    the framing reads rows split anywhere, a byte at a time included
     #[test]
     fn copy_rows_split_anywhere() -> Result<(), Error> {
         let data = encoded(&rows())?;
@@ -977,7 +990,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:conn.copy.rows+2/test]    data that is not the format, or stops before its trailer, is refused
+    // [spec:pgorm:req:conn.copy.rows+3/test]    data that is not the format, or stops before its trailer, is refused
     #[test]
     fn copy_rows_malformed_data_refused() -> Result<(), Error> {
         let data = encoded(&rows())?;
@@ -1009,7 +1022,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:conn.copy.rows+2/test]    a refused row leaves the encoder's output as it was
+    // [spec:pgorm:req:conn.copy.rows+3/test]    a refused row leaves the encoder's output as it was
     #[test]
     fn copy_rows_refused_row_writes_nothing() {
         let encoder = CopyRowEncoder::new(columns());
@@ -1028,5 +1041,52 @@ mod tests {
             Err(Error::Type(_))
         ));
         assert_eq!(&out[..], b"kept");
+    }
+
+    fn multirange_column(name: &str, kind: Kind) -> CopyColumn {
+        CopyColumn::new(
+            name,
+            Type::new(name.to_owned(), 16_400, kind, "geo".to_owned()),
+        )
+    }
+
+    // [spec:pgorm:req:conn.copy.rows+3/test]    a multirange type a schema created, its kind completed, writes from its text and reads back as the text Display writes; the simple type the driver reports, and one over a subtype no RangeSubtype reads, have no value
+    #[test]
+    fn created_multirange_reads_as_its_text() -> Result<(), Error> {
+        let reach = multirange_column("floatmultirange", Kind::Multirange(Type::FLOAT8));
+        let encoder = CopyRowEncoder::new(vec![reach.clone()]);
+        let mut decoder = CopyRowDecoder::new(vec![reach.clone()]);
+        let mut data = BytesMut::new();
+        CopyRowEncoder::header(&mut data);
+        for text in ["{[1.5,2.5), [3,4]}", " {} ", "{[-Infinity,0]}"] {
+            encoder.encode(&[ValueHolder(text.into())], &mut data)?;
+        }
+        encoder.encode(&[ValueHolder(Value::String(None))], &mut data)?;
+        CopyRowEncoder::trailer(&mut data);
+        decoder.push(&data);
+        let mut read = Vec::new();
+        while let Some(row) = decoder.next_row()? {
+            read.extend(row);
+        }
+        decoder.finish()?;
+        assert_eq!(
+            read,
+            [
+                "{[1.5,2.5),[3,4]}".into(),
+                "{}".into(),
+                "{[-inf,0]}".into(),
+                Value::String(None)
+            ]
+        );
+
+        let empty = 0i32.to_be_bytes();
+        let simple = multirange_column("floatmultirange", Kind::Simple);
+        assert!(matches!(simple.decode(Some(&empty)), Err(Error::Type(_))));
+        let nets = multirange_column("netmultirange", Kind::Multirange(Type::INET));
+        assert!(matches!(
+            nets.decode(Some(&empty)),
+            Err(Error::Type(message)) if message.contains("over `inet` has no value")
+        ));
+        Ok(())
     }
 }

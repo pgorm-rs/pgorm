@@ -6,7 +6,7 @@ use pyo3::{basic::CompareOp, prelude::*};
 
 use super::{PyExpr, coerce};
 
-// [spec:pgorm:req:python.expressions+4]
+// [spec:pgorm:req:python.expressions+5]
 #[pymethods]
 impl PyExpr {
     fn eq(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

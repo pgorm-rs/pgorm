@@ -3,7 +3,7 @@
 //! by the same stage's binder in the same order.
 
 use pgorm::{
-    pgorm_query::Values,
+    pgorm_query::{TypeName, Values},
     pipeline::{self as pl, ExprOps, JoinSide, Pipeline, alias},
 };
 
@@ -248,6 +248,15 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
             ])),
         ),
         ("expressions", sql(expressions())),
+        (
+            "compares-as",
+            sql(base!().filter_with(|b| {
+                col!("category")
+                    .compares_as(TypeName::new(n("Mood")).schema(n("app")))
+                    .in_array([b.bind("glad"), "calm".into()])
+                    .and(alias("m").compares_as(n("mood")).lt(b.bind("glad")))
+            })),
+        ),
     ];
     cases.extend(joins());
     cases

@@ -35,7 +35,7 @@ fn parity(
 }
 
 // [spec:pgorm:req:python.delegation+1/test]
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn expression_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -129,7 +129,7 @@ fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     Python::initialize();
@@ -178,7 +178,7 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]    each comparison, concatenation,
+// [spec:pgorm:req:python.expressions+5/test]    each comparison, concatenation,
 // regular-expression, containment, range position and document search method is the BinOper or
 // Rust method of its meaning, its operand bound unless it is an expression, the path bound as text
 // cast to jsonpath, and BETWEEN's symmetric form the Rust builder's
@@ -256,7 +256,7 @@ fn operator_methods_are_their_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     Python::initialize();
@@ -315,7 +315,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:python.ownership/test]
 #[test]
 fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
@@ -353,7 +353,7 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms through LikePattern, its
 // ESCAPE carried, and a plain string refused as LIKE's is
 #[test]
@@ -382,7 +382,7 @@ fn similar_to_takes_like_patterns() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+4/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]    `call` reaches the set-returning
 // constructors at their arities, and no other
 #[test]

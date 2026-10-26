@@ -1,7 +1,7 @@
-// [spec:pgorm:req:python.transactions+1]
+// [spec:pgorm:req:python.transactions+2]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
-        ("transaction.begin", "DatabaseConnection::transaction_with"),
+        ("transaction", "DatabaseConnection::transaction_with"),
         (
             "transaction.savepoint",
             "TransactionTrait::transaction for DatabaseTransaction",
@@ -13,10 +13,6 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         (
             "transaction.rollback",
             "TransactionTrait::transaction, the closure returning Err",
-        ),
-        (
-            "transaction.close",
-            "TransactionTrait::transaction, the closure returning Err / DatabaseConnection::discard",
         ),
         (
             "transaction.execute",

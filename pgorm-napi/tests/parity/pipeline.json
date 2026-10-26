@@ -94,5 +94,9 @@
   "expressions": {
     "sql": "SELECT *, CASE WHEN amount > $1 THEN 'big' WHEN amount IS NULL THEN 'none' ELSE $2 END AS size, CAST(amount AS text) AS spelled, -(((amount - $3) * $4 * 1.0 / $5) % $6) AS arith, NOT category IN ($7, 'b') AS other, id IS NOT NULL OR id >= $8 AS present, COALESCE(amount, NULL) AS filled FROM items",
     "values": [["i64","10"],["text","small"],["i64","1"],["i64","2"],["i64","3"],["i64","4"],["text","a"],["i64","0"]]
+  },
+  "compares-as": {
+    "sql": "SELECT * FROM items WHERE CAST(category AS app.\"Mood\") IN ($1, 'calm') AND CAST(m AS mood) < $2",
+    "values": [["text","glad"],["text","glad"]]
   }
 }

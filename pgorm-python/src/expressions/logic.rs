@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use super::{PyExpr, require_expr};
 use crate::errors::ConstructionError;
 
-// [spec:pgorm:req:python.expressions+4]
+// [spec:pgorm:req:python.expressions+5]
 #[pymethods]
 impl PyExpr {
     fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

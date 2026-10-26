@@ -9,6 +9,10 @@ import pgorm as p
 from pgorm import schema as s
 
 
+class RolledBack(Exception):
+    """Raised to leave a block, so that its transaction rolls back."""
+
+
 class Transactions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=3)
@@ -27,28 +31,40 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
     def rows(self):
         return p.select(p.col("id")).from_(self.table).order_by(p.col("id").asc())
 
-    # [spec:pgorm:req:python.transactions+1/test]
-    async def test_explicit_commit_rollback_and_parent_reservation(self):
+    # [spec:pgorm:req:python.transactions+2/test]
+    async def test_block_commits_and_reserves_its_connection(self):
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            self.assertFalse(tx.closed)
-            await tx.execute(self.insert(1))
-            self.assertEqual([r["id"] for r in await tx.fetch_all(self.rows())], [1])
-            self.assertEqual(await self.pool.fetch_all(self.rows()), [])
-            with self.assertRaises(p.LifecycleError):
-                await connection.execute(self.insert(2))
-            await tx.commit()
+            async with connection.transaction() as tx:
+                self.assertFalse(tx.closed)
+                await tx.execute(self.insert(1))
+                self.assertEqual([r["id"] for r in await tx.fetch_all(self.rows())], [1])
+                self.assertEqual(await self.pool.fetch_all(self.rows()), [])
+                with self.assertRaises(p.LifecycleError):
+                    await connection.execute(self.insert(2))
             self.assertTrue(tx.closed)
             self.assertTrue(await connection.ping())
             with self.assertRaises(p.LifecycleError):
-                await tx.rollback()
-            await tx.close()
-            tx = await connection.begin()
-            await tx.execute(self.insert(2))
-            await tx.rollback()
+                await tx.execute(self.insert(2))
+            with self.assertRaises(RolledBack):
+                async with connection.transaction() as tx:
+                    await tx.execute(self.insert(2))
+                    raise RolledBack
             self.assertEqual([r["id"] for r in await connection.fetch_all(self.rows())], [1])
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
+    async def test_transactions_open_only_for_a_block(self):
+        async with self.pool.connection() as connection:
+            self.assertFalse(hasattr(connection, "begin"))
+            async with connection.transaction() as tx:
+                for name in ("begin", "commit", "rollback", "close", "aclose", "__aenter__", "__aexit__"):
+                    self.assertFalse(hasattr(tx, name), name)
+                with self.assertRaises(TypeError):
+                    async with tx:
+                        pass
+                await tx.execute(self.insert(1))
+        self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1])
+
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_contexts_commit_and_preserve_original_exception(self):
         async with self.pool.transaction() as tx:
             await tx.execute(self.insert(1))
@@ -62,20 +78,22 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(tx.closed)
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1])
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_savepoints_reserve_parents_and_recover_database_errors(self):
         async with self.pool.connection() as connection:
             async with connection.transaction() as tx:
                 await tx.execute(self.insert(1))
-                child = await tx.begin()
-                for action in (tx.commit, tx.rollback, tx.begin, lambda: tx.fetch_all(self.rows())):
-                    with self.assertRaises(p.LifecycleError):
-                        await action()
-                await child.execute(self.insert(2))
                 with self.assertRaises(p.DatabaseError) as caught:
-                    await child.execute(self.insert(1))
+                    async with tx.transaction() as child:
+                        with self.assertRaises(p.LifecycleError):
+                            await tx.fetch_all(self.rows())
+                        with self.assertRaises(p.LifecycleError):
+                            async with tx.transaction():
+                                pass
+                        await child.execute(self.insert(2))
+                        await child.execute(self.insert(1))
                 self.assertEqual(caught.exception.sqlstate, "23505")
-                await child.rollback()
+                self.assertTrue(child.closed)
                 self.assertFalse(tx.closed)
                 async with tx.transaction() as child:
                     await child.execute(self.insert(3))
@@ -85,7 +103,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await connection.ping())
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [1, 3, 4])
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_options_and_foreign_parent_rejection(self):
         async with self.pool.connection() as connection, self.pool.connection() as other:
             for mode, isolation in (("read_only", "repeatable_read"), ("read_write", "serializable"), ("deferrable", None)):
@@ -98,39 +116,66 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
                         p.Transaction(tx._native, other)
             for kwargs in ({"mode": "raw SQL"}, {"isolation": "serializable"}, {"mode": "deferrable", "isolation": "serializable"}, {"mode": "read_only", "isolation": "made up"}):
                 with self.assertRaises(p.ConstructionError):
-                    await connection.begin(**kwargs)
-            tx = await connection.begin(mode="read_only")
+                    async with connection.transaction(**kwargs):
+                        self.fail("a refused mode opened a transaction")
             with self.assertRaises(p.DatabaseError) as caught:
-                await tx.execute(self.insert(7))
+                async with connection.transaction(mode="read_only") as tx:
+                    await tx.execute(self.insert(7))
             self.assertEqual(caught.exception.sqlstate, "25006")
-            await tx.rollback()
+            self.assertTrue(await connection.ping())
 
-    # [spec:pgorm:req:python.transactions+1/test]
-    async def test_failed_rollback_raises_and_discards_connection(self):
+    # [spec:pgorm:req:python.transactions+2/test]
+    async def test_failed_rollback_raises_from_exit_and_discards(self):
+        marker = ValueError("the block failed")
         async with self.pool.connection() as connection:
             pid = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
-            tx = await connection.begin()
-            await tx.execute(self.insert(1))
-            await self.pool.execute(p.RawSQL("SELECT pg_terminate_backend($1, 5000)", [pid]))
-            with self.assertRaises((p.ConnectionError, p.DatabaseError)):
-                await tx.rollback()
+            with self.assertRaises((p.ConnectionError, p.DatabaseError)) as caught:
+                async with connection.transaction() as tx:
+                    await tx.execute(self.insert(1))
+                    await self.pool.execute(p.RawSQL("SELECT pg_terminate_backend($1, 5000)", [pid]))
+                    raise marker
+            self.assertIs(caught.exception.__context__, marker)
             self.assertTrue(tx.closed)
             self.assertTrue(connection.closed)
         self.assertEqual(await self.pool.fetch_all(self.rows()), [])
 
+    # [spec:pgorm:req:python.transactions+2/test]
+    async def test_failed_rollback_never_replaces_a_cancellation(self):
+        entered = asyncio.Event()
+        connection = await self.pool.acquire()
+        pid = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+        async def work():
+            async with connection.transaction() as tx:
+                await tx.execute(self.insert(1))
+                await self.pool.execute(p.RawSQL("SELECT pg_terminate_backend($1, 5000)", [pid]))
+                entered.set()
+                await asyncio.Event().wait()
+        task = asyncio.create_task(work())
+        await entered.wait()
+        task.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 2)
+        self.assertTrue(connection.closed)
+        await connection.close()
+        self.assertEqual(await self.pool.fetch_all(self.rows()), [])
+
     # [spec:pgorm:req:python.cancellation/test]
     async def test_cancelled_request_discards_scope_within_two_seconds(self):
+        marker = RolledBack("leave the discarded scope")
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            child = await tx.begin()
-            pending = asyncio.create_task(child.fetch_one(p.RawSQL("SELECT 1 AS n FROM pg_sleep(2)")))
-            await asyncio.sleep(0.05)
-            with self.assertRaises(p.LifecycleError):
-                await child.fetch_one(p.select(p.literal(1).as_("n")))
-            started = time.monotonic()
-            pending.cancel()
-            with self.assertRaises(asyncio.CancelledError):
-                await pending
+            with self.assertRaises(RolledBack) as caught:
+                async with connection.transaction() as tx:
+                    async with tx.transaction() as child:
+                        pending = asyncio.create_task(child.fetch_one(p.RawSQL("SELECT 1 AS n FROM pg_sleep(2)")))
+                        await asyncio.sleep(0.05)
+                        with self.assertRaises(p.LifecycleError):
+                            await child.fetch_one(p.select(p.literal(1).as_("n")))
+                        started = time.monotonic()
+                        pending.cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await pending
+                        raise marker
+            self.assertIs(caught.exception, marker)
             await asyncio.wait_for(connection.close(), 2)
             self.assertLess(time.monotonic() - started, 2)
             self.assertTrue(tx.closed)
@@ -156,20 +201,28 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:python.cancellation/test]
     async def test_pool_shutdown_releases_idle_transaction(self):
         connection = await self.pool.acquire()
-        tx = await connection.begin()
-        await tx.execute(self.insert(1))
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def work():
+            async with connection.transaction() as tx:
+                await tx.execute(self.insert(1))
+                entered.set()
+                await release.wait()
+            return tx
+        task = asyncio.create_task(work())
+        await entered.wait()
         await asyncio.wait_for(self.pool.close(), 2)
-        self.assertTrue(tx.closed)
         self.assertTrue(connection.closed)
+        release.set()
         with self.assertRaises(p.LifecycleError):
-            await tx.commit()
+            await asyncio.wait_for(task, 2)
 
     # [spec:pgorm:req:python.cancellation/test]
     async def test_abandoned_savepoint_rolls_back_and_releases_parent(self):
         async with self.pool.transaction() as tx:
-            child = await tx.begin()
+            block = tx.transaction()
+            child = await block.__aenter__()
             await child.execute(self.insert(1))
-            del child
+            del block, child
             gc.collect()
             async def released():
                 while True:
@@ -181,7 +234,7 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
             await tx.execute(self.insert(2))
         self.assertEqual([r["id"] for r in await self.pool.fetch_all(self.rows())], [2])
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_foreign_event_loop_fails_before_query(self):
         async with self.pool.transaction() as tx:
             async def use_transaction():

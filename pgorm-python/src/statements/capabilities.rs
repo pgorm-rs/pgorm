@@ -35,6 +35,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::FromItem::qualifier, ColumnRef::TableAsterisk",
         ),
         ("select", "pgorm_query::Query::select"),
+        ("array", "pgorm_query::Expr::array"),
         (
             "select.select",
             "pgorm_query::SelectStatement::clear_selects, expr, expr_as",

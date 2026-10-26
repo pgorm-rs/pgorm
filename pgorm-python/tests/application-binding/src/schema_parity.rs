@@ -1,9 +1,9 @@
-use crate::account;
+use crate::{account, temper};
 use pgorm::Schema;
 use pgorm_python::expressions::Compiled;
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:python.schema+1/test]
+// [spec:pgorm:req:python.schema+2/test]
 #[test]
 fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
     Python::initialize();
@@ -62,6 +62,30 @@ fn schema_generation_matches_real_entity_traits() -> PyResult<()> {
                 assert!(compiled.values.0.is_empty());
             }
         }
+        Ok(())
+    })
+}
+
+/// An entity whose table Rust refuses, Python refuses through the same path:
+/// `schema_from_entity` raises `ConstructionError` with Rust's message and
+/// returns no schema without the key.
+// [spec:pgorm:req:python.schema+2/test]    a foreign key PostgreSQL cannot build raises
+// ConstructionError carrying the Rust refusal
+#[test]
+fn schema_generation_refuses_what_rust_refuses() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let module = PyModule::new(py, "pgorm._native")?;
+        crate::_native(&module)?;
+        let entity = module.call_method1("entity", ("app.Temper",))?;
+        let refusal = module
+            .call_method1("schema_from_entity", (&entity,))
+            .expect_err("the temper table is refused");
+        let rust = Schema::new()
+            .create_table_from_entity(temper::Entity)
+            .expect_err("Rust refuses the temper table");
+        assert!(refusal.is_instance(py, &module.getattr("ConstructionError")?));
+        assert_eq!(refusal.value(py).to_string(), rust.to_string());
         Ok(())
     })
 }

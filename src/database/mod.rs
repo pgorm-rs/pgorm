@@ -33,7 +33,7 @@ pub use pgorm_pool::{ManagerConfig, PoolBuilder, RecyclingMethod, StatementCache
 /// migration commits: the one to give
 /// [`ManagerConfig::statement_cache_channel`] for a pool to clear its
 /// statement caches after another process's migration.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]
 pub use pgorm_pool::STATEMENT_CACHE_CHANNEL;
 
 /// The TLS connector types [`connect_with`]'s bounds are written in, plus the
@@ -77,7 +77,7 @@ const CHANNEL_BYTES: usize = 63;
 /// Refuse a [`ManagerConfig::statement_cache_channel`] no notification could
 /// reach: an empty name, which `LISTEN` refuses, or one longer than an
 /// identifier, which it truncates while `pg_notify` refuses it whole.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]    an unusable channel is refused at construction
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    an unusable channel is refused at construction
 fn check_statement_cache_channel(manager: &ManagerConfig) -> Result<(), Error> {
     match &manager.statement_cache_channel {
         Some(channel) if channel.is_empty() || channel.len() > CHANNEL_BYTES => {
@@ -132,7 +132,7 @@ fn check_statement_cache_channel(manager: &ManagerConfig) -> Result<(), Error> {
 /// pool — deadpool rejects a pool configured with timeouts but no runtime —
 /// or if `statement_cache_channel` is empty or longer than the 63 bytes of an
 /// identifier.
-// [spec:pgorm:req:conn.pool+3]    the general entry point
+// [spec:pgorm:req:conn.pool+4]    the general entry point
 #[doc(alias = "ConnectOptions")]
 pub fn connect_with<T>(
     config: Config,
@@ -173,7 +173,7 @@ where
 /// [`connect_with_builder`] for a fallible pool whose shape the caller chooses,
 /// or [`connect_with`] for one whose TLS and manager configuration it chooses
 /// too.
-// [spec:pgorm:req:conn.pool+3]
+// [spec:pgorm:req:conn.pool+4]
 #[doc(alias = "Database")]
 pub fn connect(config: Config) -> DatabasePool {
     connect_with(config, NoTls, simple_manager_config(None), identity)
@@ -187,7 +187,7 @@ pub fn connect(config: Config) -> DatabasePool {
 ///
 /// Returns [`Error::Custom`] if the builder produced by `build` cannot build a
 /// pool — deadpool rejects a pool configured with timeouts but no runtime.
-// [spec:pgorm:req:conn.pool+3]    builder customization
+// [spec:pgorm:req:conn.pool+4]    builder customization
 #[doc(alias = "ConnectOptions")]
 pub fn connect_with_builder(
     config: Config,

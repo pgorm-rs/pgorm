@@ -7,7 +7,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 
 ## Pool construction and access
 
-> [spec:pgorm:req:conn.pool+3]
+> [spec:pgorm:req:conn.pool+4]
 > `connect_with(config, tls, manager, build)` is the general pool constructor,
 > and the only one: every other entry point delegates to it. It takes the
 > `tokio_postgres::Config`, a TLS connector bounded exactly as
@@ -20,7 +20,8 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > It exists because `DatabasePool` wraps a crate-private `pgorm_pool::Pool` and
 > has no other constructor, which made two things unreachable rather than merely
-> inconvenient. `Pool` is TLS-erased (`Box<dyn Connect>`), so a TLS pool was
+> inconvenient. `Pool` is TLS-erased (its `Manager` holds the connector as an
+> `Arc<dyn Connect>`), so a TLS pool was
 > always buildable inside `pgorm-pool` and never assignable to a `DatabasePool`
 > — leaving every managed PostgreSQL that requires TLS unusable through pgorm.
 > And the `Manager` was fully built before any caller hook could run, so
@@ -370,7 +371,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > (`conn.pool.statement-cache.listen`), and `up` sends one as its batch
 > commits.
 
-> [spec:pgorm:req:conn.pool.statement-cache.listen]
+> [spec:pgorm:req:conn.pool.statement-cache.listen+1]
 > `ManagerConfig::statement_cache_channel: Option<String>` carries a clear
 > between processes. A pool given a channel keeps one connection of its own
 > `LISTEN`ing on it (`conn.listen`) and, whenever a notification arrives
@@ -408,10 +409,23 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > reached none, and a connection the pool opened before the first `LISTEN`
 > may have prepared statements before a notification it could not hear. Each
 > loss is logged through `tracing` as a warning, and each clear it makes at
-> debug level. Two servers keep it from settling: a hot standby refuses
-> `LISTEN`, and receives no notification anyway, so the listener retries
-> there at its longest wait; and a server whose `idle_session_timeout` ends
-> idle sessions ends this one, so each reconnection clears the pool once more.
+> debug level. A hot standby keeps it from settling: it refuses `LISTEN`,
+> and receives no notification anyway, so the listener retries there at its
+> longest wait.
+>
+> Its session MUST NOT idle out. Before its `LISTEN` it sends `SET
+> idle_session_timeout = 0`, which reaches that session alone and which any
+> role may send, the setting's context being `user`; a server, database or
+> role whose timeout ends idle sessions would otherwise end this one each
+> period, and each reconnection would clear the pool once more. A periodic
+> no-op would also keep it alive, at a round trip each period and a period
+> that must undercut a timeout it does not know. A `SET` the server refuses
+> is logged as a warning and the `LISTEN` goes ahead without it. The
+> `LISTEN` is sent alone and last, so it is the statement
+> `pg_stat_activity` shows for the session. What ends an idle connection
+> outside the server, a pooler's or a network middlebox's timeout, still
+> ends this one; TCP keepalives in the pool's `Config` reach the listener
+> as they reach the pool's own connections.
 >
 > `DatabasePool::close` MUST stop the listener, closing its connection,
 > through `Manager::stop_statement_cache_listener`, which also keeps a pool
@@ -911,7 +925,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > computing them as the rows go in; a COPY TO reads one only through a
 > `SELECT` source naming it, since `CopyToStatement` takes no column list.
 
-> [spec:pgorm:req:conn.copy.rows+2]
+> [spec:pgorm:req:conn.copy.rows+3]
 > Binary COPY carries rows of pgorm `Value`s, each field in its value's
 > binary form, the form a parameter is bound in and a result column decoded
 > from. The format sends no column types — a header, then each row as its
@@ -927,7 +941,17 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > write included, which is prepared and not run. A COPY TO's source is checked
 > first, as `copy_out` checks it. The server describes a domain column by the
 > type the domain is over, whose form its values travel in, and checks the
-> domain's constraint as it reads them. A table or column the server refuses
+> domain's constraint as it reads them. The driver describes a multirange
+> type a schema created as a simple type, with no subtype to read or write
+> its binary form by (`sql.value.created-range`), so each description
+> completes it from the catalogue: `pg_range` names the subtype of the range
+> the multirange was created beside (`rngmultitypid`), the driver resolves
+> that subtype, a domain included, by preparing a statement whose parameter
+> is declared with it, and the column's `Type` is the multirange's name, OID
+> and schema over a `Kind::Multirange` of that subtype. An array's member
+> and a domain's base are completed the same way; any other type is the
+> driver's, and a simple type `pg_range` holds no multirange for costs the
+> description one catalogue read. A table or column the server refuses
 > is refused by the description, before any COPY starts, and leaves the
 > connection as it was. A generated column in a COPY FROM's list is not: a
 > `SELECT` reads one, so the description names it like any other column, and
@@ -944,10 +968,11 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > does not take — the check `ValueHolder` makes of a parameter
 > (`exec.cursor.binding-accepts`) — MUST be refused with `Error::Type` naming
 > the COPY's columns or the column, with nothing of the row written, and the
-> sink goes on taking rows. That check takes a range type a schema created
-> from the `String` of its text form (`exec.cursor.binding-range`), so the
-> rows a COPY TO reads from such a column write back into it. `send_model`
-> writes a model's value for each of the COPY's columns by name, refusing a
+> sink goes on taking rows. That check takes a range or multirange type a
+> schema created from the `String` of its text form
+> (`exec.cursor.binding-range`), so the rows a COPY TO reads from such a
+> column write back into it. `send_model` writes a model's value for each of
+> the COPY's columns by name, refusing a
 > column its entity lacks. `finish` writes the trailer and returns the row
 > count; a row the server refuses is reported there, and a sink dropped
 > unfinished aborts the COPY, as for bytes.
@@ -967,11 +992,15 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `timestamptz`, and `uuid` under `with-uuid`, a domain over one read as the
 > one — and written as that type's `Display` writes it, so a model's newtype
 > field reads through `models`, and an array of one reads as an `Array` of
-> those `String`s. A type no `Value` holds — a geometric type, a range type a
-> schema created over any other subtype, and a multirange a schema created,
-> which the driver reports as a simple type — and a field that does not decode
-> are an `Error::Type` naming the column. Data that is not the format — no
-> signature, a header flag the format does not define, a row whose field count
+> those `String`s. A multirange type a schema created, its kind completed by
+> the description, reads the same way, as the `String` of its text form
+> (`{[1,3),[5,8)}`), each range read through that `FromSql` and the
+> multirange written as `Multirange<T>`'s `Display` writes it, and an array
+> of one as an `Array` of those. A type no `Value` holds — a geometric type,
+> and a range or multirange type a schema created over any other subtype —
+> and a field that does not decode are an `Error::Type` naming the column.
+> Data that is not the format — no signature, a header flag the format does
+> not define, a row whose field count
 > is not the COPY's, data ending before the trailer or going on after it — is
 > an `Error::Query`. Either ends the stream as its last item. `models::<E>()`
 > reads each row into a model of `E` through its `ActiveModel`, setting each

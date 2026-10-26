@@ -51,6 +51,10 @@
     "sql": "SELECT \"a\".\"id\", (SELECT MAX(\"at\") FROM \"event\") AS \"last\" FROM \"app\".\"account\" AS \"a\" LEFT JOIN LATERAL (SELECT \"id\", \"at\" FROM \"event\" WHERE \"event\".\"account\" = \"a\".\"id\") AS \"l\" ON TRUE WHERE EXISTS(SELECT $1 FROM \"flag\" WHERE \"account\" = \"a\".\"id\")",
     "values": [["i64","1"]]
   },
+  "array-subquery": {
+    "sql": "SELECT \"a\".\"id\", ARRAY(SELECT \"id\" FROM \"event\" WHERE \"account\" = \"a\".\"id\") AS \"events\" FROM \"app\".\"account\" AS \"a\" WHERE ARRAY(SELECT \"id\" FROM \"event\" WHERE \"account\" = \"a\".\"id\") @> $1",
+    "values": [["array","[4]"]]
+  },
   "from-subquery": {
     "sql": "SELECT \"sub\".\"id\", \"sub\".* FROM (SELECT \"id\", \"kind\" FROM \"t\" WHERE \"kind\" <> $1) AS \"sub\" CROSS JOIN \"u\"",
     "values": [["text","x"]]

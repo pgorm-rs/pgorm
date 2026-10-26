@@ -6,7 +6,7 @@
 // value — its kind, its range, its precision — is the addon's; these classes
 // hold what it accepted.
 // [spec:pgorm:req:napi.values]
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 // [spec:pgorm:req:napi.temporal]
 
 import { ConstructionError, InternalError } from "./errors.js";

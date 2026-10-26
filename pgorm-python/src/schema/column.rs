@@ -15,7 +15,7 @@ pub struct PyColumnDef {
 
 #[pymethods]
 impl PyColumnDef {
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     #[new]
     fn new(name: &Bound<'_, PyAny>, kind: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
@@ -34,7 +34,7 @@ impl PyColumnDef {
     /// `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`: the column's one not-null
     /// constraint, named and kept from inheriting tables as the native
     /// `not_null_named` and `not_null_no_inherit` set it.
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     #[pyo3(signature=(*, name=None, no_inherit=false))]
     fn not_null(&self, name: Option<&Bound<'_, PyAny>>, no_inherit: bool) -> PyResult<Self> {
         let mut inner = self.inner.clone();
@@ -62,7 +62,7 @@ impl PyColumnDef {
         inner.default(expressions::coerce(value)?.inner);
         Ok(Self { inner })
     }
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     #[pyo3(signature=(condition, *, name=None, not_enforced=false, no_inherit=false))]
     fn check(
         &self,
@@ -115,7 +115,7 @@ impl PyColumnDef {
 /// A `CHECK` over `condition`, named, `NOT ENFORCED` and `NO INHERIT` as
 /// asked: what `ColumnDef.check`, `CreateTable.check` and `add_check` each
 /// build.
-// [spec:pgorm:req:python.schema+1]
+// [spec:pgorm:req:python.schema+2]
 pub(super) fn check(
     condition: &Bound<'_, PyAny>,
     name: Option<&Bound<'_, PyAny>>,

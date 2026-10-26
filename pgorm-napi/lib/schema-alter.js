@@ -7,7 +7,7 @@
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
-import { SchemaStatement } from "./schema.js";
+import { Ddl } from "./schema.js";
 
 /**
  * @typedef {import("./schema.js").TableRef} TableRef
@@ -139,7 +139,7 @@ export class PendingAlterTable extends actions(Handle) {
 }
 
 /** An `ALTER TABLE` with at least one action; every method returns a new one. */
-export class AlterTable extends actions(SchemaStatement) {
+export class AlterTable extends actions(Ddl) {
   static {
     alterOf = (handle) => new AlterTable(handle, TRUSTED);
   }

@@ -2,8 +2,10 @@
 
 use std::sync::Arc;
 
-use pgorm::pgorm_query::Name;
+use pgorm::pgorm_query::{Name, TypeName};
 use pgorm::pipeline::{self as pl, ExprOps};
+
+use crate::entities::backend::PipelineColumn;
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Binary {
@@ -79,6 +81,8 @@ pub(super) enum Recipe {
     Float(f64),
     Text(String),
     Column(String, String),
+    /// A registered entity's column, under the qualifier its relation is read by.
+    Registered(String, Arc<dyn PipelineColumn>),
     Alias(String),
     This(String),
     That(String),
@@ -87,6 +91,7 @@ pub(super) enum Recipe {
     Unary(Unary, Arc<Self>),
     Named(Arc<Self>, String),
     Cast(Arc<Self>, pl::CastType),
+    ComparesAs(Arc<Self>, TypeName),
     In(Arc<Self>, Vec<Arc<Self>>),
     CountRows,
     RowNumber,
@@ -95,7 +100,7 @@ pub(super) enum Recipe {
 }
 
 impl Recipe {
-    // [spec:pgorm:req:python.pipeline]
+    // [spec:pgorm:req:python.pipeline+1]
     pub(super) fn lower<'brand>(&self, bound: &[pl::Expr<'brand>]) -> pl::Expr<'brand> {
         match self {
             Self::Null => pl::null(),
@@ -104,6 +109,7 @@ impl Recipe {
             Self::Float(value) => (*value).into(),
             Self::Text(value) => value.as_str().into(),
             Self::Column(table, column) => pl::col(Name::runtime(table), Name::runtime(column)),
+            Self::Registered(table, column) => column.lower(table),
             Self::Alias(name) => Name::runtime(name).into(),
             Self::This(name) => pl::this(Name::runtime(name)),
             Self::That(name) => pl::that(Name::runtime(name)),
@@ -125,6 +131,7 @@ impl Recipe {
             }
             Self::Named(value, name) => value.lower(bound).as_runtime(Name::runtime(name)),
             Self::Cast(value, kind) => value.lower(bound).cast(*kind),
+            Self::ComparesAs(value, enum_type) => value.lower(bound).compares_as(enum_type.clone()),
             Self::In(value, members) => value
                 .lower(bound)
                 .in_array(members.iter().map(|m| m.lower(bound))),

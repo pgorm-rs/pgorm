@@ -1281,7 +1281,7 @@ const MANAGER: AliasName = alias("manager");
 const NAME: AliasName = alias("name");
 const MANAGER_ID: AliasName = alias("manager_id");
 
-// [spec:pgorm:sem:pipeline.self-join/test]    the classic employee-manager
+// [spec:pgorm:sem:pipeline.self-join+1/test]    the classic employee-manager
 // query: one table, two names, both sides selected
 #[test]
 fn a_named_operand_joins_a_table_to_itself() {
@@ -1303,7 +1303,7 @@ fn a_named_operand_joins_a_table_to_itself() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    the name reaches every stage
+// [spec:pgorm:sem:pipeline.self-join+1/test]    the name reaches every stage
 // after the join, not only the condition
 #[test]
 fn a_source_name_qualifies_later_stages() {
@@ -1325,7 +1325,7 @@ fn a_source_name_qualifies_later_stages() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    naming a source replaces the
+// [spec:pgorm:sem:pipeline.self-join+1/test]    naming a source replaces the
 // name it had, as SQL's AS does
 #[test]
 fn a_named_source_drops_its_own_name() {
@@ -1336,7 +1336,7 @@ fn a_named_source_drops_its_own_name() {
     assert!(matches!(err, PipelineError::Compile(ref text) if text.contains("Unknown name")));
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    an entity is named the same
+// [spec:pgorm:sem:pipeline.self-join+1/test]    an entity is named the same
 // way, and its columns then travel through col
 #[test]
 fn an_entity_operand_takes_a_name() {
@@ -1359,7 +1359,7 @@ fn an_entity_operand_takes_a_name() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    a named pipeline is a self-join
+// [spec:pgorm:sem:pipeline.self-join+1/test]    a named pipeline is a self-join
 // over a derived relation, params and all
 #[test]
 fn a_named_pipeline_joins_as_an_aliased_cte() {
@@ -1384,7 +1384,7 @@ fn a_named_pipeline_joins_as_an_aliased_cte() {
     assert_eq!(values.0.len(), 1);
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    renaming inside an embedded
+// [spec:pgorm:sem:pipeline.self-join+1/test]    renaming inside an embedded
 // pipeline reaches both sides without naming the operand
 #[test]
 fn renaming_before_embedding_reaches_both_sides() {
@@ -1411,7 +1411,7 @@ fn renaming_before_embedding_reaches_both_sides() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    a chain of names: three
+// [spec:pgorm:sem:pipeline.self-join+1/test]    a chain of names: three
 // generations of the same table in one query
 #[test]
 fn named_operands_chain_across_generations() {
@@ -1442,7 +1442,7 @@ fn named_operands_chain_across_generations() {
     );
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    a name is screened like any
+// [spec:pgorm:sem:pipeline.self-join+1/test]    a name is screened like any
 // other introduced name
 #[test]
 fn a_reserved_source_name_is_refused() {
@@ -3203,7 +3203,7 @@ mod cheerful {
     entity!(temper, "temper", rank Rank, label Label);
 }
 
-// [spec:pgorm:sem:entity.traits.column.enum-cast+11/test]    a pipeline
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    a pipeline
 // comparison casts each side that is an entity column whose domain is over an
 // enum to the enum — against a literal, a bound value, a list or another such
 // column — and so do coalesce, min and max, while sorting, grouping, count and
@@ -3263,5 +3263,73 @@ fn domain_enum_columns_compare_as_the_enum() {
         ),
         "SELECT mood, MAX(CAST(mood AS mood)) AS highest, MIN(CAST(mood AS mood)) AS lowest, \
          COUNT(mood) AS n FROM line GROUP BY mood"
+    );
+}
+
+// [spec:pgorm:sem:entity.traits.column.enum-cast+12/test]    a named relation's
+// column compares as its entity's column through Named::col, and a col
+// reference or an alias token as the enum compares_as names, schema-qualified
+// and quoted by the type-name policy, while projecting and grouping keep each
+// bare and a col reference left unnamed compares as it is
+#[test]
+fn untyped_columns_compare_as_the_named_enum() {
+    use cheerful::line;
+    use pgorm_query::TypeName;
+
+    let peer = line::Entity.named(alias("peer"));
+    assert_eq!(
+        sql_of(
+            Pipeline::from(line::Entity)
+                .join(
+                    JoinSide::Inner,
+                    peer.clone(),
+                    line::Column::Mood.eq(peer.col(line::Column::Mood)),
+                )
+                .select((line::Column::Id, peer.col(line::Column::Mood)))
+        ),
+        "SELECT line.id, peer.mood FROM line \
+         INNER JOIN line AS peer ON CAST(line.mood AS mood) = CAST(peer.mood AS mood)"
+    );
+
+    let qualified = || TypeName::new(alias("Mood")).schema(alias("app"));
+    let (bound, values) = Pipeline::from(alias("line"))
+        .filter_with(|binder| {
+            col(alias("line"), alias("mood"))
+                .compares_as(qualified())
+                .in_array([binder.bind("glad"), "calm".into()])
+        })
+        .into_sql()
+        .expect("pipeline compiles");
+    assert_eq!(
+        bound,
+        r#"SELECT * FROM line WHERE CAST(mood AS app."Mood") IN ($1, 'calm')"#
+    );
+    assert_eq!(values.0, [Value::from("glad")]);
+
+    let m = alias("m");
+    assert_eq!(
+        sql_of(
+            Pipeline::from(alias("line"))
+                .derive(col(alias("line"), alias("mood")).as_(m))
+                .filter(m.compares_as(alias("mood")).gte("calm"))
+                .select(m)
+        ),
+        "WITH table_0 AS (SELECT mood AS m FROM line) \
+         SELECT m FROM table_0 WHERE CAST(m AS mood) >= 'calm'"
+    );
+    assert_eq!(
+        sql_of(
+            Pipeline::from(alias("line"))
+                .group(col(alias("line"), alias("note")))
+                .aggregate(
+                    max(col(alias("line"), alias("mood")).compares_as(alias("mood")))
+                        .as_("highest")
+                )
+        ),
+        "SELECT note, MAX(CAST(mood AS mood)) AS highest FROM line GROUP BY note"
+    );
+    assert_eq!(
+        sql_of(Pipeline::from(alias("line")).filter(col(alias("line"), alias("mood")).eq("glad"))),
+        "SELECT * FROM line WHERE mood = 'glad'"
     );
 }

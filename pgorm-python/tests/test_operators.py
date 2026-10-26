@@ -21,7 +21,7 @@ def int4multirange(*ranges):
     return p.Value(p.Multirange([p.Range(lower, upper) for lower, upper in ranges]), "int4multirange")
 
 
-# [spec:pgorm:req:python.expressions+4/test]    every operator method selects what PostgreSQL's
+# [spec:pgorm:req:python.expressions+5/test]    every operator method selects what PostgreSQL's
 # own operator selects, on rows where it holds and rows where it does not
 class OperatorTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

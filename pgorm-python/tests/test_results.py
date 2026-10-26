@@ -113,7 +113,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(row.tagged("sql_null").is_null)
         self.assertFalse(row.tagged("json_null").is_null)
 
-    # [spec:pgorm:req:python.values+4/test]
+    # [spec:pgorm:req:python.values+5/test]
     async def test_intervals_round_trip_through_statements(self):
         cases = [
             p.Interval(1, -2, 3_000_004), p.Interval(-1, 2, -3_000_004), p.Interval(),

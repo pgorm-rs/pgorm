@@ -6,10 +6,9 @@ mod common;
 
 use common::*;
 use pgorm::{ColumnTrait, ColumnTypeTrait, Iterable, StaticName};
-use pgorm_codegen::sql_schema::{entities_from_sql, parse_schema};
-use pgorm_codegen::{Error, WriterOutput};
+use pgorm_codegen::{Error, WriterOutput, entities_from_sql, parse_schema};
 use pgorm_query::{
-    ColumnType, Domain, Expr, Name, StringLen, TableCreateStatement,
+    ColumnType, Domain, Expr, ForeignKey, Name, StringLen, TableCreateStatement,
     extension::{RangeDefinition, Type},
 };
 use std::sync::Arc;
@@ -356,7 +355,7 @@ fn built() -> (Vec<String>, TableCreateStatement) {
     (statements, keyed_with("stock_line", &["id"], columns))
 }
 
-// [spec:pgorm:def:codegen.ddl+3/test]    domains and a table of domain columns built with
+// [spec:pgorm:def:codegen.ddl+4/test]    domains and a table of domain columns built with
 // pgorm-query and rendered generate, read back, the entity the statement itself generates
 #[test]
 fn rendered_domain_columns_read_back_whole() {
@@ -375,6 +374,107 @@ fn rendered_domain_columns_read_back_whole() {
         assert_eq!(
             files(entities_from_sql(&text, opts()).expect("the rendering generates")).files,
             generate(vec![table.clone()], opts()).files,
+        );
+    }
+}
+
+/// A table `p` keyed by `k` and a table `c` whose `r` references it, with
+/// `k` and `r` of the types given, over the enum `mood` and the types
+/// `declared` creates.
+fn referencing(declared: &str, key: &str, reference: &str) -> String {
+    format!(
+        "CREATE TYPE mood AS ENUM ('sad', 'glad'); {declared} \
+         CREATE TABLE p (k {key} PRIMARY KEY); \
+         CREATE TABLE c (id integer PRIMARY KEY, r {reference} REFERENCES p (k));"
+    )
+}
+
+const UNKEYABLE: &str = "and PostgreSQL implements no foreign key with a column typed as a \
+                         domain over an enum on either side (42804)";
+
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a foreign key matching a column typed
+// as a domain over an enum, through further domains too, is refused on either side whatever
+// the other side is, in a composite key and a self-reference as alone
+#[test]
+fn keys_over_an_enum_domain_are_refused() {
+    let one = "CREATE DOMAIN cheerful AS mood;";
+    let two = "CREATE DOMAIN cheerful AS mood; CREATE DOMAIN content AS mood;";
+    let nested = "CREATE DOMAIN cheerful AS mood; CREATE DOMAIN beaming AS cheerful;";
+    for (declared, key, reference) in [
+        (one, "cheerful", "cheerful"),
+        (two, "cheerful", "content"),
+        (one, "mood", "cheerful"),
+        (one, "cheerful", "mood"),
+        (nested, "cheerful", "beaming"),
+    ] {
+        assert_eq!(
+            error(&referencing(declared, key, reference)),
+            format!("table `c`: relation to `p` matches column `r` with `k`, {UNKEYABLE}"),
+            "`{reference}` referencing `{key}`"
+        );
+    }
+    assert_eq!(
+        error(
+            "CREATE TYPE mood AS ENUM ('sad'); CREATE DOMAIN cheerful AS mood; \
+             CREATE TABLE p (n integer, k cheerful, PRIMARY KEY (n, k)); \
+             CREATE TABLE c (id integer PRIMARY KEY, n integer, r cheerful, \
+             FOREIGN KEY (n, r) REFERENCES p (n, k));"
+        ),
+        format!("table `c`: relation to `p` matches column `r` with `k`, {UNKEYABLE}")
+    );
+    assert_eq!(
+        error(
+            "CREATE TYPE mood AS ENUM ('sad'); CREATE DOMAIN cheerful AS mood; \
+             CREATE TABLE t (k cheerful PRIMARY KEY, up cheerful REFERENCES t (k));"
+        ),
+        format!("table `t`: relation to `t` matches column `up` with `k`, {UNKEYABLE}")
+    );
+}
+
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    a statement built in code is held to
+// the same refusal, and every pairing PostgreSQL keys still generates its relation: an enum
+// with itself, a domain over an integer with the integer or itself, a domain over an array of
+// an enum with itself
+#[test]
+fn keyable_domain_pairs_generate_their_relation() {
+    let cheerful = || domain("cheerful", None, mood());
+    assert_transform_error(
+        vec![
+            keyed_with("p", &["k"], vec![typed("k", cheerful())]),
+            keyed_with(
+                "c",
+                &["id"],
+                vec![typed("id", ColumnType::Integer), typed("r", mood())],
+            )
+            .foreign_key(ForeignKey::create(
+                Name::runtime("c"),
+                Name::runtime("r"),
+                Name::runtime("p"),
+                Name::runtime("k"),
+            ))
+            .to_owned(),
+        ],
+        &format!("table `c`: relation to `p` matches column `r` with `k`, {UNKEYABLE}"),
+    );
+
+    let tally = "CREATE DOMAIN tally AS integer;";
+    let moods = "CREATE DOMAIN moods AS mood[];";
+    for (declared, key, reference) in [
+        ("", "mood", "mood"),
+        (tally, "tally", "integer"),
+        (tally, "integer", "tally"),
+        (tally, "tally", "tally"),
+        (moods, "moods", "moods"),
+    ] {
+        let generated = files(
+            entities_from_sql(&referencing(declared, key, reference), Opts::default())
+                .unwrap_or_else(|error| panic!("`{reference}` referencing `{key}`: {error}")),
+        );
+        assert_contains(
+            &flat(generated.file("c.rs")),
+            &flat(
+                r#"#[pgorm(belongs_to = "super::p::Entity", from = "Column::R", to = "super::p::Column::K")]"#,
+            ),
         );
     }
 }

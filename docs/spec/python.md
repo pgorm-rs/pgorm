@@ -73,7 +73,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > explicitly before execution. Runtime-generated compositions within those
 > capabilities MUST NOT invoke rustc, Cargo, Maturin or a code-generation build.
 
-> [spec:pgorm:req:python.values+4]
+> [spec:pgorm:req:python.values+5]
 > Conversions MUST preserve supported Rust value variants and nullability in
 > both directions. The conversion table MUST cover booleans, signed and
 > unsigned integer bounds, floating-point values including signed zero and
@@ -84,10 +84,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > schema-qualifiable, and its subtype, which converts each bound. A created
 > range converts both ways, a result column of one decoding through its
 > subtype's codec to its own kind. A created multirange converts as a value,
-> but the driver reports its column's type with no subtype, so reading a
-> result column of one MUST raise a decode error, leaving it to be read cast
-> to text; an array of a created range or multirange MUST be refused both
-> ways.
+> but the driver reports a query's result column of one with no subtype, so
+> reading that column MUST raise a decode error, leaving it to be read cast
+> to text. A binary COPY's column of one is described with its subtype,
+> which pgorm completes from the catalogue (`conn.copy.rows`), so
+> `copy_out_rows` MUST decode it through the subtype's codec to a
+> `Multirange`, as a created range's column decodes, and `copy_in_rows` MUST
+> write one back from a `Value` of its kind or from its text form. An array
+> of a created range or multirange MUST be refused both ways, in a COPY as
+> anywhere else.
 > An interval is `pgorm.Interval(months, days, microseconds)`, immutable and
 > hashable, each field an exact `int` within its width and with its own
 > sign, inferred as the `interval` kind, decoded from an `interval` column
@@ -115,11 +120,14 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > typed Rust boundaries. Literal-value and binder-value paths MUST remain
 > separately expressible; bindings MUST NOT replace one with the other.
 
-> [spec:pgorm:req:python.expressions+4]
+> [spec:pgorm:req:python.expressions+5]
 > Expressions MUST compose comparison, arithmetic, boolean nesting, NULL
 > tests, membership including empty sets, literal substring helpers, explicit
 > LIKE and SIMILAR TO patterns, function calls and qualified casts through
-> Rust builders.
+> Rust builders. `array(select)` MUST be Rust's `Expr::array` over the
+> subquery as it embeds (`ARRAY(select)`, one array value, empty for no
+> rows, which casts and compares as a value), checked as any embedded
+> subquery is.
 > Every binary operator JavaScript's expressions spell (`napi.expressions`,
 > `napi.ranges`) MUST have its Python method, the Rust builder of that
 > meaning, the other operand bound unless it is an expression:
@@ -142,6 +150,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > the type checker alone, so the runtime class has no base but `object` and
 > defines every method itself, and the signature test checks each mixin's
 > methods against it.
+>
 > SQL/JSON's query functions, constructors, `FORMAT JSON` and `IS JSON` MUST
 > lower into the corresponding `pgorm_query` builders, each clause applied
 > through the builder's own method. Their behaviours MUST be typed per
@@ -315,13 +324,18 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > distinct. Unsupported entity combinations and arities MUST be reported in the
 > capability manifest and rejected, never lowered silently to a different API.
 
-> [spec:pgorm:req:python.pipeline]
+> [spec:pgorm:req:python.pipeline+1]
 > The pipeline API MUST compose runtime sources, joins, filters, projections,
 > derive, grouping/aggregation, windows, ordering, take and supported set
 > operations through pgorm::pipeline. Literal and binder paths MUST remain
 > selectable. Bound expressions MUST be lowered within valid Rust binder
 > scopes; Python ownership MUST NOT erase their scope discipline. Registered
 > select_sources terminals MUST preserve Rust model/optional-row decoding.
+> `pl.col(table, entity.col(name))` MUST lower through the registration's
+> own `Named::col`, so a registered column whose domain is over an enum
+> compares as the enum, and `compares_as(TypeName)` MUST lower through
+> `ExprOps::compares_as` for a column no registration types
+> (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`).
 
 > [spec:pgorm:req:python.raw]
 > Raw SQL MUST be an explicit application API with a declared SQL template and
@@ -332,11 +346,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 
 ## Execution and lifecycle
 
-> [spec:pgorm:req:python.schema+1]
+> [spec:pgorm:req:python.schema+2]
 > Explicit schema APIs MUST expose supported table, index and enum DDL through
 > the Rust DDL builders, retaining schema qualification, quoted identifiers
 > and type identity. Schema generation for a registered entity MUST invoke the
-> corresponding Rust entity schema path. Declaring a Python model or importing
+> corresponding Rust entity schema path. When that path refuses the entity's
+> table, as it refuses a foreign key PostgreSQL cannot build
+> (`schema.from-entity`), `schema.from_entity` MUST raise `ConstructionError`
+> carrying the Rust message, and MUST NOT return a schema that leaves the key
+> out. Declaring a Python model or importing
 > a module MUST NOT execute DDL automatically. Capabilities MUST distinguish
 > runtime DDL construction from registered-entity schema generation.
 > Every class `pgorm.schema` defines — its statements, its column and type
@@ -476,24 +494,33 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > channel pgorm-migration's runner notifies. Credentials MUST be redacted from
 > representations, exceptions and default diagnostic logs.
 
-> [spec:pgorm:req:python.transactions+1]
-> Transactions MUST support explicit begin/commit/rollback and asynchronous
-> context managers, including supported nested savepoints. A successful block
-> commits; an exceptional or cancelled block rolls back or discards the
-> connection if its state cannot be recovered. Closed, concurrently misused or
+> [spec:pgorm:req:python.transactions+2]
+> Transactions MUST open only through asynchronous context managers —
+> `pool.transaction()` and `connection.transaction()`, which take the native
+> mode and isolation, and `transaction.transaction()` for a nested savepoint,
+> which takes neither — as Rust's open only around a closure
+> (`conn.tx.closure`): no method begins, commits, rolls back or closes one,
+> and a `Transaction` is not itself a context manager. A block that exits
+> normally commits, or releases its savepoint; an exceptional or cancelled
+> block rolls back, or discards the connection if its state cannot be
+> recovered, and its exception propagates. Closed, concurrently misused or
 > foreign transaction handles MUST fail explicitly. Bindings MUST preserve
 > database error causes and MUST NOT retry writes or failed transactions
 > implicitly beyond the documented Rust behavior.
 >
 > Each transaction and savepoint MUST run inside pgorm's closure transaction
 > (`conn.tx.closure`), a task on the runtime serving its commands from inside
-> the closure: Python's commit returns `Ok` from it and a rollback `Err`, so
-> pgorm issues the `COMMIT` or `ROLLBACK`, and a connection given up mid-command
-> drops the closure's future rather than await a rollback on it. A failed
-> `COMMIT`, and a failed `ROLLBACK` — which pgorm reports as
-> `TransactionError::RollbackFailed` (`conn.tx.closure`) — each reach Python
-> with their database error and discard the connection, whose state is then
-> unknown; an abandoned frame whose `ROLLBACK` fails discards it too.
+> the closure: a block's normal exit returns `Ok` from it and an exceptional
+> one `Err`, so pgorm issues the `COMMIT` or `ROLLBACK`, and a connection given
+> up mid-command drops the closure's future rather than await a rollback on
+> it. A failed `COMMIT` MUST be raised from the block's exit with its database
+> error. A failed `ROLLBACK`, which pgorm reports as
+> `TransactionError::RollbackFailed` (`conn.tx.closure`), MUST be raised with
+> its database error in place of the block's exception, carrying that as its
+> `__context__`, unless the block's exception is a cancellation or an
+> interpreter exit, which propagates unreplaced. Either failure discards the
+> connection, whose state is then unknown; an abandoned frame whose `ROLLBACK`
+> fails discards it too.
 
 > [spec:pgorm:req:python.cancellation]
 > Cancellation, timeout, iterator abandonment and pool shutdown MUST release
@@ -570,8 +597,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > decode raises a decode error and closes the stream, discarding its
 > connection; its end and closing behave as a `CopyOutStream`'s do.
 
-> [spec:pgorm:req:python.listen]
-> [spec:pgorm:req:python.listen]
+> [spec:pgorm:req:python.listen+1]
 > `pool.listener(capacity=1024)` MUST open a listener through `conn.listen`'s
 > `DatabasePool::listener`, a connection of its own with the pool's
 > configuration and TLS, outside the pool's size, and closing the pool MUST

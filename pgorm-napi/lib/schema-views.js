@@ -8,7 +8,7 @@
 
 import { arg, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
-import { relations, SchemaStatement, statement } from "./schema.js";
+import { Ddl, relations, statement } from "./schema.js";
 
 /**
  * @typedef {import("./schema.js").TableRef} TableRef
@@ -31,7 +31,7 @@ let tableAsOf;
  * The options a plain view and a recursive one share; each method gives a new
  * statement of the receiver's kind.
  *
- * @template {new (...args: any[]) => SchemaStatement} B
+ * @template {new (...args: any[]) => Ddl} B
  * @param {B} Base
  * @param {() => (handle: unknown) => any} of
  */
@@ -57,7 +57,7 @@ function viewOptions(Base, of) {
 }
 
 /** `CREATE VIEW`; every method returns a new statement. */
-export class CreateView extends viewOptions(SchemaStatement, () => viewOf) {
+export class CreateView extends viewOptions(Ddl, () => viewOf) {
   static {
     viewOf = (handle) => new CreateView(handle, TRUSTED);
   }
@@ -69,7 +69,7 @@ export class CreateView extends viewOptions(SchemaStatement, () => viewOf) {
 }
 
 /** `CREATE RECURSIVE VIEW`, which takes no check option; every method returns a new statement. */
-export class CreateRecursiveView extends viewOptions(SchemaStatement, () => recursiveOf) {
+export class CreateRecursiveView extends viewOptions(Ddl, () => recursiveOf) {
   static {
     recursiveOf = (handle) => new CreateRecursiveView(handle, TRUSTED);
   }
@@ -78,7 +78,7 @@ export class CreateRecursiveView extends viewOptions(SchemaStatement, () => recu
 /**
  * The clauses a materialized view and `CREATE TABLE AS` share.
  *
- * @template {new (...args: any[]) => SchemaStatement} B
+ * @template {new (...args: any[]) => Ddl} B
  * @param {B} Base
  * @param {() => (handle: unknown) => any} of
  */
@@ -100,14 +100,14 @@ function relationOptions(Base, of) {
 }
 
 /** `CREATE MATERIALIZED VIEW`; every method returns a new statement. */
-export class CreateMaterializedView extends relationOptions(SchemaStatement, () => materializedOf) {
+export class CreateMaterializedView extends relationOptions(Ddl, () => materializedOf) {
   static {
     materializedOf = (handle) => new CreateMaterializedView(handle, TRUSTED);
   }
 }
 
 /** `CREATE TABLE AS`; every method returns a new statement. */
-export class CreateTableAs extends relationOptions(SchemaStatement, () => tableAsOf) {
+export class CreateTableAs extends relationOptions(Ddl, () => tableAsOf) {
   static {
     tableAsOf = (handle) => new CreateTableAs(handle, TRUSTED);
   }

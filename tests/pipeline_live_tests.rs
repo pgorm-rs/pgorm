@@ -771,7 +771,7 @@ async fn counting_a_nullable_column_skips_its_nulls() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    the classic employee-manager
+// [spec:pgorm:sem:pipeline.self-join+1/test]    the classic employee-manager
 // query on live rows: one table, two names, both sides decoded
 #[pgorm_macros::test]
 async fn self_join_decodes_employee_and_manager() {
@@ -808,7 +808,7 @@ async fn self_join_decodes_employee_and_manager() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    a left self-join over a nullable
+// [spec:pgorm:sem:pipeline.self-join+1/test]    a left self-join over a nullable
 // reference keeps the root row, its parent decoding as None
 #[pgorm_macros::test]
 async fn left_self_join_decodes_a_null_parent() {
@@ -868,7 +868,7 @@ async fn left_self_join_decodes_a_null_parent() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:sem:pipeline.self-join/test]    the same query through an
+// [spec:pgorm:sem:pipeline.self-join+1/test]    the same query through an
 // embedded pipeline: the far side is renamed before it crosses
 #[pgorm_macros::test]
 async fn embedded_self_join_renames_before_crossing() {

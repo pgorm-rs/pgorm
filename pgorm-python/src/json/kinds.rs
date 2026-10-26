@@ -13,7 +13,7 @@ use crate::{
     values::PyValue,
 };
 
-// [spec:pgorm:req:python.expressions+4]
+// [spec:pgorm:req:python.expressions+5]
 /// An operand marked as JSON text for an SQL/JSON position: `FORMAT JSON`.
 /// It is accepted only where SQL/JSON reads JSON, never as an expression.
 #[pyclass(name = "JsonInput", module = "pgorm", frozen, from_py_object)]

@@ -4,7 +4,7 @@ use crate::execution::Database;
 use std::{marker::PhantomData, sync::Arc};
 
 use futures_util::future::BoxFuture;
-use pgorm::pgorm_query::{Expr, SimpleExpr, Value, Values};
+use pgorm::pgorm_query::{Expr, Name, SimpleExpr, Value, Values};
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, Change as RustChange, ColumnTrait,
     EntityTrait, Error, Insert, IntoActiveModel, Iterable, ModelTrait, QueryFilter, QueryOrder,
@@ -36,7 +36,7 @@ where
         &self.info
     }
 
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error> {
         use crate::schema::{PyCreateIndex, PyCreateTable, PyDDL, PyEntitySchema, Statement};
         let schema = pgorm::Schema::new();
@@ -84,6 +84,11 @@ where
         Ok(Expr::col(column::<E>(name)?.as_column_ref()).into())
     }
 
+    // [spec:pgorm:req:python.pipeline+1]
+    fn pipeline_column(&self, name: &str) -> Result<Arc<dyn PipelineColumn>, Error> {
+        Ok(Arc::new(RegisteredColumn::<E>(column::<E>(name)?)))
+    }
+
     fn compare(
         &self,
         name: &str,
@@ -107,6 +112,23 @@ where
         write: VersionWrite,
     ) -> BoxFuture<'a, Result<Vec<Versions>, Error>> {
         Box::pin(self.write_versions(db, write))
+    }
+}
+
+/// One of `E`'s columns, resolved when the pipeline expression naming it was
+/// built, so lowering it cannot miss.
+struct RegisteredColumn<E: EntityTrait>(E::Column);
+
+impl<E: EntityTrait> std::fmt::Debug for RegisteredColumn<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RegisteredColumn").field(&self.0).finish()
+    }
+}
+
+// [spec:pgorm:req:python.pipeline+1]
+impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
+    fn lower<'brand>(&self, qualifier: &str) -> pgorm::pipeline::Expr<'brand> {
+        pgorm::pipeline::named_runtime(E::default(), Name::runtime(qualifier)).col(self.0)
     }
 }
 

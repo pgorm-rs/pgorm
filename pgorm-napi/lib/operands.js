@@ -2,7 +2,7 @@
 
 // Comparison, arithmetic and logic: the operators every expression has. An
 // operand that is not an expression is a value, bound as a parameter.
-// [spec:pgorm:req:napi.expressions+5]
+// [spec:pgorm:req:napi.expressions+6]
 
 import { arg, Builder, made } from "./builder.js";
 import { native } from "./operations.js";

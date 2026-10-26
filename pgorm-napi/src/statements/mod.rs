@@ -43,6 +43,7 @@ use pgorm::pgorm_query::{
 use crate::{codec::Codec, rows, values::Tagged};
 pub(crate) use args::node;
 use args::refuse;
+pub(crate) use args::select as embedded_select;
 pub(crate) use copy::{CopyFrom, CopyTo, copy_from_at, copy_to_at};
 
 /// A projection: an expression with the name its output column takes.

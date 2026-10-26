@@ -502,7 +502,7 @@ fn expanded_pk_auto_increment_reads_only_the_key() {
     assert!(auto_increment(&["id"], vec![generated_id]));
 }
 
-// [spec:pgorm:sem:codegen.entity.transform+14/test]    an identity is read off
+// [spec:pgorm:sem:codegen.entity.transform+15/test]    an identity is read off
 // the column definition as its form, and makes the column NOT NULL; one
 // carrying sequence options is refused, since an entity declares no options
 #[test]

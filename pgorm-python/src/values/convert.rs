@@ -74,7 +74,7 @@ fn strict<'a, 'py, T: pyo3::type_object::PyTypeInfo>(
     }
 }
 
-// [spec:pgorm:req:python.values+4]
+// [spec:pgorm:req:python.values+5]
 pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Value> {
     let value = match kind {
         ArrayType::Bool => Value::Bool(Some(strict::<PyBool>(data)?.extract()?)),

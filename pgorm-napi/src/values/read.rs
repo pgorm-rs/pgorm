@@ -90,7 +90,7 @@ fn boxed<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<Tagged
 
 /// A kind: a name such as `"i32"` or `"tstzrange"`, a `TypeName` for an enum,
 /// or a `CreatedRange` / `CreatedMultirange`.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 pub(crate) fn kind<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -160,7 +160,7 @@ fn type_name<'cx>(
 }
 
 /// A value of the declared `tag`. `null` is SQL NULL of the kind.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 pub(crate) fn tagged<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -201,7 +201,7 @@ pub(crate) fn tagged<'cx>(
 
 /// An array of `element`s: a JavaScript array whose items are each `null`, a
 /// `Value` of the element kind, or data of it.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 pub(crate) fn array<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -595,7 +595,7 @@ fn ranges<'cx>(
 /// A created range's text form: from a `Range` (or `Multirange`), each bound
 /// converted as the subtype's kind, or from the text form itself, read with
 /// the subtype's own parsing and written back canonically.
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 fn created_text<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,

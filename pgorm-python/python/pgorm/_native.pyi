@@ -124,6 +124,7 @@ from ._statements import (
     SampleMethod as SampleMethod, TableFunction as TableFunction,
     GroupingElement as GroupingElement,
 )
+from ._subqueries import array as array
 from ._windows import (
     FrameType as FrameType, FrameExclusion as FrameExclusion, Frame as Frame,
     FramePrecedingStart as FramePrecedingStart, FrameCurrentRowStart as FrameCurrentRowStart,

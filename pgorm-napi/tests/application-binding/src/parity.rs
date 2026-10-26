@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 
-use pgorm::pgorm_query::{Expr, Name, Values};
+use pgorm::pgorm_query::{Expr, Name, Query, Values};
 use pgorm::{
     ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, pgorm_query::Value,
 };
@@ -13,7 +13,7 @@ use serde_json::Value as Json;
 
 use pgorm::pipeline as pl;
 
-use crate::{account, graphs, membership, note};
+use crate::{account, graphs, membership, note, parcel};
 
 fn built<Q: QueryTrait>(query: &Q) -> (String, Values)
 where
@@ -86,6 +86,24 @@ fn cases() -> Vec<(&'static str, (String, Values))> {
                     .order_by_asc(account::Column::Id),
             ),
         ),
+        (
+            "find-member-subquery",
+            built(
+                &parcel::Entity::find().filter(
+                    parcel::Column::Mood.in_subquery(
+                        Query::select()
+                            .expr(Expr::col(parcel::Column::Mood.as_column_ref()))
+                            .from((Name::runtime("napi_entities"), Name::runtime("parcels")))
+                            .and_where(parcel::Column::Id.eq(2))
+                            .to_owned(),
+                    ),
+                ),
+            ),
+        ),
+        (
+            "find-member-values",
+            built(&parcel::Entity::find().filter(parcel::Column::Mood.is_not_in(["busy"]))),
+        ),
     ]
 }
 
@@ -108,6 +126,18 @@ fn pipelines() -> Vec<(&'static str, (String, Values))> {
         )
     };
     vec![
+        (
+            "pipeline-registered-column",
+            compiled(
+                pl::Pipeline::from(parcel::Entity)
+                    .filter_with(|binder| {
+                        pl::named_runtime(parcel::Entity, Name::runtime("parcels"))
+                            .col(parcel::Column::Mood)
+                            .eq(binder.bind("busy"))
+                    })
+                    .into_sql(),
+            ),
+        ),
         (
             "pipeline-entity",
             compiled(pl::Pipeline::from(account::Entity).into_sql()),
@@ -149,7 +179,7 @@ fn pipelines() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:napi.entity-reads+2/test]
+// [spec:pgorm:req:napi.entity-reads+3/test]
 // [spec:pgorm:req:napi.entity-graphs/test]
 // [spec:pgorm:req:napi.pipeline-sources/test]
 #[test]

@@ -134,15 +134,18 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
 - **`Connection`** (from `pool.acquire()`) is the caller's until closed, and
   runs one operation at a time; another meanwhile is a `LifecycleError`, not a
   queue.
-- **`Transaction`** comes from `begin()` (then `commit()` or `rollback()`) or
-  `transaction(fn)`, which commits when `fn` resolves and rolls back when it
-  throws, rejecting with `fn`'s own error. On a transaction, `begin` and
-  `transaction` open savepoints. A transaction borrows its parent exclusively,
-  as in Rust: while a savepoint is open its transaction refuses statements,
-  commits and other savepoints, and while a transaction is open its connection
-  refuses other work — refused with a `LifecycleError`, never raced. `mode`
-  (`"readWrite"`, `"readOnly"`, `"deferrable"`) and `isolation` choose how it
-  opens.
+- **`Transaction`** exists only inside `transaction(fn)`, as a Rust
+  transaction exists only inside its closure: it commits when `fn` resolves
+  and rolls back when it throws, rejecting with `fn`'s own error, so throwing
+  is how a callback rolls back. A commit that fails rejects with its failure,
+  and a ROLLBACK that fails with a `SuppressedError` whose `error` is the
+  failure and whose `suppressed` is what `fn` threw; either discards the
+  connection. On a transaction, `transaction(fn)` opens a savepoint. A
+  transaction borrows its parent exclusively, as in Rust: while a savepoint
+  is open its transaction refuses statements and other savepoints, and while
+  a transaction is open its connection refuses other work — refused with a
+  `LifecycleError`, never raced. `mode` (`"readWrite"`, `"readOnly"`,
+  `"deferrable"`) and `isolation` choose how it opens.
 - **`execute`, `query`, `one`, `optional`** are on all three; `one` and
   `optional` reject a row count they do not admit with a `DecodeError`.
   `{ tagged: true }` gives `Value`s.
@@ -154,7 +157,8 @@ await pool.execute("SELECT pg_sleep(10)", [], { signal: AbortSignal.timeout(1000
   savepoint and pulling a stream's rows each take an `AbortSignal`. Aborting
   rejects with the signal's reason and discards the connection the operation
   ran on — its outcome is unknown — ending any transaction on it.
-- **Releasing**: every handle has `close()` and works with `await using`.
+- **Releasing**: a pool, a connection and a stream each have `close()` and
+  work with `await using`; a transaction ends with its callback.
   Closing a connection returns it to its pool at once; closing a pool cancels
   what runs and waits until every connection is released. Nothing waits on
   garbage collection: a handle collected unclosed releases only what is idle,
@@ -291,7 +295,7 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 - **Builders never change.** Each method returns a new builder from a copy of
   its receiver's pgorm-query state, so a base query can be extended in two
   directions. Builders come from the module's functions (`select`, `col`,
-  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `tuple`,
+  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `array`, `tuple`,
   `groupingSet`, `rollup`, `cube`, `groupingSets`, `tableFunction`) and the
   `Table` and `With` constructors.
 - **Values are bound, identifiers quoted.** An operand that is not an
@@ -309,8 +313,9 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   (`uuidv7` and its shift among them, the set-returning `generate_series`
   and `unnest`, whose overloads need a bound argument typed:
   `bind(1).cast("int8")`, and the record-returning `json_to_record`,
-  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`
-  and `scalar`.
+  `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`,
+  `scalar`, and `array(select)`, `ARRAY(select)`: the subquery's one column as
+  one array value, empty for no rows, to cast and compare as a value.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
@@ -605,7 +610,8 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   so a value a statement carries — a `DEFAULT`, a `CHECK`'s operands, an enum
   label, a comment — is written as pgorm-query's escaped literal, and
   `inspect()` gives `{ sql, values: [] }`. Names are identifiers, quoted.
-  Nothing runs until a terminal runs it.
+  Nothing runs until a terminal runs it. Every complete statement is a `Ddl`
+  (pgorm-python's `DDL`), a `Statement` the terminals take.
 - **Schemas**: `createSchema(name, { ifNotExists })`, `dropSchema(names, {
   ifExists, behavior })` over one name or several, and `renameSchema(name,
   newName)`. A schema is named by one string, never a `Table`. A drop of a
@@ -700,10 +706,13 @@ await pool.query(top);
   its bound values with it — or `pl.source(relation).named(name)`, which is
   how a relation meets itself.
 - **Expressions** are the pipeline's own, not the statement builders':
-  `pl.col(table, column)` (prqlc has no catalog, so columns are qualified),
-  `pl.alias(name)` for a name a stage introduces, `pl.thisColumn` and
-  `pl.thatColumn` for a join's sides, the comparison, logical and arithmetic
-  methods, `coalesce`, `isNull`, `inArray`, `cast`, `as`, `asc`/`desc`,
+  `pl.col(table, column)` (prqlc has no catalog, so columns are qualified;
+  a registered entity's column, `entity.col(name)`, is compared as the
+  entity types it), `pl.alias(name)` for a name a stage introduces,
+  `pl.thisColumn` and `pl.thatColumn` for a join's sides, the comparison,
+  logical and arithmetic methods, `coalesce`, `isNull`, `inArray`, `cast`,
+  `comparesAs(type)` — the enum a column whose domain is over one compares
+  as, which PostgreSQL needs and no catalog tells prqlc —, `as`, `asc`/`desc`,
   `pl.caseWhen`, the aggregates (`sum`, `min`, `max`, `average`, `stddev`,
   `count`, `countDistinct`, `countRows`) and the window functions
   (`rowNumber`, `rank`, `rankDense`, `lag`, `lead`, `first`, `last`) over

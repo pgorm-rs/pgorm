@@ -3,7 +3,7 @@
 // Expressions over pgorm-query's builders. An operand that is not an
 // expression is a value, bound as a parameter: nothing a caller passes becomes
 // SQL text, and an identifier is quoted wherever it appears.
-// [spec:pgorm:req:napi.expressions+5]
+// [spec:pgorm:req:napi.expressions+6]
 
 import { arg, args, Builder, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
@@ -163,4 +163,14 @@ export function exists(select) {
  */
 export function scalar(select) {
   return new Expr(native.exprSubquery("scalar", arg(select)), TRUSTED);
+}
+
+/**
+ * `ARRAY(select)`: the subquery's one column collected into one array value,
+ * which can be cast and compared as a value where a subquery's rows cannot.
+ *
+ * @param {import("./select.js").Select} select
+ */
+export function array(select) {
+  return new Expr(native.exprSubquery("array", arg(select)), TRUSTED);
 }

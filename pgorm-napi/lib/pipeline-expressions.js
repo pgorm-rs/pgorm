@@ -5,9 +5,10 @@
 // They are not the statement builders' expressions, and the two do not mix.
 // A value an operand is given is bound by the stage that takes it; only
 // `literal()` writes one into the SQL.
-// [spec:pgorm:req:napi.pipeline-expressions+1]
+// [spec:pgorm:req:napi.pipeline-expressions+2]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
+import { registeredColumn } from "./entity-queries.js";
 import { native } from "./operations.js";
 
 /** @type {(handle: unknown) => PipelineExpr} */
@@ -140,6 +141,17 @@ export class PipelineExpr extends Handle {
     return exprOf(native.pipelineCast(arg(this), type));
   }
 
+  /**
+   * Compare this expression as the enum `type` names, as a registered column
+   * whose domain is over that enum compares: what such a column needs where
+   * no registration types it.
+   *
+   * @param {string | import("./values.js").TypeName} type
+   */
+  comparesAs(type) {
+    return exprOf(native.pipelineComparesAs(arg(this), type));
+  }
+
   /** @param {string | PipelineExpr} name */
   as(name) {
     return exprOf(native.pipelineAs(arg(this), arg(name)));
@@ -148,12 +160,15 @@ export class PipelineExpr extends Handle {
 
 /**
  * A column of the relation `table` names: prqlc has no catalog, so every
- * column is qualified.
+ * column is qualified. A registered entity's column (`entity.col(name)`) is
+ * the entity's own, compared as the entity types it; a name only qualifies.
  *
  * @param {string | PipelineExpr} table
- * @param {string | PipelineExpr} column
+ * @param {string | PipelineExpr | import("./entity-queries.js").EntityColumn} column
  */
 export function col(table, column) {
+  const registered = registeredColumn(column);
+  if (registered) return exprOf(native.pipelineRegisteredCol(arg(table), ...registered));
   return exprOf(native.pipelineCol(arg(table), arg(column)));
 }
 

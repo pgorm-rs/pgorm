@@ -46,7 +46,7 @@ pub struct PyDDL {
 
 #[pymethods]
 impl PyDDL {
-    // [spec:pgorm:req:python.schema+1]
+    // [spec:pgorm:req:python.schema+2]
     pub fn inspect(&self) -> Compiled {
         let sql = match &self.inner {
             Statement::AlterTable(s) => s.to_string(),

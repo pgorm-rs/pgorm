@@ -21,7 +21,7 @@ use crate::{Connect, RawConnection};
 
 /// The channel pgorm-migration's runner notifies once a batch that applied a
 /// migration commits, and so the one a pool listens on to hear of it.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]    the channel both sides default to
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    the channel both sides default to
 pub const STATEMENT_CACHE_CHANNEL: &str = "pgorm_statement_caches";
 
 /// The most of an identifier PostgreSQL keeps: `NAMEDATALEN - 1` bytes. A
@@ -35,6 +35,14 @@ const CHANNEL_BYTES: usize = 63;
 const FIRST_RETRY: Duration = Duration::from_millis(100);
 
 const LONGEST_RETRY: Duration = Duration::from_secs(10);
+
+/// Sent on the listening session before its `LISTEN`, so that a server,
+/// database or role whose `idle_session_timeout` ends idle sessions does not
+/// end this one each period, every reconnection clearing every cache. The
+/// setting's context is `user`, so any role may change it for its own
+/// session, and the change reaches no other.
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    the listening session does not idle out
+const NEVER_IDLE_OUT: &str = "SET idle_session_timeout = 0";
 
 /// Whether `channel` is a name `LISTEN` takes without truncating it, and
 /// `pg_notify` accepts: from 1 to [`CHANNEL_BYTES`] bytes.
@@ -98,7 +106,7 @@ impl CacheListener {
 ///
 /// It holds nothing of the pool but these, so the pool can be dropped while
 /// it runs: the [`Manager`](crate::Manager)'s drop aborts it.
-// [spec:pgorm:req:conn.pool.statement-cache.listen]    reconnect with a bounded backoff, clear on each LISTEN
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1]    reconnect with a bounded backoff, clear on each LISTEN
 pub(crate) async fn listen_for_clears(
     connect: Arc<dyn Connect>,
     pg_config: PgConfig,
@@ -140,8 +148,9 @@ pub(crate) async fn listen_for_clears(
     }
 }
 
-/// Drive `connection` until it ends, sending `listen` on it first. Answers
-/// whether the `LISTEN` took effect, and the error the connection ended with.
+/// Drive `connection` until it ends, sending [`NEVER_IDLE_OUT`] and then
+/// `listen` on it first. Answers whether the `LISTEN` took effect, and the
+/// error the connection ended with.
 async fn listening(
     client: &Client,
     mut connection: Box<dyn RawConnection>,
@@ -149,9 +158,24 @@ async fn listening(
     channel: &str,
     generation: &AtomicU64,
 ) -> (bool, Option<Error>) {
-    // The request completes only while the connection is polled, so the two
-    // are driven together, the request until it answers.
-    let mut request = pin!(client.batch_execute(listen));
+    // The `LISTEN` goes last and alone: a session's last statement is what
+    // `pg_stat_activity` shows, and how an operator tells this session apart.
+    // A `SET` the server refuses costs only the timeout's protection, so the
+    // `LISTEN` goes ahead without it.
+    let set_up = async {
+        match client.batch_execute(NEVER_IDLE_OUT).await {
+            Err(error) if error.as_db_error().is_some() => tracing::warn!(
+                channel,
+                "statement-cache listener cannot turn off idle_session_timeout: {error}"
+            ),
+            Err(error) => return Err(error),
+            Ok(()) => {}
+        }
+        client.batch_execute(listen).await
+    };
+    // The requests complete only while the connection is polled, so the two
+    // are driven together, the requests until the `LISTEN` answers.
+    let mut request = pin!(set_up);
     let mut listened = false;
     let error = poll_fn(|cx| {
         if !listened && let Poll::Ready(answer) = request.as_mut().poll(cx) {

@@ -10,10 +10,10 @@ from pipeline_programs import programs
 
 
 class PipelineConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     def test_public_programs_compile_with_native_parameters(self):
         cases = programs(_native)
-        self.assertEqual(len(cases), 21)
+        self.assertEqual(len(cases), 22)
         for name, query in cases.items():
             with self.subTest(name=name):
                 self.assertIsInstance(query.inspect(), p.Compiled)
@@ -28,7 +28,7 @@ class PipelineConstruction(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             pl.sources("unregistered")
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     def test_scopes_close_on_success_and_exceptions(self):
         base = pl.from_(p.Table("items"))
         key = pl.col("items", "id")
@@ -63,7 +63,7 @@ class PipelineConstruction(unittest.TestCase):
             saved[0].bind(1)
         self.assertEqual(base.inspect().params, [])
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     def test_nested_callbacks_cannot_mix_brands(self):
         base = pl.from_(p.Table("items"))
         key = pl.col("items", "id")
@@ -82,7 +82,7 @@ class PipelineConstruction(unittest.TestCase):
 
         self.assertEqual(base.filter_with(outer).inspect().params[0].value, 1)
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     def test_bound_list_limits_and_input_rejections(self):
         base = pl.from_(p.Table("items"))
         self.assertIsInstance(base.derive_with(lambda b: []), pl.Pipeline)
@@ -117,7 +117,7 @@ class PipelineConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             base.select(pl.literal(1).as_("sum")).inspect()
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     # [spec:pgorm:req:pipeline.errors+4/test]
     def test_names_the_screen_refuses_fail_at_compile(self):
         # The binding delegates to the Rust screen at `into_sql`, so it refuses
@@ -162,7 +162,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         await self.connection.close()
         await self.pool.close()
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     async def test_terminals_models_and_dynamic_streams(self):
         model = p.Model(
             "items",
@@ -185,7 +185,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             found = [row["id"] async for row in rows]
         self.assertEqual(found, [1, 2, 3, 4])
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     async def test_pipeline_stages_execute_in_postgresql(self):
         cases = programs(_native)
         expected = {
@@ -227,7 +227,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name=name):
                 await cases[name].all(self.connection)
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     async def test_literal_and_bound_text_remain_values(self):
         payload = "O'Brien'); DROP TABLE items; -- 雪"
         await self.connection.execute(
@@ -246,7 +246,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((row["id"], row["category"]), (5, payload))
         self.assertEqual(len(await base.all(self.connection)), 5)
 
-    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:python.pipeline+1/test]
     async def test_aggregates_windows_and_typed_nulls(self):
         base = pl.from_(p.Table("items"))
         amount = pl.col("items", "amount")
@@ -289,6 +289,78 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query.inspect().params[0].kind, "i32")
         self.assertIsNone((await query.one(self.connection))["result"])
 
+
+
+class PipelineDomainEnums(unittest.IsolatedAsyncioTestCase):
+    """A column whose domain is over an enum, which PostgreSQL compares only
+    as the enum, read by a pipeline that has no registration to type it."""
+
+    async def asyncSetUp(self):
+        self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
+        self.connection = await self.pool.acquire()
+        await self.drop()
+        for statement in (
+            "CREATE SCHEMA pipeline_enums",
+            "CREATE TYPE pipeline_enums.\"Mood\" AS ENUM ('sad', 'calm', 'glad')",
+            "CREATE DOMAIN pipeline_enums.cheerful AS pipeline_enums.\"Mood\"",
+            "CREATE TABLE pipeline_enums.lines (id integer PRIMARY KEY, mood pipeline_enums.cheerful NOT NULL)",
+            "INSERT INTO pipeline_enums.lines VALUES (1, 'calm'), (2, 'glad'), (3, 'calm'), (4, 'glad')",
+        ):
+            await self.connection.execute(p.RawSQL(statement))
+
+    async def drop(self):
+        await self.connection.execute(
+            p.RawSQL("DROP SCHEMA IF EXISTS pipeline_enums CASCADE")
+        )
+
+    async def asyncTearDown(self):
+        await self.drop()
+        await self.connection.close()
+        await self.pool.close()
+
+    # [spec:pgorm:req:python.pipeline+1/test]    a column with no registration compares as the
+    # schema-qualified enum compares_as names, bound, literal, listed and through an alias,
+    # where each left bare is refused with 42883
+    async def test_untyped_columns_compare_as_the_named_enum(self):
+        base = pl.from_(p.Table("lines", schema="pipeline_enums"))
+        mood = pl.col("lines", "mood")
+        enum = p.TypeName("Mood", schema="pipeline_enums")
+        typed = mood.compares_as(enum)
+        operations = p.capabilities()["operations"]
+        self.assertEqual(
+            operations["pipeline.compares_as"]["rust_api"],
+            "pgorm::pipeline::ExprOps::compares_as",
+        )
+        self.assertTrue(operations["pipeline.registered_column"]["registration_required"])
+        named = pl.alias("named")
+        self.assertEqual(
+            base.filter(typed == "glad").inspect().sql,
+            'SELECT * FROM pipeline_enums.lines WHERE CAST(mood AS pipeline_enums."Mood") = \'glad\'',
+        )
+        for query, expected in (
+            (base.filter(typed == "glad"), [2, 4]),
+            (base.filter_with(lambda binder: typed == binder.bind("glad")), [2, 4]),
+            (base.filter(typed.in_array(["calm"])), [1, 3]),
+            (base.derive(mood.as_(named)).filter(named.compares_as(enum) < "glad"), [1, 3]),
+        ):
+            with self.subTest(sql=query.inspect().sql):
+                rows = await query.all(self.connection)
+                self.assertEqual(sorted(row["id"] for row in rows), expected)
+        highest = (
+            await base.group()
+            .aggregate(pl.max(typed).cast("text").as_("highest"))
+            .one(self.connection)
+        )
+        self.assertEqual(highest["highest"], "glad")
+        for query in (
+            base.filter(mood == "glad"),
+            base.filter_with(lambda binder: mood == binder.bind("glad")),
+            base.derive(mood.as_(named)).filter(named == "glad"),
+        ):
+            with self.subTest(sql=query.inspect().sql):
+                with self.assertRaises(p.DatabaseError) as refused:
+                    await query.all(self.connection)
+                self.assertEqual(refused.exception.sqlstate, "42883")
 
 if __name__ == "__main__":
     unittest.main()

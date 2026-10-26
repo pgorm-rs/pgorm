@@ -11,12 +11,18 @@
 //! time on a fresh pool, so no statement cache hides a statement from the
 //! capture, and the two sequences are held to the oracle's property
 //! statement by statement.
+//!
+//! A run that cannot check out its connection has sent nothing, and an empty
+//! capture would read as a site that sends nothing, so a run retries its
+//! checkout for [`REACH`], and one that still cannot is reported as an
+//! [`Outage`], never judged.
 
 use std::{
     future::Future,
     pin::Pin,
     sync::{LazyLock, Mutex},
     thread::{self, ThreadId},
+    time::Duration,
 };
 
 use pgorm::{
@@ -28,7 +34,7 @@ use pgorm_migration::{MigrationName, MigrationTrait, MigratorTrait};
 
 use super::{
     corpus::{Hostile, NUL_NAME, corpus},
-    live::{close, open},
+    live::{close, error_chain, open},
     oracle::{
         BENIGN, NulBehaviour, Policy, Reference, Rendered, Site, Verdict, encoder_refuses,
         judge_against, reference_of,
@@ -36,7 +42,29 @@ use super::{
     pins::pinned,
 };
 
-type Run = for<'a> fn(&'a str, &'a str) -> Pin<Box<dyn Future<Output = ()> + 'a>>;
+type Run = for<'a> fn(&'a str, &'a str) -> Pin<Box<dyn Future<Output = Reached> + 'a>>;
+
+type Reached = Result<(), Outage>;
+
+/// Why a run never reached the server: it sent nothing, so its capture says
+/// nothing about the site.
+pub struct Outage(String);
+
+impl Outage {
+    /// The failure this outage is, for `site` run with the name `label`.
+    fn at(self, site: &str, label: &str) -> String {
+        format!("site `{site}`, name `{label}`: {}", self.0)
+    }
+}
+
+/// How long a run keeps trying to check out its connection. A loaded machine
+/// can hold a connection's handshake past the server's
+/// `authentication_timeout`, 60 s by default, which cancels it and fails the
+/// checkout; the bound outlasts two such cancellations.
+const REACH: Duration = Duration::from_secs(150);
+
+/// The pause between one failed checkout and the next.
+const REACH_RETRY: Duration = Duration::from_millis(250);
 
 /// A site registered here rather than in `registry.rs`: its [`Site`] (whose
 /// `kinds` cover the whole captured sequence, in order, and whose `render`
@@ -164,16 +192,16 @@ fn live_only(_: &str) -> Rendered {
 
 /// Open a savepoint under `name` and roll back to it, then open it again and
 /// release it: `SAVEPOINT`, `ROLLBACK TO`, `SAVEPOINT`, `RELEASE`.
-async fn savepoint(url: &str, name: &str) {
+async fn savepoint(url: &str, name: &str) -> Reached {
     let pool = pgorm_pool::Config {
         url: Some(url.to_owned()),
         ..Default::default()
     }
     .create_pool(NoTls)
     .expect("a pgorm-pool pool");
-    let mut client = pool.get().await.expect("a pooled connection");
+    let mut client = reach(|| pool.get()).await?;
     let Ok(mut txn) = client.transaction().await else {
-        return;
+        return Ok(());
     };
     if let Ok(point) = txn.savepoint(name).await {
         let _ = point.rollback().await;
@@ -182,6 +210,7 @@ async fn savepoint(url: &str, name: &str) {
         let _ = point.commit().await;
     }
     let _ = txn.rollback().await;
+    Ok(())
 }
 
 static LEDGER: Mutex<String> = Mutex::new(String::new());
@@ -215,39 +244,34 @@ impl MigratorTrait for OracleMigrator {
 }
 
 /// Run the migrator, with one no-op migration, against a ledger named `name`.
-async fn ledger(url: &str, name: &str) {
+async fn ledger(url: &str, name: &str) -> Reached {
     if let Ok(mut ledger) = LEDGER.lock() {
         name.clone_into(&mut ledger);
     }
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    let _ = OracleMigrator::up(pgorm::connect(config), None).await;
+    let pool = fresh_pool(url);
+    // The connection checked out here goes back idle, and is the one the
+    // migrator is lent, so it does not connect again.
+    drop(reach(|| pool.get()).await?);
+    let _ = OracleMigrator::up(pool, None).await;
+    Ok(())
 }
 
 /// Drop the ledger a run created, quoting the name independently of the code
 /// under test.
-async fn drop_ledger(url: &str, name: &str) {
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    if let Ok(db) = pgorm::connect(config).get().await {
-        let quoted = format!("\"{}\"", name.replace('"', "\"\""));
-        let _ = db
-            .batch_execute(&format!("DROP TABLE IF EXISTS {quoted}"))
-            .await;
-    }
+async fn drop_ledger(url: &str, name: &str) -> Reached {
+    let pool = fresh_pool(url);
+    let db = reach(|| pool.get()).await?;
+    let quoted = format!("\"{}\"", name.replace('"', "\"\""));
+    let _ = db
+        .batch_execute(&format!("DROP TABLE IF EXISTS {quoted}"))
+        .await;
+    Ok(())
 }
 
 /// Page `cake` read under the alias `name` through a cursor qualified by it.
-async fn cursor(url: &str, name: &str) {
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    let pool: DatabasePool = pgorm::connect(config);
-    let Ok(db) = pool.get().await else {
-        return;
-    };
+async fn cursor(url: &str, name: &str) -> Reached {
+    let pool = fresh_pool(url);
+    let db = reach(|| pool.get()).await?;
     let query = Query::select()
         .column(Asterisk)
         .from_as(Name::runtime("cake"), Name::runtime(name))
@@ -258,18 +282,14 @@ async fn cursor(url: &str, name: &str) {
         cake::Column::Id,
     );
     let _ = cursor.first(1).all(&db).await;
+    Ok(())
 }
 
 /// Page `cake` under the alias `name`, tiebreaking on a secondary order
 /// column qualified by it.
-async fn secondary_order(url: &str, name: &str) {
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    let pool: DatabasePool = pgorm::connect(config);
-    let Ok(db) = pool.get().await else {
-        return;
-    };
+async fn secondary_order(url: &str, name: &str) -> Reached {
+    let pool = fresh_pool(url);
+    let db = reach(|| pool.get()).await?;
     let query = Query::select()
         .column(Asterisk)
         .from_as(Name::runtime("cake"), Name::runtime(name))
@@ -281,18 +301,14 @@ async fn secondary_order(url: &str, name: &str) {
     );
     cursor.set_secondary_order_by(vec![(Name::runtime(name), cake::Column::Name.into_key())]);
     let _ = cursor.first(1).all(&db).await;
+    Ok(())
 }
 
 /// Page `cake` under the alias `name`, tiebreaking on a typed column the
 /// cursor appends qualified by it.
-async fn appended_order(url: &str, name: &str) {
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    let pool: DatabasePool = pgorm::connect(config);
-    let Ok(db) = pool.get().await else {
-        return;
-    };
+async fn appended_order(url: &str, name: &str) -> Reached {
+    let pool = fresh_pool(url);
+    let db = reach(|| pool.get()).await?;
     let query = Query::select()
         .column(Asterisk)
         .from_as(Name::runtime("cake"), Name::runtime(name))
@@ -304,24 +320,59 @@ async fn appended_order(url: &str, name: &str) {
     );
     cursor.add_secondary_order_by(Name::runtime(name), cake::Column::Name);
     let _ = cursor.first(1).all(&db).await;
+    Ok(())
 }
 
 /// Page a graph whose joined `fruit` is bound under the alias `name`, so the
 /// cursor's tiebreak is qualified by it.
-async fn graph_cursor(url: &str, name: &str) {
-    let Ok(config) = url.parse() else {
-        return;
-    };
-    let pool: DatabasePool = pgorm::connect(config);
-    let Ok(db) = pool.get().await else {
-        return;
-    };
+async fn graph_cursor(url: &str, name: &str) -> Reached {
+    let pool = fresh_pool(url);
+    let db = reach(|| pool.get()).await?;
     let _ = cake::Entity::graph()
         .join_maybe_as::<fruit::Entity>(cake::Relation::Fruit.def(), Name::runtime(name))
         .cursor_by(cake::Column::Id)
         .first(1)
         .all(&db)
         .await;
+    Ok(())
+}
+
+/// A pool of its own for one run, so no statement cache hides a statement
+/// from the capture.
+fn fresh_pool(url: &str) -> DatabasePool {
+    pgorm::connect(url.parse().expect("the test database's URL parses"))
+}
+
+/// Check out a connection through `checkout`, trying again after each
+/// failure until [`REACH`] has passed, and then answering why it did not.
+async fn reach<T, E, F, Fut>(mut checkout: F) -> Result<T, Outage>
+where
+    E: std::error::Error + 'static,
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
+    let deadline = tokio::time::Instant::now() + REACH;
+    let mut failed = None;
+    loop {
+        match tokio::time::timeout_at(deadline, checkout()).await {
+            Ok(Ok(connection)) => return Ok(connection),
+            Ok(Err(error)) => failed = Some(error_chain(&error)),
+            Err(_) => {
+                let before = failed.map_or_else(String::new, |why| format!(", after {why}"));
+                return Err(Outage(format!(
+                    "the run did not reach the server within {REACH:?}: \
+                     its last attempt was still connecting{before}"
+                )));
+            }
+        }
+        if tokio::time::Instant::now() + REACH_RETRY >= deadline {
+            let why = failed.unwrap_or_default();
+            return Err(Outage(format!(
+                "the run did not reach the server within {REACH:?}: {why}"
+            )));
+        }
+        tokio::time::sleep(REACH_RETRY).await;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -364,8 +415,10 @@ impl log::Log for Capture {
     fn flush(&self) {}
 }
 
-/// Every statement tokio-postgres was handed on this thread while `run` ran.
-async fn capture(run: Pin<Box<dyn Future<Output = ()> + '_>>) -> Vec<String> {
+/// Every statement tokio-postgres was handed on this thread while `run` ran,
+/// but for its own catalogue lookups, or the outage that kept `run` from the
+/// server.
+async fn capture(run: Pin<Box<dyn Future<Output = Reached> + '_>>) -> Result<Vec<String>, Outage> {
     // Installing twice fails harmlessly: the logger is the same one.
     let _ = log::set_logger(&CAPTURE);
     log::set_max_level(log::LevelFilter::Debug);
@@ -376,13 +429,17 @@ async fn capture(run: Pin<Box<dyn Future<Output = ()> + '_>>) -> Vec<String> {
             |mut lines| {
                 let (mine, theirs) = lines.drain(..).partition(|(thread, _)| *thread == me);
                 *lines = theirs;
-                mine.into_iter().map(|(_, sql)| sql).collect::<Vec<_>>()
+                mine.into_iter()
+                    .map(|(_, sql)| sql)
+                    .filter(|sql| !is_catalogue(sql))
+                    .collect::<Vec<_>>()
             },
         )
     };
     drain();
-    run.await;
-    drain()
+    let reached = run.await;
+    let statements = drain();
+    reached.map(|()| statements)
 }
 
 /// The benign run's statements, parsed, checked against the kinds the site
@@ -471,55 +528,71 @@ async fn live_sites_hold_every_hostile_name() {
     );
     let mut failures = Vec::new();
     for live in live_sites() {
-        let benign = capture((live.run)(&url, BENIGN)).await;
-        let benign: Vec<String> = benign
-            .into_iter()
-            .filter(|sql| !is_catalogue(sql))
-            .collect();
-        let references = match references(&live.site, &benign) {
-            Ok(references) => references,
-            Err(failure) => {
-                failures.push(failure);
-                continue;
-            }
-        };
-        if let Some(reset) = live.reset {
-            reset(&url, BENIGN).await;
-        }
-        for hostile in corpus() {
-            let captured = capture((live.run)(&url, &hostile.name)).await;
-            if let Some(reset) = live.reset {
-                reset(&url, &hostile.name).await;
-            }
-            let captured: Vec<String> = captured
-                .into_iter()
-                .filter(|sql| !is_catalogue(sql))
-                .collect();
-            let outcome = judge_sequence(&live, &hostile, &references, &captured);
-            match (outcome, pinned(live.site.id, hostile.label)) {
-                (Ok(_), None) | (Err(_), Some(_)) => {}
-                (Err(failure), None) => failures.push(failure),
-                (Ok(verdict), Some(pin)) => failures.push(format!(
-                    "site `{}`, name `{}`: pinned as `{}` but now passes ({verdict:?})",
-                    live.site.id, hostile.label, pin.node
-                )),
-            }
-        }
-        let captured = capture((live.run)(&url, NUL_NAME)).await;
-        match captured.iter().find(|sql| sql.contains('\0')) {
-            Some(sql) if live.site.policy.nul() == NulBehaviour::Encoder => {
-                if let Err(what) = encoder_refuses(sql) {
-                    failures.push(format!("site `{}`, NUL: {what}", live.site.id));
-                }
-            }
-            other => failures.push(format!(
-                "site `{}`, NUL: expected the NUL byte in a statement the encoder refuses, got {other:?}",
-                live.site.id
-            )),
-        }
+        failures.extend(hold_site(&live, &url).await);
     }
     close(ctx, db).await;
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// Hold one live site to every corpus name and to the NUL name, answering
+/// each failure.
+async fn hold_site(live: &LiveSite, url: &str) -> Vec<String> {
+    let id = live.site.id;
+    let references = match capture((live.run)(url, BENIGN)).await {
+        Ok(benign) => references(&live.site, &benign),
+        Err(outage) => Err(outage.at(id, BENIGN)),
+    };
+    let references = match references {
+        Ok(references) => references,
+        Err(failure) => return vec![failure],
+    };
+    if let Some(reset) = live.reset
+        && let Err(outage) = reset(url, BENIGN).await
+    {
+        return vec![outage.at(id, BENIGN)];
+    }
+    let mut failures = Vec::new();
+    for hostile in corpus() {
+        let captured = capture((live.run)(url, &hostile.name)).await;
+        let reset = match live.reset {
+            Some(reset) => reset(url, &hostile.name).await,
+            None => Ok(()),
+        };
+        let captured = match captured.and_then(|captured| reset.map(|()| captured)) {
+            Ok(captured) => captured,
+            Err(outage) => {
+                failures.push(outage.at(id, hostile.label));
+                continue;
+            }
+        };
+        let outcome = judge_sequence(live, &hostile, &references, &captured);
+        match (outcome, pinned(id, hostile.label)) {
+            (Ok(_), None) | (Err(_), Some(_)) => {}
+            (Err(failure), None) => failures.push(failure),
+            (Ok(verdict), Some(pin)) => failures.push(format!(
+                "site `{id}`, name `{}`: pinned as `{}` but now passes ({verdict:?})",
+                hostile.label, pin.node
+            )),
+        }
+    }
+    let captured = match capture((live.run)(url, NUL_NAME)).await {
+        Ok(captured) => captured,
+        Err(outage) => {
+            failures.push(outage.at(id, "NUL"));
+            return failures;
+        }
+    };
+    match captured.iter().find(|sql| sql.contains('\0')) {
+        Some(sql) if live.site.policy.nul() == NulBehaviour::Encoder => {
+            if let Err(what) = encoder_refuses(sql) {
+                failures.push(format!("site `{id}`, NUL: {what}"));
+            }
+        }
+        other => failures.push(format!(
+            "site `{id}`, NUL: expected the NUL byte in a statement the encoder refuses, got {other:?}"
+        )),
+    }
+    failures
 }
 
 /// tokio-postgres's own type-lookup statements, which it prepares the first

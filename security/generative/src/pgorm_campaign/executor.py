@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import time
+from collections import deque
 from pathlib import Path
 
 from . import baseline, observations
@@ -133,41 +134,16 @@ class Executor:
             return report
 
     async def execute(self, program, resolution, report):
-        effects = None
+        effects = Effects(
+            resolution, await self.subject.acquire(), self.subject.acquire
+        )
         try:
-            connection = await self.subject.acquire()
-            effects = Effects(resolution, connection)
-            for step in program["steps"]:
-                event = {
-                    "id": step["id"],
-                    "operation": step["op"],
-                    "status": "attempted",
-                }
-                report["steps"].append(event)
-                try:
-                    value, paths = await effects.perform(step)
-                    if not paths:
-                        raise RuntimeError("effect has no active native dispatch path")
-                    event.update(
-                        status="observed", observation=value, native_paths=paths
-                    )
-                except self.p.PgOrmError as error:
-                    event.update(status="error", observation=observations.error(error))
-                if connection.closed:
-                    # Stream cancellation can discard the root connection.
-                    if effects.open_transactions:
-                        raise RuntimeError(
-                            "connection closed with outstanding transactions"
-                        )
-                    connection = await self.subject.acquire()
-                    effects.scopes["root"] = connection
+            await effects.run(deque(program["steps"]), report["steps"])
         finally:
-            if effects is not None:
-                report["cleanup_errors"].extend(await effects.close())
-                try:
-                    await effects.scopes["root"].close()
-                except Exception as error:
-                    report["cleanup_errors"].append(observations.error(error))
+            try:
+                await effects.scopes["root"].close()
+            except Exception as error:
+                report["cleanup_errors"].append(observations.error(error))
 
     async def close_pools(self):
         errors = []

@@ -1,5 +1,7 @@
 """Static rejection cases; each marker must correspond to an installed-stub diagnostic."""
 
+from contextlib import AbstractAsyncContextManager
+
 import pgorm as p
 from pgorm import pipeline as pl, schema as s
 
@@ -11,8 +13,16 @@ async def invalid(connection: p.Connection) -> None:
     scalar: int = await connection.fetch_one(  # expected-error: assignment
         p.select(p.literal(1))
     )
-    await connection.begin(mode="invented")  # expected-error: arg-type
-    await connection.begin(isolation="invented")  # expected-error: arg-type
+    connection.transaction(mode="invented")  # expected-error: arg-type
+    connection.transaction(isolation="invented")  # expected-error: arg-type
+    await connection.begin()  # expected-error: attr-defined
+    async with connection.transaction() as tx:
+        await tx.begin()  # expected-error: attr-defined
+        await tx.commit()  # expected-error: attr-defined
+        await tx.rollback()  # expected-error: attr-defined
+        await tx.close()  # expected-error: attr-defined
+        tx.transaction(mode="read_only")  # expected-error: call-arg
+        held: AbstractAsyncContextManager[p.Transaction] = tx  # expected-error: assignment
     p.Expr()  # expected-error: call-arg
     p.Compiled()  # expected-error: call-arg
     p.col("id").__eq__(other=1)  # expected-error: call-arg

@@ -38,7 +38,8 @@ use std::sync::Arc;
 use neon::{prelude::*, types::Finalize};
 use pgorm::{ActiveValue, pgorm_query::Condition};
 
-use adapter::{Active, Change, Comparison, EntityBackend, Read, Select, Write};
+pub(crate) use adapter::PipelineColumn;
+use adapter::{Active, Change, Comparison, EntityBackend, Members, Read, Select, Write};
 use convert::{ModelHandle, Records, Wrote, column_value, entity_failure, names, record};
 pub use graph::{GraphBindings, GraphModel, GraphSlots, RegisteredSlot, Source};
 pub use registry::{RegistrationError, Registry};
@@ -96,6 +97,7 @@ const EXPORTS: &[(&str, Export)] = &[
     ("entityColumns", entity_columns),
     ("entityCol", entity_col),
     ("entityCompare", entity_compare),
+    ("entityIn", entity_in),
     ("entityFind", entity_find),
     ("entityActive", entity_active),
     ("entitySelectChange", select_change),
@@ -237,7 +239,7 @@ fn entity_col(mut cx: FunctionContext) -> JsResult<JsValue> {
 /// `entityCompare(entity, column, operator, value)`: the column compared
 /// through its `ColumnTrait` method, the value converted to the column's
 /// declared kind and written through its `save_as`.
-// [spec:pgorm:req:napi.entity-reads+2]
+// [spec:pgorm:req:napi.entity-reads+3]
 fn entity_compare(mut cx: FunctionContext) -> JsResult<JsValue> {
     let entity = held!(cx, EntityHandle, 0);
     let column = text!(cx, 1);
@@ -265,6 +267,54 @@ fn entity_compare(mut cx: FunctionContext) -> JsResult<JsValue> {
     match entity.compare(&column, comparison, value) {
         Ok(expr) => Ok(cx.boxed(Node::Expr(expr)).upcast()),
         Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+/// `entityIn(entity, column, negated, values | select)`: the column's
+/// membership through its `ColumnTrait` method — `is_in` / `is_not_in` over
+/// values read as the column's declared kind, `in_subquery` /
+/// `not_in_subquery` over a subquery's rows — so a column whose domain is over
+/// an enum is a member as the enum, and so is what the subquery projects.
+// [spec:pgorm:req:napi.entity-reads+3]
+fn entity_in(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    let column = text!(cx, 1);
+    let negated = cx.argument::<JsBoolean>(2)?.value(&mut cx);
+    let source = cx.argument::<JsValue>(3)?;
+    let info = match entity.info().column(&column) {
+        Ok(info) => info.clone(),
+        Err(failure) => return throw(&mut cx, failure),
+    };
+    let members = match source.downcast::<JsArray, _>(&mut cx) {
+        Ok(list) => {
+            let items = list.to_vec(&mut cx)?;
+            let mut values = Vec::with_capacity(items.len());
+            for item in items {
+                values.push(column_value(&mut cx, &info, item)?);
+            }
+            Members::Values(values)
+        }
+        Err(_) => Members::Subquery(Box::new(statements::embedded_select(&mut cx, source)?)),
+    };
+    match entity.membership(&column, negated, members) {
+        Ok(expr) => Ok(cx.boxed(Node::Expr(expr)).upcast()),
+        Err(failure) => throw(&mut cx, failure),
+    }
+}
+
+/// The registered entity at argument `entity` and its column named at
+/// argument `column`, as a pipeline reads it.
+// [spec:pgorm:req:napi.pipeline-expressions+2]
+pub(crate) fn pipeline_column(
+    cx: &mut FunctionContext,
+    entity: usize,
+    column: usize,
+) -> NeonResult<Arc<dyn PipelineColumn>> {
+    let backend = cx.argument::<JsBox<EntityHandle>>(entity)?.0.clone();
+    let name = cx.argument::<JsString>(column)?.value(cx);
+    match backend.pipeline_column(&name) {
+        Ok(column) => Ok(column),
+        Err(failure) => throw(cx, failure),
     }
 }
 
@@ -296,7 +346,7 @@ fn count_at(cx: &mut FunctionContext, index: usize) -> NeonResult<Option<u64>> {
 
 /// `entitySelectChange(select, step, argument)`: the query with one more
 /// step — `where`, `orderBy`, `limit` or `offset` — as `Select<E>` takes it.
-// [spec:pgorm:req:napi.entity-reads+2]
+// [spec:pgorm:req:napi.entity-reads+3]
 fn select_change(mut cx: FunctionContext) -> JsResult<JsValue> {
     let select = held!(cx, SelectHandle, 0);
     let change = step(&mut cx)?;

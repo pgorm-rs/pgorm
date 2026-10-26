@@ -184,6 +184,10 @@ async def versions(db):
     }
 
 
+class RolledBack(Exception):
+    """Raised to leave a block, so that its transaction or savepoint rolls back."""
+
+
 async def exercise(db):
     return {
         "runtime": await runtime(db),
@@ -204,27 +208,35 @@ async def run():
                 await pool.execute(generated.table)
             async with pool.connection() as db:
                 connection = await exercise(db)
-                transaction = await db.begin()
-                transaction_report = await exercise(transaction)
-                child = await transaction.begin()
-                await active(3, "savepoint").insert(child)
-                await child.rollback()
                 account = p.entity("app.Account")
-                savepoint = (
-                    await account.find()
-                    .filter(account.col("id") == 3)
-                    .one_opt(transaction)
-                )
-                await transaction.commit()
-                transaction = await db.begin()
-                await active(4, "rolled back").insert(transaction)
-                await transaction.rollback()
+                async with db.transaction() as transaction:
+                    transaction_report = await exercise(transaction)
+                    try:
+                        async with transaction.transaction() as child:
+                            await active(3, "savepoint").insert(child)
+                            raise RolledBack
+                    except RolledBack:
+                        pass
+                    savepoint = (
+                        await account.find()
+                        .filter(account.col("id") == 3)
+                        .one_opt(transaction)
+                    )
+                try:
+                    async with db.transaction() as transaction:
+                        await active(4, "rolled back").insert(transaction)
+                        raise RolledBack
+                except RolledBack:
+                    pass
                 rollback = (
                     await account.find().filter(account.col("id") == 4).one_opt(db)
                 )
-                read_only = await db.begin(mode="read_only")
-                mode = await read_only.fetch_one(p.RawSQL("SHOW transaction_read_only"))
-                await read_only.rollback()
+                try:
+                    async with db.transaction(mode="read_only") as read_only:
+                        mode = await read_only.fetch_one(p.RawSQL("SHOW transaction_read_only"))
+                        raise RolledBack
+                except RolledBack:
+                    pass
                 async with await db.stream(
                     p.select(p.col("id"))
                     .from_(p.Table("accounts", schema="python_entities"))

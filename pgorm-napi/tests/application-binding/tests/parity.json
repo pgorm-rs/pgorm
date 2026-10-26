@@ -50,5 +50,17 @@
   "sources-joined-one": {
     "sql": "SELECT accounts.id AS s0_id, accounts.\"display name\" AS \"s0_display name\", accounts.note AS s0_note, accounts.version AS s0_version, CAST(accounts.mood AS text) AS s0_mood, n.id AS s1_id, n.account_id AS s1_account_id, n.body AS s1_body FROM napi_entities.accounts LEFT OUTER JOIN napi_entities.notes AS n ON accounts.id = n.account_id LIMIT 1",
     "values": []
+  },
+  "find-member-subquery": {
+    "sql": "SELECT \"parcels\".\"id\", \"parcels\".\"qty\", CAST(\"parcels\".\"mood\" AS text), \"parcels\".\"codes\" FROM \"napi_entities\".\"parcels\" WHERE CAST(\"parcels\".\"mood\" AS napi_entities.mood) IN (SELECT CAST(\"parcels\".\"mood\" AS napi_entities.mood) FROM \"napi_entities\".\"parcels\" WHERE \"parcels\".\"id\" = $1)",
+    "values": [["i32","2"]]
+  },
+  "find-member-values": {
+    "sql": "SELECT \"parcels\".\"id\", \"parcels\".\"qty\", CAST(\"parcels\".\"mood\" AS text), \"parcels\".\"codes\" FROM \"napi_entities\".\"parcels\" WHERE CAST(\"parcels\".\"mood\" AS napi_entities.mood) NOT IN (CAST($1::text AS napi_entities.mood))",
+    "values": [["text","busy"]]
+  },
+  "pipeline-registered-column": {
+    "sql": "SELECT * FROM napi_entities.parcels WHERE CAST(mood AS napi_entities.mood) = $1",
+    "values": [["text","busy"]]
   }
 }

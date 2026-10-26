@@ -1243,6 +1243,14 @@ children (
                         text "conn.pool.statement-cache (+3) and conn.pool.lifecycle (+2) now name StatementCaches::clear_before_reuse and recycle's clear of a cache behind the pool's generation, which statement-cache-after-ddl added (conn.pool.statement-cache.clear, 2adf99d1)."
                         after_done true
                     }
+
+                    {
+                        at 2026-10-26T10:10:15.601786Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at conn.pool +4 (docs-stale-cleanup, f5ef4843): the rule says the pool's Manager holds its TLS connector as an Arc<dyn Connect> rather than a Box; every reference is pinned at +4."
+                        after_done true
+                    }
                 )
             }
 
@@ -1710,6 +1718,14 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Re-checked at codegen.entity.types +9 and codegen.entity.expanded +4 (codegen-enum-array-expanded, 9a8a6c61): an enum inside an array or a domain is spelled <Enum>::db_type().get_column_type().clone() by both writers, an enum column itself <Enum>::db_type(); every site was re-read and re-pinned, and the writer matches."
+                        after_done true
+                    }
+
+                    {
+                        at 2026-10-26T10:10:15.435645Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-covered at codegen.entity +4 (docs-stale-cleanup, f5ef4843): the rule no longer names the retired pgorm-cli or the deleted date_time_crate option, and its option list lost a repeated enum_extra_derives; every reference is pinned at +4."
                         after_done true
                     }
                 )
@@ -12820,6 +12836,14 @@ children (
                 kind @note
                 text "Scope, per the operator's sql.scope verdict (2026-10-18) and sql.scope +16. A notification arrives on the connection that ran LISTEN, as an AsyncMessage on tokio-postgres's Connection future, which pgorm-pool's manager polls internally and pooled connections recycle, so LISTEN cannot work on a pooled connection. Build a dedicated listener: created from the pool's config (or from a tokio_postgres::Config plus a TLS connector, as connect_with is), owning its connection outright, with listen(channel) / unlisten(channel) / unlisten_all and a Stream of notifications (channel, payload, sender pid). Channel names are quoted identifiers; NOTIFY gets a typed helper too (NOTIFY channel, 'payload' or pg_notify with a bound payload). Decide and document what happens when the connection drops (the stream ends with an error; no silent reconnect that would miss notifications) and how backpressure works (bounded buffer, an overflow error rather than unbounded growth). Live tests on 18.6: a notification sent from a pooled connection inside a committed transaction arrives, one from a rolled-back transaction does not, unlisten stops delivery, a quoted channel name with odd characters works, payload limits. Python and JavaScript get the listener as an async iterator, with stubs, .d.ts and live tests. sql.scope's LISTEN entry graduates (bump; query-second-tier re-delivers). Waits on conn-copy, which changes the same connection surfaces in three languages."
             }
+
+            {
+                at 2026-10-26T10:11:17.477625Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at python.listen +1 (python-listen-header-duplicate, 0337e941): the rule's marker line is written once, so its body no longer begins with a copy of it; every reference is pinned at +1."
+                after_done true
+            }
         )
     }
 
@@ -13263,6 +13287,13 @@ children (
                 kind @note
                 text "More found 2026-10-23: docs/spec/paginate.md cites macros.sql+4 in backticks (migration-sql-files)."
             }
+
+            {
+                at 2026-10-26T13:39:21.49016Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Also (2026-10-26): pipeline.surface does not list compares_as or Named::col yet (pipeline-untyped-enum-casts); add them in the same pass if its text is touched."
+            }
         )
     }
 
@@ -13331,6 +13362,21 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\" to taking the column's type from its entity wherever one is known (the bindings' entity registrations, a typed source), and letting the caller name the type where none is. Also in scope (found by in-subquery-enum-shapes): the Python and JavaScript statement builders' subquery membership carries no column type either, so it gets none of the domain-over-enum casts."
+            }
+
+            {
+                at 2026-10-25T23:33:44.800678Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+
+            {
+                at 2026-10-25T23:34:10.811673Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Design: the type comes from the entity where one is known and is named by the caller where none is. Rust: Named::col(column) writes a named entity's column typed by the entity; ExprOps::compares_as(enum TypeName) names the enum for col() and alias tokens. Python/JS: pl.col(table, entity.col(name)) lowers through the registration's own Named::col; compares_as / comparesAs names the enum. JS EntityColumn.isIn/isNotIn (values and Select) go through ColumnTrait is_in/in_subquery. Python's statement builders have no subquery membership at all, so there was nothing to cast there; a statement builder's own expression stays SQL as written (the caller casts)."
+                after_done true
             }
         )
     }
@@ -13495,6 +13541,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\", rename it. A breaking change to the JavaScript typings; no alias kept."
+            }
+
+            {
+                at 2026-10-26T00:13:51.100898Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13714,6 +13767,20 @@ children (
                 kind @note
                 text "Found by python-stream-truth-testing (0ace12e8). In docs/spec/python.md the python.listen rule's marker line is written twice in a row, and nspec reads the second as the first line of the rule's body. Removing it changes the body, so the rule takes a bump, its owner (conn-listen) is re-covered, and its annotations are re-pinned."
             }
+
+            {
+                at 2026-10-25T23:58:03.546339Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:02:49.425118Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13800,6 +13867,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:11:17.607085Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-covered at migration.sql-file.compile +1 (docs-stale-cleanup, f5ef4843): the error names a line and reprints it with a caret only when the parser's diagnostic quotes a token the file holds, and a unit test now holds the case of a diagnostic quoting none; every reference is pinned at +1."
+                after_done true
             }
         )
     }
@@ -13925,6 +14000,20 @@ children (
                 kind @note
                 text "Found by in-subquery-enum-shapes, which added Expr::array(SelectStatement) rendering ARRAY(...) in pgorm-query. Neither binding exposes it. Add it with stubs/typings, capability entries, parity cases and live tests."
             }
+
+            {
+                at 2026-10-25T22:09:44.912851Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:53:58.290968Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13940,6 +14029,20 @@ children (
                 kind @note
                 text "Found by value-decode-created-ranges. Created multiranges still have no Value decode in COPY or elsewhere in Rust, because tokio-postgres reports them as simple types. Decode them by a catalogue lookup of the multirange's range type or by a text cast, as created ranges decode to their text form."
             }
+
+            {
+                at 2026-10-25T22:09:46.305493Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:08:16.108726Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -13948,7 +14051,6 @@ children (
         title "Every caller pairing the tie-limit and window checks calls one public check"
         kind @refactor
         deps (view-check-dedup)
-        sealed true
         log (
             {
                 at 2026-10-23T19:22:07.811222Z
@@ -14009,6 +14111,20 @@ children (
                 kind @note
                 text "Found by schema-fk-domain-enum (c8da47a9). create_table_from_entity now refuses a belongs_to over a column typed as a domain over an enum, and pgorm-python maps the refusal to ConstructionError from schema.from_entity, but nothing tests that path: it needs an application-binding entity with a domain-over-enum key. Add it, and bump python.schema if its text should say so."
             }
+
+            {
+                at 2026-10-25T22:09:47.077279Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:20:32.030006Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14023,6 +14139,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by schema-fk-domain-enum (c8da47a9). pgorm-codegen reads DDL text and can emit a belongs_to over columns typed as a domain over an enum, which create_table_from_entity now refuses (PostgreSQL itself refuses such a key with 42804, so a dump cannot contain one as a constraint, but codegen may infer relations otherwise). Check whether codegen can produce one; if it can, refuse or annotate it as unsupported, as codegen does for other unsupported domain features. Also: a relation whose ColumnPairs are built from bare names records no types and is not checked by generation."
+            }
+
+            {
+                at 2026-10-25T22:09:45.861751Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T22:52:55.744846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14048,7 +14178,6 @@ children (
         id graph-via-as
         title "A graph's via hop can be re-bound to an alias, so a path through one table twice can be written"
         kind @feat
-        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.167976Z
@@ -14084,6 +14213,13 @@ children (
                 kind @note
                 text "Found by coming-from-seaorm. entities_from_sql is reachable only as pgorm_codegen::sql_schema::entities_from_sql. Re-export it (and whatever a caller needs beside it) at the crate root and update the docs and guide."
             }
+
+            {
+                at 2026-10-25T22:39:08.488559Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14105,6 +14241,13 @@ children (
                 kind @note
                 text "Updated 2026-10-26: codegen-root-export already fixed pgorm-codegen's README claim of live introspection; drop that item. Add: statement_cache_channel users behind a pooler or a network middlebox with an idle cutoff (an AWS NLB's 350 s) need TCP keepalives (keepalives_idle) shorter than it, since the listener's own SET idle_session_timeout = 0 (cache-listener-keepalive) covers only the server's timeout; say so in conn.pool.statement-cache.listen's prose or the connection docs."
             }
+
+            {
+                at 2026-10-26T00:24:31.094846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14120,6 +14263,13 @@ children (
                 kind @note
                 text "Found by statement-cache-cross-process. A server with idle_session_timeout set ends the pool's idle listening connection; each reconnect clears every statement cache, since a notification may have been missed. Keep the connection from idling out (a periodic no-op query, or SET idle_session_timeout = 0 on the listener's session, which is the cheaper and exact fix if the role may set it) and test it against a server with the timeout set."
             }
+
+            {
+                at 2026-10-25T22:49:56.472812Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14128,7 +14278,6 @@ children (
         title "The regex-mismatch, JSON-path and range-position operators have BinOper variants, so they render with their real precedence"
         kind @feat
         deps (boolean-operator-parens)
-        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.726332Z
@@ -14151,7 +14300,6 @@ children (
         title "A boolean generic operator under a comparison, IS, IN or LIKE renders bare where the grammar groups it the same way"
         kind @fix
         deps (boolean-operator-parens)
-        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.873Z
@@ -14237,6 +14385,20 @@ children (
                 kind @note
                 text "Found 2026-10-24 merging migration-ledger-schema: at load 40, identifier_oracle::live_capture::live_sites_hold_every_hostile_name failed after 226 s with \"site `pgorm/cursor.table`, name `zero-width-joiner`: the run stopped after 0 of 1 statements: []\"; alone it passes in 26 s. A capture that silently returns nothing under load hides real failures. Find what bounds the capture (a timeout, a log read racing the server) and make it wait for the statement or fail saying it timed out."
             }
+
+            {
+                at 2026-10-25T22:09:46.652239Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-25T23:04:46.93252Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14252,6 +14414,13 @@ children (
                 kind @note
                 text "Operator 2026-10-25, on hearing that tx-closure-only kept the bindings' APIs unchanged: do them too. Both bindings already have the scoped form beside the guard: Python `async with conn.transaction() as tx` (an asynccontextmanager; clean exit commits, an exception rolls back) and `async with tx.transaction() as sp` for a savepoint; JavaScript `conn.transaction(async (tx) => ..)` and `tx.transaction(async (sp) => ..)` (resolve commits or releases, a throw rolls back). Delete the guard forms from both public APIs: Python Connection.begin / Transaction.begin, Transaction.commit and Transaction.rollback (and the public __aenter__/__aexit__ on a Transaction a caller could hold); JavaScript Connection.begin, Transaction.begin, commit, rollback, close and [Symbol.asyncDispose] on Transaction, with their typings. Keep TransactionOptions/isolation on the scoped forms, the failed-ROLLBACK report (raised from the context manager exit / rejected from transaction()) and discard behaviour. Update stubs, capabilities, TRANSACTIONS.md, the napi README, python.transactions and napi.transactions, every test and example using the guard forms, and the security/generative Python and JavaScript emitters if they spell them."
             }
+
+            {
+                at 2026-10-25T23:17:55.346864Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14265,6 +14434,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by bindings-tx-closure-only (2026-10-26). security/generative/src/pgorm_campaign/process.py's _stop catches only ProcessLookupError, but on macOS os.killpg returns EPERM for a process group whose only member is a zombie, so test_process's test_timeout_and_output_limit_stop_children raises PermissionError under load (failed in two of four runs). Treat EPERM for a group whose leader has exited as already stopped (confirm the leader is reaped or a zombie of ours first, never swallow EPERM for a live group), and show the test passing repeatedly under load."
+            }
+
+            {
+                at 2026-10-26T00:24:07.526807Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14280,6 +14456,20 @@ children (
                 kind @note
                 text "Found by bindings-tx-closure-only (2026-10-26). pgorm-napi/tests/fixtures/racing.ts gives the first query 300 ms to settle and prints \"nothing settled\" under load, so exit.test.ts's \"exiting while settlements stream in\" failed once in a full Node run and passed alone. Make the fixture wait for the condition it needs (the first settlement) rather than a fixed delay, keeping what the test proves about exiting mid-stream."
             }
+
+            {
+                at 2026-10-25T23:58:03.087483Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:16:03.973045Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14294,6 +14484,76 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by value-decode-created-multiranges (2026-10-26). copy_in_columns / copy_out_columns now complete a created multirange's type from pg_range, and both bindings describe COPY columns through them and already decode Kind::Multirange for created types, so their copy_out_rows / copy_in_rows now read and write created multiranges as their created kinds, untested. Add a round-trip test in each binding (and through models where the binding has them), and update python.values (it says a created-multirange result column raises a decode error, still true for queries but not for a COPY column) and the napi value rule likewise."
+            }
+
+            {
+                at 2026-10-26T10:10:14.945182Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:21:29.151829Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+        )
+    }
+
+    {
+        id stale-default-test-evidence
+        title "Tests that a pool did or did not clear its statements judge the prepared statement itself, not the default it writes"
+        kind @test
+        log (
+            {
+                at 2026-10-26T13:39:20.015065Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-26: tests/statement_cache_listen_tests.rs an_idle_timeout_spares_the_listener failed twice in full integration runs (once before and once after the clear-race fix 2216c2c4), passing alone. The second time the log shows the client executed the same prepared statement s3 twice, never re-preparing it, and the server answered the new domain default: PostgreSQL re-planned the prepared insert itself. The likely cause is a shared-invalidation reset: under the full run's concurrent CREATE/DROP DATABASE churn a backend that falls behind the sinval queue discards every cached plan, and the re-plan reads the domain's new default. So 'the old default is still written' is not evidence that the pool did not clear. Judge the statement: its pg_prepared_statements row (name and prepare_time) unchanged means no clear; a new one means a clear. Rework every test that asserts a stale default persists or uses the default as the proof of a clear (tests/statement_cache_listen_tests.rs, tests/create_domain_tests.rs, tests/column_default_tests.rs, pgorm-pool/tests/cache_listener.rs, pgorm-migration/tests (domain_default), pgorm-python/tests/test_schema_domains.py, pgorm-napi/tests/connections.test.ts), keeping one live demonstration that a cleared pool writes the new default. Also fix the race cache-listener-keepalive's agent found in the Python and JavaScript listener tests (they wait for the server's view of the LISTEN, not the client's first clear; neither binding exposes anything that marks a clear). Prove sensitivity by forcing a re-plan (DISCARD PLANS on the pool's connection, or an invalidation reset) and showing the old assertions fail and the new ones hold."
+            }
+        )
+    }
+
+    {
+        id python-created-range-domain-subtype
+        title "Python decodes a created range or multirange whose subtype is a domain"
+        kind @fix
+        log (
+            {
+                at 2026-10-26T13:39:20.453705Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-copy-created-multiranges (2026-10-26). pgorm-python/src/results/ranges.rs::created matches a created range's or multirange's subtype against the built-in types without unwrapping a domain, so heightmultirange over a domain over float8 raises DecodeError, in a query and in a COPY. Rust handles it, and pgorm-napi's wire_type unwraps domains (untested there). Unwrap the domain in Python, test both bindings."
+            }
+        )
+    }
+
+    {
+        id bindings-expression-gaps
+        title "Python and JavaScript expressions spell what the other has: @@ in JavaScript, array subscripts, subquery membership and ANY/ALL in Python"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T13:39:20.82762Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-26 by binoper-missing-variants and pipeline-untyped-enum-casts. JavaScript has no matches (@@), which Python now has. Python has no array subscripts (at/slice), which JavaScript has. Python's statement builders have no subquery membership (is_in(select)) and its registered column no is_in/is_not_in; neither binding has ANY/ALL, so array(select) cannot express = ANY(..). Close each gap with stubs/typings, capabilities, parity cases and live tests, keeping Python's Expr split by family (multiple-pymethods, stub mixins) under the density gate."
+            }
+        )
+    }
+
+    {
+        id query-from-entity-schema
+        title "Query::select().from(entity) keeps the entity's schema, as Entity::find() does"
+        kind @fix
+        log (
+            {
+                at 2026-10-26T13:39:21.268023Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by pipeline-untyped-enum-casts (2026-10-26) writing a napi parity case: in Rust, Query::select().from(entity) drops the entity's schema while E::find() keeps it, so a schema-qualified entity's raw select reads the table through search_path. Confirm, fix if it is pgorm's to fix (from accepting an entity's table ref), and test with an entity in a non-public schema."
             }
         )
     }

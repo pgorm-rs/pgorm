@@ -9,6 +9,7 @@
 // [spec:pgorm:req:napi.entities]
 
 import type { Compiled, Expr, Operand, OrderBy, Predicate } from "./expressions.d.ts";
+import type { Select } from "./select.d.ts";
 import type { Conflict, ConflictUpdate } from "./writes.d.ts";
 import type { Change, Upserted } from "./models.d.ts";
 import type { OperationOptions, PlainValue, Queryable, Value } from "./index.d.ts";
@@ -91,6 +92,14 @@ export declare class EntityColumn<I extends Operand = Operand> extends Expr {
   gte(other: I): Expr;
   lt(other: I): Expr;
   lte(other: I): Expr;
+  /**
+   * In a list of values, each read as the column's declared kind as a
+   * compared value is, or in a subquery's rows, by the column's `ColumnTrait`:
+   * a column whose domain is over an enum is a member as the enum. A list
+   * holding an expression is a member as written.
+   */
+  isIn(source: readonly I[] | Select): Expr;
+  isNotIn(source: readonly I[] | Select): Expr;
 }
 
 /** What a registered entity's column is compared with. */

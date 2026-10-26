@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+5]
+// [spec:pgorm:req:napi.expressions+6]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -235,6 +235,13 @@ export declare function tuple(first: Operand, ...rest: Operand[]): Expr;
 export declare function exists(select: Select): Expr;
 /** `(select)`, a subquery yielding one value. */
 export declare function scalar(select: Select): Expr;
+/**
+ * `ARRAY(select)`: the subquery's one column collected into one array value,
+ * empty when the subquery yields no row, which can be cast and compared as a
+ * value where a subquery's rows cannot. PostgreSQL refuses a subquery of more
+ * than one column here (`42601`).
+ */
+export declare function array(select: Select): Expr;
 /** A searched `CASE` with its first arm. */
 export declare function caseWhen(condition: Predicate, result: Operand): SearchedCase;
 /** A simple `CASE` over `operand`; its first `when` makes it an expression. */

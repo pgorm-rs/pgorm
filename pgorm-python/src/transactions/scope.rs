@@ -166,7 +166,7 @@ impl Frame {
     /// Serve the frame's commands inside its transaction, a savepoint's frame
     /// nested inside while it is open: `Ok` once Python commits, an `Exit`
     /// once it rolls back or the handle is abandoned.
-    // [spec:pgorm:req:python.transactions+1]
+    // [spec:pgorm:req:python.transactions+2]
     pub(super) fn serve<'a>(
         &'a mut self,
         tx: &'a mut DatabaseTransaction<'_>,

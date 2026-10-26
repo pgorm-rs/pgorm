@@ -296,7 +296,10 @@ returned `EntitySchema` has `.enums`, `.table`, `.indexes` and `.comments`.
 Each property returns detached native statements. Execute enums first, then the
 table, then indexes and comments; deduplicate shared enum types when creating
 multiple entities. Foreign keys or other dependencies may require an
-application-specific creation order.
+application-specific creation order. A table Rust refuses to generate raises
+`ConstructionError` with Rust's message: an entity with a `belongs_to` over a
+column typed as a domain over an enum, on either side, is one, since
+PostgreSQL builds no foreign key there (`42804`).
 
 ```python
 async def create_account_schema(connection: p.Connection) -> None:

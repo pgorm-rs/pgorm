@@ -98,9 +98,14 @@ test("a rolled-back transaction's notification never arrives", async () => {
   await using listener = await pool().listener();
   await listener.listen("napi_rolled_back");
   await using connection = await pool().acquire();
-  const transaction = await connection.begin();
-  await transaction.notify("napi_rolled_back", "discarded");
-  await transaction.rollback();
+  const undo = new Error("roll the notification back");
+  await assert.rejects(
+    connection.transaction(async (transaction) => {
+      await transaction.notify("napi_rolled_back", "discarded");
+      throw undo;
+    }),
+    (error: unknown) => error === undo,
+  );
   await connection.notify("napi_rolled_back", "fence");
   assert.deepEqual(await heard(listener), ["napi_rolled_back", "fence"]);
 });
@@ -111,12 +116,12 @@ test("notifications arrive in commit order, a repeated payload once", async () =
   await listener.listen("napi_order");
   await using first = await pool().acquire();
   await using second = await pool().acquire();
-  const early = await first.begin();
-  const late = await second.begin();
-  for (const payload of ["1", "2", "1", "3"]) await early.notify("napi_order", payload);
-  await late.notify("napi_order", "first committed");
-  await late.commit();
-  await early.commit();
+  await first.transaction(async (early) => {
+    await second.transaction(async (late) => {
+      for (const payload of ["1", "2", "1", "3"]) await early.notify("napi_order", payload);
+      await late.notify("napi_order", "first committed");
+    });
+  });
   const received = [];
   for (let index = 0; index < 4; index += 1) received.push((await next(listener)).payload);
   assert.deepEqual(received, ["first committed", "1", "2", "3"]);
@@ -280,7 +285,7 @@ test("an aborted pull leaves the listener open; an aborted listen closes it", as
 });
 
 // [spec:pgorm:req:napi.listen/test]
-// [spec:pgorm:req:napi.connections+3/test]
+// [spec:pgorm:req:napi.connections+4/test]
 test("closing the pool closes its listeners, ending a pull in flight", async () => {
   const closing = new Pool(scratch(), { maxSize: 1 });
   const listener = await closing.listener();

@@ -7,6 +7,10 @@ import pgorm as p
 from pgorm import pipeline as pl, schema as s
 
 
+class RolledBack(Exception):
+    """Raised to leave a block, so that its savepoint rolls back."""
+
+
 class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=2)
@@ -23,7 +27,7 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_models_graphs_cursors_and_sources_share_transaction(self):
         async with self.pool.transaction() as tx:
             active = self.account.active().set("id", 1).set("display name", "Native").set("note", None)
@@ -43,15 +47,16 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await selected.one(tx))[0]["id"], 1)
             async with self.pool.connection() as outside:
                 self.assertEqual(await self.account.find().all(outside), [])
-            child = await tx.begin()
-            changed = await model.into_active().set("display name", "changed").update(child)
-            self.assertEqual(changed["version"], 2)
-            await child.rollback()
+            with self.assertRaises(RolledBack):
+                async with tx.transaction() as child:
+                    changed = await model.into_active().set("display name", "changed").update(child)
+                    self.assertEqual(changed["version"], 2)
+                    raise RolledBack
             self.assertEqual((await self.account.find().one(tx))["version"], 1)
             await model.into_active().delete(tx)
             self.assertEqual(await self.account.find().all(tx), [])
 
-    # [spec:pgorm:req:python.transactions+1/test]
+    # [spec:pgorm:req:python.transactions+2/test]
     async def test_after_hook_exception_rolls_back_database_write(self):
         with self.assertRaises(p.DatabaseError):
             async with self.pool.transaction() as tx:
@@ -63,13 +68,13 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:python.cancellation/test]
     async def test_cancelled_hook_ends_native_transaction_owner(self):
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            active = self.account.active().set("id", 1).set("display name", "wait_before").set("note", None)
-            task = asyncio.ensure_future(active.insert(tx))
-            await asyncio.sleep(0.05)
-            task.cancel()
             with self.assertRaises(asyncio.CancelledError):
-                await task
+                async with connection.transaction() as tx:
+                    active = self.account.active().set("id", 1).set("display name", "wait_before").set("note", None)
+                    task = asyncio.ensure_future(active.insert(tx))
+                    await asyncio.sleep(0.05)
+                    task.cancel()
+                    await task
             await asyncio.wait_for(connection.close(), 2)
             self.assertTrue(tx.closed)
             self.assertTrue(await self.pool.ping())

@@ -9,7 +9,7 @@
 import type { Select } from "./select.d.ts";
 import type { Merge } from "./merge.d.ts";
 import type { Delete, Insert, Update } from "./writes.d.ts";
-import type { SchemaStatement } from "./schema.d.ts";
+import type { Ddl } from "./schema.d.ts";
 import type { Pipeline } from "./pipeline.d.ts";
 import type { CopyFrom, CopyOutStream, CopyRows, CopyRowStream, CopySource, CopyTo } from "./copy.d.ts";
 import type { Listener, ListenerOptions } from "./listen.d.ts";
@@ -31,7 +31,7 @@ export * from "./listen.d.ts";
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
 
-// [spec:pgorm:req:napi.connections+3]
+// [spec:pgorm:req:napi.connections+4]
 /**
  * The channel pgorm-migration's runner notifies once a batch that applied a
  * migration commits: give it as {@link PoolOptions.statementCacheChannel} for
@@ -378,7 +378,7 @@ export declare class Multirange<T = PlainValue> implements Iterable<Range<T>> {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.value-tags]
+// [spec:pgorm:req:napi.value-tags+2]
 /**
  * A value with its kind declared: what plain JavaScript cannot tell apart —
  * an integer's width, a typed SQL NULL, JSON's null, an empty array, an enum's
@@ -418,7 +418,7 @@ export declare class Value {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.connections+3]
+// [spec:pgorm:req:napi.connections+4]
 /** How a {@link Pool} connects. Durations are in milliseconds. */
 export interface PoolOptions {
   /**
@@ -480,7 +480,7 @@ export interface QueryOptions extends OperationOptions {
 /** The row a terminal gives for its options. */
 export type RowFor<O extends QueryOptions> = O extends { readonly tagged: true } ? TaggedRow : Row;
 
-// [spec:pgorm:req:napi.transactions+1]
+// [spec:pgorm:req:napi.transactions+2]
 /** How a transaction opens; a savepoint inherits its transaction's. */
 export interface TransactionOptions extends OperationOptions {
   /**
@@ -497,7 +497,7 @@ export interface TransactionOptions extends OperationOptions {
  * A statement a builder made, which a terminal runs as `inspect()` builds it,
  * its values bound.
  */
-export type Statement = Select | Insert | Update | Delete | Merge | SchemaStatement | Pipeline;
+export type Statement = Select | Insert | Update | Delete | Merge | Ddl | Pipeline;
 
 /**
  * What a pool, a connection and a transaction run bound SQL through: SQL text
@@ -620,9 +620,12 @@ export declare function connect(dsn: string, options?: PoolOptions): Promise<Poo
 export declare class Connection extends Queryable implements AsyncDisposable {
   private constructor();
   readonly closed: boolean;
-  /** Open a transaction, which holds the connection until it commits or rolls back. */
-  begin(options?: TransactionOptions): Promise<Transaction>;
-  /** Run `use` in a transaction: committed when it resolves, rolled back when it throws. */
+  /**
+   * Run `use` in a transaction, which holds the connection until `use`
+   * settles: committed when it resolves, rolled back when it throws. Rejects
+   * with what `use` threw, or with a `SuppressedError` over it if the
+   * ROLLBACK failed; a failed commit or ROLLBACK discards the connection.
+   */
   transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: TransactionOptions): Promise<T>;
   /**
    * The rows of `sql`, one per pull. The stream holds the connection until its
@@ -637,25 +640,22 @@ export declare class Connection extends Queryable implements AsyncDisposable {
 }
 
 /**
- * A transaction, or a savepoint inside one. It borrows its parent
- * exclusively: while a savepoint is open, its transaction refuses statements,
- * commits, rollbacks and other savepoints with a {@link LifecycleError}, and
- * so does a transaction already running a statement.
+ * A transaction, or a savepoint inside one, open for the callback a
+ * `transaction(fn)` runs and ended as that callback settles. It borrows its
+ * parent exclusively: while a savepoint is open, its transaction refuses
+ * statements and other savepoints with a {@link LifecycleError}, and so does
+ * a transaction already running a statement.
  */
-export declare class Transaction extends Queryable implements AsyncDisposable {
+export declare class Transaction extends Queryable {
   private constructor();
   readonly closed: boolean;
   /** The connection, or for a savepoint the transaction, this one borrows. */
   readonly parent: Connection | Transaction;
-  /** Open a savepoint, which holds this transaction until it finishes. */
-  begin(options?: OperationOptions): Promise<Transaction>;
-  /** Run `use` in a savepoint: released when it resolves, rolled back to when it throws. */
+  /**
+   * Run `use` in a savepoint, which holds this transaction until `use`
+   * settles: released when it resolves, rolled back to when it throws.
+   */
   transaction<T>(use: (transaction: Transaction) => Promise<T>, options?: OperationOptions): Promise<T>;
-  commit(): Promise<void>;
-  rollback(): Promise<void>;
-  /** Roll back if still open, and resolve once the parent is free. */
-  close(): Promise<void>;
-  [Symbol.asyncDispose](): Promise<void>;
 }
 
 // [spec:pgorm:req:napi.streams]

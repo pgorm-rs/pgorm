@@ -317,6 +317,22 @@ fn subqueries() -> SelectStatement {
         .to_owned()
 }
 
+fn array_subquery() -> SelectStatement {
+    let events = Query::select()
+        .expr(col!("id"))
+        .from(table!("event"))
+        .cond_where(col!("account").eq(qualified!("a", "id")))
+        .to_owned();
+    Query::select()
+        .expr(qualified!("a", "id"))
+        .expr_as(Expr::array(events.clone()), n("events"))
+        .from(FromItem::Table(account()))
+        .cond_where(
+            Expr::expr(Expr::array(events)).binary(BinOper::Contains, Expr::val(vec![4i64])),
+        )
+        .to_owned()
+}
+
 fn from_subquery() -> SelectStatement {
     let inner = Query::select()
         .expr(col!("id"))
@@ -566,6 +582,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("functions", functions().build()),
         ("subqueries", subqueries().build()),
         ("from-subquery", from_subquery().build()),
+        ("array-subquery", array_subquery().build()),
         ("set-operations", set_operations().build()),
         ("locks", locks().build()),
         (

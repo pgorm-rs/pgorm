@@ -146,7 +146,7 @@ pub(crate) fn value(field: Field<'_>) -> PyResult<PyValue> {
         Type::MACADDR => typed::<Mac>(field, array, ArrayType::MacAddress, |v| {
             Value::MacAddress(v.map(|v| Box::new(v.0)))
         }),
-        // [spec:pgorm:req:python.values+4]
+        // [spec:pgorm:req:python.values+5]
         Type::INTERVAL => boxed!(Interval, Interval),
         _ if ty.name() == "vector" && matches!(ty.kind(), Kind::Simple) => boxed!(Vector, Vector),
         _ => {

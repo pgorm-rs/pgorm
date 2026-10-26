@@ -296,17 +296,20 @@ the live `DatabaseTransaction` and drives it through `ConnectionTrait` with
 > encoding are fixed, because changing either would report every applied file
 > as edited.
 
-> [spec:pgorm:req:migration.sql-file.compile]
+> [spec:pgorm:req:migration.sql-file.compile+1]
 > The file MUST be read while the calling crate compiles, and a file the macro
 > cannot use MUST be a compile error spanned on the path literal rather than a
 > failure at run time: a path that names no file stem, a file that cannot be
 > read, text that is not UTF-8, and text PostgreSQL's grammar refuses. The
 > grammar check is `sql!`'s — `pg_query::parse` over the whole script, held to
 > PostgreSQL 18's grammar, syntax only (`macros.sql.script`,
-> `macros.sql.ceiling`) — and its message names the file and the line the
-> parser stopped on, reprinting that line with a caret under the token the
-> parser named. A psql meta-command or a `COPY ... FROM stdin` data block is
-> refused like any other text the server would not run.
+> `macros.sql.ceiling`) — and the error names the file and carries the
+> parser's diagnostic. When the diagnostic quotes a token the file holds, the
+> error also names that token's line and reprints the line with a caret under
+> the token. A diagnostic quoting no token, such as `syntax error at end of
+> input`, gets neither, as in `sql!`. A psql meta-command or a
+> `COPY ... FROM stdin` data block is refused like any other text the server
+> would not run.
 >
 > The path is resolved against `CARGO_MANIFEST_DIR`, the directory holding the
 > calling crate's `Cargo.toml`, as sqlx's `migrate!` resolves its own, and not

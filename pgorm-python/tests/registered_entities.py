@@ -36,7 +36,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         registrations = p.capabilities()["registrations"]["entities"]
         self.assertEqual([r["name"] for r in registrations],
                          ["app.Account", "app.Booking", "app.Membership", "app.Note", "app.Old", "app.Room",
-                          "app.Stay"])
+                          "app.Stay", "app.Temper"])
         info = self.account.describe()
         self.assertTrue(info["rust_entity"].endswith("account::Entity"))
         self.assertTrue(info["rust_model"].endswith("account::Model"))
@@ -109,7 +109,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(model.tagged("mood").type_name, p.TypeName("Mood", schema="python_entities"))
 
     # [spec:pgorm:req:python.entities+3/test]
-    # [spec:pgorm:req:python.values+4/test]
+    # [spec:pgorm:req:python.values+5/test]
     async def test_created_ranges_round_trip_through_an_entity(self):
         booking = p.entity("app.Booking")
         span = p.CreatedRange("floatrange", "f64", schema="python_entities")

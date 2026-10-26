@@ -262,10 +262,11 @@ pub trait IntoSource {
     ///
     /// The name is the relation's only name from then on, as in SQL: an
     /// aliased entity no longer answers to its table name, and every
-    /// reference to its columns goes through [`col`](super::col). The
-    /// returned [`Named`] remembers what it wraps, which is how the same
-    /// spelling restates an entity source to
-    /// [`select_sources`](Pipeline::select_sources).
+    /// reference to its columns goes through the name: [`Named::col`] for
+    /// an entity's column, compared as the entity types it, or
+    /// [`col`](super::col), which only qualifies. The returned [`Named`]
+    /// remembers what it wraps, which is how the same spelling restates an
+    /// entity source to [`select_sources`](Pipeline::select_sources).
     ///
     /// ```
     /// # use pgorm::pipeline::{ExprOps, IntoSource, JoinSide, Pipeline, alias, col};
@@ -286,7 +287,7 @@ pub trait IntoSource {
     /// );
     /// # Ok::<_, pgorm::pipeline::PipelineError>(())
     /// ```
-    // [spec:pgorm:sem:pipeline.self-join]
+    // [spec:pgorm:sem:pipeline.self-join+1]
     // [spec:pgorm:sem:pipeline.select-sources+4]
     fn named(self, name: impl Into<AliasName>) -> Named<Self>
     where
@@ -326,7 +327,7 @@ fn table_source(node: PlExpr) -> Source {
 }
 
 /// A relation already carried as a [`Source`] passes through unchanged.
-// [spec:pgorm:sem:pipeline.self-join]
+// [spec:pgorm:sem:pipeline.self-join+1]
 impl IntoSource for Source {
     fn into_source(self) -> Source {
         self
@@ -493,7 +494,7 @@ impl Pipeline {
     /// A [`named`](IntoSource::named) relation carries its alias onto the
     /// reference, which is what lets the same table appear twice.
     // [spec:pgorm:req:pipeline.compose]
-    // [spec:pgorm:sem:pipeline.self-join]
+    // [spec:pgorm:sem:pipeline.self-join+1]
     fn embed(&mut self, source: Source) -> PlExpr {
         let Source { kind, alias } = source;
         let reference = self.embed_kind(kind);
@@ -854,7 +855,7 @@ impl Pipeline {
     /// exists on both sides. To join a relation to itself, give the operand
     /// a name of its own with [`named`](IntoSource::named).
     // [spec:pgorm:req:pipeline.surface+3]
-    // [spec:pgorm:sem:pipeline.self-join]
+    // [spec:pgorm:sem:pipeline.self-join+1]
     pub fn join(
         self,
         side: JoinSide,

@@ -4,6 +4,11 @@
 //! `statement_cache_channel` and one not. A domain's changed default is the
 //! DDL a prepared insert does not see, so which default an insert writes says
 //! whether its pool cleared.
+//!
+//! A test that prepares a statement and then asks whether the pool cleared
+//! waits for the listener's clears through [`ListenerClears`] first: the
+//! clear its `LISTEN` makes lands after the server already shows the
+//! `LISTEN`, and would throw a statement prepared in between away.
 
 pub mod common;
 
@@ -15,6 +20,7 @@ use pgorm::{
     ConnectionTrait, DatabaseConnection, DatabasePool, Error, ManagerConfig, NoTls,
     RecyclingMethod, STATEMENT_CACHE_CHANNEL, StatementCacheSize, notify,
 };
+use pgorm_test_support::ListenerClears;
 use pretty_assertions::assert_eq;
 
 /// How long a change the listener makes is waited for.
@@ -26,6 +32,9 @@ const SCHEMA: &str = "CREATE DOMAIN quantity AS integer DEFAULT 1; \
                       CREATE TABLE line (id integer PRIMARY KEY, qty quantity)";
 
 const SET_DEFAULT: &str = "ALTER DOMAIN quantity SET DEFAULT 2";
+
+/// How long the idle-timeout test's database lets a session idle.
+const IDLE_TIMEOUT: &str = "2s";
 
 fn manager(channel: Option<&str>) -> ManagerConfig {
     ManagerConfig {
@@ -46,6 +55,15 @@ fn listening_pool(ctx: &TestContext) -> Result<DatabasePool, Error> {
         manager(Some(STATEMENT_CACHE_CHANNEL)),
         |builder| builder.max_size(1),
     )
+}
+
+/// A pool on `ctx`'s database whose sessions never idle out, whatever the
+/// database sets, for a test to watch the server through.
+fn wakeful_pool(ctx: &TestContext) -> DatabasePool {
+    let base_url = std::env::var("DATABASE_URL").expect("TestContext loaded DATABASE_URL");
+    let mut config = config(&base_url, ctx.db_name());
+    config.options("-c idle_session_timeout=0");
+    pgorm::connect(config)
 }
 
 /// Poll `probe` until it answers `Some`, failing the test past [`ARRIVAL`].
@@ -80,11 +98,47 @@ async fn listener_backend(db: &DatabaseConnection) -> Result<Option<i32>, Error>
         .map(|row| row.get(0)))
 }
 
+/// Start `pool`'s listener and wait for the clear its `LISTEN` makes. Nothing
+/// but a checkout starts the listener, so one is taken and given straight back.
+async fn first_clear(pool: &DatabasePool, clears: &ListenerClears) -> Result<(), Error> {
+    drop(pool.get().await?);
+    clears.reach(1).await;
+    Ok(())
+}
+
 /// Open `pool`'s listener and wait for its `LISTEN`, answering its backend.
 async fn listening_backend(pool: &DatabasePool, watcher: &DatabasePool) -> Result<i32, Error> {
     drop(pool.get().await?);
     eventually("the listener's LISTEN", || async {
         listener_backend(&watcher.get().await?).await
+    })
+    .await
+}
+
+async fn backend_alive(watcher: &DatabasePool, pid: i32) -> Result<bool, Error> {
+    Ok(watcher
+        .get()
+        .await?
+        .query_one(
+            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = $1)",
+            &[&pid],
+        )
+        .await?
+        .get(0))
+}
+
+/// Open a session that takes `ctx`'s database settings and wait until the
+/// server ends it for idling. By then every session that has idled since
+/// before it opened has idled as long, and would have been ended too.
+async fn a_session_idles_out(ctx: &TestContext, watcher: &DatabasePool) -> Result<(), Error> {
+    let base_url = std::env::var("DATABASE_URL").expect("TestContext loaded DATABASE_URL");
+    let session = pgorm_test_support::connect(&base_url, ctx.db_name()).await?;
+    let pid: i32 = session
+        .query_one("SELECT pg_backend_pid()", &[])
+        .await?
+        .get(0);
+    eventually("the database's idle_session_timeout", || async {
+        Ok((!backend_alive(watcher, pid).await?).then_some(()))
     })
     .await
 }
@@ -103,88 +157,152 @@ async fn insert(pool: &DatabasePool, id: i32) -> Result<i32, Error> {
     Ok(pool.get().await?.query_one(INSERT, &[&id]).await?.get(0))
 }
 
-/// Wait until `pool`'s connection is lent with its insert closed, then insert
-/// through it.
-async fn insert_once_cleared(pool: &DatabasePool, id: i32) -> Result<i32, Error> {
-    eventually("the clear", || async {
-        let db = pool.get().await?;
-        if prepared_inserts(&db).await? > 0 {
-            return Ok(None);
-        }
-        Ok(Some(db.query_one(INSERT, &[&id]).await?.get(0)))
-    })
-    .await
+/// Once the listener has made `made` clears, insert through `pool`'s
+/// connection, which the clear lent it with its prepared insert closed.
+async fn insert_after_clears(
+    pool: &DatabasePool,
+    clears: &ListenerClears,
+    made: usize,
+    id: i32,
+) -> Result<i32, Error> {
+    clears.reach(made).await;
+    let db = pool.get().await?;
+    assert_eq!(
+        prepared_inserts(&db).await?,
+        0,
+        "the clear closed the insert"
+    );
+    Ok(db.query_one(INSERT, &[&id]).await?.get(0))
 }
 
 /// A notification on the channel clears the pool that listens there, and
 /// only that pool: its next insert writes the new default, while the pool
 /// without the setting keeps writing the default its insert was planned with.
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a notification, whatever its payload,
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a notification, whatever its payload,
 // clears the listening pool's statements, and a pool without the setting keeps its own
-#[pgorm_macros::test]
-async fn only_the_listening_pool_writes_the_new_default() -> Result<(), Error> {
-    let ctx = TestContext::new("statement_cache_listen_notified").await;
-    let quiet = &ctx.db;
-    quiet.get().await?.batch_execute(SCHEMA).await?;
-    let listening = listening_pool(&ctx)?;
-    listening_backend(&listening, quiet).await?;
+#[test]
+fn only_the_listening_pool_writes_the_new_default() -> Result<(), Error> {
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let ctx = TestContext::new("statement_cache_listen_notified").await;
+        let quiet = &ctx.db;
+        quiet.get().await?.batch_execute(SCHEMA).await?;
+        let listening = listening_pool(&ctx)?;
+        first_clear(&listening, &clears).await?;
 
-    assert_eq!(insert(&listening, 1).await?, 1);
-    assert_eq!(prepared_inserts(&listening.get().await?).await?, 1);
-    assert_eq!(insert(quiet, 2).await?, 1);
+        assert_eq!(insert(&listening, 1).await?, 1);
+        assert_eq!(prepared_inserts(&listening.get().await?).await?, 1);
+        assert_eq!(insert(quiet, 2).await?, 1);
 
-    let db = quiet.get().await?;
-    db.batch_execute(SET_DEFAULT).await?;
-    notify(&db, STATEMENT_CACHE_CHANNEL, "the payload is not read").await?;
-    drop(db);
+        let db = quiet.get().await?;
+        db.batch_execute(SET_DEFAULT).await?;
+        notify(&db, STATEMENT_CACHE_CHANNEL, "the payload is not read").await?;
+        drop(db);
 
-    assert_eq!(insert_once_cleared(&listening, 3).await?, 2);
-    assert_eq!(insert(quiet, 4).await?, 1);
-    assert_eq!(prepared_inserts(&quiet.get().await?).await?, 1);
+        assert_eq!(insert_after_clears(&listening, &clears, 2, 3).await?, 2);
+        assert_eq!(insert(quiet, 4).await?, 1);
+        assert_eq!(prepared_inserts(&quiet.get().await?).await?, 1);
 
-    drop(listening);
-    ctx.delete().await;
-    Ok(())
+        drop(listening);
+        ctx.delete().await;
+        Ok(())
+    })
 }
 
 /// A listener whose connection is terminated reconnects and clears once, for
 /// whatever was notified while it was gone, with nothing notified at all.
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    a terminated listener reconnects and
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    a terminated listener reconnects and
 // clears the pool's statements once it listens again
-#[pgorm_macros::test]
-async fn a_reconnected_listener_clears_the_pool() -> Result<(), Error> {
-    let ctx = TestContext::new("statement_cache_listen_reconnected").await;
-    let watcher = &ctx.db;
-    watcher.get().await?.batch_execute(SCHEMA).await?;
-    let listening = listening_pool(&ctx)?;
-    let lost = listening_backend(&listening, watcher).await?;
+#[test]
+fn a_reconnected_listener_clears_the_pool() -> Result<(), Error> {
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let ctx = TestContext::new("statement_cache_listen_reconnected").await;
+        let watcher = &ctx.db;
+        watcher.get().await?.batch_execute(SCHEMA).await?;
+        let listening = listening_pool(&ctx)?;
+        first_clear(&listening, &clears).await?;
+        let lost = listening_backend(&listening, watcher).await?;
 
-    assert_eq!(insert(&listening, 1).await?, 1);
-    let db = watcher.get().await?;
-    db.batch_execute(SET_DEFAULT).await?;
-    assert_eq!(
-        insert(&listening, 2).await?,
-        1,
-        "unnotified, the planned default stands"
-    );
-    db.execute("SELECT pg_terminate_backend($1)", &[&lost])
+        assert_eq!(insert(&listening, 1).await?, 1);
+        let db = watcher.get().await?;
+        db.batch_execute(SET_DEFAULT).await?;
+        assert_eq!(
+            insert(&listening, 2).await?,
+            1,
+            "unnotified, the planned default stands"
+        );
+        db.execute("SELECT pg_terminate_backend($1)", &[&lost])
+            .await?;
+        drop(db);
+
+        eventually("the reconnection", || async {
+            Ok(listener_backend(&watcher.get().await?)
+                .await?
+                .filter(|pid| *pid != lost))
+        })
         .await?;
-    drop(db);
+        assert_eq!(insert_after_clears(&listening, &clears, 2, 3).await?, 2);
 
-    eventually("the reconnection", || async {
-        Ok(listener_backend(&watcher.get().await?)
-            .await?
-            .filter(|pid| *pid != lost))
+        drop(listening);
+        ctx.delete().await;
+        Ok(())
     })
-    .await?;
-    assert_eq!(insert_once_cleared(&listening, 3).await?, 2);
-
-    drop(listening);
-    ctx.delete().await;
-    Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    closing the pool closes its listener's connection
+/// A database that ends idle sessions does not end the listener's: once a
+/// session opened after its `LISTEN` has idled out, the listener is the
+/// backend it was, and the pool has not cleared, so the insert it prepared
+/// still writes the default it was planned with.
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    the listening session outlives the
+// database's idle_session_timeout, and the pool does not clear
+#[test]
+fn an_idle_timeout_spares_the_listener() -> Result<(), Error> {
+    let clears = ListenerClears::default();
+    clears.run(async {
+        let ctx = TestContext::new("statement_cache_listen_idle").await;
+        let db = ctx.db.get().await?;
+        db.batch_execute(SCHEMA).await?;
+        db.batch_execute(&format!(
+            "ALTER DATABASE \"{}\" SET idle_session_timeout = '{IDLE_TIMEOUT}'",
+            ctx.db_name()
+        ))
+        .await?;
+        drop(db);
+        let watcher = wakeful_pool(&ctx);
+        let listening = listening_pool(&ctx)?;
+        // The pool's own connection takes the database's timeout as the
+        // listener's does; it is kept from idling out so that only the
+        // listener's session is under test.
+        listening
+            .get()
+            .await?
+            .batch_execute("SET idle_session_timeout = 0")
+            .await?;
+        first_clear(&listening, &clears).await?;
+        let listener = listening_backend(&listening, &watcher).await?;
+
+        assert_eq!(insert(&listening, 1).await?, 1);
+        watcher.get().await?.batch_execute(SET_DEFAULT).await?;
+        a_session_idles_out(&ctx, &watcher).await?;
+
+        assert_eq!(
+            listener_backend(&watcher.get().await?).await?,
+            Some(listener),
+            "the listener's session outlives the timeout"
+        );
+        assert_eq!(clears.count(), 1, "the listener cleared only as it began");
+        assert_eq!(insert(&listening, 2).await?, 1, "nothing cleared the pool");
+        assert_eq!(prepared_inserts(&listening.get().await?).await?, 1);
+
+        drop(listening);
+        drop(watcher);
+        ctx.delete().await;
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    closing the pool closes its listener's connection
 #[pgorm_macros::test]
 async fn closing_the_pool_closes_its_listener() -> Result<(), Error> {
     let ctx = TestContext::new("statement_cache_listen_closed").await;
@@ -193,17 +311,7 @@ async fn closing_the_pool_closes_its_listener() -> Result<(), Error> {
 
     listening.close();
     eventually("the listener's disconnection", || async {
-        let alive: bool = ctx
-            .db
-            .get()
-            .await?
-            .query_one(
-                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = $1)",
-                &[&pid],
-            )
-            .await?
-            .get(0);
-        Ok((!alive).then_some(()))
+        Ok((!backend_alive(&ctx.db, pid).await?).then_some(()))
     })
     .await?;
 
@@ -212,7 +320,7 @@ async fn closing_the_pool_closes_its_listener() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:req:conn.pool.statement-cache.listen/test]    connect_with refuses an empty channel and
+// [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    connect_with refuses an empty channel and
 // one past 63 bytes, before anything connects
 #[test]
 fn connect_with_refuses_an_unusable_channel() {

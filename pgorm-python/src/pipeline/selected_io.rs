@@ -10,7 +10,7 @@ use pyo3::{
 };
 use pyo3_async_runtimes::tokio::future_into_py;
 
-// [spec:pgorm:req:python.pipeline]
+// [spec:pgorm:req:python.pipeline+1]
 pub(super) fn read<'py>(
     py: Python<'py>,
     connection: &Bound<'_, PyAny>,

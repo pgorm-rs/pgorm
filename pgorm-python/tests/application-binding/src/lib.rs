@@ -9,6 +9,7 @@ pub mod old;
 pub mod room;
 pub mod sources;
 pub mod stay;
+pub mod temper;
 
 #[cfg(test)]
 mod graph_parity;
@@ -30,6 +31,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     registry.entity::<room::Entity>("app.Room")?;
     registry.entity::<stay::Entity>("app.Stay")?;
     registry.entity::<old::Entity>("app.Old")?;
+    registry.entity::<temper::Entity>("app.Temper")?;
     graphs::register(&mut registry)?;
     sources::register(&mut registry)?;
     pgorm_python::install(module, registry)

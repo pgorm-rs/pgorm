@@ -1,5 +1,6 @@
 import ast
 import unittest
+from itertools import pairwise
 
 from pgorm_campaign import baseline, emit_python, wire
 from pgorm_campaign.author import Author
@@ -90,6 +91,29 @@ def join_program():
     return author.finish()
 
 
+def nested_scopes_program():
+    """Seven nested transaction scopes, the most a program may open, each
+    closed in turn by a rollback or a commit."""
+    author = Author(seed=10)
+    table = author.node("table", data={"schema": "fixture", "name": "accounts"})
+    column = author.node("expr.column", {"table": table}, {"name": "id"})
+    query = author.node("select", {"columns": [column]})
+    query = author.node("select.from", {"query": query, "table": table})
+    scopes = ["root"] + ["s" + str(depth) for depth in range(1, 8)]
+    for parent, child in pairwise(scopes):
+        author.effect(
+            "begin",
+            data={"child": child, "mode": "default", "isolation": "default"},
+            scope=parent,
+        )
+    author.effect(
+        "fetch", {"query": query}, {"mode": "all", "ordered": False}, scope=scopes[-1]
+    )
+    for depth, scope in enumerate(reversed(scopes[1:])):
+        author.effect("rollback" if depth % 2 == 0 else "commit", scope=scope)
+    return author.finish()
+
+
 def runtime_model_program():
     author = Author(seed=9)
     table = author.node("table", data={"schema": "fixture", "name": "absent"})
@@ -147,6 +171,15 @@ class EmitPythonTests(unittest.TestCase):
         self.assertEqual(recorded, steps)
         self.assertEqual(source.count('report["steps"].append(_step)'), len(steps))
         self.assertIn("STEP_COUNT = " + str(len(steps)), source)
+
+    def test_nested_scopes_emit_as_async_with_blocks(self):
+        source = emit_python.render(nested_scopes_program())
+        compile(source, "python.py", "exec")
+        self.assertEqual(source.count("async with connection.transaction("), 1)
+        self.assertEqual(source.count(".transaction() as tx_s"), 6)
+        self.assertEqual(source.count("raise _RolledBack"), 4)
+        for guard in (".begin(", ".commit(", ".rollback(", "open_transactions"):
+            self.assertNotIn(guard, source)
 
     def test_unsupported_join_raises_named_instruction_error(self):
         with self.assertRaises(emit_python.UnsupportedInstruction) as caught:

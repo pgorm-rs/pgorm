@@ -16,8 +16,8 @@
 
 import type { Builder, BindValue, Compiled } from "./expressions.d.ts";
 import type { Table } from "./select.d.ts";
-import type { Entity, EntityRecord, SourceRegistrations } from "./entities.d.ts";
-import type { OperationOptions, Queryable } from "./index.d.ts";
+import type { Entity, EntityColumn, EntityRecord, SourceRegistrations } from "./entities.d.ts";
+import type { OperationOptions, Queryable, TypeName } from "./index.d.ts";
 
 /** An operand: a pipeline expression, or a value the stage that takes it binds. */
 export type PipelineOperand = PipelineExpr | BindValue;
@@ -82,12 +82,23 @@ export declare class PipelineExpr {
   /** Membership in an explicit list, each item an operand. */
   inArray(values: readonly PipelineOperand[]): PipelineExpr;
   cast(type: CastType): PipelineExpr;
+  /**
+   * Compared as the enum `type` names, as a registered column whose domain is
+   * over that enum compares: every comparison, `inArray`, `coalesce`, `min`
+   * and `max` cast it to the enum, which PostgreSQL needs of such a column
+   * where no registration types it.
+   */
+  comparesAs(type: string | TypeName): PipelineExpr;
   /** The name a projected expression takes: an identifier, or an {@link alias} a later stage reads it by. */
   as(name: PipelineName): PipelineExpr;
 }
 
-/** A column of the relation `table` names: prqlc has no catalog, so every column is qualified. */
-export declare function col(table: PipelineName, column: PipelineName): PipelineExpr;
+/**
+ * A column of the relation `table` names: prqlc has no catalog, so every
+ * column is qualified. A registered entity's column is the entity's own,
+ * compared as the entity types it; a name only qualifies.
+ */
+export declare function col(table: PipelineName, column: PipelineName | EntityColumn<any>): PipelineExpr;
 /** A name a stage introduces, which reads back unqualified wherever it is used. */
 export declare function alias(name: string): PipelineExpr;
 /**

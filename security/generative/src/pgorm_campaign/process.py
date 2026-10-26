@@ -39,20 +39,42 @@ async def _write(stream, data):
         stream.close()
 
 
+# Seconds a group may refuse a signal before the refusal is believed.
+_REFUSAL_GRACE = 5
+
+
+async def _signal(child, signum):
+    """Signal the child's process group, reporting whether the group remained."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _REFUSAL_GRACE
+    while True:
+        try:
+            os.killpg(child.pid, signum)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            # macOS refuses, rather than ignores, a group none of whose
+            # members it can signal, and it signals no member that is exiting
+            # or a zombie, as the leader is until this event loop reaps it.
+            # Such a group is gone once its members are reaped, which the
+            # sleep lets the loop do; a refusal that outlasts the grace is a
+            # live member this process may not signal.
+            if loop.time() >= deadline:
+                raise
+            await asyncio.sleep(0.01)
+        else:
+            return True
+
+
 async def _stop(child):
     # The leader may exit while a descendant still holds an output pipe.
-    try:
-        os.killpg(child.pid, signal.SIGTERM)
-    except ProcessLookupError:
+    if not await _signal(child, signal.SIGTERM):
         return
     try:
         await asyncio.wait_for(child.wait(), 1)
     except TimeoutError:
         pass
-    try:
-        os.killpg(child.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    await _signal(child, signal.SIGKILL)
     await child.wait()
 
 

@@ -133,7 +133,7 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
 }
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -179,7 +179,7 @@ fn window_and_range_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.schema/test]
+// [spec:pgorm:req:napi.schema+2/test]
 // [spec:pgorm:req:napi.schema-tables/test]
 // [spec:pgorm:req:napi.schema-alter/test]
 // [spec:pgorm:req:napi.schema-indexes/test]
@@ -196,7 +196,7 @@ fn schema_family_matches_its_golden_file() {
 }
 
 // [spec:pgorm:req:napi.pipeline/test]
-// [spec:pgorm:req:napi.pipeline-expressions+1/test]
+// [spec:pgorm:req:napi.pipeline-expressions+2/test]
 // [spec:pgorm:req:napi.pipeline-binder/test]
 #[test]
 fn pipeline_family_matches_its_golden_file() {

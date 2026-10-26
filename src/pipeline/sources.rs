@@ -22,6 +22,7 @@ use crate::{
 use super::adapter::{self, Piece, PlExpr};
 use super::builder::{IntoSource, Pipeline, Source};
 use super::error::PipelineError;
+use super::expr::{Expr, entity_column};
 
 mod sealed {
     use super::PlExpr;
@@ -448,7 +449,7 @@ impl<T: SourceList> SelectedSources<T> {
 /// type, so a `Named` entity can also restate a source to
 /// [`select_sources`](Pipeline::select_sources), where the entity supplies
 /// the columns and the name qualifies them.
-// [spec:pgorm:sem:pipeline.self-join]
+// [spec:pgorm:sem:pipeline.self-join+1]
 // [spec:pgorm:sem:pipeline.select-sources+4]
 #[derive(Debug, Clone)]
 pub struct Named<R> {
@@ -456,10 +457,42 @@ pub struct Named<R> {
     pub(super) name: String,
 }
 
+impl<S: SelectableSource> Named<S> {
+    /// A column of the named relation: qualified by the name, and compared as
+    /// its entity's column is, so a column whose domain is over an enum
+    /// compares as the enum here as it does read bare.
+    ///
+    /// The typed counterpart of [`col`](super::col) for an entity read under
+    /// a name of its own, which `col` can only qualify: a name says nothing
+    /// of the column's type, and the entity does.
+    ///
+    /// ```
+    /// use pgorm::pipeline::{ExprOps, IntoSource, JoinSide, Pipeline, alias};
+    /// use pgorm::tests_cfg::fruit::{self, Column as F};
+    ///
+    /// let peer = fruit::Entity.named(alias("peer"));
+    /// let (sql, _) = Pipeline::from(fruit::Entity)
+    ///     .join(JoinSide::Inner, peer.clone(), F::CakeId.eq(peer.col(F::CakeId)))
+    ///     .select((F::Name, peer.col(F::Name)))
+    ///     .into_sql()?;
+    /// assert_eq!(
+    ///     sql,
+    ///     "SELECT fruit.name AS _expr_0, peer.name FROM fruit \
+    ///      INNER JOIN fruit AS peer ON fruit.cake_id = peer.cake_id"
+    /// );
+    /// # Ok::<_, pgorm::pipeline::PipelineError>(())
+    /// ```
+    // [spec:pgorm:sem:pipeline.self-join+1]
+    // [spec:pgorm:sem:entity.traits.column.enum-cast+12]
+    pub fn col<'brand>(&self, column: <S::Entity as EntityTrait>::Column) -> Expr<'brand> {
+        entity_column(self.name.clone(), &column)
+    }
+}
+
 /// Read a relation under an owned identifier computed at runtime.
 /// Like [`IntoSource::named`], this preserves the relation's source type
 /// for [`Pipeline::select_sources`].
-// [spec:pgorm:req:python.pipeline]
+// [spec:pgorm:req:python.pipeline+1]
 pub fn named_runtime<R: IntoSource>(relation: R, name: Name) -> Named<R> {
     Named {
         relation,
@@ -469,7 +502,7 @@ pub fn named_runtime<R: IntoSource>(relation: R, name: Name) -> Named<R> {
 
 /// Naming a relation aliases it on the way in; naming it again replaces the
 /// name, as a second `AS` would.
-// [spec:pgorm:sem:pipeline.self-join]
+// [spec:pgorm:sem:pipeline.self-join+1]
 impl<R: IntoSource> IntoSource for Named<R> {
     fn into_source(self) -> Source {
         let mut source = self.relation.into_source();

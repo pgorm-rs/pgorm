@@ -24,7 +24,7 @@ macro_rules! native {
     };
 }
 
-// [spec:pgorm:req:python.transactions+1]
+// [spec:pgorm:req:python.transactions+2]
 #[pgorm::entity::prelude::async_trait::async_trait]
 impl ConnectionTrait for Database<'_> {
     async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>

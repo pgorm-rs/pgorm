@@ -15,7 +15,7 @@ PG_19 = "pg-19" in p.capabilities()["features"]
 
 
 class SchemaConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     def test_capabilities_and_detached_builders(self):
         manifest = p.capabilities()
         self.assertFalse(manifest["schema_policy"]["automatic_ddl"])
@@ -34,7 +34,7 @@ class SchemaConstruction(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             s.from_entity(p.Model("test", {"id": p.Column("i32")}))
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     def test_all_declared_types_retain_native_identity(self):
         for kind in p.capabilities()["schema_policy"]["column_types"]:
             with self.subTest(kind=kind):
@@ -62,7 +62,7 @@ class SchemaConstruction(unittest.TestCase):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     def test_invalid_options_and_unquoted_fragments_fail(self):
         for action in (
             lambda: s.DataType("text; DROP TABLE test"),
@@ -89,7 +89,7 @@ class SchemaConstruction(unittest.TestCase):
             with self.subTest(action=action), self.assertRaises(p.PgOrmError):
                 action()
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     # [spec:pgorm:req:python.schema-domains/test]    a domain's builder refuses truth testing too
     def test_schema_objects_refuse_truth_testing(self):
         table, query = p.Table("test"), p.select(p.col("id")).from_(p.Table("source"))
@@ -125,7 +125,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL(f"DROP SCHEMA {self.quoted} CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_explicit_table_index_and_alter_execution(self):
         model = p.Model('items "x"', {"id": p.Column("i32", primary_key=True), "name": p.Column("text")}, schema=self.namespace)
         importlib.reload(s)
@@ -185,7 +185,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await connection.execute(s.drop_table(renamed))
             await connection.execute(s.drop_table(renamed, if_exists=True))
 
-    # [spec:pgorm:req:python.expressions+4/test]
+    # [spec:pgorm:req:python.expressions+5/test]
     async def test_uuidv7_default_keys_rows_in_write_order(self):
         table = p.Table("minted", schema=self.namespace)
         ddl = s.create_table(table).column(s.ColumnDef("id", "uuid").default(p.call("uuidv7"))).primary_key("id")
@@ -198,7 +198,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         rows = await self.pool.fetch_all(p.select(p.col("written"), version).from_(table).order_by(p.col("id").asc()))
         self.assertEqual([dict(row) for row in rows], [{"written": n, "version": 7} for n in range(16)])
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_not_null_constraints_by_name(self):
         table = p.Table('kept "x"', schema=self.namespace)
         quoted = f'{self.quoted}."kept ""x"""'
@@ -229,7 +229,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
                 {"name": "note present", "valid": True, "no_inherit": False},
             ])
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_constraints_drop_and_rename_by_name(self):
         table = p.Table('checked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."checked ""x"""'
@@ -254,7 +254,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await connection.fetch_all(catalog), [])
             await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_check_not_valid_and_no_inherit(self):
         table = p.Table('validated "x"', schema=self.namespace)
         quoted = f'{self.quoted}."validated ""x"""'
@@ -282,7 +282,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
                 {"name": "positive", "valid": True, "no_inherit": True},
             ])
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_temporal_keys(self):
         table = p.Table('booked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."booked ""x"""'
@@ -306,7 +306,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             await self.pool.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (1, '[2020-01-15,2020-02-15)')"))
         self.assertEqual(overlap.exception.sqlstate, "23P01")
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_not_enforced_constraints(self):
         table = p.Table('checked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."checked ""x"""'
@@ -340,7 +340,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
                 {"name": "small", "enforced": True, "valid": True},
             ])
 
-    # [spec:pgorm:req:python.schema+1/test]
+    # [spec:pgorm:req:python.schema+2/test]
     async def test_qualified_enum_arrays_and_label_escaping(self):
         # A same-named public type must not capture a qualified column reference.
         shadow_name = 'Mood shadow ' + uuid4().hex[:8]

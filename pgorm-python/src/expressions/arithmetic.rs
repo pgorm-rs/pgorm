@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use super::PyExpr;
 
-// [spec:pgorm:req:python.expressions+4]
+// [spec:pgorm:req:python.expressions+5]
 #[pymethods]
 impl PyExpr {
     fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
