@@ -549,7 +549,7 @@ bound parameter is held to.
 > (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
 > and placed in relation position as
 > `FromItem::Template(fragment, "sub_statement")`
-> (`[spec:pgorm:def:sql.types.table-ref+6]`). What the paginator holds is
+> (`[spec:pgorm:def:sql.types.table-ref+7]`). What the paginator holds is
 > then ONE shape — an ordinary `SelectStatement` — for a built source and
 > a raw one alike: the page clauses of `exec.paginator.fetch` and the
 > count wrapper of `exec.paginator.count` are the builder's, and the

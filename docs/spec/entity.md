@@ -29,7 +29,7 @@ explicit limitations.
 > `src/entity/prelude.rs` (`DeriveEntityModel`, `DeriveActiveModel`, `DerivePrimaryKey`,
 > `DeriveRelation`, and friends), but every trait can be implemented by hand.
 
-> [spec:pgorm:req:entity.traits.entity-name+2]
+> [spec:pgorm:req:entity.traits.entity-name+3]
 > `EntityName::table_name` is the only required method and MUST return the table's SQL
 > name. `schema_name` and `comment` default to `None`; `module_name` defaults to
 > `table_name()`. `table_ref` MUST produce a schema-qualified `TableName`
@@ -38,6 +38,13 @@ explicit limitations.
 > type, so schema projection targets take it directly; query positions widen it to a
 > `FromItem` through `IntoFromItem`. All generated SQL that names the table goes
 > through `table_ref`, so a `Some` schema name qualifies every statement.
+> An entity handed straight to a builder's table position — `from`, a join, an
+> `INSERT`, `UPDATE` or `DELETE` target, a DDL target — MUST be qualified the same
+> way, so a raw statement reads and writes the table `find()` does and never a
+> same-named one `search_path` finds first: the `SqlName` `DeriveEntity` writes
+> answers `schema_name` as its `table_schema`, which `IntoTableName` reads
+> (`[spec:pgorm:def:sql.types.table-ref+7]`). An entity whose `SqlName` is written
+> by hand qualifies there only if it answers `table_schema` too.
 
 > [spec:pgorm:req:entity.traits.crud+4]
 > `EntityTrait` provides the static *read* surface (`src/entity/base_entity.rs`):

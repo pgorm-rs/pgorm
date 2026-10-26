@@ -49,6 +49,9 @@ before(async () => {
       "CREATE TYPE app.slot AS RANGE (subtype = int4)",
       "CREATE DOMAIN app.email AS text CHECK (VALUE LIKE '%@%')",
       "CREATE DOMAIN app.span AS interval",
+      "CREATE DOMAIN app.height AS float8",
+      "CREATE DOMAIN app.tall AS app.height CHECK (VALUE > 0)",
+      "CREATE TYPE app.heightrange AS RANGE (subtype = app.tall)",
     ]
   ) {
     await db().execute(statement);
@@ -484,6 +487,9 @@ test("a Value converts at construction, can be bound again, and hands out indepe
 // [spec:pgorm:req:napi.values/test]
 test("a domain decodes and binds as the type it is built over", async () => {
   assert.equal((await one("SELECT 'a@b'::app.email AS v")).v, "a@b");
+  const [height] = await db().query("SELECT '[1.5,2)'::app.heightrange AS v", [], { tagged: true });
+  assert.deepEqual(height?.v?.createdType, new CreatedRange("heightrange", "f64", { schema: "app" }));
+  same(height?.v?.value, new Range(1.5, 2));
   assert.equal(await roundTrip("app.email", "c@d"), "c@d");
   same((await one("SELECT ARRAY['a@b'::app.email, NULL] AS v")).v, ["a@b", null]);
   same(await roundTrip("app.span", new Interval({ days: 2 })), new Interval({ days: 2 }));

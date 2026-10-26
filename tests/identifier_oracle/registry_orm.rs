@@ -560,6 +560,81 @@ fn entity_sites() -> Vec<Site> {
             },
         },
         Site {
+            id: "pgorm/entity.schema-name.select-from",
+            api: "SelectStatement::from(entity) with a runtime EntityName::schema_name",
+            kinds: &["RangeVar.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                Rendered::sql(
+                    Query::select()
+                        .expr(Expr::val(1))
+                        .from(dyn_named::Entity::schema(n))
+                        .to_string(),
+                )
+            },
+        },
+        Site {
+            id: "pgorm/entity.schema-name.join",
+            api: "SelectStatement::join(kind, entity, on) with a runtime EntityName::schema_name",
+            kinds: &["RangeVar.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                Rendered::sql(
+                    Query::select()
+                        .expr(Expr::val(1))
+                        .from(fixed("u"))
+                        .join(
+                            JoinType::InnerJoin,
+                            dyn_named::Entity::schema(n),
+                            Expr::val(true).eq(true),
+                        )
+                        .to_string(),
+                )
+            },
+        },
+        Site {
+            id: "pgorm/entity.schema-name.insert-into",
+            api: "InsertStatement::into_table(entity) with a runtime EntityName::schema_name",
+            kinds: &["InsertStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                Rendered::sql(
+                    Query::insert()
+                        .into_table(dyn_named::Entity::schema(n))
+                        .columns([dyn_named::Column::Id])
+                        .values_panic([1.into()])
+                        .to_string(),
+                )
+            },
+        },
+        Site {
+            id: "pgorm/entity.schema-name.update",
+            api: "UpdateStatement::table(entity) with a runtime EntityName::schema_name",
+            kinds: &["UpdateStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                Rendered::sql(
+                    Query::update()
+                        .table(dyn_named::Entity::schema(n))
+                        .value(dyn_named::Column::Id, 1)
+                        .to_string(),
+                )
+            },
+        },
+        Site {
+            id: "pgorm/entity.schema-name.delete-from",
+            api: "DeleteStatement::from_table(entity) with a runtime EntityName::schema_name",
+            kinds: &["DeleteStmt.relation.schemaname"],
+            policy: Quoted,
+            render: |n| {
+                Rendered::sql(
+                    Query::delete()
+                        .from_table(dyn_named::Entity::schema(n))
+                        .to_string(),
+                )
+            },
+        },
+        Site {
             id: "pgorm/schema.create-table-from-entity",
             api: "Schema::create_table_from_entity(entity) with a runtime table name",
             kinds: &["CreateStmt.relation.relname"],

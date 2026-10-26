@@ -1134,6 +1134,7 @@ assertions (
     {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
     {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
     {id python-copy-typing-cases, kind @complete, author "brendan@necessary.nu", at 2026-10-19T10:48:39.938347Z}
+    {id python-created-range-domain-subtype, kind @complete, author "brendan@necessary.nu", at 2026-10-26T14:07:08.379524Z}
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
     {id python-datatype-export, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:56:06.241222Z}
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
@@ -1155,6 +1156,7 @@ assertions (
     {id query-comment-renders, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:23:59.814264Z}
     {id query-dead-surface-gone, kind @complete, author "brendan@necessary.nu", at 2026-09-20T00:13:16.428035Z}
     {id query-error-from, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:06:34.991306Z}
+    {id query-from-entity-schema, kind @complete, author "brendan@necessary.nu", at 2026-10-26T15:06:55.399539Z}
     {id query-generated-virtual-guarded, kind @complete, author "brendan@necessary.nu", at 2026-09-19T23:41:47.316724Z}
     {id query-identity-columns, kind @complete, author "brendan@necessary.nu", at 2026-09-21T12:28:09.876693Z}
     {id query-index-forms, kind @complete, author "brendan@necessary.nu", at 2026-09-21T12:54:17.313695Z}
