@@ -14713,4 +14713,34 @@ children (
             }
         )
     }
+
+    {
+        id binding-variant-coverage
+        title "Each binding's tests prove it handles every variant of the open enums it translates"
+        kind @test
+        deps (public-enums-non-exhaustive)
+        log (
+            {
+                at 2026-10-26T18:06:31.299236Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by public-enums-non-exhaustive (81eeeac8). Marking pgorm-query's open enums #[non_exhaustive] means a variant added later no longer breaks the bindings' builds: their wildcard arms compile, and the missing spelling shows only at run time as an unsupported error. non_exhaustive_omitted_patterns, the lint that would catch it, is still unstable on Rust 1.99. Give each binding (and the generative replay harness) a test that walks every variant of each open enum it translates (BinOper, Value kinds, ColumnType, the JSON behaviours and so on: whichever each binding matches over) and fails if one reaches the wildcard arm. pgorm-query needs a way to enumerate the variants (an ALL constant, or a test-only iterator); choose the one that does not make the enums' variant lists a second public API to keep in sync, and say why."
+            }
+        )
+    }
+
+    {
+        id scalar-kinds-shared
+        title "The bindings and the replay harness share one scalar_kinds table"
+        kind @refactor
+        deps (public-enums-non-exhaustive)
+        log (
+            {
+                at 2026-10-26T18:06:31.438371Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by public-enums-non-exhaustive (81eeeac8). The scalar_kinds! value-kind macro exists in three near-identical copies: pgorm-python, pgorm-napi and security/generative's replay harness. Give it one home (pgorm or pgorm-query, as a macro or a table the three expand from) and use it in all three, with no behaviour change."
+            }
+        )
+    }
 )
