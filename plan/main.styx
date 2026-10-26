@@ -13482,6 +13482,7 @@ children (
         title "pgorm-napi's DDL builder base is not called SchemaStatement, so schema means only a database schema there too"
         kind @refactor
         deps (schema-statement-wrapper)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:39.897126Z
@@ -13495,6 +13496,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Operator 2026-10-23: \"yes\", rename it. A breaking change to the JavaScript typings; no alias kept."
+            }
+
+            {
+                at 2026-10-26T00:13:51.100898Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

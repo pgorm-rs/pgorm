@@ -90,11 +90,11 @@ export {
   commentOnTable,
   createTable,
   CreateTable,
+  Ddl,
   dropTable,
   renameColumn,
   renameConstraint,
   renameTable,
-  SchemaStatement,
   truncateTable,
 } from "./schema.js";
 export { AlterTable, alterTable, PendingAlterTable } from "./schema-alter.js";

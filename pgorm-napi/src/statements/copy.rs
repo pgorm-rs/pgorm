@@ -259,7 +259,7 @@ fn copy_from_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(CopyStatement::CopyFrom(copy).into())
 }
 
-/// What a COPY TO reads: a table, named as a schema statement names one, or
+/// What a COPY TO reads: a table, named as a DDL statement names one, or
 /// the rows of a `Select`, or of an INSERT, UPDATE, DELETE or MERGE through
 /// its `RETURNING` list. A `Select` is final once read here, so its tie limit
 /// and WINDOW clause are checked as any statement reading one checks them. A

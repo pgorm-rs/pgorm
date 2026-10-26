@@ -189,7 +189,7 @@ pub(super) fn columns<'cx>(
 
 /// The relation a statement names: a name, or a `Table` with no alias, its
 /// schema kept. A sequence is a relation too.
-// [spec:pgorm:req:napi.schema]
+// [spec:pgorm:req:napi.schema+2]
 pub(in crate::statements) fn relation<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
@@ -201,7 +201,7 @@ pub(in crate::statements) fn relation<'cx>(
         Some(Node::Table(table)) if table.alias.is_none() => Ok(table.name),
         Some(Node::Table(_)) => refuse(
             cx,
-            "a schema statement names a Table without an alias: an alias belongs to a query",
+            "a DDL statement names a Table without an alias: an alias belongs to a query",
         ),
         _ => refuse(cx, "a table or sequence is named by a string or a Table"),
     }

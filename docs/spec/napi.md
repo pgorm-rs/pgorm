@@ -818,7 +818,7 @@ JavaScript builds DDL through pgorm-query's DDL builders as pgorm-python's
 schema surface does, and further: every statement `sql-ddl.md` specifies that
 a schema is made of, in the builder conventions the statements above use.
 
-> [spec:pgorm:req:napi.schema]
+> [spec:pgorm:req:napi.schema+2]
 > Tables, their columns, keys and constraints and their alterations, indexes,
 > types, sequences, extensions and comments MUST be built through
 > pgorm-query's DDL builders, each JavaScript object owning the builder state
@@ -829,6 +829,12 @@ a schema is made of, in the builder conventions the statements above use.
 > not know among them, so that a misspelt option is never left out of a
 > statement. Constructing one does no I/O, and nothing runs DDL but a
 > terminal.
+>
+> Every complete DDL statement MUST be a `Ddl`, the class the module exports
+> for one as pgorm-python exports `DDL`, and a member of the `Statement`
+> union the terminals take; only the module's DDL functions construct one.
+> A schema is a database schema alone (`napi.schema-schemas`), as it is in
+> pgorm-query (`sql.ddl`), so no export is named `SchemaStatement`.
 >
 > PostgreSQL takes no parameters in DDL, so a DDL statement MUST render
 > through pgorm-query's own rendering, which writes every value it carries —

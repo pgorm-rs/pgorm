@@ -6,7 +6,7 @@
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
-import { SchemaStatement, statement } from "./schema.js";
+import { Ddl, statement } from "./schema.js";
 
 /**
  * @typedef {string | import("./values.js").TypeName} TypeRef
@@ -17,7 +17,7 @@ import { SchemaStatement, statement } from "./schema.js";
  * `CREATE TYPE`: a shell type until a kind is chosen. What a type is, is one
  * slot, so choosing a kind replaces the one before.
  */
-export class CreateType extends SchemaStatement {
+export class CreateType extends Ddl {
   /** An enumeration, with the labels `values` appends. */
   asEnum() {
     return new CreateType(native.ddlTypeAsEnum(arg(this)), TRUSTED);
@@ -143,7 +143,7 @@ export class PendingAlterType extends attributeChanges(Handle) {
   }
 }
 
-export class AlterComposite extends attributeChanges(SchemaStatement) {
+export class AlterComposite extends attributeChanges(Ddl) {
   static {
     compositeOf = (handle) => new AlterComposite(handle, TRUSTED);
   }
@@ -154,7 +154,7 @@ export class AlterComposite extends attributeChanges(SchemaStatement) {
   }
 }
 
-export class RenameAttribute extends SchemaStatement {
+export class RenameAttribute extends Ddl {
   /** @param {"cascade" | "restrict"} behavior */
   behavior(behavior) {
     return new RenameAttribute(native.ddlTypeBehavior(arg(this), behavior), TRUSTED);

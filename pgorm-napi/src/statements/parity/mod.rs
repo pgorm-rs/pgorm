@@ -179,7 +179,7 @@ fn window_and_range_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:napi.schema/test]
+// [spec:pgorm:req:napi.schema+2/test]
 // [spec:pgorm:req:napi.schema-tables/test]
 // [spec:pgorm:req:napi.schema-alter/test]
 // [spec:pgorm:req:napi.schema-indexes/test]

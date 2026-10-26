@@ -7,7 +7,7 @@
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";
 import { native } from "./operations.js";
-import { SchemaStatement, statement } from "./schema.js";
+import { Ddl, statement } from "./schema.js";
 
 /**
  * @typedef {string | import("./values.js").TypeName} TypeRef
@@ -18,7 +18,7 @@ import { SchemaStatement, statement } from "./schema.js";
  * `CREATE DOMAIN`: the clauses render in one order whatever order they are
  * given in, and a default and a nullability are one slot each.
  */
-export class CreateDomain extends SchemaStatement {
+export class CreateDomain extends Ddl {
   /**
    * @param {string} collation
    * @param {{ schema?: string }} [options]
