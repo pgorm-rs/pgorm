@@ -14228,12 +14228,27 @@ children (
         id napi-racing-fixture-timing
         title "pgorm-napi's racing fixture does not depend on a query settling within 300 ms"
         kind @test
+        sealed true
         log (
             {
                 at 2026-10-25T23:57:13.543484Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by bindings-tx-closure-only (2026-10-26). pgorm-napi/tests/fixtures/racing.ts gives the first query 300 ms to settle and prints \"nothing settled\" under load, so exit.test.ts's \"exiting while settlements stream in\" failed once in a full Node run and passed alone. Make the fixture wait for the condition it needs (the first settlement) rather than a fixed delay, keeping what the test proves about exiting mid-stream."
+            }
+
+            {
+                at 2026-10-25T23:58:03.087483Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:16:03.973045Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
