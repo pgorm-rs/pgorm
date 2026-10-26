@@ -647,18 +647,16 @@ async fn a_read_never_widens_a_pre_checksum_ledger() -> Result<(), Error> {
 
 /// A batch that changes a domain's default reaches a connection that already
 /// prepared an insert through it: once the batch commits, the runner has the
-/// pool clear its statements, and the insert is prepared again and writes the
-/// new default. A run that applies nothing leaves prepared statements alone.
+/// pool clear its statements, closing the insert, which is prepared again and
+/// writes the new default. A run that applies nothing leaves the insert
+/// prepared.
 // [spec:pgorm:sem:migration.up+4/test]    a committed batch that applied a migration clears the
 // pool's statement caches, and a run that applied nothing does not
 // [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    the runner clears after the DDL it applied
 #[tokio::test]
 async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
-    use common::migrator::domain_default::{Created, Defaulted};
+    use common::migrator::domain_default::{Created, Defaulted, INSERT, prepared_insert};
 
-    const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
-    const PREPARED: &str = "SELECT count(*) FROM pg_prepared_statements \
-                            WHERE statement = 'INSERT INTO line (id) VALUES ($1) RETURNING qty'";
     const BACKEND: &str = "SELECT pg_backend_pid()";
 
     let ctx = TestContext::new("pgorm_migration_clears_statements").await;
@@ -668,6 +666,8 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
     let conn = db.get().await?;
     let backend: i32 = conn.query_one(BACKEND, &[]).await?.get(0);
     assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
+    let prepared = prepared_insert(&conn).await?;
+    assert!(prepared.is_some());
     drop(conn);
 
     Created::up(db.clone(), None).await?;
@@ -676,7 +676,7 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
         conn.query_one(BACKEND, &[]).await?.get::<_, i32>(0),
         backend
     );
-    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
+    assert_eq!(prepared_insert(&conn).await?, prepared);
     drop(conn);
 
     Defaulted::up(db.clone(), None).await?;
@@ -685,8 +685,10 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
         conn.query_one(BACKEND, &[]).await?.get::<_, i32>(0),
         backend
     );
-    assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 0);
+    assert_eq!(prepared_insert(&conn).await?, None);
     assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
+    let prepared_again = prepared_insert(&conn).await?;
+    assert!(prepared_again.is_some() && prepared_again != prepared);
     drop(conn);
 
     ctx.delete().await;
@@ -695,25 +697,26 @@ async fn up_clears_the_pools_prepared_statements() -> Result<(), Error> {
 
 /// Another process's pool, listening on the channel the runner notifies by
 /// default, hears a batch that applied a migration and clears: its insert,
-/// prepared before the batch changed the domain's default, writes the new one.
-/// A run that applies nothing sends nothing, nor does a migrator that names no
-/// channel, as the fence each is followed by shows: notifications reach a
-/// session in commit order.
+/// prepared before the batch changed the domain's default, is closed, and
+/// prepared again writes the new one. A run that applies nothing sends
+/// nothing, nor does a migrator that names no channel, which still clears the
+/// pool it was given, as the fence each is followed by shows: notifications
+/// reach a session in commit order.
 // [spec:pgorm:sem:migration.up+4/test]    a batch that applied a migration notifies the channel as
 // it commits, and a run that applied nothing, or a migrator naming no channel, does not
 // [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    another pool listening on the default
 // channel clears once the runner's batch commits
 #[test]
 fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
-    use common::migrator::domain_default::{Created, Defaulted, Unannounced};
+    use common::migrator::domain_default::{
+        Created, Defaulted, INSERT, Unannounced, prepared_insert,
+    };
     use futures::StreamExt;
     use pgorm_migration::pgorm::{Listener, Notifications, STATEMENT_CACHE_CHANNEL, notify};
     use pgorm_test_support::ListenerClears;
     use std::time::Duration;
 
-    const INSERT: &str = "INSERT INTO line (id) VALUES ($1) RETURNING qty";
-    const PREPARED: &str = "SELECT count(*) FROM pg_prepared_statements \
-                            WHERE statement = 'INSERT INTO line (id) VALUES ($1) RETURNING qty'";
+    const BACKEND: &str = "SELECT pg_backend_pid()";
     const ARRIVAL: Duration = Duration::from_secs(10);
 
     async fn payload(notifications: &mut Notifications) -> Result<String, Error> {
@@ -742,30 +745,42 @@ fn up_notifies_pools_listening_elsewhere() -> Result<(), Error> {
         clears.reach(1).await;
         let conn = elsewhere.get().await?;
         assert_eq!(conn.query_one(INSERT, &[&1]).await?.get::<_, i32>(0), 1);
+        let prepared = prepared_insert(&conn).await?;
+        assert!(prepared.is_some());
         drop(conn);
         let conn = elsewhere.get().await?;
-        assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 1);
+        assert_eq!(prepared_insert(&conn).await?, prepared);
         drop(conn);
 
         Defaulted::up(db.clone(), None).await?;
         assert_eq!(payload(&mut notifications).await?, "");
         clears.reach(2).await;
         let conn = elsewhere.get().await?;
-        assert_eq!(conn.query_one(PREPARED, &[]).await?.get::<_, i64>(0), 0);
+        assert_eq!(prepared_insert(&conn).await?, None);
         assert_eq!(conn.query_one(INSERT, &[&2]).await?.get::<_, i32>(0), 2);
+        let prepared_again = prepared_insert(&conn).await?;
+        assert!(prepared_again.is_some() && prepared_again != prepared);
         drop(conn);
 
+        let conn = db.get().await?;
+        let backend: i32 = conn.query_one(BACKEND, &[]).await?.get(0);
+        assert_eq!(conn.query_one(INSERT, &[&3]).await?.get::<_, i32>(0), 2);
+        assert!(prepared_insert(&conn).await?.is_some());
+        drop(conn);
         Defaulted::up(db.clone(), None).await?;
         Unannounced::up(db.clone(), None).await?;
+        let conn = db.get().await?;
         assert_eq!(
-            db.get()
-                .await?
-                .query_one(INSERT, &[&3])
-                .await?
-                .get::<_, i32>(0),
-            3,
+            conn.query_one(BACKEND, &[]).await?.get::<_, i32>(0),
+            backend
+        );
+        assert_eq!(
+            prepared_insert(&conn).await?,
+            None,
             "the runner still clears its own pool"
         );
+        assert_eq!(conn.query_one(INSERT, &[&4]).await?.get::<_, i32>(0), 3);
+        drop(conn);
         notify(&db.get().await?, STATEMENT_CACHE_CHANNEL, "fence").await?;
         assert_eq!(payload(&mut notifications).await?, "fence");
 

@@ -14443,12 +14443,27 @@ children (
         id stale-default-test-evidence
         title "Tests that a pool did or did not clear its statements judge the prepared statement itself, not the default it writes"
         kind @test
+        sealed true
         log (
             {
                 at 2026-10-26T13:39:20.015065Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found 2026-10-26: tests/statement_cache_listen_tests.rs an_idle_timeout_spares_the_listener failed twice in full integration runs (once before and once after the clear-race fix 2216c2c4), passing alone. The second time the log shows the client executed the same prepared statement s3 twice, never re-preparing it, and the server answered the new domain default: PostgreSQL re-planned the prepared insert itself. The likely cause is a shared-invalidation reset: under the full run's concurrent CREATE/DROP DATABASE churn a backend that falls behind the sinval queue discards every cached plan, and the re-plan reads the domain's new default. So 'the old default is still written' is not evidence that the pool did not clear. Judge the statement: its pg_prepared_statements row (name and prepare_time) unchanged means no clear; a new one means a clear. Rework every test that asserts a stale default persists or uses the default as the proof of a clear (tests/statement_cache_listen_tests.rs, tests/create_domain_tests.rs, tests/column_default_tests.rs, pgorm-pool/tests/cache_listener.rs, pgorm-migration/tests (domain_default), pgorm-python/tests/test_schema_domains.py, pgorm-napi/tests/connections.test.ts), keeping one live demonstration that a cleared pool writes the new default. Also fix the race cache-listener-keepalive's agent found in the Python and JavaScript listener tests (they wait for the server's view of the LISTEN, not the client's first clear; neither binding exposes anything that marks a clear). Prove sensitivity by forcing a re-plan (DISCARD PLANS on the pool's connection, or an invalidation reset) and showing the old assertions fail and the new ones hold."
+            }
+
+            {
+                at 2026-10-26T14:20:49.183559Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Diagnosis confirmed 2026-10-26 by a probe on a disposable server (pgorm-python/tests/with_postgres.py): one prepared insert, its pg_prepared_statements name and prepare_time unchanged throughout, wrote the domain's new default without any clear after each of DISCARD PLANS, a CREATE SCHEMA in its database, and a 3000-table CREATE in another database, both while the session was busy (pg_sleep) and while it sat idle (5 of 5 rounds). A transaction that queues more invalidation messages than the shared queue holds resets every session that has not caught up, and a reset re-plans every statement a session keeps. Evidence chosen: the statement itself (pgorm-test-support PREPARED_STATEMENT: name || prepare_time for statements starting with a text); the stale default is asserted only where a plan_mark witness (an IMMUTABLE plpgsql function reading a table, folded into a generic plan) shows the session has not re-planned."
+            }
+
+            {
+                at 2026-10-26T16:12:09.117063Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

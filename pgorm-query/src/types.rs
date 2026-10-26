@@ -766,7 +766,7 @@ pub enum Keyword {
     CurrentTimestamp,
     /// `VALUE`: the value a domain's `CHECK` constraint is tested against
     /// ([`Expr::domain_value`](crate::Expr::domain_value)).
-    // [spec:pgorm:req:sql.ddl.domain+2]
+    // [spec:pgorm:req:sql.ddl.domain+3]
     Value,
 }
 

@@ -21,6 +21,7 @@ use pgorm::pgorm_query::{
     extension::Type,
 };
 use pgorm::{ConnectionTrait, TransactionTrait, entity::prelude::*};
+use pgorm_test_support::PREPARED_STATEMENT;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 use tokio_postgres::error::SqlState;
@@ -242,7 +243,7 @@ fn written(id: i32, qty: i32, mood: Mood, codes: &[&str]) -> line::Model {
 /// entity writes, reads and filters through them — the domain over an enum
 /// compared as its enum, which is the only way PostgreSQL compares one —
 /// while each domain's check refuses what it does not hold.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    an entity whose columns are domains over an
+// [spec:pgorm:req:sql.ddl.domain+3/test]    an entity whose columns are domains over an
 // integer, over an enum and an array of one creates its table with them, reads, writes and
 // filters through them, a predicate on the enum's domain comparing as the enum, and a check's
 // refusal arrives as 23514 naming the constraint
@@ -1074,14 +1075,58 @@ async fn untyped_pipeline_columns_compare_as_the_enum() -> Result<(), Error> {
     Ok(())
 }
 
+/// A function the planner folds into a plan as a constant, being declared
+/// immutable, though it reads a table: a session answers `SELECT plan_mark()`
+/// with what `plan_mark` held when the session last planned that statement.
+const PLAN_MARK: &str = "CREATE TABLE plan_mark (n integer); INSERT INTO plan_mark VALUES (1); \
+                         CREATE FUNCTION plan_mark() RETURNS integer IMMUTABLE LANGUAGE plpgsql \
+                         AS $$ BEGIN RETURN (SELECT n FROM plan_mark); END $$";
+
+async fn plan_mark(db: &impl ConnectionTrait) -> Result<i32, Error> {
+    Ok(db.query_one("SELECT plan_mark()", &[]).await?.get(0))
+}
+
+/// Plan `SELECT plan_mark()` on `db`'s session and then change what it reads,
+/// so that the session answers 1 until it re-plans its statements and 2 after.
+/// Run before the statement whose plan is in question is prepared, so that a
+/// re-plan of that statement is a re-plan of this one too.
+async fn mark_plans(db: &impl ConnectionTrait) -> Result<(), Error> {
+    db.batch_execute(PLAN_MARK).await?;
+    assert_eq!(plan_mark(db).await?, 1);
+    db.batch_execute("UPDATE plan_mark SET n = 2").await
+}
+
+/// Whether `db`'s session has re-planned its statements since [`mark_plans`].
+/// A reset of the session's caches re-plans every statement it keeps prepared,
+/// under the same name, and one comes whenever the session falls behind the
+/// server's shared invalidation queue, which other databases' catalogue churn
+/// can cause at any moment; asked after a statement ran, a no says that the
+/// statement ran with the plan it was prepared with.
+async fn replanned(db: &impl ConnectionTrait) -> Result<bool, Error> {
+    Ok(plan_mark(db).await? != 1)
+}
+
+/// A `line` written with every column but `qty`, which the domain's default
+/// fills.
+fn defaulted(id: i32) -> line::ActiveModel {
+    line::ActiveModel {
+        id: set(id),
+        mood: set(Mood::Calm),
+        codes: set(Vec::new()),
+        ..Default::default()
+    }
+}
+
 /// PostgreSQL's plan cache does not see a domain's default change: an insert a
 /// connection prepared before `SET DEFAULT` keeps writing the default it was
 /// planned with, where the same insert prepared afterwards — on another
 /// connection, whose statement cache is its own — writes the new one. A
-/// check added at the same point holds at once.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    an insert prepared before SET DEFAULT keeps the old
-// default on its connection while a fresh connection's writes the new one, and a check added
-// then holds at once
+/// check added at the same point holds at once. The old default is held only
+/// while the session is shown not to have re-planned ([`replanned`]): a re-plan
+/// keeps the statement and writes the new default.
+// [spec:pgorm:req:sql.ddl.domain+3/test]    an insert prepared before SET DEFAULT keeps the old
+// default on its connection, as one statement, while the session has not re-planned, a fresh
+// connection's writes the new one, and a check added then holds at once
 #[pgorm_macros::test]
 async fn a_prepared_insert_keeps_its_planned_default() -> Result<(), Error> {
     let ctx = TestContext::new("domain_default_plan_cache").await;
@@ -1094,13 +1139,10 @@ async fn a_prepared_insert_keeps_its_planned_default() -> Result<(), Error> {
                 .to_string(),
         )
         .await?;
-    let defaulted = |id: i32| line::ActiveModel {
-        id: set(id),
-        mood: set(Mood::Calm),
-        codes: set(Vec::new()),
-        ..Default::default()
-    };
+    mark_plans(&first).await?;
     assert_eq!(defaulted(1).insert(&first).await?.qty, 1);
+    let prepared = prepared_insert(&first).await?;
+    assert!(prepared.is_some());
 
     let set_default = Domain::alter((n("billing"), n("quantity")))
         .set_default(2)
@@ -1110,7 +1152,14 @@ async fn a_prepared_insert_keeps_its_planned_default() -> Result<(), Error> {
         r#"ALTER DOMAIN "billing"."quantity" SET DEFAULT 2"#
     );
     first.batch_execute(&set_default).await?;
-    assert_eq!(defaulted(2).insert(&first).await?.qty, 1);
+    let written = defaulted(2).insert(&first).await?.qty;
+    assert_eq!(prepared_insert(&first).await?, prepared);
+    if !replanned(&first).await? {
+        assert_eq!(
+            written, 1,
+            "the insert keeps the default it was planned with"
+        );
+    }
     let second = ctx.db.get().await?;
     assert_eq!(defaulted(3).insert(&second).await?.qty, 2);
 
@@ -1125,11 +1174,62 @@ async fn a_prepared_insert_keeps_its_planned_default() -> Result<(), Error> {
                 .to_string(),
         )
         .await?;
-    let stale = defaulted(4)
-        .insert(&first)
-        .await
-        .expect_err("the planned default under the new check");
-    checked_by(&stale, "several", "quantity");
+    let stale = defaulted(4).insert(&first).await;
+    if !replanned(&first).await? {
+        let refused = stale.expect_err("the planned default under the new check");
+        checked_by(&refused, "several", "quantity");
+    }
+
+    drop(first);
+    drop(second);
+    ctx.delete().await;
+    Ok(())
+}
+
+/// A reset of the session's caches re-plans every statement it keeps
+/// prepared, under the name it was prepared with, and [`replanned`] sees it:
+/// after `DISCARD PLANS`, and after another session creates a schema in the
+/// database, the insert prepared before `SET DEFAULT` writes the new default
+/// as the same statement. A session falling behind the server's shared
+/// invalidation queue is reset the same way, but only catalogue churn heavy
+/// enough to reset every other session on the server causes that.
+// [spec:pgorm:req:sql.ddl.domain+3/test]    a reset of the session's caches, by DISCARD PLANS or a
+// schema created in its database, re-plans the kept insert under its name with the new default
+#[pgorm_macros::test]
+async fn a_reset_replans_the_kept_insert() -> Result<(), Error> {
+    let ctx = TestContext::new("domain_default_replanned").await;
+    let first = ctx.db.get().await?;
+    domains(&first).await?;
+    first
+        .batch_execute(
+            &pgorm::Schema::new()
+                .create_table_from_entity(line::Entity)?
+                .to_string(),
+        )
+        .await?;
+    mark_plans(&first).await?;
+    assert_eq!(defaulted(1).insert(&first).await?.qty, 1);
+    let prepared = prepared_insert(&first).await?;
+    assert!(prepared.is_some());
+
+    let second = ctx.db.get().await?;
+    second
+        .batch_execute(r#"ALTER DOMAIN "billing"."quantity" SET DEFAULT 2"#)
+        .await?;
+    first.batch_execute("DISCARD PLANS").await?;
+    assert_eq!(defaulted(2).insert(&first).await?.qty, 2);
+    assert_eq!(prepared_insert(&first).await?, prepared);
+    assert_eq!(plan_mark(&first).await?, 2);
+
+    second
+        .batch_execute(
+            r#"UPDATE plan_mark SET n = 3; ALTER DOMAIN "billing"."quantity" SET DEFAULT 3;
+               CREATE SCHEMA elsewhere"#,
+        )
+        .await?;
+    assert_eq!(defaulted(3).insert(&first).await?.qty, 3);
+    assert_eq!(prepared_insert(&first).await?, prepared);
+    assert_eq!(plan_mark(&first).await?, 3);
 
     drop(first);
     drop(second);
@@ -1143,26 +1243,23 @@ async fn backend(db: &impl ConnectionTrait) -> Result<i32, Error> {
     Ok(db.query_one("SELECT pg_backend_pid()", &[]).await?.get(0))
 }
 
-/// How many inserts into `line` the connection's session holds prepared on
-/// the server.
-async fn prepared_inserts(db: &impl ConnectionTrait) -> Result<i64, Error> {
+/// The insert into `line` the connection's session holds prepared, or `None`.
+async fn prepared_insert(db: &impl ConnectionTrait) -> Result<Option<String>, Error> {
     Ok(db
-        .query_one(
-            r#"SELECT count(*) FROM pg_prepared_statements WHERE statement LIKE 'INSERT INTO "line"%'"#,
-            &[],
-        )
+        .query_opt(PREPARED_STATEMENT, &[&r#"INSERT INTO "line""#])
         .await?
-        .get(0))
+        .map(|row| row.get(0)))
 }
 
 /// After `clear_statement_caches`, a connection that already ran an insert
-/// writes the domain's new default: one idle at the time as soon as it is
-/// lent, and one checked out at the time once it is returned and lent again.
-/// The insert it had prepared is closed on the server before it runs anything.
+/// prepares it again and writes the domain's new default: one idle at the time
+/// as soon as it is lent, and one checked out at the time once it is returned
+/// and lent again, keeping its insert until then. The insert it had prepared
+/// is closed on the server before it runs anything.
 // [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    idle and checked-out connections that
 // prepared an insert before SET DEFAULT write the new default once next lent, their old statement
 // deallocated on the server, while a connection still checked out keeps it
-// [spec:pgorm:req:sql.ddl.domain+2/test]    the clear is the remedy for a planned default
+// [spec:pgorm:req:sql.ddl.domain+3/test]    the clear is the remedy for a planned default
 #[pgorm_macros::test]
 async fn a_cleared_pool_writes_the_new_default() -> Result<(), Error> {
     let ctx = TestContext::new("domain_default_cleared").await;
@@ -1174,17 +1271,13 @@ async fn a_cleared_pool_writes_the_new_default() -> Result<(), Error> {
             .to_string(),
     )
     .await?;
-    let defaulted = |id: i32| line::ActiveModel {
-        id: set(id),
-        mood: set(Mood::Calm),
-        codes: set(Vec::new()),
-        ..Default::default()
-    };
 
     let idle = ctx.db.get().await?;
     assert_eq!(defaulted(1).insert(&held).await?.qty, 1);
     assert_eq!(defaulted(2).insert(&idle).await?.qty, 1);
     let (held_backend, idle_backend) = (backend(&held).await?, backend(&idle).await?);
+    let (held_insert, idle_insert) = (prepared_insert(&held).await?, prepared_insert(&idle).await?);
+    assert!(held_insert.is_some() && idle_insert.is_some());
     drop(idle);
 
     held.batch_execute(
@@ -1195,20 +1288,27 @@ async fn a_cleared_pool_writes_the_new_default() -> Result<(), Error> {
     .await?;
     ctx.db.clear_statement_caches();
 
-    assert_eq!(defaulted(3).insert(&held).await?.qty, 1);
-    assert_eq!(prepared_inserts(&held).await?, 1);
+    defaulted(3).insert(&held).await?;
+    assert_eq!(
+        prepared_insert(&held).await?,
+        held_insert,
+        "a connection checked out keeps its insert"
+    );
 
     let idle = ctx.db.get().await?;
     assert_eq!(backend(&idle).await?, idle_backend);
-    assert_eq!(prepared_inserts(&idle).await?, 0);
+    assert_eq!(prepared_insert(&idle).await?, None);
     assert_eq!(defaulted(4).insert(&idle).await?.qty, 2);
+    let prepared_again = prepared_insert(&idle).await?;
+    assert!(prepared_again.is_some() && prepared_again != idle_insert);
 
     drop(held);
     let held = ctx.db.get().await?;
     assert_eq!(backend(&held).await?, held_backend);
-    assert_eq!(prepared_inserts(&held).await?, 0);
+    assert_eq!(prepared_insert(&held).await?, None);
     assert_eq!(defaulted(5).insert(&held).await?.qty, 2);
-    assert_eq!(prepared_inserts(&held).await?, 1);
+    let prepared_again = prepared_insert(&held).await?;
+    assert!(prepared_again.is_some() && prepared_again != held_insert);
 
     drop(held);
     drop(idle);
@@ -1220,7 +1320,7 @@ async fn a_cleared_pool_writes_the_new_default() -> Result<(), Error> {
 /// with: a default fills an insert that leaves the column out, `NOT NULL` is
 /// refused over a null and then holds, and a named check is added, renamed and
 /// dropped; a domain is renamed with the column still typed by it.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    each alter action changes the domain: a default and
+// [spec:pgorm:req:sql.ddl.domain+3/test]    each alter action changes the domain: a default and
 // its drop, NOT NULL refused over a null (23502) and then held, a check added, renamed and
 // dropped, a rename of the domain; and a missing constraint (42704) or a taken name (42710)
 // refused
@@ -1332,7 +1432,7 @@ async fn each_alter_action_changes_the_domain() -> Result<(), Error> {
 /// A check added over values that fail it is refused; added `NOT VALID`, it
 /// leaves them and holds every value written after it, and validating it is
 /// refused until the failing value is gone.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    a check over failing values is refused (23514);
+// [spec:pgorm:req:sql.ddl.domain+3/test]    a check over failing values is refused (23514);
 // NOT VALID leaves them, holds new values, and VALIDATE CONSTRAINT is refused (23514) until
 // they are gone
 #[pgorm_macros::test]
@@ -1397,7 +1497,7 @@ async fn a_not_valid_check_leaves_old_values() -> Result<(), Error> {
 /// unsaid, until it cascades and takes the column; several domains drop in
 /// one statement, and a missing one is refused unless the drop says `IF
 /// EXISTS`.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    a drop of a domain a column is typed with is refused
+// [spec:pgorm:req:sql.ddl.domain+3/test]    a drop of a domain a column is typed with is refused
 // under RESTRICT, said or unsaid (2BP01), until CASCADE drops the column; several drop at once,
 // and a missing domain is 42704 unless IF EXISTS
 #[pgorm_macros::test]
@@ -1454,7 +1554,7 @@ async fn a_drop_is_refused_while_typed_with() -> Result<(), Error> {
 /// already has, two constraints of one name, a subquery in a check or a
 /// default, a collation on a type without one, and a default its base cannot
 /// hold.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    a taken name (42710), a constraint named twice (42710),
+// [spec:pgorm:req:sql.ddl.domain+3/test]    a taken name (42710), a constraint named twice (42710),
 // a subquery in a check or a default (0A000), a COLLATE on integer (42804) and a default its base
 // cannot read (22P02) are the server's refusals
 #[pgorm_macros::test]
@@ -1514,7 +1614,7 @@ async fn the_server_refuses_what_no_builder_sees() -> Result<(), Error> {
 }
 
 /// A domain is created inside a transaction, and a rollback takes it away.
-// [spec:pgorm:req:sql.ddl.domain+2/test]    a domain created in a transaction is gone when the
+// [spec:pgorm:req:sql.ddl.domain+3/test]    a domain created in a transaction is gone when the
 // transaction rolls back
 #[pgorm_macros::test]
 async fn a_domain_rolls_back_with_its_transaction() -> Result<(), Error> {

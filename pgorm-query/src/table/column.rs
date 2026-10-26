@@ -138,7 +138,7 @@ pub enum ColumnType {
     /// renders the same DDL but says nothing of what the column holds, which
     /// is what an entity reads and writes by.
     // [spec:pgorm:def:sql.types.column-type+11]
-    // [spec:pgorm:req:sql.ddl.domain+2]
+    // [spec:pgorm:req:sql.ddl.domain+3]
     Domain {
         name: Name,
         schema: Option<Name>,

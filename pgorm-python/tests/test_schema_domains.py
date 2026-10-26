@@ -7,6 +7,17 @@ from uuid import uuid4
 import pgorm as p
 from pgorm import schema as s
 
+# The prepared statement a session holds whose text begins with $1, as the
+# server names and stamps it. A clear closes it and the next use prepares it
+# again under a new name, which is how a test tells whether a pool cleared.
+# What the statement writes cannot tell: PostgreSQL re-plans a statement a
+# session keeps whenever the session's caches are reset, and an insert
+# re-planned so writes a domain's new default under its old name.
+PREPARED_STATEMENT = (
+    "SELECT name || ' prepared at ' || prepare_time AS statement "
+    "FROM pg_prepared_statements WHERE starts_with(statement, $1)"
+)
+
 OPERATIONS = (
     "create_domain", "set_domain_default", "drop_domain_default", "set_domain_not_null",
     "drop_domain_not_null", "add_domain_check", "drop_domain_constraint",
@@ -184,6 +195,20 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.insert(self.table).columns("id", "qty").values(6, 60))
         self.assertEqual(await self.quantities(), [(2, 3), (6, 60)])
 
+    @staticmethod
+    async def prepared_statement(db, query):
+        """The statement the connection `db` runs on holds prepared for `query`, or None."""
+        row = await db.fetch_optional(p.RawSQL(PREPARED_STATEMENT, [query.inspect().sql]))
+        return None if row is None else row["statement"]
+
+    @classmethod
+    async def inserted(cls, pool, query):
+        """Run `query` on one connection of `pool`, answering the qty written and the statement
+        that wrote it."""
+        async with pool.connection() as connection:
+            written = (await connection.fetch_one(query))["qty"]
+            return written, await cls.prepared_statement(connection, query)
+
     # [spec:pgorm:req:python.connections+3/test]    clear_statement_caches makes the connection
     # that already ran an insert prepare it again, its old statement closed on the server, and
     # write the domain's new default
@@ -194,18 +219,19 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         def insert(row):
             return p.insert(self.table).columns("id").values(row).returning(p.col("qty"))
 
-        prepared = p.RawSQL(
-            "SELECT count(*)::integer AS n FROM pg_prepared_statements WHERE statement LIKE $1",
-            ["INSERT INTO%"],
-        )
         self.assertEqual((await self.pool.fetch_one(insert(1)))["qty"], 7)
+        before = await self.prepared_statement(self.pool, insert(1))
+        self.assertIsNotNone(before)
         await self.pool.execute(s.set_domain_default(self.domain, 9))
-        self.assertEqual((await self.pool.fetch_one(insert(2)))["qty"], 7)
-        self.assertEqual((await self.pool.fetch_one(prepared))["n"], 1)
+        await self.pool.fetch_one(insert(2))
+        self.assertEqual(await self.prepared_statement(self.pool, insert(2)), before)
 
         self.pool.clear_statement_caches()
-        self.assertEqual((await self.pool.fetch_one(prepared))["n"], 0)
+        self.assertIsNone(await self.prepared_statement(self.pool, insert(3)))
         self.assertEqual((await self.pool.fetch_one(insert(3)))["qty"], 9)
+        after = await self.prepared_statement(self.pool, insert(3))
+        self.assertIsNotNone(after)
+        self.assertNotEqual(after, before)
 
     async def eventually(self, what, probe):
         deadline = asyncio.get_running_loop().time() + 10
@@ -218,6 +244,12 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     # closes its listening connection when it closes; a pool without the setting keeps its
     # statements
     # [spec:pgorm:req:conn.pool.statement-cache.listen+1/test]    from Python
+    #
+    # The clear the listener makes as its LISTEN takes effect can land after the server shows
+    # the LISTEN, closing the insert as the notification's clear does, and Python sees no
+    # clear to wait for. Each insert is read back on the connection that ran it, which no
+    # clear reaches before it is next lent, and no assertion depends on which clear closed
+    # it, so the late one changes no outcome; the Rust suites count the clears.
     async def test_a_notified_pool_writes_the_new_default(self):
         p.require_capability("pool.statement_cache_channel")
         self.assertEqual(p.STATEMENT_CACHE_CHANNEL, "pgorm_statement_caches")
@@ -228,10 +260,6 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         def insert(row):
             return p.insert(self.table).columns("id").values(row).returning(p.col("qty"))
 
-        prepared = p.RawSQL(
-            "SELECT count(*)::integer AS n FROM pg_prepared_statements WHERE statement LIKE $1",
-            ["INSERT INTO%"],
-        )
         listeners = p.RawSQL(
             "SELECT count(*)::integer AS n FROM pg_stat_activity "
             "WHERE datname = current_database() AND query = $1 AND state = 'idle'",
@@ -244,28 +272,31 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         try:
             self.assertTrue(await listening.ping())
             await self.eventually("the listener's LISTEN", lambda: self.is_count(listening_count, 1))
-            self.assertEqual((await listening.fetch_one(insert(1)))["qty"], 7)
-            self.assertEqual((await listening.fetch_one(prepared))["n"], 1)
-            self.assertEqual((await self.pool.fetch_one(insert(2)))["qty"], 7)
+            written, notified = await self.inserted(listening, insert(1))
+            self.assertEqual(written, 7)
+            self.assertIsNotNone(notified)
+            written, kept = await self.inserted(self.pool, insert(2))
+            self.assertEqual(written, 7)
+            self.assertIsNotNone(kept)
 
             await self.pool.execute(s.set_domain_default(self.domain, 9))
             async with self.pool.connection() as connection:
                 await connection.notify(channel, "not read")
-            await self.eventually(
-                "the clear",
-                lambda: self.is_count(lambda: self.count(listening, prepared), 0),
-            )
-            self.assertEqual((await listening.fetch_one(insert(3)))["qty"], 9)
-            self.assertEqual((await self.pool.fetch_one(insert(4)))["qty"], 7)
+
+            async def closed():
+                return await self.prepared_statement(listening, insert(3)) is None
+
+            await self.eventually("the clear", closed)
+            written, again = await self.inserted(listening, insert(3))
+            self.assertEqual(written, 9)
+            self.assertIsNotNone(again)
+            self.assertNotEqual(again, notified)
+            self.assertEqual((await self.inserted(self.pool, insert(4)))[1], kept)
 
             await listening.close()
             await self.eventually("the listener's close", lambda: self.is_count(listening_count, 0))
         finally:
             await listening.close()
-
-    @staticmethod
-    async def count(pool, query):
-        return (await pool.fetch_one(query))["n"]
 
     @staticmethod
     async def is_count(probe, expected):

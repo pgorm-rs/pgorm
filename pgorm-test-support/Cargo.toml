@@ -4,7 +4,7 @@ version = "0.2.0"
 authors = []
 edition = "2024"
 rust-version = "1.89"
-description = "Run-scoped names for what pgorm's live tests create on a shared server, the sweep of crashed runs' leftovers, and a count of a pool's statement-cache clears"
+description = "Run-scoped names for what pgorm's live tests create on a shared server, the sweep of crashed runs' leftovers, a count of a pool's statement-cache clears, and the query that names a session's prepared statement"
 license = "MIT OR Apache-2.0"
 publish = false
 
