@@ -14214,12 +14214,20 @@ children (
         id generative-killpg-eperm
         title "The security campaign's process runner stops a child whose group holds only a zombie without raising"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-25T23:57:13.230768Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by bindings-tx-closure-only (2026-10-26). security/generative/src/pgorm_campaign/process.py's _stop catches only ProcessLookupError, but on macOS os.killpg returns EPERM for a process group whose only member is a zombie, so test_process's test_timeout_and_output_limit_stop_children raises PermissionError under load (failed in two of four runs). Treat EPERM for a group whose leader has exited as already stopped (confirm the leader is reaped or a zombie of ours first, never swallow EPERM for a live group), and show the test passing repeatedly under load."
+            }
+
+            {
+                at 2026-10-26T00:24:07.526807Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -1,11 +1,27 @@
 import asyncio
+import errno
 import os
+import signal
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from pgorm_campaign import process
 from pgorm_campaign.process import ProcessFailure, run
+
+
+async def _zombie_leader():
+    # The event loop reaps its children, so blocking it until the leader has
+    # died leaves the leader a zombie, the only member of its group, when the
+    # next statement runs.
+    child = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)", start_new_session=True
+    )
+    os.kill(child.pid, signal.SIGKILL)
+    os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOWAIT)  # noqa: ASYNC222
+    return child
 
 
 # [spec:pgorm:req:generative.isolation/test]
@@ -42,6 +58,41 @@ class ProcessTests(unittest.IsolatedAsyncioTestCase):
                 await task
             with self.assertRaises(ProcessLookupError):
                 os.kill(pid, 0)
+
+    async def test_stop_reaps_an_exited_unreaped_leader(self):
+        child = await _zombie_leader()
+        await process._stop(child)
+        self.assertEqual(child.returncode, -signal.SIGKILL)
+        with self.assertRaises(ProcessLookupError):
+            os.killpg(child.pid, 0)
+
+    async def test_stop_raises_eperm_from_a_live_group(self):
+        refused = PermissionError(errno.EPERM, os.strerror(errno.EPERM))
+        refusing = mock.patch("os.killpg", side_effect=refused)
+        child = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", "import time; time.sleep(30)", start_new_session=True
+        )
+        try:
+            with (
+                mock.patch.object(process, "_REFUSAL_GRACE", 0.1),
+                refusing,
+                self.assertRaises(PermissionError),
+            ):
+                await process._stop(child)
+            self.assertIsNone(child.returncode)
+        finally:
+            child.kill()
+            await child.wait()
+        # A group that still refuses once its leader is reaped holds a member
+        # this process cannot stop.
+        child = await _zombie_leader()
+        with (
+            mock.patch.object(process, "_REFUSAL_GRACE", 0.1),
+            refusing,
+            self.assertRaises(PermissionError),
+        ):
+            await process._stop(child)
+        self.assertEqual(child.returncode, -signal.SIGKILL)
 
 
 if __name__ == "__main__":
