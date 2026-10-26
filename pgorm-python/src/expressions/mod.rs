@@ -16,6 +16,7 @@ mod predicates;
 mod ranges;
 mod search;
 mod shaping;
+mod subscripts;
 #[cfg(test)]
 mod tests;
 
@@ -28,7 +29,7 @@ pub use construct::PyCondition;
 pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
-// [spec:pgorm:req:python.expressions+5]
+// [spec:pgorm:req:python.expressions+6]
 // [spec:pgorm:req:python.ownership]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
 #[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]

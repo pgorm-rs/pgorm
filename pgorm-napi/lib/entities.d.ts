@@ -8,7 +8,7 @@
 // [spec:pgorm:req:napi.typing]
 // [spec:pgorm:req:napi.entities]
 
-import type { Compiled, Expr, Operand, OrderBy, Predicate } from "./expressions.d.ts";
+import type { Compiled, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
 import type { Select } from "./select.d.ts";
 import type { Conflict, ConflictUpdate } from "./writes.d.ts";
 import type { Change, Upserted } from "./models.d.ts";
@@ -85,13 +85,16 @@ export declare function entity<N extends EntityName>(name: N): Entity<TypesOf<N>
 export declare class EntityColumn<I extends Operand = Operand> extends Expr {
   /** The column's SQL name. */
   readonly name: string;
-  /** Equal to a value converted to the column's declared kind and written through its `save_as`, or to an expression. */
-  eq(other: I): Expr;
-  ne(other: I): Expr;
-  gt(other: I): Expr;
-  gte(other: I): Expr;
-  lt(other: I): Expr;
-  lte(other: I): Expr;
+  /**
+   * Equality with a value of the column's declared kind, written through its
+   * `save_as`, or with an expression, `any(..)` or `all(..)` as it stands.
+   */
+  eq(other: I | Quantified): Expr;
+  ne(other: I | Quantified): Expr;
+  gt(other: I | Quantified): Expr;
+  gte(other: I | Quantified): Expr;
+  lt(other: I | Quantified): Expr;
+  lte(other: I | Quantified): Expr;
   /**
    * In a list of values, each read as the column's declared kind as a
    * compared value is, or in a subquery's rows, by the column's `ColumnTrait`:

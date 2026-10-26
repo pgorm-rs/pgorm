@@ -71,6 +71,9 @@ pub(crate) enum Node {
     /// The operand of a simple `CASE` before its first arm, which is no
     /// expression yet: PostgreSQL's grammar requires a `WHEN`.
     CaseOperand(SimpleExpr),
+    /// `ANY (..)` or `ALL (..)`, which PostgreSQL's grammar reads only as the
+    /// right operand of a comparison, so no other operator takes it.
+    Quantified(SimpleExpr),
     Table(NamedTable),
     FromItem(FromItem),
     /// An item of a `GROUP BY` list beyond a bare expression: a set,
@@ -127,6 +130,7 @@ impl Node {
             Self::Aliased(_) => "an aliased projection",
             Self::Ordering(_) => "an ordering",
             Self::CaseOperand(_) => "a CASE with no WHEN arm",
+            Self::Quantified(_) => "an ANY or ALL operand",
             Self::Table(_) => "a Table",
             Self::FromItem(_) => "a FROM item",
             Self::GroupingElement(_) => "a grouping element",

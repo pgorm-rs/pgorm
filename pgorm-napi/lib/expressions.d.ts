@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.expressions+6]
+// [spec:pgorm:req:napi.expressions+7]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
 import type { Select } from "./select.d.ts";
@@ -48,12 +48,13 @@ export type Nulls = "first" | "last";
 /** An SQL expression; every method returns a new one. */
 export declare class Expr extends Builder {
   protected constructor();
-  eq(other: Operand): Expr;
-  ne(other: Operand): Expr;
-  lt(other: Operand): Expr;
-  lte(other: Operand): Expr;
-  gt(other: Operand): Expr;
-  gte(other: Operand): Expr;
+  /** `=`; `any(..)` or `all(..)` compares with an array's elements or a subquery's rows. */
+  eq(other: Operand | Quantified): Expr;
+  ne(other: Operand | Quantified): Expr;
+  lt(other: Operand | Quantified): Expr;
+  lte(other: Operand | Quantified): Expr;
+  gt(other: Operand | Quantified): Expr;
+  gte(other: Operand | Quantified): Expr;
   add(other: Operand): Expr;
   sub(other: Operand): Expr;
   mul(other: Operand): Expr;
@@ -85,6 +86,12 @@ export declare class Expr extends Builder {
   iregex(pattern: Operand): Expr;
   /** `!~*`: the text does not match the regular expression, case ignored. */
   notIregex(pattern: Operand): Expr;
+  /**
+   * `@@`: a `tsvector` against a `tsquery`, text against text as PostgreSQL's
+   * full-text conversion reads it, or a `jsonb` against a `jsonpath`
+   * predicate; a `jsonpath` is written cast, as a bound string is text.
+   */
+  matches(other: Operand): Expr;
   /** `@?`: a `jsonpath` returns an item for this `jsonb`; the path is bound as text cast to `jsonpath`. */
   pathExists(path: string): Expr;
   isDistinctFrom(other: Operand): Expr;
@@ -138,6 +145,14 @@ export declare class Expr extends Builder {
   as(alias: string): Aliased;
   asc(options?: { readonly nulls?: Nulls }): OrderBy;
   desc(options?: { readonly nulls?: Nulls }): OrderBy;
+}
+
+/**
+ * `ANY (..)` or `ALL (..)`: the right operand of `eq`, `ne`, `lt`, `lte`, `gt`
+ * or `gte`, the one place PostgreSQL reads it, and no expression of its own.
+ */
+export declare class Quantified {
+  private constructor();
 }
 
 /** An expression and the output column name it takes in a projection. */
@@ -242,6 +257,17 @@ export declare function scalar(select: Select): Expr;
  * than one column here (`42601`).
  */
 export declare function array(select: Select): Expr;
+/**
+ * `ANY (..)`: the comparison holds for some element of an array — an
+ * expression, or a value bound as one array parameter — or for some row of a
+ * subquery; over an empty array or no rows it is false.
+ */
+export declare function any(source: Select | Operand): Quantified;
+/**
+ * `ALL (..)`: the comparison holds for every element of an array, or every
+ * row of a subquery; over an empty array or no rows it is true.
+ */
+export declare function all(source: Select | Operand): Quantified;
 /** A searched `CASE` with its first arm. */
 export declare function caseWhen(condition: Predicate, result: Operand): SearchedCase;
 /** A simple `CASE` over `operand`; its first `when` makes it an expression. */

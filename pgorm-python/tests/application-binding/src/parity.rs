@@ -1,4 +1,6 @@
-use pgorm::pgorm_query::{NullOrdering, Order};
+use std::ffi::CString;
+
+use pgorm::pgorm_query::{Expr, Name, NullOrdering, Order, Query};
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, Iterable,
     QueryFilter, QueryOrder, QuerySelect, QueryTrait, StaticName,
@@ -6,7 +8,10 @@ use pgorm::{
 use pgorm_python::{entities::ActiveState, expressions::Compiled, values::PyValue};
 use pyo3::{prelude::*, types::PyDict};
 
-use crate::account::{self, Column};
+use crate::{
+    account::{self, Column},
+    temper,
+};
 
 fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     let module = PyModule::new(py, "pgorm._native")?;
@@ -14,7 +19,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     Ok(module)
 }
 
-// [spec:pgorm:req:python.entities+3/test]
+// [spec:pgorm:req:python.entities+4/test]
 #[test]
 fn query_sql_and_values_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -82,6 +87,71 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
     })
 }
 
+// [spec:pgorm:req:python.entities+4/test]    a column's is_in and is_not_in are its
+// ColumnTrait membership: is_in / is_not_in over values of its declared kind, and in_subquery /
+// not_in_subquery over a Select's rows, so a column whose domain is over an enum is a member as
+// the enum, the subquery's projection cast beside it
+#[test]
+fn column_membership_matches_column_trait() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = PyDict::new(py);
+        globals.set_item("p", module(py)?)?;
+        let column = |name: &str| {
+            Query::select()
+                .expr(Expr::col(Name::runtime(name)))
+                .from(Name::runtime("t"))
+                .to_owned()
+        };
+        let cases = [
+            (
+                "p.entity('app.Account').col('id').is_in([1, 2])",
+                Column::Id.is_in([1, 2]),
+            ),
+            (
+                "p.entity('app.Account').col('id').is_in([])",
+                Column::Id.is_in(Vec::<i32>::new()),
+            ),
+            (
+                "p.entity('app.Account').col('mood').is_not_in(('calm',))",
+                Column::Mood.is_not_in(["calm"]),
+            ),
+            (
+                "p.entity('app.Account').col('id').is_not_in(p.Select(p.col('id')).from_(p.Table('t')))",
+                Column::Id.not_in_subquery(column("id")),
+            ),
+            (
+                "p.entity('app.Temper').col('mood').is_in(['calm', 'busy'])",
+                temper::Column::Mood.is_in(["calm", "busy"]),
+            ),
+            (
+                "p.entity('app.Temper').col('mood').is_in(p.Select(p.col('mood')).from_(p.Table('t')))",
+                temper::Column::Mood.in_subquery(column("mood")),
+            ),
+        ];
+        for (source, expected) in cases {
+            let built = py.eval(&CString::new(source)?, Some(&globals), None)?;
+            let built = built.call_method0("inspect")?;
+            let built = built.extract::<PyRef<'_, Compiled>>()?;
+            let (sql, values) = Query::select().expr(expected).build();
+            assert_eq!(built.sql, sql, "{source}");
+            assert_eq!(built.values, values, "{source}");
+        }
+        for refused in [
+            "p.entity('app.Account').col('id').is_in('12')",
+            "p.entity('app.Account').col('id').is_in([p.col('x')])",
+            "p.entity('app.Account').col('id').is_in(['one'])",
+        ] {
+            assert!(
+                py.eval(&CString::new(refused)?, Some(&globals), None)
+                    .is_err(),
+                "{refused} is refused"
+            );
+        }
+        Ok(())
+    })
+}
+
 fn assert_active(native: &Bound<'_, PyAny>, rust: &account::ActiveModel) -> PyResult<()> {
     for column in Column::iter() {
         let native = native.call_method1("get", (column.as_str(),))?;
@@ -113,7 +183,7 @@ fn assert_active(native: &Bound<'_, PyAny>, rust: &account::ActiveModel) -> PyRe
     Ok(())
 }
 
-// [spec:pgorm:req:python.entities+3/test]
+// [spec:pgorm:req:python.entities+4/test]
 #[test]
 fn active_state_and_values_match_rust() -> PyResult<()> {
     Python::initialize();

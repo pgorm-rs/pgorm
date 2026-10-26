@@ -1,6 +1,7 @@
-"""Expr's binary operators beyond comparison and arithmetic against PostgreSQL,
-through the installed wheel: each selects the rows the server's own operator,
-written as SQL text, selects."""
+"""Expr's binary operators beyond comparison and arithmetic, its subscripts,
+subqueries and quantifiers against PostgreSQL, through the installed wheel:
+each selects the rows the server's own operator, written as SQL text,
+selects."""
 
 import os
 import unittest
@@ -21,7 +22,7 @@ def int4multirange(*ranges):
     return p.Value(p.Multirange([p.Range(lower, upper) for lower, upper in ranges]), "int4multirange")
 
 
-# [spec:pgorm:req:python.expressions+5/test]    every operator method selects what PostgreSQL's
+# [spec:pgorm:req:python.expressions+6/test]    every operator method selects what PostgreSQL's
 # own operator selects, on rows where it holds and rows where it does not
 class OperatorTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -96,6 +97,58 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
                 ids = await self.built(predicate)
                 self.assertEqual(ids, await self.written(written))
                 self.assertEqual(ids, expected)
+
+    # [spec:pgorm:req:python.expressions+6/test]    at and slice subscript an array as
+    # PostgreSQL's own subscripts do, an index past the bounds NULL and a slice cut to them
+    async def test_subscripts_answer_as_postgres_does(self):
+        cases = [
+            (self.c("tags").at(1) == "a", "tags[1] = 'a'", [1]),
+            (self.c("tags").at(self.c("id")).is_null(), "tags[id] IS NULL", [2, 3]),
+            (self.c("tags").slice(2) == p.Value.array("text", ["b"]), "tags[2:] = '{b}'", [1]),
+            (self.c("tags").slice(upper=1) == p.Value.array("text", ["c"]), "tags[:1] = '{c}'", [2]),
+            (self.c("tags").slice(1, 5) == self.c("tags").slice(), "tags[1:5] = tags[:]", [1, 2, 3]),
+        ]
+        for predicate, written, expected in cases:
+            with self.subTest(written=written):
+                ids = await self.built(predicate)
+                self.assertEqual(ids, await self.written(written))
+                self.assertEqual(ids, expected)
+
+    # [spec:pgorm:req:python.expressions+6/test]    EXISTS, a scalar subquery, IN a Select, and
+    # any_ and all_ after each comparison over an array or a subquery's rows answer as the SQL
+    # written by hand, an empty array false under ANY and true under ALL
+    async def test_subqueries_and_quantifiers_answer_as_postgres_does(self):
+        inner = p.Table(self.name).as_("i")
+        noted = p.Select(inner.col("id")).from_(inner).where_(inner.col("note").is_not_null())
+        later = p.Select(inner.col("id")).from_(inner).where_(inner.col("id") > self.c("id"))
+        name = quoted(self.name)
+        noted_sql = f"SELECT i.id FROM {name} i WHERE i.note IS NOT NULL"
+        ints = lambda *items: p.Value.array("i64", list(items))
+        cases = [
+            (p.exists(later), f"EXISTS (SELECT i.id FROM {name} i WHERE i.id > {name}.id)", [1, 2]),
+            (self.c("id") == p.scalar(p.Select(p.call("max", inner.col("id"))).from_(inner)),
+             f"id = (SELECT max(i.id) FROM {name} i)", [3]),
+            (self.c("id").is_in(noted), f"id IN ({noted_sql})", [1, 3]),
+            (self.c("id").is_not_in(noted), f"id NOT IN ({noted_sql})", [2]),
+            (self.c("id") == p.any_(ints(1, 3)), "id = ANY('{1,3}'::int8[])", [1, 3]),
+            (self.c("id") != p.all_(ints(1, 3)), "id <> ALL('{1,3}'::int8[])", [2]),
+            (self.c("id") == p.any_(ints()), "id = ANY('{}'::int8[])", []),
+            (self.c("id") != p.all_(ints()), "id <> ALL('{}'::int8[])", [1, 2, 3]),
+            (p.bind("a") == p.any_(self.c("tags")), "'a' = ANY(tags)", [1]),
+            (self.c("id") >= p.all_(noted), f"id >= ALL ({noted_sql})", [3]),
+            (self.c("id").lt(p.any_(noted)), f"id < ANY ({noted_sql})", [1, 2]),
+            (self.c("id").ne(p.all_(p.array(noted))), f"id <> ALL (ARRAY({noted_sql}))", [2]),
+        ]
+        for predicate, written, expected in cases:
+            with self.subTest(written=written):
+                ids = await self.built(predicate)
+                self.assertEqual(ids, await self.written(written))
+                self.assertEqual(ids, expected)
+        quantified = p.any_(self.c("tags"))
+        for refused in [lambda: self.c("id") + quantified, lambda: self.c("id").contains(quantified),
+                        lambda: self.c("id").is_in([quantified]), lambda: bool(quantified)]:
+            with self.assertRaises(p.ConstructionError):
+                refused()
 
     async def test_bare_operators_group_as_built(self):
         predicate = (self.c("label").not_regex("^s")

@@ -316,6 +316,17 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   `jsonb_to_record`, `json_to_recordset` and `jsonb_to_recordset`), `exists`,
   `scalar`, and `array(select)`, `ARRAY(select)`: the subquery's one column as
   one array value, empty for no rows, to cast and compare as a value.
+- **ANY and ALL**: `any(source)` and `all(source)` are `ANY (..)` and
+  `ALL (..)`, the right operand of `eq` .. `gte` and of nothing else, as
+  PostgreSQL's grammar reads it — another operator refuses one, and it has no
+  `inspect` of its own. The source is a `Select`, whose rows it ranges over,
+  or an array: an expression (an array column, `array(select)`) or a value
+  bound as one array parameter. `col("id").eq(any([1, 3]))` is
+  `"id" = ANY($1)`, the membership `isIn` tests with one placeholder for any
+  length, so the statement's text is the same at every length;
+  `col("id").ne(all(ids))` is its complement, and
+  `col("score").gt(all(select(..)))` compares with every row. Over an empty
+  array or no rows, `ANY` is false and `ALL` true.
 - **SELECT**: `select(..)`, `from`, `join` (`kind`, `lateral`), `crossJoin`,
   `where`, `groupBy` (expressions, and `groupingSet`, `rollup`, `cube` and
   `groupingSets`), `groupByDistinct`, `having`, `orderBy`, `limit`/`offset`
@@ -470,10 +481,14 @@ await pool.query(select().from(new Table("booking"))
   (`&>`) and `adjacentTo` (`-|-`) over ranges and multiranges. A range binds
   as a `Value` naming its kind — a built-in one or a `CreatedRange` — never
   inferred.
-- **Regular expressions and JSON paths**: `regex` (`~`), `notRegex` (`!~`),
-  `iregex` (`~*`) and `notIregex` (`!~*`) match POSIX regular expressions,
-  the pattern bound unless it is an expression. `pathExists(path)` is `@?`,
-  the `jsonpath` string bound as text cast to `jsonpath`; unlike
+- **Regular expressions, text search and JSON paths**: `regex` (`~`),
+  `notRegex` (`!~`), `iregex` (`~*`) and `notIregex` (`!~*`) match POSIX
+  regular expressions, the pattern bound unless it is an expression.
+  `matches` is `@@`: a `tsvector` against a `tsquery`, text against text as
+  PostgreSQL's full-text conversion reads it, or a `jsonb` against a
+  `jsonpath` predicate, written cast:
+  `doc.matches(bind("$.a == 1").cast("jsonpath"))`. `pathExists(path)` is
+  `@?`, the `jsonpath` string bound as text cast to `jsonpath`; unlike
   `jsonExists`, a GIN index on the column serves it, and a strict-mode path
   that would raise answers NULL.
 

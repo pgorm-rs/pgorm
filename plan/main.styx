@@ -14562,6 +14562,13 @@ children (
                 kind @note
                 text "Found 2026-10-26 by binoper-missing-variants and pipeline-untyped-enum-casts. JavaScript has no matches (@@), which Python now has. Python has no array subscripts (at/slice), which JavaScript has. Python's statement builders have no subquery membership (is_in(select)) and its registered column no is_in/is_not_in; neither binding has ANY/ALL, so array(select) cannot express = ANY(..). Close each gap with stubs/typings, capabilities, parity cases and live tests, keeping Python's Expr split by family (multiple-pymethods, stub mixins) under the density gate."
             }
+
+            {
+                at 2026-10-26T17:15:31.190363Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 

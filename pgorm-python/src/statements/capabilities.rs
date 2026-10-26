@@ -36,6 +36,13 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         ("select", "pgorm_query::Query::select"),
         ("array", "pgorm_query::Expr::array"),
+        ("exists", "pgorm_query::Expr::exists"),
+        (
+            "scalar",
+            "pgorm_query::SimpleExpr::SubQuery, SubQueryStatement::SelectStatement",
+        ),
+        ("any_", "pgorm_query::Expr::any, Func::any"),
+        ("all_", "pgorm_query::Expr::all, Func::all"),
         (
             "select.select",
             "pgorm_query::SelectStatement::clear_selects, expr, expr_as",

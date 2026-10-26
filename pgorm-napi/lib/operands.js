@@ -1,8 +1,9 @@
 // @ts-check
 
 // Comparison, arithmetic and logic: the operators every expression has. An
-// operand that is not an expression is a value, bound as a parameter.
-// [spec:pgorm:req:napi.expressions+6]
+// operand that is not an expression is a value, bound as a parameter; a
+// comparison's may also be `any(..)` or `all(..)`.
+// [spec:pgorm:req:napi.expressions+7]
 
 import { arg, Builder, made } from "./builder.js";
 import { native } from "./operations.js";
@@ -187,6 +188,18 @@ export class Operand extends Builder {
    */
   notIregex(pattern) {
     return binary(this, "notIregex", pattern);
+  }
+
+  /**
+   * `@@`: a `tsvector` against a `tsquery`, text against text as PostgreSQL's
+   * own full-text conversion reads it, or a `jsonb` against a `jsonpath`
+   * predicate. The operand is bound unless it is an expression; a `jsonpath`
+   * is written cast, as a bound string is text.
+   *
+   * @param {unknown} other
+   */
+  matches(other) {
+    return binary(this, "matches", other);
   }
 
   /**

@@ -137,7 +137,9 @@ class ModelColumn:
     def expr(self) -> p.Expr:
         return self.expression
 
-    def _operand(self, value: Any) -> p.Expr | p.Value:
+    def _operand(self, value: Any) -> p.Expr | p.Value | p.Quantified:
+        if isinstance(value, p.Quantified):
+            return value
         if isinstance(value, ModelColumn):
             if (
                 self.declaration._null.snapshot()["type"]
@@ -193,10 +195,18 @@ class ModelColumn:
     def is_not_null(self) -> p.Expr:
         return self.expression.is_not_null()
 
-    def is_in(self, values: list[Any] | tuple[Any, ...]) -> p.Expr:
+    def is_in(self, values: list[Any] | tuple[Any, ...] | p.Select) -> p.Expr:
+        return self.expression.is_in(self._members(values))
+
+    def is_not_in(self, values: list[Any] | tuple[Any, ...] | p.Select) -> p.Expr:
+        return self.expression.is_not_in(self._members(values))
+
+    def _members(self, values: Any) -> list[p.Expr | p.Value | p.Quantified] | p.Select:
+        if isinstance(values, p.Select):
+            return values
         if type(values) not in (list, tuple):
-            raise p.ConstructionError("model IN requires a list or tuple")
-        return self.expression.is_in([self._operand(value) for value in values])
+            raise p.ConstructionError("model IN requires a list or tuple, or a Select")
+        return [self._operand(value) for value in values]
 
     def asc(self, *, nulls: p.Nulls | None = None) -> p.OrderBy:
         return self.expression.asc(nulls=nulls)

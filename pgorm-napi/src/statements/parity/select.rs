@@ -203,6 +203,29 @@ fn regex_and_json_path() -> SelectStatement {
         .to_owned()
 }
 
+fn matches_and_quantifiers() -> SelectStatement {
+    let ids = |name: &str| {
+        Query::select()
+            .expr(col!("id"))
+            .from(table!(name))
+            .to_owned()
+    };
+    let jsonpath = Expr::value("$.a == 1").cast_as_type(TypeName::new(n("jsonpath")));
+    star!()
+        .from(table!("t"))
+        .cond_where(
+            Condition::all()
+                .add(col!("body").binary(BinOper::Matches, "fat & rat"))
+                .add(col!("doc").binary(BinOper::Matches, jsonpath))
+                .add(col!("id").binary(BinOper::Equal, Func::any(Expr::val(vec![1i64, 2i64]))))
+                .add(col!("id").binary(BinOper::NotEqual, Func::all(Expr::array(ids("u")))))
+                .add(col!("score").binary(BinOper::GreaterThan, Expr::all(ids("v"))))
+                .add(col!("id").binary(BinOper::SmallerThanOrEqual, Expr::any(ids("w"))))
+                .add(col!("a").binary(BinOper::GreaterThanOrEqual, Func::any(col!("b")))),
+        )
+        .to_owned()
+}
+
 fn casts() -> SelectStatement {
     let mood = TypeName::new(n("Mood")).schema(n("app")).array();
     let twice: SimpleExpr = Expr::expr(col!("f")).index(1i64).into();
@@ -576,6 +599,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("between", between().build()),
         ("patterns", patterns().build()),
         ("regex-and-json-path", regex_and_json_path().build()),
+        ("matches-and-quantifiers", matches_and_quantifiers().build()),
         ("casts-collations-subscripts", casts().build()),
         ("case", case().build()),
         ("values", values().build()),

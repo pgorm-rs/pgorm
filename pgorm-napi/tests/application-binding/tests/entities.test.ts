@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
 import {
+  all,
+  any,
   bind,
   CheckViolationError,
   col as statementCol,
@@ -127,7 +129,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads+3/test]
+// [spec:pgorm:req:napi.entity-reads+4/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());
@@ -144,11 +146,14 @@ test("a query reads records through Select's terminals, keyed by SQL column", as
   assert.throws(() => Account.col("mood").eq(null as never), refused(/compared with null is never true/));
   assert.throws(() => Account.col("id").eq("one"), ConstructionError);
   assert.throws(() => Account.col("nickname"), refused(/no column "nickname"/));
+  const quantified = await Account.find().where(Account.col("id").eq(any([1, 3]))).orderBy(Account.col("id").asc()).all(pool());
+  assert.deepStrictEqual(quantified.map((record) => record.id), [1, 3]);
+  assert.deepStrictEqual((await Account.find().where(Account.col("id").ne(all([1, 3]))).all(pool())).map((record) => record.id), [2]);
   const counted = await pool().one("SELECT count(*) AS n FROM napi_entities.accounts WHERE id = $1", [2]);
   assert.equal(counted.n, 1n);
 });
 
-// [spec:pgorm:req:napi.entity-reads+3/test]
+// [spec:pgorm:req:napi.entity-reads+4/test]
 test("one and oneOpt narrow a row limit and never widen one of zero", async () => {
   await seed();
   const none = Account.find().orderBy(Account.col("id").asc()).limit(0);
@@ -205,7 +210,7 @@ test("an ActiveModel holds each column's state, and its writes run the applicati
 // [spec:pgorm:req:napi.schema-domains/test]    a domain column reports, binds and reads as the
 // kind it is over, and a check refuses a value written to it as a CheckViolationError naming the
 // domain
-// [spec:pgorm:req:napi.entity-reads+3/test]    a column whose domain is over an enum compares as
+// [spec:pgorm:req:napi.entity-reads+4/test]    a column whose domain is over an enum compares as
 // the enum
 test("a registered entity's domain columns read, write and compare as the types they are over", async () => {
   assert.deepStrictEqual(
@@ -256,7 +261,7 @@ test("a registered entity's domain columns read, write and compare as the types 
   assert.deepStrictEqual(ids(await Parcel.find().orderBy(byId).all(pool())), [1, 2, 3, 4]);
 });
 
-// [spec:pgorm:req:napi.entity-reads+3/test]    a column whose domain is over an enum is a
+// [spec:pgorm:req:napi.entity-reads+4/test]    a column whose domain is over an enum is a
 // member of a list of values and of a subquery's rows as the enum, either way round, where the
 // column's plain expression is refused with 42883
 // [spec:pgorm:req:napi.pipeline-expressions+2/test]    a registered column a pipeline reads

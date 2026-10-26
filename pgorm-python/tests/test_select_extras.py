@@ -26,7 +26,7 @@ def text_array(values):
 
 
 # [spec:pgorm:req:python.statements+10/test]
-# [spec:pgorm:req:python.expressions+5/test]
+# [spec:pgorm:req:python.expressions+6/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -274,7 +274,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         count = p.Select(p.call("count", unaliased.col("id"))).from_(unaliased)
         self.assertEqual(await self.rows(count), [(200,)])
 
-    # [spec:pgorm:req:python.expressions+5/test]    array(select) collects a subquery's one
+    # [spec:pgorm:req:python.expressions+6/test]    array(select) collects a subquery's one
     # column into an array value, empty for no rows, cast as one value, and the server refuses a
     # subquery of two columns with 42601
     async def test_array_collects_a_subquery_column(self):

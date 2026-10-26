@@ -1,11 +1,12 @@
 use std::ffi::CString;
 
 use pgorm::pgorm_query::{
-    Asterisk, BinOper, ColumnType, CommonTableExpression, Condition, Expr, ExtendedWindow,
-    FrameExclusion, FrameType, FromItem, Func, GroupingElement, IntoNamedTable, JoinType,
-    MatchedAction, MergeInsert, MergeUpdate, Name, NotMatchedAction, NullOrdering, OnConflict,
-    Order, OverStatement, Overriding, Query, ReturningRow, SampleMethod, SimpleExpr, TableFunction,
-    TableSample, UnionType, Values, WindowStatement, WithClause,
+    ArrayType, Asterisk, BinOper, ColumnType, CommonTableExpression, Condition, Expr,
+    ExtendedWindow, FrameExclusion, FrameType, FromItem, Func, GroupingElement, IntoNamedTable,
+    JoinType, MatchedAction, MergeInsert, MergeUpdate, Name, NotMatchedAction, NullOrdering,
+    OnConflict, Order, OverStatement, Overriding, Query, ReturningRow, SampleMethod, SimpleExpr,
+    SubQueryStatement, TableFunction, TableSample, UnionType, Value, Values, WindowStatement,
+    WithClause,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -1171,7 +1172,7 @@ fn set_operation_arms_are_checked_when_read() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+5/test]    array(select) is Rust's Expr::array over the
+// [spec:pgorm:req:python.expressions+6/test]    array(select) is Rust's Expr::array over the
 // subquery as it embeds, projected and compared as one value, and an ordered-with-ties subquery
 // is refused as any embedded one is
 #[test]
@@ -1224,6 +1225,75 @@ fn array_subquery_matches_rust_expr_array() -> PyResult<()> {
             refused
                 .is_err_and(|error| error.is_instance_of::<crate::errors::ConstructionError>(py))
         );
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:python.expressions+6/test]    exists, scalar, IN a Select and any_ / all_
+// are Rust's Expr::exists, the scalar SubQuery, in_subquery / not_in_subquery and Expr::any /
+// Expr::all over a subquery or Func::any / Func::all over an array, a quantifier taken by each
+// comparison and refused by every other operator
+#[test]
+fn subquery_expressions_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let ids = |table: &str| {
+            Query::select()
+                .expr(Expr::col(Name::runtime("id")))
+                .from(Name::runtime(table))
+                .to_owned()
+        };
+        let id = || Expr::col(Name::runtime("id"));
+        let scalar =
+            SimpleExpr::SubQuery(None, Box::new(SubQueryStatement::SelectStatement(ids("v"))));
+        let array = Value::Array(
+            ArrayType::BigInt,
+            Some(Box::new(vec![1i64.into(), 2i64.into()])),
+        );
+        let expected = Query::select()
+            .column(Asterisk)
+            .from(Name::runtime("t"))
+            .cond_where(
+                Condition::all()
+                    .add(Expr::exists(ids("u")))
+                    .add(id().eq(scalar))
+                    .add(id().in_subquery(ids("w")))
+                    .add(id().not_in_subquery(ids("x")))
+                    .add(id().binary(BinOper::Equal, Func::any(Expr::val(array))))
+                    .add(id().binary(BinOper::NotEqual, Func::all(Expr::array(ids("y")))))
+                    .add(id().binary(BinOper::GreaterThan, Expr::all(ids("z"))))
+                    .add(id().binary(BinOper::SmallerThanOrEqual, Expr::any(ids("u"))))
+                    .add(Expr::col(Name::runtime("a")).binary(
+                        BinOper::GreaterThanOrEqual,
+                        Func::any(Expr::col(Name::runtime("b"))),
+                    )),
+            )
+            .build();
+        parity(
+            py,
+            &globals,
+            "(lambda ids, i: p.Select().from_(p.Table('t')).where_(p.Condition.all(p.exists(ids('u')), i == p.scalar(ids('v')), i.is_in(ids('w')), i.is_not_in(ids('x')), i == p.any_(p.Value.array('i64', [1, 2])), i.ne(p.all_(p.array(ids('y')))), i > p.all_(ids('z')), i.lte(p.any_(ids('u'))), p.col('a') >= p.any_(p.col('b')))))(lambda name: p.Select(p.col('id')).from_(p.Table(name)), p.col('id'))",
+            expected,
+        )?;
+        for refused in [
+            "p.col('id') + p.any_(p.col('b'))",
+            "p.col('id').is_distinct_from(p.all_(p.col('b')))",
+            "p.col('id').is_in([p.any_(p.col('b'))])",
+            "p.bind(p.any_(p.col('b')))",
+            "p.any_([1, 2])",
+            "p.exists(p.Select(p.col('id')).from_(p.Table('t')).limit_with_ties(1))",
+            "p.any_(p.Select(p.col('id')).from_(p.Table('t')).limit_with_ties(1))",
+            "bool(p.any_(p.col('b')))",
+        ] {
+            let outcome = py.eval(&CString::new(refused)?, Some(&globals), None);
+            assert!(
+                outcome.is_err_and(
+                    |error| error.is_instance_of::<crate::errors::ConstructionError>(py)
+                ),
+                "{refused} is refused"
+            );
+        }
         Ok(())
     })
 }

@@ -1,8 +1,12 @@
-use pyo3::{basic::CompareOp, prelude::*};
+use pyo3::{
+    basic::CompareOp,
+    prelude::*,
+    types::{PyList, PyTuple},
+};
 use std::sync::Arc;
 
 use super::{
-    backend::{Comparison, EntityBackend},
+    backend::{Comparison, EntityBackend, Members},
     metadata::EntityInfo,
 };
 use crate::{
@@ -26,6 +30,35 @@ impl PyEntityColumn {
             .compare(&self.name, op, value.inner)
             .map(PyExpr::from_rust)
             .map_err(|error| crate::errors::ConstructionError::new_err(error.to_string()))
+    }
+
+    /// Membership through the column's `ColumnTrait`: `is_in` / `is_not_in`
+    /// over a list or tuple of values, each converted to the column's
+    /// declared kind as a compared value is, or `in_subquery` /
+    /// `not_in_subquery` over a `Select`'s rows, so a column whose domain is
+    /// over an enum is a member as the enum, and so is what the subquery
+    /// projects.
+    // [spec:pgorm:req:python.entities+4]
+    fn membership(&self, values: &Bound<'_, PyAny>, negated: bool) -> PyResult<PyExpr> {
+        let members = if let Some(select) = crate::statements::subquery(values)? {
+            Members::Subquery(Box::new(select))
+        } else if values.is_exact_instance_of::<PyList>()
+            || values.is_exact_instance_of::<PyTuple>()
+        {
+            let input = &self.entity.info().column(&self.name)?.input;
+            let values = values
+                .try_iter()?
+                .map(|value| Ok(input.coerce(&value?)?.inner));
+            Members::Values(values.collect::<PyResult<_>>()?)
+        } else {
+            return Err(ConstructionError::new_err(
+                "membership requires a list or tuple of values, or a Select",
+            ));
+        };
+        self.entity
+            .membership(&self.name, negated, members)
+            .map(PyExpr::from_rust)
+            .map_err(|error| ConstructionError::new_err(error.to_string()))
     }
 }
 
@@ -72,6 +105,13 @@ impl PyEntityColumn {
     }
     fn lte(&self, value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         self.comparison(value, Comparison::Le)
+    }
+
+    fn is_in(&self, values: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
+        self.membership(values, false)
+    }
+    fn is_not_in(&self, values: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
+        self.membership(values, true)
     }
 
     fn __richcmp__(&self, value: &Bound<'_, PyAny>, op: CompareOp) -> PyResult<PyExpr> {

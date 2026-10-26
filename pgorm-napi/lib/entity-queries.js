@@ -3,12 +3,12 @@
 // A registered entity's reads: its columns as expressions whose
 // comparisons are the column's own `ColumnTrait` methods, and its
 // `Select<E>` with Rust's terminals.
-// [spec:pgorm:req:napi.entity-reads+3]
+// [spec:pgorm:req:napi.entity-reads+4]
 
 import { arg, Handle, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";
 import { predicateOf, recordsOf } from "./entities.js";
-import { Expr, OrderBy } from "./expressions.js";
+import { Expr, OrderBy, Quantified } from "./expressions.js";
 import { native } from "./operations.js";
 
 /** Marks a construction from a registered entity. */
@@ -27,7 +27,8 @@ export let registeredColumn;
  * column's declared kind and is written through its `save_as`, by the
  * column's own `ColumnTrait` method, and so do the values of a list it is
  * tested for membership in; a subquery's rows are compared by the trait's
- * `in_subquery`; an expression is compared as written.
+ * `in_subquery`; an expression, and `any(..)` or `all(..)`, are compared as
+ * written.
  */
 export class EntityColumn extends Expr {
   /** @type {unknown} */
@@ -92,7 +93,7 @@ export class EntityColumn extends Expr {
    * @param {unknown} other
    */
   #compare(operator, other) {
-    if (other instanceof Expr) return null;
+    if (other instanceof Expr || other instanceof Quantified) return null;
     return new Expr(native.entityCompare(this.#entity, this.#column, operator, other), TRUSTED);
   }
 

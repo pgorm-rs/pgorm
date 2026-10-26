@@ -32,7 +32,7 @@ export { Listener } from "./listen.js";
 export { CopyFrom, copyFrom, CopyOutStream, CopyTo, copyTo } from "./copy.js";
 export { CopyRowStream } from "./copy-rows.js";
 export { CaseOperand, caseOf, caseWhen, Condition, SearchedCase, SimpleCase } from "./conditions.js";
-export { Aliased, array, bind, call, col, exists, Expr, OrderBy, scalar, tuple } from "./expressions.js";
+export { Aliased, all, any, array, bind, call, col, exists, Expr, OrderBy, Quantified, scalar, tuple } from "./expressions.js";
 export { Builder } from "./builder.js";
 export { FromItem, Select, select, Table, With } from "./select.js";
 export { cube, GroupingElement, groupingSet, groupingSets, rollup } from "./grouping.js";

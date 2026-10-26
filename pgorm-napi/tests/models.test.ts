@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 
 import {
+  all,
+  any,
   column,
   Conflict,
   ConstructionError,
@@ -185,7 +187,7 @@ test("insertMany writes rows that set the same fields, and a batch of none sends
   assert.equal(await Account.find().count(pool()), 2);
 });
 
-// [spec:pgorm:req:napi.model-reads/test]
+// [spec:pgorm:req:napi.model-reads+1/test]
 test("find, select and findByKey read records, filtered, ordered and windowed", async () => {
   await seed();
   const names = (rows: { name: string }[]) => rows.map((row) => row.name);
@@ -204,7 +206,7 @@ test("find, select and findByKey read records, filtered, ordered and windowed", 
   assert.equal(await Account.find().limit(1).count(pool()), 3);
 });
 
-// [spec:pgorm:req:napi.model-reads/test]
+// [spec:pgorm:req:napi.model-reads+1/test]
 test("a column compares through its declared kind, and refuses what it cannot bind", async () => {
   await seed();
   const glad = await Account.select("name").where(Account.col("mood").eq("glad")).all(pool());
@@ -220,6 +222,15 @@ test("a column compares through its declared kind, and refuses what it cannot bi
     await Account.select("name").where(Account.col("mood").isIn(["calm", "glad"])).orderBy(byId).all(pool()),
     [{ name: "Ann" }, { name: "Cy" }],
   );
+  assert.deepStrictEqual(
+    await Account.select("name").where(Account.col("name").eq(any(["Ann", "Cy"]))).orderBy(byId).all(pool()),
+    [{ name: "Ann" }, { name: "Cy" }],
+  );
+  assert.deepStrictEqual(
+    await Account.select("name").where(Account.col("name").ne(all(["Ann", "Cy"]))).orderBy(byId).all(pool()),
+    [{ name: "Bob" }],
+  );
+  assert.throws(() => Account.col("tags").contains(any(["a"]) as never), refused(/ANY and ALL follow a comparison/));
   assert.deepStrictEqual(await Account.select("name").where(Account.col("id").between(2, 3)).orderBy(byId).all(pool()), [
     { name: "Bob" },
     { name: "Cy" },
@@ -235,7 +246,7 @@ test("a column compares through its declared kind, and refuses what it cannot bi
   );
 });
 
-// [spec:pgorm:req:napi.model-reads/test]
+// [spec:pgorm:req:napi.model-reads+1/test]
 test("a key names every key field and no other, a composite one included", async () => {
   await Version.insertMany([{ doc: 1, rev: 1, body: "one" }, { doc: 1, rev: 2, body: "two" }]).execute(pool());
   assert.equal((await Version.findByKey({ doc: 1, rev: 2 }).one(pool())).body, "two");
