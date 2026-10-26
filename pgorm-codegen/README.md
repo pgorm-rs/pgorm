@@ -1,8 +1,42 @@
 # pgorm-codegen
 
-Entity source generation for pgorm. Give it a schema — introspected from a
-live database, or parsed from DDL text via
-[libpg_query](https://github.com/pganalyze/libpg_query) (`entities_from_sql`)
-— and it writes the entity modules: models, columns, primary keys, relations,
-and active enums. Library-only; there is no CLI. Call it from a build script
-or a small binary of your own.
+Entity source generation for pgorm. Give it a schema as DDL text and it
+writes the entity modules: models, columns, primary keys, relations, and
+active enums. The text is read with
+[libpg_query](https://github.com/pganalyze/libpg_query), the PostgreSQL
+server's own parser, so it is read as PostgreSQL 18 reads it. Library-only;
+there is no CLI. Call it from a build script or a small binary of your own.
+
+`entities_from_sql` is the whole pipeline. It returns a `WriterOutput`, whose
+`files` are `OutputFile`s holding a name and its source, for you to write;
+`EntityWriterOptions` chooses what is generated:
+
+```rust,no_run
+use pgorm_codegen::{EntityWriterOptions, WithSerde, entities_from_sql};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let ddl = std::fs::read_to_string("schema.sql")?;
+    let output = entities_from_sql(
+        &ddl,
+        EntityWriterOptions {
+            with_serde: WithSerde::Both,
+            ..Default::default()
+        },
+    )?;
+    for file in output.files {
+        std::fs::write(format!("src/entities/{}", file.name), file.content)?;
+    }
+    Ok(())
+}
+```
+
+The schema is the `CREATE` statements: tables with their keys and foreign
+keys, enum and range types, domains, indexes, comments and schemas. Anything
+else in the text is refused with an `Error` naming it, so a schema that
+generates is one read in full. `pg_dump --schema-only` writes its keys as
+`ALTER TABLE` statements and opens with `SET`s, so its output is refused.
+
+The stages are public too: `parse_schema` reads the text into the
+`TableCreateStatement`s `EntityTransformer::transform` takes, and
+`EntityWriter::generate` writes the entities, so statements built in code
+generate the same way.

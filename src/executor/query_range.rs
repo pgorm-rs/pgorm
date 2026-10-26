@@ -55,25 +55,35 @@ where
         let Kind::Multirange(subtype) = ty.kind() else {
             return Err(format!("`{ty}` is not a multirange type").into());
         };
-        let mut raw = raw;
-        let count = usize::try_from(read_i32(&mut raw)?)?;
-        let ranges = (0..count)
-            .map(|_| {
-                let len = usize::try_from(read_i32(&mut raw)?)?;
-                let (range, rest) = raw.split_at_checked(len).ok_or("invalid message size")?;
-                raw = rest;
-                range_from_sql(subtype, range)
-            })
-            .collect::<WireResult<Multirange<T>>>()?;
-        if !raw.is_empty() {
-            return Err("invalid message size".into());
-        }
-        Ok(Self(ranges))
+        multirange_from_sql(subtype, raw).map(Self)
     }
 
     fn accepts(ty: &Type) -> bool {
         matches!(ty.kind(), Kind::Multirange(subtype) if T::accepts(subtype))
     }
+}
+
+/// A multirange over `subtype` from its binary form: a count of ranges, each
+/// length-prefixed in a range's own encoding, and nothing after the last.
+// [spec:pgorm:def:exec.decode.range+3]
+pub(crate) fn multirange_from_sql<'a, T>(subtype: &Type, raw: &'a [u8]) -> WireResult<Multirange<T>>
+where
+    T: FromSql<'a>,
+{
+    let mut raw = raw;
+    let count = usize::try_from(read_i32(&mut raw)?)?;
+    let ranges = (0..count)
+        .map(|_| {
+            let len = usize::try_from(read_i32(&mut raw)?)?;
+            let (range, rest) = raw.split_at_checked(len).ok_or("invalid message size")?;
+            raw = rest;
+            range_from_sql(subtype, range)
+        })
+        .collect::<WireResult<Multirange<T>>>()?;
+    if !raw.is_empty() {
+        return Err("invalid message size".into());
+    }
+    Ok(ranges)
 }
 
 fn read_i32(raw: &mut &[u8]) -> WireResult<i32> {
@@ -237,7 +247,7 @@ try_getable_range_family!(jiff::Timestamp);
 // The subtypes only a range type a schema created ranges over. Their
 // multiranges are reported by tokio-postgres as simple types, and an array of
 // them is not built, so the range alone decodes.
-// [spec:pgorm:def:sql.value.created-range+3]
+// [spec:pgorm:def:sql.value.created-range+4]
 try_getable_range!(i16);
 try_getable_range!(f32);
 try_getable_range!(f64);

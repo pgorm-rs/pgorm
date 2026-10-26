@@ -36,6 +36,11 @@ impl Schema {
     /// implement is refused with [`Error::Type`] naming the relation rather
     /// than written: the server keys no column typed as a domain over an
     /// enum, on either side of the key, not even to the enum itself (`42804`).
+    /// The check reads each side's type from the
+    /// [`ColumnPairs`](crate::ColumnPairs) of the relation, which records it
+    /// only when the pair was named by entity columns, as `DeriveRelation` and
+    /// [`RelationBuilder`](crate::RelationBuilder) name them: a pair built from
+    /// bare names is written as declared, unchecked.
     pub fn create_table_from_entity<E>(&self, entity: E) -> Result<TableCreateStatement, Error>
     where
         E: EntityTrait,
