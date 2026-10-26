@@ -26,7 +26,7 @@ def text_array(values):
 
 
 # [spec:pgorm:req:python.statements+10/test]
-# [spec:pgorm:req:python.expressions+3/test]
+# [spec:pgorm:req:python.expressions+5/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -65,7 +65,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     def ranked(self):
         return p.Select(self.s("id")).from_(self.scores).order_by(self.s("score").desc())
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tied rows come back beyond the count
+    # [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the tied rows come back beyond the count
     async def test_tie_limit_keeps_rows_tied_with_last(self):
         ids = lambda rows: sorted(row[0] for row in rows)
         self.assertEqual(ids(await self.rows(self.ranked().limit_with_ties(2))), [1, 2, 3])
@@ -76,7 +76,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         later = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2).order_by(self.s("score").desc())
         self.assertEqual(ids(await self.rows(later)), [1, 2, 3])
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    refused before any SQL is sent: the
+    # [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    refused before any SQL is sent: the
     # transaction the refused statement was offered to is still usable
     async def test_unordered_tie_limit_refused_before_sending(self):
         unordered = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2)
@@ -91,7 +91,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
                         await terminal(unordered)
             self.assertEqual(len(await self.rows(self.ranked().limit_with_ties(2), tx)), 3)
 
-    # [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    a CTE body or subquery cannot be ordered
+    # [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    a CTE body or subquery cannot be ordered
     # once read, so a tie limit is checked as it is read
     async def test_embedded_tie_limit_is_checked_when_read(self):
         unordered = p.Select(self.s("id")).from_(self.scores).limit_with_ties(2)
@@ -274,7 +274,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         count = p.Select(p.call("count", unaliased.col("id"))).from_(unaliased)
         self.assertEqual(await self.rows(count), [(200,)])
 
-    # [spec:pgorm:req:python.expressions+3/test]    array(select) collects a subquery's one
+    # [spec:pgorm:req:python.expressions+5/test]    array(select) collects a subquery's one
     # column into an array value, empty for no rows, cast as one value, and the server refuses a
     # subquery of two columns with 42601
     async def test_array_collects_a_subquery_column(self):

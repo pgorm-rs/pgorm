@@ -93,7 +93,7 @@ const byScore = score.col("score").desc();
 const unordered = ranked.limitWithTies(2);
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]
 test("a tie limit keeps every row tied with the last one counted, in LIMIT's slot", async () => {
   const tied = ranked.orderBy(byScore).limitWithTies(2);
   assert.deepStrictEqual(field(await pool().query(tied), "score"), [10, 9, 9]);
@@ -110,7 +110,7 @@ test("a tie limit keeps every row tied with the last one counted, in LIMIT's slo
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]
 test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect() and every run before it is sent", async () => {
   const skipping = ranked.orderBy(byScore).limitWithTies(2).lock("update", { wait: "skipLocked" });
   for (const [statement, reason] of [[unordered, /needs an ORDER BY/], [skipping, /SKIP LOCKED/]] as const) {
@@ -147,7 +147,7 @@ test("a tie limit with no ORDER BY, or beside SKIP LOCKED, is refused by inspect
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]
 test("a refused tie limit cannot be read into another statement, where nothing could still order it", async () => {
   for (
     const embed of [
@@ -201,7 +201,7 @@ test("GROUP BY DISTINCT groups each grouping set its elements reach once", async
   }
 });
 
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]
 test("SIMILAR TO matches a whole string against its pattern, the pattern bound and its escape honoured", async () => {
   const words = async (predicate: Expr) =>
@@ -221,7 +221,7 @@ test("SIMILAR TO matches a whole string against its pattern, the pattern bound a
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("unnest WITH ORDINALITY numbers each element, reading a column of the item before it", async () => {
   const letters = tableFunction(call("unnest", bind(["x", "y", "z"]).cast("text", { array: true })), {
@@ -243,7 +243,7 @@ test("unnest WITH ORDINALITY numbers each element, reading a column of the item 
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]
 test("ROWS FROM reads its calls side by side, padding the shorter with NULL", async () => {
   const zipped = tableFunction(
@@ -279,7 +279,7 @@ test("ROWS FROM reads its calls side by side, padding the shorter with NULL", as
 });
 
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 // [spec:pgorm:req:sql.ast.select.column-definitions/test]
 test("a call returning record reads through its column definitions, alone or inside ROWS FROM", async () => {
   const one = tableFunction({

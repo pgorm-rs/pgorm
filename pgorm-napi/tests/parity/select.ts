@@ -3,7 +3,7 @@
 // build, which the Rust test `statements::parity` builds the same statement to
 // with pgorm-query's own builders.
 // [spec:pgorm:req:napi.select+2/test]
-// [spec:pgorm:req:napi.expressions+5/test]
+// [spec:pgorm:req:napi.expressions+6/test]
 
 import {
   array,
@@ -103,6 +103,16 @@ export const cases: Record<string, () => Builder> = {
         col("e").startsWith("50%_"),
         col("f").endsWith("O'Brien"),
         col("g").containsText("\\"),
+      ),
+    ),
+  "regex-and-json-path": () =>
+    select().from(t).where(
+      Condition.any(
+        col("a").regex("^x"),
+        col("b").notRegex(col("c")),
+        col("d").iregex("y$"),
+        col("e").notIregex("z"),
+        col("doc").pathExists('$.tags[*] ? (@ == "blue")'),
       ),
     ),
   "casts-collations-subscripts": () =>

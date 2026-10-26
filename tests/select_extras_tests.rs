@@ -142,7 +142,7 @@ fn sql_state(err: &Error) -> Option<&SqlState> {
     }
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    against a live server: the tied rows are kept,
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    against a live server: the tied rows are kept,
 // the count and offset bound, where a plain LIMIT cuts the tie
 // [spec:pgorm:req:sql.render.tie-limit/test]
 async fn tie_limit_keeps_rows_tied_with_the_last(db: &DatabaseConnection) -> Result<(), Error> {
@@ -172,7 +172,7 @@ async fn tie_limit_keeps_rows_tied_with_the_last(db: &DatabaseConnection) -> Res
     Ok(())
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two refused shapes come back as builder
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the two refused shapes come back as builder
 // errors before anything is sent, where the server would refuse their text with 42601
 // [spec:pgorm:req:exec.tie-limit+1/test]
 async fn refused_tie_limits_never_reach_the_server(db: &DatabaseConnection) -> Result<(), Error> {

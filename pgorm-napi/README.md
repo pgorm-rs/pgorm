@@ -465,8 +465,17 @@ await pool.query(select().from(new Table("booking"))
   it could not extend as an entry are a `ConstructionError` when the
   statement is inspected, run or read into another.
 - **Ranges**: `contains` (`@>`), `containedBy` (`<@`) and `overlaps` (`&&`)
-  over ranges, multiranges and arrays. A range binds as a `Value` naming its
-  kind — a built-in one or a `CreatedRange` — never inferred.
+  over ranges, multiranges and arrays, and `strictlyLeftOf` (`<<`),
+  `strictlyRightOf` (`>>`), `notExtendRightOf` (`&<`), `notExtendLeftOf`
+  (`&>`) and `adjacentTo` (`-|-`) over ranges and multiranges. A range binds
+  as a `Value` naming its kind — a built-in one or a `CreatedRange` — never
+  inferred.
+- **Regular expressions and JSON paths**: `regex` (`~`), `notRegex` (`!~`),
+  `iregex` (`~*`) and `notIregex` (`!~*`) match POSIX regular expressions,
+  the pattern bound unless it is an expression. `pathExists(path)` is `@?`,
+  the `jsonpath` string bound as text cast to `jsonpath`; unlike
+  `jsonExists`, a GIN index on the column serves it, and a strict-mode path
+  that would raise answers NULL.
 
 ## Models
 

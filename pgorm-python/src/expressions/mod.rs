@@ -1,28 +1,34 @@
 //! Composable, owned wrappers of the existing Rust expression builders.
+//!
+//! `Expr`'s methods are one `#[pymethods]` block per operator family, each
+//! in its own module (PyO3's `multiple-pymethods`), as its stub is one mixin
+//! per family.
 
+mod arithmetic;
 mod capabilities;
+mod comparison;
 mod compiled;
 mod construct;
+mod logic;
 mod options;
+mod patterns;
+mod predicates;
+mod ranges;
+mod search;
+mod shaping;
 #[cfg(test)]
 mod tests;
 
-use pgorm::pgorm_query::{BinOper, Expr, Func, Name, Query, SimpleExpr};
-use pyo3::{basic::CompareOp, prelude::*};
+use pgorm::pgorm_query::{BinOper, SimpleExpr};
+use pyo3::prelude::*;
 
-use crate::{
-    errors::ConstructionError,
-    identifiers::{Direction, Nulls, PyIdentifier, collation},
-    values::PyTypeName,
-};
 pub(crate) use capabilities::operations as capabilities;
 pub use compiled::Compiled;
 pub use construct::PyCondition;
-use construct::sequence;
 pub(crate) use construct::{coerce, require_expr};
 pub use options::{AliasedExpr, LikePattern, OrderBy};
 
-// [spec:pgorm:req:python.expressions+3]
+// [spec:pgorm:req:python.expressions+5]
 // [spec:pgorm:req:python.ownership]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
 #[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]
@@ -40,224 +46,6 @@ impl PyExpr {
         Ok(Self::from_rust(
             self.inner.clone().binary(operator, coerce(other)?.inner),
         ))
-    }
-}
-
-#[pymethods]
-impl PyExpr {
-    fn eq(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Equal, other)
-    }
-    fn ne(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::NotEqual, other)
-    }
-    fn gt(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::GreaterThan, other)
-    }
-    fn gte(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::GreaterThanOrEqual, other)
-    }
-    fn lt(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::SmallerThan, other)
-    }
-    fn lte(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::SmallerThanOrEqual, other)
-    }
-
-    fn __richcmp__(&self, other: &Bound<'_, PyAny>, operator: CompareOp) -> PyResult<Self> {
-        self.binary(
-            match operator {
-                CompareOp::Eq => BinOper::Equal,
-                CompareOp::Ne => BinOper::NotEqual,
-                CompareOp::Lt => BinOper::SmallerThan,
-                CompareOp::Le => BinOper::SmallerThanOrEqual,
-                CompareOp::Gt => BinOper::GreaterThan,
-                CompareOp::Ge => BinOper::GreaterThanOrEqual,
-            },
-            other,
-        )
-    }
-
-    fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Add, other)
-    }
-    fn __sub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Sub, other)
-    }
-    fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Mul, other)
-    }
-    fn __truediv__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Div, other)
-    }
-    fn __mod__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        self.binary(BinOper::Mod, other)
-    }
-    fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner
-                .clone()
-                .and(construct::require_expr(other)?.inner),
-        ))
-    }
-    fn __or__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner.clone().or(construct::require_expr(other)?.inner),
-        ))
-    }
-    fn __invert__(&self) -> Self {
-        Self::from_rust(self.inner.clone().not())
-    }
-    fn __bool__(&self) -> PyResult<bool> {
-        Err(ConstructionError::new_err(
-            "SQL expressions cannot be tested as Python booleans; use &, | and ~",
-        ))
-    }
-
-    fn is_null(&self) -> Self {
-        Self::from_rust(Expr::expr(self.inner.clone()).is_null())
-    }
-    fn is_not_null(&self) -> Self {
-        Self::from_rust(Expr::expr(self.inner.clone()).is_not_null())
-    }
-
-    fn is_in(&self, values: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).is_in(sequence(values)?),
-        ))
-    }
-    fn is_not_in(&self, values: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).is_not_in(sequence(values)?),
-        ))
-    }
-    fn between(&self, lower: &Bound<'_, PyAny>, upper: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).between(coerce(lower)?.inner, coerce(upper)?.inner),
-        ))
-    }
-    fn not_between(&self, lower: &Bound<'_, PyAny>, upper: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).not_between(coerce(lower)?.inner, coerce(upper)?.inner),
-        ))
-    }
-
-    #[pyo3(signature = (type_name, *, array=false))]
-    fn cast(&self, type_name: PyRef<'_, PyTypeName>, array: bool) -> Self {
-        let name = type_name.rust_type();
-        Self::from_rust(
-            self.inner
-                .clone()
-                .cast_as_type(if array { name.array() } else { name }),
-        )
-    }
-    /// `(expr COLLATE "name")`: this expression under a collation, through
-    /// Rust's `Expr::collate`. It stays an operand, so it goes on to be
-    /// compared, and `asc` or `desc` over it writes the clause into the sort
-    /// key, where PostgreSQL reads an `ORDER BY`'s collation.
-    // [spec:pgorm:req:python.expr-collate]
-    #[pyo3(signature = (name, *, schema=None))]
-    fn collate(
-        &self,
-        name: &Bound<'_, PyAny>,
-        schema: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let collated = Expr::expr(self.inner.clone()).collate(collation(name, schema)?);
-        Ok(Self::from_rust(collated.into()))
-    }
-    fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<AliasedExpr> {
-        Ok(AliasedExpr {
-            expr: self.clone(),
-            alias: PyIdentifier::new(alias)?,
-        })
-    }
-    /// This call over a window: a `Window` or an `ExtendedWindow` written
-    /// inline, or the name of the one a statement declares with
-    /// `Select.window`. Only a function call or a JSON aggregate takes one,
-    /// as PostgreSQL's grammar has it.
-    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<crate::statements::PyWindowedExpr> {
-        let call = crate::statements::WindowCall::of(&self.inner)?;
-        call.over(window)
-    }
-    #[pyo3(signature = (*, nulls=None))]
-    fn asc(&self, nulls: Option<Nulls>) -> OrderBy {
-        OrderBy {
-            expr: self.clone(),
-            direction: Direction::Asc,
-            nulls,
-        }
-    }
-    #[pyo3(signature = (*, nulls=None))]
-    fn desc(&self, nulls: Option<Nulls>) -> OrderBy {
-        OrderBy {
-            expr: self.clone(),
-            direction: Direction::Desc,
-            nulls,
-        }
-    }
-
-    fn starts_with(&self, text: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Func::starts_with(self.inner.clone(), coerce(text)?.inner).into(),
-        ))
-    }
-    fn contains_text(&self, text: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let position =
-            Func::named(Name::runtime("strpos")).args([self.inner.clone(), coerce(text)?.inner]);
-        Ok(Self::from_rust(
-            Expr::expr(position).gt(SimpleExpr::Constant(0i32.into())),
-        ))
-    }
-    fn ends_with(&self, text: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let text = coerce(text)?.inner;
-        let suffix = Func::named(Name::runtime("right"))
-            .args([self.inner.clone(), Func::char_length(text.clone()).into()]);
-        Ok(Self::from_rust(Expr::expr(suffix).eq(text)))
-    }
-    fn like(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner.clone().like(options::pattern(pattern)?),
-        ))
-    }
-    fn not_like(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner.clone().not_like(options::pattern(pattern)?),
-        ))
-    }
-    fn ilike(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).ilike(options::pattern(pattern)?),
-        ))
-    }
-    fn not_ilike(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            Expr::expr(self.inner.clone()).not_ilike(options::pattern(pattern)?),
-        ))
-    }
-    // [spec:pgorm:req:python.expressions+3]
-    /// `SIMILAR TO`: a whole-string match in SQL's regular-expression
-    /// dialect, the pattern bound and its ESCAPE carried as LIKE's are.
-    fn similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner.clone().similar_to(options::pattern(pattern)?),
-        ))
-    }
-    // [spec:pgorm:req:python.expressions+3]
-    fn not_similar_to(&self, pattern: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner
-                .clone()
-                .not_similar_to(options::pattern(pattern)?),
-        ))
-    }
-
-    /// Inspect this expression as the projection of a Rust-built SELECT.
-    fn inspect(&self) -> Compiled {
-        let (sql, values) = Query::select().expr(self.inner.clone()).build();
-        Compiled { sql, values }
-    }
-    fn __repr__(&self) -> &'static str {
-        "Expr(...)"
     }
 }
 

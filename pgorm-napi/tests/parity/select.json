@@ -27,6 +27,10 @@
     "sql": "SELECT * FROM \"t\" WHERE \"a\" LIKE $1 OR \"b\" NOT LIKE $2 ESCAPE E'\\\\' OR \"c\" ILIKE $3 OR \"d\" NOT ILIKE $4 ESCAPE '!' OR STARTS_WITH(\"e\", $5) OR \"right\"(\"f\", CHAR_LENGTH($6)) = $7 OR strpos(\"g\", $8) > 0",
     "values": [["text","A%"], ["text","50\\%%"], ["text","x_y"], ["text","%z"], ["text","50%_"], ["text","O'Brien"], ["text","O'Brien"], ["text","\\"]]
   },
+  "regex-and-json-path": {
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" ~ $1 OR \"b\" !~ \"c\" OR \"d\" ~* $2 OR \"e\" !~* $3 OR \"doc\" @? CAST($4::text AS jsonpath)",
+    "values": [["text","^x"], ["text","y$"], ["text","z"], ["text","$.tags[*] ? (@ == \"blue\")"]]
+  },
   "casts-collations-subscripts": {
     "sql": "SELECT CAST(\"a\" AS integer), CAST(\"b\" AS app.\"Mood\"[]), CAST($1::text AS interval), (\"c\" COLLATE \"C\"), (\"d\" COLLATE \"pg_catalog\".\"de-x-icu\"), \"e\"[$2], \"f\"[$3][$4], \"g\"[$5:$6], \"h\"[:$7], \"i\"[$8:], \"j\"[:]",
     "values": [["text","1 day"], ["i64","1"], ["i64","1"], ["i32","2"], ["i64","2"], ["i64","3"], ["i64","3"], ["i64","2"]]

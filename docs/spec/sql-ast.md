@@ -587,7 +587,7 @@ today, including panicking edges and deliberate failsafes.
 > the type cannot tell from a table's, and sampling one is the server's
 > refusal (`0A000`).
 
-> [spec:pgorm:req:sql.ast.select.tie-limit+1]
+> [spec:pgorm:req:sql.ast.select.tie-limit+2]
 > `limit_with_ties(count)` sets a tie limit, `FETCH FIRST count ROWS WITH
 > TIES`: the first `count` rows in the statement's ORDER BY and every further
 > row equal to the last of them on all its keys. It shares one slot with
@@ -619,6 +619,14 @@ today, including panicking edges and deliberate failsafes.
 > that `42601`. The check reads the statement's own clauses: a SELECT nested
 > in it — a subquery, a CTE body, a set operation's arm — carrying a refused
 > shape is the server's refusal.
+>
+> `check_clauses` is the one public check a caller about to render a
+> `SELECT` as it stands calls: it runs `check_tie_limit` and then
+> `check_windows` (`sql.ast.window-statement`), the first refusal found its
+> error. Every pgorm executor, the Python and JavaScript builders, a stored
+> definition's body (`sql.ddl.view`) and a COPY TO's source (`sql.ast.copy`)
+> call it rather than pairing the two themselves, so each reports the same
+> refusal for the same statement.
 
 > [spec:pgorm:req:sql.ast.select.group-distinct]
 > `group_by_distinct()` sets the GROUP BY list's set quantifier to
@@ -938,13 +946,24 @@ today, including panicking edges and deliberate failsafes.
 > functions: `Func::any`/`some`/`all` render SQL only in that position, and are
 > the escape hatch for the operators these two do not name.
 
-> [spec:pgorm:req:sql.ast.expr.json+1]
+> [spec:pgorm:req:sql.ast.expr.json+2]
 > `Expr` MUST provide the JSON *operator* vocabulary as typed combinators:
 > field access `get_json_field` (`->`) and `cast_json_field` (`->>`), path
-> access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), and key existence
+> access `get_json_path` (`#>`) and `cast_json_path` (`#>>`), key existence
 > `has_json_key` (`?`), `has_any_json_keys` (`?|`) and `has_all_json_keys`
-> (`?&`). They live in a child module of `expr` rather than in `Expr`'s main
-> block, as the membership family does.
+> (`?&`), and path existence `json_path_exists` (`@?`). They live in a child
+> module of `expr` rather than in `Expr`'s main block, as the membership
+> family does.
+>
+> `json_path_exists` binds its path as `text` cast to `jsonpath`, as
+> `JSON_EXISTS` binds its own (`[spec:pgorm:def:sql.ast.expr.sql-json+2]`):
+> the path never becomes statement text, and the driver, which writes a
+> value in the format of the type it is, is never asked to write a
+> `jsonpath`. Its bound is `Into<String>`, a path being text. It is not
+> `JSON_EXISTS` under another name: checked on PostgreSQL 18.6, a GIN index
+> on the column, `jsonb_ops` or `jsonb_path_ops`, serves `@?` and no index
+> serves `JSON_EXISTS`, and where a strict-mode path raises an error, as
+> `strict $.b` over a document without `b` does, `@?` answers NULL.
 >
 > PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
 > and the constructors — are the neighbouring vocabulary,
@@ -961,8 +980,9 @@ today, including panicking edges and deliberate failsafes.
 > the rest — are ordinary function applications a caller already spells with
 > `Func::named`, and naming each one here would be a second, worse function-call
 > syntax. The operators pgorm does not name (`-` and `#-` key/path deletion,
-> the jsonpath operators `@?` and `@@`) stay reachable through `binary` with
-> `BinOper::Raw`; only `@@` has a variant, shared with full-text `matches`.
+> and the jsonpath match `@@`) stay reachable through `binary`: the deletions
+> with `BinOper::Raw`, `@@` with `BinOper::Matches`, the variant full-text
+> `matches` renders.
 >
 > Containment (`@>`, `<@`) and concatenation (`||`) MUST NOT be duplicated
 > here: PostgreSQL defines one operator each across every type that has them,

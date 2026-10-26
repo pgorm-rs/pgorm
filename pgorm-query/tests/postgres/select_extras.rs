@@ -21,7 +21,7 @@ fn ordered() -> SelectStatement {
         .take()
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the tie limit renders in LIMIT's place and
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the tie limit renders in LIMIT's place and
 // parses as PostgreSQL's WITH TIES limit, its count bound
 // [spec:pgorm:req:sql.render.tie-limit/test]
 #[test]
@@ -46,7 +46,7 @@ fn tie_limit_renders_fetch_first_with_ties() {
     assert_eq!(query.check_tie_limit(), Ok(()));
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `limit` and `limit_with_ties` share one slot,
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    `limit` and `limit_with_ties` share one slot,
 // the last call winning, and `reset_limit` clears either
 #[test]
 fn row_limits_replace_each_other() {
@@ -77,7 +77,7 @@ fn row_limits_replace_each_other() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    `narrow_limit_to_one` narrows every row
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    `narrow_limit_to_one` narrows every row
 // limit to a plain LIMIT of at most one, keeping a limit of zero and the OFFSET
 #[test]
 fn narrowing_keeps_a_zero_limit() {
@@ -108,7 +108,7 @@ fn narrowing_keeps_a_zero_limit() {
     );
 }
 
-// [spec:pgorm:req:sql.ast.select.tie-limit+1/test]    the two shapes the grammar refuses are refused by
+// [spec:pgorm:req:sql.ast.select.tie-limit+2/test]    the two shapes the grammar refuses are refused by
 // `check_tie_limit`, and the grammar does refuse what they render
 // [spec:pgorm:req:sql.render.oracle+4/test]    the one render held rejected by design
 // [spec:pgorm:req:sql.render.tie-limit/test]
@@ -205,7 +205,7 @@ fn a_exprs(sql: &str) -> Vec<(i64, String)> {
 
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms, the pattern bound and an ESCAPE
 // inline, and the grammar reads them as SIMILAR TO
-// [spec:pgorm:def:sql.render.operators+7/test]
+// [spec:pgorm:def:sql.render.operators+8/test]
 #[test]
 fn similar_to_binds_its_pattern() {
     let query = Query::select()
@@ -245,7 +245,7 @@ fn similar_to_binds_its_pattern() {
 
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    `no_escape` renders `ESCAPE ''` after LIKE,
 // ILIKE and SIMILAR TO's bound pattern, and the grammar reads an empty escape there
-// [spec:pgorm:def:sql.render.operators+7/test]
+// [spec:pgorm:def:sql.render.operators+8/test]
 #[test]
 fn no_escape_renders_an_empty_escape() {
     let off = || LikeExpr::new(r"a\%").no_escape();
@@ -297,7 +297,7 @@ fn no_escape_renders_an_empty_escape() {
 
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    SIMILAR TO ranks with LIKE: bare under the
 // logical operators and NOT, an arithmetic operand bare inside it
-// [spec:pgorm:def:sql.render.precedence+12/test]
+// [spec:pgorm:def:sql.render.precedence+14/test]
 #[test]
 fn similar_to_sits_in_the_like_family() {
     let sql = Query::select()
@@ -351,7 +351,7 @@ fn grouping(node: &serde_json::Value) -> String {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence+12/test]    ILIKE and NOT ILIKE rank with LIKE: bare under
+// [spec:pgorm:def:sql.render.precedence+14/test]    ILIKE and NOT ILIKE rank with LIKE: bare under
 // the logical operators and NOT, ESCAPE tail included, an arithmetic operand bare inside them,
 // and the grammar groups the bare render as the condition was built
 #[test]

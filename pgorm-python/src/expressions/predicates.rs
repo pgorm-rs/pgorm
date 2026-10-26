@@ -1,0 +1,60 @@
+//! `Expr`'s NULL tests, membership and `[NOT] BETWEEN [SYMMETRIC]`.
+
+use pgorm::pgorm_query::Expr;
+use pyo3::prelude::*;
+
+use super::{PyExpr, coerce, construct::sequence};
+
+// [spec:pgorm:req:python.expressions+5]
+#[pymethods]
+impl PyExpr {
+    fn is_null(&self) -> Self {
+        Self::from_rust(Expr::expr(self.inner.clone()).is_null())
+    }
+    fn is_not_null(&self) -> Self {
+        Self::from_rust(Expr::expr(self.inner.clone()).is_not_null())
+    }
+
+    fn is_in(&self, values: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self::from_rust(
+            Expr::expr(self.inner.clone()).is_in(sequence(values)?),
+        ))
+    }
+    fn is_not_in(&self, values: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self::from_rust(
+            Expr::expr(self.inner.clone()).is_not_in(sequence(values)?),
+        ))
+    }
+    /// `BETWEEN`, or with `symmetric` `BETWEEN SYMMETRIC`, which sorts its
+    /// bounds first, so they hold in whichever order they are given.
+    #[pyo3(signature = (lower, upper, *, symmetric=false))]
+    fn between(
+        &self,
+        lower: &Bound<'_, PyAny>,
+        upper: &Bound<'_, PyAny>,
+        symmetric: bool,
+    ) -> PyResult<Self> {
+        let (lower, upper) = (coerce(lower)?.inner, coerce(upper)?.inner);
+        let expr = Expr::expr(self.inner.clone());
+        Ok(Self::from_rust(if symmetric {
+            expr.between_symmetric(lower, upper)
+        } else {
+            expr.between(lower, upper)
+        }))
+    }
+    #[pyo3(signature = (lower, upper, *, symmetric=false))]
+    fn not_between(
+        &self,
+        lower: &Bound<'_, PyAny>,
+        upper: &Bound<'_, PyAny>,
+        symmetric: bool,
+    ) -> PyResult<Self> {
+        let (lower, upper) = (coerce(lower)?.inner, coerce(upper)?.inner);
+        let expr = Expr::expr(self.inner.clone());
+        Ok(Self::from_rust(if symmetric {
+            expr.not_between_symmetric(lower, upper)
+        } else {
+            expr.not_between(lower, upper)
+        }))
+    }
+}

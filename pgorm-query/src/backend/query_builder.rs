@@ -522,7 +522,7 @@ impl QueryBuilder {
 
     /// Translate a [`LikeExpr`] into the pattern and optional `ESCAPE` tail of a
     /// `LIKE` / `ILIKE` / `SIMILAR TO`.
-    // [spec:pgorm:def:sql.render.operators+7]
+    // [spec:pgorm:def:sql.render.operators+8]
     fn prepare_like_expr(&self, like: &LikeExpr, sql: &mut dyn SqlWriter) {
         sql.push_param(like.pattern.clone().into());
         match like.escape {
@@ -696,7 +696,7 @@ impl QueryBuilder {
     }
 
     /// Translate [`UnOper`] into SQL statement.
-    // [spec:pgorm:def:sql.render.operators+7] (the only unary operator: NOT)
+    // [spec:pgorm:def:sql.render.operators+8] (the only unary operator: NOT)
     fn prepare_un_oper(&self, un_oper: &UnOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -708,7 +708,7 @@ impl QueryBuilder {
         .unwrap();
     }
 
-    // [spec:pgorm:def:sql.render.operators+7]
+    // [spec:pgorm:def:sql.render.operators+8]
     fn prepare_bin_oper(&self, bin_oper: &BinOper, sql: &mut dyn SqlWriter) {
         write!(
             sql,
@@ -765,8 +765,14 @@ impl QueryBuilder {
                 BinOper::HasJsonKey => "?",
                 BinOper::HasAnyJsonKeys => "?|",
                 BinOper::HasAllJsonKeys => "?&",
+                BinOper::JsonPathExists => "@?",
                 BinOper::Regex => "~",
                 BinOper::RegexCaseInsensitive => "~*",
+                BinOper::NotRegex => "!~",
+                BinOper::NotRegexCaseInsensitive => "!~*",
+                BinOper::NotExtendRightOf => "&<",
+                BinOper::NotExtendLeftOf => "&>",
+                BinOper::AdjacentTo => "-|-",
                 BinOper::AtTimeZone => "AT TIME ZONE",
                 BinOper::EuclideanDistance => "<->",
                 BinOper::NegativeInnerProduct => "<#>",

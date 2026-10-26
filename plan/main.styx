@@ -13694,6 +13694,13 @@ children (
                 kind @note
                 text "Folded into spec-prose-unversioned-refs by the operator's 2026-10-23 decision; completes with it."
             }
+
+            {
+                at 2026-10-26T10:26:16.873766Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "check-clauses-shared (f72f55ea) bumped sql.ast.select.tie-limit to +2: it now names check_clauses as the one check every executor, both bindings, a stored definition's body and a COPY TO's source call. The tie-limit half of this node is done by that text; sql.ast.window-statement (+8) still names only the executors and the bindings."
+            }
         )
     }
 
@@ -14051,6 +14058,20 @@ children (
                 kind @note
                 text "Found by view-check-dedup, which added the crate-private SelectStatement::check_clauses for the view and COPY-source checks. PySelect::check, pgorm-napi's checked and the executor's ensure_select_list still pair check_tie_limit and check_windows themselves. Making check_clauses public (an addition, with a sql.surface entry) would let all of them share it."
             }
+
+            {
+                at 2026-10-25T23:58:04.696792Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T00:24:00.568357Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14264,6 +14285,13 @@ children (
                 kind @note
                 text "Found by boolean-operator-parens. !~, !~*, @?, -|- and the range position operators &< and &> have no BinOper variant and arrive only as BinOper::Raw, whose result type is unknown, so they keep parentheses under the logical operators. sql.types.opers asks for a variant where an operator's parenthesisation differs from the default. Add them (and their binding spellings) with oracle-checked grouping tests."
             }
+
+            {
+                at 2026-10-26T10:26:17.005467Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -14278,6 +14306,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by boolean-operator-parens. The grammar ranks generic operators (@>, &&, ~ ..) above comparison, IS, IN and LIKE, but such an operator under one of them keeps parentheses, e.g. (\"a\" @> $1) = TRUE. Only redundant, never a wrong grouping; low priority."
+            }
+
+            {
+                at 2026-10-25T23:58:04.072088Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:49:05.626762Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

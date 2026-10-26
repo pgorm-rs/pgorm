@@ -78,7 +78,7 @@ fn sweep_select_clause_shapes() {
 
 // [spec:pgorm:req:sql.render.oracle+4/test]    expression rendering, including the parenthesis
 // elision of `sql.render.precedence`
-// [spec:pgorm:req:sql.render.parens+4/test]
+// [spec:pgorm:req:sql.render.parens+5/test]
 #[test]
 fn sweep_expression_shapes() {
     let exprs: Vec<SimpleExpr> = vec![
@@ -887,7 +887,7 @@ fn sweep_column_type_vocabulary() {
 
 // [spec:pgorm:req:sql.render.oracle+4/test]    the binary operator vocabulary, minus `Escape`, which
 // is only grammatical inside LIKE and is pinned in `oracle_pins.rs`
-// [spec:pgorm:def:sql.render.operators+7/test]
+// [spec:pgorm:def:sql.render.operators+8/test]
 #[test]
 fn sweep_binary_operator_vocabulary() {
     let opers = [
@@ -929,6 +929,12 @@ fn sweep_binary_operator_vocabulary() {
         BinOper::CastJsonField,
         BinOper::Regex,
         BinOper::RegexCaseInsensitive,
+        BinOper::NotRegex,
+        BinOper::NotRegexCaseInsensitive,
+        BinOper::JsonPathExists,
+        BinOper::NotExtendRightOf,
+        BinOper::NotExtendLeftOf,
+        BinOper::AdjacentTo,
         BinOper::EuclideanDistance,
         BinOper::NegativeInnerProduct,
         BinOper::CosineDistance,

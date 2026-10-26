@@ -105,6 +105,39 @@ subquery's rows cannot: `array(names).cast(TypeName("text"), array=True)`. The
 subquery is checked as any embedded one is, and PostgreSQL refuses one of more
 than one column (`42601`).
 
+PostgreSQL's other binary operators are methods, each the Rust builder of its
+meaning, the other operand bound unless it is an expression — the same set
+JavaScript's expressions have:
+
+| Method | Operator | Reads |
+| --- | --- | --- |
+| `is_distinct_from(other)`, `is_not_distinct_from(other)` | `IS [NOT] DISTINCT FROM` | any two values, NULL as a value |
+| `concat(other)` | `\|\|` | text, arrays and `jsonb` |
+| `regex(pattern)`, `not_regex(pattern)` | `~`, `!~` | text against a POSIX regular expression |
+| `iregex(pattern)`, `not_iregex(pattern)` | `~*`, `!~*` | the same with case ignored |
+| `contains(other)`, `contained_by(other)`, `overlaps(other)` | `@>`, `<@`, `&&` | ranges, multiranges and arrays |
+| `strictly_left_of(other)`, `strictly_right_of(other)` | `<<`, `>>` | ranges and multiranges |
+| `not_extend_right_of(other)`, `not_extend_left_of(other)` | `&<`, `&>` | ranges and multiranges |
+| `adjacent_to(other)` | `-\|-` | ranges and multiranges |
+| `matches(other)` | `@@` | full-text search, or a `jsonb` against a `jsonpath` predicate |
+| `path_exists(path)` | `@?` | a `jsonb` against a `jsonpath` |
+
+`between` and `not_between` take `symmetric=True` for `BETWEEN SYMMETRIC`,
+which sorts the bounds first. A range or multirange operand binds as a
+`Value` naming its kind, `Value(Range(1, 5), "int4range")`, as a range always
+does. `path_exists` takes a `str`, bound as text cast to `jsonpath` (Rust's
+`json_path_exists`), so the path never becomes statement text; anything else
+is a `ConstructionError`. Unlike `json_exists`, `@?` is served by a GIN index
+on the column, and a strict-mode path that would raise answers NULL.
+`matches` binds a `str` as text, which reads it as full-text search; a
+`jsonpath` predicate is written cast,
+`bind("$.a == 1").cast(TypeName("jsonpath"))`.
+
+`Expr`'s stub declares its methods in one stub-only mixin per family
+(`_expr_comparison.pyi`, `_expr_patterns.pyi` and the rest), which exist for
+the type checker alone: at runtime `Expr` has no base but `object`, so
+`help(Expr)` and `dir(Expr)` list every method on the class itself.
+
 ## Text and functions
 
 `starts_with`, `ends_with` and `contains_text` treat their arguments as text,

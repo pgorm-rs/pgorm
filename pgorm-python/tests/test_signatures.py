@@ -51,7 +51,29 @@ def runtime_parameters(value, *, receiver):
     ]
 
 
+def stub_classes(root):
+    return {
+        item.name: (path.name, item)
+        for path in sorted(root.glob("_*.pyi"))
+        for item in ast.parse(path.read_text()).body
+        if isinstance(item, ast.ClassDef)
+    }
+
+
+def stub_only_bases(item, classes):
+    """The stub-only mixins a stub class inherits, transitively.
+
+    A class the stubs declare but `_native` does not define exists for the
+    type checker alone: it groups methods the native class it is mixed into
+    defines itself, so its methods are checked against that class."""
+    for base in item.bases:
+        if isinstance(base, ast.Name) and base.id in classes and not hasattr(_native, base.id):
+            yield classes[base.id]
+            yield from stub_only_bases(classes[base.id][1], classes)
+
+
 def native_calls(root):
+    classes = stub_classes(root)
     for path in sorted(root.glob("_*.pyi")):
         for item in ast.parse(path.read_text()).body:
             if isinstance(item, ast.FunctionDef):
@@ -63,30 +85,32 @@ def native_calls(root):
                     False,
                     False,
                 )
-            elif isinstance(item, ast.ClassDef):
+            elif isinstance(item, ast.ClassDef) and hasattr(_native, item.name):
                 cls = getattr(_native, item.name)
-                for method in item.body:
-                    if not isinstance(method, ast.FunctionDef):
-                        continue
-                    decorators = {
-                        decorator.id
-                        for decorator in method.decorator_list
-                        if isinstance(decorator, ast.Name)
-                    }
-                    if "property" in decorators:
-                        getattr(cls, method.name)
-                        continue
-                    if method.name == "__init__":
-                        yield path.name, item.name, method, cls, True, False
-                    else:
-                        yield (
-                            path.name,
-                            f"{item.name}.{method.name}",
-                            method,
-                            getattr(cls, method.name),
-                            "classmethod" in decorators,
-                            False,
-                        )
+                declarations = [(path.name, item), *stub_only_bases(item, classes)]
+                for file, declaration in declarations:
+                    for method in declaration.body:
+                        if not isinstance(method, ast.FunctionDef):
+                            continue
+                        decorators = {
+                            decorator.id
+                            for decorator in method.decorator_list
+                            if isinstance(decorator, ast.Name)
+                        }
+                        if "property" in decorators:
+                            getattr(cls, method.name)
+                            continue
+                        if method.name == "__init__":
+                            yield file, item.name, method, cls, True, False
+                        else:
+                            yield (
+                                file,
+                                f"{item.name}.{method.name}",
+                                method,
+                                getattr(cls, method.name),
+                                "classmethod" in decorators,
+                                False,
+                            )
 
 
 class Signatures(unittest.TestCase):
@@ -111,6 +135,27 @@ class Signatures(unittest.TestCase):
                     )
             checked += 1
         self.assertGreater(checked, 200)
+
+    # [spec:pgorm:req:python.typing/test]    a stub-only mixin is inherited by a native class in
+    # the stubs and absent at runtime, where the native class defines each of its methods itself
+    def test_stub_only_mixins_belong_to_native_classes(self):
+        root = Path(pgorm.__file__).resolve().parent
+        classes = stub_classes(root)
+        stub_only = {name for name in classes if not hasattr(_native, name)}
+        inherited = {}
+        for name, (_, item) in classes.items():
+            if hasattr(_native, name):
+                for _, base in stub_only_bases(item, classes):
+                    inherited.setdefault(base.name, set()).add(name)
+        self.assertEqual(stub_only, set(inherited))
+        for mixin, owners in inherited.items():
+            for owner in owners:
+                cls = getattr(_native, owner)
+                with self.subTest(mixin=mixin, owner=owner):
+                    self.assertEqual(cls.__mro__, (cls, object))
+                    for method in classes[mixin][1].body:
+                        if isinstance(method, ast.FunctionDef):
+                            self.assertIn(method.name, vars(cls))
 
     def test_python_wrapper_signatures_match_shipped_stubs(self):
         root = Path(pgorm.__file__).resolve().parent / "_registered"

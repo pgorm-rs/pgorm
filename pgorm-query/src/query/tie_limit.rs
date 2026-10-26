@@ -10,7 +10,7 @@ use crate::{
 /// A SELECT's row limit. The two forms share one slot because PostgreSQL's
 /// grammar takes a `LIMIT` or a `FETCH FIRST`, never both, so setting either
 /// replaces the other.
-// [spec:pgorm:req:sql.ast.select.tie-limit+1]
+// [spec:pgorm:req:sql.ast.select.tie-limit+2]
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RowLimit {
     /// `LIMIT n`: at most `n` rows.
@@ -51,7 +51,7 @@ impl SelectStatement {
     /// );
     /// assert_eq!(query.check_tie_limit(), Ok(()));
     /// ```
-    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+2]
     pub fn limit_with_ties(&mut self, count: u64) -> &mut Self {
         self.limit = Some(RowLimit::WithTies(count));
         self
@@ -60,7 +60,7 @@ impl SelectStatement {
     /// Whether the row limit is a tie limit, which counts rows only up to
     /// the ties of the last: a caller that pages or narrows the result by
     /// row count reads this before replacing the limit.
-    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+2]
     pub fn has_tie_limit(&self) -> bool {
         matches!(self.limit, Some(RowLimit::WithTies(_)))
     }
@@ -95,7 +95,7 @@ impl SelectStatement {
     ///     r#"SELECT "image" FROM "glyph" ORDER BY "aspect" DESC LIMIT 0"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+2]
     pub fn narrow_limit_to_one(&mut self) -> &mut Self {
         let none = matches!(self.limit, Some(RowLimit::Count(0) | RowLimit::WithTies(0)));
         self.limit = Some(RowLimit::Count(if none { 0 } else { 1 }));
@@ -129,7 +129,7 @@ impl SelectStatement {
     /// query.lock_with_behavior(LockType::Update, LockBehavior::SkipLocked);
     /// assert_eq!(query.check_tie_limit(), Err(Error::TiesWithSkipLocked));
     /// ```
-    // [spec:pgorm:req:sql.ast.select.tie-limit+1]
+    // [spec:pgorm:req:sql.ast.select.tie-limit+2]
     pub fn check_tie_limit(&self) -> Result<()> {
         if !self.has_tie_limit() {
             Ok(())
@@ -147,13 +147,38 @@ impl SelectStatement {
     }
 
     /// Both checks of this statement's own clauses that rendering leaves to
-    /// its caller, tie limit first and WINDOW clause second, for a builder
-    /// that takes a `SELECT` it will render as it is: a stored definition's
-    /// body and a COPY TO's source. The first refusal found is the error, in
-    /// that order, so every taker reports the same one for the same query.
+    /// its caller: [`check_tie_limit`](Self::check_tie_limit) first and
+    /// [`check_windows`](Self::check_windows) second, the first refusal found
+    /// the error. It is the check for whoever is about to render a `SELECT`
+    /// as it stands — pgorm's executors, the Python and JavaScript bindings,
+    /// a stored definition's body, a COPY TO's source — so every one reports
+    /// the same refusal for the same statement.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use pgorm_query::{*, error::Error, tests_cfg::*};
+    ///
+    /// let mut query = Query::select();
+    /// query
+    ///     .expr_window_name(Func::count(Expr::col(Char::Id)), Name::runtime("w"))
+    ///     .from(Char::Table)
+    ///     .limit_with_ties(3);
+    /// assert_eq!(query.check_clauses(), Err(Error::TiesWithoutOrder));
+    ///
+    /// query.order_by(Char::Id, Order::Asc);
+    /// assert_eq!(
+    ///     query.check_clauses(),
+    ///     Err(Error::WindowUndefined { name: "w".to_owned() })
+    /// );
+    ///
+    /// query.window(Name::runtime("w"), WindowStatement::partition_by(Char::FontSize));
+    /// assert_eq!(query.check_clauses(), Ok(()));
+    /// ```
+    // [spec:pgorm:req:sql.ast.select.tie-limit+2]
     // [spec:pgorm:req:sql.ddl.view+1]
     // [spec:pgorm:def:sql.ast.copy+2]
-    pub(crate) fn check_clauses(&self) -> Result<()> {
+    pub fn check_clauses(&self) -> Result<()> {
         self.check_tie_limit()?;
         self.check_windows()
     }

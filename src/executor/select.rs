@@ -20,8 +20,8 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 /// The guard every ORM path that sends a `SELECT` passes through: a statement
 /// whose projection list is empty renders as `SELECT  FROM "tbl"`, which the
 /// server rejects with an opaque syntax error, so it is refused here instead,
-/// and so are a tie limit PostgreSQL's grammar refuses (`check_tie_limit`) and
-/// a WINDOW clause, or a reference to one, that it refuses (`check_windows`).
+/// and so are a tie limit PostgreSQL's grammar refuses and a WINDOW clause, or
+/// a reference to one, that it refuses (`check_clauses`).
 ///
 /// The `select_only` typestate keeps the ORM's own builders out of this state,
 /// but an empty `columns([])` / `exprs([])` iterator and a hand-rolled
@@ -29,14 +29,14 @@ pub type PinBoxSendStream<'db, Item> = Pin<Box<dyn Stream<Item = Item> + Send + 
 // [spec:pgorm:sem:query.build.modifiers+9]
 // [spec:pgorm:req:exec.tie-limit+1]
 // [spec:pgorm:def:sql.ast.window-statement+8]
+// [spec:pgorm:req:sql.ast.select.tie-limit+2]
 pub(crate) fn ensure_select_list(query: &SelectStatement) -> Result<(), Error> {
     if query.selects().is_empty() {
         return Err(Error::Query(RuntimeError::Internal(
             "select list is empty; add at least one column or expression".to_owned(),
         )));
     }
-    query.check_tie_limit()?;
-    query.check_windows()?;
+    query.check_clauses()?;
     Ok(())
 }
 

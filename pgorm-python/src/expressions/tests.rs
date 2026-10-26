@@ -1,7 +1,7 @@
 use std::ffi::CString;
 
 use pgorm::pgorm_query::{
-    Condition, Expr, Func, LikeExpr, Name, Query, SimpleExpr, TypeName, Value,
+    BinOper, Condition, Expr, Func, LikeExpr, Name, Query, SimpleExpr, TypeName, Value,
 };
 use pyo3::{prelude::*, types::PyDict};
 
@@ -35,7 +35,7 @@ fn parity(
 }
 
 // [spec:pgorm:req:python.delegation+1/test]
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn expression_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -129,7 +129,7 @@ fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     Python::initialize();
@@ -178,7 +178,85 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]    each comparison, concatenation,
+// regular-expression, containment, range position and document search method is the BinOper or
+// Rust method of its meaning, its operand bound unless it is an expression, the path bound as text
+// cast to jsonpath, and BETWEEN's symmetric form the Rust builder's
+#[test]
+fn operator_methods_are_their_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let x = || Expr::col(Name::runtime("x"));
+        let y = || Expr::col(Name::runtime("y"));
+        let cases = [
+            ("regex", BinOper::Regex),
+            ("not_regex", BinOper::NotRegex),
+            ("iregex", BinOper::RegexCaseInsensitive),
+            ("not_iregex", BinOper::NotRegexCaseInsensitive),
+            ("matches", BinOper::Matches),
+            ("concat", BinOper::Concatenate),
+        ];
+        for (method, operator) in cases {
+            parity(
+                py,
+                &globals,
+                &format!("p.col('x').{method}('^a')"),
+                x().binary(operator, "^a"),
+            )?;
+        }
+        let cases = [
+            ("contains", BinOper::Contains),
+            ("contained_by", BinOper::Contained),
+            ("overlaps", BinOper::Overlap),
+            ("strictly_left_of", BinOper::LShift),
+            ("strictly_right_of", BinOper::RShift),
+            ("not_extend_right_of", BinOper::NotExtendRightOf),
+            ("not_extend_left_of", BinOper::NotExtendLeftOf),
+            ("adjacent_to", BinOper::AdjacentTo),
+        ];
+        for (method, operator) in cases {
+            parity(
+                py,
+                &globals,
+                &format!("p.col('x').{method}(p.col('y'))"),
+                x().binary(operator, y()),
+            )?;
+        }
+        parity(
+            py,
+            &globals,
+            "p.col('x').is_distinct_from(1)",
+            x().is_distinct_from(1i64),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('x').is_not_distinct_from(p.col('y'))",
+            x().is_not_distinct_from(y()),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('x').between(2, 1, symmetric=True)",
+            x().between_symmetric(2i64, 1i64),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('x').not_between(2, 1, symmetric=True)",
+            x().not_between_symmetric(2i64, 1i64),
+        )?;
+        parity(
+            py,
+            &globals,
+            "p.col('x').path_exists('$.a')",
+            x().json_path_exists("$.a"),
+        )
+    })
+}
+
+// [spec:pgorm:req:python.expressions+5/test]
 #[test]
 fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     Python::initialize();
@@ -237,7 +315,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:python.ownership/test]
 #[test]
 fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
@@ -275,7 +353,7 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms through LikePattern, its
 // ESCAPE carried, and a plain string refused as LIKE's is
 #[test]
@@ -304,7 +382,7 @@ fn similar_to_takes_like_patterns() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+3/test]
+// [spec:pgorm:req:python.expressions+5/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]    `call` reaches the set-returning
 // constructors at their arities, and no other
 #[test]

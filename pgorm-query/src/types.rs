@@ -549,14 +549,14 @@ pub trait IntoFromItem {
 }
 
 /// Unary operator
-// [spec:pgorm:def:sql.types.opers+5]
+// [spec:pgorm:def:sql.types.opers+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOper {
     Not,
 }
 
 /// Binary operator
-// [spec:pgorm:def:sql.types.opers+5]
+// [spec:pgorm:def:sql.types.opers+6]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOper {
     And,
@@ -599,7 +599,11 @@ pub enum BinOper {
     Mul,
     Div,
     Mod,
+    /// `<<`. A left shift, and over ranges and multiranges the test that the
+    /// left lies strictly left of the right: one operator, so one variant.
     LShift,
+    /// `>>`. A right shift, and over ranges and multiranges the test that the
+    /// left lies strictly right of the right.
     RShift,
     As,
     ILike,
@@ -629,10 +633,28 @@ pub enum BinOper {
     HasAnyJsonKeys,
     /// `?&`. Whether every key in a `text[]` list exists.
     HasAllJsonKeys,
+    /// `@?`. Whether a `jsonpath` returns any item for the `jsonb` on its
+    /// left.
+    JsonPathExists,
     /// `~` Regex operator.
     Regex,
     /// `~*`. Regex operator with case insensitive matching.
     RegexCaseInsensitive,
+    /// `!~`. Whether the text does not match a regular expression,
+    /// case-sensitively: the complement of [`BinOper::Regex`].
+    NotRegex,
+    /// `!~*`. Whether the text does not match a regular expression when case
+    /// is ignored: the complement of [`BinOper::RegexCaseInsensitive`].
+    NotRegexCaseInsensitive,
+    /// `&<`. Whether a range or multirange does not extend to the right of
+    /// the other.
+    NotExtendRightOf,
+    /// `&>`. Whether a range or multirange does not extend to the left of the
+    /// other.
+    NotExtendLeftOf,
+    /// `-|-`. Whether two ranges or multiranges are adjacent: they share no
+    /// value, and nothing lies between them.
+    AdjacentTo,
     /// `AT TIME ZONE`. Reinterprets a timestamp in the zone its right operand
     /// names, converting between `timestamp` and `timestamptz` in whichever
     /// direction the left operand's type calls for.
