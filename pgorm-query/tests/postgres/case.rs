@@ -121,7 +121,7 @@ fn simple_case_binds_in_textual_order() {
 
 // [spec:pgorm:req:sql.render.case/test]    a compound operand or value needs no parentheses:
 // the keywords delimit it
-// [spec:pgorm:def:sql.render.precedence+13/test]    the simple form is an atom under an
+// [spec:pgorm:def:sql.render.precedence+14/test]    the simple form is an atom under an
 // operator
 #[test]
 fn simple_case_operands_render_bare() {

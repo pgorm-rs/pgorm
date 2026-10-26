@@ -14151,6 +14151,7 @@ children (
         title "A boolean generic operator under a comparison, IS, IN or LIKE renders bare where the grammar groups it the same way"
         kind @fix
         deps (boolean-operator-parens)
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.873Z
@@ -14164,6 +14165,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-10-26T10:49:05.626762Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

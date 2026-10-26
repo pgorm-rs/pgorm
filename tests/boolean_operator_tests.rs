@@ -164,7 +164,7 @@ async fn each_operator_answers_as_postgres_does(db: &DatabaseConnection) -> Resu
     Ok(())
 }
 
-// [spec:pgorm:def:sql.render.precedence+13/test]    against a live server, these operators
+// [spec:pgorm:def:sql.render.precedence+14/test]    against a live server, these operators
 // rendered bare under AND, OR and NOT select the rows the parenthesised condition selects
 async fn bare_operators_group_as_built(db: &DatabaseConnection) -> Result<(), Error> {
     let condition = Condition::all()

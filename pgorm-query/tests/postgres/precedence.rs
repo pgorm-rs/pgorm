@@ -52,32 +52,49 @@ fn where_grouping(sql: &str) -> String {
     grouping(&select["where_clause"])
 }
 
-// [spec:pgorm:def:sql.render.precedence+13/test]    every boolean-valued operator outside the
+/// The operators outside the comparison, BETWEEN, IN, LIKE and IS families
+/// that answer a boolean, each with its lexeme.
+const BOOLEAN_OPERATORS: [(BinOper, &str); 18] = [
+    (BinOper::Contains, "@>"),
+    (BinOper::Contained, "<@"),
+    (BinOper::Overlap, "&&"),
+    (BinOper::Matches, "@@"),
+    (BinOper::Similarity, "%"),
+    (BinOper::WordSimilarity, "<%"),
+    (BinOper::StrictWordSimilarity, "<<%"),
+    (BinOper::HasJsonKey, "?"),
+    (BinOper::HasAnyJsonKeys, "?|"),
+    (BinOper::HasAllJsonKeys, "?&"),
+    (BinOper::JsonPathExists, "@?"),
+    (BinOper::Regex, "~"),
+    (BinOper::RegexCaseInsensitive, "~*"),
+    (BinOper::NotRegex, "!~"),
+    (BinOper::NotRegexCaseInsensitive, "!~*"),
+    (BinOper::NotExtendRightOf, "&<"),
+    (BinOper::NotExtendLeftOf, "&>"),
+    (BinOper::AdjacentTo, "-|-"),
+];
+
+/// Each projected expression of a SELECT as the grammar grouped it.
+fn select_groupings(sql: &str) -> Vec<String> {
+    let select = parsed_nodes(sql, "SelectStmt")
+        .into_iter()
+        .next()
+        .expect("a SELECT");
+    select["target_list"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|target| grouping(&target["ResTarget"]["val"]))
+        .collect()
+}
+
+// [spec:pgorm:def:sql.render.precedence+14/test]    every boolean-valued operator outside the
 // comparison, BETWEEN, IN, LIKE and IS families renders bare under AND, OR and NOT, and the grammar
 // groups the bare render as the condition was built
 #[test]
 fn boolean_operators_render_bare_under_logic() {
-    let operators = [
-        (BinOper::Contains, "@>"),
-        (BinOper::Contained, "<@"),
-        (BinOper::Overlap, "&&"),
-        (BinOper::Matches, "@@"),
-        (BinOper::Similarity, "%"),
-        (BinOper::WordSimilarity, "<%"),
-        (BinOper::StrictWordSimilarity, "<<%"),
-        (BinOper::HasJsonKey, "?"),
-        (BinOper::HasAnyJsonKeys, "?|"),
-        (BinOper::HasAllJsonKeys, "?&"),
-        (BinOper::JsonPathExists, "@?"),
-        (BinOper::Regex, "~"),
-        (BinOper::RegexCaseInsensitive, "~*"),
-        (BinOper::NotRegex, "!~"),
-        (BinOper::NotRegexCaseInsensitive, "!~*"),
-        (BinOper::NotExtendRightOf, "&<"),
-        (BinOper::NotExtendLeftOf, "&>"),
-        (BinOper::AdjacentTo, "-|-"),
-    ];
-    for (operator, lexeme) in operators {
+    for (operator, lexeme) in BOOLEAN_OPERATORS {
         let test = |column: Char, value: i32| Expr::col(column).binary(operator, value);
         let sql = Query::select()
             .column(Char::Id)
@@ -106,7 +123,61 @@ fn boolean_operators_render_bare_under_logic() {
     }
 }
 
-// [spec:pgorm:def:sql.render.precedence+13/test]    the BETWEEN family renders bare under AND, OR
+// [spec:pgorm:def:sql.render.precedence+14/test]    a boolean generic operator renders bare as
+// either operand of a comparison, IS DISTINCT FROM, BETWEEN, IN and LIKE, and the grammar groups
+// each bare render as the expression was built
+// [spec:pgorm:req:sql.render.parens+5/test]    a boolean generic operator is a BETWEEN bound the
+// grammar ranks above BETWEEN, so it renders bare as either bound
+#[test]
+fn boolean_operators_render_bare_under_comparisons() {
+    let truth = || SimpleExpr::Constant(true.into());
+    for (operator, lexeme) in BOOLEAN_OPERATORS {
+        let test = |column: Char, value: i32| Expr::col(column).binary(operator, value);
+        let sql = Query::select()
+            .expr(test(Char::Character, 1).binary(BinOper::Equal, truth()))
+            .expr(truth().binary(BinOper::NotEqual, test(Char::SizeW, 2)))
+            .expr(Expr::expr(test(Char::SizeH, 3)).is_distinct_from(truth()))
+            .expr(Expr::expr(truth()).is_not_distinct_from(test(Char::FontId, 4)))
+            .expr(Expr::expr(test(Char::Ascii, 5)).is_in([truth()]))
+            .expr(Expr::expr(test(Char::Character, 6)).between(false, true))
+            .expr(Expr::expr(truth()).between(test(Char::SizeW, 7), test(Char::SizeH, 8)))
+            .expr(test(Char::FontId, 9).binary(BinOper::Like, Expr::col(Char::Ascii)))
+            .expr(Expr::col(Char::Ascii).binary(BinOper::NotILike, test(Char::Character, 10)))
+            .from(Char::Table)
+            .to_string();
+        assert_eq!(
+            sql,
+            [
+                format!(r#"SELECT "character" {lexeme} 1 = TRUE"#),
+                format!(r#"TRUE <> "size_w" {lexeme} 2"#),
+                format!(r#""size_h" {lexeme} 3 IS DISTINCT FROM TRUE"#),
+                format!(r#"TRUE IS NOT DISTINCT FROM "font_id" {lexeme} 4"#),
+                format!(r#""ascii" {lexeme} 5 IN (TRUE)"#),
+                format!(r#""character" {lexeme} 6 BETWEEN FALSE AND TRUE"#),
+                format!(r#"TRUE BETWEEN "size_w" {lexeme} 7 AND "size_h" {lexeme} 8"#),
+                format!(r#""font_id" {lexeme} 9 LIKE "ascii""#),
+                format!(r#""ascii" NOT ILIKE "character" {lexeme} 10 FROM "character""#),
+            ]
+            .join(", ")
+        );
+        assert_eq!(
+            select_groupings(&sql),
+            [
+                format!("=({lexeme}, _)"),
+                format!("<>(_, {lexeme})"),
+                format!("=({lexeme}, _)"),
+                format!("=(_, {lexeme})"),
+                format!("=({lexeme}, _)"),
+                format!("BETWEEN({lexeme}, _, _)"),
+                format!("BETWEEN(_, {lexeme}, {lexeme})"),
+                format!("~~({lexeme}, _)"),
+                format!("!~~*(_, {lexeme})"),
+            ]
+        );
+    }
+}
+
+// [spec:pgorm:def:sql.render.precedence+14/test]    the BETWEEN family renders bare under AND, OR
 // and NOT, negated and symmetric forms included, as its left and its right operand, and the
 // grammar takes each AND after a lower bound as BETWEEN's own and the next as the logical one
 #[test]
@@ -137,7 +208,7 @@ fn between_family_renders_bare_under_logic() {
     );
 }
 
-// [spec:pgorm:req:sql.render.parens+4/test]    a BETWEEN's bounds are its own operands rather than
+// [spec:pgorm:req:sql.render.parens+5/test]    a BETWEEN's bounds are its own operands rather than
 // an AND's: an arithmetic bound renders bare, and a comparison, LIKE or BETWEEN bound keeps the
 // parentheses without which the grammar regroups the render or refuses it
 #[test]
