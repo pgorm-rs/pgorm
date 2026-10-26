@@ -21,10 +21,11 @@ import {
   Pool,
   select,
   Table,
+  type Transaction,
   update,
   Window,
 } from "../lib/index.js";
-import { same, scratchDatabase } from "./support.ts";
+import { holdTransaction, same, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -448,15 +449,18 @@ test("a source that throws abandons the COPY, writes nothing and leaves the conn
 test("a row the server refuses rejects with its SQLSTATE, and aborts the transaction it ran in", async () => {
   await reset("items");
   await using connection = await pool().acquire();
-  const tx = await connection.begin();
-  await tx.execute("INSERT INTO items (id) VALUES (100)");
   async function* duplicated() {
     yield bytes("1\ta\n2\tb\n");
     yield bytes("1\tagain\n3\tc\n");
   }
-  await assert.rejects(tx.copyIn(copyFrom("items", "text").columns(["id", "note"]), duplicated()), sqlstate("23505"));
-  await assert.rejects(tx.query("SELECT 1"), sqlstate("25P02"));
-  await tx.rollback();
+  await assert.rejects(
+    connection.transaction(async (tx) => {
+      await tx.execute("INSERT INTO items (id) VALUES (100)");
+      await assert.rejects(tx.copyIn(copyFrom("items", "text").columns(["id", "note"]), duplicated()), sqlstate("23505"));
+      await tx.query("SELECT 1");
+    }),
+    sqlstate("25P02"),
+  );
   assert.equal(connection.closed, false);
   assert.equal((await connection.one("SELECT count(*)::int AS n FROM items")).n, 0);
   await connection.transaction(async (kept) => {
@@ -484,10 +488,17 @@ test("a COPY FROM refused before its data flows rejects with the refusal, discar
   await assert.rejects(connection.copyIn(copyFrom("items", "text").columns(["nope"]), bytes("1\n")), sqlstate("42703"));
   assert.equal(connection.closed, true);
   await connection.close();
-  const tx = await (await single.acquire()).begin();
-  await assert.rejects(tx.copyIn(copyFrom("missing", "csv"), bytes("1\n")), sqlstate("42P01"));
-  assert.equal(tx.closed, true);
-  await tx.parent.close();
+  const refused = await single.acquire();
+  let tx = undefined as Transaction | undefined;
+  await assert.rejects(
+    refused.transaction(async (opened) => {
+      tx = opened;
+      await opened.copyIn(copyFrom("missing", "csv"), bytes("1\n"));
+    }),
+    sqlstate("42P01"),
+  );
+  assert.equal(tx?.closed, true);
+  await refused.close();
   assert.equal((await single.one("SELECT 4 AS n")).n, 4);
 });
 
@@ -504,7 +515,7 @@ test("a connection and a transaction refuse other work while a COPY holds them",
   const copying = connection.copyIn(copyFrom("items", "text").columns(["id", "note"]), gated());
   await assert.rejects(within(connection.query("SELECT 1")), lifecycle(/busy/));
   await assert.rejects(within(connection.copyOut(copyTo("items", "text"))), lifecycle(/busy/));
-  await assert.rejects(within(connection.begin()), lifecycle(/busy/));
+  await assert.rejects(within(connection.transaction(async () => {})), lifecycle(/busy/));
   held.open();
   assert.equal(await copying, 2);
   const out = await connection.copyOut(copyTo(select(col("id")).from(new Table("items")).orderBy(col("id").asc()), "csv"));
@@ -518,7 +529,7 @@ test("a connection and a transaction refuse other work while a COPY holds them",
   await connection.transaction(async (tx) => {
     const stream = await tx.copyOut(copyTo("items", "text"));
     await assert.rejects(within(tx.query("SELECT 1")), lifecycle(/busy/));
-    await assert.rejects(within(tx.begin()), lifecycle(/busy/));
+    await assert.rejects(within(tx.transaction(async () => {})), lifecycle(/busy/));
     await drained(stream);
     assert.equal((await tx.one("SELECT 6 AS n")).n, 6);
   });
@@ -567,30 +578,40 @@ test("aborting a COPY rejects with the signal's reason, discards its connection 
   assert.equal(connection.closed, true);
   await connection.close();
 
-  const tx = await (await pool().acquire()).begin();
-  await tx.execute("INSERT INTO items (id) VALUES (50)");
+  const writing = await pool().acquire();
+  let tx = undefined as Transaction | undefined;
   await assert.rejects(
-    tx.copyIn(copyFrom("items", "text").columns(["id", "note"]), slow(), { signal: AbortSignal.timeout(100) }),
+    writing.transaction(async (opened) => {
+      tx = opened;
+      await opened.execute("INSERT INTO items (id) VALUES (50)");
+      await opened.copyIn(copyFrom("items", "text").columns(["id", "note"]), slow(), { signal: AbortSignal.timeout(100) });
+    }),
     (error: unknown) => error instanceof DOMException && error.name === "TimeoutError",
   );
+  assert.ok(tx);
   assert.equal(tx.closed, true);
-  assert.equal(tx.parent.closed, true);
-  await assert.rejects(tx.commit(), lifecycle(/closed/));
-  await tx.parent.close();
+  assert.equal(writing.closed, true);
+  await assert.rejects(tx.query("SELECT 1"), lifecycle(/closed/));
+  await writing.close();
   held.open();
 
-  const reading = await (await pool().acquire()).begin();
-  await reading.execute("INSERT INTO items (id) VALUES (60)");
-  const stream = await reading.copyOut(copyTo("many", "text"), { signal: AbortSignal.timeout(100) });
+  const reader = await pool().acquire();
   await assert.rejects(
-    (async () => {
-      for await (const _ of stream) await new Promise((resolve) => setTimeout(resolve, 20));
-    })(),
-    (error: unknown) => error instanceof DOMException && error.name === "TimeoutError",
+    reader.transaction(async (reading) => {
+      await reading.execute("INSERT INTO items (id) VALUES (60)");
+      const stream = await reading.copyOut(copyTo("many", "text"), { signal: AbortSignal.timeout(100) });
+      await assert.rejects(
+        (async () => {
+          for await (const _ of stream) await new Promise((resolve) => setTimeout(resolve, 20));
+        })(),
+        (error: unknown) => error instanceof DOMException && error.name === "TimeoutError",
+      );
+      assert.equal(stream.closed, true);
+      assert.equal(reading.closed, true);
+    }),
+    lifecycle(/closed/),
   );
-  assert.equal(stream.closed, true);
-  assert.equal(reading.closed, true);
-  await reading.parent.close();
+  await reader.close();
   assert.equal(await count("items"), 0);
 });
 
@@ -620,13 +641,14 @@ test("closing what a COPY runs on ends the COPY at once, its source still waitin
   const closing = new Pool(scratch(), { maxSize: 2 });
   const stream = await closing.copyOut(copyTo("many", "text"));
   await stream.next();
-  const tx = await (await closing.acquire()).begin();
-  const out = await tx.copyOut(copyTo("many", "csv"));
+  const holding = await holdTransaction(async (use) => await (await closing.acquire()).transaction(use));
+  const out = await holding.transaction.copyOut(copyTo("many", "csv"));
   await out.next();
   await closing.close();
   await assert.rejects(within(stream.next()), lifecycle(/pool closed during the COPY/));
   assert.equal(stream.closed, true);
   await assert.rejects(within(out.next()), LifecycleError);
   assert.equal(out.closed, true);
-  assert.equal(tx.closed, true);
+  assert.equal(holding.transaction.closed, true);
+  await assert.rejects(within(holding.end()), lifecycle(/closed/));
 });

@@ -1,4 +1,4 @@
-"""Ordered public asynchronous terminals and explicit transaction/stream cleanup."""
+"""Ordered public asynchronous terminals, transaction scopes and stream cleanup."""
 
 import asyncio
 
@@ -109,12 +109,87 @@ async def versions(name, inputs, data, connection, p):
     ], ["pgorm::Insert::" + path]
 
 
+class RolledBack(Exception):
+    """Raised through a scope's ``async with`` block, so that it rolls back."""
+
+
 class Effects:
-    def __init__(self, resolution, connection):
+    def __init__(self, resolution, connection, acquire):
         self.resolution = resolution
         self.p = resolution.p
         self.scopes = {"root": connection}
-        self.open_transactions = []
+        self.acquire = acquire
+
+    async def run(self, steps, events, scoped=False):
+        """Perform ``steps`` in order, recording each in ``events``, until the
+        commit or rollback that closes the scope the caller opened: that
+        step and its event, or ``None`` for both once the steps run out."""
+        while steps:
+            step = steps.popleft()
+            event = {"id": step["id"], "operation": step["op"], "status": "attempted"}
+            events.append(event)
+            if step["op"] in ("commit", "rollback"):
+                return step, event
+            if step["op"] == "begin":
+                await self.transaction(step, event, steps, events)
+            else:
+                try:
+                    value, paths = await self.perform(step)
+                    if not paths:
+                        raise RuntimeError("effect has no active native dispatch path")
+                    event.update(
+                        status="observed", observation=value, native_paths=paths
+                    )
+                except self.p.PgOrmError as error:
+                    event.update(status="error", observation=observations.error(error))
+            await self.reacquire(scoped)
+        return None, None
+
+    async def reacquire(self, scoped):
+        if not self.scopes["root"].closed:
+            return
+        # Stream cancellation can discard the root connection.
+        if scoped:
+            raise RuntimeError("connection closed with outstanding transactions")
+        self.scopes["root"] = await self.acquire()
+
+    async def transaction(self, step, event, steps, events):
+        """A transaction scope: the steps up to the one closing it run inside
+        the ``async with`` block that opens it, and that step is how the block
+        exits, normally to commit and by raising to roll back."""
+        d = step["data"]
+        parent = self.scopes[step["scope"]]
+        if step["scope"] == "root":
+            isolation = None if d["isolation"] == "default" else d["isolation"]
+            block = parent.transaction(mode=d["mode"], isolation=isolation)
+            path = "pgorm::DatabaseConnection::transaction_with"
+        else:
+            block, path = parent.transaction(), "pgorm::TransactionTrait::transaction"
+        closed = event
+        try:
+            async with block as child:
+                self.scopes[d["child"]] = child
+                event.update(
+                    status="observed",
+                    observation={"kind": "transaction", "scope": d["child"]},
+                    native_paths=[path],
+                )
+                closing, closing_event = await self.run(steps, events, True)
+                if closing_event is not None:
+                    closed = closing_event
+                if closing is None or closing["op"] == "rollback":
+                    raise RolledBack
+        except RolledBack:
+            pass
+        except self.p.PgOrmError as error:
+            closed.update(status="error", observation=observations.error(error))
+            return
+        if closed is not event:
+            closed.update(
+                status="observed",
+                observation={"kind": "unit"},
+                native_paths=["pgorm::TransactionTrait::transaction"],
+            )
 
     async def perform(self, step):
         name, d = step["op"], step["data"]
@@ -163,23 +238,6 @@ class Effects:
                     "kind": "rows",
                     "rows": [observations.row(row) for row in rows],
                 }, paths
-            case "begin":
-                if step["scope"] == "root":
-                    isolation = None if d["isolation"] == "default" else d["isolation"]
-                    child = await connection.begin(mode=d["mode"], isolation=isolation)
-                else:
-                    child = await connection.begin()
-                self.scopes[d["child"]] = child
-                self.open_transactions.append(d["child"])
-                return {"kind": "transaction", "scope": d["child"]}, [
-                    "pgorm::DatabaseConnection::transaction_with"
-                    if step["scope"] == "root"
-                    else "pgorm::TransactionTrait::transaction"
-                ]
-            case "commit" | "rollback":
-                await getattr(connection, name)()
-                self.open_transactions.remove(step["scope"])
-                return {"kind": "unit"}, ["pgorm::TransactionTrait::transaction"]
             case "stream":
                 rows, state = await stream(query, d, connection)
                 self.resolution.results[step["id"]] = rows
@@ -202,13 +260,3 @@ class Effects:
                 )
                 return observations.compiled(query.inspect()), [prefix]
         raise RuntimeError("inactive effect dispatch: " + name)
-
-    async def close(self):
-        errors = []
-        for identity in reversed(self.open_transactions):
-            try:
-                await self.scopes[identity].close()
-            except Exception as error:
-                errors.append(observations.error(error))
-        self.open_transactions.clear()
-        return errors

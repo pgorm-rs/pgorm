@@ -34,22 +34,32 @@ const dsn = process.env.PGORM_TEST_DSN ?? "";
 // savepoint whose transaction and connection objects nothing else holds.
 const working = new Pool(dsn, { maxSize: 2 });
 const running = working.acquire().then((connection) => connection.one("SELECT pg_sleep(0.3)::text, 1 AS n"));
-const savepoint = await (await (await working.acquire()).begin()).begin();
-await churn();
-const row = await running;
-await savepoint.execute("SELECT 1");
-await savepoint.commit();
-console.log(`finished ${row.n} ${savepoint.parent.closed}`);
+const finished = await (await working.acquire()).transaction((transaction) =>
+  transaction.transaction(async (savepoint) => {
+    await churn();
+    const row = await running;
+    await savepoint.execute("SELECT 1");
+    return `finished ${row.n} ${savepoint.parent.closed}`;
+  })
+);
+console.log(finished);
 
 // An idle connection whose object nothing holds goes back to its pool.
 const idle = new Pool(dsn, { maxSize: 1 });
 await idle.acquire();
 console.log(`idle ${await settles(idle, 1)}`);
 
-// An idle transaction whose objects nothing holds is rolled back, and its
-// connection goes back to the pool rather than being discarded.
+// An idle transaction whose callback never settles, and whose objects
+// nothing holds, is rolled back, and its connection goes back to the pool
+// rather than being discarded.
 const abandoned = new Pool(dsn, { maxSize: 1 });
-await (await (await abandoned.acquire()).begin()).execute("SET LOCAL application_name = 'abandoned'");
+const applied = Promise.withResolvers<void>();
+void (await abandoned.acquire()).transaction(async (transaction) => {
+  await transaction.execute("SET LOCAL application_name = 'abandoned'");
+  applied.resolve();
+  await new Promise(() => {});
+});
+await applied.promise;
 console.log(`abandoned ${await settles(abandoned, 1)}`);
 const after = await abandoned.one("SELECT current_setting('application_name') AS name");
 console.log(`rolled back ${after.name !== "abandoned"}`);

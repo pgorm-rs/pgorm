@@ -44,15 +44,16 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `copy_out_rows(statement)` on a pool, connection or transaction | `CopyRowStream`, an `AsyncIterator[tuple[object, ...]]` and async context manager |
 | `pool.listener(capacity=1024)` | `Listener`, an `AsyncIterator[Notification]` and async context manager |
 | `notify(channel, payload)` on a pool, connection or transaction | `None` |
-| `connection.begin()`, `transaction.begin()` | `Transaction` |
+| `pool.transaction()`, `connection.transaction()`, `transaction.transaction()` | `AbstractAsyncContextManager[Transaction]`; the `Transaction` is open for its `async with` block only |
 | `Model.find().all(executor)` | `list[ModelRecord]` |
 | `Model.find().one_opt(executor)` | `ModelRecord \| None` |
 | `Entity.find().all(connection_or_transaction)` | `list[EntityModel]` |
 | `Pipeline.all(connection_or_transaction)` | `list[Record]` |
 | `Pipeline.one_opt(connection_or_transaction)` | `Record \| None` |
 
-`Pool.connection()` and `Pool.transaction()` return async context managers;
-use `async with` directly. Queries and builder methods are synchronous and
+`Pool.connection()` and every `transaction()` return async context managers;
+use `async with` directly. A `Transaction` is not one itself; its block's exit
+decides its outcome. Queries and builder methods are synchronous and
 immutable until an execution method is called. Native methods returning an
 `Awaitable[T]` must be awaited just like the Python `async def` facade methods.
 The stream must be closed or used with `async with` when iteration can stop

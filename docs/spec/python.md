@@ -462,24 +462,33 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > channel pgorm-migration's runner notifies. Credentials MUST be redacted from
 > representations, exceptions and default diagnostic logs.
 
-> [spec:pgorm:req:python.transactions+1]
-> Transactions MUST support explicit begin/commit/rollback and asynchronous
-> context managers, including supported nested savepoints. A successful block
-> commits; an exceptional or cancelled block rolls back or discards the
-> connection if its state cannot be recovered. Closed, concurrently misused or
+> [spec:pgorm:req:python.transactions+2]
+> Transactions MUST open only through asynchronous context managers —
+> `pool.transaction()` and `connection.transaction()`, which take the native
+> mode and isolation, and `transaction.transaction()` for a nested savepoint,
+> which takes neither — as Rust's open only around a closure
+> (`conn.tx.closure`): no method begins, commits, rolls back or closes one,
+> and a `Transaction` is not itself a context manager. A block that exits
+> normally commits, or releases its savepoint; an exceptional or cancelled
+> block rolls back, or discards the connection if its state cannot be
+> recovered, and its exception propagates. Closed, concurrently misused or
 > foreign transaction handles MUST fail explicitly. Bindings MUST preserve
 > database error causes and MUST NOT retry writes or failed transactions
 > implicitly beyond the documented Rust behavior.
 >
 > Each transaction and savepoint MUST run inside pgorm's closure transaction
 > (`conn.tx.closure`), a task on the runtime serving its commands from inside
-> the closure: Python's commit returns `Ok` from it and a rollback `Err`, so
-> pgorm issues the `COMMIT` or `ROLLBACK`, and a connection given up mid-command
-> drops the closure's future rather than await a rollback on it. A failed
-> `COMMIT`, and a failed `ROLLBACK` — which pgorm reports as
-> `TransactionError::RollbackFailed` (`conn.tx.closure`) — each reach Python
-> with their database error and discard the connection, whose state is then
-> unknown; an abandoned frame whose `ROLLBACK` fails discards it too.
+> the closure: a block's normal exit returns `Ok` from it and an exceptional
+> one `Err`, so pgorm issues the `COMMIT` or `ROLLBACK`, and a connection given
+> up mid-command drops the closure's future rather than await a rollback on
+> it. A failed `COMMIT` MUST be raised from the block's exit with its database
+> error. A failed `ROLLBACK`, which pgorm reports as
+> `TransactionError::RollbackFailed` (`conn.tx.closure`), MUST be raised with
+> its database error in place of the block's exception, carrying that as its
+> `__context__`, unless the block's exception is a cancellation or an
+> interpreter exit, which propagates unreplaced. Either failure discards the
+> connection, whose state is then unknown; an abandoned frame whose `ROLLBACK`
+> fails discards it too.
 
 > [spec:pgorm:req:python.cancellation]
 > Cancellation, timeout, iterator abandonment and pool shutdown MUST release

@@ -5,6 +5,8 @@
 // callback's transaction ends.
 // [spec:pgorm:req:napi.cancellation]
 
+import { LifecycleError } from "./errors.js";
+
 /** @type {any} */
 export let native;
 
@@ -19,9 +21,6 @@ export function installConnections(addon) {
 
 /** Marks a construction from a handle the addon made. */
 export const TRUSTED = Symbol("pgorm-napi native handle");
-
-/** Ends a transaction at once, discarding its connection. */
-export const ABORT = Symbol("abort");
 
 /**
  * @param {unknown} signal
@@ -85,33 +84,57 @@ export function queryOptions(options) {
 }
 
 /**
- * Run `use` in `transaction`: committed when `use` resolves, rolled back when
- * it throws, whose error then stands whatever the rollback does. A commit
- * that fails ends the transaction and discards its connection.
+ * Run `use` in the transaction or savepoint `handle` is, which `transaction`
+ * wraps: committed (a savepoint released) when `use` resolves, and rolled back
+ * when it throws, rejecting with what it threw. A commit that fails ends the
+ * transaction, discarding its connection, and rejects with its failure; a
+ * ROLLBACK that fails does too, rejecting with a `SuppressedError` over the
+ * rollback's failure and what `use` threw.
+ * [spec:pgorm:req:napi.transactions+2]
  *
  * @template T
+ * @param {unknown} handle
  * @param {import("./connections.js").Transaction} transaction
  * @param {(transaction: import("./connections.js").Transaction) => Promise<T>} use
  * @returns {Promise<T>}
  */
-export async function scoped(transaction, use) {
+export async function scoped(handle, transaction, use) {
   let result;
   try {
     result = await use(transaction);
   } catch (error) {
-    try {
-      await transaction.close();
-    } catch {
-      // The callback's error stands; a cleanup that failed discarded the
-      // connection.
-    }
-    throw error;
+    throw await rolledBack(handle, error);
   }
   try {
-    await transaction.commit();
+    await native.transactionFinish(handle, true);
   } catch (error) {
-    await transaction[ABORT]();
+    await native.transactionAbort(handle);
     throw error;
   }
   return result;
+}
+
+/**
+ * Roll `handle` back after its callback threw `error`, resolving with what
+ * `transaction(fn)` rejects with.
+ *
+ * @param {unknown} handle
+ * @param {unknown} error
+ * @returns {Promise<unknown>}
+ */
+async function rolledBack(handle, error) {
+  if (!native.transactionClosed(handle)) {
+    try {
+      await native.transactionFinish(handle, false);
+    } catch (failure) {
+      await native.transactionAbort(handle);
+      // A refusal is the frame given up — a statement or savepoint still held
+      // it, or it had just closed — rather than a ROLLBACK the server failed,
+      // so the callback's error stands alone.
+      if (failure instanceof LifecycleError) return error;
+      return new SuppressedError(failure, error, "the transaction's ROLLBACK failed after its callback threw");
+    }
+  }
+  await native.transactionWaitClosed(handle);
+  return error;
 }

@@ -10,6 +10,8 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import type { Transaction } from "../lib/index.js";
+
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** The repository checkout this package sits in. */
@@ -334,4 +336,41 @@ export function same(actual: unknown, expected: unknown, path = "value"): void {
       same((actual as Record<string, unknown>)[key], item, `${path}.${key}`);
     }
   }
+}
+
+/** A transaction held open until the test ends its callback. */
+export interface Held {
+  readonly transaction: Transaction;
+  /**
+   * Let the callback resolve, or throw `error` if one is given, and give back
+   * what `transaction(fn)` then settles with.
+   */
+  end(error?: unknown): Promise<unknown>;
+}
+
+/**
+ * Open a transaction through `open`, which passes its callback to some
+ * `transaction(fn)`, and hold that callback pending until `end`, so that the
+ * test can act on a transaction whose callback has not settled. A transaction
+ * that never opens rejects with why.
+ */
+export async function holdTransaction(
+  open: (use: (transaction: Transaction) => Promise<void>) => Promise<unknown>,
+): Promise<Held> {
+  const opened = Promise.withResolvers<Transaction>();
+  const release = Promise.withResolvers<void>();
+  const settled = open(async (transaction) => {
+    opened.resolve(transaction);
+    await release.promise;
+  });
+  settled.catch((error: unknown) => opened.reject(error));
+  const transaction = await opened.promise;
+  return {
+    transaction,
+    end(error?: unknown) {
+      if (error === undefined) release.resolve();
+      else release.reject(error);
+      return settled;
+    },
+  };
 }

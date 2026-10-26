@@ -14270,6 +14270,13 @@ children (
                 kind @note
                 text "Operator 2026-10-25, on hearing that tx-closure-only kept the bindings' APIs unchanged: do them too. Both bindings already have the scoped form beside the guard: Python `async with conn.transaction() as tx` (an asynccontextmanager; clean exit commits, an exception rolls back) and `async with tx.transaction() as sp` for a savepoint; JavaScript `conn.transaction(async (tx) => ..)` and `tx.transaction(async (sp) => ..)` (resolve commits or releases, a throw rolls back). Delete the guard forms from both public APIs: Python Connection.begin / Transaction.begin, Transaction.commit and Transaction.rollback (and the public __aenter__/__aexit__ on a Transaction a caller could hold); JavaScript Connection.begin, Transaction.begin, commit, rollback, close and [Symbol.asyncDispose] on Transaction, with their typings. Keep TransactionOptions/isolation on the scoped forms, the failed-ROLLBACK report (raised from the context manager exit / rejected from transaction()) and discard behaviour. Update stubs, capabilities, TRANSACTIONS.md, the napi README, python.transactions and napi.transactions, every test and example using the guard forms, and the security/generative Python and JavaScript emitters if they spell them."
             }
+
+            {
+                at 2026-10-25T23:17:55.346864Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 

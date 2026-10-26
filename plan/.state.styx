@@ -889,6 +889,7 @@ assertions (
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
+    {id bindings-tx-closure-only, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:17:55.346864Z}
     {id boolean-operator-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T19:58:11.56594Z}
     {id bound-datetime-max-precision, kind @complete, author "brendan@necessary.nu", at 2026-09-15T01:21:21.710443Z}
     {id bug.char-render, kind @complete, author "brendan@necessary.nu", at 2026-09-02T16:53:09.178481Z}

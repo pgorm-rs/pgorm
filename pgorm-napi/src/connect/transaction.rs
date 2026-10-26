@@ -227,7 +227,7 @@ impl State {
     /// The frame's lock, refusing rather than waiting when a request or an
     /// open savepoint holds it. Taken on the JavaScript thread as each request
     /// is made, so requests are refused in the order JavaScript made them.
-    // [spec:pgorm:req:napi.transactions+1]
+    // [spec:pgorm:req:napi.transactions+2]
     fn lock(&self) -> Result<OwnedMutexGuard<()>, Failure> {
         self.ensure_open()?;
         self.busy.clone().try_lock_owned().map_err(|_| {
@@ -430,7 +430,7 @@ impl Frame {
     /// Serve the frame's commands inside its transaction, a savepoint's frame
     /// nested inside while it is open: `Ok` once JavaScript commits, an `Exit`
     /// once it rolls back or the handle is collected unfinished.
-    // [spec:pgorm:req:napi.transactions+1]
+    // [spec:pgorm:req:napi.transactions+2]
     fn serve<'a>(
         &'a mut self,
         tx: &'a mut DatabaseTransaction<'_>,
@@ -598,7 +598,7 @@ impl Frame {
 /// Open a transaction on `connection`, which it holds until it finishes: a
 /// task takes the connection out of its slot and serves the transaction from
 /// inside the closure pgorm opens it around.
-// [spec:pgorm:req:napi.transactions+1]
+// [spec:pgorm:req:napi.transactions+2]
 async fn begin(
     mut operation: Operation,
     mode: TransactionMode,

@@ -21,6 +21,10 @@ def table_ddl(name):
     )
 
 
+class RolledBack(Exception):
+    """Raised to leave a block, so that its transaction rolls back."""
+
+
 async def collect(stream):
     async with stream:
         return b"".join([chunk async for chunk in stream])
@@ -192,15 +196,14 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:python.copy+2/test]    a refused row raises 23505 and aborts the transaction
     async def test_unique_violation_aborts_transaction_until_rollback(self):
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            await tx.execute(p.insert(self.items).columns("id", "name").values(1, "kept"))
-            with self.assertRaises(p.DatabaseError) as caught:
-                await tx.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), b"2\tb\n1\tdup\n3\tc\n")
-            self.assertEqual(caught.exception.sqlstate, "23505")
-            with self.assertRaises(p.DatabaseError) as caught:
-                await tx.fetch_all(self.rows())
-            self.assertEqual(caught.exception.sqlstate, "25P02")
-            await tx.rollback()
+            with self.assertRaises(p.DatabaseError) as aborted:
+                async with connection.transaction() as tx:
+                    await tx.execute(p.insert(self.items).columns("id", "name").values(1, "kept"))
+                    with self.assertRaises(p.DatabaseError) as caught:
+                        await tx.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), b"2\tb\n1\tdup\n3\tc\n")
+                    self.assertEqual(caught.exception.sqlstate, "23505")
+                    await tx.fetch_all(self.rows())
+            self.assertEqual(aborted.exception.sqlstate, "25P02")
             self.assertEqual(await self.stored(connection), [])
             self.assertTrue(await connection.ping())
 
@@ -243,14 +246,13 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError("source failed")
 
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            with self.assertRaises(RuntimeError):
-                await tx.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), failing())
-            self.assertFalse(tx.closed)
-            with self.assertRaises(p.DatabaseError) as caught:
-                await tx.execute(p.insert(self.items).columns("id", "name").values(2, "two"))
-            self.assertEqual(caught.exception.sqlstate, "25P02")
-            await tx.rollback()
+            with self.assertRaises(p.DatabaseError) as aborted:
+                async with connection.transaction() as tx:
+                    with self.assertRaises(RuntimeError):
+                        await tx.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), failing())
+                    self.assertFalse(tx.closed)
+                    await tx.execute(p.insert(self.items).columns("id", "name").values(2, "two"))
+            self.assertEqual(aborted.exception.sqlstate, "25P02")
             self.assertEqual(await self.stored(connection), [])
 
     # [spec:pgorm:req:python.copy+2/test]    8 MB streamed lazily in, then counted out chunk by chunk
@@ -355,9 +357,11 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await connection.ping())
             async with connection.transaction() as tx:
                 stream = await tx.copy_out(p.CopyTo(self.items, "text"))
-                for attempt in (lambda: tx.fetch_all(self.rows()), tx.commit, tx.begin):
-                    with self.assertRaises(p.LifecycleError):
-                        await attempt()
+                with self.assertRaises(p.LifecycleError):
+                    await tx.fetch_all(self.rows())
+                with self.assertRaises(p.LifecycleError):
+                    async with tx.transaction():
+                        self.fail("a savepoint opened under an active COPY")
                 self.assertEqual((await collect(stream)).count(b"\n"), 2)
                 self.assertEqual(len(await tx.fetch_all(self.rows())), 2)
                 self.assertEqual(await tx.copy_in(statement, b"3\tthree\n"), 1)
@@ -389,12 +393,13 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue((await anext(stream)).startswith(b"1\t"))
             self.assertTrue(connection.closed)
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
-            stream = await tx.copy_out(p.CopyTo(self.items, "text"))
-            await anext(stream)
-            await stream.aclose()
-            self.assertTrue(tx.closed)
-            self.assertTrue(connection.closed)
+            with self.assertRaises(p.LifecycleError):
+                async with connection.transaction() as tx:
+                    stream = await tx.copy_out(p.CopyTo(self.items, "text"))
+                    await anext(stream)
+                    await stream.aclose()
+                    self.assertTrue(tx.closed)
+                    self.assertTrue(connection.closed)
         self.assertTrue(await self.pool.ping())
 
     # [spec:pgorm:req:python.copy+2/test]    a refused COPY FROM raises 42P01 and the pool lends a working connection
@@ -409,9 +414,9 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             await self.pool.copy_in(p.CopyFrom(self.items, "csv").columns("absent"), b"1\n")
         self.assertEqual(caught.exception.sqlstate, "42703")
         async with self.pool.connection() as connection:
-            tx = await connection.begin()
             with self.assertRaises(p.DatabaseError) as caught:
-                await tx.copy_in(p.CopyFrom(missing, "text"), b"1\n")
+                async with connection.transaction() as tx:
+                    await tx.copy_in(p.CopyFrom(missing, "text"), b"1\n")
             self.assertEqual(caught.exception.sqlstate, "42P01")
             self.assertTrue(tx.closed)
         async with self.pool.connection() as connection:
@@ -632,16 +637,17 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await connection.copy_in_rows(copy, []), 0)
             ids = p.select(self.rows.col("id")).from_(self.rows)
             self.assertEqual(len(await rows_of(await connection.copy_out_rows(p.CopyTo(ids, "binary")))), 600)
-            transaction = await connection.begin()
-            self.assertEqual(await transaction.copy_in_rows(copy, [[601, "late"]]), 1)
-            returning = (p.insert(self.rows).columns("id", "name").values(602, "returned")
-                         .returning(self.rows.col("qty"), self.rows.col("name")))
-            stream = await transaction.copy_out_rows(p.CopyTo(returning, "binary"))
-            self.assertEqual(stream.columns, ("qty", "name"))
-            self.assertEqual(await rows_of(stream), [(7, "returned")])
-            count = await transaction.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
-            self.assertEqual(count["n"], 602)
-            await transaction.rollback()
+            with self.assertRaises(RolledBack):
+                async with connection.transaction() as transaction:
+                    self.assertEqual(await transaction.copy_in_rows(copy, [[601, "late"]]), 1)
+                    returning = (p.insert(self.rows).columns("id", "name").values(602, "returned")
+                                 .returning(self.rows.col("qty"), self.rows.col("name")))
+                    stream = await transaction.copy_out_rows(p.CopyTo(returning, "binary"))
+                    self.assertEqual(stream.columns, ("qty", "name"))
+                    self.assertEqual(await rows_of(stream), [(7, "returned")])
+                    count = await transaction.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+                    self.assertEqual(count["n"], 602)
+                    raise RolledBack
             count = await connection.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
             self.assertEqual(count["n"], 600)
 
@@ -652,10 +658,9 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
                 await connection.copy_in_rows(p.CopyFrom(p.Table("python_copy_missing"), "binary"), [[1]])
             self.assertEqual(caught.exception.sqlstate, "42P01")
             self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 1 AS n")))["n"], 1)
-            transaction = await connection.begin()
             with self.assertRaises(p.DatabaseError):
-                await transaction.copy_out_rows(p.CopyTo(p.Table("python_copy_missing"), "binary"))
-            await transaction.rollback()
+                async with connection.transaction() as transaction:
+                    await transaction.copy_out_rows(p.CopyTo(p.Table("python_copy_missing"), "binary"))
             self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 2 AS n")))["n"], 2)
 
         await self.pool.execute(p.RawSQL(
