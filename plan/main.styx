@@ -14457,12 +14457,20 @@ children (
         id python-created-range-domain-subtype
         title "Python decodes a created range or multirange whose subtype is a domain"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-26T13:39:20.453705Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by bindings-copy-created-multiranges (2026-10-26). pgorm-python/src/results/ranges.rs::created matches a created range's or multirange's subtype against the built-in types without unwrapping a domain, so heightmultirange over a domain over float8 raises DecodeError, in a query and in a COPY. Rust handles it, and pgorm-napi's wire_type unwraps domains (untested there). Unwrap the domain in Python, test both bindings."
+            }
+
+            {
+                at 2026-10-26T14:07:08.379524Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14491,6 +14499,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by pipeline-untyped-enum-casts (2026-10-26) writing a napi parity case: in Rust, Query::select().from(entity) drops the entity's schema while E::find() keeps it, so a schema-qualified entity's raw select reads the table through search_path. Confirm, fix if it is pgorm's to fix (from accepting an entity's table ref), and test with an entity in a non-public schema."
+            }
+
+            {
+                at 2026-10-26T13:40:08.362994Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
             }
         )
     }

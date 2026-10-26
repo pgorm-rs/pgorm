@@ -178,6 +178,28 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.DecodeError):
             await self.connection.fetch_one(p.Select(p.bind(value).as_("spans")))
 
+    async def test_domain_subtype_reads_as_its_base(self):
+        schema = self.quoted(self.schema)
+        for statement in (
+            f"CREATE DOMAIN {schema}.height AS float8",
+            f"CREATE DOMAIN {schema}.tall AS {schema}.height CHECK (VALUE > 0)",
+            f"CREATE TYPE {schema}.heightrange AS RANGE (SUBTYPE = {schema}.tall)",
+            f"CREATE TABLE {schema}.heights (id int PRIMARY KEY, span {schema}.heightrange, "
+            f"spans {schema}.heightmultirange)",
+        ):
+            await self.connection.execute(p.RawSQL(statement))
+        span = p.Value(p.Range(1.5, 2.0), p.CreatedRange("heightrange", "f64", schema=self.schema))
+        spans = p.Value(p.Multirange([p.Range(1.5, 2.0), p.Range(3.0, None)]),
+                        p.CreatedMultirange("heightmultirange", "f64", schema=self.schema))
+        row = await self.connection.fetch_one(p.Select(p.bind(span).as_("span")))
+        self.assertEqual(row.tagged("span"), span)
+        table = p.Table("heights", schema=self.schema)
+        self.assertEqual(await self.connection.copy_in_rows(p.CopyFrom(table, "binary"), [(1, span, spans)]), 1)
+        stream = await self.connection.copy_out_rows(p.CopyTo(table, "binary"))
+        async with stream:
+            rows = [row async for row in stream]
+        self.assertEqual(rows, [(1, span.value, spans.value)])
+
     async def test_arrays_of_a_created_range_are_refused(self):
         await self.create("slot", "int4")
         with self.assertRaises(p.DecodeError):

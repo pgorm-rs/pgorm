@@ -12,11 +12,14 @@ import {
   ConstructionError,
   copyFrom,
   copyTo,
+  CreatedMultirange,
+  CreatedRange,
   DatabaseError,
   Decimal,
   DecodeError,
   insert,
   Interval,
+  Multirange,
   type Param,
   Pool,
   Range,
@@ -137,6 +140,28 @@ test("copyInRows writes each value kind as the server reads its literal, and cop
   assert.equal(rows[0]?.[18], "loud");
   assert.equal(rows[0]?.[20], null);
   await pool().execute("TRUNCATE kinds");
+});
+
+// [spec:pgorm:req:napi.copy.rows/test]    a created range or multirange whose subtype is a domain, nested included, travels as the type the domains are over
+test("a created range and multirange over a domain are written and read through the domain's base", async () => {
+  for (
+    const statement of [
+      "CREATE DOMAIN height AS float8",
+      "CREATE DOMAIN tall AS height CHECK (VALUE > 0)",
+      "CREATE TYPE heightrange AS RANGE (subtype = tall)",
+      "CREATE TABLE heights (id int PRIMARY KEY, span heightrange, spans heightmultirange)",
+    ]
+  ) {
+    await pool().execute(statement);
+  }
+  const span = new Value(new Range(1.5, 2), new CreatedRange("heightrange", "f64"));
+  const spans = new Value(
+    new Multirange([new Range(1.5, 2), new Range(3, null)]),
+    new CreatedMultirange("heightmultirange", "f64"),
+  );
+  assert.equal(await pool().copyInRows(copyFrom("heights", "binary"), [[1, span, spans]]), 1);
+  same(await rowsOf(await pool().copyOutRows(copyTo("heights", "binary"))), [[1, span.value, spans.value]]);
+  assert.equal((await pool().one("SELECT spans::text AS t FROM heights")).t, "{[1.5,2),[3,)}");
 });
 
 // [spec:pgorm:req:napi.copy.rows/test]    a row of the wrong width or type is a ConstructionError that abandons the COPY

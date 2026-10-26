@@ -34,13 +34,13 @@ struct RangeCodec<T>(Range<T>);
 impl<'a, T: FromSql<'a>> FromSql<'a> for RangeCodec<T> {
     fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, CodecError> {
         match ty.kind() {
-            Kind::Range(subtype) => read_range(subtype, raw).map(Self),
+            Kind::Range(subtype) => read_range(over_domains(subtype), raw).map(Self),
             _ => Err("expected a PostgreSQL range".into()),
         }
     }
 
     fn accepts(ty: &Type) -> bool {
-        matches!(ty.kind(), Kind::Range(subtype) if T::accepts(subtype))
+        matches!(ty.kind(), Kind::Range(subtype) if T::accepts(over_domains(subtype)))
     }
 }
 
@@ -53,6 +53,7 @@ impl<'a, T: FromSql<'a>> FromSql<'a> for MultirangeCodec<T> {
         let Kind::Multirange(subtype) = ty.kind() else {
             return Err("expected a PostgreSQL multirange".into());
         };
+        let subtype = over_domains(subtype);
         let mut raw = raw;
         let count = usize::try_from(read_i32(&mut raw)?)?;
         let ranges = (0..count)
@@ -70,8 +71,19 @@ impl<'a, T: FromSql<'a>> FromSql<'a> for MultirangeCodec<T> {
     }
 
     fn accepts(ty: &Type) -> bool {
-        matches!(ty.kind(), Kind::Multirange(subtype) if T::accepts(subtype))
+        matches!(ty.kind(), Kind::Multirange(subtype) if T::accepts(over_domains(subtype)))
     }
+}
+
+/// The type `ty` is over once every domain is looked through: a bound of a
+/// range over a domain travels as the domain's base type does, however deep
+/// the domains nest.
+fn over_domains(ty: &Type) -> &Type {
+    let mut ty = ty;
+    while let Kind::Domain(base) = ty.kind() {
+        ty = base;
+    }
+    ty
 }
 
 fn read_i32(raw: &mut &[u8]) -> Result<i32, CodecError> {
@@ -204,7 +216,7 @@ fn created(field: Field<'_>, ty: &Type, subtype: &Type, multi: bool) -> PyResult
             )
         };
     }
-    let (kind, text) = match *subtype {
+    let (kind, text) = match *over_domains(subtype) {
         Type::INT2 => text!(i16, SmallInt, |v| v),
         Type::INT4 => text!(i32, Int, |v| v),
         Type::INT8 => text!(i64, BigInt, |v| v),
