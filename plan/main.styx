@@ -13287,6 +13287,13 @@ children (
                 kind @note
                 text "More found 2026-10-23: docs/spec/paginate.md cites macros.sql+4 in backticks (migration-sql-files)."
             }
+
+            {
+                at 2026-10-26T13:39:21.49016Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Also (2026-10-26): pipeline.surface does not list compares_as or Named::col yet (pipeline-untyped-enum-casts); add them in the same pass if its text is touched."
+            }
         )
     }
 
@@ -14428,6 +14435,62 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by value-decode-created-multiranges (2026-10-26). copy_in_columns / copy_out_columns now complete a created multirange's type from pg_range, and both bindings describe COPY columns through them and already decode Kind::Multirange for created types, so their copy_out_rows / copy_in_rows now read and write created multiranges as their created kinds, untested. Add a round-trip test in each binding (and through models where the binding has them), and update python.values (it says a created-multirange result column raises a decode error, still true for queries but not for a COPY column) and the napi value rule likewise."
+            }
+        )
+    }
+
+    {
+        id stale-default-test-evidence
+        title "Tests that a pool did or did not clear its statements judge the prepared statement itself, not the default it writes"
+        kind @test
+        log (
+            {
+                at 2026-10-26T13:39:20.015065Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-26: tests/statement_cache_listen_tests.rs an_idle_timeout_spares_the_listener failed twice in full integration runs (once before and once after the clear-race fix 2216c2c4), passing alone. The second time the log shows the client executed the same prepared statement s3 twice, never re-preparing it, and the server answered the new domain default: PostgreSQL re-planned the prepared insert itself. The likely cause is a shared-invalidation reset: under the full run's concurrent CREATE/DROP DATABASE churn a backend that falls behind the sinval queue discards every cached plan, and the re-plan reads the domain's new default. So 'the old default is still written' is not evidence that the pool did not clear. Judge the statement: its pg_prepared_statements row (name and prepare_time) unchanged means no clear; a new one means a clear. Rework every test that asserts a stale default persists or uses the default as the proof of a clear (tests/statement_cache_listen_tests.rs, tests/create_domain_tests.rs, tests/column_default_tests.rs, pgorm-pool/tests/cache_listener.rs, pgorm-migration/tests (domain_default), pgorm-python/tests/test_schema_domains.py, pgorm-napi/tests/connections.test.ts), keeping one live demonstration that a cleared pool writes the new default. Also fix the race cache-listener-keepalive's agent found in the Python and JavaScript listener tests (they wait for the server's view of the LISTEN, not the client's first clear; neither binding exposes anything that marks a clear). Prove sensitivity by forcing a re-plan (DISCARD PLANS on the pool's connection, or an invalidation reset) and showing the old assertions fail and the new ones hold."
+            }
+        )
+    }
+
+    {
+        id python-created-range-domain-subtype
+        title "Python decodes a created range or multirange whose subtype is a domain"
+        kind @fix
+        log (
+            {
+                at 2026-10-26T13:39:20.453705Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by bindings-copy-created-multiranges (2026-10-26). pgorm-python/src/results/ranges.rs::created matches a created range's or multirange's subtype against the built-in types without unwrapping a domain, so heightmultirange over a domain over float8 raises DecodeError, in a query and in a COPY. Rust handles it, and pgorm-napi's wire_type unwraps domains (untested there). Unwrap the domain in Python, test both bindings."
+            }
+        )
+    }
+
+    {
+        id bindings-expression-gaps
+        title "Python and JavaScript expressions spell what the other has: @@ in JavaScript, array subscripts, subquery membership and ANY/ALL in Python"
+        kind @feat
+        log (
+            {
+                at 2026-10-26T13:39:20.82762Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-26 by binoper-missing-variants and pipeline-untyped-enum-casts. JavaScript has no matches (@@), which Python now has. Python has no array subscripts (at/slice), which JavaScript has. Python's statement builders have no subquery membership (is_in(select)) and its registered column no is_in/is_not_in; neither binding has ANY/ALL, so array(select) cannot express = ANY(..). Close each gap with stubs/typings, capabilities, parity cases and live tests, keeping Python's Expr split by family (multiple-pymethods, stub mixins) under the density gate."
+            }
+        )
+    }
+
+    {
+        id query-from-entity-schema
+        title "Query::select().from(entity) keeps the entity's schema, as Entity::find() does"
+        kind @fix
+        log (
+            {
+                at 2026-10-26T13:39:21.268023Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by pipeline-untyped-enum-casts (2026-10-26) writing a napi parity case: in Rust, Query::select().from(entity) drops the entity's schema while E::find() keeps it, so a schema-qualified entity's raw select reads the table through search_path. Confirm, fix if it is pgorm's to fix (from accepting an entity's table ref), and test with an entity in a non-public schema."
             }
         )
     }
