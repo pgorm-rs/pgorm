@@ -17,7 +17,7 @@ fn named() -> Config {
     }
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding/test]    target_session_attrs reaches the connection
+// [spec:pgorm:req:conn.pool.config-forwarding+1/test]    target_session_attrs reaches the connection
 #[test]
 fn target_session_attrs_is_forwarded() {
     let pg = named().get_pg_config().expect("a named config builds");
@@ -41,7 +41,7 @@ fn target_session_attrs_is_forwarded() {
     );
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding/test]    channel_binding reaches the connection
+// [spec:pgorm:req:conn.pool.config-forwarding+1/test]    channel_binding reaches the connection
 #[test]
 fn channel_binding_is_forwarded() {
     let pg = named().get_pg_config().expect("a named config builds");
@@ -67,7 +67,7 @@ fn channel_binding_is_forwarded() {
     }
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding/test]    load_balance_hosts reaches the connection
+// [spec:pgorm:req:conn.pool.config-forwarding+1/test]    load_balance_hosts reaches the connection
 #[test]
 fn load_balance_hosts_is_forwarded() {
     let pg = named().get_pg_config().expect("a named config builds");
@@ -83,7 +83,7 @@ fn load_balance_hosts_is_forwarded() {
     assert_eq!(pg.get_load_balance_hosts(), PgLoadBalanceHosts::Random);
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding/test]    ssl_mode, which was already forwarded, still is
+// [spec:pgorm:req:conn.pool.config-forwarding+1/test]    ssl_mode, which was already forwarded, still is
 #[test]
 fn ssl_mode_is_forwarded() {
     let pg = Config {
@@ -96,7 +96,7 @@ fn ssl_mode_is_forwarded() {
     assert_eq!(pg.get_ssl_mode(), PgSslMode::Require);
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding/test]    the struct form and the URL form agree
+// [spec:pgorm:req:conn.pool.config-forwarding+1/test]    the struct form and the URL form agree
 #[test]
 fn struct_form_matches_url_form() {
     let from_url = Config {

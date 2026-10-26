@@ -7,6 +7,7 @@ use crate::{Collation, ColumnType, DropBehavior, IntoCollation, IntoName, Name, 
 /// One change to a composite's attributes, as `ALTER TYPE` chains them.
 // [spec:pgorm:req:sql.ddl.type-composite+2]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum AttributeChange {
     /// `ADD ATTRIBUTE "name" <type>[ COLLATE <collation>]`.
     Add(CompositeAttribute),

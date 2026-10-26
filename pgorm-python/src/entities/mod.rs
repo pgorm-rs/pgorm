@@ -42,7 +42,7 @@ impl PyEntity {
 
     fn describe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         py.import("json")?
-            .call_method1("loads", (self.backend.info().describe().to_string(),))
+            .call_method1("loads", (self.backend.info().describe()?.to_string(),))
     }
 
     fn col(&self, name: &Bound<'_, PyAny>) -> PyResult<PyEntityColumn> {

@@ -7,7 +7,7 @@ use tokio_postgres::Row;
 use crate::{
     codec::Codec,
     decode,
-    errors::Failure,
+    errors::{Failure, throw},
     models,
     values::{Tagged, write},
 };
@@ -57,7 +57,8 @@ pub(crate) fn kinds<'cx>(cx: &mut Cx<'cx>, row: Option<&[Tagged]>) -> JsResult<'
     let row = row.unwrap_or_default();
     let kinds = JsArray::new(cx, row.len());
     for (at, value) in row.iter().enumerate() {
-        let kind = cx.string(models::kind_key(&value.tag));
+        let kind = models::kind_key(&value.tag).or_else(|failure| throw(cx, failure))?;
+        let kind = cx.string(kind);
         kinds.set(cx, index(at), kind)?;
     }
     Ok(kinds)

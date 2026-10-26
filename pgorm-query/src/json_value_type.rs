@@ -46,6 +46,7 @@ use std::sync::Arc;
 /// so `json` or `jsonb` spelled that way is not refused and meets the defect.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum JsonValueType {
     Char(Option<u32>),
     String(StringLen),

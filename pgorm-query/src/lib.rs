@@ -647,8 +647,8 @@
 // `Error`/`Result`), `extension` (PostgreSQL's `CREATE EXTENSION` / `CREATE
 // TYPE` surface, deliberately not flattened into the root), and `value`
 // (`value::with_array::NotU8`, which pgorm's derives name in generated code).
-// [spec:pgorm:req:sql.surface+36]
-// [spec:pgorm:req:sql.surface+36/test]    the two `compile_fail,E0603` examples in
+// [spec:pgorm:req:sql.surface+37]
+// [spec:pgorm:req:sql.surface+37/test]    the two `compile_fail,E0603` examples in
 // the crate docs above, under "The public surface": a module path into the
 // crate does not resolve. `cargo test --doc -p pgorm-query` runs them; nextest
 // runs the rest of the rule's tests, in `tests/surface`.

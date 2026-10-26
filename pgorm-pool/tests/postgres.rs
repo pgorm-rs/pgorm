@@ -210,7 +210,7 @@ async fn generic_client() {
     _use_generic_client(&**client);
 }
 
-// [spec:pgorm:sem:conn.pool.recycle/test]    every recycling method keeps handing out usable connections
+// [spec:pgorm:sem:conn.pool.recycle+1/test]    every recycling method keeps handing out usable connections
 #[tokio::test]
 async fn recycling_methods() {
     let recycling_methods = vec![
@@ -484,7 +484,7 @@ async fn detach_unregisters_statement_cache() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.recycle/test]    Fast runs no query, so session state survives recycling
+// [spec:pgorm:sem:conn.pool.recycle+1/test]    Fast runs no query, so session state survives recycling
 #[tokio::test]
 async fn recycle_fast_keeps_session_state() {
     let pool = single_connection_pool(RecyclingMethod::Fast);
@@ -504,7 +504,7 @@ async fn recycle_fast_keeps_session_state() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.recycle/test]    Clean's RESET ALL wipes session state on reuse
+// [spec:pgorm:sem:conn.pool.recycle+1/test]    Clean's RESET ALL wipes session state on reuse
 #[tokio::test]
 async fn recycle_clean_resets_session_state() {
     let pool = single_connection_pool(RecyclingMethod::Clean);
@@ -528,7 +528,7 @@ async fn recycle_clean_resets_session_state() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.recycle/test]    Clean omits DEALLOCATE ALL, so cached statements survive
+// [spec:pgorm:sem:conn.pool.recycle+1/test]    Clean omits DEALLOCATE ALL, so cached statements survive
 #[tokio::test]
 async fn recycle_clean_keeps_cached_statements() {
     let pool = single_connection_pool(RecyclingMethod::Clean);
@@ -547,7 +547,7 @@ async fn recycle_clean_keeps_cached_statements() {
     );
 }
 
-// [spec:pgorm:sem:conn.pool.recycle/test]    Custom runs the caller's SQL, here one that does deallocate
+// [spec:pgorm:sem:conn.pool.recycle+1/test]    Custom runs the caller's SQL, here one that does deallocate
 #[tokio::test]
 async fn recycle_custom_discard_all_deallocates() {
     let pool = single_connection_pool(RecyclingMethod::Custom("DISCARD ALL;".to_string()));

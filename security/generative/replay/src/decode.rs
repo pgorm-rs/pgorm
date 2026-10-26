@@ -116,5 +116,5 @@ pub(crate) fn value(row: &Row, index: usize) -> Result<Tagged, FormatError> {
             )));
         }
     }?;
-    Ok(Tagged::from_value(inner))
+    Tagged::from_value(inner)
 }

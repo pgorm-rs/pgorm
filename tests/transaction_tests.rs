@@ -702,7 +702,7 @@ pub async fn transaction_nested() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4/test]    a savepoint nested in a connection transaction, both plain closures, runs in a spawned task and commits
+// [spec:pgorm:sem:conn.tx.closure+5/test]    a savepoint nested in a connection transaction, both plain closures, runs in a spawned task and commits
 #[pgorm_macros::test]
 pub async fn transaction_nested_in_spawned_task() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_nested_in_spawned_task").await;
@@ -740,7 +740,7 @@ fn serializable() -> TransactionMode {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4/test]    Ok commits, and the value is returned
+// [spec:pgorm:sem:conn.tx.closure+5/test]    Ok commits, and the value is returned
 #[pgorm_macros::test]
 pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_commit_txclosure").await;
@@ -774,7 +774,7 @@ pub async fn transaction_closure_commit_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4/test]    each closure form's future is Send, so it runs in a spawned task
+// [spec:pgorm:sem:conn.tx.closure+5/test]    each closure form's future is Send, so it runs in a spawned task
 #[pgorm_macros::test]
 pub async fn transaction_closures_run_in_spawned_tasks() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closures_run_in_spawned_tasks").await;
@@ -821,7 +821,7 @@ pub async fn transaction_closures_run_in_spawned_tasks() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4/test]    Err rolls back and is wrapped, not swallowed
+// [spec:pgorm:sem:conn.tx.closure+5/test]    Err rolls back and is wrapped, not swallowed
 #[pgorm_macros::test]
 pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_closure_error_txclosure").await;
@@ -855,7 +855,7 @@ pub async fn transaction_closure_error_txclosure() -> Result<(), Error> {
     Ok(())
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4/test]    a ROLLBACK that fails after the closure's error is reported beside it
+// [spec:pgorm:sem:conn.tx.closure+5/test]    a ROLLBACK that fails after the closure's error is reported beside it
 #[pgorm_macros::test]
 pub async fn transaction_failed_rollback_is_reported() -> Result<(), Error> {
     let ctx = TestContext::new("transaction_failed_rollback_is_reported").await;

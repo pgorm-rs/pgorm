@@ -152,17 +152,17 @@ impl InputKind {
         }
     }
 
-    fn describe(&self) -> Json {
-        match self {
+    fn describe(&self) -> PyResult<Json> {
+        Ok(match self {
             Self::Scalar(name) => json!({"kind": name}),
             Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
             Self::Created(kind) => json!({
                 "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
-                "subtype": crate::values::scalar_name(&kind.subtype),
+                "subtype": crate::values::scalar_name(&kind.subtype)?,
             }),
-            Self::Array(member) => json!({"kind": "array", "element": member.describe()}),
+            Self::Array(member) => json!({"kind": "array", "element": member.describe()?}),
             Self::Explicit => json!({"kind": "explicit_value_required"}),
-        }
+        })
     }
 }
 
@@ -178,10 +178,12 @@ pub(crate) struct ColumnInfo {
 }
 
 impl ColumnInfo {
-    pub(crate) fn describe(&self) -> Json {
-        json!({"name": self.name, "json_key": self.json_key, "sql_type": self.sql_type,
+    pub(crate) fn describe(&self) -> PyResult<Json> {
+        Ok(
+            json!({"name": self.name, "json_key": self.json_key, "sql_type": self.sql_type,
             "rust_decode_type": self.rust_decode_type,
-            "nullable": self.nullable, "primary_key": self.primary_key, "input_hint": self.input.describe()})
+            "nullable": self.nullable, "primary_key": self.primary_key, "input_hint": self.input.describe()?}),
+        )
     }
 }
 
@@ -273,17 +275,19 @@ impl EntityInfo {
             .ok_or_else(|| ConstructionError::new_err("unknown compiled entity column"))
     }
 
-    pub(crate) fn describe(&self) -> Json {
-        json!({"name": self.name, "schema": self.schema, "table": self.table,
+    pub(crate) fn describe(&self) -> PyResult<Json> {
+        Ok(
+            json!({"name": self.name, "schema": self.schema, "table": self.table,
             "rust_entity": self.entity_type, "rust_column": self.column_type, "rust_model": self.model_type, "rust_active_model": self.active_type,
-            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Vec<_>>(),
+            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<PyResult<Vec<_>>>()?,
             "primary_keys": self.primary_keys,
             "primary_key_without_overlaps": self.without_overlaps,
             "relations": self.relations,
             "terminals": ["all", "one", "one_opt", "active.insert", "active.update", "active.delete",
                 "update.returning_change", "update_many.returning_changes",
                 "insert.returning_upsert", "insert_many.returning_upserts"],
-            "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"})
+            "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"}),
+        )
     }
 }
 
@@ -300,17 +304,17 @@ mod tests {
     fn range_columns_hint_their_range_kind() -> PyResult<()> {
         let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
         assert_eq!(
-            describe(ColumnType::Range(RangeType::Int4)),
+            describe(ColumnType::Range(RangeType::Int4))?,
             json!({"kind": "int4range"})
         );
         assert_eq!(
-            describe(ColumnType::Multirange(RangeType::TimestampTz)),
+            describe(ColumnType::Multirange(RangeType::TimestampTz))?,
             json!({"kind": "tstzmultirange"})
         );
         assert_eq!(
             describe(ColumnType::Array(Arc::new(ColumnType::Range(
                 RangeType::Date
-            )))),
+            ))))?,
             json!({"kind": "array", "element": {"kind": "daterange"}})
         );
 
@@ -354,7 +358,7 @@ mod tests {
         };
         let input = InputKind::from_column(&column);
         assert_eq!(
-            input.describe(),
+            input.describe()?,
             json!({"kind": "created_range", "name": "floatrange", "schema": "measure", "subtype": "f64"})
         );
         let multirange = ColumnType::CreatedMultirange {
@@ -363,7 +367,7 @@ mod tests {
             subtype: Arc::new(ColumnType::Integer),
         };
         assert_eq!(
-            InputKind::from_column(&multirange).describe()["kind"],
+            InputKind::from_column(&multirange).describe()?["kind"],
             "created_multirange"
         );
 
@@ -406,13 +410,13 @@ mod tests {
         };
         let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
         let quantity = domain("quantity", ColumnType::Integer);
-        assert_eq!(describe(quantity.clone()), json!({"kind": "i32"}));
+        assert_eq!(describe(quantity.clone())?, json!({"kind": "i32"}));
         assert_eq!(
-            describe(domain("small", quantity.clone())),
+            describe(domain("small", quantity.clone()))?,
             json!({"kind": "i32"})
         );
         assert_eq!(
-            describe(ColumnType::Array(Arc::new(quantity.clone()))),
+            describe(ColumnType::Array(Arc::new(quantity.clone())))?,
             json!({"kind": "array", "element": {"kind": "i32"}})
         );
         let mood = ColumnType::Enum {
@@ -421,7 +425,7 @@ mod tests {
             variants: Vec::new(),
         };
         assert_eq!(
-            describe(domain("cheerful", mood)),
+            describe(domain("cheerful", mood))?,
             json!({"kind": "enum", "name": "mood", "schema": null})
         );
 

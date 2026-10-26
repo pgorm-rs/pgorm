@@ -14562,12 +14562,27 @@ children (
         id public-enums-non-exhaustive
         title "Public enums whose variants grow are #[non_exhaustive], so adding one is not a breaking change"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-10-26T16:12:26.747137Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-26, asked whether BinOper and SubQueryOper should be #[non_exhaustive] after binoper-missing-variants added six BinOper variants and in-subquery-enum-shapes added SubQueryOper::Array without marking either breaking: \"public enums yes\". Survey the public enums of pgorm, pgorm-query, pgorm-pool, pgorm-migration and pgorm-codegen; mark #[non_exhaustive] every one whose set of variants is an open vocabulary that can grow (operators, functions, column and value types, statement and DDL options, error kinds, capabilities), and leave exhaustive the closed sets a caller is meant to match completely (e.g. ascending/descending, a two-state status), stating the criterion in the rule. Add the wildcard arms that code and tests outside the defining crate then need. This is a breaking change once: mark the commit breaking, and record the list in sql.surface (or the crates' surface rules) and CLAUDE.md's pg-19 note, which today forbids adding a variant to an exhaustive public enum."
+            }
+
+            {
+                at 2026-10-26T17:36:55.48494Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Criterion (sql.surface+37): #[non_exhaustive] when the variants name members of a vocabulary that can grow (PostgreSQL's operators, functions, types/values, statement kinds, clauses/actions/options/behaviours, objects a statement names; a crate's failure kinds); exhaustive when the variants partition a choice by construction (binary choices, Deferrability's combinations, shape alternatives, sets fixed by what they measure, JoinType's four answers, uninhabited markers). Borderline decisions: Order open (USING sort missing), SequenceType open (PostgreSQL's choice, not a partition), OnConflict open (pairs arbiter with a growing action set), TableName/TypeRef/JsonKind/IntervalPrecision/PgInterval/JoinType closed; pgorm's RuntimeError kept exhaustive (error.model.runtime fixes one variant, destructured whole), TransactionMode kept (conn.tx calls it closed: every combination PostgreSQL acts on); codegen's ColumnExpr/Operator are pub(crate)-reexported so not surface. Outside matches: SubQueryStatement gained Display so pgorm's COPY renders it without matching; codegen reads RangeType/ForeignKeyAction through tables its validation checks (get_foreign_key_action now returns Option<String>) and keeps its own closed CurrentKeyword; the bindings and the replay harness refuse unknown kinds with typed errors (Python UnsupportedCapabilityError, JS InternalError, replay FormatError); TransactionError's unknown arm discards the connection. Found: security/generative/bridge/Cargo.lock lacks inventory since d9dd0959 (pre-existing, --locked fails); the scalar_kinds! macro exists three times (pgorm-python, pgorm-napi, security replay)."
+            }
+
+            {
+                at 2026-10-26T17:36:55.644296Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -39,7 +39,7 @@ pub enum ColumnExpr {
     /// `NULL`.
     Null,
     /// `CURRENT_DATE`, `CURRENT_TIME` or `CURRENT_TIMESTAMP`.
-    Keyword(Keyword),
+    Keyword(CurrentKeyword),
     /// A call of a function by its unqualified name.
     Call(String, Vec<ColumnExpr>),
     /// A cast to a type named by its name, schema and whether it is an array.
@@ -58,6 +58,26 @@ pub struct CastType {
     pub schema: Option<String>,
     pub name: String,
     pub array: bool,
+}
+
+/// The keywords of the subset: the three `CURRENT_*` values, which are all
+/// the writers spell, where pgorm-query's [`Keyword`] is a vocabulary that
+/// grows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CurrentKeyword {
+    Date,
+    Time,
+    Timestamp,
+}
+
+impl CurrentKeyword {
+    fn keyword(self) -> Keyword {
+        match self {
+            Self::Date => Keyword::CurrentDate,
+            Self::Time => Keyword::CurrentTime,
+            Self::Timestamp => Keyword::CurrentTimestamp,
+        }
+    }
 }
 
 /// The binary operators of the subset.
@@ -198,7 +218,7 @@ impl ColumnExpr {
             Self::Text(text) => Expr::val(text.as_str()).into(),
             Self::Bool(value) => Expr::val(*value).into(),
             Self::Null => SimpleExpr::Keyword(Keyword::Null),
-            Self::Keyword(keyword) => SimpleExpr::Keyword(keyword.clone()),
+            Self::Keyword(keyword) => SimpleExpr::Keyword(keyword.keyword()),
             Self::Call(name, args) => args
                 .iter()
                 .fold(Func::named(Name::runtime(name.as_str())), |call, arg| {
@@ -227,7 +247,11 @@ impl ColumnExpr {
             SimpleExpr::Keyword(Keyword::Value) => {
                 return Err("`VALUE`, which only a domain's CHECK reads".to_owned());
             }
-            SimpleExpr::Keyword(keyword) => Self::Keyword(keyword.clone()),
+            SimpleExpr::Keyword(Keyword::CurrentDate) => Self::Keyword(CurrentKeyword::Date),
+            SimpleExpr::Keyword(Keyword::CurrentTime) => Self::Keyword(CurrentKeyword::Time),
+            SimpleExpr::Keyword(Keyword::CurrentTimestamp) => {
+                Self::Keyword(CurrentKeyword::Timestamp)
+            }
             SimpleExpr::FunctionCall(call) => match call.get_func() {
                 Function::Named(_) if !call.is_plain() => {
                     return Err("a call carrying DISTINCT or an aggregate clause".to_owned());
@@ -340,11 +364,9 @@ impl ColumnExpr {
             Self::Bool(value) => quote! { Expr::val(#value) },
             Self::Null => quote! { pgorm::pgorm_query::Keyword::Null },
             Self::Keyword(keyword) => match keyword {
-                Keyword::CurrentDate => quote! { Expr::current_date() },
-                Keyword::CurrentTime => quote! { Expr::current_time() },
-                Keyword::CurrentTimestamp => quote! { Expr::current_timestamp() },
-                Keyword::Null => quote! { pgorm::pgorm_query::Keyword::Null },
-                Keyword::Value => quote! { Expr::domain_value() },
+                CurrentKeyword::Date => quote! { Expr::current_date() },
+                CurrentKeyword::Time => quote! { Expr::current_time() },
+                CurrentKeyword::Timestamp => quote! { Expr::current_timestamp() },
             },
             Self::Call(name, args) => {
                 let args = args.iter().map(Self::to_rust);

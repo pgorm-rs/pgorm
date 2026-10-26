@@ -91,7 +91,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `connect_multi_with_builder` returns the raw `BTreeMap` on success), so
 > outside the crate it is effectively read-only API surface.
 
-> [spec:pgorm:req:conn.pool.config-forwarding]
+> [spec:pgorm:req:conn.pool.config-forwarding+1]
 > `pgorm_pool::Config` is the deserializable connection configuration — the
 > shape `PG__HOST`, `PG__PASSWORD`, `PG__SSL_MODE` and their siblings land in.
 > Every field it declares MUST reach the `tokio_postgres::Config` that
@@ -115,6 +115,12 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 >
 > `ssl_mode` was already forwarded and stays so. The rule is over the whole
 > struct, not over the three that happened to be missing.
+>
+> The four enums the struct mirrors from tokio-postgres — `SslMode`,
+> `TargetSessionAttrs`, `ChannelBinding` and `LoadBalanceHosts` — are
+> `#[non_exhaustive]` as tokio-postgres's own are, and so is `ConfigError`,
+> what `get_pg_config` refuses a configuration with: each can grow
+> (`sql.surface`).
 
 > [spec:pgorm:sem:conn.pool.config-redaction]
 > `Debug` on a pool configuration type MUST NOT reveal a credential.
@@ -156,7 +162,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > the recycling method's query, if any. `detach` unregisters the connection's
 > statement cache.
 
-> [spec:pgorm:sem:conn.pool.recycle]
+> [spec:pgorm:sem:conn.pool.recycle+1]
 > `RecyclingMethod` selects the health check run on reuse: `Fast` (the
 > default, and what `connect` uses) performs no query — only the `is_closed()`
 > check; `Verified` executes an empty `simple_query` round trip; `Clean` runs
@@ -165,6 +171,8 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > pg_advisory_unlock_all(); DISCARD TEMP; DISCARD SEQUENCES;`) that
 > intentionally omits `DEALLOCATE ALL`/`DISCARD PLANS` so cached prepared
 > statements survive recycling; `Custom(sql)` runs caller-provided SQL.
+> `RecyclingMethod` is `#[non_exhaustive]`, so a further health check is not a
+> breaking change (`sql.surface`).
 
 > [spec:pgorm:sem:conn.pool.statement-cache+3]
 > Each `ClientWrapper` carries an `Arc<StatementCache>` keyed by `(query text,
@@ -724,7 +732,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > replacing it — so a `ROLLBACK` queued as the handle drops is still flushed
 > after the connection returns to the pool and is handed to the next caller.
 
-> [spec:pgorm:sem:conn.tx.closure+4]
+> [spec:pgorm:sem:conn.tx.closure+5]
 > `TransactionTrait::transaction(f)` and `DatabaseConnection::transaction_with(opts,
 > f)` run a closure inside a transaction, taking `F: AsyncFnOnce(&mut
 > Self::Transaction<'_>) -> Result<T, E>` — `&mut DatabaseTransaction<'_>` on a
@@ -782,7 +790,10 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > `source()` where `E: Error + 'static`. There is deliberately no
 > `From<Error> for TransactionError<E>`: with `E = Error`, the common case, it
 > would file every closure-side error under `Connection` and erase the
-> distinction the enum exists to draw.
+> distinction the enum exists to draw. It is `#[non_exhaustive]`, since kinds
+> of failure grow (`sql.surface`), and a caller's `match` ends in an arm for a
+> kind it does not know, which it treats as it treats `RollbackFailed` below:
+> neither how the transaction ended nor the state of its connection is known.
 >
 > When the closure returned an error AND the `ROLLBACK` then fails, the caller
 > MUST be told both. The closure's error stays the cause — `RollbackFailed`'s

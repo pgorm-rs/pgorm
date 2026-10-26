@@ -104,7 +104,7 @@ pub trait TransactionTrait: sealed::Open {
     /// [`TransactionError::RollbackFailed`]. Dropping the
     /// returned future before it finishes rolls the transaction back without
     /// awaiting the server.
-    // [spec:pgorm:sem:conn.tx.closure+4]    one body for every implementor
+    // [spec:pgorm:sem:conn.tx.closure+5]    one body for every implementor
     #[doc(alias = "begin")]
     fn transaction<T, E, F>(&mut self, f: F) -> impl Future<Output = Result<T, TransactionError<E>>>
     where
@@ -120,7 +120,7 @@ pub trait TransactionTrait: sealed::Open {
     }
 }
 
-// [spec:pgorm:sem:conn.tx.closure+4]    commit on Ok, awaited rollback on Err
+// [spec:pgorm:sem:conn.tx.closure+5]    commit on Ok, awaited rollback on Err
 pub(crate) async fn drive<H, T, E, F>(mut txn: H, f: F) -> Result<T, TransactionError<E>>
 where
     H: sealed::Close,
@@ -138,7 +138,7 @@ where
 
 /// Roll back a transaction whose closure failed with `cause`, and say how it
 /// ended.
-// [spec:pgorm:sem:conn.tx.closure+4]    a failed ROLLBACK travels beside the closure's error
+// [spec:pgorm:sem:conn.tx.closure+5]    a failed ROLLBACK travels beside the closure's error
 pub(crate) async fn rolled_back<E>(txn: impl sealed::Close, cause: E) -> TransactionError<E> {
     match txn.rollback(sealed::TOKEN).await {
         Ok(()) => TransactionError::Transaction(cause),
@@ -152,8 +152,9 @@ pub(crate) async fn rolled_back<E>(txn: impl sealed::Close, cause: E) -> Transac
 /// transaction machinery itself, which is why there is deliberately no
 /// `From<Error>` impl: with `E = Error` it would silently file every
 /// closure-side error under `Connection` and erase that distinction.
-// [spec:pgorm:sem:conn.tx.closure+4]    error wrapper
+// [spec:pgorm:sem:conn.tx.closure+5]    error wrapper
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum TransactionError<E> {
     /// `BEGIN`, `COMMIT`, or acquiring the transaction failed.
     Connection(Error),

@@ -21,7 +21,7 @@ pub use interval::PyInterval;
 pub(crate) use ranges::{column_type as range_column_type, kind_names as range_kind_names};
 pub use types::PyTypeName;
 use types::Tag;
-pub(crate) use types::{SCALAR_NAMES, scalar_name};
+pub(crate) use types::{SCALAR_NAMES, scalar_name, unrepresented};
 
 // [spec:pgorm:req:python.values+5]
 // [spec:pgorm:req:python.value-tags]
@@ -37,7 +37,7 @@ impl PyValue {
     /// Wrap a Rust value without changing its variant or payload.
     pub fn from_rust(inner: Value) -> PyResult<Self> {
         Ok(Self {
-            tag: types::rust_tag(&inner),
+            tag: types::rust_tag(&inner)?,
             inner,
         })
     }
@@ -131,7 +131,7 @@ impl PyValue {
         }
         let kind = tag.array_type()?;
         let inner = if data.is_none() {
-            types::scalar_null(&kind)
+            types::scalar_null(&kind)?
         } else if let Tag::Created(created) = &tag {
             Value::String(Some(Box::new(created.text(data)?)))
         } else {
@@ -165,7 +165,7 @@ impl PyValue {
     fn null(kind: &Bound<'_, PyAny>) -> PyResult<Self> {
         let tag = Tag::parse(kind).map_err(construction_error)?;
         Ok(Self {
-            inner: types::scalar_null(&tag.array_type()?),
+            inner: types::scalar_null(&tag.array_type()?)?,
             tag,
         })
     }
@@ -206,12 +206,12 @@ impl PyValue {
     }
 
     #[getter]
-    fn kind(&self) -> &'static str {
+    fn kind(&self) -> PyResult<&'static str> {
         self.tag.name()
     }
 
     #[getter]
-    fn is_null(&self) -> bool {
+    fn is_null(&self) -> PyResult<bool> {
         types::is_null(&self.inner)
     }
 
@@ -266,8 +266,12 @@ impl PyValue {
         json::to_python(py, &snapshot::encode(self)?)
     }
 
-    fn __repr__(&self) -> String {
-        format!("Value(kind={:?}, is_null={})", self.kind(), self.is_null())
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "Value(kind={:?}, is_null={})",
+            self.kind()?,
+            self.is_null()?
+        ))
     }
 }
 

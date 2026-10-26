@@ -115,16 +115,16 @@ fn labels(ty: &ColumnType) -> Option<Vec<String>> {
 }
 
 impl ColumnInfo {
-    fn describe(&self) -> Json {
-        json!({
+    fn describe(&self) -> Result<Json, Failure> {
+        Ok(json!({
             "name": self.name,
             "sqlType": self.sql_type,
             "rustType": self.rust_type,
             "nullable": self.nullable,
             "primaryKey": self.primary_key,
-            "kind": self.tag.as_ref().map(kind_key),
+            "kind": self.tag.as_ref().map(kind_key).transpose()?,
             "values": self.labels,
-        })
+        }))
     }
 }
 
@@ -215,12 +215,12 @@ impl EntityInfo {
 
     /// The registration as `describe()` gives it.
     // [spec:pgorm:req:napi.entities]
-    pub(crate) fn describe(&self) -> Json {
-        json!({
+    pub(crate) fn describe(&self) -> Result<Json, Failure> {
+        Ok(json!({
             "name": self.name,
             "schema": self.schema,
             "table": self.table,
-            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Vec<_>>(),
+            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Result<Vec<_>, _>>()?,
             "primaryKey": self.primary_key,
             "primaryKeyWithoutOverlaps": self.without_overlaps,
             "relations": self.relations,
@@ -230,7 +230,7 @@ impl EntityInfo {
                 "activeModel": self.rust[2],
                 "column": self.rust[3],
             },
-        })
+        }))
     }
 }
 
@@ -285,7 +285,9 @@ mod tests {
     use super::*;
 
     fn key(ty: &ColumnType) -> Option<String> {
-        column_tag(ty).as_ref().map(kind_key)
+        column_tag(ty)
+            .as_ref()
+            .map(|tag| kind_key(tag).unwrap_or_else(|failure| panic!("{failure}")))
     }
 
     // [spec:pgorm:req:napi.entities/test]    each column type maps to the kind

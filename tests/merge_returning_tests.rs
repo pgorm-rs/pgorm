@@ -276,7 +276,7 @@ async fn merge_action_resolves_only_in_a_merge_list(db: &DatabaseConnection) -> 
 
 /// A MERGE body yields the rows its RETURNING list returns. Without a list
 /// it still runs, and only reading it is refused.
-// [spec:pgorm:req:sql.ast+3/test]    against a live server: a MERGE CTE body runs and yields its
+// [spec:pgorm:req:sql.ast+4/test]    against a live server: a MERGE CTE body runs and yields its
 // returned rows; one without RETURNING runs, and reading it is refused (0A000)
 // [spec:pgorm:def:sql.ast.with+5/test]
 async fn a_merge_body_yields_its_returned_rows(db: &DatabaseConnection) -> Result<(), Error> {

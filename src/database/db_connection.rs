@@ -226,7 +226,7 @@ impl DatabaseConnection {
     ///
     /// [`TransactionTrait`]: crate::TransactionTrait
     /// [`TransactionTrait::transaction`]: crate::TransactionTrait::transaction
-    // [spec:pgorm:sem:conn.tx.closure+4]    configured BEGIN
+    // [spec:pgorm:sem:conn.tx.closure+5]    configured BEGIN
     #[doc(alias("transaction_with_config", "begin_with_config"))]
     pub async fn transaction_with<T, E, F>(
         &mut self,

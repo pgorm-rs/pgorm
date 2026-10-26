@@ -43,7 +43,7 @@ impl PyEntityColumn {
                 .entity
                 .info()
                 .column(&self.name)?
-                .describe()
+                .describe()?
                 .to_string(),),
         )
     }

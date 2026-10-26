@@ -7,6 +7,7 @@ use crate::{FromItem, IntoFromItem, IntoNamedTable, NamedTable, Value};
 /// methods.
 // [spec:pgorm:req:sql.ast.select.table-sample]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SampleMethod {
     /// `BERNOULLI`: each row on its own, with the given probability, so the
     /// sample is spread across the table and every page is read.

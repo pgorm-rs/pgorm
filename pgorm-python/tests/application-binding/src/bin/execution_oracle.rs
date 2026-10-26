@@ -20,7 +20,8 @@ fn ended<T>(outcome: std::result::Result<T, TransactionError<Failure>>) -> Resul
     outcome.map_err(|error| match error {
         TransactionError::Connection(error) => error.into(),
         TransactionError::Transaction(error) => error,
-        unfinished @ TransactionError::RollbackFailed { .. } => unfinished.to_string().into(),
+        // A failed ROLLBACK, or a failure with no arm here.
+        unfinished => unfinished.to_string().into(),
     })
 }
 

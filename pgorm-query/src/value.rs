@@ -27,6 +27,7 @@ use crate::{ColumnType, Interval, Multirange, QueryBuilder, Range, RangeType, St
 /// [`Value`] types variant for Postgres array
 // [spec:pgorm:def:sql.value.array+6]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
 pub enum ArrayType {
     Bool,
     TinyInt,
@@ -83,6 +84,7 @@ pub enum ArrayType {
 /// `NaN` equals itself, and `0.0` and `-0.0` are distinct values.
 // [spec:pgorm:def:sql.value+3]
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum Value {
     Bool(Option<bool>),
     TinyInt(Option<i8>),
@@ -187,6 +189,7 @@ pub struct ValueTuple(Vec<Value>);
 /// Why a [`ValueTuple`] could not be rebuilt into a typed tuple.
 // [spec:pgorm:def:sql.value.tuple+3]
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ValueTupleError {
     /// The tuple's arity is not the one the target type requires.
     Arity {

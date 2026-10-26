@@ -182,6 +182,7 @@ pub(super) fn value(field: Field<'_>, ty: &Type, array: bool) -> PyResult<Option
         RangeType::TimestampTz => decode!(Timestamp, |v| Value::DateTimeWithTimeZone(Some(
             Box::new(v)
         ))),
+        _ => Err(crate::values::unrepresented()),
     }?;
     PyValue::from_rust(value).map(Some)
 }

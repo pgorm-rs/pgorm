@@ -6,7 +6,7 @@ it.
 
 ## Taxonomy
 
-> [spec:pgorm:def:error.model+10]
+> [spec:pgorm:def:error.model+11]
 > `Error` is the crate-wide error enum. Driver and pool failures convert in
 > via `From`: `Postgres(tokio_postgres::Error)` (the variant every
 > `ConnectionTrait` call and transaction commit produces on database failure;
@@ -55,6 +55,14 @@ it.
 > be reintroduced, and no alias is kept behind for a superseded one. A variant
 > name MUST NOT restate its enum: the conversion failure is `Error::Conversion`
 > and the wrapped database failure is `TryGetError::Db`.
+>
+> `Error`, `SqlError`, `VerifyError`, `ListenError` and `TryGetError` are
+> `#[non_exhaustive]`: each names kinds of failure, and kinds of failure grow,
+> so a caller's `match` ends in an arm for one it does not know
+> (`sql.surface`). `RuntimeError` is not: `error.model.runtime` fixes it at its
+> one variant, a carrier of a message that a caller takes apart without a
+> second arm, and a new kind of failure becomes a variant of `Error`'s rather
+> than of its.
 
 > [spec:pgorm:def:error.model.runtime+3]
 > `RuntimeError` has exactly one variant, `Internal(String)`, wrapping

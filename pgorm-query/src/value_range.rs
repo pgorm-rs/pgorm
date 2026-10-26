@@ -24,6 +24,7 @@ use crate::{
 /// decodes, because the wire format of a range is its subtype's.
 // [spec:pgorm:def:sql.value.range+5]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum RangeType {
     /// `int4range` / `int4multirange`, over `integer` (`i32`).
     Int4,

@@ -226,6 +226,7 @@ impl fmt::Debug for Config {
 
 /// This error is returned if there is something wrong with the configuration
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ConfigError {
     /// This variant is returned if the `url` is invalid
     InvalidUrl(tokio_postgres::Error),
@@ -322,7 +323,7 @@ impl Config {
     /// How `url` and the individual fields combine is documented on
     /// [`url`](Self::url): most fields replace what the URL set, but the host,
     /// hostaddr and port families are added to it.
-    // [spec:pgorm:req:conn.pool.config-forwarding]
+    // [spec:pgorm:req:conn.pool.config-forwarding+1]
     #[allow(unused_results)]
     pub fn get_pg_config(&self) -> Result<tokio_postgres::Config, ConfigError> {
         let mut cfg = if let Some(url) = &self.url {
@@ -442,8 +443,9 @@ impl Config {
 ///
 /// [`Fast`]: RecyclingMethod::Fast
 /// [`Verified`]: RecyclingMethod::Verified
-// [spec:pgorm:sem:conn.pool.recycle]
+// [spec:pgorm:sem:conn.pool.recycle+1]
 #[derive(Clone, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
 pub enum RecyclingMethod {
     /// Only run [`Client::is_closed()`][1] when recycling existing connections.
     ///
@@ -653,7 +655,7 @@ pub enum TargetSessionAttrs {
     ReadWrite,
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
+// [spec:pgorm:req:conn.pool.config-forwarding+1]    the enum the field is forwarded as
 impl From<TargetSessionAttrs> for PgTargetSessionAttrs {
     fn from(attrs: TargetSessionAttrs) -> Self {
         match attrs {
@@ -709,7 +711,7 @@ pub enum ChannelBinding {
     Require,
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
+// [spec:pgorm:req:conn.pool.config-forwarding+1]    the enum the field is forwarded as
 impl From<ChannelBinding> for PgChannelBinding {
     fn from(cb: ChannelBinding) -> Self {
         match cb {
@@ -734,7 +736,7 @@ pub enum LoadBalanceHosts {
     Random,
 }
 
-// [spec:pgorm:req:conn.pool.config-forwarding]    the enum the field is forwarded as
+// [spec:pgorm:req:conn.pool.config-forwarding+1]    the enum the field is forwarded as
 impl From<LoadBalanceHosts> for PgLoadBalanceHosts {
     fn from(cb: LoadBalanceHosts) -> Self {
         match cb {

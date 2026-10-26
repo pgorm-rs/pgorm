@@ -9,7 +9,7 @@ golden fixtures under `pgorm-codegen/tests/`. A schema reaches the pipeline as
 DDL text, through `entities_from_sql` and `parse_schema` at the crate root,
 specified under [Schema from DDL text](#schema-from-ddl-text).
 
-> [spec:pgorm:def:codegen.entity+4]
+> [spec:pgorm:def:codegen.entity+5]
 > The entity generator is the pipeline
 > `EntityTransformer::transform(Vec<TableCreateStatement>) -> EntityWriter`
 > followed by `EntityWriter::generate(&EntityWriterContext) -> WriterOutput`.
@@ -29,8 +29,16 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > to the generated derive lists; extra attributes are emitted as additional
 > `#[...]` lines on the Model struct or enum.
 >
-> Errors are the two-variant `Error` enum: `StdIoError(io::Error)` and
-> `TransformError(String)`.
+> Errors are the `#[non_exhaustive]` `Error` enum, whose two variants are
+> `StdIoError(io::Error)` and `TransformError(String)` (`sql.surface`).
+>
+> Where generated source spells a member of one of pgorm-query's growing
+> enums — a built-in `RangeType`, a `ForeignKeyAction` — the writer reads it
+> from a table naming each member codegen writes, and validation refuses a
+> column or relation holding one the table lacks with a `TransformError`, so a
+> member pgorm-query gains is reported rather than written as another. A
+> column expression's keywords are codegen's own closed set, the three
+> `CURRENT_*` values its reader accepts.
 
 ## Schema discovery → Entity model
 

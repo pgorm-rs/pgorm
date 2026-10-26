@@ -674,6 +674,12 @@ where
             conn.discard();
             Err(cause)
         }
+        // A failure with no arm here leaves the connection's state as unknown
+        // as a failed ROLLBACK does.
+        Err(other) => {
+            conn.discard();
+            Err(Error::Custom(other.to_string()))
+        }
     }
 }
 

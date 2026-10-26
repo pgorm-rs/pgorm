@@ -1,7 +1,7 @@
 use super::*;
 use crate::oracle::{assert_eq, assert_query_eq, parsed_nodes};
 
-// [spec:pgorm:req:sql.ast+3/test]
+// [spec:pgorm:req:sql.ast+4/test]
 // [spec:pgorm:def:sql.ast.select+6/test]
 // [spec:pgorm:req:sql.render.ident-quoting+7/test]
 #[test]
@@ -1970,6 +1970,7 @@ fn parsed_operation(union: UnionType) -> (i64, bool) {
         UnionType::IntersectAll => (SetOperation::SetopIntersect, true),
         UnionType::Except => (SetOperation::SetopExcept, false),
         UnionType::ExceptAll => (SetOperation::SetopExcept, true),
+        other => panic!("no parse-tree set operation is known for {other:?}"),
     };
     (op as i64, all)
 }

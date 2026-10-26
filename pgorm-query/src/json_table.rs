@@ -15,6 +15,7 @@ use crate::{
 /// says; PostgreSQL takes no other (`42601`).
 // [spec:pgorm:def:sql.ast.json-table]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum JsonTableBehavior {
     /// Raise the error.
     Error,

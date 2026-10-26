@@ -8,7 +8,7 @@ use super::{
     read::{self, parse_decimal, parse_uuid, refuse, string},
     write,
 };
-use crate::codec::Codec;
+use crate::{codec::Codec, errors::throw};
 
 pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("valueNew", value_new)?;
@@ -65,7 +65,8 @@ fn value_null(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
     let kind = cx.argument::<JsValue>(0)?;
     let codec = Codec::get(&mut cx)?;
     let tag = read::kind(&mut cx, codec, kind)?;
-    Ok(cx.boxed(Tagged::null(tag)))
+    let value = Tagged::null(tag).or_else(|failure| throw(&mut cx, failure))?;
+    Ok(cx.boxed(value))
 }
 
 /// `valueJson(data)`: a JSON document, `null` being JSON's null rather than
@@ -75,9 +76,9 @@ fn value_json(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
     let data = cx.argument::<JsValue>(0)?;
     let codec = Codec::get(&mut cx)?;
     let json = super::json::read(&mut cx, codec, data, 0)?;
-    Ok(cx.boxed(Tagged::value(pgorm::pgorm_query::Value::Json(Some(
-        Box::new(json),
-    )))))
+    let value = Tagged::value(pgorm::pgorm_query::Value::Json(Some(Box::new(json))))
+        .or_else(|failure| throw(&mut cx, failure))?;
+    Ok(cx.boxed(value))
 }
 
 /// `valueArray(kind, items)`: an array of the element kind, `null` items SQL
@@ -97,7 +98,8 @@ fn value_array(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
                 "arrays of a created range or multirange type are not supported",
             );
         }
-        return Ok(cx.boxed(Tagged::null(tag)));
+        let value = Tagged::null(tag).or_else(|failure| throw(&mut cx, failure))?;
+        return Ok(cx.boxed(value));
     }
     let datum = read::array(&mut cx, codec, items, &element)?;
     Ok(cx.boxed(Tagged { datum, tag }))
@@ -105,13 +107,16 @@ fn value_array(mut cx: FunctionContext) -> JsResult<JsBox<Tagged>> {
 
 fn value_kind(mut cx: FunctionContext) -> JsResult<JsString> {
     let value = tagged(&mut cx, 0)?;
-    let name = value.tag.name();
+    let name = value
+        .tag
+        .name()
+        .or_else(|failure| throw(&mut cx, failure))?;
     Ok(cx.string(name))
 }
 
 fn value_is_null(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let value = tagged(&mut cx, 0)?;
-    let null = value.is_null();
+    let null = value.is_null().or_else(|failure| throw(&mut cx, failure))?;
     Ok(cx.boolean(null))
 }
 
@@ -129,19 +134,24 @@ fn type_name<'cx>(
 
 fn kind_object<'cx>(cx: &mut Cx<'cx>, codec: Codec<'cx>, tag: &Tag) -> JsResult<'cx, JsValue> {
     match tag {
-        Tag::Scalar(kind) => Ok(cx.string(super::scalar_name(kind)).upcast()),
+        Tag::Scalar(kind) => {
+            let name = super::scalar_name(kind).or_else(|failure| throw(cx, failure))?;
+            Ok(cx.string(name).upcast())
+        }
         Tag::Enum(name) => type_name(cx, codec, name),
         Tag::Created(kind) => {
             let schema: Handle<JsValue> = match &kind.name.schema {
                 Some(schema) => cx.string(schema).upcast(),
                 None => cx.null().upcast(),
             };
+            let subtype =
+                super::scalar_name(&kind.subtype).or_else(|failure| throw(cx, failure))?;
             codec.make(
                 cx,
                 (
                     "created",
                     kind.name.name.clone(),
-                    super::scalar_name(&kind.subtype),
+                    subtype,
                     schema,
                     kind.multirange,
                 ),

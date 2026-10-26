@@ -191,13 +191,16 @@ impl CreatedKind {
     // [spec:pgorm:req:python.values+5]
     pub(crate) fn text(&self, data: &Bound<'_, PyAny>) -> PyResult<String> {
         let ranges = if let Ok(text) = data.cast_exact::<PyString>() {
-            dispatch!(self.subtype, parsed, text.to_str()?, self.multirange).ok_or_else(|| {
-                ConstructionError::new_err(format!(
-                    "text is no {} over {}",
-                    self.kind_name(),
-                    scalar_name(&self.subtype)
-                ))
-            })?
+            match dispatch!(self.subtype, parsed, text.to_str()?, self.multirange) {
+                Some(ranges) => ranges,
+                None => {
+                    return Err(ConstructionError::new_err(format!(
+                        "text is no {} over {}",
+                        self.kind_name(),
+                        scalar_name(&self.subtype)?
+                    )));
+                }
+            }
         } else {
             self.bounds(data)?
         };
@@ -329,28 +332,28 @@ macro_rules! created_kind_methods {
             }
 
             #[getter]
-            fn subtype(&self) -> &'static str {
+            fn subtype(&self) -> PyResult<&'static str> {
                 scalar_name(&self.0.subtype)
             }
 
-            fn __hash__(&self) -> u64 {
+            fn __hash__(&self) -> PyResult<u64> {
                 use std::hash::{Hash, Hasher};
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                (&self.0.name.name, &self.0.name.schema, self.subtype()).hash(&mut hasher);
-                hasher.finish()
+                (&self.0.name.name, &self.0.name.schema, self.subtype()?).hash(&mut hasher);
+                Ok(hasher.finish())
             }
 
-            fn __repr__(&self) -> String {
+            fn __repr__(&self) -> PyResult<String> {
                 let schema = match &self.0.name.schema {
                     Some(schema) => format!(", schema={schema:?}"),
                     None => String::new(),
                 };
-                format!(
+                Ok(format!(
                     concat!($label, "({:?}, {:?}{})"),
                     self.0.name.name,
-                    self.subtype(),
+                    self.subtype()?,
                     schema
-                )
+                ))
             }
         }
     };

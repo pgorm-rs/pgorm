@@ -23,6 +23,7 @@
 /// ```
 // [spec:pgorm:req:sql.ddl.sequence]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SequenceOption {
     /// `INCREMENT BY n`: the step between two values, negative for a
     /// descending sequence.
@@ -137,6 +138,7 @@ pub(crate) fn merge_into(slot: &mut Option<SequenceOptions>, options: SequenceOp
 /// the choice is a closed set rather than a column type.
 // [spec:pgorm:req:sql.ddl.sequence]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SequenceType {
     /// `smallint`
     SmallInteger,

@@ -424,6 +424,7 @@ impl ToSql for ValueHolder {
             Value::Range(_, Some(x)) => range::bind_range(x, ty, out),
             Value::Multirange(_, Some(x)) => range::bind_multirange(x, ty, out),
             Value::Range(_, None) | Value::Multirange(_, None) => Ok(IsNull::Yes),
+            _ => Err(format!("pgorm has no binding for this value to Postgres type `{ty}`").into()),
         }
     }
 

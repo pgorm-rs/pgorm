@@ -96,9 +96,9 @@ impl Column {
                 ColumnType::Array(column_type) => {
                     format!("Vec<{}>", write_rs_type(column_type))
                 }
-                ColumnType::Range(range) => format!("Range<{}>", range_element(*range)),
+                ColumnType::Range(range) => format!("Range<{}>", checked_range_spelling(*range).1),
                 ColumnType::Multirange(range) => {
-                    format!("Multirange<{}>", range_element(*range))
+                    format!("Multirange<{}>", checked_range_spelling(*range).1)
                 }
                 ColumnType::Domain { base, .. } => write_rs_type(base),
                 other => unreachable!(
@@ -402,17 +402,31 @@ pub(crate) fn under_domains(col_type: &ColumnType) -> &ColumnType {
     }
 }
 
-/// The Rust type a built-in range ranges over, as the prelude names it.
+/// A built-in range as generated source spells it: the `RangeType` variant
+/// naming it, and the Rust type it ranges over as the prelude names it.
+/// `None` for one codegen has no spelling of, which `validate_col_type`
+/// refuses, so the writers meet only ranges this answers for.
 // [spec:pgorm:sem:codegen.entity.types+9]
-fn range_element(range: RangeType) -> &'static str {
-    match range {
-        RangeType::Int4 => "i32",
-        RangeType::Int8 => "i64",
-        RangeType::Numeric => "Decimal",
-        RangeType::Date => "Date",
-        RangeType::Timestamp => "DateTime",
-        RangeType::TimestampTz => "DateTimeWithTimeZone",
-    }
+fn range_spelling(range: RangeType) -> Option<(&'static str, &'static str)> {
+    Some(match range {
+        RangeType::Int4 => ("Int4", "i32"),
+        RangeType::Int8 => ("Int8", "i64"),
+        RangeType::Numeric => ("Numeric", "Decimal"),
+        RangeType::Date => ("Date", "Date"),
+        RangeType::Timestamp => ("Timestamp", "DateTime"),
+        RangeType::TimestampTz => ("TimestampTz", "DateTimeWithTimeZone"),
+        _ => return None,
+    })
+}
+
+/// [`range_spelling`] of a range a built `Column` holds.
+fn checked_range_spelling(range: RangeType) -> (&'static str, &'static str) {
+    range_spelling(range).unwrap_or_else(|| {
+        unreachable!(
+            "range type {range:?} reached the writer; \
+             every Column is type-checked when it is built"
+        )
+    })
 }
 
 /// The program text the compact derive splices after `ColumnType::` for a
@@ -521,14 +535,8 @@ fn interval_spec_tokens(spec: &IntervalSpec) -> TokenStream {
 
 /// The `RangeType` naming a built-in range, as generated source spells it.
 fn range_type_tokens(range: RangeType) -> TokenStream {
-    match range {
-        RangeType::Int4 => quote! { RangeType::Int4 },
-        RangeType::Int8 => quote! { RangeType::Int8 },
-        RangeType::Numeric => quote! { RangeType::Numeric },
-        RangeType::Date => quote! { RangeType::Date },
-        RangeType::Timestamp => quote! { RangeType::Timestamp },
-        RangeType::TimestampTz => quote! { RangeType::TimestampTz },
-    }
+    let variant = format_ident!("{}", checked_range_spelling(range).0);
+    quote! { RangeType::#variant }
 }
 
 /// The set of `ColumnType`s `get_rs_type` and `get_def` can render, checked
@@ -580,7 +588,12 @@ fn validate_col_type(context: &str, col_type: &ColumnType) -> Result<(), Error> 
             }
             Ok(())
         }
-        ColumnType::Range(_) | ColumnType::Multirange(_) => Ok(()),
+        ColumnType::Range(range) | ColumnType::Multirange(range) => match range_spelling(*range) {
+            Some(_) => Ok(()),
+            None => Err(Error::TransformError(format!(
+                "{context}: range type {range:?} is not supported by codegen"
+            ))),
+        },
         // A range type a schema created is generated as a newtype over
         // `Range<T>`, which only `RangeSubtype`'s subtypes can be; an array of
         // one has no conversion, as the newtype has no `NotU8`.

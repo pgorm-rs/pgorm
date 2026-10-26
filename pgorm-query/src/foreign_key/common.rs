@@ -34,6 +34,7 @@ pub struct TableForeignKey {
 
 /// Foreign key on update & on delete actions
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum ForeignKeyAction {
     Restrict,
     Cascade,

@@ -57,15 +57,16 @@ pub(crate) fn column_type(name: &str) -> Option<ColumnType> {
 }
 
 /// The scalar kind a range type's bounds are.
-pub(super) fn element(range: RangeType) -> ArrayType {
-    match range {
+pub(super) fn element(range: RangeType) -> PyResult<ArrayType> {
+    Ok(match range {
         RangeType::Int4 => ArrayType::Int,
         RangeType::Int8 => ArrayType::BigInt,
         RangeType::Numeric => ArrayType::Decimal,
         RangeType::Date => ArrayType::Date,
         RangeType::Timestamp => ArrayType::DateTime,
         RangeType::TimestampTz => ArrayType::DateTimeWithTimeZone,
-    }
+        _ => return Err(types::unrepresented()),
+    })
 }
 
 // [spec:pgorm:req:python.values+5]
@@ -73,11 +74,12 @@ pub(super) fn multirange_from_python(data: &Bound<'_, PyAny>, range: RangeType) 
     let multirange = data
         .cast_exact::<PyMultirange>()
         .map_err(|_| ConstructionError::new_err("expected pgorm.Multirange"))?;
+    let element = element(range)?;
     let ranges = multirange
         .get()
         .ranges
         .iter()
-        .map(|item| read_bounds(item.bind(data.py()).as_any(), &element(range)))
+        .map(|item| read_bounds(item.bind(data.py()).as_any(), &element))
         .collect::<PyResult<Multirange<Value>>>()?;
     Ok(Value::Multirange(range, Some(Box::new(ranges))))
 }
@@ -129,7 +131,9 @@ pub(super) fn multirange_to_python(
 pub(super) fn write(py: Python<'_>, range: &Range<Value>) -> PyResult<PyRange> {
     let side = |bound: &ops::Bound<Value>| -> PyResult<(Option<Py<PyAny>>, bool)> {
         Ok(match bound {
-            ops::Bound::Included(value) | ops::Bound::Excluded(value) if !types::is_null(value) => {
+            ops::Bound::Included(value) | ops::Bound::Excluded(value)
+                if !types::is_null(value)? =>
+            {
                 (
                     Some(convert::to_python(py, value)?),
                     matches!(bound, ops::Bound::Included(_)),

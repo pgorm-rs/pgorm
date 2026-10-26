@@ -3,13 +3,12 @@
 //! everything else.
 
 use super::unsupported;
-use crate::{CastType, ColumnExpr, Error, Operator};
+use crate::{CastType, ColumnExpr, CurrentKeyword, Error, Operator};
 use pg_query::NodeEnum;
 use pg_query::protobuf::{
     AConst, AExpr, AExprKind, BoolExpr, BoolExprType, CoercionForm, FuncCall, MinMaxOp, Node,
     NullTest, NullTestType, SqlValueFunction, SqlValueFunctionOp, TypeCast, TypeName, a_const,
 };
-use pgorm_query::Keyword;
 
 /// The schema holding PostgreSQL's built-in functions and types, which the
 /// server searches before the schemas `search_path` names unless the path
@@ -230,9 +229,9 @@ fn cast_type(type_name: &TypeName) -> Option<CastType> {
 
 fn keyword(function: &SqlValueFunction) -> Option<ColumnExpr> {
     let keyword = match SqlValueFunctionOp::try_from(function.op).ok()? {
-        SqlValueFunctionOp::SvfopCurrentDate => Keyword::CurrentDate,
-        SqlValueFunctionOp::SvfopCurrentTime => Keyword::CurrentTime,
-        SqlValueFunctionOp::SvfopCurrentTimestamp => Keyword::CurrentTimestamp,
+        SqlValueFunctionOp::SvfopCurrentDate => CurrentKeyword::Date,
+        SqlValueFunctionOp::SvfopCurrentTime => CurrentKeyword::Time,
+        SqlValueFunctionOp::SvfopCurrentTimestamp => CurrentKeyword::Timestamp,
         _ => return None,
     };
     Some(ColumnExpr::Keyword(keyword))

@@ -80,21 +80,29 @@ impl Tag {
     }
 
     /// The portable kind name, as it appears in the encoded `kind` field.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Scalar(kind) => scalar_name(kind),
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FormatError`] for a scalar kind [`scalar_name`] refuses.
+    pub fn name(&self) -> Result<&'static str, FormatError> {
+        Ok(match self {
+            Self::Scalar(kind) => scalar_name(kind)?,
             Self::Enum(_) => "enum",
             Self::Array(_) => "array",
-        }
+        })
     }
 
     /// The encoded tag: `{"kind": ..}`, plus enum identity or element tag.
-    pub fn encode(&self) -> Json {
-        match self {
-            Self::Scalar(_) => json!({"kind": self.name()}),
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FormatError`] for a scalar kind [`scalar_name`] refuses.
+    pub fn encode(&self) -> Result<Json, FormatError> {
+        Ok(match self {
+            Self::Scalar(_) => json!({"kind": self.name()?}),
             Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
-            Self::Array(element) => json!({"kind": "array", "element": element.encode()}),
-        }
+            Self::Array(element) => json!({"kind": "array", "element": element.encode()?}),
+        })
     }
 }
 
@@ -106,14 +114,20 @@ macro_rules! scalar_kinds {
         /// The portable name of a Rust scalar variant.
         ///
         /// A range is named by its catalogue type, as `wire.RANGES` names it. A
-        /// multirange has a name here so the function is total, but no
-        /// portable kind, so [`validate`] refuses a value tagged with one.
-        pub fn scalar_name(kind: &ArrayType) -> &'static str {
-            match kind {
+        /// multirange has a name here, but no portable kind, so [`validate`]
+        /// refuses a value tagged with one.
+        ///
+        /// # Errors
+        ///
+        /// Returns [`FormatError`] for a kind pgorm gained after this harness
+        /// was written, which has no portable name.
+        pub fn scalar_name(kind: &ArrayType) -> Result<&'static str, FormatError> {
+            Ok(match kind {
                 $(ArrayType::$variant => $name,)+
                 ArrayType::Range(ty) => ty.range_type_name(),
                 ArrayType::Multirange(_) => "multirange",
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         /// The scalar variant a portable name denotes.
@@ -125,35 +139,53 @@ macro_rules! scalar_kinds {
         }
 
         /// The typed SQL NULL of a scalar kind.
-        pub fn scalar_null(kind: &ArrayType) -> Value {
-            match kind {
+        ///
+        /// # Errors
+        ///
+        /// Returns [`FormatError`] for a kind pgorm gained after this harness
+        /// was written.
+        pub fn scalar_null(kind: &ArrayType) -> Result<Value, FormatError> {
+            Ok(match kind {
                 $(ArrayType::$variant => Value::$variant(None),)+
                 ArrayType::Range(ty) => Value::Range(*ty, None),
                 ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         /// The tag a Rust value carries on its own, before enum identity applies.
-        pub fn rust_tag(value: &Value) -> Tag {
-            match value {
+        ///
+        /// # Errors
+        ///
+        /// Returns [`FormatError`] for a value of a kind pgorm gained after
+        /// this harness was written.
+        pub fn rust_tag(value: &Value) -> Result<Tag, FormatError> {
+            Ok(match value {
                 $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
                 Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
                 Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
                 Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
 
         /// Whether the value is an SQL NULL rather than a present payload.
         ///
         /// Distinct from a JSON `null` payload, which is a present value whose
         /// content happens to be JSON's null literal.
-        pub fn is_sql_null(value: &Value) -> bool {
-            match value {
+        ///
+        /// # Errors
+        ///
+        /// Returns [`FormatError`] for a value of a kind pgorm gained after
+        /// this harness was written.
+        pub fn is_sql_null(value: &Value) -> Result<bool, FormatError> {
+            Ok(match value {
                 $(Value::$variant(value) => value.is_none(),)+
                 Value::Array(_, value) => value.is_none(),
                 Value::Range(_, value) => value.is_none(),
                 Value::Multirange(_, value) => value.is_none(),
-            }
+                _ => return Err(unrepresented()),
+            })
         }
     };
 }
@@ -181,18 +213,18 @@ pub const RANGES: &[(RangeType, &str)] = &[
 
 /// A range's payload: `{"empty": true}`, or each bound's own payload (absent
 /// where unbounded) and the two inclusivity characters.
-fn range_payload(range: &Range<Value>) -> Json {
+fn range_payload(range: &Range<Value>) -> Result<Json, FormatError> {
     let (lower, upper) = match range {
-        Range::Empty => return json!({"empty": true}),
+        Range::Empty => return Ok(json!({"empty": true})),
         Range::Bounds { lower, upper } => (lower, upper),
     };
     let side = |bound: &Bound<Value>| match bound {
         Bound::Included(value) | Bound::Excluded(value) => Tagged {
-            tag: rust_tag(value),
+            tag: rust_tag(value)?,
             inner: value.clone(),
         }
         .payload(),
-        Bound::Unbounded => Json::Null,
+        Bound::Unbounded => Ok(Json::Null),
     };
     let opening = if matches!(lower, Bound::Included(_)) {
         '['
@@ -204,11 +236,11 @@ fn range_payload(range: &Range<Value>) -> Json {
     } else {
         ')'
     };
-    json!({
-        "lower": side(lower),
-        "upper": side(upper),
+    Ok(json!({
+        "lower": side(lower)?,
+        "upper": side(upper)?,
         "bounds": format!("{opening}{closing}"),
-    })
+    }))
 }
 
 /// A Rust value together with the identity its payload alone cannot carry.
@@ -224,11 +256,16 @@ pub struct Tagged {
 
 impl Tagged {
     /// Wrap a Rust value, taking its tag from its own variant.
-    pub fn from_value(inner: Value) -> Self {
-        Self {
-            tag: rust_tag(&inner),
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FormatError`] for a value of a kind pgorm gained after this
+    /// harness was written.
+    pub fn from_value(inner: Value) -> Result<Self, FormatError> {
+        Ok(Self {
+            tag: rust_tag(&inner)?,
             inner,
-        }
+        })
     }
 
     /// Retain a PostgreSQL enum's qualified identity alongside its label payload.
@@ -256,18 +293,28 @@ impl Tagged {
     }
 
     /// Whether this is an SQL NULL rather than a present payload.
-    pub fn is_sql_null(&self) -> bool {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FormatError`] for a value of a kind pgorm gained after this
+    /// harness was written.
+    pub fn is_sql_null(&self) -> Result<bool, FormatError> {
         is_sql_null(&self.inner)
     }
 
     /// The tagged encoding: version, type tag, SQL NULL flag, payload.
-    pub fn encode(&self) -> Json {
-        json!({
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FormatError`] for a value, or a value's kind, pgorm gained
+    /// after this harness was written.
+    pub fn encode(&self) -> Result<Json, FormatError> {
+        Ok(json!({
             "version": 1,
-            "type": self.tag.encode(),
-            "sql_null": self.is_sql_null(),
-            "data": self.payload(),
-        })
+            "type": self.tag.encode()?,
+            "sql_null": self.is_sql_null()?,
+            "data": self.payload()?,
+        }))
     }
 
     /// [`encode`](Self::encode), rejected here rather than by the Python oracle
@@ -279,18 +326,18 @@ impl Tagged {
     /// a temporal beyond microsecond precision, a `bytea` past its byte budget,
     /// a JSON integer outside `i64`/`u64`.
     pub fn encode_checked(&self) -> Result<Json, FormatError> {
-        let encoded = self.encode();
+        let encoded = self.encode()?;
         validate(&encoded)?;
         Ok(encoded)
     }
 
-    fn payload(&self) -> Json {
+    fn payload(&self) -> Result<Json, FormatError> {
         macro_rules! string {
             ($value:expr) => {
                 json!($value.as_ref().map(|value| value.to_string()))
             };
         }
-        match &self.inner {
+        Ok(match &self.inner {
             Value::Bool(value) => json!(value),
             Value::TinyInt(value) => string!(value),
             Value::SmallInt(value) => string!(value),
@@ -319,25 +366,31 @@ impl Tagged {
                     .map(|value| format!("{:08x}", value.to_bits()))
                     .collect::<Vec<_>>()
             })),
-            Value::Array(_, values) => json!(values.as_ref().map(|values| {
+            Value::Array(_, values) => json!(
                 values
-                    .iter()
-                    .map(|inner| {
-                        let tag = match &self.tag {
-                            Tag::Array(element) => (**element).clone(),
-                            _ => rust_tag(inner),
-                        };
-                        Self {
-                            inner: inner.clone(),
-                            tag,
-                        }
-                        .encode()
+                    .as_ref()
+                    .map(|values| {
+                        values
+                            .iter()
+                            .map(|inner| {
+                                let tag = match &self.tag {
+                                    Tag::Array(element) => (**element).clone(),
+                                    _ => rust_tag(inner)?,
+                                };
+                                Self {
+                                    inner: inner.clone(),
+                                    tag,
+                                }
+                                .encode()
+                            })
+                            .collect::<Result<Vec<_>, _>>()
                     })
-                    .collect::<Vec<_>>()
-            })),
-            Value::Range(_, value) => value
-                .as_ref()
-                .map_or(Json::Null, |range| range_payload(range)),
+                    .transpose()?
+            ),
+            Value::Range(_, value) => match value {
+                Some(range) => range_payload(range)?,
+                None => Json::Null,
+            },
             // Each field its own decimal text, as `wire.INTERVAL_FIELDS`
             // names them; none is folded into another.
             // [spec:pgorm:def:sql.value.interval+2]
@@ -350,6 +403,14 @@ impl Tagged {
             // data is the value's SQL literal, a description rather than an
             // invented payload.
             Value::Multirange(_, value) => json!(value.as_ref().map(|_| self.inner.to_string())),
-        }
+            _ => return Err(unrepresented()),
+        })
     }
+}
+
+/// The refusal of a value, or value kind, that pgorm gained after this harness
+/// was written: it has no portable encoding, and is reported rather than
+/// encoded as another kind.
+fn unrepresented() -> FormatError {
+    FormatError::new("a kind of pgorm value the replay harness does not represent")
 }

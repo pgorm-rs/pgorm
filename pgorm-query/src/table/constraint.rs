@@ -160,6 +160,7 @@ impl Enforcement {
 /// key's, so no target can rule the difference out by type.
 // [spec:pgorm:req:sql.ddl.alter-table+13]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ConstraintChange {
     /// `INHERIT`: a `NOT NULL` constraint passes to inheriting tables again,
     /// each child that lacks one taking it.

@@ -12,6 +12,7 @@ use crate::{ColumnType, IntoName, SimpleExpr, SqlJson, Value};
 /// server answers `false`.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum JsonExistsBehavior {
     True,
     False,
@@ -26,6 +27,7 @@ pub enum JsonExistsBehavior {
 /// returns `NULL` in both cases.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum JsonValueBehavior {
     Null,
     Error,
@@ -43,6 +45,7 @@ pub enum JsonValueBehavior {
 /// object. Without a behaviour the server returns `NULL` in both cases.
 // [spec:pgorm:def:sql.ast.expr.sql-json+2]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum JsonQueryBehavior {
     Null,
     Error,

@@ -16,6 +16,7 @@ mod uuid;
 // [spec:pgorm:def:sql.ast.func+11]
 // [spec:pgorm:req:sql.ast.cast-shape+2]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Function {
     Max,
     Min,

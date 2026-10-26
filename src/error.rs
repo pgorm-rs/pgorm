@@ -1,9 +1,10 @@
 use tokio_postgres::error::SqlState;
 
 /// An error from unsuccessful database operations
-// [spec:pgorm:def:error.model+10]
+// [spec:pgorm:def:error.model+11]
 #[derive(thiserror::Error, Debug)]
 #[doc(alias = "DbErr")]
+#[non_exhaustive]
 pub enum Error {
     /// Postgres error
     #[error("Postgres Error: {0:?} {db:?}", db = .0.as_db_error())]
@@ -155,7 +156,7 @@ pub enum ListenError {
 ///
 /// assert!(first_cake_id().is_err());
 /// ```
-// [spec:pgorm:def:error.model+10]    crate-root Result alias
+// [spec:pgorm:def:error.model+11]    crate-root Result alias
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Runtime error
@@ -167,7 +168,7 @@ pub enum RuntimeError {
     Internal(String),
 }
 
-// [spec:pgorm:def:error.model+10]    Display-string equality
+// [spec:pgorm:def:error.model+11]    Display-string equality
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         self.to_string() == other.to_string()

@@ -39,6 +39,7 @@ pub struct Expr {
 /// various operators and sub-queries.
 // [spec:pgorm:def:sql.ast.expr+7]
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum SimpleExpr {
     Column(ColumnRef),
     Tuple(Vec<SimpleExpr>),
