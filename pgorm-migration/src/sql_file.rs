@@ -59,7 +59,7 @@ use crate::{Error, MigrationName, MigrationTrait};
 /// a checkout that writes CRLF runs the same text and reports the same
 /// checksum.
 // [spec:pgorm:def:migration.sql-file]
-// [spec:pgorm:req:migration.sql-file.compile]    a refusal is a compile error
+// [spec:pgorm:req:migration.sql-file.compile+1]    a refusal is a compile error
 #[macro_export]
 macro_rules! sql_migration {
     ($($input:tt)*) => {

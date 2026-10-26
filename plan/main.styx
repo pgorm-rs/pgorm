@@ -14084,6 +14084,7 @@ children (
         id docs-stale-cleanup
         title "Doc comments, READMEs and rule text that describe removed or changed things are corrected"
         kind @docs
+        sealed true
         log (
             {
                 at 2026-10-23T20:42:26.448116Z
@@ -14097,6 +14098,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Updated 2026-10-26: codegen-root-export already fixed pgorm-codegen's README claim of live introspection; drop that item. Add: statement_cache_channel users behind a pooler or a network middlebox with an idle cutoff (an AWS NLB's 350 s) need TCP keepalives (keepalives_idle) shorter than it, since the listener's own SET idle_session_timeout = 0 (cache-listener-keepalive) covers only the server's timeout; say so in conn.pool.statement-cache.listen's prose or the connection docs."
+            }
+
+            {
+                at 2026-10-26T00:24:31.094846Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

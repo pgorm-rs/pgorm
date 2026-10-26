@@ -56,11 +56,11 @@ pub trait EntityName: StaticName + Default {
 /// - Relation (implemented [`RelationTrait`])
 /// - Primary Key (implemented [`PrimaryKeyTrait`] and [`PrimaryKeyToColumn`])
 ///
-/// This trait also provides an API for CRUD actions
-/// - Select: `find`, `find_*`
-/// - Insert: `insert`, `insert_*`
-/// - Update: `update`, `update_*`
-/// - Delete: `delete`, `delete_*`
+/// It builds the reads [`find`](EntityTrait::find),
+/// [`graph`](EntityTrait::graph) and [`find_by_id`](EntityTrait::find_by_id),
+/// and one delete, [`delete_by_id`](EntityTrait::delete_by_id). Inserts and
+/// updates start from [`Insert`](crate::Insert) and [`Update`](crate::Update),
+/// and other deletes from [`Delete`].
 // [spec:pgorm:def:entity.traits+2]
 // [spec:pgorm:req:entity.traits.crud+4]
 pub trait EntityTrait: EntityName {

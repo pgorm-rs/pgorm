@@ -9,7 +9,7 @@ golden fixtures under `pgorm-codegen/tests/`. Callers with DDL text rather than
 a live database reach the same pipeline through `sql_schema`, specified under
 [Schema from DDL text](#schema-from-ddl-text).
 
-> [spec:pgorm:def:codegen.entity+3]
+> [spec:pgorm:def:codegen.entity+4]
 > The entity generator is the pipeline
 > `EntityTransformer::transform(Vec<TableCreateStatement>) -> EntityWriter`
 > followed by `EntityWriter::generate(&EntityWriterContext) -> WriterOutput`.
@@ -18,14 +18,14 @@ a live database reach the same pipeline through `sql_schema`, specified under
 > (name, `ColumnType`, `auto_increment`, `identity`, `not_null`, `unique`), `relations`,
 > `conjunct_relations`,
 > and `primary_keys`. A `WriterOutput` is a list of `OutputFile { name, content }`
-> — the writer never touches the filesystem; callers (e.g. `pgorm-cli`) write
-> the files and run `rustfmt` over them.
+> — the writer never touches the filesystem; its caller writes the files and
+> runs `rustfmt` over them.
 >
 > `EntityWriterContext` selects all generation options: `expanded_format`,
-> `with_serde`, `with_copy_enums`, `date_time_crate`, `schema_name`, `lib`,
+> `with_serde`, `with_copy_enums`, `schema_name`, `lib`,
 > `serde_skip_deserializing_primary_key`, `serde_skip_hidden_column`,
 > `model_extra_derives`, `model_extra_attributes`, `enum_extra_derives`,
-> `enum_extra_derives`, and `enum_extra_attributes`. Extra derives are appended
+> and `enum_extra_attributes`. Extra derives are appended
 > to the generated derive lists; extra attributes are emitted as additional
 > `#[...]` lines on the Model struct or enum.
 >
