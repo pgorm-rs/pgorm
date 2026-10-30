@@ -11,7 +11,8 @@ from pgorm import _native
 
 class PackageTests(unittest.TestCase):
     # [spec:pgorm:req:python.package/test]
-    # [spec:pgorm:def:python.api/test]
+    # [spec:pgorm:def:bindings.api/test]
+    # [spec:pgorm:def:python.api+1/test]
     def test_installed_native_identity(self):
         self.assertTrue(
             any(str(_native.__file__).endswith(suffix)
@@ -24,7 +25,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest["transport"], "in-process")
         self.assertEqual(json.loads(json.dumps(manifest)), manifest)
 
-    # [spec:pgorm:req:python.capabilities/test]
+    # [spec:pgorm:req:python.capabilities+1/test]
     def test_capability_queries_are_isolated_and_fail_closed(self):
         manifest = pgorm.capabilities()
         manifest["operations"]["invented-operation"] = {"rust_api": "fake"}
@@ -32,7 +33,7 @@ class PackageTests(unittest.TestCase):
             pgorm.require_capability("invented-operation")
         self.assertNotIn("invented-operation", pgorm.capabilities()["operations"])
 
-    # [spec:pgorm:req:python.optional/test]
+    # [spec:pgorm:req:bindings.optional/test]
     def test_public_wheel_excludes_campaign_and_fixture_code(self):
         files = importlib.metadata.files("pgorm")
         self.assertIsNotNone(files)
@@ -41,8 +42,8 @@ class PackageTests(unittest.TestCase):
             self.assertNotIn("security/", str(path))
             self.assertNotIn("fixtures/", str(path))
 
-    # [spec:pgorm:req:python.entities+4/test]
-    # [spec:pgorm:req:python.graph/test]
+    # [spec:pgorm:req:bindings.entities/test]
+    # [spec:pgorm:req:bindings.entity-graphs/test]
     def test_standalone_registry_has_no_application_entities(self):
         self.assertEqual(pgorm.capabilities()["registrations"]["entities"], [])
         with self.assertRaises(pgorm.UnsupportedCapabilityError):

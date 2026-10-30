@@ -38,7 +38,7 @@ fn schemas_at(cx: &mut FunctionContext, index: usize) -> NeonResult<(Name, Vec<N
 }
 
 /// `ddlCreateSchema(name, { ifNotExists })`.
-// [spec:pgorm:req:napi.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 fn create_schema(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let options = object(cx, 1, &["ifNotExists"])?;
@@ -50,7 +50,7 @@ fn create_schema(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlDropSchema(names, { ifExists, behavior })`.
-// [spec:pgorm:req:napi.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 fn drop_schema(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (first, rest) = schemas_at(cx, 0)?;
     let options = object(cx, 1, &["ifExists", "behavior"])?;
@@ -72,7 +72,7 @@ fn drop_schema(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlRenameSchema(name, newName)`, which PostgreSQL gives no `IF EXISTS`.
-// [spec:pgorm:req:napi.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 fn rename_schema(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let to = name_at(cx, 1)?;

@@ -25,7 +25,7 @@ const MAX_DEPTH: usize = 64;
 pub(crate) const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
 
 /// A `json` or `jsonb` column whose every number serde_json read exactly.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:napi.values+1]
 #[derive(Debug)]
 pub(crate) struct ExactJson(pub(crate) Value);
 
@@ -115,7 +115,7 @@ fn canonical(text: &str) -> Result<(bool, String, i64), CodecError> {
 /// within 64 bits, a string, an array, or an object of the module's plain
 /// kind. Anything JSON cannot hold is refused, never dropped or turned into a
 /// string as `JSON.stringify` would.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:napi.values+1]
 pub(crate) fn read<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -205,7 +205,7 @@ pub(crate) fn read<'cx>(
 mod tests {
     use super::*;
 
-    // [spec:pgorm:req:napi.values/test]
+    // [spec:pgorm:req:napi.values+1/test]
     #[test]
     fn json_numbers_are_read_exactly_or_refused() -> Result<(), CodecError> {
         for text in [

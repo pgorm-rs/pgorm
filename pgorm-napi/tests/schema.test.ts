@@ -87,7 +87,7 @@ async function constraints(table: string): Promise<unknown[]> {
   return rows.map((row) => [row.conname, row.contype, row.convalidated, row.conenforced, row.connoinherit]);
 }
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("a table is created with its identity, defaults, generated columns and collation, each meaning what it says", async () => {
   const visit = new Table("visit", { schema: "app" });
   await pool().execute(
@@ -119,7 +119,7 @@ test("a table is created with its identity, defaults, generated columns and coll
   await assert.rejects(pool().execute("INSERT INTO app.visit (seats) VALUES (NULL)"), rejectedWith("23502"));
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("a column's NOT NULL is named and kept from inheriting tables, and a NOT ENFORCED CHECK holds no row", async () => {
   await pool().execute(
     createTable("parent")
@@ -139,7 +139,7 @@ test("a column's NOT NULL is named and kept from inheriting tables, and a NOT EN
   await pool().execute("INSERT INTO child VALUES (NULL, 1), (500, 1)");
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("a key is the table's: one primary key, unique keys with NULLS NOT DISTINCT, INCLUDE and WITHOUT OVERLAPS", async () => {
   await pool().execute(
     createTable("room")
@@ -164,7 +164,7 @@ test("a key is the table's: one primary key, unique keys with NULLS NOT DISTINCT
   await assert.rejects(pool().execute("INSERT INTO room VALUES (2, NULL, 'west', '[2020-01-01,2020-02-01)')"), rejectedWith("23505"));
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("a deferred key is checked at commit, an immediate one at each statement's end", async () => {
   await pool().execute(
     createTable("slot")
@@ -187,7 +187,7 @@ test("a deferred key is checked at commit, an immediate one at each statement's 
   );
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("a foreign key's actions, deferral, enforcement and PERIOD mean what they say", async () => {
   await pool().execute(
     createTable("owner").column(new ColumnDef("id", "integer")).column(new ColumnDef("during", "daterange"))
@@ -225,7 +225,7 @@ test("a foreign key's actions, deferral, enforcement and PERIOD mean what they s
   );
 });
 
-// [spec:pgorm:req:napi.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
 test("constraints added NOT VALID hold new rows at once and leave the old ones to validateConstraint", async () => {
   await pool().execute("CREATE TABLE ledger (id integer PRIMARY KEY, amount integer, ref integer)");
   await pool().execute("CREATE TABLE account (id integer PRIMARY KEY)");
@@ -256,7 +256,7 @@ test("constraints added NOT VALID hold new rows at once and leave the old ones t
   assert.ok((await constraints("ledger")).every((row) => (row as boolean[])[2]));
 });
 
-// [spec:pgorm:req:napi.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
 test("ALTER TABLE adds, changes and drops columns, expressions and constraints", async () => {
   const stock = new Table("stock", { schema: "app" });
   await pool().execute(
@@ -286,7 +286,7 @@ test("ALTER TABLE adds, changes and drops columns, expressions and constraints",
   assert.deepStrictEqual(await constraints("app.stock"), [["stock_id_not_null", "n", true, true, false]]);
 });
 
-// [spec:pgorm:req:napi.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
 test("alterConstraint moves a foreign key between enforced and not, and a NOT NULL between inherited and not", async () => {
   await pool().execute("CREATE TABLE tag (id integer PRIMARY KEY)");
   await pool().execute("CREATE TABLE label (tag integer CONSTRAINT label_tag REFERENCES tag, name text NOT NULL)");
@@ -302,7 +302,7 @@ test("alterConstraint moves a foreign key between enforced and not, and a NOT NU
   ]);
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
 test("tables are renamed, emptied, commented and dropped, a CASCADE taking what depends on them", async () => {
   await pool().execute("CREATE TABLE app.draft (id integer CONSTRAINT draft_key PRIMARY KEY, body text)");
   await pool().execute("CREATE TABLE app.ref (draft integer REFERENCES app.draft)");
@@ -330,7 +330,7 @@ test("tables are renamed, emptied, commented and dropped, a CASCADE taking what 
   assert.deepStrictEqual(await constraints("app.ref"), []);
 });
 
-// [spec:pgorm:req:napi.schema+2/test]
+// [spec:pgorm:req:bindings.schema/test]
 test("an ALTER TABLE with no action has nothing to inspect, and every terminal refuses it", async () => {
   const pending = alterTable("anything");
   assert.equal("inspect" in pending, false);
@@ -342,8 +342,8 @@ test("an ALTER TABLE with no action has nothing to inspect, and every terminal r
   assert.deepStrictEqual(createTable("t").inspect().values, []);
 });
 
-// [spec:pgorm:req:napi.schema+2/test]
-// [spec:pgorm:req:napi.typing/test]
+// [spec:pgorm:req:napi.schema-api/test]
+// [spec:pgorm:req:napi.typing+1/test]
 test("every complete DDL statement is a Ddl, a Statement the terminals take, made only by the module", () => {
   const statements: Ddl[] = [
     createTable("t").column(new ColumnDef("a", "integer")),
@@ -363,8 +363,8 @@ test("every complete DDL statement is a Ddl, a Statement the terminals take, mad
   assert.equal(pgorm.SchemaStatement, undefined);
 });
 
-// [spec:pgorm:req:napi.schema-tables/test]
-// [spec:pgorm:req:napi.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
 test("a shape PostgreSQL cannot take, or an option the builder does not know, is refused as it is built", () => {
   assert.throws(() => createTable("t").column(new ColumnDef("a")), refused(/needs a type/));
   assert.throws(() => alterTable("t").addColumn(new ColumnDef("a")), refused(/needs a type/));

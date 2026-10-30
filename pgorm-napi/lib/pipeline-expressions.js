@@ -5,7 +5,7 @@
 // They are not the statement builders' expressions, and the two do not mix.
 // A value an operand is given is bound by the stage that takes it; only
 // `literal()` writes one into the SQL.
-// [spec:pgorm:req:napi.pipeline-expressions+2]
+// [spec:pgorm:req:bindings.pipeline-expressions]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { registeredColumn } from "./entity-queries.js";

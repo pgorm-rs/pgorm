@@ -1,7 +1,7 @@
 // @ts-check
 
 // Row streams over a pool's or a connection's connection.
-// [spec:pgorm:req:napi.streams]
+// [spec:pgorm:req:bindings.streams]
 
 import { LifecycleError } from "./errors.js";
 import { abortable, native, queryOptions, row, TRUSTED } from "./operations.js";
@@ -20,7 +20,7 @@ let decoding;
  * `stream`, its items made by `decode` rather than as row objects: how a
  * model streams its records. Only the module calls this, before the first
  * pull.
- * [spec:pgorm:req:napi.model-records]
+ * [spec:pgorm:req:bindings.model-records]
  *
  * @param {RowStream} stream
  * @param {Decode} decode

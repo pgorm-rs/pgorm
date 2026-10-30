@@ -123,7 +123,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 
 const ids = (rows: Record<string, unknown>[], key = "id") => rows.map((row) => row[key]);
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.select/test]
 test("a SELECT with a join, a nested filter, grouping, HAVING, ordering and a limit runs", async () => {
   const count = call("count", event.col("id"));
   const query = select(account.col("name"), count.as("clicks"))
@@ -142,7 +142,7 @@ test("a SELECT with a join, a nested filter, grouping, HAVING, ordering and a li
   assert.equal(tagged[0]?.clicks?.kind, "i64");
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("every terminal runs a built statement as it runs SQL text, on a pool, a connection and a transaction", async () => {
   const one = select(account.col("name")).from(account).where(account.col("id").eq(1));
   const none = select(account.col("name")).from(account).where(account.col("id").eq(99));
@@ -166,7 +166,8 @@ test("every terminal runs a built statement as it runs SQL text, on a pool, a co
   });
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
+// [spec:pgorm:req:napi.argument-errors/test]
 test("a built statement binds its own values, so parameters passed beside it are refused", async () => {
   const query = select().from(account);
   await assert.rejects(pool().query(query, [1] as never), (error: unknown) => {
@@ -177,7 +178,7 @@ test("a built statement binds its own values, so parameters passed beside it are
   assert.throws(() => pool().stream(query, [] as never), TypeError);
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("a builder never changes: extending one in two directions leaves it and each other unchanged", async () => {
   const base = select(account.col("id")).from(account);
   const before = base.inspect().sql;
@@ -195,7 +196,8 @@ test("a builder never changes: extending one in two directions leaves it and eac
   assert.deepStrictEqual(ids(await pool().query(base.orderBy(account.col("id").asc()))), [1n, 2n, 3n, 4n]);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.identifiers/test]
 test("values are bound and identifiers quoted: neither text becomes SQL", async () => {
   const hostile = "x' OR '1'='1";
   const query = select(account.col("id")).from(account).where(account.col("name").eq(hostile));
@@ -212,7 +214,7 @@ test("values are bound and identifiers quoted: neither text becomes SQL", async 
   assert.deepStrictEqual(row, { "Mixed Case": 1, select: "kept" });
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("membership in an empty list matches no row, and its negation every row", async () => {
   const base = select(account.col("id")).from(account).orderBy(account.col("id").asc());
   assert.deepStrictEqual(await pool().query(base.where(account.col("id").isIn([]))), []);
@@ -222,7 +224,7 @@ test("membership in an empty list matches no row, and its negation every row", a
   assert.deepStrictEqual(ids(await pool().query(pairs)), [1n]);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("text tests read their argument as text, and LIKE reads it as a pattern with its escape", async () => {
   const names = async (predicate: ReturnType<typeof col>) =>
     ids(await pool().query(select(account.col("name")).from(account).where(predicate).orderBy(account.col("id").asc())), "name");
@@ -236,7 +238,7 @@ test("text tests read their argument as text, and LIKE reads it as a pattern wit
   assert.deepStrictEqual(await names(account.col("name").notLike("%o%")), ["Alice", "O'Brien"]);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]
 test("an empty escape turns escaping off, so a backslash in a pattern is itself", async () => {
   const text = (value: string) => bind(value).cast("text");
@@ -251,7 +253,7 @@ test("an empty escape turns escaping off, so a backslash in a pattern is itself"
   assert.match(text("a").like("a", { escape: "" }).inspect().sql, /ESCAPE ''$/);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("regex, notRegex, iregex and notIregex, and pathExists, answer as PostgreSQL's operators", async () => {
   const names = async (predicate: ReturnType<typeof col>) =>
     ids(await pool().query(select(account.col("name")).from(account).where(predicate).orderBy(account.col("id").asc())), "name");
@@ -283,7 +285,7 @@ test("regex, notRegex, iregex and notIregex, and pathExists, answer as PostgreSQ
   assert.throws(() => doc.pathExists(1 as never), refused(/JSON path is a string/));
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]    matches is @@, and any and all quantify each
+// [spec:pgorm:req:bindings.quantifiers/test]    matches is @@, and any and all quantify each
 // comparison over an array, bound or an expression, and over a subquery's rows or its ARRAY(..),
 // an empty array false under ANY and true under ALL, each answering as the SQL written by hand
 test("matches, and any and all after a comparison, answer as PostgreSQL's operators", async () => {
@@ -331,7 +333,7 @@ test("matches, and any and all after a comparison, answer as PostgreSQL's operat
   assert.throws(() => bind(quantified as never), refused(/cannot be inferred/));
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("an enum value binds through its type's cast, scalar and array alike", async () => {
   const calm = new Value("calm", mood);
   const rows = await pool().query(select(account.col("id")).from(account).where(account.col("mood").eq(calm)));
@@ -340,7 +342,9 @@ test("an enum value binds through its type's cast, scalar and array alike", asyn
   assert.deepStrictEqual(listed, { moods: ["glad", "sad"] });
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.case/test]
+// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.collations/test]
 test("CASE, casts, collations and subscripts compute on the server", async () => {
   const row = await pool().one(
     select(
@@ -367,7 +371,8 @@ test("CASE, casts, collations and subscripts compute on the server", async () =>
   assert.deepStrictEqual(ids(ordered, "v"), ["B", "a", "b"]);
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.from-subqueries/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("subqueries: EXISTS, a scalar subquery, IN a subquery, a lateral join and a subquery as a FROM item", async () => {
   const clickers = select(event.col("account_id")).from(event).where(event.col("kind").eq("click"));
   const inSubquery = await pool().query(
@@ -398,7 +403,7 @@ test("subqueries: EXISTS, a scalar subquery, IN a subquery, a lateral join and a
   assert.equal(await pool().execute(select(sub.star()).from(sub)), 3);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]    array() collects a subquery's one column into an
+// [spec:pgorm:req:bindings.expressions/test]    array() collects a subquery's one column into an
 // array value, empty for no rows, which is projected, cast and compared as one value, and a
 // subquery of two columns is refused with 42601
 test("array() collects a subquery's column into one array value", async () => {
@@ -425,7 +430,7 @@ test("array() collects a subquery's column into one array value", async () => {
   );
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.select/test]
 test("set operations combine rows with and without duplicates", async () => {
   const kinds = select(event.col("kind")).from(event);
   const count = async (query: ReturnType<typeof select>) => (await pool().query(query)).length;
@@ -437,7 +442,7 @@ test("set operations combine rows with and without duplicates", async () => {
   assert.equal(await count(kinds.intersectAll(kinds)), 7);
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.select/test]
 // [spec:pgorm:sem:sql.ast.select.union+2/test]
 test("a chain of set operations combines in call order, for every pair of operators", async () => {
   const bag = (name: keyof typeof BAGS) => select(col("v")).from(new Table(name));
@@ -467,7 +472,7 @@ test("a chain of set operations combines in call order, for every pair of operat
   );
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.row-locks/test]
 test("a locking read takes its rows' locks, OF an aliased schema-qualified table, and SKIP LOCKED skips them", async () => {
   await using holder = await pool().acquire();
   await using other = await pool().acquire();
@@ -485,7 +490,7 @@ test("a locking read takes its rows' locks, OF an aliased schema-qualified table
   });
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.with/test]
 test("common table expressions, recursive ones with SEARCH and CYCLE included, run", async () => {
   const clicks = new With("clicks", select(event.col("account_id")).from(event).where(event.col("kind").eq("click")), {
     columns: ["who"],
@@ -506,7 +511,7 @@ test("common table expressions, recursive ones with SEARCH and CYCLE included, r
   assert.deepStrictEqual(ids(counted, "n"), [1, 2, 3, 4, 5]);
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("inspect gives the SQL and each bound value with its kind, expressions and conditions included", () => {
   const { sql, values } = select(col("x")).from(new Table("t")).where(col("x").eq(new Value(7, "i16"))).limit(3).inspect();
   assert.equal(sql, 'SELECT "x" FROM "t" WHERE "x" = $1 LIMIT $2');
@@ -517,7 +522,7 @@ test("inspect gives the SQL and each bound value with its kind, expressions and 
   assert.equal(Condition.all().inspect().sql, "SELECT TRUE WHERE TRUE");
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("a failing built statement rejects with the server's error", async () => {
   await assert.rejects(
     pool().query(select(account.col("name").cast("integer")).from(account)),
@@ -525,14 +530,14 @@ test("a failing built statement rejects with the server's error", async () => {
   );
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("a value with no statement form is refused as it is bound", () => {
   assert.throws(() => col("x").eq(null as never), refused(/null has no kind.*isNull\(\)/));
   assert.throws(() => bind(undefined as never), refused(/undefined/));
   assert.throws(() => col("x").eq(new Table("t") as never), refused(/expected an expression or a value, got a Table/));
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("an interval binds in a built statement, each field and sign kept", async () => {
   const intervals = [
     new Interval({ months: 1, days: -2, microseconds: 3_000_004n }),
@@ -582,7 +587,7 @@ test("an interval binds in a built statement, each field and sign kept", async (
   );
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.identifiers/test]
 test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(""), refused(/identifier/));
   assert.throws(() => col("x".repeat(64)), refused(/identifier/));
@@ -593,7 +598,7 @@ test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(1 as never), refused(/identifier is a string/));
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("call() reaches only the functions pgorm-query constructs, at their argument counts", () => {
   assert.throws(() => call("pg_sleep" as never, 1), refused(/no "pg_sleep"/));
   assert.throws(() => call("lower", col("a"), col("b")), refused(/taking 2 argument/));
@@ -602,7 +607,7 @@ test("call() reaches only the functions pgorm-query constructs, at their argumen
   assert.equal(call("uuidv7").inspect().sql, "SELECT UUIDV7()");
 });
 
-// [spec:pgorm:req:napi.select+2/test]
+// [spec:pgorm:req:bindings.select/test]
 test("limits and offsets are non-negative integers within PostgreSQL's bigint", () => {
   const base = select().from(new Table("t"));
   for (const bad of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2n ** 63n, -1n, "3", Number.NaN]) {
@@ -612,7 +617,7 @@ test("limits and offsets are non-negative integers within PostgreSQL's bigint", 
   assert.deepStrictEqual(base.limit(2n ** 63n - 1n).inspect().values.map((value) => value.value), [2n ** 63n - 1n]);
 });
 
-// [spec:pgorm:req:napi.expressions+7/test]
+// [spec:pgorm:req:bindings.expressions/test]
 test("shapes PostgreSQL has no SQL for are refused as they are built", () => {
   assert.throws(() => (select().select as () => unknown).call(select()), refused(/at least one item/));
   assert.throws(() => (tuple as () => unknown)(), refused(/at least one item/));
@@ -630,7 +635,7 @@ test("shapes PostgreSQL has no SQL for are refused as they are built", () => {
   assert.throws(() => col("x").asc({ nulls: "middle" as never }), refused(/nulls/));
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("a statement binding more values than PostgreSQL takes is refused before it is sent", async () => {
   const many = select().from(account).where(account.col("id").isIn(Array.from({ length: 65_536 }, (_, index) => index)));
   assert.throws(() => many.inspect(), refused(/65536 values, past PostgreSQL's 65535/));
@@ -639,7 +644,7 @@ test("a statement binding more values than PostgreSQL takes is refused before it
   assert.equal((await pool().query(most)).length, 4);
 });
 
-// [spec:pgorm:req:napi.statements/test]
+// [spec:pgorm:req:bindings.statements/test]
 test("builders come only from the module's functions", () => {
   const Select = select().constructor as new (handle: unknown) => unknown;
   assert.throws(() => new Select({}), TypeError);

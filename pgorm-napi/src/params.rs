@@ -49,7 +49,7 @@ pub(crate) fn read<'cx>(
 /// would be accepted and read as UTC, where PostgreSQL's own cast between the
 /// two reads the wall clock in the session's time zone: a silent
 /// reinterpretation, which the binding does not make.
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:napi.temporal+1]
 fn check_temporal(value: &Value, ty: &Type) -> Result<(), BindError> {
     let ty = base_type(ty);
     match value {
@@ -126,7 +126,7 @@ mod tests {
         param.to_sql(ty, &mut BytesMut::new())
     }
 
-    // [spec:pgorm:req:napi.temporal/test]
+    // [spec:pgorm:req:napi.temporal+1/test]
     #[test]
     fn temporal_values_bind_only_to_their_own_type() {
         let civil = Param::Value(ValueHolder(Value::DateTime(Some(Box::new(

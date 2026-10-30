@@ -10,6 +10,7 @@ use crate::{
     identifiers::PyIdentifier,
 };
 
+// [spec:pgorm:req:bindings.writes]
 /// A runtime INSERT with explicit columns, row arity and default-row state.
 #[pyclass(name = "Insert", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]

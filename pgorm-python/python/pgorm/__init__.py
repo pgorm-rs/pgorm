@@ -1,6 +1,6 @@
 """Compose native pgorm builders and execute them directly against PostgreSQL."""
 
-# [spec:pgorm:req:python.typing]
+# [spec:pgorm:req:python.typing+1]
 from ._native import (
     PgOrmError,
     CancelledError,
@@ -137,6 +137,8 @@ from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
+# [spec:pgorm:req:bindings.surface]
+# [spec:pgorm:req:python.naming]
 select = Select
 insert = Insert
 update = Update

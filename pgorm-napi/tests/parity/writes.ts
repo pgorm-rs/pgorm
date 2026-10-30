@@ -1,6 +1,6 @@
 // The INSERT, UPDATE and DELETE family's parity cases, held to `writes.json`
 // as `select.ts`'s are to theirs.
-// [spec:pgorm:req:napi.writes/test]
+// [spec:pgorm:req:bindings.writes/test]
 
 import {
   bind,

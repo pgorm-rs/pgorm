@@ -61,7 +61,7 @@ test("promises left to the drop queue never hold a process open", async () => {
 });
 
 // [spec:pgorm:req:napi.exit/test]
-// [spec:pgorm:req:napi.connections+4/test]
+// [spec:pgorm:req:napi.lifecycle/test]
 test("a process that ends holding a transaction and a stream open exits", async () => {
   exitedCleanly(await runFixture("holding", DEADLINE), "holding 1 false\n");
 });
@@ -89,7 +89,8 @@ test("exiting with a query still running neither waits for it nor crashes", asyn
   assert.ok(outcome.elapsed < 8000, `exited after ${outcome.elapsed} ms, not before the ten-second query`);
 });
 
-// [spec:pgorm:req:napi.runtime/test]
+// [spec:pgorm:req:napi.runtime+1/test]
+// [spec:pgorm:req:bindings.runtime/test]
 test("a worker thread's instance runs queries beside the main thread's, and both exit", async () => {
   const outcome = await runFixture("worker", DEADLINE, { WORKER_MODE: "finish" });
   exitedCleanly(outcome, "main 2\nworker 3\nworker exited\n");

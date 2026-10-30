@@ -4,7 +4,8 @@
 // described entities, graphs and source tuples and builds one native library
 // with the binding's API, beside a copy of the binding's ES module that loads
 // it. Nothing is built and no database is reached.
-// [spec:pgorm:req:napi.codegen]
+// [spec:pgorm:req:bindings.codegen]
+// [spec:pgorm:req:napi.codegen+1]
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

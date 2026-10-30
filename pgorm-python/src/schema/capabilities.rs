@@ -1,7 +1,7 @@
-// [spec:pgorm:req:python.schema+2]
-// [spec:pgorm:req:python.schema-views+2]
-// [spec:pgorm:req:python.schema-schemas]
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:python.schema-api]
+// [spec:pgorm:req:bindings.schema-views]
+// [spec:pgorm:req:bindings.schema-schemas]
+// [spec:pgorm:req:bindings.schema-domains]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
         ("schema.data_type", "pgorm_query::ColumnType"),

@@ -42,7 +42,7 @@ impl Related<super::note::Entity> for Entity {
     }
 }
 
-// [spec:pgorm:req:napi.entity-writes/test]
+// [spec:pgorm:req:bindings.entity-writes/test]
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {

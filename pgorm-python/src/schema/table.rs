@@ -29,7 +29,7 @@ pub struct PyCreateTable {
 
 #[pymethods]
 impl PyCreateTable {
-    // [spec:pgorm:req:python.schema+2]
+    // [spec:pgorm:req:bindings.schema-tables]
     #[new]
     fn new(table: &PyTable) -> PyResult<Self> {
         Ok(Self {
@@ -52,7 +52,7 @@ impl PyCreateTable {
     #[pyo3(signature=(first, *rest, without_overlaps=None))]
     // A table has one primary key: a later call replaces the key an earlier
     // one declared, as the native builder's one slot does.
-    // [spec:pgorm:req:python.schema+2]
+    // [spec:pgorm:req:bindings.schema-tables]
     fn primary_key(
         &self,
         first: &Bound<'_, PyAny>,
@@ -149,7 +149,7 @@ pub(super) fn rename_column(
 
 /// `ALTER TABLE ... RENAME CONSTRAINT ... TO ...`: a constraint of any kind,
 /// renamed by a statement of its own, as a column is.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-tables]
 #[pyfunction]
 pub(super) fn rename_constraint(
     table: &PyTable,
@@ -238,7 +238,8 @@ fn unique_key(
 
 /// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
 /// declares, added to a table that exists.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
+// [spec:pgorm:req:python.schema-api]
 #[pyfunction]
 #[pyo3(signature=(table, first, *rest, without_overlaps=None))]
 pub(super) fn add_primary_key(
@@ -255,7 +256,7 @@ pub(super) fn add_primary_key(
 
 /// `ALTER TABLE ... ADD UNIQUE (...)`: the key `CreateTable.unique` declares,
 /// added to a table that exists.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 #[pyo3(signature=(table, first, *rest, name=None, nulls_not_distinct=false, without_overlaps=None))]
 pub(super) fn add_unique(
@@ -283,7 +284,7 @@ pub(super) fn drop_column(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<
 
 /// `ALTER TABLE ... ALTER COLUMN ... SET EXPRESSION AS (...)`: a generated
 /// column's new expression, which the rows already written take.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 pub(super) fn set_expression(
     table: &PyTable,
@@ -300,7 +301,7 @@ pub(super) fn set_expression(
 
 /// `ALTER TABLE ... ALTER COLUMN ... DROP EXPRESSION [IF EXISTS]`: a stored
 /// generated column made plain, keeping its values.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 #[pyo3(signature=(table, name, *, if_exists=false))]
 pub(super) fn drop_expression(
@@ -323,7 +324,7 @@ pub(super) fn drop_expression(
 /// `ALTER TABLE ... ADD [CONSTRAINT ...] NOT NULL ... [NO INHERIT] [NOT VALID]`:
 /// a not-null constraint over one column, the spelling that can leave the rows
 /// already there for `validate_constraint` to check.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 #[pyo3(signature=(table, column, *, name=None, no_inherit=false, not_valid=false))]
 pub(super) fn add_not_null(
@@ -352,7 +353,7 @@ pub(super) fn add_not_null(
 /// ENFORCED] [NOT VALID]`: the constraint `CreateTable.check` declares, added
 /// to a table that exists, and with `not_valid` leaving the rows already
 /// there unchecked.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 #[pyo3(signature=(table, condition, *, name=None, not_enforced=false, no_inherit=false, not_valid=false))]
 pub(super) fn add_check(
@@ -377,7 +378,7 @@ pub(super) fn add_check(
 
 /// `ALTER TABLE ... VALIDATE CONSTRAINT ...`: the rows a `NOT VALID`
 /// constraint skipped, checked now.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 pub(super) fn validate_constraint(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
     Ok(PyDDL {
@@ -389,7 +390,7 @@ pub(super) fn validate_constraint(table: &PyTable, name: &Bound<'_, PyAny>) -> P
 
 /// `ALTER TABLE ... DROP CONSTRAINT [IF EXISTS] ... [CASCADE]`: a constraint
 /// of any kind, dropped by name.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 #[pyo3(signature=(table, name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_constraint(
@@ -412,7 +413,7 @@ pub(super) fn drop_constraint(
 
 /// `ALTER TABLE ... ALTER CONSTRAINT ... <change>`, the change named as the
 /// native `ConstraintChange` variant is.
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-alter]
 #[pyfunction]
 pub(super) fn alter_constraint(
     table: &PyTable,

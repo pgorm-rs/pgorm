@@ -82,7 +82,7 @@ where
     fn models(row: GraphItem<E, Self>, bindings: &GraphBindings) -> Vec<Option<PyEntityModel>>;
 }
 
-// [spec:pgorm:req:python.graph]
+// [spec:pgorm:req:bindings.entity-graphs]
 impl<E> GraphSlots<E> for ()
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -109,7 +109,7 @@ where
 
 macro_rules! slots {
     ($($slot:ident @ $at:tt),+) => {
-        // [spec:pgorm:req:python.graph]
+        // [spec:pgorm:req:bindings.entity-graphs]
         impl<E, $($slot),+> GraphSlots<E> for ($($slot,)+)
         where
             E: EntityTrait + Send + Sync + 'static,

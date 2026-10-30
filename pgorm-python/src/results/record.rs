@@ -20,7 +20,8 @@ pub struct PyField {
     pub column_id: Option<i16>,
 }
 
-// [spec:pgorm:req:python.results]
+// [spec:pgorm:req:bindings.rows]
+// [spec:pgorm:req:python.records]
 /// A detached row whose unique output names index exact, tagged Rust values.
 #[derive(Clone, Debug)]
 #[pyclass(name = "Record", module = "pgorm", frozen, from_py_object)]

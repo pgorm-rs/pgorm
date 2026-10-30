@@ -97,7 +97,7 @@ fn returning(
 
 /// `jsonFormat(operand)`: the operand marked as JSON text, `FORMAT JSON`,
 /// accepted only where SQL/JSON reads JSON.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn format_json(cx: &mut FunctionContext) -> NeonResult<Node> {
     let operand = operand_at(cx, 0)?;
     Ok(Node::JsonInput(Expr::expr(operand).format_json()))
@@ -106,7 +106,7 @@ fn format_json(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `jsonDefault(value)`: `DEFAULT value`, which pgorm-query writes as an
 /// escaped literal, PostgreSQL refusing a parameter there. A value whose type
 /// a cast would carry cannot keep it in a literal, and is refused.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_default(cx: &mut FunctionContext) -> NeonResult<Node> {
     let data = arg(cx, 0);
     let codec = Codec::get(cx)?;
@@ -125,7 +125,7 @@ fn json_default(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `jsonIs(operand, negated, kind, uniqueKeys)`: `IS [NOT] JSON [VALUE |
 /// SCALAR | ARRAY | OBJECT] [WITH UNIQUE KEYS]`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn is_json(cx: &mut FunctionContext) -> NeonResult<Node> {
     let operand = Expr::expr(operand_at(cx, 0)?);
     let negated = flag(cx, 1)?;
@@ -240,7 +240,7 @@ pub(super) fn shaping(cx: &mut FunctionContext, index: usize) -> NeonResult<Opti
 }
 
 /// `jsonExists(context, path, passing, onError)`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
     let context = input_at(cx, 0)?;
     let path = path(cx, 1)?;
@@ -255,7 +255,7 @@ fn json_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `jsonValue(context, path, passing, returning, onEmpty, onError)`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_value(cx: &mut FunctionContext) -> NeonResult<Node> {
     let context = input_at(cx, 0)?;
     let path = path(cx, 1)?;
@@ -283,7 +283,7 @@ fn json_value(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `jsonQuery(context, path, passing, returning, shaping, onEmpty, onError)`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_query(cx: &mut FunctionContext) -> NeonResult<Node> {
     let context = input_at(cx, 0)?;
     let path = path(cx, 1)?;
@@ -312,7 +312,7 @@ fn json_query(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `jsonObject(entries, absentOnNull, uniqueKeys, returning)`: each entry a
 /// `[key, value]` pair, a key an operand — a string key is bound — and a value
 /// read as JSON.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_object(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut json = Func::json_object();
     let entries = arg(cx, 0);
@@ -376,7 +376,7 @@ fn filter(
 }
 
 /// `jsonObjectAgg(key, value, absentOnNull, uniqueKeys, returning, filter)`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_object_agg(cx: &mut FunctionContext) -> NeonResult<Node> {
     let key = operand_at(cx, 0)?;
     let value = input_at(cx, 1)?;
@@ -399,7 +399,7 @@ fn json_object_agg(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `jsonArrayAgg(value, orderBy, nullOnNull, returning, filter)`. The ORDER BY
 /// takes no NULLS placement, so an ordering asking for one is refused rather
 /// than dropped.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_array_agg(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = input_at(cx, 0)?;
     let mut json = Func::json_arrayagg(value);

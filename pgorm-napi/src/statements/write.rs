@@ -66,7 +66,7 @@ pub(crate) struct Delete {
 }
 
 /// The SQL and values a write builds, or why it cannot run.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 pub(crate) fn built(node: &Node) -> Option<Result<(String, Values), &'static str>> {
     Some(match node {
         Node::Insert(insert) if insert.rows == Rows::None => {
@@ -106,7 +106,7 @@ fn target<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<pgorm::pgorm_query::
 }
 
 /// `insertNew(table)`.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn insert_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Insert(Insert {
@@ -208,7 +208,7 @@ fn insert_on_conflict(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `updateNew(table)`.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn update_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Update(Update {
@@ -239,7 +239,7 @@ fn update_set(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `deleteNew(table)`.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn delete_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Delete(Delete {
@@ -306,7 +306,7 @@ fn write_from(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `writeReturning(write, items, oldAs, newAs)`: the RETURNING list.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 fn write_returning(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut node = this(cx, 0)?;
     let clause = returning::clause(cx, 1)?;

@@ -20,7 +20,7 @@ fn undecodable<'cx, T>(cx: &mut Cx<'cx>, message: impl Into<String>) -> NeonResu
 }
 
 /// A value as the plain JavaScript value of its kind.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:bindings.values]
 pub(crate) fn plain<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -94,8 +94,8 @@ fn subsecond(nanoseconds: i32) -> (i32, i32) {
 }
 
 /// A pgorm value as plain JavaScript.
-// [spec:pgorm:req:napi.values]
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:bindings.values]
+// [spec:pgorm:req:napi.temporal+1]
 pub(crate) fn value<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,

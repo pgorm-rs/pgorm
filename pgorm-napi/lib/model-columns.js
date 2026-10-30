@@ -3,7 +3,7 @@
 // A model's columns: each one's declared kind, nullability and key, what a
 // value written to it or compared with it becomes, and the expression that
 // reads it.
-// [spec:pgorm:req:napi.models]
+// [spec:pgorm:req:bindings.model-columns]
 
 import { TRUSTED } from "./builder.js";
 import { ConstructionError } from "./errors.js";

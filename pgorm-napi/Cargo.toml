@@ -9,7 +9,7 @@ repository = "https://github.com/pgorm-rs/pgorm"
 publish = false
 
 # A separate workspace keeps the Node-API addon out of ordinary Rust builds,
-# as pgorm-python's does for Python ([spec:pgorm:req:napi.optional]).
+# as pgorm-python's does for Python ([spec:pgorm:req:bindings.optional]).
 [workspace]
 
 # An rlib, which applications registering their entities link. The addon's

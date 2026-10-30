@@ -27,7 +27,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.models/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -61,7 +61,7 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.models/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (
@@ -98,7 +98,7 @@ class ModelConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             model.insert({"mood": p.Value("calm", p.TypeName("Mood", schema="wrong"))})
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-reads/test]
     def test_queries_keep_native_sql_and_parameter_tags(self):
         model = accounts().as_("a")
         query = (
@@ -146,7 +146,7 @@ class ModelConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             model.col("id") == model.col("display_name")
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-writes/test]
     def test_crud_preserves_omission_and_write_guards(self):
         model = accounts()
         omitted = model.insert({"id": 1}).inspect()
@@ -190,7 +190,8 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP SCHEMA python_models CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-writes/test]
+    # [spec:pgorm:req:bindings.model-records/test]
     async def test_crud_returns_declared_field_records(self):
         with patch(
             "subprocess.run",
@@ -228,7 +229,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         row["tags"].append("local mutation")
         self.assertEqual(row["tags"], ["a", None])
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-writes/test]
     async def test_json_null_and_defaults_stay_distinct(self):
         omitted = await self.model.insert({}).returning().one(self.pool)
         sql_null = (
@@ -260,7 +261,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-records/test]
     async def test_declared_types_validate_decoded_columns(self):
         await self.model.insert({}).execute(self.pool)
         for columns in (
@@ -277,7 +278,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.DecodeError):
             p.ModelRecord(self.model, record, ("id",))
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-reads/test]
     async def test_alias_joins_and_composite_keys(self):
         for name in ("A", "B"):
             await self.model.insert({"display_name": name}).execute(self.pool)
@@ -309,7 +310,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(dict(row), {"a": 1, "b": "second"})
 
-    # [spec:pgorm:req:python.models/test]
+    # [spec:pgorm:req:bindings.model-records/test]
     async def test_declared_wire_kinds_keep_exact_tags(self):
         cases = [
             ("bool", "boolean", True),
@@ -375,8 +376,8 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
                 {"moods": p.Value.array(p.TypeName("Mood", schema="wrong"), labels)}
             )
 
-    # [spec:pgorm:req:python.models/test]
-    # [spec:pgorm:req:python.values+5/test]
+    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.created-ranges/test]
     async def test_created_range_columns_keep_their_type(self):
         await self.pool.execute(
             p.RawSQL("CREATE TYPE python_models.floatrange AS RANGE (SUBTYPE = float8)")

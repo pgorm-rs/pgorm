@@ -26,7 +26,7 @@ OPERATIONS = (
 
 
 class DomainConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.schema-domains/test]    a create renders its clauses in the native
+    # [spec:pgorm:req:bindings.schema-domains/test]    a create renders its clauses in the native
     # order whatever order they were given in, each alter carries its one action, a drop names
     # every domain given in order, and nothing is bound
     def test_domain_statements_render_in_native_order(self):
@@ -84,7 +84,7 @@ class DomainConstruction(unittest.TestCase):
         )
         self.assertEqual(s.drop_domain("a").inspect().sql, 'DROP DOMAIN "a"')
 
-    # [spec:pgorm:req:python.schema-domains/test]    a name that is not an identifier, a check
+    # [spec:pgorm:req:bindings.schema-domains/test]    a name that is not an identifier, a check
     # that is not an expression and an unknown base type are refused as the statement is built
     def test_invalid_domain_input_is_refused(self):
         for action in (
@@ -115,7 +115,7 @@ class DomainConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             bool(s.drop_domain("d"))
 
-    # [spec:pgorm:req:python.schema-domains/test]    `domain_value` is the keyword `VALUE`
+    # [spec:pgorm:req:bindings.schema-domains/test]    `domain_value` is the keyword `VALUE`
     def test_domain_value_is_the_keyword(self):
         self.assertEqual(p.domain_value().inspect().sql, "SELECT VALUE")
 
@@ -154,7 +154,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
             .column(s.ColumnDef("qty", self.domain)).primary_key("id")
         )
 
-    # [spec:pgorm:req:python.schema-domains/test]    a column of the domain takes its default
+    # [spec:pgorm:req:bindings.schema-domains/test]    a column of the domain takes its default
     # and is held to its check and its NOT NULL, each alter changes what it holds the column
     # to, and a NOT VALID check leaves the rows already there until VALIDATE refuses them
     async def test_domain_holds_its_column_to_its_constraints(self):
@@ -209,7 +209,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
             written = (await connection.fetch_one(query))["qty"]
             return written, await cls.prepared_statement(connection, query)
 
-    # [spec:pgorm:req:python.connections+3/test]    clear_statement_caches makes the connection
+    # [spec:pgorm:req:bindings.connections/test]    clear_statement_caches makes the connection
     # that already ran an insert prepare it again, its old statement closed on the server, and
     # write the domain's new default
     # [spec:pgorm:req:conn.pool.statement-cache.clear+1/test]    from Python
@@ -239,7 +239,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertLess(asyncio.get_running_loop().time(), deadline, what)
             await asyncio.sleep(0.01)
 
-    # [spec:pgorm:req:python.connections+3/test]    a pool given statement_cache_channel listens
+    # [spec:pgorm:req:bindings.connections/test]    a pool given statement_cache_channel listens
     # from its first acquisition, clears on a notification there whatever its payload, and
     # closes its listening connection when it closes; a pool without the setting keeps its
     # statements
@@ -302,7 +302,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     async def is_count(probe, expected):
         return await probe() == expected
 
-    # [spec:pgorm:req:python.schema-domains/test]    a rename keeps the column typed with the
+    # [spec:pgorm:req:bindings.schema-domains/test]    a rename keeps the column typed with the
     # domain, a drop is refused under RESTRICT while a column uses it, and CASCADE drops the
     # column with it
     async def test_domain_renames_and_drops(self):
@@ -324,7 +324,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertEqual([row["name"] for row in columns], ["id"])
 
-    # [spec:pgorm:req:python.schema-domains/test]    the server's refusals arrive by SQLSTATE: a
+    # [spec:pgorm:req:bindings.schema-domains/test]    the server's refusals arrive by SQLSTATE: a
     # name a type already has, a missing domain or constraint, and a COLLATE on a type without
     # one
     async def test_server_refusals_by_sqlstate(self):

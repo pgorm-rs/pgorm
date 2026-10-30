@@ -17,7 +17,8 @@ TransactionMode: TypeAlias = Literal["default", "read_write", "read_only", "defe
 IsolationLevel: TypeAlias = Literal["read_uncommitted", "read_committed", "repeatable_read", "serializable"]
 
 
-# [spec:pgorm:req:python.transactions+2]
+# [spec:pgorm:req:bindings.transactions]
+# [spec:pgorm:req:python.transactions+3]
 @asynccontextmanager
 async def _scope(
     opening: Callable[[], Awaitable[_native._Transaction]], parent: Connection | Transaction
@@ -65,7 +66,7 @@ async def _roll_back(native: _native._Transaction, error: BaseException) -> None
     await native.wait_closed()
 
 
-# [spec:pgorm:req:python.transactions+2]
+# [spec:pgorm:req:python.transactions+3]
 class Transaction:
     """One native transaction or savepoint, open for the ``async with`` block
     that opened it and reserving its parent until that block exits.

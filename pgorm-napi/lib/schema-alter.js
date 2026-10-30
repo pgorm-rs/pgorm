@@ -3,7 +3,7 @@
 // ALTER TABLE over pgorm-query's typestate: `alterTable(table)` names the
 // table and has no action, so nothing to inspect or run, and its first action
 // gives the statement, which takes more.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

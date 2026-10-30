@@ -238,7 +238,7 @@ impl PyPipelineExpr {
     /// Compare this expression as the enum `type_name`, through Rust's
     /// `ExprOps::compares_as`: what a column whose domain is over an enum
     /// needs where no registration says so.
-    // [spec:pgorm:req:python.pipeline+1]
+    // [spec:pgorm:req:bindings.pipeline-expressions]
     fn compares_as(&self, type_name: PyRef<'_, PyTypeName>) -> PyResult<Self> {
         Self::compose(
             Recipe::ComparesAs(self.recipe.clone(), type_name.rust_type()),

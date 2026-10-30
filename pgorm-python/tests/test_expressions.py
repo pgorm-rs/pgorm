@@ -15,10 +15,11 @@ def inspection(expression):
     return compiled.sql, [value.snapshot() for value in compiled.params]
 
 
-# [spec:pgorm:req:python.expressions+6/test]
-# [spec:pgorm:req:python.input-boundaries/test]
-# [spec:pgorm:req:python.ownership/test]
-# [spec:pgorm:req:python.delegation+1/test]
+# [spec:pgorm:req:bindings.expressions/test]
+# [spec:pgorm:req:bindings.identifiers/test]
+# [spec:pgorm:req:python.input-boundaries+1/test]
+# [spec:pgorm:req:bindings.statements/test]
+# [spec:pgorm:req:bindings.delegation/test]
 class ExpressionTests(unittest.TestCase):
     def test_identifiers_and_values_have_separate_paths(self):
         name = 'A"雪.%\\'

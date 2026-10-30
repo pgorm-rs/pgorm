@@ -29,7 +29,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 ];
 
 /// `tableNew(name, schema, alias)`.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.select]
 fn table_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let schema = arg(cx, 1);
@@ -94,7 +94,7 @@ fn table_star(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `fromSubquery(select, alias)`: `(SELECT ..) AS "alias"`.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.from-subqueries]
 fn from_subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
     let select = select_at(cx, 0)?;
     let alias = name_at(cx, 1)?;
@@ -115,7 +115,7 @@ fn sample_number(cx: &mut FunctionContext, index: usize, what: &str) -> NeonResu
 /// `TABLESAMPLE BERNOULLI` or `SYSTEM`, its percentage and optional
 /// `REPEATABLE` seed bound. The table keeps its schema and alias, the name
 /// the item answers to.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.select]
 fn table_sample(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Table(table) = this(cx, 0)? else {
         return refuse(cx, "only a Table is sampled");
@@ -152,7 +152,7 @@ fn table_call<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<
 /// The column definition list `value` holds, `[[name, type], ..]`: each
 /// column an identifier and a type as `DataType` arguments take one, at least
 /// one of them, since a call without a list has none to give.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.select]
 fn column_definitions<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
@@ -180,7 +180,7 @@ fn column_definitions<'cx>(
 /// when there are several or `rowsFrom` says, numbered `WITH ORDINALITY` when
 /// asked, its columns named in the alias — each call with the column
 /// definition list `definitions` holds for it, if any.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.select]
 fn table_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     let definitions = arg(cx, 5);
     let definitions = if absent(cx, definitions) {

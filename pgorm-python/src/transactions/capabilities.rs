@@ -1,4 +1,4 @@
-// [spec:pgorm:req:python.transactions+2]
+// [spec:pgorm:req:bindings.transactions]
 pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
     [
         ("transaction", "DatabaseConnection::transaction_with"),

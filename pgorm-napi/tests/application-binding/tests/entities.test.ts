@@ -2,7 +2,7 @@
 // against a live server in either runtime: reads through `Select<E>`, writes
 // through `ActiveModelTrait` with the application's hooks, the terminals
 // that return a row's two versions, and registered graphs and their cursors.
-// [spec:pgorm:req:napi.application/test]
+// [spec:pgorm:req:napi.application+1/test]
 
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
@@ -99,7 +99,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
   };
 }
 
-// [spec:pgorm:req:napi.entities/test]
+// [spec:pgorm:req:bindings.entities/test]
 test("the module names its registrations and describes each, and refuses a name it does not register", () => {
   assert.deepStrictEqual(entities(), ["app.Account", "app.Membership", "app.Note", "app.Parcel"]);
   assert.deepStrictEqual(graphs(), ["app.AccountNotes", "app.AccountOnly", "app.MembershipOnly", "app.MixedNotes", "app.RequiredNotes"]);
@@ -129,7 +129,7 @@ test("the module names its registrations and describes each, and refuses a name 
   ]);
 });
 
-// [spec:pgorm:req:napi.entity-reads+4/test]
+// [spec:pgorm:req:bindings.entity-reads/test]
 test("a query reads records through Select's terminals, keyed by SQL column", async () => {
   await seed();
   const busy = await Account.find().where(Account.col("mood").eq("busy")).all(pool());
@@ -153,7 +153,7 @@ test("a query reads records through Select's terminals, keyed by SQL column", as
   assert.equal(counted.n, 1n);
 });
 
-// [spec:pgorm:req:napi.entity-reads+4/test]
+// [spec:pgorm:req:bindings.entity-reads/test]
 test("one and oneOpt narrow a row limit and never widen one of zero", async () => {
   await seed();
   const none = Account.find().orderBy(Account.col("id").asc()).limit(0);
@@ -170,7 +170,7 @@ test("one and oneOpt narrow a row limit and never widen one of zero", async () =
   assert.equal(String(five.inspect("one").values.at(-1)?.value), "1");
 });
 
-// [spec:pgorm:req:napi.entity-writes/test]
+// [spec:pgorm:req:bindings.entity-writes/test]
 test("an ActiveModel holds each column's state, and its writes run the application's hooks", async () => {
   const fresh = Account.active();
   assert.deepStrictEqual(fresh.get("version"), { state: "set", value: 1 });
@@ -204,13 +204,13 @@ test("an ActiveModel holds each column's state, and its writes run the applicati
   assert.throws(() => Account.active().set("mood", "wild"), ConstructionError);
 });
 
-// [spec:pgorm:req:napi.entities/test]    a registered entity whose columns are domains, over an
+// [spec:pgorm:req:bindings.entities/test]    a registered entity whose columns are domains, over an
 // integer, over an enum and an array of one over text, describes, reads, writes and compares
 // through them as through their base types
-// [spec:pgorm:req:napi.schema-domains/test]    a domain column reports, binds and reads as the
+// [spec:pgorm:req:bindings.schema-domains/test]    a domain column reports, binds and reads as the
 // kind it is over, and a check refuses a value written to it as a CheckViolationError naming the
 // domain
-// [spec:pgorm:req:napi.entity-reads+4/test]    a column whose domain is over an enum compares as
+// [spec:pgorm:req:bindings.entity-reads/test]    a column whose domain is over an enum compares as
 // the enum
 test("a registered entity's domain columns read, write and compare as the types they are over", async () => {
   assert.deepStrictEqual(
@@ -261,10 +261,10 @@ test("a registered entity's domain columns read, write and compare as the types 
   assert.deepStrictEqual(ids(await Parcel.find().orderBy(byId).all(pool())), [1, 2, 3, 4]);
 });
 
-// [spec:pgorm:req:napi.entity-reads+4/test]    a column whose domain is over an enum is a
+// [spec:pgorm:req:bindings.entity-reads/test]    a column whose domain is over an enum is a
 // member of a list of values and of a subquery's rows as the enum, either way round, where the
 // column's plain expression is refused with 42883
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]    a registered column a pipeline reads
+// [spec:pgorm:req:bindings.pipeline-sources/test]    a registered column a pipeline reads
 // compares as the enum, under its table and under a source's name, where the column named by text
 // is refused with 42883
 test("a registered column whose domain is over an enum is a member, and a pipeline's column, as the enum", async () => {
@@ -305,7 +305,7 @@ test("a registered column whose domain is over an enum is a member, and a pipeli
   await assert.rejects(rows(pl.from(Parcel).filter(pl.col("parcels", "mood").eq("busy"))), undefinedOperator);
 });
 
-// [spec:pgorm:req:napi.entity-writes/test]
+// [spec:pgorm:req:bindings.entity-writes/test]
 test("a record's model converts and copies as Rust's does, and belongs to its entity", async () => {
   await seed();
   const bob = await Account.find().where(Account.col("id").eq(2)).one(pool());
@@ -324,7 +324,8 @@ test("a record's model converts and copies as Rust's does, and belongs to its en
   assert.throws(() => Account.update(Note.active()), refused(/app.Note's, not app.Account's/));
 });
 
-// [spec:pgorm:req:napi.entity-versions/test]
+// [spec:pgorm:req:bindings.entity-versions/test]
+// [spec:pgorm:req:napi.update-many-guard/test]
 test("the version terminals return each written row before and after, no hook running", async () => {
   await seed();
   const ann = await Account.find().where(Account.col("id").eq(1)).one(pool());
@@ -365,7 +366,7 @@ test("the version terminals return each written row before and after, no hook ru
   assert.deepStrictEqual(await Account.insertMany([]).returningUpserts(pool()), []);
 });
 
-// [spec:pgorm:req:napi.entity-graphs/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
 test("a registered graph decodes its root and slots, an absent optional slot null", async () => {
   await seed();
   type Pair = [Record<string, unknown>, Record<string, unknown> | null];
@@ -393,7 +394,7 @@ test("a registered graph decodes its root and slots, an absent optional slot nul
   assert.throws(() => graph("app.AccountNotes").find({ aliases: ["accounts"] }), refused(/names a source twice/));
 });
 
-// [spec:pgorm:req:napi.entity-graphs/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
 test("a registered graph's cursor pages by keyset, resuming inside a root's slot rows", async () => {
   await seed();
   const cursor = graph("app.AccountNotes").find({ aliases: ["n"] }).cursor("id");
@@ -411,7 +412,8 @@ test("a registered graph's cursor pages by keyset, resuming inside a root's slot
   assert.throws(() => cursor.after("x"), ConstructionError);
 });
 
-// [spec:pgorm:req:napi.entities/test]
+// [spec:pgorm:req:bindings.entities/test]
+// [spec:pgorm:req:bindings.registered-pools/test]
 test("an entity's operations run on a connection or a transaction, with a statement's refusals and aborts", async () => {
   await seed();
   await assert.rejects(
@@ -435,7 +437,7 @@ test("an entity's operations run on a connection or a transaction, with a statem
   await assert.rejects(Account.find().all({} as never), TypeError);
 });
 
-// [spec:pgorm:req:napi.pipeline-sources/test]
+// [spec:pgorm:req:bindings.pipeline-sources/test]
 test("a pipeline reads a registered entity's table, and selects registered sources into their models", async () => {
   await seed();
   const ids = await pool().query(pl.from(Account).filter(pl.col("accounts", "id").gt(1)).sort(pl.col("accounts", "id")));
@@ -472,7 +474,7 @@ test("a pipeline reads a registered entity's table, and selects registered sourc
   assert.deepStrictEqual(pl.sourceTuples(), ["app.AccountWithNote", "app.SingleAccount", "app.SixSources"]);
 });
 
-// [spec:pgorm:req:napi.pipeline-sources/test]
+// [spec:pgorm:req:bindings.pipeline-sources/test]
 test("a selection refuses a reshaped pipeline, a wrong count of qualifiers and a tuple the module does not register", async () => {
   const reshaped = pl.from(Account).select(pl.col("accounts", "id")).selectSources(pl.sources("app.SingleAccount"));
   assert.throws(() => reshaped.inspect(), refused(/select/));

@@ -54,7 +54,7 @@ fn column_path(cx: &mut FunctionContext, index: usize) -> NeonResult<Option<Stri
 }
 
 /// `jsonTableOrdinality(name)`: `name FOR ORDINALITY`.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn ordinality(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     Ok(Node::JsonTableColumn(JsonTableColumn::ordinality(name)))
@@ -154,7 +154,7 @@ fn nested(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `jsonTable(context, path, columns, alias, passing, pathName, onError)`:
 /// `JSON_TABLE(..) AS "alias"`, a FROM item. The alias is required, as pgorm
 /// names every FROM item that is not a table.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 fn json_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let context = arg(cx, 0);
     let context = input(cx, context)?;

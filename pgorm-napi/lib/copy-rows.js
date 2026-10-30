@@ -3,7 +3,7 @@
 // Binary COPY as rows of values: the rows `copyInRows` writes, encoded by the
 // addon a batch at a time against the column types the server describes, and
 // the `CopyRowStream` `copyOutRows` reads them back through.
-// [spec:pgorm:req:napi.copy.rows]
+// [spec:pgorm:req:bindings.copy-rows]
 
 import { close, describe, step, watching, write } from "./copy-feed.js";
 import { LifecycleError } from "./errors.js";

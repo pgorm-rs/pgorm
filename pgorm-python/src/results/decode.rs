@@ -79,8 +79,8 @@ pub(super) fn typed<T: for<'a> FromSql<'a>>(
     }
 }
 
-// [spec:pgorm:req:python.results]
-// [spec:pgorm:req:python.value-tags]
+// [spec:pgorm:req:bindings.values]
+// [spec:pgorm:req:bindings.value-tags]
 pub(crate) fn value(field: Field<'_>) -> PyResult<PyValue> {
     let index = field.index();
     let declared = field.ty();
@@ -146,7 +146,7 @@ pub(crate) fn value(field: Field<'_>) -> PyResult<PyValue> {
         Type::MACADDR => typed::<Mac>(field, array, ArrayType::MacAddress, |v| {
             Value::MacAddress(v.map(|v| Box::new(v.0)))
         }),
-        // [spec:pgorm:req:python.values+5]
+        // [spec:pgorm:req:bindings.values]
         Type::INTERVAL => boxed!(Interval, Interval),
         _ if ty.name() == "vector" && matches!(ty.kind(), Kind::Simple) => boxed!(Vector, Vector),
         _ => {

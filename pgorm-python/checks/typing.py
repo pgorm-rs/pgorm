@@ -69,7 +69,7 @@ print(json.dumps({'version': pgorm.__version__, 'python': platform.python_versio
     )
 
 
-# [spec:pgorm:req:python.typing]
+# [spec:pgorm:req:python.typing+1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

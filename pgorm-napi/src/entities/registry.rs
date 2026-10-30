@@ -51,7 +51,8 @@ impl Registry {
     /// Register an entity's real `EntityTrait`, model, columns and
     /// ActiveModel under `name`. A name or a Rust type registered twice is
     /// refused, and nothing is added.
-    // [spec:pgorm:req:napi.entities]
+    // [spec:pgorm:req:bindings.entities]
+    // [spec:pgorm:req:napi.application+1]
     pub fn entity<E>(&mut self, name: &str) -> Result<&mut Self, RegistrationError>
     where
         E: EntityTrait + Send + Sync + 'static,
@@ -79,7 +80,7 @@ impl Registry {
     /// factory receives one alias per joined slot, in tuple order, and must
     /// join each slot under its alias; every source entity is registered
     /// first.
-    // [spec:pgorm:req:napi.entity-graphs]
+    // [spec:pgorm:req:bindings.entity-graphs]
     pub fn graph<E, S, Build>(
         &mut self,
         name: &str,
@@ -170,7 +171,7 @@ mod tests {
         impl ActiveModelBehavior for ActiveModel {}
     }
 
-    // [spec:pgorm:req:napi.entities/test]    a name or a Rust entity registered
+    // [spec:pgorm:req:bindings.entities/test]    a name or a Rust entity registered
     // twice, a name out of bounds and a graph of an unregistered entity are each
     // refused, and nothing is added
     #[test]

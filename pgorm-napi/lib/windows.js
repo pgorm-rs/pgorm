@@ -4,7 +4,7 @@
 // start offers only the ends that may follow it, so no frame whose end comes
 // before its start can be built, and a function PostgreSQL computes only over
 // a window has no form but `over`.
-// [spec:pgorm:req:napi.windows+2]
+// [spec:pgorm:req:bindings.windows]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

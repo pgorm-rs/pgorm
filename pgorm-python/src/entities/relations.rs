@@ -8,7 +8,8 @@ use pgorm::pgorm_query::{ConditionType, Deferrability, Enforcement, FromItem};
 use pgorm::{EntityTrait, Iterable, RelationDef, RelationTrait, RelationType};
 use serde_json::{Value as Json, json};
 
-// [spec:pgorm:req:python.entities+4]
+// [spec:pgorm:req:bindings.entities]
+// [spec:pgorm:req:bindings.relation-conditions]
 /// Every relation the entity's `Relation` enum declares, in declaration order.
 pub(super) fn describe<E: EntityTrait>() -> Vec<Json> {
     E::Relation::iter()
@@ -89,7 +90,8 @@ mod tests {
         }
     }
 
-    // [spec:pgorm:req:python.entities+4/test]
+    // [spec:pgorm:req:bindings.entities/test]
+    // [spec:pgorm:req:bindings.relation-conditions/test]
     #[test]
     fn join_condition_shape_is_reported() {
         let plain = relation_json("Account", &relation());

@@ -210,9 +210,9 @@ const MAX_PARAMETERS: usize = 65_535;
 /// clause PostgreSQL would refuse: rendering writes either regardless, and
 /// the ORDER BY or window entry they turn on may arrive later, so this is
 /// the first point the statement is final.
-// [spec:pgorm:req:napi.statements]
-// [spec:pgorm:req:napi.select+2]
-// [spec:pgorm:req:napi.windows+2]
+// [spec:pgorm:req:bindings.statements]
+// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.windows]
 pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String, Values)> {
     let built = match node {
         Node::Select(select) => match select.check_clauses() {
@@ -233,7 +233,7 @@ pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String,
             );
         }
         // A COPY opens a data flow no statement terminal reads or feeds.
-        // [spec:pgorm:req:napi.copy+2]
+        // [spec:pgorm:req:bindings.copy]
         Node::Copy(copy) => {
             let what = copy.describe();
             return refuse(
@@ -271,7 +271,7 @@ fn limited<'cx>(cx: &mut Cx<'cx>, built: (String, Values)) -> NeonResult<(String
 /// statement is built as it runs; an expression as the one item of a
 /// `SELECT`, and a condition as the `WHERE` of `SELECT TRUE`, as
 /// pgorm-python inspects them.
-// [spec:pgorm:req:napi.statements]
+// [spec:pgorm:req:bindings.statements]
 fn inspect(mut cx: FunctionContext) -> JsResult<JsArray> {
     let node = cx.argument::<JsBox<Node>>(0)?;
     let (sql, values) = match &**node {

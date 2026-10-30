@@ -72,7 +72,7 @@ async function indexdef(name: string): Promise<string | null> {
   return row ? String(row.indexdef) : null;
 }
 
-// [spec:pgorm:req:napi.schema-indexes/test]
+// [spec:pgorm:req:bindings.schema-indexes/test]
 test("an index over expressions and columns, with its operator class, order, INCLUDE and predicate, is the one PostgreSQL holds", async () => {
   const person = new Table("person", { schema: "app" });
   await pool().execute(
@@ -107,7 +107,7 @@ test("an index over expressions and columns, with its operator class, order, INC
   await assert.rejects(pool().execute(dropIndex(person, "person_nick")), rejectedWith("42704"));
 });
 
-// [spec:pgorm:req:napi.schema-types/test]
+// [spec:pgorm:req:bindings.schema-types/test]
 test("an enumeration's labels are data, in the order created, added and renamed", async () => {
   const mood = new TypeName("Mood \"name\"", { schema: "app" });
   await pool().execute(createType(mood).values(["calm", "O'Brien", "", "back\\slash"]));
@@ -129,7 +129,7 @@ test("an enumeration's labels are data, in the order created, added and renamed"
   await pool().execute(dropType(["nothing_here", "nor_here"], { ifExists: true }));
 });
 
-// [spec:pgorm:req:napi.schema-types/test]
+// [spec:pgorm:req:bindings.schema-types/test]
 test("a composite's attributes are created, added, retyped, dropped and renamed, CASCADE reaching a typed table", async () => {
   await pool().execute(
     createType(new TypeName("pair", { schema: "app" })).attribute("a", "integer")
@@ -157,7 +157,7 @@ test("a composite's attributes are created, added, retyped, dropped and renamed,
   assert.equal((await pool().one("SELECT (ROW(2, 'y')::app.pair).label AS l")).l, "y");
 });
 
-// [spec:pgorm:req:napi.schema-types/test]
+// [spec:pgorm:req:bindings.schema-types/test]
 test("a created range type is a range over its subtype, with the multirange it is given", async () => {
   await pool().execute(
     createType(new TypeName("floatrange", { schema: "app" })).asRange("double", {
@@ -179,7 +179,7 @@ test("a created range type is a range over its subtype, with the multirange it i
   await pool().execute(dropType([new TypeName("floatrange", { schema: "app" }), "bare"]));
 });
 
-// [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
 test("a sequence hands out the values its options say, restarts, and goes with the column that owns it", async () => {
   const ticket = new Table("ticket", { schema: "app" });
   await pool().execute(
@@ -209,7 +209,7 @@ test("a sequence hands out the values its options say, restarts, and goes with t
   await assert.rejects(pool().execute(dropSequence("spare")), rejectedWith("42P01"));
 });
 
-// [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
 test("an identity column's sequence takes the options a sequence does", async () => {
   await pool().execute(
     createTable("numbered").column(
@@ -221,7 +221,7 @@ test("an identity column's sequence takes the options a sequence does", async ()
   assert.deepStrictEqual((await pool().query("SELECT n FROM numbered ORDER BY x")).map((row) => row.n), [100n, 110n, 5n]);
 });
 
-// [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
 test("an extension is created in the schema and at the version asked, and dropped", async () => {
   await pool().execute(createExtension("btree_gist", { schema: "app", version: "1.7" }));
   await pool().execute(createExtension("btree_gist", { ifNotExists: true }));
@@ -235,8 +235,8 @@ test("an extension is created in the schema and at the version asked, and droppe
   await assert.rejects(pool().execute(createExtension("no_such_extension")), rejectedWith("0A000"));
 });
 
-// [spec:pgorm:req:napi.schema-types/test]
-// [spec:pgorm:req:napi.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-types/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
 test("labels, types and sequence clauses PostgreSQL cannot take are refused as they are built", async () => {
   assert.throws(() => createType("t").values(["x".repeat(64)]), refused(/63 UTF-8 bytes/));
   assert.throws(() => createType("t").values(["a\0b"]), refused(/NUL/));

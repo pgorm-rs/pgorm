@@ -20,7 +20,7 @@ fn function_call(value: &Bound<'_, PyAny>) -> PyResult<FunctionCall> {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.select]
 /// A function in FROM: one call, or several read side by side under
 /// `ROWS FROM (..)`, the shorter padded with NULLs; `with_ordinality` adds a
 /// final `bigint` column numbering the rows from 1, `columns` names the
@@ -104,7 +104,7 @@ impl PyTableFunction {
         "TableFunction(...)"
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "FROM items cannot be tested as Python booleans",

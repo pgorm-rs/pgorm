@@ -27,6 +27,7 @@ _GATHER = 64 * 1024
 _SLICE = 256 * 1024
 
 
+# [spec:pgorm:req:python.argument-errors]
 def _view(item: object) -> memoryview:
     if isinstance(item, str):
         raise _native.ConstructionError("COPY data is bytes; encode text before copying it")
@@ -88,8 +89,9 @@ async def _pieces(items: AsyncIterator[memoryview]) -> AsyncGenerator[Buffer]:
         yield gathered
 
 
-# [spec:pgorm:req:python.copy+2]
-# [spec:pgorm:req:python.cancellation]
+# [spec:pgorm:req:bindings.copy]
+# [spec:pgorm:req:bindings.cancellation]
+# [spec:pgorm:req:python.cancellation+1]
 async def copy_in(
     native: _native._Connection | _native._Transaction,
     statement: _native.CopyFrom[Any],
@@ -113,7 +115,7 @@ async def copy_in(
     return await copy.finish()
 
 
-# [spec:pgorm:req:python.copy+2]
+# [spec:pgorm:req:bindings.copy]
 class CopyOutStream:
     """COPY TO's data as an async iterator of ``bytes`` chunks.
 
@@ -178,7 +180,7 @@ class CopyOutStream:
     ) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+1]
+    # [spec:pgorm:req:python.truth-testing+2]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("copy streams cannot be tested as Python booleans")
 
@@ -211,7 +213,7 @@ def _row_source(rows: object) -> AsyncGenerator[object]:
     return _rows_of(rows)
 
 
-# [spec:pgorm:req:python.copy.rows]
+# [spec:pgorm:req:bindings.copy-rows]
 async def copy_in_rows(
     native: _native._Connection | _native._Transaction,
     statement: _native.CopyFrom[Literal["binary"]],
@@ -244,7 +246,7 @@ async def copy_in_rows(
     return await copy.finish()
 
 
-# [spec:pgorm:req:python.copy.rows]
+# [spec:pgorm:req:bindings.copy-rows]
 class CopyRowStream:
     """A binary COPY TO's rows as an async iterator of tuples of values.
 
@@ -322,7 +324,7 @@ class CopyRowStream:
     ) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+1]
+    # [spec:pgorm:req:python.truth-testing+2]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("copy streams cannot be tested as Python booleans")
 

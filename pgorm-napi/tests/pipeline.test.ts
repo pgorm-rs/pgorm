@@ -71,7 +71,7 @@ function refused(kind: typeof ConstructionError | typeof LifecycleError, pattern
 const lifecycle = (pattern: RegExp) => refused(LifecycleError, pattern);
 const construction = (pattern: RegExp) => refused(ConstructionError, pattern);
 
-// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 test("a pipeline's stages run as any statement does, through each terminal", async () => {
   const totals = base.filter(category.isNotNull()).group(category).aggregate(pl.sum(amount).as(total))
     .filter(total.gt(5)).sort(total.desc());
@@ -87,7 +87,8 @@ test("a pipeline's stages run as any statement does, through each terminal", asy
   assert.equal(await pool().transaction((tx) => tx.execute(base.select(id))), 6);
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]
+// [spec:pgorm:req:bindings.pipeline-expressions/test]
+// [spec:pgorm:req:napi.pipeline-operands/test]
 test("a value an operand is given is bound; only literal() writes one into the SQL", async () => {
   const awkward = "O'Brien; -- \\";
   const bound = base.filter(category.eq(awkward)).select(id);
@@ -108,7 +109,7 @@ test("a value an operand is given is bound; only literal() writes one into the S
   assert.deepStrictEqual(await pool().query(cast), [{ spelled: "5", negated: -5 }]);
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]    a column whose domain is over an enum,
+// [spec:pgorm:req:bindings.pipeline-expressions/test]    a column whose domain is over an enum,
 // read with no registration, compares as the schema-qualified enum comparesAs names, bound, listed,
 // coalesced, through an alias and in max, where each left bare is refused with 42883
 test("a column whose domain is over an enum compares as the enum it is named as", async () => {
@@ -142,7 +143,7 @@ test("a column whose domain is over an enum compares as the enum it is named as"
   assert.throws(() => mood.comparesAs(5 as unknown as string), construction(/a TypeName/));
 });
 
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]
+// [spec:pgorm:req:bindings.pipeline-expressions/test]
 test("an interval binds in a pipeline as any value does", async () => {
   const span = new Interval({ months: 1, days: -2, microseconds: 3_000_004n });
   const selected = base.filter(id.eq(1)).selectWith((binder) => [
@@ -155,7 +156,7 @@ test("an interval binds in a pipeline as any value does", async () => {
   ]);
 });
 
-// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 test("a window computes over its partition, ordering and frame", async () => {
   const position = pl.alias("position");
   const ranked = base.filter(category.isNotNull()).window(
@@ -176,7 +177,7 @@ test("a window computes over its partition, ordering and frame", async () => {
   assert.deepStrictEqual(await pool().query(shifted), [{ before: null }, { before: 5 }]);
 });
 
-// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 test("joins read named sources and embedded pipelines, whose values travel with them", async () => {
   const peer = base.join(pl.source(items).named("peer"), category.eq(pl.col("peer", "category")).and(
     id.lt(pl.col("peer", "id")),
@@ -195,7 +196,7 @@ test("joins read named sources and embedded pipelines, whose values travel with 
   assert.deepStrictEqual(await pool().query(left), [{ id: 1n, other_id: null }]);
 });
 
-// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 test("set operations append, intersect and remove rows, and distinct keeps one of each", async () => {
   const low = base.filter(amount.lt(6)).select(id);
   const fruit = base.filter(category.eq("fruit")).select(id);
@@ -209,7 +210,7 @@ test("set operations append, intersect and remove rows, and distinct keeps one o
   );
 });
 
-// [spec:pgorm:req:napi.pipeline-binder/test]
+// [spec:pgorm:req:bindings.pipeline-binder/test]
 test("a binder binds while its function runs, one placeholder per bind, reusable in its stage", async () => {
   const both = base.filterWith((binder) => {
     const pivot = binder.bind(new Value(3, "i64"));
@@ -235,7 +236,7 @@ test("a binder binds while its function runs, one placeholder per bind, reusable
   );
 });
 
-// [spec:pgorm:req:napi.pipeline-binder/test]
+// [spec:pgorm:req:bindings.pipeline-binder/test]
 test("a placeholder used outside the stage its binder's function returns it to is a LifecycleError", () => {
   let saved: pl.Binder | undefined;
   let placeholder: pl.PipelineExpr | undefined;
@@ -269,8 +270,8 @@ test("a placeholder used outside the stage its binder's function returns it to i
   assert.throws(() => thrown?.bind(1), lifecycle(/only while its function runs/));
 });
 
-// [spec:pgorm:req:napi.pipeline-binder/test]
-// [spec:pgorm:req:napi.pipeline-expressions+2/test]
+// [spec:pgorm:req:bindings.pipeline-binder/test]
+// [spec:pgorm:req:napi.argument-errors/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);
@@ -290,7 +291,7 @@ test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => pl.lag(1.5, amount), construction(/offset/));
 });
 
-// [spec:pgorm:req:napi.pipeline/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 test("what pgorm's compile step judges is a ConstructionError before anything is sent", async () => {
   await assert.rejects(pool().query(base.select(pl.literal(1).as("sum"))), construction(/PRQL built-in/));
   assert.throws(() => base.select(pl.col("items", 'a"b')).inspect(), construction(/a"b/));

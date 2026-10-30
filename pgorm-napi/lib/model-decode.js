@@ -8,7 +8,7 @@
 // DecodeError rather than a value of the wrong type; and each row becomes a
 // record keyed by field, a tuple of a graph's records, or null for an
 // optional source its row does not carry.
-// [spec:pgorm:req:napi.model-records]
+// [spec:pgorm:req:bindings.model-records]
 
 import { runStatement } from "./connections.js";
 import { DecodeError } from "./errors.js";

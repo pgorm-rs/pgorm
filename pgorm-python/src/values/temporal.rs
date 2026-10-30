@@ -10,7 +10,7 @@ use pyo3::{
 
 use crate::errors::{ConstructionError, DecodeError};
 
-// [spec:pgorm:req:python.value-tags]
+// [spec:pgorm:req:python.values+6]
 pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult<Value> {
     match kind {
         ArrayType::Date if data.is_exact_instance_of::<PyDate>() => {

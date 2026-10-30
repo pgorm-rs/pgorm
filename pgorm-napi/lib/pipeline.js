@@ -4,8 +4,8 @@
 // compiled through prqlc to PostgreSQL SQL. Each stage returns a new
 // pipeline. A stage's `With` form calls its function once with a `Binder`,
 // whose placeholders belong to that stage alone, as pgorm brands them.
-// [spec:pgorm:req:napi.pipeline]
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline]
+// [spec:pgorm:req:bindings.pipeline-binder]
 
 import { arg, args, Builder, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

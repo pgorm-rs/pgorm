@@ -8,7 +8,7 @@ from pgorm import schema as s
 
 
 class SchemaConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.schema-schemas/test]    each statement names its schema as one
+    # [spec:pgorm:req:bindings.schema-schemas/test]    each statement names its schema as one
     # quoted identifier, a drop names every schema given in order, and nothing is bound
     def test_schema_statements_render_quoted_names(self):
         manifest = p.capabilities()["operations"]
@@ -28,7 +28,7 @@ class SchemaConstruction(unittest.TestCase):
             'ALTER SCHEMA "a" RENAME TO "b ""x"""',
         )
 
-    # [spec:pgorm:req:python.schema-schemas/test]    a name that is not an identifier is
+    # [spec:pgorm:req:bindings.schema-schemas/test]    a name that is not an identifier is
     # refused as the statement is built, and a drop needs at least one name
     def test_invalid_schema_names_are_refused(self):
         for action in (
@@ -67,7 +67,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         ))
         return row["n"] == 1
 
-    # [spec:pgorm:req:python.schema-schemas/test]    a created schema holds a table qualified by
+    # [spec:pgorm:req:bindings.schema-schemas/test]    a created schema holds a table qualified by
     # it, a drop is refused while it holds one until it cascades, and a rename carries the table
     async def test_schema_holds_renames_and_drops(self):
         await self.pool.execute(s.create_schema(self.namespace))
@@ -88,7 +88,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(s.drop_schema(self.renamed, cascade=True))
         self.assertFalse(await self.exists(self.renamed))
 
-    # [spec:pgorm:req:python.schema-schemas/test]    the server's refusals arrive by SQLSTATE: a
+    # [spec:pgorm:req:bindings.schema-schemas/test]    the server's refusals arrive by SQLSTATE: a
     # schema that exists, a pg_ name and a missing schema
     async def test_server_refusals_by_sqlstate(self):
         await self.pool.execute(s.create_schema(self.namespace))

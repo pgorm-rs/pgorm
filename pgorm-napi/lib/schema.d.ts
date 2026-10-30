@@ -13,8 +13,9 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.schema+2]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.schema]
+// [spec:pgorm:req:napi.schema-api]
 
 import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
@@ -330,7 +331,7 @@ export declare function dropType(
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): Ddl;
 
-// [spec:pgorm:req:napi.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 
 /**
  * `CREATE DOMAIN`; every method returns a new statement. The clauses render
@@ -458,7 +459,7 @@ export declare function dropExtension(
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): Ddl;
 
-// [spec:pgorm:req:napi.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 
 /** `CREATE SCHEMA`: a schema is named by one identifier, never qualified. */
 export declare function createSchema(
@@ -475,7 +476,7 @@ export declare function dropSchema(
 /** `ALTER SCHEMA ... RENAME TO`, which PostgreSQL gives no `IF EXISTS`. */
 export declare function renameSchema(name: string, newName: string): Ddl;
 
-// [spec:pgorm:req:napi.schema-views]
+// [spec:pgorm:req:bindings.schema-views]
 
 /**
  * The options a view takes, plain or recursive: each written only when set,

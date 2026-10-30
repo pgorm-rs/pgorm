@@ -43,7 +43,7 @@ const KEY_OPTIONS: &[&str] = &["name", "include", "deferrability", "withoutOverl
 /// A key of either kind over the columns at `index`, with the options object
 /// after them: a name, `INCLUDE`d columns, its deferrability and PostgreSQL
 /// 18's `WITHOUT OVERLAPS` column, which pgorm-query writes last.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn key<'cx, K>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -75,7 +75,7 @@ pub(super) fn primary_key(cx: &mut FunctionContext, index: usize) -> NeonResult<
 }
 
 /// A unique key, which alone takes `NULLS NOT DISTINCT`.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 pub(super) fn unique_key(cx: &mut FunctionContext, index: usize) -> NeonResult<TableKey<Unique>> {
     let (key, options) = key::<Unique>(cx, index, &["nullsNotDistinct"])?;
     Ok(if flag(cx, options, "nullsNotDistinct")? {
@@ -90,7 +90,7 @@ pub(super) fn unique_key(cx: &mut FunctionContext, index: usize) -> NeonResult<T
 /// object — a name, the referential actions, deferrability, enforcement and
 /// PostgreSQL 18's `PERIOD` pair, which pgorm-query writes last on both
 /// sides.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 pub(super) fn foreign_key<'cx>(
     cx: &mut FunctionContext<'cx>,
     table: TableName,
@@ -158,14 +158,14 @@ fn create(cx: &mut FunctionContext) -> NeonResult<TableCreateStatement> {
 }
 
 /// `ddlCreateTable(table)`.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn create_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = relation_at(cx, 0)?;
     Ok(Ddl::CreateTable(Table::create(table)).into())
 }
 
 /// `ddlCreateTableColumn(create, column)`: a column, which needs its type.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn create_table_column(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut create = create(cx)?;
     let value = arg(cx, 1);
@@ -215,7 +215,7 @@ fn create_table_check(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlDropTable(tables, { ifExists, behavior })`.
-// [spec:pgorm:req:napi.schema-tables]
+// [spec:pgorm:req:bindings.schema-tables]
 fn drop_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (first, rest) = relations_at(cx, 0)?;
     let options = object(cx, 1, &["ifExists", "behavior"])?;
@@ -266,7 +266,7 @@ fn truncate_table(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `ddlCommentOnTable(table, text)`: the text a literal pgorm-query escapes.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn comment_on_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = relation_at(cx, 0)?;
     let comment = arg(cx, 1);

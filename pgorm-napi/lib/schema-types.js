@@ -2,7 +2,7 @@
 
 // CREATE TYPE — a shell type, an enumeration, a composite or a range — ALTER
 // TYPE over pgorm-query's typestate, and DROP TYPE.
-// [spec:pgorm:req:napi.schema-types]
+// [spec:pgorm:req:bindings.schema-types]
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

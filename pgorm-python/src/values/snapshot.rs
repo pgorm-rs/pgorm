@@ -9,7 +9,7 @@ use super::{
     types::{Tag, is_null},
 };
 
-// [spec:pgorm:req:python.value-tags]
+// [spec:pgorm:req:python.value-tags+1]
 pub(super) fn encode(value: &PyValue) -> PyResult<Json> {
     Ok(
         json!({"version": 1, "type": tag(&value.tag)?, "sql_null": is_null(&value.inner)?, "data": payload(value)?}),

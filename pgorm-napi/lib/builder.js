@@ -5,7 +5,7 @@
 // addon. A builder never changes: each method returns a new one, built from a
 // copy of its receiver's state, so a statement or expression can be reused
 // and extended in two directions without either affecting the other.
-// [spec:pgorm:req:napi.statements]
+// [spec:pgorm:req:bindings.statements]
 
 import { native } from "./operations.js";
 
@@ -33,6 +33,7 @@ export class Handle {
   }
 }
 
+// [spec:pgorm:req:bindings.delegation]
 /** The base of every builder class that can be inspected. */
 export class Builder extends Handle {
   /**
@@ -93,6 +94,7 @@ export function trusted(trusted, name, madeBy) {
 export function statementArgs(statement, params, options) {
   if (statement instanceof Handle) {
     if (Array.isArray(params)) {
+      // [spec:pgorm:req:napi.argument-errors]
       throw new TypeError("a built statement binds its own values: pass its options second");
     }
     return [handleOf(statement), [], params ?? {}];

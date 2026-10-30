@@ -7,7 +7,7 @@ use crate::identifiers::PyIdentifier;
 use pgorm::pgorm_query::Schema;
 use pyo3::{prelude::*, types::PyTuple};
 
-// [spec:pgorm:req:python.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 #[pyfunction]
 #[pyo3(signature=(name, *, if_not_exists=false))]
 pub(super) fn create_schema(name: &Bound<'_, PyAny>, if_not_exists: bool) -> PyResult<PyDDL> {
@@ -22,7 +22,7 @@ pub(super) fn create_schema(name: &Bound<'_, PyAny>, if_not_exists: bool) -> PyR
 
 /// `DROP SCHEMA`, over the first name and every further positional one, so
 /// the list PostgreSQL requires to be non-empty always is.
-// [spec:pgorm:req:python.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 #[pyfunction]
 #[pyo3(signature=(name, *names, if_exists=false, cascade=false))]
 pub(super) fn drop_schema(
@@ -47,7 +47,7 @@ pub(super) fn drop_schema(
 }
 
 /// `ALTER SCHEMA ... RENAME TO`, which PostgreSQL gives no `IF EXISTS`.
-// [spec:pgorm:req:python.schema-schemas]
+// [spec:pgorm:req:bindings.schema-schemas]
 #[pyfunction]
 pub(super) fn rename_schema(
     name: &Bound<'_, PyAny>,

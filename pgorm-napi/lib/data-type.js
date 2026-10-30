@@ -3,7 +3,7 @@
 // The SQL types SQL/JSON's RETURNING and JSON_TABLE's columns name: a built-in
 // type by name, with the size it takes, an enum by `TypeName`, or a range type
 // a schema created.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 
 import { arg, Handle, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

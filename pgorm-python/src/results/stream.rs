@@ -41,8 +41,8 @@ impl StreamState {
     }
 }
 
-// [spec:pgorm:req:python.results]
-// [spec:pgorm:req:python.cancellation]
+// [spec:pgorm:req:bindings.streams]
+// [spec:pgorm:req:bindings.cancellation]
 #[pyclass(name = "_Stream", module = "pgorm._native", frozen)]
 pub(crate) struct NativeStream {
     state: Arc<StreamState>,

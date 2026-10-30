@@ -37,7 +37,7 @@ fn check(condition: &Bound<'_, PyAny>, name: Option<&Bound<'_, PyAny>>) -> PyRes
 
 #[pymethods]
 impl PyCreateDomain {
-    // [spec:pgorm:req:python.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains]
     #[new]
     fn new(name: &Bound<'_, PyAny>, base: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
@@ -45,7 +45,7 @@ impl PyCreateDomain {
         })
     }
 
-    // [spec:pgorm:req:python.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains]
     #[pyo3(signature=(name, *, schema=None))]
     fn collate(
         &self,
@@ -77,7 +77,7 @@ impl PyCreateDomain {
         Self { inner }
     }
 
-    // [spec:pgorm:req:python.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains]
     #[pyo3(signature=(condition, *, name=None))]
     fn check(
         &self,
@@ -115,7 +115,7 @@ fn altered(
     })
 }
 
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 #[pyfunction]
 pub(super) fn set_domain_default(
     domain: &Bound<'_, PyAny>,
@@ -140,7 +140,7 @@ pub(super) fn drop_domain_not_null(domain: &Bound<'_, PyAny>) -> PyResult<PyDDL>
     altered(domain, PendingDomainAlter::drop_not_null)
 }
 
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 #[pyfunction]
 #[pyo3(signature=(domain, condition, *, name=None, not_valid=false))]
 pub(super) fn add_domain_check(
@@ -156,7 +156,7 @@ pub(super) fn add_domain_check(
     })
 }
 
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 #[pyfunction]
 #[pyo3(signature=(domain, name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_domain_constraint(
@@ -199,7 +199,7 @@ pub(super) fn validate_domain_constraint(
 
 /// `RENAME TO`, the new name one identifier: a rename keeps the domain in
 /// its schema.
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 #[pyfunction]
 pub(super) fn rename_domain(
     domain: &Bound<'_, PyAny>,
@@ -211,7 +211,7 @@ pub(super) fn rename_domain(
 
 /// `DROP DOMAIN`, over the first domain and every further positional one, so
 /// the list PostgreSQL requires to be non-empty always is.
-// [spec:pgorm:req:python.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains]
 #[pyfunction]
 #[pyo3(signature=(domain, *domains, if_exists=false, cascade=false))]
 pub(super) fn drop_domain(

@@ -253,16 +253,17 @@ explicit limitations.
 > as the type the server gives it, the domain, which the server refuses
 > (`42883`), until `compares_as(enum)` names the enum it compares as, a
 > structured `TypeName` schema-qualified where the enum is; the operators then
-> cast it as they cast an entity column so typed. The Python and JavaScript
+> cast it as they cast an entity column so typed. The language bindings'
 > pipelines take the same two routes: a registered entity's column read
 > under a qualifier (`col(table, entity.col(name))`) lowers through the
-> registration's own `Named::col`, and `compares_as` / `comparesAs` names
-> the enum where no registration types the column. JavaScript's registered
-> column is a member — of a list of values, each converted to its declared
-> kind, or of a subquery's rows — through its `ColumnTrait`'s `is_in`,
-> `is_not_in`, `in_subquery` and `not_in_subquery`, so it is cast as Rust's
-> is; a statement builder's own expression is SQL as written, and is cast
-> by the caller where it needs one.
+> registration's own `Named::col`, and `compares_as` names the enum where no
+> registration types the column (`bindings.pipeline-sources`,
+> `bindings.pipeline-expressions`). A binding's registered column is a
+> member — of a list of values, each converted to its declared kind, or of a
+> subquery's rows — through its `ColumnTrait`'s `is_in`, `is_not_in`,
+> `in_subquery` and `not_in_subquery`, so it is cast as Rust's is
+> (`bindings.entity-reads`); a statement builder's own expression is SQL as
+> written, and is cast by the caller where it needs one.
 >
 > Every value-position operand a `ColumnTrait` predicate takes passes through
 > `save_as`, but under a column whose domain is over an enum, where it is cast

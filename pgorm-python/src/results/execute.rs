@@ -9,7 +9,7 @@ use crate::{
     transactions::work::{Output, Work},
 };
 
-// [spec:pgorm:req:python.results]
+// [spec:pgorm:req:bindings.results]
 pub(crate) fn execute<'py>(
     py: Python<'py>,
     target: Target,

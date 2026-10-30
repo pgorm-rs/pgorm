@@ -7,8 +7,8 @@ from types import TracebackType
 from . import _native
 
 
-# [spec:pgorm:req:python.listen+1]
-# [spec:pgorm:req:python.cancellation]
+# [spec:pgorm:req:bindings.listen]
+# [spec:pgorm:req:bindings.cancellation]
 class Listener:
     """A connection of its own that receives LISTEN notifications.
 
@@ -93,7 +93,7 @@ class Listener:
     ) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+1]
+    # [spec:pgorm:req:python.truth-testing+2]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("listeners cannot be tested as Python booleans")
 

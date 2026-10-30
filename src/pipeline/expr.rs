@@ -143,7 +143,7 @@ impl<'brand> From<AliasName> for Expr<'brand> {
 }
 
 /// A runtime alias reads an introduced name under the same resolution rules.
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline-expressions]
 impl<'brand> From<Name> for Expr<'brand> {
     fn from(alias: Name) -> Self {
         name(&SqlName::to_string(&*alias))
@@ -373,7 +373,7 @@ pub trait ExprOps<'brand>: Into<Expr<'brand>> + Sized {
 
     /// Name a projection with an owned identifier computed at runtime.
     /// Reserved-name validation is identical to [`as_`](ExprOps::as_).
-    // [spec:pgorm:req:python.pipeline+1]
+    // [spec:pgorm:req:bindings.pipeline-expressions]
     fn as_runtime(self, name: Name) -> Expr<'brand> {
         branded(adapter::aliased(
             self.into().node,

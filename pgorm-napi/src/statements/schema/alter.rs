@@ -68,7 +68,7 @@ macro_rules! act {
 }
 
 /// `ddlAlterTable(table)`: the table, with no action yet.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn alter_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = relation_at(cx, 0)?;
     Ok(Part::PendingAlterTable(table.clone(), Table::alter(table)).into())
@@ -99,7 +99,7 @@ fn add_column(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// column carries as its own action. One it would leave out — a generated
 /// expression, the serial family, a collation with no type to retype — is
 /// refused rather than dropped.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn modify_column(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (table, alter) = receiver(cx)?;
     let value = arg(cx, 1);
@@ -159,7 +159,7 @@ fn add_unique(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlAlterAddForeignKey(alter, columns, references, refColumns, options)`:
 /// a foreign key, `NOT VALID` when the options say, which leaves the rows
 /// already there unchecked.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn add_foreign_key(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (table, alter) = receiver(cx)?;
     let (key, options) = foreign_key(cx, table.clone(), 1, &["notValid"])?;
@@ -184,7 +184,7 @@ fn add_check(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `ddlAlterAddNotNull(alter, column, { name, noInherit, notValid })`:
 /// PostgreSQL 18's table-level `NOT NULL`, the one spelling with a place for
 /// `NOT VALID`.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn add_not_null(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (table, alter) = receiver(cx)?;
     let column = name_at(cx, 1)?;
@@ -228,7 +228,7 @@ fn validate_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlAlterAlterConstraint(alter, name, change)`: whether a `NOT NULL`
 /// passes to inheriting tables, or whether a foreign key is enforced.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn alter_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (table, alter) = receiver(cx)?;
     let name = name_at(cx, 1)?;
@@ -249,7 +249,7 @@ fn alter_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlAlterSetExpression(alter, column, expression)`: a generated column's
 /// new expression, which the rows already written take.
-// [spec:pgorm:req:napi.schema-alter]
+// [spec:pgorm:req:bindings.schema-alter]
 fn set_expression(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (table, alter) = receiver(cx)?;
     let column = name_at(cx, 1)?;

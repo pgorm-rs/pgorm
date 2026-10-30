@@ -76,7 +76,7 @@ impl Drop for CloseUnlessAnswered {
 
 /// Open a listener on `pool`'s configuration and register it, so closing the
 /// pool closes it.
-// [spec:pgorm:req:python.listen+1]
+// [spec:pgorm:req:bindings.listen]
 pub(crate) fn open<'py>(
     py: Python<'py>,
     pool: Arc<PoolState>,
@@ -118,8 +118,8 @@ fn channel(value: &Bound<'_, PyAny>) -> PyResult<String> {
         .map_err(|_| ConstructionError::new_err("a channel name must be a str"))
 }
 
-// [spec:pgorm:req:python.listen+1]
-// [spec:pgorm:req:python.cancellation]
+// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.cancellation]
 /// A dedicated connection's `LISTEN` set and the notifications it receives.
 #[pyclass(name = "_Listener", module = "pgorm._native", frozen)]
 pub(crate) struct NativeListener {
@@ -257,7 +257,7 @@ impl Drop for NativeListener {
     }
 }
 
-// [spec:pgorm:req:python.listen+1]
+// [spec:pgorm:req:bindings.listen]
 /// One notification: its channel, its payload and the process id of the
 /// session that sent it.
 #[pyclass(
@@ -308,7 +308,7 @@ impl PyNotification {
 
 /// Send `payload` on `channel` through pgorm's `notify` on a connection or
 /// transaction: bound, and delivered when the transaction commits.
-// [spec:pgorm:req:python.listen+1]
+// [spec:pgorm:req:bindings.listen]
 pub(crate) fn notify<'py>(
     py: Python<'py>,
     target: Target,
@@ -343,8 +343,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// [spec:pgorm:req:python.capabilities]
-// [spec:pgorm:req:python.listen+1]
+// [spec:pgorm:req:python.capabilities+1]
+// [spec:pgorm:req:bindings.listen]
 pub(crate) fn policy() -> Value {
     json!({
         "connection": "a dedicated connection opened with the pool's configuration and TLS, outside its size; closing the pool closes it",

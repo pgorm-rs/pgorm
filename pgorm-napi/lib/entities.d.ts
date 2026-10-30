@@ -5,8 +5,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.entities]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.entities]
 
 import type { Compiled, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
 import type { Select } from "./select.d.ts";

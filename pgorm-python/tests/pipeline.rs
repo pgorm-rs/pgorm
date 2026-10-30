@@ -219,7 +219,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
     ])
 }
 
-// [spec:pgorm:req:python.pipeline+1/test]
+// [spec:pgorm:req:bindings.pipeline/test]
 #[test]
 fn pipeline_sql_and_parameters_match_rust() -> Result<(), Box<dyn std::error::Error>> {
     Python::initialize();

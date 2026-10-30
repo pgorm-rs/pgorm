@@ -79,8 +79,7 @@ async function typed(pool: Pool): Promise<unknown[]> {
   return [id, mood, tags, span, created, missing, generated, wild, key, title, name, maybe, grouped, loaded, owner, before, was];
 }
 
-// [spec:pgorm:req:napi.models/test]
-// [spec:pgorm:req:napi.typing/test]
+// [spec:pgorm:req:napi.typing+1/test]
 test("the declarations type a model's records, writes, keys, graphs and cursors from its columns", () => {
   assert.equal(typeof typed, "function");
   assert.match(Account.select("id", "name").inspect().sql, /SELECT "account"\."id", "account"\."name"/);

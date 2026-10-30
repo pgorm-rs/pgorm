@@ -2,7 +2,7 @@
 // server in either runtime: its exports are the registrations they name, and
 // their records, graph rows and source rows read as its declarations type
 // them.
-// [spec:pgorm:req:napi.codegen/test]
+// [spec:pgorm:req:bindings.codegen/test]
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -50,7 +50,7 @@ after(async () => {
   await database?.drop();
 });
 
-// [spec:pgorm:req:napi.codegen/test]
+// [spec:pgorm:req:bindings.codegen/test]
 test("the generated exports are the registrations they name", () => {
   assert.equal(Account.name, "app.Account");
   assert.equal(Note.name, "app.Note");

@@ -14,7 +14,8 @@ use tokio::runtime::{Builder, Runtime};
 /// the process's exit ends them. Shutting it down when an instance unloads
 /// would cancel the queries of the instances still running, and dropping it on
 /// a JavaScript thread blocks that thread until every worker stops.
-// [spec:pgorm:req:napi.runtime]
+// [spec:pgorm:req:bindings.runtime]
+// [spec:pgorm:req:napi.runtime+1]
 // [spec:pgorm:req:napi.exit]
 static RUNTIME: LazyLock<std::io::Result<Runtime>> = LazyLock::new(|| {
     Builder::new_multi_thread()

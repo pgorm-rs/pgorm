@@ -48,7 +48,7 @@ impl LikePattern {
         "LikePattern(...)"
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "LIKE patterns cannot be tested as Python booleans",

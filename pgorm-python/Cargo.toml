@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/pgorm-rs/pgorm"
 readme = "README.md"
 
-# [spec:pgorm:req:python.optional]
+# [spec:pgorm:req:bindings.optional]
 # A separate workspace keeps Python configuration out of ordinary Rust builds.
 [workspace]
 

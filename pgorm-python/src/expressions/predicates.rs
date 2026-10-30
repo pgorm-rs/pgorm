@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use super::{PyExpr, coerce, construct::sequence};
 use crate::statements::subquery;
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.expressions]
 #[pymethods]
 impl PyExpr {
     fn is_null(&self) -> Self {

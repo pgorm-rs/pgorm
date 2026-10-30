@@ -84,7 +84,7 @@ async function column(expr: ReturnType<typeof col>, where = docs.col("id").eq(1)
   return (await pool().one(select(expr.as("v")).from(docs).where(where))).v;
 }
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("JSON_VALUE reads a scalar as the type it returns, with its DEFAULT and ERROR behaviours", async () => {
   assert.equal(await column(jsonValue(doc, "$.size", { returning: "integer" })), 3);
   assert.equal(
@@ -102,7 +102,7 @@ test("JSON_VALUE reads a scalar as the type it returns, with its DEFAULT and ERR
   );
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("JSON_EXISTS reads PASSING variables by their exact names, and JSON_QUERY shapes what it finds", async () => {
   const tagged = (tag: string) =>
     pool().query(select(docs.col("id")).from(docs).where(jsonExists(doc, "$.tags[*] ? (@ == $Tag)", { passing: { Tag: tag } })));
@@ -117,7 +117,7 @@ test("JSON_EXISTS reads PASSING variables by their exact names, and JSON_QUERY s
   assert.equal(await column(jsonQuery(formatJson(docs.col("body")), "$.name", { returning: "text", shaping: "omitQuotes" })), "first");
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("the constructors build JSON on the server, a bound number staying a number", async () => {
   const row = await pool().one(
     select(
@@ -141,7 +141,7 @@ test("the constructors build JSON on the server, a bound number staying a number
   );
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("the JSON aggregates take their ordering, NULL handling and FILTER", async () => {
   const row = await pool().one(
     select(
@@ -153,7 +153,7 @@ test("the JSON aggregates take their ordering, NULL handling and FILTER", async 
   assert.deepStrictEqual(Object.keys(row.bodies as object).length, 3);
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("IS JSON tests a value's kind", async () => {
   const rows = await pool().query(
     select(docs.col("id"), isJson(docs.col("body")).as("json"), isJson(docs.col("body"), { kind: "array" }).as("array"),
@@ -167,7 +167,7 @@ test("IS JSON tests a value's kind", async () => {
   ]);
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("JSON_TABLE reads rows out of a document, each kind of column its own way, and LEFT JOIN keeps an empty one", async () => {
   const items = jsonTable(doc, "$.items[*] ? (@.n >= $Min)", [
     C.ordinality("i"),
@@ -197,7 +197,7 @@ test("JSON_TABLE reads rows out of a document, each kind of column its own way, 
   assert.deepStrictEqual(kept.map((row) => [row.id, row.mood]), [[2n, null], [3n, "calm"]]);
 });
 
-// [spec:pgorm:req:napi.sql-json/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 test("a behaviour, type or shape a SQL/JSON function cannot take is refused as it is built", () => {
   assert.throws(() => jsonValue(doc, "$.a", { returning: "jsonb" }), refused(/JSON_VALUE cannot return json or jsonb/));
   assert.throws(() => jsonValue(doc, "$.a", { returning: "json" }), refused(/bug #19695/));

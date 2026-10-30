@@ -25,7 +25,7 @@ impl PyEntitySchema {
     }
 }
 
-// [spec:pgorm:req:python.schema+2]
+// [spec:pgorm:req:bindings.schema-from-entity]
 #[pyfunction]
 pub(super) fn schema_from_entity(entity: &Bound<'_, PyAny>) -> PyResult<PyEntitySchema> {
     let entity = entity.extract::<PyRef<'_, PyEntity>>().map_err(|_| {

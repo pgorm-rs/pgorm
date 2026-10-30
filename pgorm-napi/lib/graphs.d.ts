@@ -4,8 +4,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.graphs]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.graphs]
 
 import type { Compiled, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Select } from "./select.d.ts";

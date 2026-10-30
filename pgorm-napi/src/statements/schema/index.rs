@@ -30,7 +30,7 @@ pub(super) const EXPORTS: &[(&str, super::super::Build)] = &[
 
 /// An index entry: a column's name, an expression, or `{ on, order,
 /// operatorClass }` over either.
-// [spec:pgorm:req:napi.schema-indexes]
+// [spec:pgorm:req:bindings.schema-indexes]
 fn entry<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<IndexColumn> {
     if value.is_a::<JsString, _>(cx) {
         return Ok(IndexColumn::name(name(cx, value)?));
@@ -87,7 +87,7 @@ fn receiver(cx: &mut FunctionContext) -> NeonResult<IndexCreateStatement> {
 
 /// `ddlCreateIndex(table, entry, { name })`: an index over its first entry,
 /// named when the options say and named by PostgreSQL otherwise.
-// [spec:pgorm:req:napi.schema-indexes]
+// [spec:pgorm:req:bindings.schema-indexes]
 fn create_index(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = relation_at(cx, 0)?;
     let first = arg(cx, 1);
@@ -116,7 +116,7 @@ fn index_unique(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `NULLS NOT DISTINCT`, which PostgreSQL defines for a unique index alone,
 /// and so makes the index unique.
-// [spec:pgorm:req:napi.schema-indexes]
+// [spec:pgorm:req:bindings.schema-indexes]
 fn index_nulls_not_distinct(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut created = receiver(cx)?;
     created.unique().nulls_not_distinct();
@@ -131,7 +131,7 @@ fn index_if_not_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlIndexUsing(index, method)`: the access method, any the server has —
 /// `btree`, `hash` and `gin` by pgorm-query's own variants, another by name.
-// [spec:pgorm:req:napi.schema-indexes]
+// [spec:pgorm:req:bindings.schema-indexes]
 fn index_using(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut created = receiver(cx)?;
     let value = arg(cx, 1);
@@ -166,7 +166,7 @@ fn index_where(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlDropIndex(table, name, { ifExists })`: the index in its table's
 /// schema.
-// [spec:pgorm:req:napi.schema-indexes]
+// [spec:pgorm:req:bindings.schema-indexes]
 fn drop_index(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = relation_at(cx, 0)?;
     let name = name_at(cx, 1)?;

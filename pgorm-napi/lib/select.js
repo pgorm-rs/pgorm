@@ -1,7 +1,9 @@
 // @ts-check
 
 // SELECT, the tables and other items it reads, and common table expressions.
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.from-subqueries]
+// [spec:pgorm:req:bindings.row-locks]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";

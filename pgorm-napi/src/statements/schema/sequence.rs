@@ -71,14 +71,14 @@ macro_rules! clause {
 }
 
 /// `ddlCreateSequence(name)`: a sequence is a relation, named as a table is.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn create_sequence(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     Ok(Ddl::CreateSequence(Sequence::create(name)).into())
 }
 
 /// `ddlAlterSequence(name)`: the sequence, with no clause yet.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn alter_sequence(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = relation_at(cx, 0)?;
     Ok(Part::PendingAlterSequence(Sequence::alter(name)).into())
@@ -127,7 +127,7 @@ fn sequence_as_type(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlSequenceOptions(sequence, options)`: at least one option, merged into
 /// those already set, a later one for a clause replacing the earlier.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn sequence_set_options(cx: &mut FunctionContext) -> NeonResult<Node> {
     let clauses = clauses(cx)?;
     let Some(options): Option<SequenceOptions> = sequence_options(cx, 1)? else {
@@ -166,7 +166,7 @@ fn sequence_restart(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlSequenceOwnedBy(sequence, table, column)`, or with a `null` table
 /// `OWNED BY NONE`, which releases it.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn sequence_owned_by(cx: &mut FunctionContext) -> NeonResult<Node> {
     let clauses = clauses(cx)?;
     let table = arg(cx, 1);
@@ -209,7 +209,7 @@ fn rename_sequence(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `ddlCreateExtension(name, { ifNotExists, schema, version, cascade })`: the
 /// name and schema quoted, the version a literal.
-// [spec:pgorm:req:napi.schema-sequences]
+// [spec:pgorm:req:bindings.schema-sequences]
 fn create_extension(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = name_at(cx, 0)?;
     let options = object(cx, 1, &["ifNotExists", "schema", "version", "cascade"])?;

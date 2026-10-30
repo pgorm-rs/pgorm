@@ -57,7 +57,7 @@ fn doc() -> Expr {
     Expr::col(Name::runtime("doc"))
 }
 
-// [spec:pgorm:req:python.expressions+6/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn query_functions_match_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -153,7 +153,7 @@ fn query_functions_match_the_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+6/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn constructors_match_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -254,7 +254,7 @@ fn constructors_match_the_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.expressions+6/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn unrepresentable_choices_are_refused() -> PyResult<()> {
     Python::initialize();
@@ -319,7 +319,7 @@ fn statement_parity(
     Ok(())
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn json_table_matches_the_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -438,7 +438,7 @@ jt = p.json_table(
     })
 }
 
-// [spec:pgorm:req:python.statements+10/test]
+// [spec:pgorm:req:bindings.sql-json/test]
 #[test]
 fn json_table_refuses_what_its_builder_cannot_take() -> PyResult<()> {
     Python::initialize();

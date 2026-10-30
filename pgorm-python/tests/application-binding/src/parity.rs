@@ -19,7 +19,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     Ok(module)
 }
 
-// [spec:pgorm:req:python.entities+4/test]
+// [spec:pgorm:req:bindings.entity-reads/test]
 #[test]
 fn query_sql_and_values_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -87,7 +87,7 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.entities+4/test]    a column's is_in and is_not_in are its
+// [spec:pgorm:req:bindings.entity-reads/test]    a column's is_in and is_not_in are its
 // ColumnTrait membership: is_in / is_not_in over values of its declared kind, and in_subquery /
 // not_in_subquery over a Select's rows, so a column whose domain is over an enum is a member as
 // the enum, the subquery's projection cast beside it
@@ -183,7 +183,7 @@ fn assert_active(native: &Bound<'_, PyAny>, rust: &account::ActiveModel) -> PyRe
     Ok(())
 }
 
-// [spec:pgorm:req:python.entities+4/test]
+// [spec:pgorm:req:bindings.entity-writes/test]
 #[test]
 fn active_state_and_values_match_rust() -> PyResult<()> {
     Python::initialize();

@@ -5,8 +5,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.windows+2]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.windows]
 
 import type { Expr, Operand, OrderBy } from "./expressions.d.ts";
 

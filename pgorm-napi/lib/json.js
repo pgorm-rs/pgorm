@@ -3,7 +3,7 @@
 // SQL/JSON's query functions, constructors, FORMAT JSON and IS JSON over
 // pgorm-query's builders. Each function takes only its own behaviours, so a
 // choice PostgreSQL refuses for it cannot be written.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 
 import { arg, args, Handle, made, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

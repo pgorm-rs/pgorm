@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 
 use super::PyExpr;
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.ranges]
 #[pymethods]
 impl PyExpr {
     fn contains(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

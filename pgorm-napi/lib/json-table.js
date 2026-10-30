@@ -3,7 +3,7 @@
 // JSON_TABLE, a FROM item reading rows out of a JSON document. Its paths are
 // written as escaped literals, which PostgreSQL requires there; its PASSING
 // values are bound.
-// [spec:pgorm:req:napi.sql-json]
+// [spec:pgorm:req:bindings.sql-json]
 
 import { arg, args, Handle, trusted, TRUSTED } from "./builder.js";
 import { variables } from "./json.js";

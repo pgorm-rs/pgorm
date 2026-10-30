@@ -11,7 +11,7 @@ def rows(changes):
     return [(change.old["id"], change.old["note"], change.new["note"]) for change in changes]
 
 
-# [spec:pgorm:req:python.entities+4/test]
+# [spec:pgorm:req:bindings.entity-versions/test]
 class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

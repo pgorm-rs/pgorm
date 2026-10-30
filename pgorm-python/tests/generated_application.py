@@ -19,7 +19,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
     asyncSetUp = fixture.RegisteredEntities.asyncSetUp
     asyncTearDown = fixture.RegisteredEntities.asyncTearDown
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:bindings.codegen/test]
     async def test_generated_models_keep_native_states(self):
         original = (
             app.Account.active()
@@ -64,8 +64,8 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await updated.into_active().delete(connection), 1)
                 self.assertIsNone(await query.one_opt(connection))
 
-    # [spec:pgorm:req:python.codegen+2/test]
-    # [spec:pgorm:req:python.entities+4/test]
+    # [spec:pgorm:req:bindings.codegen/test]
+    # [spec:pgorm:req:bindings.entity-versions/test]
     async def test_generated_views_return_typed_versions(self):
         def active(identity, name):
             return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
@@ -101,7 +101,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 case other:
                     self.fail(f"expected an update then an insert, got {other!r}")
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:bindings.codegen/test]
     async def test_graph_views_keep_optional_models(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2):
@@ -134,7 +134,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
             required = await app.RequiredNotes.find().all(connection)
             self.assertEqual([(a.id, n.id) for a, n in required], [(1, 10)])
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:bindings.codegen/test]
     async def test_views_reject_foreign_entities(self):
         with self.assertRaises(p.LifecycleError):
             app.AccountActive(p.entity("app.Note").active())
@@ -173,7 +173,7 @@ class GeneratedIntervals(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP TABLE IF EXISTS interval_span"))
         await self.pool.close()
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:python.codegen+3/test]
     async def test_interval_fields_are_pgorm_intervals(self):
         behind = p.Interval(14, -3, -(4 * HOUR + 1_234_567))
         ahead = p.Interval(-1, 2, HOUR + 3_000_004)
@@ -250,7 +250,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
         await self.drop()
         await self.pool.close()
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:python.codegen+3/test]
     async def test_domain_fields_are_their_bases(self):
         active = (
             app.StockLine.active()
@@ -295,7 +295,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, "23514")
 
 
-    # [spec:pgorm:req:python.pipeline+1/test]    a registered column a pipeline reads compares
+    # [spec:pgorm:req:bindings.pipeline-sources/test]    a registered column a pipeline reads compares
     # as the enum its domain is over, under its table and under a source's name, where the
     # column named by text is refused with 42883
     async def test_pipeline_compares_registered_domain_as_enum(self):
@@ -343,7 +343,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, "42883")
 
 class GeneratedContract(unittest.TestCase):
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:bindings.codegen/test]
     def test_compatibility_fails_before_queries(self):
         for key in ("package_version", "pgorm_version", "registry_abi", "features"):
             expected = copy.deepcopy(app._COMPATIBILITY)
@@ -368,7 +368,7 @@ class GeneratedContract(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             exec(compile(code, "incompatible.py", "exec"), {})
 
-    # [spec:pgorm:req:python.codegen+2/test]
+    # [spec:pgorm:req:python.codegen+3/test]
     def test_generated_types_follow_compiled_metadata(self):
         stub = Path(app.__file__).with_suffix(".pyi").read_text()
         self.assertIn("def id(self) -> int:", stub)

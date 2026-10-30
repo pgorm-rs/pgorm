@@ -109,7 +109,7 @@ fn scope_open(_: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `pipelineScopeClose(scope)`: the function returned or threw; nothing more
 /// binds in it.
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-binder]
 fn scope_close(cx: &mut FunctionContext) -> NeonResult<Node> {
     let scope = scope_at(cx, 0)?;
     scope.state(cx)?.open = false;
@@ -119,7 +119,7 @@ fn scope_close(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// A value to bind: any parameter, inferred or declared with `Value`, but none
 /// whose kind needs a cast pgorm's pipeline cannot write, or `null`, which has
 /// no kind.
-// [spec:pgorm:req:napi.pipeline-expressions+2]
+// [spec:pgorm:req:napi.pipeline-operands]
 pub(super) fn bindable<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<Value> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -146,7 +146,7 @@ pub(super) fn bindable<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> Neo
 
 /// `pipelineBind(scope, value)`: one placeholder for one value, branded with
 /// the scope, while its function runs.
-// [spec:pgorm:req:napi.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-binder]
 fn bind(cx: &mut FunctionContext) -> NeonResult<Node> {
     let scope = scope_at(cx, 0)?;
     let value = arg(cx, 1);

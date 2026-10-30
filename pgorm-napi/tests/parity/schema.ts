@@ -3,15 +3,15 @@
 // views, materialized views and tables created from a query, extensions and
 // comments — held to `schema.json` as `select.ts`'s are to theirs. A DDL
 // statement binds nothing, so every case's values are empty.
-// [spec:pgorm:req:napi.schema+2/test]
-// [spec:pgorm:req:napi.schema-tables/test]
-// [spec:pgorm:req:napi.schema-alter/test]
-// [spec:pgorm:req:napi.schema-indexes/test]
-// [spec:pgorm:req:napi.schema-types/test]
-// [spec:pgorm:req:napi.schema-sequences/test]
-// [spec:pgorm:req:napi.schema-views/test]
-// [spec:pgorm:req:napi.schema-schemas/test]
-// [spec:pgorm:req:napi.schema-domains/test]
+// [spec:pgorm:req:bindings.schema/test]
+// [spec:pgorm:req:bindings.schema-tables/test]
+// [spec:pgorm:req:bindings.schema-alter/test]
+// [spec:pgorm:req:bindings.schema-indexes/test]
+// [spec:pgorm:req:bindings.schema-types/test]
+// [spec:pgorm:req:bindings.schema-sequences/test]
+// [spec:pgorm:req:bindings.schema-views/test]
+// [spec:pgorm:req:bindings.schema-schemas/test]
+// [spec:pgorm:req:bindings.schema-domains/test]
 
 import {
   alterDomain,

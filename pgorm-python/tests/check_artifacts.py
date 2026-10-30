@@ -19,7 +19,7 @@ def pyo3_releases(packages: list[dict]) -> list[str]:
     return sorted(p["version"] for p in packages if p["name"] == "pyo3")
 
 
-# [spec:pgorm:req:python.optional/test]
+# [spec:pgorm:req:bindings.optional/test]
 # [spec:pgorm:req:python.package/test]
 # [spec:pgorm:req:python.distribution/test]
 def check_source(path: Path) -> None:
@@ -48,7 +48,7 @@ def check_source(path: Path) -> None:
         assert any(name.endswith("/pgorm/THIRD_PARTY_NOTICES.txt") for name in names)
 
 
-# [spec:pgorm:req:python.optional/test]
+# [spec:pgorm:req:bindings.optional/test]
 # [spec:pgorm:req:python.package/test]
 # [spec:pgorm:req:python.distribution/test]
 def check_wheel(path: Path) -> None:

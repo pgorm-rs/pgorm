@@ -4,8 +4,11 @@
 // pgorm from Node.js and Deno. This module loads the native addon, hands it
 // the error and value classes it rejects with and builds values from, and is
 // what an application imports.
+// [spec:pgorm:def:bindings.api]
+// [spec:pgorm:req:bindings.surface]
+// [spec:pgorm:req:napi.naming]
 // [spec:pgorm:def:napi.api+1]
-// [spec:pgorm:req:napi.typing]
+// [spec:pgorm:req:napi.typing+1]
 
 import { loadAddon } from "./native.js";
 import { installConnections } from "./operations.js";

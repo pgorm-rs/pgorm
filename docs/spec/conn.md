@@ -370,7 +370,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > created after the call is not cleared at all. `InstrumentedPool` forwards it
 > to the pool it wraps (`metric.layer`); the Python and JavaScript pools expose
 > it as `clear_statement_caches()` and `clearStatementCaches()`
-> (`python.connections`, `napi.connections`); and pgorm-migration's `up`
+> (`bindings.connections`); and pgorm-migration's `up`
 > calls it once a batch that applied a migration commits (`migration.up`).
 >
 > It reaches only the pool it is called on, and so only the process holding
@@ -460,7 +460,7 @@ connection handles plus the `ConnectionTrait` / `TransactionTrait` surface;
 > defaults, so a hook for this would be a change every collector had to make.
 > The Python and JavaScript pools take the setting as
 > `statement_cache_channel` and `statementCacheChannel`, and export
-> `STATEMENT_CACHE_CHANNEL` (`python.connections`, `napi.connections`).
+> `STATEMENT_CACHE_CHANNEL` (`bindings.connections`).
 
 ## Statement execution surface
 

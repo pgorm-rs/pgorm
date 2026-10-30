@@ -53,6 +53,7 @@ class ModelRows:
         raise p.ConstructionError("model queries cannot be tested as Python booleans")
 
 
+# [spec:pgorm:req:bindings.model-reads]
 @dataclass(frozen=True, eq=False, slots=True)
 class ModelQuery(ModelRows):
     statement: p.Select
@@ -80,6 +81,7 @@ class ModelQuery(ModelRows):
         return replace(self, statement=self.statement.join(other.table, on, kind=kind))
 
 
+# [spec:pgorm:req:bindings.model-writes]
 @dataclass(frozen=True, eq=False, slots=True)
 class ModelWrite:
     model: Model

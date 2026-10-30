@@ -115,7 +115,7 @@ impl<T: SourceTypes> SourceQuery<T> {
     }
 }
 
-// [spec:pgorm:req:python.pipeline+1]
+// [spec:pgorm:req:bindings.pipeline-sources]
 impl<T: SourceTypes> QueryBackend for SourceQuery<T>
 where
     <T::Selection as SourceList>::Row: Send,

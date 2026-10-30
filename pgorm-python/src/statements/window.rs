@@ -71,7 +71,7 @@ impl PyFrameType {
         })
     }
 
-    // [spec:pgorm:req:python.truth-testing+1]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "window frames cannot be tested as Python booleans",
@@ -251,7 +251,7 @@ impl PyFrameFollowing {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.windows]
 /// An `OVER` window: PARTITION BY, ORDER BY and a frame, owned by Rust's
 /// `WindowStatement`.
 #[pyclass(name = "Window", module = "pgorm", frozen, from_py_object)]
@@ -320,7 +320,7 @@ fn frame_clause(frame: &Bound<'_, PyAny>) -> PyResult<FrameClause> {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.windows]
 /// A window built on an entry of a SELECT's WINDOW clause, owned by Rust's
 /// `ExtendedWindow`: it copies the base's PARTITION BY and any ORDER BY, and
 /// adds an ORDER BY and a frame. Declared with `Select.window` it builds on
@@ -366,7 +366,7 @@ impl PyExtendedWindow {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.windows]
 /// What `Select.window` declares a name as: a `Window`, or an
 /// `ExtendedWindow` built on an earlier entry. Anything else is a
 /// `TypeError`, as an argument of the wrong class is.
@@ -440,7 +440,7 @@ enum Over {
     Named(Name),
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.windows]
 /// A function call under `OVER`, a SELECT item built by `over`.
 #[pyclass(name = "WindowedExpr", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -495,7 +495,7 @@ impl PyWindowedExpr {
     }
 }
 
-// [spec:pgorm:req:python.statements+10]
+// [spec:pgorm:req:bindings.windows]
 /// A function PostgreSQL computes only over a window, built by
 /// `window_function`. Its one method is `over`, so it cannot stand in a query
 /// without its window (`42809`).

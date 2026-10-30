@@ -5,7 +5,8 @@ use pyo3::prelude::*;
 
 use super::PyExpr;
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:python.naming]
 #[pymethods]
 impl PyExpr {
     fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

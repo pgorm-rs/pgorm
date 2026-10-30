@@ -31,7 +31,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             kind=kind,
         )
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-sources/test]
     async def test_all_source_arities_preserve_optional_models(self):
         async with self.pool.connection() as connection:
             one = pl.from_(self.account).select_sources(pl.sources("app.SingleAccount"))
@@ -61,7 +61,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(row[0]["id"], 3)
                 self.assertEqual(row[1:], (None,) * (size - 1))
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-sources/test]
     async def test_right_full_and_absent_single_sources(self):
         selection = pl.sources("app.TwoSources")
         async with self.pool.connection() as connection:
@@ -90,7 +90,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.DatabaseError):
                 await empty.one(connection)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-sources/test]
     async def test_aliases_parameters_and_decode_failures(self):
         alias = "notes '雪'; -- $1"
         refused = 'notes "雪"'
@@ -134,7 +134,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(p.DecodeError):
                     await terminal(connection)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-sources/test]
     async def test_registration_and_shape_rejections(self):
         entries = {x["name"]: x for x in p.capabilities()["registrations"]["sources"]}
         self.assertEqual(len(entries), 6)
@@ -159,7 +159,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(p.ConstructionError, "reshap"):
                 changed.select_sources(selection).inspect()
 
-    # [spec:pgorm:req:python.truth-testing+1/test]
+    # [spec:pgorm:req:python.truth-testing+2/test]
     async def test_selected_sources_refuse_truth_testing(self):
         selected = self.joined().select_sources(
             pl.sources("app.TwoSources"), qualifiers=["accounts", "n"]
@@ -167,7 +167,8 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.ConstructionError):
             bool(selected)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-sources/test]
+    # [spec:pgorm:req:bindings.cancellation/test]
     async def test_source_query_cancellation_releases_connection(self):
         await self.pool.execute(
             p.RawSQL(

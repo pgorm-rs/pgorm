@@ -40,7 +40,7 @@ pub(crate) fn refuse<'cx, T>(cx: &mut Cx<'cx>, message: impl Into<String>) -> Ne
 /// A JavaScript string as UTF-8. A lone surrogate has no UTF-8 form, and is
 /// refused rather than replaced with U+FFFD as Node-API's own conversion
 /// would.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:napi.values+1]
 pub(crate) fn string<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<String> {
     let Ok(text) = data.downcast::<JsString, _>(cx) else {
         return refuse(cx, "expected a string");
@@ -90,7 +90,7 @@ fn boxed<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<Tagged
 
 /// A kind: a name such as `"i32"` or `"tstzrange"`, a `TypeName` for an enum,
 /// or a `CreatedRange` / `CreatedMultirange`.
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.value-tags]
 pub(crate) fn kind<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -160,7 +160,7 @@ fn type_name<'cx>(
 }
 
 /// A value of the declared `tag`. `null` is SQL NULL of the kind.
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.value-tags]
 pub(crate) fn tagged<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -199,7 +199,7 @@ pub(crate) fn tagged<'cx>(
 
 /// An array of `element`s: a JavaScript array whose items are each `null`, a
 /// `Value` of the element kind, or data of it.
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.value-tags]
 pub(crate) fn array<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -330,7 +330,7 @@ fn civil_date<'cx>(
 
 /// A time of day from Temporal's fields. PostgreSQL keeps microseconds, so a
 /// nanosecond digit is refused rather than truncated.
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:napi.temporal+1]
 fn civil_time<'cx>(
     cx: &mut Cx<'cx>,
     description: &Description<'cx>,
@@ -361,7 +361,7 @@ fn civil_time<'cx>(
 }
 
 /// A Temporal value of the temporal `kind`.
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:napi.temporal+1]
 fn temporal<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -397,7 +397,7 @@ fn temporal<'cx>(
 }
 
 /// The pgorm value a described Temporal object holds.
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:napi.temporal+1]
 fn temporal_value<'cx>(cx: &mut Cx<'cx>, description: &Description<'cx>) -> NeonResult<Value> {
     Ok(match description.tag.as_str() {
         "date" => Value::Date(Some(Box::new(civil_date(cx, description, 0)?))),
@@ -438,7 +438,8 @@ fn temporal_value<'cx>(cx: &mut Cx<'cx>, description: &Description<'cx>) -> Neon
 
 /// An interval from the module's `Interval`, or from a `Temporal.Duration`,
 /// which `lib/values.js` converts to one.
-// [spec:pgorm:req:napi.temporal]
+// [spec:pgorm:req:napi.temporal+1]
+// [spec:pgorm:req:bindings.values]
 fn interval<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -486,7 +487,7 @@ fn decimal<'cx>(
 
 /// A decimal written in plain notation, held exactly: at most 28 fractional
 /// digits and a 96-bit coefficient, rust_decimal's and so pgorm's range.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:napi.values+1]
 pub(crate) fn parse_decimal<'cx>(cx: &mut Cx<'cx>, text: &str) -> NeonResult<Decimal> {
     let body = text.strip_prefix(['-', '+']).unwrap_or(text);
     let (whole, fraction) = body.split_once('.').unwrap_or((body, ""));
@@ -594,7 +595,7 @@ fn ranges<'cx>(
 /// A created range's text form: from a `Range` (or `Multirange`), each bound
 /// converted as the subtype's kind, or from the text form itself, read with
 /// the subtype's own parsing and written back canonically.
-// [spec:pgorm:req:napi.value-tags+2]
+// [spec:pgorm:req:bindings.created-ranges]
 fn created_text<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,
@@ -626,7 +627,7 @@ fn created_text<'cx>(
 
 /// A value of the scalar `kind`, read strictly: only the JavaScript types
 /// that kind declares.
-// [spec:pgorm:req:napi.values]
+// [spec:pgorm:req:bindings.values]
 fn scalar<'cx>(
     cx: &mut Cx<'cx>,
     codec: Codec<'cx>,

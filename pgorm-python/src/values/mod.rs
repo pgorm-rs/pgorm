@@ -23,8 +23,7 @@ pub use types::PyTypeName;
 use types::Tag;
 pub(crate) use types::{SCALAR_NAMES, scalar_name, unrepresented};
 
-// [spec:pgorm:req:python.values+5]
-// [spec:pgorm:req:python.value-tags]
+// [spec:pgorm:req:bindings.value-tags]
 /// Immutable owned Rust value plus qualified enum/array identity.
 #[pyclass(name = "Value", module = "pgorm", frozen, eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]

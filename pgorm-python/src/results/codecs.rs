@@ -11,7 +11,7 @@ use tokio_postgres::types::{FromSql, Kind, ToSql, Type};
 type CodecError = Box<dyn Error + Send + Sync>;
 
 /// The upstream Decimal decoder can round. Accept only exact values and scale.
-// [spec:pgorm:req:python.results]
+// [spec:pgorm:req:bindings.values]
 #[derive(Debug)]
 pub(super) struct ExactDecimal(pub Decimal);
 

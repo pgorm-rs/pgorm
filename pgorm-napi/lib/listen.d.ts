@@ -6,8 +6,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.listen]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.listen]
 
 import type { OperationOptions } from "./index.d.ts";
 

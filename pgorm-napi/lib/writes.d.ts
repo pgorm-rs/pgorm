@@ -5,8 +5,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.writes]
 
 import type { Aliased, Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
 import type { Select, Source, Table, With } from "./select.d.ts";

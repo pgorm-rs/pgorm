@@ -3,7 +3,7 @@
 // A model's reads: a SELECT of its fields, filtered, ordered, limited and
 // joined along its relations, run through terminals that decode each row
 // into a record of the model's fields.
-// [spec:pgorm:req:napi.model-reads+1]
+// [spec:pgorm:req:bindings.model-reads]
 
 import { arg, TRUSTED } from "./builder.js";
 import { Condition } from "./conditions.js";

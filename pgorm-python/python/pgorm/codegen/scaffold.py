@@ -10,7 +10,7 @@ import tomllib
 from .config import CodegenError, identifier, rust_string, validate
 
 
-# [spec:pgorm:req:python.codegen+2]
+# [spec:pgorm:req:bindings.codegen]
 def scaffold(
     config: object,
     destination: str | PathLike[str],

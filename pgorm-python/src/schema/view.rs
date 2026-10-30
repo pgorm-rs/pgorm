@@ -43,7 +43,7 @@ fn check_option(option: &str) -> PyResult<ViewCheckOption> {
 
 /// `CREATE [OR REPLACE] VIEW`: the check option exists only here, the
 /// recursive form having none, as PostgreSQL's grammar refuses one there.
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), or_replace=false, check_option=None, security_barrier=false, security_invoker=false))]
 #[allow(clippy::too_many_arguments)]
@@ -80,7 +80,7 @@ pub(super) fn create_view(
 /// `CREATE [OR REPLACE] RECURSIVE VIEW`: its column list names the rows of
 /// the `WITH RECURSIVE` query PostgreSQL defines it as, and the grammar
 /// refuses one without, so an empty list is refused here.
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, columns, query, *, or_replace=false, security_barrier=false, security_invoker=false))]
 pub(super) fn create_recursive_view(
@@ -114,7 +114,7 @@ pub(super) fn create_recursive_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_view(name: &PyTable, if_exists: bool, cascade: bool) -> PyResult<PyDDL> {
@@ -130,7 +130,7 @@ pub(super) fn drop_view(name: &PyTable, if_exists: bool, cascade: bool) -> PyRes
     })
 }
 
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
 pub(super) fn create_materialized_view(
@@ -157,7 +157,7 @@ pub(super) fn create_materialized_view(
 /// `REFRESH MATERIALIZED VIEW`. PostgreSQL refuses `CONCURRENTLY` beside
 /// `WITH NO DATA`, and the Rust statement holds the two in one slot, so both
 /// together are refused here rather than one silently kept.
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, *, concurrently=false, with_no_data=false))]
 pub(super) fn refresh_materialized_view(
@@ -182,7 +182,7 @@ pub(super) fn refresh_materialized_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, *, if_exists=false, cascade=false))]
 pub(super) fn drop_materialized_view(
@@ -202,7 +202,7 @@ pub(super) fn drop_materialized_view(
     })
 }
 
-// [spec:pgorm:req:python.schema-views+2]
+// [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
 #[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
 pub(super) fn create_table_as(

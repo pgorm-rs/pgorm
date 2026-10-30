@@ -57,7 +57,7 @@ async function exists(name: string): Promise<boolean> {
   return (await pool().optional("SELECT 1 FROM pg_namespace WHERE nspname = $1", [name])) !== null;
 }
 
-// [spec:pgorm:req:napi.schema-schemas/test]
+// [spec:pgorm:req:bindings.schema-schemas/test]
 test("each schema statement names its schemas as quoted identifiers and binds nothing", () => {
   assert.deepStrictEqual(createSchema('bill "x"', { ifNotExists: true }).inspect(), {
     sql: 'CREATE SCHEMA IF NOT EXISTS "bill ""x"""',
@@ -76,7 +76,7 @@ test("each schema statement names its schemas as quoted identifiers and binds no
   assert.throws(() => dropSchema("a", { behavior: "sideways" } as never));
 });
 
-// [spec:pgorm:req:napi.schema-schemas/test]
+// [spec:pgorm:req:bindings.schema-schemas/test]
 test("a schema holds a table qualified by it, carries it through a rename, and is dropped only by a cascade", async () => {
   await pool().execute(createSchema('billing "雪"'));
   assert.equal(await exists('billing "雪"'), true);
@@ -96,7 +96,7 @@ test("a schema holds a table qualified by it, carries it through a rename, and i
   assert.equal(await exists("ledger"), false);
 });
 
-// [spec:pgorm:req:napi.schema-schemas/test]
+// [spec:pgorm:req:bindings.schema-schemas/test]
 test("the server refuses a schema that exists, a pg_ name and a missing schema", async () => {
   await pool().execute(createSchema("archive"));
   await assert.rejects(pool().execute(createSchema("archive")), rejectedWith("42P06"));

@@ -58,9 +58,9 @@ def reject_execution_mismatch(project, output, environment):
         )
 
 
-# [spec:pgorm:req:python.entities+4/test]
-# [spec:pgorm:req:python.graph/test]
-# [spec:pgorm:req:python.pipeline+1/test]
+# [spec:pgorm:req:bindings.entities/test]
+# [spec:pgorm:req:bindings.entity-graphs/test]
+# [spec:pgorm:req:bindings.pipeline-sources/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-entities"))

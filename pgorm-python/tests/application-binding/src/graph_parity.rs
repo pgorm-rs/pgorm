@@ -4,7 +4,7 @@ use pgorm::{QueryFilter, QueryOrder, QueryTrait};
 use pgorm_python::expressions::Compiled;
 use pyo3::{prelude::*, types::PyDict};
 
-// [spec:pgorm:req:python.graph/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
 #[test]
 fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -56,7 +56,7 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.graph/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
 #[test]
 fn graphs_require_sources_and_unique_names() -> PyResult<()> {
     Python::initialize();
@@ -71,8 +71,8 @@ fn graphs_require_sources_and_unique_names() -> PyResult<()> {
     Ok(())
 }
 
-// [spec:pgorm:req:python.graph/test]
-// [spec:pgorm:req:python.entities+4/test]
+// [spec:pgorm:req:bindings.entity-graphs/test]
+// [spec:pgorm:req:bindings.entities/test]
 #[test]
 fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
     use crate::{room, stay};

@@ -20,7 +20,7 @@ pub(crate) struct Decoded {
     pub(crate) rows: Vec<Vec<Tagged>>,
 }
 
-// [spec:pgorm:req:napi.rows]
+// [spec:pgorm:req:bindings.rows]
 pub(crate) fn decode(rows: &[Row]) -> Result<Decoded, Failure> {
     let Some(first) = rows.first() else {
         return Ok(Decoded::default());
@@ -66,8 +66,9 @@ pub(crate) fn kinds<'cx>(cx: &mut Cx<'cx>, row: Option<&[Tagged]>) -> JsResult<'
 
 /// `[names, rows, kinds]`, each row an array of its values in column order,
 /// and each column's kind for a model to hold to its declaration.
-// [spec:pgorm:req:napi.rows]
-// [spec:pgorm:req:napi.model-records]
+// [spec:pgorm:req:bindings.rows]
+// [spec:pgorm:req:napi.records]
+// [spec:pgorm:req:bindings.model-records]
 pub(crate) fn to_js<'cx>(
     cx: &mut Cx<'cx>,
     decoded: Decoded,

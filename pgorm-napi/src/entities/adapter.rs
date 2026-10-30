@@ -93,7 +93,7 @@ impl<E: EntityTrait> Debug for RegisteredColumn<E> {
     }
 }
 
-// [spec:pgorm:req:napi.pipeline-expressions+2]
+// [spec:pgorm:req:bindings.pipeline-sources]
 impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
     fn lower<'brand>(&self, qualifier: Name) -> pgorm::pipeline::Expr<'brand> {
         pgorm::pipeline::named_runtime(E::default(), qualifier).col(self.0)
@@ -197,7 +197,7 @@ pub(crate) struct EntityAdapter<E> {
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:req:napi.entities]
+// [spec:pgorm:req:bindings.entities]
 impl<E> EntityBackend for EntityAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -247,7 +247,7 @@ where
         })
     }
 
-    // [spec:pgorm:req:napi.entity-reads+4]
+    // [spec:pgorm:req:bindings.entity-reads]
     fn membership(
         &self,
         name: &str,
@@ -316,7 +316,7 @@ where
         }
     }
 
-    // [spec:pgorm:req:napi.entity-versions]
+    // [spec:pgorm:req:bindings.entity-versions]
     async fn write_versions(
         &self,
         db: Database<'_>,
@@ -387,7 +387,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:napi.entity-reads+4]
+// [spec:pgorm:req:bindings.entity-reads]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -459,7 +459,7 @@ where
     })
 }
 
-// [spec:pgorm:req:napi.entity-writes]
+// [spec:pgorm:req:bindings.entity-writes]
 impl<E> ModelBackend for ModelAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,
@@ -518,7 +518,7 @@ where
     }
 }
 
-// [spec:pgorm:req:napi.entity-writes]
+// [spec:pgorm:req:bindings.entity-writes]
 impl<E> ActiveBackend for ActiveAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,

@@ -10,7 +10,7 @@ from pipeline_programs import programs
 
 
 class PipelineConstruction(unittest.TestCase):
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline/test]
     def test_public_programs_compile_with_native_parameters(self):
         cases = programs(_native)
         self.assertEqual(len(cases), 22)
@@ -28,7 +28,7 @@ class PipelineConstruction(unittest.TestCase):
         with self.assertRaises(p.UnsupportedCapabilityError):
             pl.sources("unregistered")
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-binder/test]
     def test_scopes_close_on_success_and_exceptions(self):
         base = pl.from_(p.Table("items"))
         key = pl.col("items", "id")
@@ -63,7 +63,7 @@ class PipelineConstruction(unittest.TestCase):
             saved[0].bind(1)
         self.assertEqual(base.inspect().params, [])
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-binder/test]
     def test_nested_callbacks_cannot_mix_brands(self):
         base = pl.from_(p.Table("items"))
         key = pl.col("items", "id")
@@ -82,7 +82,7 @@ class PipelineConstruction(unittest.TestCase):
 
         self.assertEqual(base.filter_with(outer).inspect().params[0].value, 1)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-binder/test]
     def test_bound_list_limits_and_input_rejections(self):
         base = pl.from_(p.Table("items"))
         self.assertIsInstance(base.derive_with(lambda b: []), pl.Pipeline)
@@ -117,7 +117,7 @@ class PipelineConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             base.select(pl.literal(1).as_("sum")).inspect()
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline/test]
     # [spec:pgorm:req:pipeline.errors+4/test]
     def test_names_the_screen_refuses_fail_at_compile(self):
         # The binding delegates to the Rust screen at `into_sql`, so it refuses
@@ -162,7 +162,8 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         await self.connection.close()
         await self.pool.close()
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline/test]
+    # [spec:pgorm:req:python.pipeline-operands/test]
     async def test_terminals_models_and_dynamic_streams(self):
         model = p.Model(
             "items",
@@ -185,7 +186,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             found = [row["id"] async for row in rows]
         self.assertEqual(found, [1, 2, 3, 4])
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline/test]
     async def test_pipeline_stages_execute_in_postgresql(self):
         cases = programs(_native)
         expected = {
@@ -227,7 +228,8 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name=name):
                 await cases[name].all(self.connection)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-expressions/test]
+    # [spec:pgorm:req:python.pipeline-operands/test]
     async def test_literal_and_bound_text_remain_values(self):
         payload = "O'Brien'); DROP TABLE items; -- 雪"
         await self.connection.execute(
@@ -246,7 +248,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((row["id"], row["category"]), (5, payload))
         self.assertEqual(len(await base.all(self.connection)), 5)
 
-    # [spec:pgorm:req:python.pipeline+1/test]
+    # [spec:pgorm:req:bindings.pipeline-expressions/test]
     async def test_aggregates_windows_and_typed_nulls(self):
         base = pl.from_(p.Table("items"))
         amount = pl.col("items", "amount")
@@ -318,7 +320,7 @@ class PipelineDomainEnums(unittest.IsolatedAsyncioTestCase):
         await self.connection.close()
         await self.pool.close()
 
-    # [spec:pgorm:req:python.pipeline+1/test]    a column with no registration compares as the
+    # [spec:pgorm:req:bindings.pipeline-expressions/test]    a column with no registration compares as the
     # schema-qualified enum compares_as names, bound, literal, listed and through an alias,
     # where each left bare is refused with 42883
     async def test_untyped_columns_compare_as_the_named_enum(self):

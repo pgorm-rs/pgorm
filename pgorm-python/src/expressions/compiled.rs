@@ -24,7 +24,7 @@ impl Compiled {
             .collect()
     }
 
-    // [spec:pgorm:req:python.schema+2]
+    // [spec:pgorm:req:python.truth-testing+2]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "compiled SQL cannot be tested as Python booleans",

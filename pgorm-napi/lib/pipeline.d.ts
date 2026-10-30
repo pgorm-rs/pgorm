@@ -11,8 +11,8 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.pipeline]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.pipeline]
 
 import type { Builder, BindValue, Compiled } from "./expressions.d.ts";
 import type { Table } from "./select.d.ts";

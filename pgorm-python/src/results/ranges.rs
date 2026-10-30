@@ -137,7 +137,7 @@ fn built_in(ty: &Type) -> bool {
 /// A range or multirange column, or an array of either, as a tagged value;
 /// `None` for a column of any other type. A range type a schema created reads
 /// as its own kind, named as the column's type is, whatever its subtype.
-// [spec:pgorm:req:python.results]
+// [spec:pgorm:req:bindings.values]
 pub(super) fn value(field: Field<'_>, ty: &Type, array: bool) -> PyResult<Option<PyValue>> {
     let index = field.index();
     let (subtype, multi) = match ty.kind() {
@@ -191,7 +191,7 @@ pub(super) fn value(field: Field<'_>, ty: &Type, array: bool) -> PyResult<Option
 /// A column of a range type a schema created: read in binary as a range of
 /// its subtype's Rust type, through the subtype's own codec, and held as the
 /// text form that type's values travel as, tagged with the type's name.
-// [spec:pgorm:req:python.results]
+// [spec:pgorm:req:bindings.created-ranges]
 fn created(field: Field<'_>, ty: &Type, subtype: &Type, multi: bool) -> PyResult<PyValue> {
     let index = field.index();
     macro_rules! text {

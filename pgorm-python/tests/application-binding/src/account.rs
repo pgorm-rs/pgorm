@@ -39,7 +39,7 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
-// [spec:pgorm:req:python.entities+4/test]
+// [spec:pgorm:req:bindings.entity-writes/test]
 #[async_trait::async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {

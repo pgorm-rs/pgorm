@@ -5,7 +5,8 @@ use pyo3::prelude::*;
 
 use super::{PyExpr, coerce};
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:python.expressions+7]
 #[pymethods]
 impl PyExpr {
     /// `a[index]`: one element, through Rust's `Expr::index`. Arrays count

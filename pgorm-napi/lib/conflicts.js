@@ -2,7 +2,7 @@
 
 // ON CONFLICT: an arbiter, then an action. A target is never empty, an update
 // never assigns nothing, and only a completed action reaches an INSERT.
-// [spec:pgorm:req:napi.writes]
+// [spec:pgorm:req:bindings.writes]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

@@ -7,11 +7,11 @@ scope {
     elements ([arch:pgorm:python-api])
     rules (
         [spec:pgorm:def:python.api]
-        [spec:pgorm:req:python.optional]
-        [spec:pgorm:req:python.delegation]
+        [spec:pgorm:req:bindings.optional]
+        [spec:pgorm:req:bindings.delegation]
         [spec:pgorm:req:python.capabilities]
-        [spec:pgorm:req:python.models]
-        [spec:pgorm:req:python.entities]
+        [spec:pgorm:req:bindings.models]
+        [spec:pgorm:req:bindings.entities]
         [spec:pgorm:req:python.runtime]
         [spec:pgorm:req:python.codegen]
         [spec:pgorm:req:python.distribution]

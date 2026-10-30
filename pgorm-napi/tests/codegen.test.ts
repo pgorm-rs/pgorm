@@ -29,7 +29,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
   };
 }
 
-// [spec:pgorm:req:napi.codegen/test]
+// [spec:pgorm:req:bindings.codegen/test]
 test("a build description names a crate, unique registrations and exports, and Rust paths of items", () => {
   const described = validate(
     {
@@ -127,7 +127,7 @@ test("each described kind becomes the TypeScript type its records read and its w
   assert.equal(propertyKey("display name"), '"display name"');
 });
 
-// [spec:pgorm:req:napi.codegen/test]
+// [spec:pgorm:req:napi.codegen+1/test]
 test("a manifest's package, dependency versions and library name are read as scaffolding needs them", () => {
   const napi = manifest(join(dirname(fileURLToPath(import.meta.url)), "..", "Cargo.toml"));
   assert.equal(napi.get("package.name"), "pgorm-napi");

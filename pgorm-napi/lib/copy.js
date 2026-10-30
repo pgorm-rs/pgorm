@@ -7,8 +7,8 @@
 // or its direction does not take is refused as it is called. COPY takes no
 // bind parameters, so `inspect()` gives its SQL, every value in it a
 // literal, and no values.
-// [spec:pgorm:req:napi.copy+2]
-// [spec:pgorm:req:napi.copy.rows]
+// [spec:pgorm:req:bindings.copy]
+// [spec:pgorm:req:bindings.copy-rows]
 
 import { arg, Builder, trusted, TRUSTED } from "./builder.js";
 import { pump } from "./copy-feed.js";

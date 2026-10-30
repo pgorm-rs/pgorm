@@ -8,6 +8,7 @@ use crate::{
     identifiers::PyIdentifier,
 };
 
+// [spec:pgorm:req:bindings.writes]
 /// A runtime UPDATE with explicit predicates or all-rows intent.
 #[pyclass(name = "Update", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -91,6 +92,7 @@ impl PyUpdate {
     }
 }
 
+// [spec:pgorm:req:bindings.writes]
 /// A runtime DELETE with explicit predicates or all-rows intent.
 #[pyclass(name = "Delete", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]

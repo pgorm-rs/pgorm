@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use super::PyExpr;
 use crate::errors::ConstructionError;
 
-// [spec:pgorm:req:python.expressions+6]
+// [spec:pgorm:req:bindings.expressions]
 #[pymethods]
 impl PyExpr {
     /// `@?`: whether a `jsonpath` returns any item for this `jsonb`. The path

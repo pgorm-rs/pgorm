@@ -4,8 +4,11 @@
  * @module
  */
 
-// [spec:pgorm:req:napi.typing]
-// [spec:pgorm:req:napi.select+2]
+// [spec:pgorm:req:napi.typing+1]
+// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.from-subqueries]
+// [spec:pgorm:req:bindings.row-locks]
+// [spec:pgorm:req:bindings.with]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";
