@@ -121,7 +121,7 @@ class Column:
         }
 
 
-# [spec:pgorm:req:bindings.model-columns]
+# [spec:pgorm:req:bindings.model-columns+1]
 @dataclass(frozen=True, eq=False, slots=True)
 class ModelColumn:
     field_name: str
