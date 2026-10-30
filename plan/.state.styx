@@ -1838,9 +1838,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name main, rule conn.tx.closure}
         {impl_name main, rule conn.tx.retry}
-    ), rule_versions_seen (
-        {id conn.tx.closure, version 2}
-        {id conn.tx.retry, version 1}
     )}
     {id migration-sql-files, covered_rules (
         migration.sql-file
