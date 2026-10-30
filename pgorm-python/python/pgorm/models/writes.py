@@ -102,10 +102,9 @@ def versions(
     if kind is None:
         raise ValueError(f"a model write has no terminal {terminal!r}")
     statement = write.statement
-    if statement is not None and not isinstance(statement, kind):
+    # An insert of no rows has no statement, and is still an insert.
+    if (p.Insert if statement is None else type(statement)) is not kind:
         raise p.UnsupportedCapabilityError(f"{terminal} reads a model {kind.__name__.lower()}")
-    if statement is None and kind is p.Update:
-        raise p.ConstructionError("an insert of no rows has no statement")
     model = write.model
     fields = tuple(model.columns)
     columns = [model._sql(name) for name in fields]

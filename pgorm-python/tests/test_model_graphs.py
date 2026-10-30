@@ -339,6 +339,8 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaises(p.ConstructionError):
             empty.inspect()
+        with self.assertRaises(p.UnsupportedCapabilityError):
+            await empty.returning_changes(self.pool)
         with self.assertRaises(p.ConstructionError):
             Account.update({"seq": 1})
         with self.assertRaises(p.UnsupportedCapabilityError):
