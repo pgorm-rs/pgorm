@@ -5,7 +5,8 @@
 //! `s0_{61 chars}` and a decode requesting all 64 bytes would never meet.
 //! Every prefixed name is therefore composed here, by the writers and the
 //! readers alike, so both sides of the contract spell a long name the same
-//! bounded way.
+//! bounded way; a binding that projects and decodes prefixed sources of its
+//! own composes their names through it too.
 
 /// PostgreSQL's identifier bound: `NAMEDATALEN - 1` bytes.
 const IDENT_MAX_BYTES: usize = 63;
@@ -28,7 +29,7 @@ const IDENT_MAX_BYTES: usize = 63;
 /// remains is two distinct long names hashing alike — a 64-bit FNV
 /// collision the contract accepts and does not check for.
 // [spec:pgorm:sem:query.graph.writer+4]
-pub(crate) fn result_column_name(pre: &str, col: &str) -> String {
+pub fn result_column_name(pre: &str, col: &str) -> String {
     let full = format!("{pre}{col}");
     if full.len() < IDENT_MAX_BYTES {
         return full;

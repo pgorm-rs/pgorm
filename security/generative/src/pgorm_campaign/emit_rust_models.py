@@ -413,22 +413,36 @@ class ModelEmitter:
         return tuple((item["name"], item["name"]) for item in definition["columns"])
 
     def model_projection(self, reference, names=None):
-        """`Model._projection`: each declared field as `physical AS logical`."""
+        """`Model._projected`: each declared field's column, aliased to its
+        logical name where the two differ."""
         fields = dict(self.model_fields(reference))
         selected = list(fields) if not names else list(names)
-        table = self.nodes[reference]["inputs"]["table"]
         items = []
         for logical in selected:
             if logical not in fields:
                 raise UnsupportedInstruction("unknown runtime model field")
-            column = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(fields[logical])}))"
             items.append(
                 (
-                    f"{Q}::SimpleExpr::from({Q}::Expr::col({self.table_column(table, column)}))",
+                    self.model_column(reference, fields[logical]),
                     logical,
+                    fields[logical],
                 )
             )
         return items
+
+    def model_column(self, reference, physical):
+        """A runtime model's column, qualified as `Model.col` qualifies it: by
+        the table's alias or else its name, never its schema."""
+        table = self.nodes[self.nodes[reference]["inputs"]["table"]]
+        alias = table["data"].get("alias")
+        qualifier = (
+            f"{Q}::Name::runtime({literal(alias)})"
+            if alias is not None
+            else self.alias_of(table, "name")
+        )
+        column = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(physical)}))"
+        reference = f"{Q}::ColumnRef::TableColumn({Q}::IntoName::into_name({qualifier}), {column})"
+        return f"{Q}::SimpleExpr::from({Q}::Expr::col({reference}))"
 
     def runtime_model(self, node):
         name, d, i = node["op"], node["data"], node["inputs"]
@@ -437,10 +451,7 @@ class ModelEmitter:
                 fields = dict(self.model_fields(i["model"]))
                 if d["name"] not in fields:
                     raise UnsupportedInstruction("unknown runtime model field")
-                table = self.nodes[i["model"]]["inputs"]["table"]
-                column = f"{Q}::IntoName::into_name({Q}::Name::runtime({literal(fields[d['name']])}))"
-                reference = self.table_column(table, column)
-                return f"{Q}::SimpleExpr::from({Q}::Expr::col({reference}))"
+                return self.model_column(i["model"], fields[d["name"]])
             case "model.select":
                 return self.model_select(node)
             case "model.write":
@@ -452,9 +463,11 @@ class ModelEmitter:
     def model_select(self, node):
         i = node["inputs"]
         body = [f"    let mut query = {Q}::Query::select();"]
-        for expression, logical in self.model_projection(i["model"]):
+        for expression, logical, physical in self.model_projection(i["model"]):
             body.append(
-                f"    query.expr_as({expression}, {Q}::Name::runtime({literal(logical)}));"
+                f"    query.expr({expression});"
+                if logical == physical
+                else f"    query.expr_as({expression}, {Q}::Name::runtime({literal(logical)}));"
             )
         body.append(f"    query.from({self.use(i['model'])});")
         if "predicate" in i:
@@ -517,10 +530,15 @@ class ModelEmitter:
         d, i = node["data"], node["inputs"]
         model = self.nodes[i["query"]]["inputs"]["model"]
         items = []
-        for expression, logical in self.model_projection(model, d["columns"]):
+        for _, logical, physical in self.model_projection(model, d["columns"]):
+            # RETURNING names the written table's columns unqualified.
+            column = f"{Q}::Name::runtime({literal(physical)})"
+            expression = f"{Q}::SimpleExpr::from({Q}::Expr::col({column}))"
             alias = f"{Q}::Name::runtime({literal(logical)})"
             items.append(
-                f"{expression}.binary({Q}::BinOper::As, "
+                expression
+                if logical == physical
+                else f"{expression}.binary({Q}::BinOper::As, "
                 f"{Q}::SimpleExpr::from({Q}::Expr::col({alias})))"
             )
         body = [

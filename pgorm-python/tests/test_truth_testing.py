@@ -8,7 +8,7 @@ import pgorm as p
 from pgorm import _native, pipeline as pl, schema as s
 from pgorm._registered import entities as views, graphs as graph_views, versions as version_views
 from pgorm.codegen.types import FieldType
-from pgorm.models import Column, Model, ModelRecord
+from pgorm.models import Column, Model, ModelRecord, Relation, cursors, graphs, queries, record
 from pgorm.runtime import PoolStatus
 
 # Classes whose instances keep Python's own truth, grouped by why that is safe.
@@ -32,8 +32,13 @@ EXEMPT = {
     _native._CopyIn, _native._CopyOut, _native._Listener,
     # Registrations and declarations: they name what a query reads and are
     # true as any declared object is; the queries they start refuse.
-    p.Entity, p.EntityGraph, Model, Column, pl.SourceSelection, pl.Binder,
+    p.Entity, p.EntityGraph, Model, Column, Relation, pl.SourceSelection, pl.Binder,
     views.EntityView, graph_views.GraphView, FieldType,
+    # The private state a model query, graph, cursor or paginator holds and
+    # builds its statements from: data the application never handles, held by
+    # a query that refuses.
+    queries.Recipe, queries.Joined, graphs.State, graphs.Table, graphs.Edge,
+    cursors.Keyed, cursors.Position, cursors.Pageable, record.Source,
 }
 
 # Refusing classes only a registered application or a live server can build:
@@ -107,6 +112,7 @@ def other_samples():
         pl.from_(table), pl.col("items", "id"), pl.from_(table).group(pl.col("items", "id")),
         pl.Over(), pl.source(table),
         model.col("id"), model.find(), model.delete(), model.insert({"id": 1}).returning("id"),
+        model.graph(), model.find().cursor("id"), model.find().paginate(2),
     ]
 
 

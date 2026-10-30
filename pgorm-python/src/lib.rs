@@ -3,6 +3,9 @@
 //! The installed capability manifest records the implemented surface and the
 //! concrete Rust API behind each operation. Downstream bindings share this crate.
 
+// The capability manifest is one `json!` literal, deeper than the default limit.
+#![recursion_limit = "256"]
+
 mod capabilities;
 mod config;
 mod copy;
@@ -14,6 +17,7 @@ pub mod graphs;
 pub mod identifiers;
 pub mod json;
 mod listen;
+mod models;
 pub mod pipeline;
 pub mod results;
 mod runtime;
@@ -68,6 +72,7 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     copy::register(module)?;
     listen::register(module)?;
     results::register(module)?;
+    models::register(module)?;
     entities::install(module, registry)?;
     graphs::install(module)?;
     pipeline::install(module)?;

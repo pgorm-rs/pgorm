@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, dataclass, field
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, Literal
 
 from .. import _native as p
 
@@ -47,6 +48,28 @@ MODEL_KINDS = frozenset(
 )
 
 
+GENERATED = ("always", "by_default")
+
+
+def _flag(value: object, option: str) -> bool:
+    if type(value) is not bool:
+        raise TypeError(f"a column's {option} is a bool")
+    return value
+
+
+def _labels(values: object) -> tuple[str, ...]:
+    if not isinstance(values, (list, tuple)) or not all(
+        type(label) is str for label in values
+    ):
+        raise TypeError("an enum column's values are a list or tuple of strings")
+    labels = tuple(values)
+    if not labels:
+        raise ValueError("an enum column lists at least one value")
+    if len(set(labels)) != len(labels):
+        raise ValueError("an enum column lists each value once")
+    return labels
+
+
 # [spec:pgorm:req:bindings.models]
 @dataclass(frozen=True, slots=True)
 class Column:
@@ -55,31 +78,45 @@ class Column:
     nullable: bool = False
     primary_key: bool = False
     array: bool = False
+    default: bool = False
+    generated: Literal["always", "by_default"] | None = None
+    values: Sequence[str] | None = None
     _null: p.Value = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        for flag in (self.nullable, self.primary_key, self.array):
-            if type(flag) is not bool:
-                raise p.ConstructionError("column flags require exact booleans")
+        for option in ("nullable", "primary_key", "array", "default"):
+            _flag(getattr(self, option), option)
         if self.primary_key and self.nullable:
             raise p.ConstructionError("primary-key columns cannot be nullable")
+        if self.generated is not None:
+            if type(self.generated) is not str:
+                raise TypeError('a column is generated "always" or "by_default"')
+            if self.generated not in GENERATED:
+                raise ValueError('a column is generated "always" or "by_default"')
+            if self.default:
+                raise p.ConstructionError(
+                    "a generated column has no default of its own: declare one or the other"
+                )
         if self.name is not None:
             object.__setattr__(self, "name", p.Identifier(self.name).name)
-        if isinstance(self.kind, p.TypeName):
+        if isinstance(self.kind, p.CreatedMultirange):
+            raise p.UnsupportedCapabilityError(
+                "the native Record decoder does not read a created multirange"
+            )
+        if isinstance(self.kind, (p.TypeName, p.CreatedRange)):
+            # A decoded row names an enum or a created range with its schema.
             if self.kind.schema is None:
                 raise p.ConstructionError(
-                    "enum columns require a schema-qualified TypeName"
-                )
-        elif isinstance(self.kind, p.CreatedRange):
-            # A decoded row names its range type with the schema it lives in.
-            if self.kind.schema is None:
-                raise p.ConstructionError(
-                    "created range columns require a schema-qualified CreatedRange"
+                    "an enum or created range column names its type's schema"
                 )
         elif type(self.kind) is not str or self.kind not in MODEL_KINDS:
             raise p.UnsupportedCapabilityError(
                 "column kind is not supported by the native Record decoder"
             )
+        if self.values is not None:
+            if not isinstance(self.kind, p.TypeName):
+                raise p.ConstructionError("only an enum column lists its values")
+            object.__setattr__(self, "values", _labels(self.values))
         kind = self.kind
         if not self.array:
             null = p.Value.null(kind)
@@ -88,6 +125,11 @@ class Column:
         else:
             null = p.Value.array(kind, None)
         object.__setattr__(self, "_null", null)
+
+    @property
+    def omissible(self) -> bool:
+        """Whether an insert may leave the column out."""
+        return self.nullable or self.default or self.generated is not None
 
     def validate(self, value: p.Value, *, decoding: bool = False) -> p.Value:
         error = p.DecodeError if decoding else p.ConstructionError
@@ -100,6 +142,11 @@ class Column:
             raise error("value type differs from the declared model column")
         if value.is_null and not self.nullable:
             raise error("non-nullable model column received SQL NULL")
+        if self.values is not None and not value.is_null:
+            labels = value.value if self.array else [value.value]
+            for label in labels:
+                if label is not None and label not in self.values:
+                    raise error(f"{label!r} is not one of the column's values")
         return value
 
     def value(self, data: Any) -> p.Value:
@@ -118,6 +165,9 @@ class Column:
             "type": self._null.snapshot()["type"],
             "nullable": self.nullable,
             "primary_key": self.primary_key,
+            "default": self.default,
+            "generated": self.generated,
+            "values": None if self.values is None else list(self.values),
         }
 
 
