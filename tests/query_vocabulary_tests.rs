@@ -253,7 +253,7 @@ async fn a_groups_frame_reaches_whole_peer_groups(db: &DatabaseConnection) -> Re
 /// multiplicity and the plain forms collapse it, so each pair differs; without
 /// `INTERSECT ALL` and `EXCEPT ALL` the middle four answers would be
 /// unreachable from the builder at all.
-// [spec:pgorm:sem:query.build.union+1/test]
+// [spec:pgorm:sem:query.build.union/test]
 // [spec:pgorm:req:sql.scope+23/test]
 async fn the_all_set_operations_keep_the_duplicates(db: &DatabaseConnection) -> Result<(), Error> {
     let bag = |table: &str| {
