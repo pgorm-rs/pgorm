@@ -15018,6 +15018,7 @@ children (
         title "Each binding is its own nspec impl, so a shared rule is covered for Python only by Python's code and for JavaScript only by JavaScript's"
         kind @chore
         deps (binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-30T13:27:03.272959Z
@@ -15031,6 +15032,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "As done 2026-10-30. .config/nspec/config.styx has three impls: main (the Rust crates, sqlmap and security/generative), python (pgorm-python src, python, checks; tests/**/*.rs and *.py as tests), javascript (pgorm-napi src, lib, checks, codegen and .github/workflows/napi.yml; tests/**/*.ts and *.rs as tests). Coverage needs only an implementation annotation (no verify_required policy), so claims follow implementation sites. 116 main claims re-keyed (python +88, javascript +95; main keeps 323): napi.* under javascript, python.* under python, every bindings.* rule once under each binding, the gap node holding its binding's side (a python-* node the python side, a napi-* node the javascript side, quantifier-beyond-comparisons both, since it extends both bindings) and binding-spec-consolidation the side that binding already has. main keeps bindings.connections, bindings.pipeline and bindings.pipeline-expressions, which pgorm's own code also annotates. Live per-impl coverage moves seven gap nodes to todo. python-model-column-operators, python-statement-gaps and quantifier-beyond-comparisons stay done: Python's code already annotates bindings.model-columns, writes, merge, with and quantifiers for what it has, and the quantifiers rule states only what both bindings do today. Each of the three goes open only when its rule is bumped or Python's partial annotations are re-pointed."
+            }
+
+            {
+                at 2026-10-30T14:18:38.065807Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
