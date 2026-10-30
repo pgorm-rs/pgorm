@@ -49,12 +49,12 @@ import pgorm as p
 
 AccountNotes = p.graph("app.AccountNotes")
 query = AccountNotes.find(aliases=["n"])
-query = query.filter(query.col(0, "id") >= 10)
+query = query.where(query.col(0, "id") >= 10)
 query = query.order_by(query.col(0, "id").asc(), query.col(1, "id").asc())
 
 async with pool.connection() as connection:
     rows = await query.all(connection)
-    first = await query.one_opt(connection)
+    first = await query.optional(connection)
     for account, note in rows:
         print(account["id"], None if note is None else note["body"])
 ```
@@ -73,7 +73,7 @@ if a name equals the root's table).
 declared source order, containing detached native `EntityModel` objects and
 `None` for absent optional slots. A slotless row is a bare `EntityModel`.
 Models retain their registered columns, value tags and `into_active` behavior.
-`one_opt` adds Rust's `LIMIT 1` and returns the first row or `None` for no row.
+`optional` adds Rust's `LIMIT 1` and returns the first row or `None` for no row.
 An absent optional source is distinct from no graph row. A present source whose
 model cannot decode raises `DecodeError`; it does not become absent.
 
@@ -89,7 +89,7 @@ checks the key, never what a join reads. The entity's `describe()` reports each
 of these on its `relations` (see [ENTITIES.md](ENTITIES.md)).
 
 `inspect()` returns Rust-built SQL and tagged parameters for `all`.
-`inspect(terminal="one_opt")` includes that terminal's limit. Execution uses
+`inspect(terminal="optional")` includes that terminal's limit. Execution uses
 the same owned `SelectGraph` builder state and calls its actual Rust terminal.
 Graph reads use acquired connections and native asyncio awaitables, with the
 same loop ownership, busy-connection rejection and cancellation/discard policy

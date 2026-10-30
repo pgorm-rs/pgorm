@@ -18,7 +18,7 @@ class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
         detached.clear()
         self.assertEqual(len(generated.enums), 1)
         async with p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1) as pool:
-            before = await pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM pg_namespace WHERE nspname = 'python_entities'"))
+            before = await pool.one(p.RawSQL("SELECT count(*) AS n FROM pg_namespace WHERE nspname = 'python_entities'"))
             self.assertEqual(before["n"], 0)
             await pool.execute(p.RawSQL("CREATE SCHEMA python_entities"))
             try:
@@ -33,9 +33,9 @@ class RegisteredSchema(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(model["display name"], "Native|before")
                     self.assertEqual(model["mood"], "calm")
                     self.assertEqual((await account.find().one(connection))["id"], 1)
-                comments = await pool.fetch_one(p.RawSQL("SELECT obj_description('python_entities.accounts'::regclass, 'pg_class') AS table_comment, col_description('python_entities.accounts'::regclass, 2) AS column_comment"))
+                comments = await pool.one(p.RawSQL("SELECT obj_description('python_entities.accounts'::regclass, 'pg_class') AS table_comment, col_description('python_entities.accounts'::regclass, 2) AS column_comment"))
                 self.assertEqual(dict(comments), {"table_comment": "Accounts' native schema", "column_comment": "The user's display name"})
-                indexes = await pool.fetch_all(p.RawSQL("SELECT indexname FROM pg_indexes WHERE schemaname = 'python_entities' ORDER BY indexname"))
+                indexes = await pool.query(p.RawSQL("SELECT indexname FROM pg_indexes WHERE schemaname = 'python_entities' ORDER BY indexname"))
                 self.assertEqual([row["indexname"] for row in indexes], ["accounts_pkey", "idx-accounts-display name"])
             finally:
                 await pool.execute(p.RawSQL("DROP SCHEMA python_entities CASCADE"))

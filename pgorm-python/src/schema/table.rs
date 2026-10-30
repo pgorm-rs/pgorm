@@ -166,7 +166,7 @@ pub(super) fn rename_constraint(
 }
 
 #[pyfunction]
-pub(super) fn truncate(table: &PyTable) -> PyResult<PyDDL> {
+pub(super) fn truncate_table(table: &PyTable) -> PyResult<PyDDL> {
     Ok(PyDDL {
         inner: Statement::Truncate(Table::truncate(table_name(table)?)),
     })
@@ -239,7 +239,7 @@ fn unique_key(
 /// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
 /// declares, added to a table that exists.
 // [spec:pgorm:req:bindings.schema-alter]
-// [spec:pgorm:req:python.schema-api]
+// [spec:pgorm:req:python.schema-api+2]
 #[pyfunction]
 #[pyo3(signature=(table, first, *rest, without_overlaps=None))]
 pub(super) fn add_primary_key(

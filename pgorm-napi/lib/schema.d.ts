@@ -15,7 +15,7 @@
 
 // [spec:pgorm:req:napi.typing+1]
 // [spec:pgorm:req:bindings.schema]
-// [spec:pgorm:req:napi.schema-api]
+// [spec:pgorm:req:napi.schema-api+2]
 
 import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
@@ -105,7 +105,7 @@ export interface NotValidOption {
 }
 
 /** A complete DDL statement. It inspects as it runs, with no values. */
-export declare class Ddl extends Builder {
+export declare class DDL extends Builder {
   protected constructor();
 }
 
@@ -132,7 +132,7 @@ export declare class ColumnDef {
 }
 
 /** `CREATE TABLE`; every method returns a new statement. */
-export declare class CreateTable extends Ddl {
+export declare class CreateTable extends DDL {
   /** A column, which needs its type. */
   column(column: ColumnDef): CreateTable;
   ifNotExists(): CreateTable;
@@ -193,7 +193,7 @@ export declare class PendingAlterTable {
 export interface PendingAlterTable extends AlterTableActions {}
 
 /** An `ALTER TABLE` with at least one action, applied in order; every method returns a new one. */
-export declare class AlterTable extends Ddl {}
+export declare class AlterTable extends DDL {}
 export interface AlterTable extends AlterTableActions {}
 
 export declare function alterTable(table: TableRef): PendingAlterTable;
@@ -201,21 +201,21 @@ export declare function alterTable(table: TableRef): PendingAlterTable;
 export declare function dropTable(
   tables: TableRef | readonly [TableRef, ...TableRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 /** The new name is bare, since a rename cannot move a table to another schema. */
-export declare function renameTable(table: TableRef, name: string): Ddl;
+export declare function renameTable(table: TableRef, name: string): DDL;
 
-export declare function renameColumn(table: TableRef, name: string, newName: string): Ddl;
+export declare function renameColumn(table: TableRef, name: string, newName: string): DDL;
 
 /** A constraint of any kind renamed, a key's index with it. */
-export declare function renameConstraint(table: TableRef, name: string, newName: string): Ddl;
+export declare function renameConstraint(table: TableRef, name: string, newName: string): DDL;
 
-export declare function truncateTable(table: TableRef): Ddl;
+export declare function truncateTable(table: TableRef): DDL;
 
-export declare function commentOnTable(table: TableRef, text: string): Ddl;
+export declare function commentOnTable(table: TableRef, text: string): DDL;
 
-export declare function commentOnColumn(table: TableRef, column: string, text: string): Ddl;
+export declare function commentOnColumn(table: TableRef, column: string, text: string): DDL;
 
 /**
  * An index entry: a column's name, an expression, or either with an order and
@@ -231,7 +231,7 @@ export type IndexColumn =
   };
 
 /** `CREATE INDEX`; every method returns a new statement. */
-export declare class CreateIndex extends Ddl {
+export declare class CreateIndex extends DDL {
   column(column: IndexColumn): CreateIndex;
   unique(): CreateIndex;
   /** `NULLS NOT DISTINCT`, which PostgreSQL defines for a unique index alone, so the index becomes one. */
@@ -257,7 +257,7 @@ export declare function dropIndex(
   table: TableRef,
   name: string,
   options?: { readonly ifExists?: boolean },
-): Ddl;
+): DDL;
 
 export interface CollationOption {
   readonly collation?: Collation;
@@ -267,7 +267,7 @@ export interface CollationOption {
  * `CREATE TYPE`: a shell type until a kind is chosen. What a type is, is one
  * slot, so choosing a kind replaces the one before.
  */
-export declare class CreateType extends Ddl {
+export declare class CreateType extends DDL {
   /** An enumeration, with no labels until `values` appends them. */
   asEnum(): CreateType;
   /** Labels appended to an enumeration, which the type becomes: data of at most 63 bytes, written as literals. */
@@ -303,24 +303,24 @@ export interface AttributeChanges {
 export declare class PendingAlterType {
   private constructor();
   /** A label added to an enumeration: at its end, or before or after one. */
-  addValue(label: string, options?: { readonly before: string } | { readonly after: string }): Ddl;
+  addValue(label: string, options?: { readonly before: string } | { readonly after: string }): DDL;
   /** The type renamed; the new name is bare, the type staying in its schema. */
-  renameTo(name: string): Ddl;
-  renameValue(label: string, newLabel: string): Ddl;
+  renameTo(name: string): DDL;
+  renameValue(label: string, newLabel: string): DDL;
   /** An attribute renamed: PostgreSQL takes `RENAME` as an `ALTER TYPE`'s sole action. */
   renameAttribute(name: string, newName: string): RenameAttribute;
 }
 export interface PendingAlterType extends AttributeChanges {}
 
 /** A composite's attribute changes, applied in order; every method returns a new statement. */
-export declare class AlterComposite extends Ddl {
+export declare class AlterComposite extends DDL {
   /** `CASCADE`, which carries the changes into typed tables, or `RESTRICT`; the last call wins. */
   behavior(behavior: DropBehavior): AlterComposite;
 }
 export interface AlterComposite extends AttributeChanges {}
 
 /** A composite's attribute renamed. */
-export declare class RenameAttribute extends Ddl {
+export declare class RenameAttribute extends DDL {
   behavior(behavior: DropBehavior): RenameAttribute;
 }
 
@@ -329,7 +329,7 @@ export declare function alterType(name: TypeRef): PendingAlterType;
 export declare function dropType(
   names: TypeRef | readonly [TypeRef, ...TypeRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 // [spec:pgorm:req:bindings.schema-domains]
 
@@ -337,7 +337,7 @@ export declare function dropType(
  * `CREATE DOMAIN`; every method returns a new statement. The clauses render
  * in one order whatever order they are given in.
  */
-export declare class CreateDomain extends Ddl {
+export declare class CreateDomain extends DDL {
   /** The collation the domain's values compare under, for a base type that has one. */
   collate(collation: string, options?: { readonly schema?: string }): CreateDomain;
   /** `DEFAULT`: an expression, or a value written as an escaped literal; a later default replaces it. */
@@ -364,22 +364,22 @@ export declare function createDomain(name: TypeRef, base: ColumnType): CreateDom
 export declare class PendingAlterDomain {
   private constructor();
   /** The default columns of the domain take from now on, where they have none of their own. */
-  setDefault(value: Operand): Ddl;
-  dropDefault(): Ddl;
+  setDefault(value: Operand): DDL;
+  dropDefault(): DDL;
   /** Refused while a column of the domain holds a null (`23502`). */
-  setNotNull(): Ddl;
-  dropNotNull(): Ddl;
+  setNotNull(): DDL;
+  dropNotNull(): DDL;
   /**
    * A `CHECK` added: checked against the values already held (`23514` for one
    * that fails), or, `notValid`, left unchecked until `validateConstraint`.
    */
-  addCheck(condition: Expr, options?: { readonly name?: string } & NotValidOption): Ddl;
-  dropConstraint(name: string, options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior }): Ddl;
-  renameConstraint(name: string, newName: string): Ddl;
+  addCheck(condition: Expr, options?: { readonly name?: string } & NotValidOption): DDL;
+  dropConstraint(name: string, options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior }): DDL;
+  renameConstraint(name: string, newName: string): DDL;
   /** Checks the values a `NOT VALID` check left unchecked (`23514` for one that fails). */
-  validateConstraint(name: string): Ddl;
+  validateConstraint(name: string): DDL;
   /** The domain renamed; the new name is bare, the domain staying in its schema. */
-  renameTo(name: string): Ddl;
+  renameTo(name: string): DDL;
 }
 
 export declare function alterDomain(name: TypeRef): PendingAlterDomain;
@@ -388,7 +388,7 @@ export declare function alterDomain(name: TypeRef): PendingAlterDomain;
 export declare function dropDomain(
   names: TypeRef | readonly [TypeRef, ...TypeRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 /**
  * `VALUE`: inside a domain's `CHECK`, the value tested. PostgreSQL reads it
@@ -410,7 +410,7 @@ export interface SequenceClauses<S> {
 }
 
 /** `CREATE SEQUENCE`; every method returns a new statement. */
-export declare class CreateSequence extends Ddl {
+export declare class CreateSequence extends DDL {
   ifNotExists(): CreateSequence;
 }
 export interface CreateSequence extends SequenceClauses<CreateSequence> {}
@@ -427,7 +427,7 @@ export declare class PendingAlterSequence {
 export interface PendingAlterSequence extends SequenceClauses<AlterSequence> {}
 
 /** An `ALTER SEQUENCE` with at least one clause; every method returns a new one. */
-export declare class AlterSequence extends Ddl {
+export declare class AlterSequence extends DDL {
   ifExists(): AlterSequence;
   restart(value?: number | bigint): AlterSequence;
 }
@@ -440,9 +440,9 @@ export declare function alterSequence(name: TableRef): PendingAlterSequence;
 export declare function dropSequence(
   names: TableRef | readonly [TableRef, ...TableRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
-export declare function renameSequence(name: TableRef, newName: string): Ddl;
+export declare function renameSequence(name: TableRef, newName: string): DDL;
 
 export declare function createExtension(
   name: string,
@@ -452,12 +452,12 @@ export declare function createExtension(
     readonly version?: string;
     readonly cascade?: boolean;
   },
-): Ddl;
+): DDL;
 
 export declare function dropExtension(
   name: string,
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 // [spec:pgorm:req:bindings.schema-schemas]
 
@@ -465,16 +465,16 @@ export declare function dropExtension(
 export declare function createSchema(
   name: string,
   options?: { readonly ifNotExists?: boolean },
-): Ddl;
+): DDL;
 
 /** `DROP SCHEMA`: one schema or several; `"restrict"`, said or not, refuses a schema that holds anything. */
 export declare function dropSchema(
   names: string | readonly [string, ...string[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 /** `ALTER SCHEMA ... RENAME TO`, which PostgreSQL gives no `IF EXISTS`. */
-export declare function renameSchema(name: string, newName: string): Ddl;
+export declare function renameSchema(name: string, newName: string): DDL;
 
 // [spec:pgorm:req:bindings.schema-views]
 
@@ -501,7 +501,7 @@ export interface ViewOptions<S> {
  * `CREATE VIEW` over a {@link Select}, written with its values inlined: a
  * view's definition is SQL text and binds nothing.
  */
-export declare class CreateView extends Ddl {
+export declare class CreateView extends DDL {
   /**
    * `WITH LOCAL CHECK OPTION` or `WITH CASCADED CHECK OPTION`: a row written
    * through the view must be one it shows (`44000` otherwise). Only an
@@ -515,7 +515,7 @@ export interface CreateView extends ViewOptions<CreateView> {}
  * `CREATE RECURSIVE VIEW`, whose query reads the view by name. It has no
  * check option, which PostgreSQL refuses on a recursive view.
  */
-export declare class CreateRecursiveView extends Ddl {}
+export declare class CreateRecursiveView extends DDL {}
 export interface CreateRecursiveView extends ViewOptions<CreateRecursiveView> {}
 
 /** The clauses a materialized view and `CREATE TABLE AS` share. */
@@ -532,11 +532,11 @@ export interface RelationAsOptions<S> {
  * `CREATE MATERIALIZED VIEW`: the rows the query returned, held until a
  * refresh. One created `withNoData` cannot be read until it is refreshed.
  */
-export declare class CreateMaterializedView extends Ddl {}
+export declare class CreateMaterializedView extends DDL {}
 export interface CreateMaterializedView extends RelationAsOptions<CreateMaterializedView> {}
 
 /** `CREATE TABLE AS`: a table of the query's columns and rows, tied to it no further. */
-export declare class CreateTableAs extends Ddl {}
+export declare class CreateTableAs extends DDL {}
 export interface CreateTableAs extends RelationAsOptions<CreateTableAs> {}
 
 export declare function createView(name: TableRef, query: Select): CreateView;
@@ -551,7 +551,7 @@ export declare function createRecursiveView(
 export declare function dropView(
   names: TableRef | readonly [TableRef, ...TableRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 export declare function createMaterializedView(name: TableRef, query: Select): CreateMaterializedView;
 
@@ -564,11 +564,11 @@ export declare function createMaterializedView(name: TableRef, query: Select): C
 export declare function refreshMaterializedView(
   name: TableRef,
   options?: { readonly concurrently?: boolean; readonly withNoData?: boolean },
-): Ddl;
+): DDL;
 
 export declare function dropMaterializedView(
   names: TableRef | readonly [TableRef, ...TableRef[]],
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
-): Ddl;
+): DDL;
 
 export declare function createTableAs(name: TableRef, query: Select): CreateTableAs;

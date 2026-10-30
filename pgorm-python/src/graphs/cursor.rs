@@ -6,19 +6,19 @@ use crate::{
 use pyo3::{prelude::*, types::PyTuple};
 
 #[derive(Clone, Debug)]
-#[pyclass(name = "GraphCursor", module = "pgorm", frozen, from_py_object)]
-pub struct PyGraphCursor {
+#[pyclass(name = "EntityGraphCursor", module = "pgorm", frozen, from_py_object)]
+pub struct PyEntityGraphCursor {
     pub(crate) query: Query,
     pub(crate) plan: CursorPlan,
 }
 
-impl PyGraphCursor {
+impl PyEntityGraphCursor {
     fn columns(&self) -> PyResult<Vec<&ColumnInfo>> {
         let sources = &self.query.info().bindings.sources;
         let root = &sources[0].entity;
         let mut columns = vec![root.column(&self.plan.column)?];
         for (source_index, source) in sources.iter().enumerate() {
-            for key in &source.entity.primary_keys {
+            for key in &source.entity.primary_key {
                 if source_index != 0 || key != &self.plan.column {
                     columns.push(source.entity.column(key)?);
                 }
@@ -77,7 +77,7 @@ impl PyGraphCursor {
 }
 
 #[pymethods]
-impl PyGraphCursor {
+impl PyEntityGraphCursor {
     fn before(&self, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         self.primary(true, value)
     }

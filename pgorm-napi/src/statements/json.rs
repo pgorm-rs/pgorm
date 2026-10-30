@@ -32,8 +32,8 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
     ("jsonObject", json_object),
     ("jsonArray", json_array),
     ("jsonArrayQuery", json_array_query),
-    ("jsonObjectAgg", json_object_agg),
-    ("jsonArrayAgg", json_array_agg),
+    ("jsonObjectagg", json_object_agg),
+    ("jsonArrayagg", json_array_agg),
     ("jsonParse", json_parse),
     ("jsonScalar", json_scalar),
     ("jsonSerialize", json_serialize),
@@ -375,7 +375,7 @@ fn filter(
     }
 }
 
-/// `jsonObjectAgg(key, value, absentOnNull, uniqueKeys, returning, filter)`.
+/// `jsonObjectagg(key, value, absentOnNull, uniqueKeys, returning, filter)`.
 // [spec:pgorm:req:bindings.sql-json]
 fn json_object_agg(cx: &mut FunctionContext) -> NeonResult<Node> {
     let key = operand_at(cx, 0)?;
@@ -396,7 +396,7 @@ fn json_object_agg(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Expr(json.into()))
 }
 
-/// `jsonArrayAgg(value, orderBy, nullOnNull, returning, filter)`. The ORDER BY
+/// `jsonArrayagg(value, orderBy, nullOnNull, returning, filter)`. The ORDER BY
 /// takes no NULLS placement, so an ordering asking for one is refused rather
 /// than dropped.
 // [spec:pgorm:req:bindings.sql-json]

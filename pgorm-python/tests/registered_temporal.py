@@ -13,8 +13,8 @@ def days(start, end):
     return p.Range(date(2026, *start), date(2026, *end))
 
 
-# [spec:pgorm:req:bindings.entity-reads/test]
-# [spec:pgorm:req:bindings.entity-graphs/test]
+# [spec:pgorm:req:bindings.entity-reads+2/test]
+# [spec:pgorm:req:bindings.entity-graphs+2/test]
 class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -49,7 +49,7 @@ class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
 
     async def test_describe_reports_the_temporal_key_and_relations(self):
         room = self.room.describe()
-        self.assertEqual(room["primary_keys"], ["id", "valid_at"])
+        self.assertEqual(room["primary_key"], ["id", "valid_at"])
         self.assertTrue(room["primary_key_without_overlaps"])
         self.assertEqual(room["relations"], [])
         self.assertFalse(self.account.describe()["primary_key_without_overlaps"])
@@ -75,11 +75,11 @@ class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
         january, february = days((1, 1), (2, 1)), days((2, 1), (3, 1))
         async with self.pool.connection() as connection:
             key = (self.room.col("id") == 1) & (self.room.col("valid_at") == february)
-            found = await self.room.find().filter(key).one(connection)
+            found = await self.room.find().where(key).one(connection)
             self.assertEqual(found["rate"], 120)
             # An update by key names one version: equality on the period too,
             # so January's rate for room 1 is the only row it changes.
-            jan = await self.room.find().filter((self.room.col("id") == 1) & (self.room.col("valid_at") == january)).one(connection)
+            jan = await self.room.find().where((self.room.col("id") == 1) & (self.room.col("valid_at") == january)).one(connection)
             changed = await jan.into_active().set("rate", 105).update(connection)
             self.assertEqual((changed["valid_at"], changed["rate"]), (january, 105))
             self.assertEqual(await self.rates(connection), [(1, january, 105), (1, february, 120), (2, january, 80)])

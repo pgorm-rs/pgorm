@@ -62,7 +62,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     async def exists(self, name):
-        row = await self.pool.fetch_one(p.RawSQL(
+        row = await self.pool.one(p.RawSQL(
             "SELECT count(*) AS n FROM pg_namespace WHERE nspname = $1", [name],
         ))
         return row["n"] == 1
@@ -82,7 +82,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
 
         await self.pool.execute(s.rename_schema(self.namespace, self.renamed))
         self.assertFalse(await self.exists(self.namespace))
-        rows = await self.pool.fetch_all(p.Select(p.col("id")).from_(p.Table("item", schema=self.renamed)))
+        rows = await self.pool.query(p.Select(p.col("id")).from_(p.Table("item", schema=self.renamed)))
         self.assertEqual([row["id"] for row in rows], [1])
 
         await self.pool.execute(s.drop_schema(self.renamed, cascade=True))

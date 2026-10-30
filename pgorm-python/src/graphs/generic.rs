@@ -36,7 +36,7 @@ where
     }
 
     fn find(&self, aliases: Vec<String>) -> Query {
-        Arc::new(GraphQuery::<E, S> {
+        Arc::new(EntityGraphQuery::<E, S> {
             query: (self.build)(&aliases),
             info: self.info.clone(),
             aliases,
@@ -45,14 +45,14 @@ where
 }
 
 #[derive(Debug)]
-struct GraphQuery<E: EntityTrait, S> {
+struct EntityGraphQuery<E: EntityTrait, S> {
     query: SelectGraph<E, S>,
     info: Arc<Info>,
     aliases: Vec<String>,
 }
 
-// [spec:pgorm:req:bindings.entity-graphs]
-impl<E, S> QueryBackend for GraphQuery<E, S>
+// [spec:pgorm:req:bindings.entity-graphs+2]
+impl<E, S> QueryBackend for EntityGraphQuery<E, S>
 where
     E: EntityTrait + Send + Sync + 'static,
     S: GraphSlots<E>,
@@ -107,7 +107,7 @@ where
     }
 }
 
-impl<E, S> GraphQuery<E, S>
+impl<E, S> EntityGraphQuery<E, S>
 where
     E: EntityTrait + Send + Sync + 'static,
     S: GraphSlots<E>,

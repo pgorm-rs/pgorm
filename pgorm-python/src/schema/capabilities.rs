@@ -1,4 +1,4 @@
-// [spec:pgorm:req:python.schema-api]
+// [spec:pgorm:req:python.schema-api+2]
 // [spec:pgorm:req:bindings.schema-views]
 // [spec:pgorm:req:bindings.schema-schemas]
 // [spec:pgorm:req:bindings.schema-domains]
@@ -10,7 +10,7 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
         ("schema.drop_table", "pgorm_query::TableDropStatement"),
         ("schema.rename_table", "pgorm_query::TableRenameStatement"),
         ("schema.rename_column", "pgorm_query::ColumnRenameStatement"),
-        ("schema.truncate", "pgorm_query::TableTruncateStatement"),
+        ("schema.truncate_table", "pgorm_query::TableTruncateStatement"),
         ("schema.add_column", "pgorm_query::PendingTableAlter::add_column"),
         ("schema.modify_column", "pgorm_query::PendingTableAlter::modify_column"),
         ("schema.drop_column", "pgorm_query::PendingTableAlter::drop_column"),

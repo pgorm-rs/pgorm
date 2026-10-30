@@ -140,7 +140,7 @@ export declare class Expr extends Builder {
   /**
    * This call over a window, inline or named by the statement; an inline
    * `ExtendedWindow` builds on an entry the statement declares. Only a
-   * function call or `jsonArrayAgg` / `jsonObjectAgg` takes one.
+   * function call or `jsonArrayagg` / `jsonObjectagg` takes one.
    */
   over(window: Window | ExtendedWindow | string): Windowed;
   /** A projection naming its output column. */

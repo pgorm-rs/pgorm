@@ -163,7 +163,7 @@ fn manifest() -> Value {
                 "set_<field>": "typed Value construction then ActiveModelTrait::set on a cloned native model",
                 "model and active views": "registered native EntityModel and ActiveModel methods",
                 "entity query views": "registered native EntityQuery methods over Select<Entity>",
-                "graph and cursor views": "registered native GraphQuery and GraphCursor methods over SelectGraph; wrap decoded models in concrete Python views"
+                "graph and cursor views": "registered native EntityGraphQuery and EntityGraphCursor methods over SelectGraph; wrap decoded models in concrete Python views"
             }
         },
         "model_policy": {
@@ -186,7 +186,7 @@ fn manifest() -> Value {
             "qualified_enum_binding": false,
             "source_arities": [1, 2, 3, 4, 5, 6],
             "source_result": "tuple of optional registered models; (None,) is distinct from no row",
-            "record_terminals": "all / one / one_opt on acquired Connection or Transaction; one and one_opt append take(1)",
+            "record_terminals": "all / one / optional on acquired Connection or Transaction; one and optional append take(1)",
             "stream": "dynamic Record through pool.stream or connection.stream",
             "selected_sources_stream": false
         },

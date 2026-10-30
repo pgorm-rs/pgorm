@@ -41,15 +41,15 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
         ]
         for sql, kind, expected in cases:
             with self.subTest(sql=sql):
-                row = await self.pool.fetch_one(p.RawSQL(f"SELECT {sql} AS value"))
+                row = await self.pool.one(p.RawSQL(f"SELECT {sql} AS value"))
                 self.assertEqual(row["value"], expected)
                 self.assertEqual(row.tagged("value"), p.Value(expected, kind))
-                null = await self.pool.fetch_one(
+                null = await self.pool.one(
                     p.RawSQL(f"SELECT CASE WHEN FALSE THEN {sql} END AS value")
                 )
                 self.assertIsNone(null["value"])
                 self.assertEqual(null.tagged("value"), p.Value.null(kind))
-        row = await self.pool.fetch_one(p.RawSQL(
+        row = await self.pool.one(p.RawSQL(
             "SELECT ARRAY['[1,3)'::int4range, NULL, 'empty'] AS spans,"
             " ARRAY['{[1,2)}'::int8multirange] AS sets"
         ))
@@ -59,7 +59,7 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_bound_ranges_read_back_canonical(self):
         written = p.Range(Decimal("-0.50"), Decimal("2.500"), "(]")
-        row = await self.pool.fetch_one(p.Select(
+        row = await self.pool.one(p.Select(
             pinned(p.Value(written, "numrange"), "numrange").as_("amounts"),
             pinned(p.Value(p.Range(1, 5, "[]"), "int4range"), "int4range").as_("counts"),
             pinned(p.Value(p.Range.empty(), "tstzrange"), "tstzrange").as_("nothing"),
@@ -74,14 +74,14 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row["sets"], p.Multirange([p.Range(1, 8)]))
         self.assertEqual(row["days"], [p.Range(dt.date(2024, 1, 1), None), None])
         with self.assertRaises(p.DatabaseError) as inverted:
-            await self.pool.fetch_one(p.Select(
+            await self.pool.one(p.Select(
                 pinned(p.Value(p.Range(5, 1), "int4range"), "int4range").as_("n")
             ))
         self.assertEqual(inverted.exception.sqlstate, "22000")
 
     async def test_raw_sql_compares_bound_ranges(self):
         span = p.Value(p.Range(1, 5), "int4range")
-        row = await self.pool.fetch_one(p.RawSQL(
+        row = await self.pool.one(p.RawSQL(
             "SELECT $1 && $2::int4range AS overlaps, $1 @> $3::int4range AS contains,"
             " $1::int4range @> 3 AS element",
             [span, p.Value(p.Range(4, 9), "int4range"), p.Value(p.Range(5, 9), "int4range")],
@@ -97,7 +97,7 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
                     await connection.execute(p.RawSQL(
                         f'CREATE TYPE "{schema}".{name} AS RANGE (SUBTYPE = {subtype})'
                     ))
-                row = await connection.fetch_one(p.RawSQL(
+                row = await connection.one(p.RawSQL(
                     f"""SELECT '[1,3)'::"{schema}".slot AS n, '[1.5,2)'::"{schema}".floatrange AS f"""
                 ))
                 self.assertEqual((row["n"], row["f"]), (p.Range(1, 3), p.Range(1.5, 2.0)))
@@ -106,7 +106,7 @@ class RangeResultTests(unittest.IsolatedAsyncioTestCase):
                                  p.CreatedRange("floatrange", "f64", schema=schema))
                 # The driver reports a created multirange as a simple type.
                 with self.assertRaises(p.DecodeError):
-                    await connection.fetch_one(p.RawSQL(
+                    await connection.one(p.RawSQL(
                         f"""SELECT '{{[1,3)}}'::"{schema}".slot_multirange AS n"""
                     ))
             finally:

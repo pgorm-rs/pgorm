@@ -69,7 +69,7 @@ async def exercise(
     )
     async with pool.transaction() as transaction:
         assert_type(transaction, p.Transaction)
-        changed = accounts.update({"visits": 1}).where_(accounts.key({"id": 1}))
+        changed = accounts.update({"visits": 1}).where(accounts.key({"id": 1}))
         assert await changed.execute(transaction) == 1
         with suppress(RolledBack):
             async with transaction.transaction() as child:
@@ -86,7 +86,7 @@ async def exercise(
         .join(e, a.col("id") == e.col("account_id"), kind=p.Join.Left)
         .order_by(a.col("id").asc())
     )
-    records = await pool.fetch_all(join)
+    records = await pool.query(join)
     assert_type(records, list[p.Record])
     joined = [dict(record) for record in records]
     assert joined == [
@@ -101,7 +101,7 @@ async def exercise(
         .order_by(p.col("id").asc())
     )
     assert_type(without_events, p.Select)
-    quiet = [record["id"] for record in await pool.fetch_all(without_events)]
+    quiet = [record["id"] for record in await pool.query(without_events)]
     assert quiet == [2]
 
     visit = (
@@ -111,7 +111,7 @@ async def exercise(
         .returning(a.col("id"), a.col("visits"))
     )
     assert_type(visit, p.Merge)
-    visited = await pool.fetch_all(visit)
+    visited = await pool.query(visit)
     assert_type(visited, list[p.Record])
     merged = [dict(record) for record in visited]
     assert merged == [{"merge_action": "UPDATE", "id": 1, "visits": 2}]
@@ -125,7 +125,7 @@ async def exercise(
     )
     assert_type(pipeline, pl.Pipeline)
     async with pool.connection() as connection:
-        selected = await pipeline.one_opt(connection)
+        selected = await pipeline.optional(connection)
         assert_type(selected, p.Record | None)
         assert selected is not None and selected["name"] == "Nora O'Brien"
 
@@ -133,7 +133,7 @@ async def exercise(
     async with await pool.stream(
         p.select(p.col("id")).from_(accounts.table).order_by(p.col("id").asc())
     ) as rows:
-        assert_type(rows, p.ResultStream)
+        assert_type(rows, p.RowStream)
         async for row in rows:
             assert_type(row, p.Record)
             # Dynamic record fields are Any; schema metadata does not invent static field types.
@@ -141,9 +141,9 @@ async def exercise(
             assert isinstance(identity, int)
             streamed.append(identity)
     assert streamed == [1, 2]
-    removed = await accounts.delete().where_(accounts.key({"id": 2})).execute(pool)
+    removed = await accounts.delete().where(accounts.key({"id": 2})).execute(pool)
     assert removed == 1
-    missing = await accounts.find().filter(accounts.key({"id": 2})).one_opt(pool)
+    missing = await accounts.find().where(accounts.key({"id": 2})).optional(pool)
     assert_type(missing, p.ModelRecord | None)
     assert missing is None
     return {

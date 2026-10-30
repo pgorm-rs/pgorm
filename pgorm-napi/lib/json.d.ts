@@ -158,7 +158,7 @@ export declare function jsonArray(
 export declare function jsonArrayQuery(query: Select, options?: { readonly returning?: JsonType }): Expr;
 
 /** JSON_OBJECTAGG, which also runs over a window. */
-export declare function jsonObjectAgg(
+export declare function jsonObjectagg(
   key: Operand,
   value: JsonOperand,
   options?: {
@@ -170,7 +170,7 @@ export declare function jsonObjectAgg(
 ): Expr;
 
 /** JSON_ARRAYAGG, which also runs over a window; its ordering takes no NULLS placement. */
-export declare function jsonArrayAgg(
+export declare function jsonArrayagg(
   value: JsonOperand,
   options?: {
     readonly orderBy?: readonly OrderBy[];

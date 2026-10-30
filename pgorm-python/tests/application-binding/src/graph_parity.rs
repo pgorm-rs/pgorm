@@ -4,7 +4,7 @@ use pgorm::{QueryFilter, QueryOrder, QueryTrait};
 use pgorm_python::expressions::Compiled;
 use pyo3::{prelude::*, types::PyDict};
 
-// [spec:pgorm:req:bindings.entity-graphs/test]
+// [spec:pgorm:req:bindings.entity-graphs+2/test]
 #[test]
 fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -20,9 +20,9 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
                 let id = query.call_method1("col", (0, "id"))?;
                 let child = query.call_method1("col", (1, "id"))?;
                 let query = query
-                    .call_method1("filter", (id.call_method1("gte", (2,))?,))?
+                    .call_method1("where", (id.call_method1("gte", (2,))?,))?
                     .call_method1("order_by", (child.call_method0("desc")?,))?;
-                for terminal in ["all", "one_opt"] {
+                for terminal in ["all", "optional"] {
                     let kwargs = PyDict::new(py);
                     kwargs.set_item("terminal", terminal)?;
                     let native: Compiled =
@@ -41,7 +41,7 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
                             .order_by(ordering, Order::Desc)
                             .into_query()
                     };
-                    if terminal == "one_opt" {
+                    if terminal == "optional" {
                         rust.narrow_limit_to_one();
                     }
                     assert_eq!(
@@ -56,7 +56,7 @@ fn graph_sql_and_parameters_match_rust() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.entity-graphs/test]
+// [spec:pgorm:req:bindings.entity-graphs+2/test]
 #[test]
 fn graphs_require_sources_and_unique_names() -> PyResult<()> {
     Python::initialize();
@@ -71,7 +71,7 @@ fn graphs_require_sources_and_unique_names() -> PyResult<()> {
     Ok(())
 }
 
-// [spec:pgorm:req:bindings.entity-graphs/test]
+// [spec:pgorm:req:bindings.entity-graphs+2/test]
 // [spec:pgorm:req:bindings.entities/test]
 #[test]
 fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
@@ -95,7 +95,7 @@ fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
         let rate = query.call_method1("col", (1, "rate"))?;
         let query = query
             .call_method1(
-                "filter",
+                "where",
                 (period.call_method1(
                     "eq",
                     (module.getattr("Value")?.call1((&range, "daterange"))?,),
@@ -122,7 +122,7 @@ fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
             .call_method1("__and__", (valid_at.call_method1("eq", (&range,))?,))?;
         let native: Compiled = entity
             .call_method0("find")?
-            .call_method1("filter", (key,))?
+            .call_method1("where", (key,))?
             .call_method0("inspect")?
             .extract()?;
         let expected = room::Entity::find()
@@ -144,7 +144,7 @@ fn temporal_keys_and_period_relations_match_rust() -> PyResult<()> {
             room["primary_key_without_overlaps"],
             serde_json::json!(true)
         );
-        assert_eq!(room["primary_keys"], serde_json::json!(["id", "valid_at"]));
+        assert_eq!(room["primary_key"], serde_json::json!(["id", "valid_at"]));
         let stay = describe("app.Stay")?;
         assert_eq!(
             stay["relations"],

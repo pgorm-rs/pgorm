@@ -48,7 +48,7 @@ impl LikePattern {
         "LikePattern(...)"
     }
 
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "LIKE patterns cannot be tested as Python booleans",
@@ -57,9 +57,9 @@ impl LikePattern {
 }
 
 /// A projection expression with a separate, validated output identifier.
-#[pyclass(name = "AliasedExpr", module = "pgorm", frozen, from_py_object)]
+#[pyclass(name = "Aliased", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
-pub struct AliasedExpr {
+pub struct Aliased {
     #[pyo3(get)]
     pub expr: PyExpr,
     #[pyo3(get)]
@@ -67,7 +67,7 @@ pub struct AliasedExpr {
 }
 
 #[pymethods]
-impl AliasedExpr {
+impl Aliased {
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "SQL projections cannot be tested as Python booleans",

@@ -11,7 +11,7 @@ def dispatch(name, i, d, p):
         case "select.from":
             return i["query"].from_(i["table"]), ["pgorm_query::SelectStatement::from"]
         case "select.filter" | "write.filter":
-            return i["query"].where_(i["predicate"]), [
+            return i["query"].where(i["predicate"]), [
                 "pgorm_query::ConditionalStatement::cond_where"
             ]
         case "select.join":
@@ -69,7 +69,7 @@ def dispatch(name, i, d, p):
         case "insert.conflict":
             target = p.ConflictTarget(*d["keys"])
             action = (
-                target.ignore()
+                target.do_nothing()
                 if d["action"] == "nothing"
                 else target.update(*d["columns"])
             )

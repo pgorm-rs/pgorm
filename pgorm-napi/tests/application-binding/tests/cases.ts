@@ -1,7 +1,7 @@
 // The entity family's parity cases, built through the binding from the
 // application's registrations and held to `parity.json`, which the
 // application crate's Rust test builds with its entities directly.
-// [spec:pgorm:req:bindings.entity-reads/test]
+// [spec:pgorm:req:bindings.entity-reads+2/test]
 
 import { type Compiled, entity, graph, pipeline as pl, select, Table } from "../../../lib/index.js";
 
@@ -40,6 +40,6 @@ export function cases(): Record<string, () => Compiled> {
     "sources-joined": () =>
       joined().selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).inspect(),
     "sources-joined-one": () =>
-      joined().selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).inspect("oneOpt"),
+      joined().selectSources(pl.sources("app.AccountWithNote"), { qualifiers: ["accounts", "n"] }).inspect("optional"),
   };
 }

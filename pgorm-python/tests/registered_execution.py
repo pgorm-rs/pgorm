@@ -24,13 +24,13 @@ async def runtime(db):
     update = (
         p.update(table)
         .set("name", "changed")
-        .where_(p.col("id") == 1)
+        .where(p.col("id") == 1)
         .returning(p.col("id"), p.col("name"))
     )
-    changed = await db.fetch_one(update.inspect())
-    raw = await db.fetch_one(p.RawSQL("SELECT $1::text AS value", [p.Value("raw 雪")]))
-    deleted = await db.execute(p.delete(table).where_(p.col("id") == 1))
-    missing = await db.fetch_optional(p.select(p.col("id")).from_(table))
+    changed = await db.one(update.inspect())
+    raw = await db.one(p.RawSQL("SELECT $1::text AS value", [p.Value("raw 雪")]))
+    deleted = await db.execute(p.delete(table).where(p.col("id") == 1))
+    missing = await db.optional(p.select(p.col("id")).from_(table))
     await db.execute(s.drop_table(table))
     return {
         "inserted": inserted,
@@ -84,13 +84,13 @@ async def models(db):
     query = account.find().order_by(account.col("id").expr().asc())
     all_rows = [model(row) for row in await query.all(db)]
     one = model(await query.one(db))
-    missing = await query.filter(account.col("id") == 99).one_opt(db)
+    missing = await query.where(account.col("id") == 99).optional(db)
     graph = p.graph("app.AccountNotes").find(aliases=["n"])
     graph = graph.order_by(graph.col(0, "id").asc())
     joined = pairs(await graph.all(db))
     cursor = pairs(await graph.cursor("id").first(2).all(db))
-    graph_first = (await graph.one_opt(db))[0]["id"]
-    graph_missing = await graph.filter(graph.col(0, "id") == 99).one_opt(db)
+    graph_first = (await graph.optional(db))[0]["id"]
+    graph_missing = await graph.where(graph.col(0, "id") == 99).optional(db)
     pipeline = (
         pl.from_(account)
         .join(
@@ -107,7 +107,7 @@ async def models(db):
     source_missing = (
         await pipeline.filter(False)
         .select_sources(selection, qualifiers=["accounts", "n"])
-        .one_opt(db)
+        .optional(db)
     )
     plain = (
         await pl.from_(account)
@@ -159,7 +159,7 @@ async def versions(db):
     many = await (
         account.update_many()
         .set("note", "bulk")
-        .filter(account.col("id") == 2)
+        .where(account.col("id") == 2)
         .returning_changes(db)
     )
     one = await (
@@ -172,7 +172,7 @@ async def versions(db):
     )
     skipped = await (
         account.insert(active(1, "skipped"))
-        .on_conflict(p.ConflictTarget("id").ignore())
+        .on_conflict(p.ConflictTarget("id").do_nothing())
         .returning_upsert(db)
     )
     return {
@@ -219,8 +219,8 @@ async def run():
                         pass
                     savepoint = (
                         await account.find()
-                        .filter(account.col("id") == 3)
-                        .one_opt(transaction)
+                        .where(account.col("id") == 3)
+                        .optional(transaction)
                     )
                 try:
                     async with db.transaction() as transaction:
@@ -229,11 +229,11 @@ async def run():
                 except RolledBack:
                     pass
                 rollback = (
-                    await account.find().filter(account.col("id") == 4).one_opt(db)
+                    await account.find().where(account.col("id") == 4).optional(db)
                 )
                 try:
                     async with db.transaction(mode="read_only") as read_only:
-                        mode = await read_only.fetch_one(p.RawSQL("SHOW transaction_read_only"))
+                        mode = await read_only.one(p.RawSQL("SHOW transaction_read_only"))
                         raise RolledBack
                 except RolledBack:
                     pass

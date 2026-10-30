@@ -7,7 +7,7 @@ use pgorm_napi::{RegistrationError, Registry};
 use crate::{account::Entity as A, note::Entity as N};
 
 /// Register every tuple, once its entities are registered.
-// [spec:pgorm:req:bindings.pipeline-sources/test]
+// [spec:pgorm:req:bindings.pipeline-sources+2/test]
 pub fn register(registry: &mut Registry) -> Result<(), RegistrationError> {
     registry.sources::<(A,)>("app.SingleAccount")?;
     registry.sources::<(A, N)>("app.AccountWithNote")?;

@@ -38,17 +38,17 @@ class JsonTableTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     async def rows(self, query):
-        return [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        return [tuple(row.values()) for row in await self.connection.query(query)]
 
     async def sqlstate(self, query):
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(query)
+            await self.connection.query(query)
         return caught.exception.sqlstate
 
     def over(self, column, *, id=2, path="$.items[*]", **options):
         d = self.docs
         jt = p.json_table(d.col("doc"), path, column, alias="jt", **options)
-        return p.Select(jt.col("v")).from_(d).from_(jt).where_(d.col("id") == id)
+        return p.Select(jt.col("v")).from_(d).from_(jt).where(d.col("id") == id)
 
     async def test_column_kinds_read_document_rows(self):
         d = self.docs

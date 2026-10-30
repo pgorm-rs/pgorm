@@ -2,7 +2,7 @@
 
 # [spec:pgorm:req:python.typing+1]
 from ._native import (
-    PgOrmError,
+    PgormError,
     CancelledError,
     ConnectionError,
     ConstructionError,
@@ -31,7 +31,7 @@ from ._native import (
     Expr,
     Condition,
     LikePattern,
-    AliasedExpr,
+    Aliased,
     OrderBy,
     Compiled,
     col,
@@ -84,7 +84,7 @@ from ._native import (
     FrameFollowingStart,
     Window,
     ExtendedWindow,
-    WindowedExpr,
+    Windowed,
     WindowFunction,
     window_function,
     Insert,
@@ -121,9 +121,9 @@ from ._native import (
     EntityUpdateMany,
     EntityInsert,
     EntityInsertMany,
-    Graph,
-    GraphQuery,
-    GraphCursor,
+    EntityGraph,
+    EntityGraphQuery,
+    EntityGraphCursor,
     graph,
     __pgorm_version__,
     __version__,
@@ -131,21 +131,21 @@ from ._native import (
     require_capability,
 )
 from .runtime import STATEMENT_CACHE_CHANNEL, Connection, Pool, PoolStatus, connect
-from .results import Record, Field, ResultStream, Query
+from .results import Record, Field, RowStream, Query
 from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
 from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
 # [spec:pgorm:req:bindings.surface]
-# [spec:pgorm:req:python.naming]
+# [spec:pgorm:req:python.naming+2]
 select = Select
 insert = Insert
 update = Update
 delete = Delete
 
 __all__ = [
-    "PgOrmError",
+    "PgormError",
     "CancelledError",
     "ConnectionError",
     "ConstructionError",
@@ -169,7 +169,7 @@ __all__ = [
     "connect",
     "Record",
     "Field",
-    "ResultStream",
+    "RowStream",
     "Query",
     "Column",
     "ModelColumn",
@@ -193,7 +193,7 @@ __all__ = [
     "Expr",
     "Condition",
     "LikePattern",
-    "AliasedExpr",
+    "Aliased",
     "OrderBy",
     "Compiled",
     "col",
@@ -246,7 +246,7 @@ __all__ = [
     "FrameFollowingStart",
     "Window",
     "ExtendedWindow",
-    "WindowedExpr",
+    "Windowed",
     "WindowFunction",
     "window_function",
     "Insert",
@@ -288,9 +288,9 @@ __all__ = [
     "EntityUpdateMany",
     "EntityInsert",
     "EntityInsertMany",
-    "Graph",
-    "GraphQuery",
-    "GraphCursor",
+    "EntityGraph",
+    "EntityGraphQuery",
+    "EntityGraphCursor",
     "graph",
     "select",
     "insert",

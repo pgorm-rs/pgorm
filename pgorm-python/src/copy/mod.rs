@@ -156,7 +156,7 @@ pub(crate) fn capabilities() -> Map<String, Value> {
         ),
         ("copy_from.columns", "pgorm_query::CopyFromStatement::columns"),
         (
-            "copy_from.where_",
+            "copy_from.where",
             "pgorm_query::ConditionalStatement::cond_where for CopyFromStatement",
         ),
         ("copy_from.freeze", "pgorm_query::CopyFromStatement::freeze"),

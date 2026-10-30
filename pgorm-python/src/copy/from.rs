@@ -99,7 +99,7 @@ impl PyCopyFrom {
         Ok(next)
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let predicate = condition(predicate)?;
         let mut next = self.clone();
         every!(CopyFrom, &mut next.inner, |s| s.cond_where(predicate));

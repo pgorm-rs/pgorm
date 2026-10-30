@@ -17,7 +17,7 @@ async def observations(pool):
         query = p.RawSQL(
             "SELECT row_to_json(t)::text AS value FROM " + name + " AS t ORDER BY id"
         )
-        result[name] = [json.loads(row["value"]) for row in await pool.fetch_all(query)]
+        result[name] = [json.loads(row["value"]) for row in await pool.query(query)]
     return result
 
 
@@ -35,7 +35,7 @@ async def main():
             assert initial == await observations(reference)
             table = p.Table("accounts", schema="fixture")
             await subject.execute(
-                p.update(table).set("name", "changed").where_(p.col("id") == 1)
+                p.update(table).set("name", "changed").where(p.col("id") == 1)
             )
             assert initial != await observations(subject)
             assert initial == await observations(reference)
@@ -59,7 +59,7 @@ async def main():
                         "restricted role allowed a privileged operation"
                     )
             try:
-                await subject.fetch_one(p.RawSQL("SELECT pg_sleep(5)"))
+                await subject.one(p.RawSQL("SELECT pg_sleep(5)"))
             except p.DatabaseError as error:
                 assert error.sqlstate == "57014", str(error)
             else:

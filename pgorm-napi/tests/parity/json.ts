@@ -11,12 +11,12 @@ import {
   isJson,
   isNotJson,
   jsonArray,
-  jsonArrayAgg,
+  jsonArrayagg,
   jsonArrayQuery,
   jsonDefault,
   jsonExists,
   jsonObject,
-  jsonObjectAgg,
+  jsonObjectagg,
   jsonParse,
   jsonQuery,
   jsonScalar,
@@ -49,8 +49,8 @@ export const cases: Record<string, () => Builder> = {
   "json-array-query": () => jsonArrayQuery(select(col("id")).from(new Table("t")), { returning: "jsonb" }),
   "json-aggregates": () =>
     select(
-      jsonObjectAgg(col("k"), col("v"), { absentOnNull: true, uniqueKeys: true, returning: "jsonb", filter: col("v").isNotNull() }),
-      jsonArrayAgg(col("v"), { orderBy: [col("k").desc()], nullOnNull: true, returning: "jsonb", filter: col("k").gt(0) }),
+      jsonObjectagg(col("k"), col("v"), { absentOnNull: true, uniqueKeys: true, returning: "jsonb", filter: col("v").isNotNull() }),
+      jsonArrayagg(col("v"), { orderBy: [col("k").desc()], nullOnNull: true, returning: "jsonb", filter: col("k").gt(0) }),
     ).from(new Table("t")),
   "json-parse-scalar-serialize": () =>
     select(

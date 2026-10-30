@@ -18,7 +18,7 @@ pub enum PyMatchedAction {
 
 #[pymethods]
 impl PyMatchedAction {
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "MERGE actions cannot be tested as Python booleans",
@@ -77,7 +77,7 @@ impl PyMergeUpdate {
         })
     }
 
-    fn and_value(&self, column: &Bound<'_, PyAny>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn set(&self, column: &Bound<'_, PyAny>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let column = PyIdentifier::new(column)?.name();
         let value = coerce(value)?.inner;
         Ok(Self {
@@ -113,7 +113,7 @@ impl PyMergeInsert {
         })
     }
 
-    fn and_value(&self, column: &Bound<'_, PyAny>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn set(&self, column: &Bound<'_, PyAny>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
         let column = PyIdentifier::new(column)?.name();
         let value = coerce(value)?.inner;
         Ok(Self {

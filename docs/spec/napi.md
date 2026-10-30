@@ -17,7 +17,7 @@ waiting on the operator. The WBS root is `napi`.
 > classes it rejects with and builds values from, exports them, and is what an
 > application imports; the addon is not imported directly.
 
-> [spec:pgorm:req:napi.naming]
+> [spec:pgorm:req:napi.naming+2]
 > JavaScript MUST spell a shared rule's neutral name in camelCase — functions,
 > methods and option keys — and a class as written. A closed choice is a
 > string literal in camelCase (`"inner"`, `"noKeyUpdate"`, `"skipLocked"`,
@@ -31,16 +31,11 @@ waiting on the operator. The WBS root is `napi`.
 >
 > A reserved word is spelled otherwise: `deleteFrom` for `delete`, and
 > `thisColumn`, `thatColumn` and `caseWhen` for a pipeline's `this`, `that`
-> and `case`. These names differ from the neutral spelling by choice and wait
-> on the operator (`bindings.surface`): `PgormError`, the base error class;
-> `Ddl`; `Aliased` and `Windowed`; `RowStream`; `EntityGraph`,
-> `EntityGraphQuery` and `EntityGraphCursor` for a registered graph, its query
-> and its cursor; the grouping elements as the functions `groupingSet`,
-> `rollup`, `cube` and `groupingSets`; `Conflict.doNothing()`,
-> `Conflict.on(..)` and `Conflict.onConstraint(..)`; `MergeAction.update`,
-> `.insert`, `.delete`, `.doNothing` and `.insertDefaults`, and `set` on
-> MERGE's update and insert; `jsonObjectAgg` and `jsonArrayAgg`; and
-> `PipelineExpr`, the pipeline's expression class.
+> and `case`. These differ from the shared shape by choice and wait on the
+> operator (`bindings.surface`): the grouping elements as the functions
+> `groupingSet`, `rollup`, `cube` and `groupingSets`; `Conflict.on(..)` for a
+> conflict arbiter; and `MergeAction.update`, `.insert`, `.delete`,
+> `.doNothing` and `.insertDefaults` for MERGE's actions.
 
 ## Targeting and loading
 
@@ -208,10 +203,10 @@ first rule: a value reaches JavaScript exactly or not at all.
 > notification a frozen `{ channel, payload, processId }`, and a pool's status
 > a plain object.
 
-> [spec:pgorm:req:napi.row-count]
-> `one` finding no row or several, `optional` finding several, and the `one`,
-> `oneOpt` and `optional` of model, entity, graph and source queries finding a
-> count they do not take MUST reject with a `DecodeError`.
+> [spec:pgorm:req:napi.row-count+2]
+> `one` finding no row or several, `optional` finding several, and the `one`
+> and `optional` of model, entity, graph and source queries finding a count
+> they do not take MUST reject with a `DecodeError`.
 
 ## Connections
 
@@ -272,9 +267,9 @@ first rule: a value reaches JavaScript exactly or not at all.
 
 ## Schema
 
-> [spec:pgorm:req:napi.schema-api]
+> [spec:pgorm:req:napi.schema-api+2]
 > The module MUST spell the DDL `bindings.schema` describes as these
-> factories and builders, every complete statement a `Ddl` and a member of
+> factories and builders, every complete statement a `DDL` and a member of
 > the `Statement` union the terminals take; no export is named
 > `SchemaStatement`:
 >

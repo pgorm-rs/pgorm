@@ -12,8 +12,8 @@ import {
   CreatedRange,
   ExtendedWindow,
   FrameType,
-  jsonArrayAgg,
-  jsonObjectAgg,
+  jsonArrayagg,
+  jsonObjectagg,
   Multirange,
   Range,
   select,
@@ -80,8 +80,8 @@ export const cases: Record<string, () => Builder> = {
   },
   "window-json-aggregates": () =>
     select(
-      jsonArrayAgg(col("v"), { orderBy: [col("v").asc()] }).over(new Window().partitionBy(col("k"))),
-      jsonObjectAgg(col("k"), col("v")).over("w").as("pairs"),
+      jsonArrayagg(col("v"), { orderBy: [col("v").asc()] }).over(new Window().partitionBy(col("k"))),
+      jsonObjectagg(col("k"), col("v")).over("w").as("pairs"),
     ).from(new Table("t")).window("w", new Window().orderBy(col("k").asc())),
   "ranges": () =>
     select().from(new Table("booking")).where(

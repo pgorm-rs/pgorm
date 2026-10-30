@@ -27,7 +27,7 @@ pub(crate) use capabilities::operations as capabilities;
 pub use compiled::Compiled;
 pub use construct::PyCondition;
 pub(crate) use construct::{coerce, require_expr};
-pub use options::{AliasedExpr, LikePattern, OrderBy};
+pub use options::{Aliased, LikePattern, OrderBy};
 
 // [spec:pgorm:req:bindings.expressions]
 // [spec:pgorm:req:python.expressions+7]
@@ -55,7 +55,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyExpr>()?;
     module.add_class::<PyCondition>()?;
     module.add_class::<LikePattern>()?;
-    module.add_class::<AliasedExpr>()?;
+    module.add_class::<Aliased>()?;
     module.add_class::<OrderBy>()?;
     module.add_class::<Compiled>()?;
     module.add_function(wrap_pyfunction!(construct::col, module)?)?;

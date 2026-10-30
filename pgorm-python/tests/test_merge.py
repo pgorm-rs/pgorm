@@ -40,7 +40,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         return p.merge(t, s, t.col("id") == s.col("id"))
 
     async def rows(self, query):
-        return sorted(tuple(row.values()) for row in await self.connection.fetch_all(query))
+        return sorted(tuple(row.values()) for row in await self.connection.query(query))
 
     async def final(self):
         table = p.Table(self.target_name)
@@ -49,9 +49,9 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def test_each_row_kind_takes_its_own_arm(self):
         t, s = self.target, self.source
         query = (self.pending()
-                 .when_matched(p.MergeUpdate("name", s.col("name")).and_value("visits", t.col("visits") + s.col("visits")))
-                 .when_not_matched(p.MergeInsert("id", s.col("id")).and_value("name", s.col("name"))
-                                   .and_value("visits", s.col("visits")))
+                 .when_matched(p.MergeUpdate("name", s.col("name")).set("visits", t.col("visits") + s.col("visits")))
+                 .when_not_matched(p.MergeInsert("id", s.col("id")).set("name", s.col("name"))
+                                   .set("visits", s.col("visits")))
                  .when_not_matched_by_source(p.MatchedAction.Delete)
                  .returning_action()
                  .returning(t.col("id"), p.ReturningRow.Old.col("visits").as_("before"),
@@ -84,7 +84,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
                  .returning_action().returning(t.col("name")))
         with self.assertRaises(p.DatabaseError) as caught:
             # The default row has no id: the target's primary key refuses it.
-            await self.connection.fetch_all(query)
+            await self.connection.query(query)
         self.assertEqual(caught.exception.sqlstate, "23502")
         query = (self.pending()
                  .when_matched(p.MatchedAction.Delete)
@@ -104,7 +104,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cte_source_and_cte_body(self):
         t = self.target
-        staged = p.Select(p.col("id"), p.col("visits")).from_(p.Table(self.source_name)).where_(p.col("visits") > 10)
+        staged = p.Select(p.col("id"), p.col("visits")).from_(p.Table(self.source_name)).where(p.col("visits") > 10)
         s = p.Table("staged")
         query = (p.merge(t, s, t.col("id") == s.col("id"))
                  .when_matched(p.MergeUpdate("visits", s.col("visits")))
@@ -123,10 +123,10 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
                                old_as="before", new_as="after")
         self.assertEqual(await self.rows(query), [(10, 5), (20, 50)])
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(base.returning(p.ReturningRow.Old.col("visits"), old_as="before"))
+            await self.connection.query(base.returning(p.ReturningRow.Old.col("visits"), old_as="before"))
         self.assertEqual(caught.exception.sqlstate, "42P01")
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(base.returning(old_as="s"))
+            await self.connection.query(base.returning(old_as="s"))
         self.assertEqual(caught.exception.sqlstate, "42712")
 
     async def test_only_leaves_inheriting_tables_alone(self):
@@ -145,7 +145,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         await self.connection.execute(p.RawSQL(
             f"CREATE TEMP TABLE {quoted(name)} (id integer GENERATED ALWAYS AS IDENTITY, n integer)"))
         target, s = p.Table(name).as_("t"), self.source
-        insert = p.MergeInsert("id", s.col("id")).and_value("n", s.col("visits"))
+        insert = p.MergeInsert("id", s.col("id")).set("n", s.col("visits"))
         query = p.merge(target, s, target.col("id") == s.col("id"))
         with self.assertRaises(p.DatabaseError) as caught:
             await self.connection.execute(query.when_not_matched(insert))
@@ -187,26 +187,26 @@ class ReturningVersionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_and_delete_read_both_versions(self):
         old, new = p.ReturningRow.Old, p.ReturningRow.New
-        update = (p.Update(self.table).set("visits", p.col("visits") + 5).where_(p.col("id") == 1)
+        update = (p.Update(self.table).set("visits", p.col("visits") + 5).where(p.col("id") == 1)
                   .returning(old.col("visits").as_("before"), new.col("visits").as_("after")))
-        self.assertEqual(dict(await self.connection.fetch_one(update)), {"before": 10, "after": 15})
-        delete = p.Delete(self.table).where_(p.col("id") == 1).returning(old.star(), new.col("id").as_("gone"))
-        self.assertEqual(dict(await self.connection.fetch_one(delete)), {"id": 1, "visits": 15, "gone": None})
+        self.assertEqual(dict(await self.connection.one(update)), {"before": 10, "after": 15})
+        delete = p.Delete(self.table).where(p.col("id") == 1).returning(old.star(), new.col("id").as_("gone"))
+        self.assertEqual(dict(await self.connection.one(delete)), {"id": 1, "visits": 15, "gone": None})
 
     async def test_upsert_says_which_rows_it_inserted(self):
         old = p.ReturningRow.Old
         upsert = (p.Insert(self.table).columns("id", "visits").values(1, 1).values(2, 2)
                   .on_conflict(p.ConflictTarget("id").set("visits", p.col("visits", table="excluded")))
                   .returning(p.col("id"), old.col("id").is_null().as_("inserted")))
-        rows = sorted(tuple(row.values()) for row in await self.connection.fetch_all(upsert))
+        rows = sorted(tuple(row.values()) for row in await self.connection.query(upsert))
         self.assertEqual(rows, [(1, False), (2, True)])
 
     async def test_renamed_versions_on_an_update(self):
-        update = (p.Update(self.table).set("visits", 0).where_(p.col("id") == 1)
+        update = (p.Update(self.table).set("visits", 0).where(p.col("id") == 1)
                   .returning(p.col("visits", table="o").as_("was"), p.col("visits", table="n").as_("is"),
                              old_as="o", new_as="n"))
-        self.assertEqual(tuple((await self.connection.fetch_one(update)).values()), (10, 0))
+        self.assertEqual(tuple((await self.connection.one(update)).values()), (10, 0))
         same = p.Update(self.table).set("visits", 0).all_rows().returning(old_as="o", new_as="o")
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(same)
+            await self.connection.query(same)
         self.assertEqual(caught.exception.sqlstate, "42712")

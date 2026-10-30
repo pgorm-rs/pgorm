@@ -163,7 +163,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     # [spec:pgorm:req:bindings.pipeline/test]
-    # [spec:pgorm:req:python.pipeline-operands/test]
+    # [spec:pgorm:req:python.pipeline-operands+2/test]
     async def test_terminals_models_and_dynamic_streams(self):
         model = p.Model(
             "items",
@@ -177,9 +177,9 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await query.one(self.connection))["id"], 1)
         self.assertIn("LIMIT 1", query.inspect(terminal="one").sql)
         with self.assertRaises(p.DatabaseError):
-            await self.connection.fetch_one(query)
+            await self.connection.one(query)
         empty = query.filter(pl.col("items", "id") < 0)
-        self.assertIsNone(await empty.one_opt(self.connection))
+        self.assertIsNone(await empty.optional(self.connection))
         with self.assertRaises(p.DatabaseError):
             await empty.one(self.connection)
         async with await self.connection.stream(query) as rows:
@@ -229,7 +229,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
                 await cases[name].all(self.connection)
 
     # [spec:pgorm:req:bindings.pipeline-expressions/test]
-    # [spec:pgorm:req:python.pipeline-operands/test]
+    # [spec:pgorm:req:python.pipeline-operands+2/test]
     async def test_literal_and_bound_text_remain_values(self):
         payload = "O'Brien'); DROP TABLE items; -- 雪"
         await self.connection.execute(

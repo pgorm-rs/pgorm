@@ -18,7 +18,7 @@ async def received(listener):
 
 
 async def backend_pid(executor):
-    return (await executor.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+    return (await executor.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
 
 
 async def listening_pid(executor, channel):
@@ -26,12 +26,12 @@ async def listening_pid(executor, channel):
         "SELECT pid FROM pg_stat_activity WHERE datname = current_database() AND query = $1",
         [f'LISTEN "{channel}"'],
     )
-    return (await executor.fetch_one(query))["pid"]
+    return (await executor.one(query))["pid"]
 
 
 class ListenerSurface(unittest.TestCase):
     # [spec:pgorm:req:bindings.listen/test]    listeners come from a pool
-    # [spec:pgorm:req:python.truth-testing+2/test]    neither Listener nor Notification is a boolean
+    # [spec:pgorm:req:python.truth-testing+3/test]    neither Listener nor Notification is a boolean
     def test_listener_objects_refuse_truth_testing(self):
         with self.assertRaises(p.ConstructionError):
             p.Listener(object())
@@ -250,7 +250,7 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
                 "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database() "
                 "AND query IN ('LISTEN \"py_close\"', 'LISTEN \"py_pool_close\"')"
             )
-            while (await self.pool.fetch_one(query))["n"]:
+            while (await self.pool.one(query))["n"]:
                 pass
 
         await asyncio.wait_for(ended(), ARRIVAL)

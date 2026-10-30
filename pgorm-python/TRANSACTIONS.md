@@ -30,8 +30,8 @@ async def main() -> None:
                         raise RolledBack
                 except RolledBack:
                     pass
-                assert [r["id"] for r in await tx.fetch_all(p.select(p.col("id")).from_(table))] == [1]
-            assert (await pool.fetch_one(p.select(p.col("id")).from_(table)))["id"] == 1
+                assert [r["id"] for r in await tx.query(p.select(p.col("id")).from_(table))] == [1]
+            assert (await pool.one(p.select(p.col("id")).from_(table)))["id"] == 1
         finally:
             await pool.execute(s.drop_table(table))
 
@@ -63,7 +63,7 @@ connection cannot perform other operations. Overlapping requests fail with
 `LifecycleError`; the bindings do not queue concurrent transaction use. A block
 exits only after releasing its parent.
 
-Use the same `execute`, `fetch_all`, `fetch_one` and `fetch_optional` methods as
+Use the same `execute`, `query`, `one` and `optional` methods as
 on a connection. These accept SELECT/CRUD builders, pipelines, schema statements,
 `Compiled` and explicit `RawSQL`. Dynamic record cardinality rules are unchanged.
 Runtime models, registered entity queries and ActiveModel hooks, registered
@@ -89,7 +89,7 @@ the transaction configuration and take no mode or isolation arguments.
 ```python
 async def read_snapshot(connection: p.Connection) -> None:
     async with connection.transaction(mode="read_only", isolation="repeatable_read") as tx:
-        row = await tx.fetch_one(p.select(p.literal("snapshot").as_("label")))
+        row = await tx.one(p.select(p.literal("snapshot").as_("label")))
         print(row["label"])
 ```
 

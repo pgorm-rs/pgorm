@@ -86,13 +86,13 @@ Using the example registration:
 import pgorm as p
 
 Account = p.entity("app.Account")
-query = Account.find().filter(Account.col("id") >= 10)
+query = Account.find().where(Account.col("id") >= 10)
 query = query.order_by(Account.col("id").expr().desc()).limit(20)
 print(query.inspect().sql)
 
 async with pool.connection() as connection:
     accounts = await query.all(connection)
-    first = await query.one_opt(connection)
+    first = await query.optional(connection)
     active = Account.active().set("id", 42).set("display name", "Nora")
     inserted = await active.insert(connection)
     updated = await inserted.into_active().set("note", "Reviewed").update(connection)
@@ -111,7 +111,7 @@ compares one — and the subquery's projection is cast beside it:
 ```python
 Temper = p.entity("app.Temper")
 settled = p.Select(p.col("settles_into")).from_(p.Table("tempers", schema="python_entities"))
-query = Temper.find().filter(Temper.col("mood").is_in(settled))
+query = Temper.find().where(Temper.col("mood").is_in(settled))
 ```
 
 The column takes values only; `col(name).expr()` is its plain expression,
@@ -126,15 +126,16 @@ connection if the operation's completion is uncertain. Closing its connection
 or pool also cancels an outstanding Rust hook. Cancellation does not guarantee
 rollback of a submitted write.
 
-`all` returns a list of detached models. Rust's `one` and `one_opt` narrow
-the query's limit to one row: `LIMIT 1`, including when an earlier query limit
-was larger, and `LIMIT 0` when it was zero, which finds no row. `one` raises
-`DatabaseError` on absence; `one_opt` returns `None`. `inspect(terminal="one")`
-or `inspect(terminal="one_opt")` includes that terminal's limit. A decoding
-failure remains `DecodeError`. These are the registered Rust selector's
-semantics; the dynamic `fetch_one` terminal has its own strict cardinality
-contract. Entity streams and arbitrary partial entity projections are not
-advertised by this registration API.
+`all` returns a list of detached models. `one` and `optional` are Rust's `one`
+and `one_opt`, which narrow the query's limit to one row: `LIMIT 1`, including
+when an earlier query limit was larger, and `LIMIT 0` when it was zero, which
+finds no row. `one` raises `DatabaseError` on absence; `optional` returns
+`None`. `inspect(terminal="one")` or `inspect(terminal="optional")` includes
+that terminal's limit. A decoding failure remains `DecodeError`. These are the
+registered Rust selector's semantics; the `one` of a pool, connection or
+transaction has its own strict cardinality contract. Entity streams and
+arbitrary partial entity projections are not advertised by this registration
+API.
 
 ## Writes that return both versions
 
@@ -147,7 +148,7 @@ Account = p.entity("app.Account")
 change = await Account.update(model.into_active().set("note", "x")).returning_change(connection)
 print(change.old["note"], change.new["note"])
 changes = await (Account.update_many().set("note", "bulk")
-                 .filter(Account.col("id") >= 2).returning_changes(connection))
+                 .where(Account.col("id") >= 2).returning_changes(connection))
 renamed = p.ConflictTarget("id").update("display name")
 match await Account.insert(active).on_conflict(renamed).returning_upsert(connection):
     case p.Upserted.Inserted(model): ...
@@ -159,7 +160,7 @@ rows = await Account.insert_many([a, b]).on_conflict(renamed).returning_upserts(
 | Python | Rust |
 | --- | --- |
 | `entity.update(active).returning_change(connection)` | `Update::one(active)?.exec_returning_change` |
-| `entity.update_many().set(..).filter(..).returning_changes(connection)` | `Update::many(entity).col_expr(..).filter(..).exec_returning_changes` |
+| `entity.update_many().set(..).where(..).returning_changes(connection)` | `Update::many(entity).col_expr(..).filter(..).exec_returning_changes` |
 | `entity.insert(active).on_conflict(..).returning_upsert(connection)` | `Insert::one(active).on_conflict(..).exec_returning_upsert` |
 | `entity.insert_many(actives).on_conflict(..).returning_upserts(connection)` | `Insert::many(actives).on_conflict(..).exec_returning_upserts` |
 

@@ -101,7 +101,7 @@ pub(super) enum Recipe {
 
 impl Recipe {
     // [spec:pgorm:req:bindings.pipeline-expressions]
-    // [spec:pgorm:req:python.pipeline-operands]
+    // [spec:pgorm:req:python.pipeline-operands+2]
     pub(super) fn lower<'brand>(&self, bound: &[pl::Expr<'brand>]) -> pl::Expr<'brand> {
         match self {
             Self::Null => pl::null(),

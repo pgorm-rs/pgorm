@@ -130,7 +130,7 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(subtype=sql):
                 created = await self.create(f"Range {sql}", sql)
                 value = p.Value(written, created)
-                row = await self.connection.fetch_one(p.Select(
+                row = await self.connection.one(p.Select(
                     p.bind(value).as_("bound"), p.literal(value).as_("inline")))
                 self.assertEqual(row["bound"], written)
                 self.assertEqual(row["inline"], written)
@@ -138,7 +138,7 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_built_in_subtype_keeps_its_name(self):
         slot = await self.create("slot", "int4")
-        row = await self.connection.fetch_one(p.RawSQL(
+        row = await self.connection.one(p.RawSQL(
             f"SELECT '[1,5]'::{self.quoted(self.schema)}.slot AS n, NULL::{self.quoted(self.schema)}.slot AS absent"))
         # A created range is continuous, so the server keeps [1,5] as written.
         self.assertEqual(row["n"], p.Range(1, 5, "[]"))
@@ -154,16 +154,16 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
             await self.connection.execute(
                 p.Insert(table).columns("span").values(p.literal(p.Value(p.Range(1, 5), "int4range"))))
         self.assertEqual(built_in.exception.sqlstate, "42804")
-        stored = await self.connection.fetch_one(p.Select(p.col("span")).from_(table))
+        stored = await self.connection.one(p.Select(p.col("span")).from_(table))
         self.assertEqual(stored["span"], p.Range(1, 5, "[]"))
 
     async def test_server_refuses_what_type_cannot_hold(self):
         slot = await self.create("slot", "int4")
         with self.assertRaises(p.DatabaseError) as inverted:
-            await self.connection.fetch_one(p.Select(p.bind(p.Value(p.Range(5, 1), slot)).as_("n")))
+            await self.connection.one(p.Select(p.bind(p.Value(p.Range(5, 1), slot)).as_("n")))
         self.assertEqual(inverted.exception.sqlstate, "22000")
         with self.assertRaises(p.DatabaseError) as missing:
-            await self.connection.fetch_one(
+            await self.connection.one(
                 p.Select(p.bind(p.Value(p.Range(1, 2), p.CreatedRange("absent", "i32"))).as_("n")))
         self.assertEqual(missing.exception.sqlstate, "42704")
 
@@ -172,10 +172,10 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
         spans = p.CreatedMultirange("floatmultirange", "f64", schema=self.schema)
         value = p.Value(p.Multirange([p.Range(5.0, 8.0), p.Range(1.0, 3.0), p.Range(2.0, 4.0)]), spans)
         text = p.bind(value).cast(p.TypeName("text", schema="pg_catalog")).as_("text")
-        row = await self.connection.fetch_one(p.Select(text))
+        row = await self.connection.one(p.Select(text))
         self.assertEqual(p.Value(row["text"], spans).value, p.Multirange([p.Range(1.0, 4.0), p.Range(5.0, 8.0)]))
         with self.assertRaises(p.DecodeError):
-            await self.connection.fetch_one(p.Select(p.bind(value).as_("spans")))
+            await self.connection.one(p.Select(p.bind(value).as_("spans")))
 
     async def test_domain_subtype_reads_as_its_base(self):
         schema = self.quoted(self.schema)
@@ -190,7 +190,7 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
         span = p.Value(p.Range(1.5, 2.0), p.CreatedRange("heightrange", "f64", schema=self.schema))
         spans = p.Value(p.Multirange([p.Range(1.5, 2.0), p.Range(3.0, None)]),
                         p.CreatedMultirange("heightmultirange", "f64", schema=self.schema))
-        row = await self.connection.fetch_one(p.Select(p.bind(span).as_("span")))
+        row = await self.connection.one(p.Select(p.bind(span).as_("span")))
         self.assertEqual(row.tagged("span"), span)
         table = p.Table("heights", schema=self.schema)
         self.assertEqual(await self.connection.copy_in_rows(p.CopyFrom(table, "binary"), [(1, span, spans)]), 1)
@@ -202,5 +202,5 @@ class CreatedRangeResultTests(unittest.IsolatedAsyncioTestCase):
     async def test_arrays_of_a_created_range_are_refused(self):
         await self.create("slot", "int4")
         with self.assertRaises(p.DecodeError):
-            await self.connection.fetch_one(p.RawSQL(
+            await self.connection.one(p.RawSQL(
                 f"SELECT ARRAY['[1,2)'::{self.quoted(self.schema)}.slot] AS spans"))

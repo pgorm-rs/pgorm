@@ -39,7 +39,7 @@ and parameter comparisons:
 | SELECT with a left join and nested predicates | Expected records; absent joined fields retain typed NULLs |
 | UPDATE with RETURNING | Exact updated record and visits count |
 | DELETE | One affected row, then zero on repeating the same builder |
-| SELECT with no matching row | `fetch_optional` returns None |
+| SELECT with no matching row | `optional` returns None |
 | MERGE of events with accounts, every kind of arm, RETURNING `merge_action()` and both row versions | Four rows: a deleted unmatched event, two inserts and a conditional update, each with its old and new points |
 | SELECT final state | Expected surviving accounts and updated values |
 | COPY FROM csv, with a column list, `HEADER` and `DELIMITER` | Two rows; the injection-shaped term holds the delimiter and Python's `csv` quotes it |

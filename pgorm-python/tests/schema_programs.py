@@ -18,13 +18,13 @@ def programs(p):
         "column_specs": p.CreateTable(table).column(p.ColumnDef("id", "bigint").auto_increment())
             .column(p.ColumnDef("n", "integer").null().check(p.col("n") > 0)).primary_key("id").unique("n"),
         "index": p.CreateIndex(table, "name", name='index "x"').column('id "x"', descending=True)
-            .unique().nulls_not_distinct().method("btree").if_not_exists(),
-        "index_gin": p.CreateIndex(table, "moods").method("gin"),
+            .unique().nulls_not_distinct().using("btree").if_not_exists(),
+        "index_gin": p.CreateIndex(table, "moods").using("gin"),
         "drop_index": p.drop_index(table, 'index "x"', if_exists=True),
         "drop_table": p.drop_table(table, if_exists=True, cascade=True),
         "rename_table": p.rename_table(table, 'new "x"'),
         "rename_column": p.rename_column(table, 'id "x"', 'new "x"'),
-        "truncate": p.truncate(table),
+        "truncate_table": p.truncate_table(table),
         "add_column": p.add_column(table, p.ColumnDef("extra", "text"), if_not_exists=True),
         "modify_column": p.modify_column(table, p.ColumnDef("extra", "varchar").not_null().default("hello")),
         "collated": p.CreateTable(table).column(p.ColumnDef('word "x"', "text").not_null().collate("C"))
@@ -119,7 +119,7 @@ def schemas(p):
 
 
 def views(p, table):
-    query = p.Select(p.col('id "x"'), p.col("name")).from_(table).where_(p.col("name") != "O'Brien \\ 雪")
+    query = p.Select(p.col('id "x"'), p.col("name")).from_(table).where(p.col("name") != "O'Brien \\ 雪")
     view = p.Table('view "雪"', schema='schema "雪"')
     return {
         "create_view": p.create_view(view, query),

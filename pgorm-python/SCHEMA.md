@@ -24,7 +24,7 @@ async def main() -> None:
         await pool.execute(statement)
         try:
             await pool.execute(s.create_index(table, "name", name="example_name_idx"))
-            row = await pool.fetch_one(
+            row = await pool.one(
                 p.insert(table).columns("name").values("Nora")
                 .returning(p.col("id"), p.col("name"))
             )
@@ -67,7 +67,7 @@ an alias; `schema=` retains the qualified identifier.
 
 `CreateIndex` requires a table and first column. `.column(name, descending=True)`
 adds an ordered column; `.unique()`, `.nulls_not_distinct()`, `.if_not_exists()`
-and `.method("btree" | "hash" | "gin" | "gist" | "spgist" | "brin")` select native
+and `.using("btree" | "hash" | "gin" | "gist" | "spgist" | "brin")` select native
 options. `nulls_not_distinct()` also selects uniqueness and requires PostgreSQL
 15 or later. `drop_index(table, name)` uses the table's schema to qualify the
 index name.
@@ -75,7 +75,7 @@ index name.
 Table changes use `add_column`, `modify_column`, `drop_column`, `rename_column`,
 `set_expression`, `drop_expression`, `add_not_null`, `add_check`,
 `validate_constraint`, `alter_constraint`, `drop_constraint`,
-`rename_constraint`, `rename_table`, `truncate` and `drop_table`. Each returns a ready native DDL statement. A `modify_column`
+`rename_constraint`, `rename_table`, `truncate_table` and `drop_table`. Each returns a ready native DDL statement. A `modify_column`
 definition selects Rust's corresponding type, nullability and default changes;
 a generated column's expression is changed by `set_expression(table, column,
 expr)`, which the rows already written take, and removed by
@@ -241,7 +241,7 @@ nothing can order it once it is a definition, so a `limit_with_ties` without
 
 ```python
 account = p.Table("account", schema="app")
-active = p.Select(p.col("id"), p.col("name")).from_(account).where_(p.col("active") == True)
+active = p.Select(p.col("id"), p.col("name")).from_(account).where(p.col("active") == True)
 view = s.create_view(p.Table("active_account", schema="app"), active, check_option="cascaded")
 snapshot = p.Table("account_snapshot", schema="app")
 statements = [
@@ -272,7 +272,7 @@ yet (`42P01`):
 
 ```python
 counter = p.Table("counter", schema="app")
-step = p.Select(p.col("n") + 1).from_(p.Table("counter")).where_(p.col("n") < 4)
+step = p.Select(p.col("n") + 1).from_(p.Table("counter")).where(p.col("n") < 4)
 counting = s.create_recursive_view(counter, ["n"], p.Select(p.literal(1).as_("n")).union_all(step))
 ```
 

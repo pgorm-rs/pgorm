@@ -19,15 +19,15 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
             "ConnectionTrait::execute for DatabaseTransaction",
         ),
         (
-            "transaction.fetch_all",
+            "transaction.query",
             "ConnectionTrait::query_all for DatabaseTransaction",
         ),
         (
-            "transaction.fetch_one",
+            "transaction.one",
             "ConnectionTrait::query_all for DatabaseTransaction",
         ),
         (
-            "transaction.fetch_optional",
+            "transaction.optional",
             "ConnectionTrait::query_all for DatabaseTransaction",
         ),
         (

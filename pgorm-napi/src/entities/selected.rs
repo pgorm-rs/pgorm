@@ -55,7 +55,7 @@ fn sources_names(mut cx: FunctionContext) -> JsResult<JsValue> {
 }
 
 /// `sourcesGet(registry, name)`: the source tuple registered as `name`.
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 fn sources_get(mut cx: FunctionContext) -> JsResult<JsValue> {
     let registry = held!(cx, super::RegistryHandle, 0);
     let name = text!(cx, 1);
@@ -108,7 +108,7 @@ fn qualifiers(cx: &mut FunctionContext, factory: &dyn SourcesFactory) -> NeonRes
 /// `sourcesSelect(sources, pipeline, qualifiers)`: the pipeline with the
 /// tuple's projection as its last stage, each source read under its
 /// qualifier.
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 fn sources_select(mut cx: FunctionContext) -> JsResult<JsValue> {
     let factory = held!(cx, SourcesHandle, 0);
     let value = cx.argument::<JsValue>(1)?;
@@ -135,15 +135,15 @@ fn read_terminal(cx: &mut FunctionContext) -> NeonResult<Read> {
     match cx.argument::<JsString>(1)?.value(cx).as_str() {
         "all" => Ok(Read::All),
         "one" => Ok(Read::One),
-        "oneOpt" => Ok(Read::OneOpt),
-        _ => cx.throw_type_error("a terminal is all, one or oneOpt"),
+        "optional" => Ok(Read::OneOpt),
+        _ => cx.throw_type_error("a terminal is all, one or optional"),
     }
 }
 
 /// `selectedInspect(selected, terminal)`: the SQL and values the terminal
-/// sends, `one` and `oneOpt` taking one row; a pipeline reshaped before the
+/// sends, `one` and `optional` taking one row; a pipeline reshaped before the
 /// selection is a `ConstructionError`, as pgorm refuses it.
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 fn selected_inspect(mut cx: FunctionContext) -> JsResult<JsValue> {
     let selected = held!(cx, SelectedHandle, 0);
     let read = read_terminal(&mut cx)?;

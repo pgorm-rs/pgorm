@@ -24,7 +24,7 @@ impl PyExpr {
 }
 
 // [spec:pgorm:req:bindings.expressions]
-// [spec:pgorm:req:python.naming]
+// [spec:pgorm:req:python.naming+2]
 #[pymethods]
 impl PyExpr {
     fn eq(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

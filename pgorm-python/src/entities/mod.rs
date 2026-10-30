@@ -120,7 +120,7 @@ pub(crate) fn capabilities() -> serde_json::Map<String, serde_json::Value> {
         ("entity.column", "pgorm::ColumnTrait"),
         ("entity.all", "pgorm::Select<E>::all"),
         ("entity.one", "pgorm::Select<E>::one"),
-        ("entity.one_opt", "pgorm::Select<E>::one_opt"),
+        ("entity.optional", "pgorm::Select<E>::one_opt"),
         ("entity.model", "pgorm::ModelTrait"),
         (
             "entity.active",

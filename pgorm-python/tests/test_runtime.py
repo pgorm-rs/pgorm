@@ -135,7 +135,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         try:
             self.assertNotIn(password, repr(pool))
             self.assertNotIn(password, repr(pool._native))
-            with self.assertRaises(pgorm.PgOrmError) as caught:
+            with self.assertRaises(pgorm.PgormError) as caught:
                 await pool.ping()
             self.assertEqual(caught.exception.sqlstate, "28P01")
             self.assertNotIn(password, repr(caught.exception))
@@ -147,7 +147,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_tls_never_falls_back_to_plaintext(self):
         pool = pgorm.Pool(self.dsn, tls="verify-full")
         try:
-            with self.assertRaises(pgorm.PgOrmError):
+            with self.assertRaises(pgorm.PgormError):
                 await pool.ping()
         finally:
             await pool.close()
@@ -218,7 +218,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await pool.ping())
         pool = pgorm.Pool(dsn, tls="disable")
         try:
-            with self.assertRaises(pgorm.PgOrmError):
+            with self.assertRaises(pgorm.PgormError):
                 await pool.ping()
         finally:
             await pool.close()
@@ -231,7 +231,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         dsn = urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
         pool = pgorm.Pool(dsn, tls="verify-full", cafile=os.environ["PGORM_TEST_CA"])
         try:
-            with self.assertRaises(pgorm.PgOrmError):
+            with self.assertRaises(pgorm.PgormError):
                 await pool.ping()
         finally:
             await pool.close()
@@ -293,7 +293,7 @@ class ConstraintViolationTests(unittest.IsolatedAsyncioTestCase):
                     await self.pool.execute(pgorm.RawSQL(sql))
                 error = caught.exception
                 self.assertIsInstance(error, pgorm.DatabaseError)
-                self.assertIsInstance(error, pgorm.PgOrmError)
+                self.assertIsInstance(error, pgorm.PgormError)
                 for other in classes - {cls}:
                     self.assertNotIsInstance(error, other)
                 self.assertEqual(error.sqlstate, sqlstate)

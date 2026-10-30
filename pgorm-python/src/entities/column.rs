@@ -38,7 +38,7 @@ impl PyEntityColumn {
     /// `not_in_subquery` over a `Select`'s rows, so a column whose domain is
     /// over an enum is a member as the enum, and so is what the subquery
     /// projects.
-    // [spec:pgorm:req:bindings.entity-reads]
+    // [spec:pgorm:req:bindings.entity-reads+2]
     fn membership(&self, values: &Bound<'_, PyAny>, negated: bool) -> PyResult<PyExpr> {
         let members = if let Some(select) = crate::statements::subquery(values)? {
             Members::Subquery(Box::new(select))

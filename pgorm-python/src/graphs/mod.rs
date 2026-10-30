@@ -8,8 +8,8 @@ mod query;
 mod registration;
 mod slots;
 
-pub use cursor::PyGraphCursor;
-pub use query::PyGraphQuery;
+pub use cursor::PyEntityGraphCursor;
+pub use query::PyEntityGraphQuery;
 pub use slots::{GraphBindings, GraphSlots};
 
 use crate::{errors::ConstructionError, identifiers::validate_name};
@@ -17,13 +17,13 @@ use pyo3::{prelude::*, types::PyString};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
-#[pyclass(name = "Graph", module = "pgorm", frozen, from_py_object)]
-pub struct PyGraph {
+#[pyclass(name = "EntityGraph", module = "pgorm", frozen, from_py_object)]
+pub struct PyEntityGraph {
     pub(crate) factory: Arc<dyn backend::Factory>,
 }
 
 #[pymethods]
-impl PyGraph {
+impl PyEntityGraph {
     #[getter]
     fn name(&self) -> &str {
         &self.factory.info().name
@@ -35,7 +35,7 @@ impl PyGraph {
     }
 
     #[pyo3(signature = (*, aliases=None))]
-    fn find(&self, aliases: Option<&Bound<'_, PyAny>>) -> PyResult<PyGraphQuery> {
+    fn find(&self, aliases: Option<&Bound<'_, PyAny>>) -> PyResult<PyEntityGraphQuery> {
         let sources = &self.factory.info().bindings.sources;
         let root = &sources[0].entity.table;
         let aliases = match aliases.filter(|value| !value.is_none()) {
@@ -74,16 +74,16 @@ impl PyGraph {
                 ));
             }
         }
-        Ok(PyGraphQuery {
+        Ok(PyEntityGraphQuery {
             inner: self.factory.find(aliases),
         })
     }
 }
 
 pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<PyGraph>()?;
-    module.add_class::<PyGraphQuery>()?;
-    module.add_class::<PyGraphCursor>()?;
+    module.add_class::<PyEntityGraph>()?;
+    module.add_class::<PyEntityGraphQuery>()?;
+    module.add_class::<PyEntityGraphCursor>()?;
     module.add_function(wrap_pyfunction!(registration::graph, module)?)?;
     Ok(())
 }
@@ -93,11 +93,11 @@ pub(crate) fn capabilities() -> serde_json::Map<String, serde_json::Value> {
         ("graph", "pgorm_python::entities::Registry::graph"),
         ("graph.find", "application SelectGraph<E, S> factory"),
         ("graph.column", "pgorm::pgorm_query::Expr::col"),
-        ("graph.filter", "pgorm::QueryFilter"),
+        ("graph.where", "pgorm::QueryFilter"),
         ("graph.order_by", "pgorm::QueryOrder"),
         ("graph.inspect", "pgorm::QueryTrait::build"),
         ("graph.all", "pgorm::SelectGraph<E, S>::all"),
-        ("graph.one_opt", "pgorm::SelectGraph<E, S>::one_opt"),
+        ("graph.optional", "pgorm::SelectGraph<E, S>::one_opt"),
         ("graph.cursor", "pgorm::SelectGraph<E, S>::cursor_by"),
         (
             "graph.cursor.bounds",

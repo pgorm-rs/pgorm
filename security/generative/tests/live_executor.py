@@ -155,7 +155,7 @@ async def main():
         result = await checked(executor, cases.active_case(), output, "active")
         assert field(rows(result)[0], "name") == "O'Brien|updated"
         assert field(rows(result)[0], "rank") == "2"
-        untouched = await executor.reference.fetch_one(
+        untouched = await executor.reference.one(
             p.RawSQL("SELECT name, rank FROM fixture.accounts WHERE id=1")
         )
         assert untouched["name"] == "Alice" and untouched["rank"] == 1

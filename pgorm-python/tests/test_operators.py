@@ -50,12 +50,12 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
         return self.table.col(name)
 
     async def built(self, predicate):
-        query = (p.Select(self.c("id")).from_(self.table).where_(predicate)
+        query = (p.Select(self.c("id")).from_(self.table).where(predicate)
                  .order_by(self.c("id").asc()))
-        return [row["id"] for row in await self.connection.fetch_all(query)]
+        return [row["id"] for row in await self.connection.query(query)]
 
     async def written(self, predicate):
-        rows = await self.connection.fetch_all(p.RawSQL(
+        rows = await self.connection.query(p.RawSQL(
             f"SELECT id FROM {quoted(self.name)} WHERE {predicate} ORDER BY id"))
         return [row["id"] for row in rows]
 
@@ -120,8 +120,8 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
     # written by hand, an empty array false under ANY and true under ALL
     async def test_subqueries_and_quantifiers_answer_as_postgres_does(self):
         inner = p.Table(self.name).as_("i")
-        noted = p.Select(inner.col("id")).from_(inner).where_(inner.col("note").is_not_null())
-        later = p.Select(inner.col("id")).from_(inner).where_(inner.col("id") > self.c("id"))
+        noted = p.Select(inner.col("id")).from_(inner).where(inner.col("note").is_not_null())
+        later = p.Select(inner.col("id")).from_(inner).where(inner.col("id") > self.c("id"))
         name = quoted(self.name)
         noted_sql = f"SELECT i.id FROM {name} i WHERE i.note IS NOT NULL"
         ints = lambda *items: p.Value.array("i64", list(items))

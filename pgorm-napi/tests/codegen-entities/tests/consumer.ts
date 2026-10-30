@@ -55,7 +55,7 @@ export async function typed(pool: Pool): Promise<unknown[]> {
   const [first, second] = selected[0]!;
   const selectedName: string | undefined = first?.["display name"];
   const selectedBody: string | undefined = second?.body;
-  const noteRecord = await Note.find().oneOpt(pool);
+  const noteRecord = await Note.find().optional(pool);
   return [id, name, note, mood, big, price, token, day, at, tags, written, root, body, required, keptBody, maybeBody,
     selectedName, selectedBody, noteRecord];
 }

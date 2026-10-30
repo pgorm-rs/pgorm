@@ -14906,12 +14906,27 @@ children (
         title "The bindings spell each shared name one way: Python takes JavaScript's names where they differed by choice, and JavaScript takes DDL, jsonObjectagg and jsonArrayagg"
         kind @refactor
         deps (binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-30T13:24:34.227637Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Decision (6) of the operator's 2026-10-30 answer (binding-spec-consolidation). Python: AliasedExpr→Aliased, WindowedExpr→Windowed, PgOrmError→PgormError, ResultStream→RowStream, Graph/GraphQuery/GraphCursor→EntityGraph/EntityGraphQuery/EntityGraphCursor, schema.truncate→truncate_table, pipeline Expr→PipelineExpr; on Pool, Connection and Transaction fetch_all/fetch_one/fetch_optional→query/one/optional; every one_opt→optional (model queries and rows, and a pipeline's own terminal); filter on entity, entity-graph, update-many and model queries→where; where_ on Select, Update, Delete, CopyFrom, CopyTo, ConflictTarget and ConflictUpdate→where; MergeInsert/MergeUpdate and_value→set; Conflict/ConflictTarget ignore→do_nothing; CreateIndex method→using. JavaScript: Ddl→DDL, jsonObjectAgg→jsonObjectagg, jsonArrayAgg→jsonArrayagg. The old names are deleted, not aliased or deprecated. Everything that spells them follows: stubs, docs, examples, codegen output, the generative campaign's emitted programs, tests. python.naming and napi.naming lose the exceptions these were, bindings-surface.json moves them out of undecided."
+            }
+
+            {
+                at 2026-10-30T14:30:29.234614Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Applied the decision's principle beyond its list where a name still differed by choice. Never one_opt: besides Python's model queries, model rows and pipeline terminal, the registered entity query, entity-graph query and source selection's one_opt (Python) and oneOpt (JavaScript) became optional in both bindings, inspect's terminal string included; bindings-surface.json's shared EntityQuery, EntityGraphQuery and SelectedSources lists now say optional. python.naming listed primary_keys for a model's key fields as waiting on the operator, JavaScript spelling primaryKey: Python's Model.primary_key, and the primary_key key of model and registration describe(). Kept: the pipeline's filter stage (PRQL's verb, the same in both); the campaign's portable operation names (select.filter, entity.filter), which are its program format rather than binding names; Rust-internal identifiers such as pgorm-napi's Ddl enum. Shapes stay undecided: python.naming and napi.naming now list only the grouping elements, the conflict arbiter and MERGE's actions, and Pipeline.all / one / optional stay under shapes."
+            }
+
+            {
+                at 2026-10-30T14:35:54.859252Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

@@ -180,7 +180,7 @@ class CopyOutStream:
     ) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+2]
+    # [spec:pgorm:req:python.truth-testing+3]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("copy streams cannot be tested as Python booleans")
 
@@ -324,7 +324,7 @@ class CopyRowStream:
     ) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+2]
+    # [spec:pgorm:req:python.truth-testing+3]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("copy streams cannot be tested as Python booleans")
 

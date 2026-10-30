@@ -9,7 +9,7 @@ from typing import Any, Literal, NamedTuple
 from . import _native
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource, copy_in, copy_in_rows
 from .listen import Listener
-from .results import Query, Record, ResultStream
+from .results import Query, Record, RowStream
 from .transactions import IsolationLevel, Transaction, TransactionMode, _scope
 
 
@@ -129,19 +129,19 @@ class Pool:
         async with self.connection() as connection:
             return await connection.execute(query)
 
-    async def fetch_all(self, query: Query) -> list[Record]:
+    async def query(self, query: Query) -> list[Record]:
         async with self.connection() as connection:
-            return await connection.fetch_all(query)
+            return await connection.query(query)
 
-    async def fetch_one(self, query: Query) -> Record:
+    async def one(self, query: Query) -> Record:
         async with self.connection() as connection:
-            return await connection.fetch_one(query)
+            return await connection.one(query)
 
-    async def fetch_optional(self, query: Query) -> Record | None:
+    async def optional(self, query: Query) -> Record | None:
         async with self.connection() as connection:
-            return await connection.fetch_optional(query)
+            return await connection.optional(query)
 
-    async def stream(self, query: Query) -> ResultStream:
+    async def stream(self, query: Query) -> RowStream:
         """Open a stream; its iterator keeps the acquired connection alive."""
         connection = await self.acquire()
         try:
@@ -149,7 +149,7 @@ class Pool:
         except BaseException:
             await connection.close()
             raise
-        return ResultStream(native, connection, release_connection=True)
+        return RowStream(native, connection, release_connection=True)
 
     async def copy_in(self, statement: "_native.CopyFrom[Any]", source: CopySource) -> int:
         """Run a COPY FROM on a connection of its own; see ``Connection.copy_in``."""
@@ -252,21 +252,21 @@ class Connection:
     async def execute(self, query: Query) -> int:
         return await self._native.execute(query)
 
-    async def fetch_all(self, query: Query) -> list[Record]:
+    async def query(self, query: Query) -> list[Record]:
         """Materialize all rows through Rust decoders, preserving output names."""
         return await self._native.fetch(query, "all")
 
-    async def fetch_one(self, query: Query) -> Record:
+    async def one(self, query: Query) -> Record:
         """Require exactly one row; zero or multiple rows raise DatabaseError."""
         return await self._native.fetch(query, "one")
 
-    async def fetch_optional(self, query: Query) -> Record | None:
+    async def optional(self, query: Query) -> Record | None:
         """Require at most one row; only zero rows produce None."""
         return await self._native.fetch(query, "optional")
 
-    async def stream(self, query: Query) -> ResultStream:
+    async def stream(self, query: Query) -> RowStream:
         native = await self._native.stream(query)
-        return ResultStream(native, self, release_connection=False)
+        return RowStream(native, self, release_connection=False)
 
     async def copy_in(self, statement: "_native.CopyFrom[Any]", source: CopySource) -> int:
         """Run a COPY FROM over ``source`` and return the rows it inserted.

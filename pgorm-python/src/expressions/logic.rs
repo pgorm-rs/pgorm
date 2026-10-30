@@ -7,7 +7,7 @@ use super::{PyExpr, require_expr};
 use crate::errors::ConstructionError;
 
 // [spec:pgorm:req:bindings.expressions]
-// [spec:pgorm:req:python.naming]
+// [spec:pgorm:req:python.naming+2]
 #[pymethods]
 impl PyExpr {
     fn __and__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {

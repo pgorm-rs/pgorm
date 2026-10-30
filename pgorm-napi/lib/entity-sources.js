@@ -4,7 +4,7 @@
 // pipeline's last stage projects — `pipeline.selectSources(sources(name))` —
 // and whose rows Rust decodes into each entity's model through its absence
 // witness, every position optional, as pgorm's `select_sources` does.
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 
 import { arg } from "./builder.js";
 import { runJob } from "./connections.js";
@@ -102,10 +102,10 @@ export class SelectedSources {
   }
 
   /**
-   * The SQL and values a terminal sends, `one` and `oneOpt` taking one row; a
+   * The SQL and values a terminal sends, `one` and `optional` taking one row; a
    * pipeline reshaped before the selection is a `ConstructionError`.
    *
-   * @param {"all" | "one" | "oneOpt"} [terminal]
+   * @param {"all" | "one" | "optional"} [terminal]
    */
   inspect(terminal = "all") {
     const [sql, values] = native.selectedInspect(this.#native, terminal);
@@ -113,7 +113,7 @@ export class SelectedSources {
   }
 
   /**
-   * @param {"all" | "one" | "oneOpt"} terminal
+   * @param {"all" | "one" | "optional"} terminal
    * @param {unknown} db
    * @param {unknown} options
    */
@@ -147,8 +147,8 @@ export class SelectedSources {
    * @param {unknown} db
    * @param {{ signal?: AbortSignal }} [options]
    */
-  async oneOpt(db, options) {
-    return (await this.#read("oneOpt", db, options))[0] ?? null;
+  async optional(db, options) {
+    return (await this.#read("optional", db, options))[0] ?? null;
   }
 }
 

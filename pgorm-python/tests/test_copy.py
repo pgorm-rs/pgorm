@@ -47,7 +47,7 @@ class CopyStatements(unittest.TestCase):
             (lambda: p.CopyTo(t, "csv").header_match(), "COPY FROM"),
             (lambda: p.CopyTo(t, "csv").force_null("id"), "COPY FROM"),
             (lambda: p.CopyTo(t, "csv").columns("id"), "Select"),
-            (lambda: p.CopyTo(t, "csv").where_(p.col("id") > 1), "Select"),
+            (lambda: p.CopyTo(t, "csv").where(p.col("id") > 1), "Select"),
             (lambda: p.CopyFrom(t, "yaml"), "format"),
             (lambda: p.CopyFrom(t, "csv").delimiter("ab"), "one-character"),
             (lambda: p.CopyFrom(t, "csv").quote(""), "one-character"),
@@ -59,7 +59,7 @@ class CopyStatements(unittest.TestCase):
             (lambda: p.CopyFrom(t, "csv").columns("id", "id"), "duplicate"),
             (lambda: p.CopyFrom(t.as_("x"), "csv"), "alias"),
             (lambda: p.CopyTo(p.RawSQL("SELECT 1"), "csv"), "Select"),
-            (lambda: p.CopyTo(p.update(t).set("id", 1), "csv"), "where_"),
+            (lambda: p.CopyTo(p.update(t).set("id", 1), "csv"), "where"),
         ]
         for build, reason in refusals:
             with self.subTest(reason=reason), self.assertRaises(p.ConstructionError) as caught:
@@ -73,7 +73,7 @@ class CopyStatements(unittest.TestCase):
         writes = [
             (p.insert(t).columns("id").values(1), "INSERT"),
             (p.update(t).set("id", 1).all_rows(), "UPDATE"),
-            (p.delete(t).where_(p.col("id") == 1), "DELETE"),
+            (p.delete(t).where(p.col("id") == 1), "DELETE"),
             (merge, "MERGE"),
         ]
         for write, keyword in writes:
@@ -85,7 +85,7 @@ class CopyStatements(unittest.TestCase):
         returning = [
             p.insert(t).columns("id").values(1).returning(p.col("id")),
             p.update(t).set("id", 1).all_rows().returning(p.col("id")),
-            p.delete(t).where_(p.col("id") == 1).returning(p.col("id")),
+            p.delete(t).where(p.col("id") == 1).returning(p.col("id")),
             merge.returning_action(),
         ]
         for write in returning:
@@ -98,7 +98,7 @@ class CopyStatements(unittest.TestCase):
         base = p.CopyFrom(t, "csv")
         built = (
             base.columns("id", "image").header().null_string("").force_null("image")
-            .where_(p.col("id") > p.bind(2))
+            .where(p.col("id") > p.bind(2))
         )
         self.assertEqual(base.inspect().sql, 'COPY "art"."glyph" FROM STDIN WITH (FORMAT csv)')
         self.assertEqual(
@@ -111,7 +111,7 @@ class CopyStatements(unittest.TestCase):
         ignore = p.CopyFrom(t, "text").on_error_ignore(5, "verbose").inspect().sql
         self.assertIn("ON_ERROR ignore, REJECT_LIMIT 5", ignore)
         self.assertIn("LOG_VERBOSITY verbose", ignore)
-        query = p.select(p.col("id")).from_(p.Table("glyph")).where_(p.col("name") == p.bind("it's"))
+        query = p.select(p.col("id")).from_(p.Table("glyph")).where(p.col("name") == p.bind("it's"))
         out = p.CopyTo(query, "csv").header().force_quote_all().inspect()
         self.assertEqual(
             out.sql,
@@ -143,7 +143,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         return p.select(p.col("id"), p.col("name"), p.col("note"), p.col("score")).from_(table).order_by(p.col("id").asc())
 
     async def stored(self, executor=None, table=None):
-        records = await (executor or self.pool).fetch_all(self.rows(table))
+        records = await (executor or self.pool).query(self.rows(table))
         return [tuple(record.values()) for record in records]
 
     # [spec:pgorm:req:bindings.copy/test]    text and csv data both ways
@@ -162,7 +162,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         out = await collect(await self.pool.copy_out(p.CopyTo(query, "csv").header().force_quote("name")))
         self.assertEqual(out, b'id,name\n1,"alpha"\n2,"beta"\n3,"gamma, quoted"\n4,"delta"\n')
 
-    # [spec:pgorm:req:python.truth-testing+2/test]    a stream's truth would not say whether data remains
+    # [spec:pgorm:req:python.truth-testing+3/test]    a stream's truth would not say whether data remains
     async def test_copy_out_stream_refuses_truth_testing(self):
         await self.pool.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), b"1\talpha\n")
         stream = await self.pool.copy_out(p.CopyTo(self.items, "text"))
@@ -189,7 +189,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         statement = p.CopyFrom(self.items, "text").columns("id").columns("name")
         self.assertEqual(await self.pool.copy_in(statement, b"5\tfive\n"), 1)
         self.assertEqual(await self.stored(), [(5, "five", "none", 7)])
-        where = p.CopyFrom(self.items, "csv").columns("id", "name").where_(p.col("id") > 6)
+        where = p.CopyFrom(self.items, "csv").columns("id", "name").where(p.col("id") > 6)
         self.assertEqual(await self.pool.copy_in(where, b"6,six\n7,seven\n"), 1)
         self.assertEqual([row[0] for row in await self.stored()], [5, 7])
 
@@ -202,7 +202,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
                     with self.assertRaises(p.DatabaseError) as caught:
                         await tx.copy_in(p.CopyFrom(self.items, "text").columns("id", "name"), b"2\tb\n1\tdup\n3\tc\n")
                     self.assertEqual(caught.exception.sqlstate, "23505")
-                    await tx.fetch_all(self.rows())
+                    await tx.query(self.rows())
             self.assertEqual(aborted.exception.sqlstate, "25P02")
             self.assertEqual(await self.stored(connection), [])
             self.assertTrue(await connection.ping())
@@ -222,7 +222,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
 
         statement = p.CopyFrom(self.items, "text").columns("id", "name")
         async with self.pool.connection() as connection:
-            pid = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+            pid = (await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
             with self.assertRaises(ValueError) as caught:
                 await connection.copy_in(statement, failing())
             self.assertIs(caught.exception, marker)
@@ -236,7 +236,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
                 await connection.execute(statement)
             self.assertEqual(await self.stored(connection), [])
             self.assertEqual(await connection.copy_in(statement, [b"9\tnine\n"]), 1)
-            again = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+            again = (await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
             self.assertEqual(pid, again)
             self.assertFalse(connection.closed)
 
@@ -267,7 +267,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             for n in range(rows):
                 if n == rows * 3 // 4:
                     # The server has consumed data before the source is exhausted.
-                    record = await self.pool.fetch_one(p.RawSQL(
+                    record = await self.pool.one(p.RawSQL(
                         "SELECT coalesce(max(bytes_processed), 0) AS done FROM pg_stat_progress_copy"
                     ))
                     progress.append(record["done"])
@@ -293,24 +293,24 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         await self.pool.copy_in(p.CopyFrom(self.items, "csv").columns("id", "name"), b"1,a\n2,b\n3,c\n")
         query = (
             p.select(p.col("id"), p.col("name")).from_(self.items)
-            .where_(p.col("name") != p.bind("b")).order_by(p.col("id").desc())
+            .where(p.col("name") != p.bind("b")).order_by(p.col("id").desc())
         )
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(query, "csv"))), b"3,c\n1,a\n")
         write = p.insert(self.items).columns("id", "name").values(4, "d").returning(p.col("id"))
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(write, "text"))), b"4\n")
-        update = (p.update(self.items).set("score", 0).where_(p.col("id") == 1)
+        update = (p.update(self.items).set("score", 0).where(p.col("id") == 1)
                   .returning(p.col("id"), p.col("score")))
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(update, "csv"))), b"1,0\n")
-        delete = p.delete(self.items).where_(p.col("id") == 3).returning(p.col("name"))
+        delete = p.delete(self.items).where(p.col("id") == 3).returning(p.col("name"))
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(delete, "text"))), b"c\n")
         merge = (p.merge(self.items, self.mirror, self.items.col("id") == self.mirror.col("id"))
                  .when_not_matched(p.MergeInsert("id", self.mirror.col("id"))
-                                   .and_value("name", self.mirror.col("name")))
+                                   .set("name", self.mirror.col("name")))
                  .returning_action().returning(self.items.col("id")))
         await self.pool.execute(p.insert(self.mirror).columns("id", "name").values(5, "e"))
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(merge, "text"))), b"INSERT\t5\n")
         with self.assertRaises(p.ConstructionError):
-            p.CopyTo(p.delete(self.items).where_(p.col("id") == 4), "text")
+            p.CopyTo(p.delete(self.items).where(p.col("id") == 4), "text")
         self.assertEqual([row[0] for row in await self.stored()], [1, 2, 4, 5])
 
     # [spec:pgorm:req:bindings.copy/test]    a Select source's refused tie limit or window is refused before COPY TO runs
@@ -351,7 +351,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(refused), 2)
             stream = await connection.copy_out(p.CopyTo(self.items, "csv"))
             with self.assertRaises(p.LifecycleError):
-                await connection.fetch_all(self.rows())
+                await connection.query(self.rows())
             with self.assertRaises(p.LifecycleError):
                 await connection.copy_out(p.CopyTo(self.items, "csv"))
             self.assertEqual((await collect(stream)).count(b"\n"), 2)
@@ -359,14 +359,14 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             async with connection.transaction() as tx:
                 stream = await tx.copy_out(p.CopyTo(self.items, "text"))
                 with self.assertRaises(p.LifecycleError):
-                    await tx.fetch_all(self.rows())
+                    await tx.query(self.rows())
                 with self.assertRaises(p.LifecycleError):
                     async with tx.transaction():
                         self.fail("a savepoint opened under an active COPY")
                 self.assertEqual((await collect(stream)).count(b"\n"), 2)
-                self.assertEqual(len(await tx.fetch_all(self.rows())), 2)
+                self.assertEqual(len(await tx.query(self.rows())), 2)
                 self.assertEqual(await tx.copy_in(statement, b"3\tthree\n"), 1)
-            self.assertEqual(len(await connection.fetch_all(self.rows())), 3)
+            self.assertEqual(len(await connection.query(self.rows())), 3)
 
     # [spec:pgorm:req:bindings.copy/test]    a pool copy holds its own connection until the end
     async def test_pool_copy_owns_and_releases_its_connection(self):
@@ -427,7 +427,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(connection.closed)
             self.assertTrue(await connection.ping())
         for _ in range(3):
-            self.assertEqual((await self.pool.fetch_one(p.RawSQL("SELECT 1 AS one")))["one"], 1)
+            self.assertEqual((await self.pool.one(p.RawSQL("SELECT 1 AS one")))["one"], 1)
 
     # [spec:pgorm:req:bindings.copy/test]    cancelling a copy during a slow source commits nothing
     # [spec:pgorm:req:bindings.cancellation/test]
@@ -472,7 +472,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
         try:
             connection = await pool.acquire()
-            before = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+            before = (await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
             statement = p.CopyFrom(self.mirror, "text").columns("id", "name")
             # The statement trigger sleeps after the last row, inside finish.
             task = asyncio.create_task(connection.copy_in(statement, b"1\tone\n"))
@@ -487,7 +487,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
                     await asyncio.sleep(0.02)
 
             await asyncio.wait_for(discarded(), 5)
-            after = (await pool.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+            after = (await pool.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
             self.assertNotEqual(before, after)
         finally:
             await pool.close()
@@ -585,7 +585,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             self.assertIn("CopyTrait", operations[name]["rust_api"])
         self.assertEqual(await self.pool.copy_in_rows(p.CopyFrom(self.kinds, "binary"), [kind_row(1)]), 1)
         await self.pool.execute(p.RawSQL(LITERALS))
-        same = await self.pool.fetch_one(p.RawSQL(
+        same = await self.pool.one(p.RawSQL(
             "SELECT (to_jsonb(a) - 'id') = (to_jsonb(b) - 'id') AS same "
             "FROM python_copy_kinds a, python_copy_kinds b WHERE a.id = 1 AND b.id = 2"
         ))
@@ -595,13 +595,13 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stream.columns[:3], ("id", "c_bool", "c_int2"))
         self.assertEqual(len(stream.columns), 21)
         rows = await rows_of(stream)
-        records = await self.pool.fetch_all(p.RawSQL("SELECT * FROM python_copy_kinds ORDER BY id"))
+        records = await self.pool.query(p.RawSQL("SELECT * FROM python_copy_kinds ORDER BY id"))
         self.assertEqual(rows, [tuple(record.values()) for record in records])
         self.assertEqual(rows[0][1:4], (True, -7, 9_000_000_000))
         self.assertEqual(rows[0][18], "loud")
         self.assertIsNone(rows[0][20])
 
-    # [spec:pgorm:req:python.truth-testing+2/test]    a stream's truth would not say whether rows remain
+    # [spec:pgorm:req:python.truth-testing+3/test]    a stream's truth would not say whether rows remain
     async def test_copy_row_stream_refuses_truth_testing(self):
         await self.pool.copy_in_rows(p.CopyFrom(self.rows, "binary").columns("id", "name"), [(1, "a")])
         stream = await self.pool.copy_out_rows(p.CopyTo(self.rows, "binary"))
@@ -633,7 +633,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             await self.pool.copy_in_rows(p.CopyFrom(self.rows, "text"), [[1, "a"]])
         with self.assertRaisesRegex(p.ConstructionError, "binary"):
             await self.pool.copy_out_rows(p.CopyTo(self.rows, "csv"))
-        count = await self.pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+        count = await self.pool.one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
         self.assertEqual(count["n"], 0)
 
         self.assertEqual(await self.pool.copy_in_rows(copy, [(1, "one"), [2, None]]), 2)
@@ -664,10 +664,10 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
                     stream = await transaction.copy_out_rows(p.CopyTo(returning, "binary"))
                     self.assertEqual(stream.columns, ("qty", "name"))
                     self.assertEqual(await rows_of(stream), [(7, "returned")])
-                    count = await transaction.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+                    count = await transaction.one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
                     self.assertEqual(count["n"], 602)
                     raise RolledBack
-            count = await connection.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
+            count = await connection.one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
             self.assertEqual(count["n"], 600)
 
     # [spec:pgorm:req:bindings.copy-rows/test]    a refused description keeps the connection; an undecodable field raises and closes the stream
@@ -676,11 +676,11 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.DatabaseError) as caught:
                 await connection.copy_in_rows(p.CopyFrom(p.Table("python_copy_missing"), "binary"), [[1]])
             self.assertEqual(caught.exception.sqlstate, "42P01")
-            self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 1 AS n")))["n"], 1)
+            self.assertEqual((await connection.one(p.RawSQL("SELECT 1 AS n")))["n"], 1)
             with self.assertRaises(p.DatabaseError):
                 async with connection.transaction() as transaction:
                     await transaction.copy_out_rows(p.CopyTo(p.Table("python_copy_missing"), "binary"))
-            self.assertEqual((await connection.fetch_one(p.RawSQL("SELECT 2 AS n")))["n"], 2)
+            self.assertEqual((await connection.one(p.RawSQL("SELECT 2 AS n")))["n"], 2)
 
         await self.pool.execute(p.RawSQL(
             "CREATE TABLE python_copy_points AS SELECT point(n, n) AS spot FROM generate_series(1, 3) AS n"
@@ -691,7 +691,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(stream.closed)
         with self.assertRaises(StopAsyncIteration):
             await anext(stream)
-        self.assertEqual((await self.pool.fetch_one(p.RawSQL("SELECT 3 AS n")))["n"], 3)
+        self.assertEqual((await self.pool.one(p.RawSQL("SELECT 3 AS n")))["n"], 3)
 
     # [spec:pgorm:req:bindings.copy-rows/test]    a created multirange reads as a Multirange and writes back from a Value of its kind or from its text
     # [spec:pgorm:req:bindings.created-ranges/test]
@@ -716,7 +716,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
         # A query's column of one has no subtype the driver reports, so only a
         # COPY, whose description completes it, reads one.
         with self.assertRaises(p.DecodeError):
-            await self.pool.fetch_one(p.RawSQL("SELECT reach FROM python_copy_geo.spans WHERE id = 1"))
+            await self.pool.one(p.RawSQL("SELECT reach FROM python_copy_geo.spans WHERE id = 1"))
 
         written = [
             (11, p.Value(rows[0][1], reach), p.Value(rows[0][2], slots), p.Value(rows[0][3], reach)),
@@ -724,7 +724,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             (13, "{[-Infinity,0]}", "{(,7)}", "{}"),
         ]
         self.assertEqual(await self.pool.copy_in_rows(p.CopyFrom(spans, "binary"), written), 3)
-        compared = await self.pool.fetch_one(p.RawSQL(
+        compared = await self.pool.one(p.RawSQL(
             "SELECT count(*) AS n FROM python_copy_geo.spans a JOIN python_copy_geo.spans b ON b.id = a.id + 10 "
             "WHERE a.reach = b.reach AND a.slots IS NOT DISTINCT FROM b.slots "
             "AND a.kept::python_copy_geo.floatmultirange IS NOT DISTINCT FROM b.kept::python_copy_geo.floatmultirange"
@@ -736,7 +736,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             with self.subTest(text=text), self.assertRaises(p.ConstructionError) as caught:
                 await self.pool.copy_in_rows(copy, [(20, text)])
             self.assertIn("COPY column `reach` of type `python_copy_geo.floatmultirange`", str(caught.exception))
-        count = await self.pool.fetch_one(p.RawSQL("SELECT count(*) AS n FROM python_copy_geo.spans"))
+        count = await self.pool.one(p.RawSQL("SELECT count(*) AS n FROM python_copy_geo.spans"))
         self.assertEqual(count["n"], 6)
 
         many = await self.pool.copy_out_rows(p.CopyTo(p.Table("many", schema="python_copy_geo"), "binary"))

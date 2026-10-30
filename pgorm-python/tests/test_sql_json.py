@@ -23,12 +23,12 @@ class SqlJsonTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     async def values(self, *items):
-        row = await self.pool.fetch_one(one(*items))
+        row = await self.pool.one(one(*items))
         return list(row.values())
 
     async def sqlstate(self, item):
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.pool.fetch_one(one(item))
+            await self.pool.one(one(item))
         return caught.exception.sqlstate
 
     async def test_query_functions_read_bound_and_literal_documents(self):
@@ -132,10 +132,10 @@ class SqlJsonTests(unittest.IsolatedAsyncioTestCase):
                                  returning="jsonb").as_("filtered"),
                 p.json_objectagg(p.col("k"), p.col("n"), absent_on_null=True,
                                  returning="jsonb").as_("absent"),
-                p.json_array_query(p.Select(p.col("n")).from_(table).where_(p.col("n") < 2),
+                p.json_array_query(p.Select(p.col("n")).from_(table).where(p.col("n") < 2),
                                    returning="jsonb").as_("sub"),
             ).from_(table)
-            row = await connection.fetch_one(query)
+            row = await connection.one(query)
             self.assertEqual(dict(row), {"desc": [2, 1], "nulls": [1, 2, None], "filtered": {"b": 2},
                                          "absent": {"a": 1, "b": 2}, "sub": [1]})
 

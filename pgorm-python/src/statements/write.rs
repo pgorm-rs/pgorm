@@ -42,7 +42,7 @@ impl PyUpdate {
         Ok(next)
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.inner.cond_where(common::condition(predicate)?);
         next.guarded = true;
@@ -71,7 +71,7 @@ impl PyUpdate {
     pub fn inspect(&self) -> PyResult<Compiled> {
         if !self.guarded {
             return Err(ConstructionError::new_err(
-                "update requires where_ or explicit all_rows",
+                "update requires where or explicit all_rows",
             ));
         }
         if self.inner.get_values().is_empty() {
@@ -111,7 +111,7 @@ impl PyDelete {
         }
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.inner.cond_where(common::condition(predicate)?);
         next.guarded = true;
@@ -140,7 +140,7 @@ impl PyDelete {
     pub fn inspect(&self) -> PyResult<Compiled> {
         if !self.guarded {
             return Err(ConstructionError::new_err(
-                "delete requires where_ or explicit all_rows",
+                "delete requires where or explicit all_rows",
             ));
         }
         common::compiled(self.inner.build())

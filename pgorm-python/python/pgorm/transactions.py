@@ -49,7 +49,7 @@ async def _roll_back(native: _native._Transaction, error: BaseException) -> None
             # is discarded, and the block's exception stands.
             await native.abort()
             return
-        except _native.PgOrmError as failure:
+        except _native.PgormError as failure:
             await native.abort()
             # asyncio's timeouts and task groups recognise a cancellation only
             # as the CancelledError itself, so a failed ROLLBACK never
@@ -99,13 +99,13 @@ class Transaction:
     async def execute(self, query: Query) -> int:
         return await self._native.execute(query)
 
-    async def fetch_all(self, query: Query) -> list[Record]:
+    async def query(self, query: Query) -> list[Record]:
         return await self._native.fetch(query, "all")
 
-    async def fetch_one(self, query: Query) -> Record:
+    async def one(self, query: Query) -> Record:
         return await self._native.fetch(query, "one")
 
-    async def fetch_optional(self, query: Query) -> Record | None:
+    async def optional(self, query: Query) -> Record | None:
         return await self._native.fetch(query, "optional")
 
     async def copy_in(self, statement: _native.CopyFrom[Any], source: CopySource) -> int:

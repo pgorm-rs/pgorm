@@ -151,9 +151,9 @@ export function jsonArrayQuery(query, { returning } = {}) {
  * @param {unknown} value
  * @param {{ absentOnNull?: boolean, uniqueKeys?: boolean, returning?: Returning, filter?: unknown }} [options]
  */
-export function jsonObjectAgg(key, value, { absentOnNull = false, uniqueKeys = false, returning, filter } = {}) {
+export function jsonObjectagg(key, value, { absentOnNull = false, uniqueKeys = false, returning, filter } = {}) {
   return made.expr(
-    native.jsonObjectAgg(arg(key), arg(value), absentOnNull === true, uniqueKeys === true, arg(returning), arg(filter)),
+    native.jsonObjectagg(arg(key), arg(value), absentOnNull === true, uniqueKeys === true, arg(returning), arg(filter)),
   );
 }
 
@@ -161,8 +161,8 @@ export function jsonObjectAgg(key, value, { absentOnNull = false, uniqueKeys = f
  * @param {unknown} value
  * @param {{ orderBy?: readonly import("./expressions.js").OrderBy[], nullOnNull?: boolean, returning?: Returning, filter?: unknown }} [options]
  */
-export function jsonArrayAgg(value, { orderBy = [], nullOnNull = false, returning, filter } = {}) {
-  return made.expr(native.jsonArrayAgg(arg(value), args(orderBy), nullOnNull === true, arg(returning), arg(filter)));
+export function jsonArrayagg(value, { orderBy = [], nullOnNull = false, returning, filter } = {}) {
+  return made.expr(native.jsonArrayagg(arg(value), args(orderBy), nullOnNull === true, arg(returning), arg(filter)));
 }
 
 /**

@@ -51,7 +51,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "select.from_",
             "pgorm_query::SelectStatement::from, FromItem",
         ),
-        ("select.where_", "pgorm_query::SelectStatement::cond_where"),
+        ("select.where", "pgorm_query::SelectStatement::cond_where"),
         ("select.join", "pgorm_query::SelectStatement::join, FromItem"),
         (
             "select.cross_join",
@@ -131,7 +131,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::Query::update, UpdateStatement::table",
         ),
         ("update.set", "pgorm_query::UpdateStatement::value"),
-        ("update.where_", "pgorm_query::UpdateStatement::cond_where"),
+        ("update.where", "pgorm_query::UpdateStatement::cond_where"),
         (
             "update.all_rows",
             "pgorm_query::UpdateStatement with explicit unrestricted intent",
@@ -145,7 +145,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "delete",
             "pgorm_query::Query::delete, DeleteStatement::from_table",
         ),
-        ("delete.where_", "pgorm_query::DeleteStatement::cond_where"),
+        ("delete.where", "pgorm_query::DeleteStatement::cond_where"),
         (
             "delete.all_rows",
             "pgorm_query::DeleteStatement with explicit unrestricted intent",
@@ -155,17 +155,17 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::DeleteStatement::returning",
         ),
         ("delete.inspect", "pgorm_query::DeleteStatement::build"),
-        ("conflict.ignore", "pgorm_query::OnConflict::do_nothing"),
+        ("conflict.do_nothing", "pgorm_query::OnConflict::do_nothing"),
         (
             "conflict.target",
             "pgorm_query::OnConflict::column, ConflictTarget::and_column",
         ),
         (
-            "conflict.target.where_",
+            "conflict.target.where",
             "pgorm_query::ConflictTarget::cond_where",
         ),
         (
-            "conflict.target.ignore",
+            "conflict.target.do_nothing",
             "pgorm_query::ConflictTarget::do_nothing",
         ),
         (
@@ -179,7 +179,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::ConflictUpdate::update_column",
         ),
         (
-            "conflict.update.where_",
+            "conflict.update.where",
             "pgorm_query::ConflictUpdate::cond_where",
         ),
         (

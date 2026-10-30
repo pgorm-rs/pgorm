@@ -26,7 +26,7 @@ impl Info {
                 serde_json::json!({"index":index, "entity":source.entity.name,
                     "slot": if index == 0 { "root" } else if source.optional { "Opt" } else { "Req" }})
             }).collect::<Vec<_>>(),
-            "terminals": ["all", "one_opt", "cursor.all"],
+            "terminals": ["all", "optional", "cursor.all"],
             "aliases": "joined sources at find time; root name is fixed by EntityTrait",
             "cursor": {"source": 0, "order_columns": 1, "bounds": ["before", "after", "before_with", "after_with"], "windows": ["first", "last"], "inspect": false}})
     }

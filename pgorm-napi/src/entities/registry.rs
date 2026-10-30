@@ -80,7 +80,7 @@ impl Registry {
     /// factory receives one alias per joined slot, in tuple order, and must
     /// join each slot under its alias; every source entity is registered
     /// first.
-    // [spec:pgorm:req:bindings.entity-graphs]
+    // [spec:pgorm:req:bindings.entity-graphs+2]
     pub fn graph<E, S, Build>(
         &mut self,
         name: &str,

@@ -84,7 +84,7 @@ where
         Ok(Expr::col(column::<E>(name)?.as_column_ref()).into())
     }
 
-    // [spec:pgorm:req:bindings.pipeline-sources]
+    // [spec:pgorm:req:bindings.pipeline-sources+2]
     fn pipeline_column(&self, name: &str) -> Result<Arc<dyn PipelineColumn>, Error> {
         Ok(Arc::new(RegisteredColumn::<E>(column::<E>(name)?)))
     }
@@ -106,7 +106,7 @@ where
         })
     }
 
-    // [spec:pgorm:req:bindings.entity-reads]
+    // [spec:pgorm:req:bindings.entity-reads+2]
     fn membership(&self, name: &str, negated: bool, members: Members) -> Result<SimpleExpr, Error> {
         let column = column::<E>(name)?;
         Ok(match (members, negated) {
@@ -136,7 +136,7 @@ impl<E: EntityTrait> std::fmt::Debug for RegisteredColumn<E> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
     fn lower<'brand>(&self, qualifier: &str) -> pgorm::pipeline::Expr<'brand> {
         pgorm::pipeline::named_runtime(E::default(), Name::runtime(qualifier)).col(self.0)

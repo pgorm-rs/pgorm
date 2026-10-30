@@ -34,10 +34,10 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | Operation | Result after `await` |
 | --- | --- |
 | `pool.execute(query)`, `connection.execute(query)`, `transaction.execute(query)` | `int` affected rows |
-| `fetch_all(query)` | `list[Record]` |
-| `fetch_one(query)` | `Record`; raises `DatabaseError` unless exactly one row exists |
-| `fetch_optional(query)` | `Record \| None`; raises `DatabaseError` if more than one row exists |
-| `pool.stream(query)`, `connection.stream(query)` | `ResultStream`, an `AsyncIterator[Record]` and async context manager |
+| `query(query)` | `list[Record]` |
+| `one(query)` | `Record`; raises `DatabaseError` unless exactly one row exists |
+| `optional(query)` | `Record \| None`; raises `DatabaseError` if more than one row exists |
+| `pool.stream(query)`, `connection.stream(query)` | `RowStream`, an `AsyncIterator[Record]` and async context manager |
 | `copy_in(statement, source)` on a pool, connection or transaction | `int` rows inserted |
 | `copy_out(statement)` on a pool, connection or transaction | `CopyOutStream`, an `AsyncIterator[bytes]` and async context manager |
 | `copy_in_rows(statement, rows)` on a pool, connection or transaction | `int` rows inserted; `statement` is a `CopyFrom[Literal["binary"]]` |
@@ -46,10 +46,10 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `notify(channel, payload)` on a pool, connection or transaction | `None` |
 | `pool.transaction()`, `connection.transaction()`, `transaction.transaction()` | `AbstractAsyncContextManager[Transaction]`; the `Transaction` is open for its `async with` block only |
 | `Model.find().all(executor)` | `list[ModelRecord]` |
-| `Model.find().one_opt(executor)` | `ModelRecord \| None` |
+| `Model.find().optional(executor)` | `ModelRecord \| None` |
 | `Entity.find().all(connection_or_transaction)` | `list[EntityModel]` |
 | `Pipeline.all(connection_or_transaction)` | `list[Record]` |
-| `Pipeline.one_opt(connection_or_transaction)` | `Record \| None` |
+| `Pipeline.optional(connection_or_transaction)` | `Record \| None` |
 
 `Pool.connection()` and every `transaction()` return async context managers;
 use `async with` directly. A `Transaction` is not one itself; its block's exit
@@ -105,7 +105,7 @@ too). A table's constraint is named in `constraint`, a `NOT NULL` column in
 
 Closed resources, concurrent use of a reserved connection and use from another
 event loop raise `LifecycleError`; configured deadlines raise pgorm's
-`TimeoutError`. These errors derive from `PgOrmError`. Task cancellation remains
+`TimeoutError`. These errors derive from `PgormError`. Task cancellation remains
 `asyncio.CancelledError` and should normally propagate. Rust panic exceptions
 are not converted into input-validation errors. See [connections](README.md#connections)
 and [transaction cleanup](TRANSACTIONS.md) for resource behavior on failure.

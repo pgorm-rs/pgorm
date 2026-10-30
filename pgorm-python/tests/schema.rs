@@ -124,7 +124,7 @@ fn programs() -> error::Result<BTreeMap<&'static str, String>> {
             "rename_column",
             Table::rename_column(table.clone(), a("id \"x\""), a("new \"x\"")).to_string(),
         ),
-        ("truncate", Table::truncate(table.clone()).to_string()),
+        ("truncate_table", Table::truncate(table.clone()).to_string()),
         (
             "add_column",
             Table::alter(table.clone())
