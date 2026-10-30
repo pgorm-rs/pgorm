@@ -100,6 +100,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
 }
 
 // [spec:pgorm:req:bindings.entities/test]
+// [spec:pgorm:req:bindings.relation-conditions/test]
 test("the module names its registrations and describes each, and refuses a name it does not register", () => {
   assert.deepStrictEqual(entities(), ["app.Account", "app.Membership", "app.Note", "app.Parcel", "app.Temper"]);
   assert.deepStrictEqual(graphs(), ["app.AccountNotes", "app.AccountOnly", "app.MembershipOnly", "app.MixedNotes", "app.RequiredNotes"]);
@@ -119,7 +120,18 @@ test("the module names its registrations and describes each, and refuses a name 
       false,
     ]],
   );
-  assert.equal(described.relations[0].type, "hasMany");
+  assert.deepStrictEqual(described.relations, [{
+    name: "Note",
+    type: "hasMany",
+    from: { schema: "napi_entities", table: "accounts" },
+    to: { schema: "napi_entities", table: "notes" },
+    columns: [["id", "account_id"]],
+    period: null,
+    conditionType: "all",
+    onCondition: false,
+    enforcement: null,
+    deferrability: null,
+  }]);
   assert.match(described.rust.entity, /account::Entity$/);
   assert.deepStrictEqual(Membership.describe().primaryKey, ["account_id", "team"]);
   assert.deepStrictEqual(graph("app.MixedNotes").describe().sources.map((source: { slot: string }) => source.slot), [
