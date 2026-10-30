@@ -87,7 +87,7 @@ import pgorm as p
 
 Account = p.entity("app.Account")
 query = Account.find().where(Account.col("id") >= 10)
-query = query.order_by(Account.col("id").expr().desc()).limit(20)
+query = query.order_by(Account.col("id").desc()).limit(20)
 print(query.inspect().sql)
 
 async with pool.connection() as connection:
@@ -114,9 +114,11 @@ settled = p.Select(p.col("settles_into")).from_(p.Table("tempers", schema="pytho
 query = Temper.find().where(Temper.col("mood").is_in(settled))
 ```
 
-The column takes values only; `col(name).expr()` is its plain expression,
-which composes with any `Expr` method, a list of expressions or `any_(..)`
-included, compared as written.
+The column is itself an `Expr`: every other expression method reads it as
+written, and it goes wherever an expression goes. An expression operand, a
+list of expressions or `any_(..)` included, is compared as written.
+`col(name).expr()` gives its plain expression, whose comparisons bind as an
+`Expr`'s do rather than through the column's `ColumnTrait`.
 
 Entity terminals currently require an acquired `Connection`. They return
 native asyncio awaitables; calling a terminal schedules its operation. Await

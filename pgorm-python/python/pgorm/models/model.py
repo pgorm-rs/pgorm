@@ -84,7 +84,7 @@ class Model:
         return names
 
     def _projection(self, fields: tuple[str, ...]) -> tuple[p.Aliased, ...]:
-        return tuple(self.col(name).expression.as_(name) for name in fields)
+        return tuple(self.col(name).as_(name) for name in fields)
 
     def select(self, *fields: str) -> ModelQuery:
         from .queries import ModelQuery

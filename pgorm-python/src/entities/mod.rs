@@ -45,13 +45,14 @@ impl PyEntity {
             .call_method1("loads", (self.backend.info().describe()?.to_string(),))
     }
 
-    fn col(&self, name: &Bound<'_, PyAny>) -> PyResult<PyEntityColumn> {
+    fn col<'py>(
+        &self,
+        py: Python<'py>,
+        name: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, PyEntityColumn>> {
         let name = PyIdentifier::new(name)?.name;
         self.backend.info().column(&name)?;
-        Ok(PyEntityColumn {
-            entity: self.backend.clone(),
-            name,
-        })
+        Bound::new(py, PyEntityColumn::new(self.backend.clone(), name)?)
     }
 
     fn find(&self) -> PyEntityQuery {

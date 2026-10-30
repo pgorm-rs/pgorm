@@ -61,14 +61,18 @@ query = left.select("id").join(right, left.col("id") == right.col("id"))
 
 The joined query projects the selected fields from its root descriptor. Use
 the native statement APIs when selecting an arbitrary cross-source
-shape. `col(field)` validates the field and converts comparison inputs through
-its declared native Value tag. `eq`, `ne`, ordering comparisons, `is_in`,
-`is_not_in`, `is_null` and `is_not_null` produce native expressions — a
-comparison takes `any_(..)` or `all_(..)` as written, and membership a list or
-tuple of values or a `Select`'s rows; `asc`/`desc` produce
-native orderings. `col(field).expr()` exposes the native expression for further
-composition. Explicit native expressions keep their existing binding semantics.
-Use `is_null()` for a NULL test on a non-nullable declaration.
+shape. `col(field)` validates the field and is itself an `Expr`, so it goes
+wherever an expression goes. Every operator that takes a value converts it
+through the field's declared native Value tag: `eq`, `ne` and the ordering
+comparisons, `is_in` and `is_not_in`, `between` and `not_between`,
+`is_distinct_from` and `is_not_distinct_from`, `contains`, `contained_by`,
+`overlaps` and the range position operators. A comparison takes `any_(..)`
+or `all_(..)` as written, membership a list or tuple of values or a
+`Select`'s rows, and every operator an expression as written. Every other
+`Expr` method — `+`, `like`, `cast`, `as_`, `asc`/`desc` — reads the column
+as written and binds its operands as an `Expr`'s do. `col(field).expr()` gives
+the plain expression, whose operators bind as an `Expr`'s do. `None` is
+refused as a compared value: use `is_null()`.
 
 `key(mapping)` constructs a native conjunction over all declared primary-key
 fields, in declaration order. It requires every key field and rejects extras.

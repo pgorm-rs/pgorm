@@ -9,6 +9,7 @@ mod capabilities;
 mod comparison;
 mod compiled;
 mod construct;
+mod declared;
 mod logic;
 mod options;
 mod patterns;
@@ -33,7 +34,7 @@ pub use options::{Aliased, LikePattern, OrderBy};
 // [spec:pgorm:req:python.expressions+7]
 // [spec:pgorm:req:bindings.statements]
 /// An immutable owned Rust SimpleExpr. Every composition clones its inputs.
-#[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object)]
+#[pyclass(name = "Expr", module = "pgorm", frozen, from_py_object, subclass)]
 #[derive(Clone, Debug)]
 pub struct PyExpr {
     pub inner: SimpleExpr,
@@ -53,6 +54,7 @@ impl PyExpr {
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyExpr>()?;
+    module.add_class::<declared::DeclaredColumn>()?;
     module.add_class::<PyCondition>()?;
     module.add_class::<LikePattern>()?;
     module.add_class::<Aliased>()?;

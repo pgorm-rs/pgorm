@@ -2206,8 +2206,10 @@ impl_evidence (
         {impl_name main, rule bindings.case}
     )}
     {id python-model-column-operators, covered_rules (
+        bindings.column-operators
         bindings.model-columns
     ), covered_claims (
+        {impl_name python, rule bindings.column-operators}
         {impl_name python, rule bindings.model-columns}
     )}
     {id python-model-gaps, covered_rules (

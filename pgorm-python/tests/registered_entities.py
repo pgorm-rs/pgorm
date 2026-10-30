@@ -139,12 +139,22 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 booking.active().set("span", p.Range(1, 2))
 
     # [spec:pgorm:req:bindings.entity-reads+2/test]
+    # [spec:pgorm:req:bindings.column-operators/test]    a registered column is its own expression,
+    # every Expr method reading it as written
     async def test_typed_select_reuses_real_entity_projection(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2, 3):
                 await self.active(identity, f"account{identity}").insert(connection)
+            column = self.account.col("id")
+            self.assertIsInstance(column, p.Expr)
+            self.assertEqual(column.desc().expr.inspect().sql, column.expr().inspect().sql)
+            self.assertEqual((column + 1).inspect().params[0].kind, "i64")
+            self.assertEqual(
+                [row["id"] for row in await self.account.find().where(column.between(2, 3)).order_by(column.asc()).all(connection)],
+                [2, 3],
+            )
             query = self.account.find().where(self.account.col("id") >= 2)
-            query = query.order_by(self.account.col("id").expr().desc())
+            query = query.order_by(column.desc())
             self.assertEqual([row["id"] for row in await query.all(connection)], [3, 2])
             self.assertEqual((await query.one(connection))["id"], 3)
             self.assertEqual(len(await query.all(connection)), 2)
