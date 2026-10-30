@@ -159,6 +159,29 @@ is `{ old, new }`; an upsert `{ kind: "inserted", new }` or `{ kind:
 `returningUpsert` and left out of `returningUpserts`. `updateMany` needs
 `where` or `allRows()`.
 
+## Schema
+
+```js
+import { entity, fromEntity } from "./lib/index.js";
+
+const generated = fromEntity(entity("app.Account"));
+for (const statement of generated.enums) await pool.execute(statement);
+await pool.execute(generated.table);
+for (const statement of [...generated.indexes, ...generated.comments]) await pool.execute(statement);
+```
+
+`fromEntity(entity)` is pgorm's own `Schema` for the registered entity: an
+`EntitySchema` whose `table` is `create_table_from_entity`, a `CreateTable`,
+and whose `enums`, `indexes` and `comments` are `create_enum_from_entity`,
+`create_index_from_entity` and `create_comments_from_entity`, as
+`CreateType`s, `CreateIndex`es and `Ddl`s. Each is a DDL statement as the
+module's builders make one, and nothing runs it but a terminal. Run the enums
+first, then the table, then the rest; create an enum two entities share once,
+and a table a foreign key references before the table holding the key. A
+table pgorm refuses is a `ConstructionError` carrying its message: a
+`belongs_to` over a column typed as a domain over an enum, on either side, is
+one, since PostgreSQL builds no foreign key there (`42804`).
+
 ## Graphs
 
 ```js

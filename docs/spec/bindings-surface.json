@@ -483,10 +483,7 @@
       "pgorm.Table.inspect": "inherited from Builder, and refuses a part that is no statement",
       "pgorm.With.inspect": "inherited from Builder, and refuses a part that is no statement"
     },
-    "gaps": {
-      "schema.from_entity": "napi-schema-from-entity",
-      "schema.EntitySchema": "napi-schema-from-entity"
-    },
+    "gaps": {},
     "undecided": {
       "pgorm.json_arrayagg": {"spelled": "jsonArrayAgg", "question": "names"},
       "pgorm.json_objectagg": {"spelled": "jsonObjectAgg", "question": "names"},

@@ -21,6 +21,7 @@ import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
 import type { BuiltinType, DataType } from "./json.d.ts";
 import type { Select, Table } from "./select.d.ts";
+import type { Entity } from "./entities.d.ts";
 
 /**
  * A table or sequence a statement names: a name, or a {@link Table} without
@@ -262,6 +263,31 @@ export declare function dropIndex(
 export interface CollationOption {
   readonly collation?: Collation;
 }
+
+/**
+ * A registered entity's schema as pgorm's own entity schema path writes it:
+ * `Schema::create_table_from_entity` with its enum, index and comment
+ * statements, each in the order pgorm writes them.
+ */
+// [spec:pgorm:req:bindings.schema-from-entity]
+export declare class EntitySchema {
+  private constructor();
+  /** `CREATE TABLE`, with its primary key, unique keys and foreign keys. */
+  readonly table: CreateTable;
+  /** `CREATE TYPE .. AS ENUM` for each enum type its columns name. */
+  readonly enums: readonly CreateType[];
+  /** `CREATE INDEX` for each column it indexes. */
+  readonly indexes: readonly CreateIndex[];
+  /** `COMMENT ON` its table and its columns. */
+  readonly comments: readonly Ddl[];
+}
+
+/**
+ * The schema of a registered entity, by pgorm's own entity schema path. A
+ * table that path refuses, such as one whose foreign key PostgreSQL cannot
+ * build, is a `ConstructionError` carrying the Rust message.
+ */
+export declare function fromEntity(entity: Entity<any>): EntitySchema;
 
 /**
  * `CREATE TYPE`: a shell type until a kind is chosen. What a type is, is one
