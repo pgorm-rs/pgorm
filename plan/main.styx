@@ -14739,7 +14739,6 @@ children (
                 [spec:pgorm:req:napi.records]
                 [spec:pgorm:req:napi.row-count]
                 [spec:pgorm:req:napi.runtime]
-                [spec:pgorm:req:napi.schema-api]
                 [spec:pgorm:req:napi.temporal]
                 [spec:pgorm:req:napi.transactions]
                 [spec:pgorm:req:napi.typing]
@@ -14769,6 +14768,7 @@ children (
                 [spec:pgorm:req:bindings.schema-types]
                 [spec:pgorm:req:bindings.with]
                 [spec:pgorm:req:bindings.writes]
+                [spec:pgorm:req:bindings.schema-api]
             )
             main ([spec:pgorm:req:bindings.connections] [spec:pgorm:req:bindings.pipeline] [spec:pgorm:req:bindings.pipeline-expressions])
             python (
@@ -14822,7 +14822,6 @@ children (
                 [spec:pgorm:req:python.records]
                 [spec:pgorm:req:python.row-count]
                 [spec:pgorm:req:python.runtime]
-                [spec:pgorm:req:python.schema-api]
                 [spec:pgorm:req:python.transactions]
                 [spec:pgorm:req:python.truth-testing]
                 [spec:pgorm:req:python.typing]
@@ -14873,6 +14872,13 @@ children (
                 kind @note
                 text "Re-read after napi-binding-decisions (b7a7b5fe) moved bindings.errors, bindings.listen, python.lifecycle, napi.lifecycle, napi.argument-errors and napi.pipeline-operands to +2. bindings.errors gained one clause: a shared rule's ConstructionError is for the argument's value, an argument of the wrong type taking the class each binding's own rule names, which python.argument-errors keeps as ConstructionError for Python. bindings.listen states once that a pull pending when the listener itself closes ends the iteration, which Python's listener already did and JavaScript's now does; python.lifecycle and napi.lifecycle lost their per-binding sentences. napi.argument-errors and napi.pipeline-operands are JavaScript's rewritten rules. Every reference to the six rules, in both bindings, is pinned at +2, and the code they sit on is what napi-binding-decisions left at these versions; Python's sites changed only their pins."
                 after_done true
+            }
+
+            {
+                at 2026-10-30T17:58:38.975141Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Another shape for decision (7), found merging python-schema-gaps (2026-10-30): Python's DDL builder classes are constructible (CreateTable(..), with #[new]) and each factory is the class under a second name (create_table = CreateTable, a pattern on main before that node extended it to every builder), while JavaScript's builder classes take a private construction token and only the factory functions make them. The surface test sees both names on both sides, so it does not flag it. Bring it to the operator with the other shapes when the schema area is next worked on."
             }
         )
     }
@@ -14941,6 +14947,7 @@ children (
                 [spec:pgorm:req:bindings.schema-sequences]
                 [spec:pgorm:req:bindings.schema-tables]
                 [spec:pgorm:req:bindings.schema-types]
+                [spec:pgorm:req:bindings.schema-api]
             )
         }
         deps (binding-renames)
@@ -14958,6 +14965,13 @@ children (
                 kind @decision
                 text "Operator 2026-10-30, decision (10): Python adopts JavaScript's DDL builders and pending-ALTER typestates (several actions in one ALTER TABLE), and its per-action functions (add_column, drop_constraint, set_domain_default and the rest under the schema-api question in bindings-surface.json) are deleted, not deprecated."
                 after_done true
+            }
+
+            {
+                at 2026-10-30T17:48:32.500331Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Built Python's DDL as JavaScript's, modulo naming, and folded python.schema-api and napi.schema-api into one shared bindings.schema-api (bindings.md), the python half claimed here and the javascript half by binding-spec-consolidation. Choices made while building it: (a) every complete statement is a native subclass of pgorm.schema.DDL (PyO3 extends, the base holding the statement), so terminals take DDL alone and the pending ALTERs (PendingAlterTable/Type/Domain/Sequence) are no DDL, have no inspect() and are refused by terminals with ConstructionError; (b) builders are constructed by calling the class, each also spelled as its function (create_type = CreateType and the rest); (c) shapes follow JavaScript: key columns and drop lists are one name or a non-empty list (no varargs), behavior=\"cascade\"|\"restrict\" replaces cascade=bool, enforcement= replaces not_enforced=, closed choices are snake_case strings, an index entry is on with order=/operator_class= keywords, a collation option is a name or {\"name\", \"schema\"}, sequence options are **kwargs (None the NO form), owned_by(None) is OWNED BY NONE, and a table is named by str, Identifier or Table; (d) argument errors: TypeError for the wrong Python type (including a non-str name in the new schema code), ValueError only for an integer outside bigint, ConstructionError for a value that cannot become SQL; the shared helpers (PyIdentifier::new, require_expr) keep their current errors for the argument-errors node; (e) using() takes any access method, gin now rendering as pgorm-query's IndexType::Gin as JavaScript does; (f) methods shared by two or three classes are written once in a macro_rules per family and instantiated per class."
             }
         )
     }

@@ -1,116 +1,166 @@
-use super::{
-    statement::{PyDDL, Statement},
-    table::table_name,
-};
-use crate::{
-    UnsupportedCapabilityError, errors::ConstructionError, expressions::Compiled,
-    identifiers::PyIdentifier, statements::PyTable,
-};
-use pgorm::pgorm_query::{Index, IndexCreateStatement, IndexOrder, IndexType, Name, Values};
-use pyo3::prelude::*;
+//! `CREATE INDEX` and `DROP INDEX`. An index's entries are columns or
+//! expressions, each with an operator class and an order; the index takes
+//! uniqueness, `NULLS NOT DISTINCT`, an access method, `INCLUDE`d columns and
+//! a partial-index predicate. `CONCURRENTLY` is not offered: PostgreSQL
+//! refuses it inside a transaction, where DDL runs as often as not.
 
-#[derive(Clone, Debug)]
-#[pyclass(name = "CreateIndex", module = "pgorm.schema", frozen, from_py_object)]
-pub struct PyCreateIndex {
-    pub(crate) inner: IndexCreateStatement,
+use super::{
+    args::{self, choice, relation},
+    statement::{PyDDL, Statement, ddl_class},
+};
+use crate::{expressions::PyExpr, identifiers::PyIdentifier, statements::condition};
+use pgorm::pgorm_query::{Index, IndexColumn, IndexCreateStatement, IndexOrder, IndexType};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyString};
+
+/// An index entry: a column's name or an expression, with the order and
+/// operator class given.
+// [spec:pgorm:req:bindings.schema-indexes]
+fn entry(
+    on: &Bound<'_, PyAny>,
+    order: Option<&str>,
+    operator_class: Option<&Bound<'_, PyAny>>,
+) -> PyResult<IndexColumn> {
+    let mut column = if let Ok(expr) = on.extract::<PyRef<'_, PyExpr>>() {
+        IndexColumn::expr(expr.inner.clone())
+    } else if on.is_instance_of::<PyString>() || on.is_instance_of::<PyIdentifier>() {
+        IndexColumn::name(args::name(on)?)
+    } else {
+        return Err(PyTypeError::new_err(
+            "an index entry is a column's name or an expression",
+        ));
+    };
+    if let Some(class) = operator_class {
+        column = column.operator_class(args::name(class)?);
+    }
+    let order = choice(
+        order,
+        "an index entry's order",
+        &[("asc", IndexOrder::Asc), ("desc", IndexOrder::Desc)],
+    )?;
+    if let Some(order) = order {
+        column = column.order(order);
+    }
+    Ok(column)
 }
+
+/// `CREATE INDEX`; every method gives a new statement.
+#[derive(Debug)]
+#[pyclass(name = "CreateIndex", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateIndex;
+
+ddl_class!(PyCreateIndex, CreateIndex, IndexCreateStatement, with);
 
 #[pymethods]
 impl PyCreateIndex {
+    /// An index over its first entry, named as asked and by PostgreSQL
+    /// otherwise.
     // [spec:pgorm:req:bindings.schema-indexes]
     #[new]
-    #[pyo3(signature=(table, first, *, name=None))]
+    #[pyo3(signature=(table, on, *, name=None, order=None, operator_class=None))]
     fn new(
-        table: &PyTable,
-        first: &Bound<'_, PyAny>,
+        table: &Bound<'_, PyAny>,
+        on: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let mut inner = Index::create(table_name(table)?, PyIdentifier::new(first)?.name());
+        order: Option<&str>,
+        operator_class: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let mut created = Index::create(relation(table)?, entry(on, order, operator_class)?);
         if let Some(name) = name {
-            inner.name(PyIdentifier::new(name)?.name());
+            created.name(args::name(name)?);
         }
-        Ok(Self { inner })
+        let statement = Statement::CreateIndex(created);
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
     }
 
-    #[pyo3(signature=(name, *, descending=None))]
-    fn column(&self, name: &Bound<'_, PyAny>, descending: Option<bool>) -> PyResult<Self> {
-        let name = PyIdentifier::new(name)?.name();
-        let mut inner = self.inner.clone();
-        match descending {
-            None => {
-                inner.col(name);
-            }
-            Some(false) => {
-                inner.col((name, IndexOrder::Asc));
-            }
-            Some(true) => {
-                inner.col((name, IndexOrder::Desc));
-            }
-        }
-        Ok(Self { inner })
+    #[pyo3(signature=(on, *, order=None, operator_class=None))]
+    fn column<'py>(
+        slf: &Bound<'py, Self>,
+        on: &Bound<'_, PyAny>,
+        order: Option<&str>,
+        operator_class: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let column = entry(on, order, operator_class)?;
+        Self::with(slf, |statement| {
+            statement.col(column);
+        })
     }
 
-    fn unique(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.unique();
-        Self { inner }
+    fn unique<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+        let mut statement = Self::statement(slf)?;
+        statement.unique();
+        Self::object(slf.py(), statement)
     }
 
-    fn nulls_not_distinct(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.unique().nulls_not_distinct();
-        Self { inner }
+    /// `NULLS NOT DISTINCT`, which PostgreSQL defines for a unique index
+    /// alone, and so makes the index unique rather than be written for
+    /// nothing.
+    // [spec:pgorm:req:bindings.schema-indexes]
+    fn nulls_not_distinct<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+        let mut statement = Self::statement(slf)?;
+        statement.unique().nulls_not_distinct();
+        Self::object(slf.py(), statement)
     }
 
-    fn if_not_exists(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.if_not_exists();
-        Self { inner }
+    fn if_not_exists<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+        let mut statement = Self::statement(slf)?;
+        statement.if_not_exists();
+        Self::object(slf.py(), statement)
     }
 
-    fn using(&self, name: &str) -> PyResult<Self> {
-        let kind = match name {
-            "btree" => IndexType::BTree,
-            "hash" => IndexType::Hash,
-            "gin" | "gist" | "spgist" | "brin" => IndexType::Named(Name::runtime(name)),
-            _ => {
-                return Err(UnsupportedCapabilityError::new_err(
-                    "unsupported index access method",
-                ));
-            }
+    /// The access method, any the server has — `btree`, `hash` and `gin` by
+    /// pgorm-query's own variants, another by its quoted name.
+    // [spec:pgorm:req:bindings.schema-indexes]
+    fn using<'py>(slf: &Bound<'py, Self>, method: &Bound<'_, PyAny>) -> PyResult<Bound<'py, Self>> {
+        let name = args::name(method)?;
+        let method = match method.extract::<&str>() {
+            Ok("btree") => IndexType::BTree,
+            Ok("hash") => IndexType::Hash,
+            Ok("gin") => IndexType::Gin,
+            _ => IndexType::Named(name),
         };
-        let mut inner = self.inner.clone();
-        inner.index_type(kind);
-        Ok(Self { inner })
+        Self::with(slf, |statement| {
+            statement.index_type(method);
+        })
     }
 
-    pub fn inspect(&self) -> Compiled {
-        Compiled {
-            sql: self.inner.to_string(),
-            values: Values(Vec::new()),
-        }
+    /// Columns carried in the index's leaves without being indexed; appends.
+    fn include<'py>(
+        slf: &Bound<'py, Self>,
+        columns: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let columns = args::names(columns, "an index's include list")?;
+        Self::with(slf, |statement| {
+            statement.include(columns);
+        })
     }
 
-    fn __bool__(&self) -> PyResult<bool> {
-        Err(ConstructionError::new_err(
-            "SQL statements cannot be tested as Python booleans",
-        ))
+    /// The partial index's predicate, ANDed to one already there.
+    // [spec:pgorm:req:bindings.schema-indexes]
+    #[pyo3(name = "where")]
+    fn where_<'py>(
+        slf: &Bound<'py, Self>,
+        predicate: &Bound<'_, PyAny>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let predicate = condition(predicate)?;
+        Self::with(slf, |statement| {
+            statement.cond_where(predicate);
+        })
     }
 }
 
+/// `DROP INDEX`, the index in its table's schema.
+// [spec:pgorm:req:bindings.schema-indexes]
 #[pyfunction]
 #[pyo3(signature=(table, name, *, if_exists=false))]
 pub(super) fn drop_index(
-    table: &PyTable,
+    table: &Bound<'_, PyAny>,
     name: &Bound<'_, PyAny>,
     if_exists: bool,
 ) -> PyResult<PyDDL> {
-    let mut inner = Index::drop(PyIdentifier::new(name)?.name());
-    inner.table(table_name(table)?);
+    let mut drop = Index::drop(args::name(name)?);
+    drop.table(relation(table)?);
     if if_exists {
-        inner.if_exists();
+        drop.if_exists();
     }
-    Ok(PyDDL {
-        inner: Statement::DropIndex(inner),
-    })
+    Ok(PyDDL::new(Statement::DropIndex(drop)))
 }

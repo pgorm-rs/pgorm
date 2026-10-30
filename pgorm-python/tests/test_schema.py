@@ -16,7 +16,7 @@ PG_19 = "pg-19" in p.capabilities()["features"]
 
 class SchemaConstruction(unittest.TestCase):
     # [spec:pgorm:req:bindings.schema/test]
-    # [spec:pgorm:req:python.schema-api+2/test]
+    # [spec:pgorm:req:bindings.schema-api/test]
     def test_capabilities_and_detached_builders(self):
         manifest = p.capabilities()
         self.assertFalse(manifest["schema_policy"]["automatic_ddl"])
@@ -53,7 +53,7 @@ class SchemaConstruction(unittest.TestCase):
         column = s.ColumnDef("word", "text").collate("C")
         sql = s.create_table(p.Table("t")).column(column.collate('C "x"', schema="pg_catalog")).inspect().sql
         self.assertEqual(sql, 'CREATE TABLE "t" ( "word" text COLLATE "pg_catalog"."C ""x""" )')
-        self.assertIn('"word" text COLLATE "C"', s.add_column(p.Table("t"), column).inspect().sql)
+        self.assertIn('"word" text COLLATE "C"', s.alter_table(p.Table("t")).add_column(column).inspect().sql)
         for action in (
             lambda: column.collate(""),
             lambda: column.collate("C", schema=""),
@@ -77,28 +77,32 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.create_table(p.Table("test", alias="t")),
             lambda: s.create_index(p.Table("test", alias="t"), "v"),
             lambda: s.drop_table(p.Table("test", alias="t")),
-            lambda: s.create_index(p.Table("test"), "v").using("gin); SELECT 1 --"),
             lambda: s.ColumnDef("", "text"),
             lambda: s.ColumnDef("v", "text").generated("raw SQL", "stored"),
             lambda: s.ColumnDef("v", "integer").generated(p.col("id"), "persisted"),
-            lambda: s.create_enum("mood", ["a\0b"]),
-            lambda: s.create_enum("mood", ["雪" * 22]),
-            lambda: s.add_enum_value("mood", "v", before="a", after="b"),
-            lambda: s.alter_constraint(p.Table("test"), "c", "deferrable"),
-            lambda: s.add_not_null(p.Table("test", alias="t"), "c"),
+            lambda: s.create_type("mood").values(["a\0b"]),
+            lambda: s.create_type("mood").values(["雪" * 22]),
+            lambda: s.alter_type("mood").add_value("v", before="a", after="b"),
+            lambda: s.alter_table(p.Table("test")).alter_constraint("c", "deferrable"),
+            lambda: s.alter_table(p.Table("test", alias="t")).add_not_null("c"),
         ):
             with self.subTest(action=action), self.assertRaises(p.PgormError):
                 action()
 
-    # [spec:pgorm:req:python.truth-testing+3/test]    a domain's builder refuses truth testing too
+    # [spec:pgorm:req:python.truth-testing+3/test]    every schema builder and pending ALTER
+    # refuses truth testing too
     def test_schema_objects_refuse_truth_testing(self):
         table, query = p.Table("test"), p.select(p.col("id")).from_(p.Table("source"))
         samples = [
             s.DataType("integer"), s.ColumnDef("id", "integer"), s.create_table(table),
-            s.create_index(table, "id"), s.drop_table(table), s.create_enum("mood", ["calm"]),
+            s.create_index(table, "id"), s.drop_table(table), s.create_type("mood").values(["calm"]),
+            s.alter_table(table), s.alter_table(table).drop_column("id"), s.alter_type("mood"),
+            s.alter_type("pair").drop_attribute("a"), s.alter_type("pair").rename_attribute("a", "b"),
             s.create_view(table, query), s.create_recursive_view(table, ["id"], query),
             s.create_materialized_view(table, query), s.refresh_materialized_view(table),
             s.create_table_as(table, query), s.create_domain("quantity", "integer"),
+            s.alter_domain("quantity"), s.create_sequence("ticket"), s.alter_sequence("ticket"),
+            s.alter_sequence("ticket").restart(),
         ]
         for sample in [*samples, s.create_table(table).inspect()]:
             with self.subTest(sample=sample), self.assertRaises(p.ConstructionError):
@@ -112,6 +116,12 @@ class SchemaConstruction(unittest.TestCase):
         unsampled = (native | exported) - {type(sample) for sample in samples}
         self.assertEqual(unsampled, {s.EntitySchema})
         self.assertIn("__bool__", vars(s.EntitySchema))
+
+    # [spec:pgorm:req:bindings.schema-indexes/test]    an access method is any identifier,
+    # quoted where pgorm-query writes it, never SQL
+    def test_index_access_method_is_an_identifier(self):
+        index = s.create_index(p.Table("test"), "v").using("gin); SELECT 1 --")
+        self.assertEqual(index.inspect().sql, 'CREATE INDEX  ON "test" USING "gin); SELECT 1 --" ("v")')
 
 
 class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
@@ -144,40 +154,40 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         inserted = await self.pool.one(p.insert(table).default_values().returning(p.col("id"), p.col("name"), p.col("twice"), p.col("next")))
         self.assertEqual(dict(inserted), {"id": 1, "name": "O'Brien \\ 雪", "twice": 2, "next": 2})
         async with self.pool.connection() as connection:
-            index = s.create_index(table, "name", name='idx "雪"').column("id", descending=True).nulls_not_distinct()
+            index = s.create_index(table, "name", name='idx "雪"').column("id", order="desc").nulls_not_distinct()
             await connection.execute(index)
             await connection.execute(index.if_not_exists())
-            await connection.execute(s.add_column(table, s.ColumnDef("extra", "text").default("hello")))
-            await connection.execute(s.add_column(table, s.ColumnDef("extra", "text"), if_not_exists=True))
-            await connection.execute(s.modify_column(table, s.ColumnDef("extra", "varchar").not_null().default("changed")))
-            await connection.execute(s.add_unique(table, "extra", "name", name='unique "x"', nulls_not_distinct=True))
-            keyed = s.add_primary_key(table, "id")
+            await connection.execute(s.alter_table(table).add_column(s.ColumnDef("extra", "text").default("hello")))
+            await connection.execute(s.alter_table(table).add_column(s.ColumnDef("extra", "text"), if_not_exists=True))
+            await connection.execute(s.alter_table(table).modify_column(s.ColumnDef("extra", "varchar").not_null().default("changed")))
+            await connection.execute(s.alter_table(table).add_unique(["extra", "name"], name='unique "x"', nulls_not_distinct=True))
+            keyed = s.alter_table(table).add_primary_key("id")
             self.assertTrue(keyed.inspect().sql.endswith('ADD PRIMARY KEY ("id")'), keyed.inspect().sql)
             with self.assertRaises(p.DatabaseError) as refused:
                 await connection.execute(keyed)
             self.assertEqual(refused.exception.sqlstate, "42P16")
             derived = p.RawSQL(f'SELECT twice, next FROM {self.quoted}."items ""x"""')
-            await connection.execute(s.set_expression(table, "twice", p.col("id") * 10))
+            await connection.execute(s.alter_table(table).set_expression("twice", p.col("id") * 10))
             self.assertEqual(dict(await connection.one(derived)), {"twice": 10, "next": 2})
-            virtual = [s.drop_expression(table, "next", if_exists=True)]
+            virtual = [s.alter_table(table).drop_expression("next", if_exists=True)]
             if PG_19:
                 # 19 checks the rows against the table's CHECK instead of refusing.
-                await connection.execute(s.set_expression(table, "next", p.col("id") + 100))
+                await connection.execute(s.alter_table(table).set_expression("next", p.col("id") + 100))
                 self.assertEqual(dict(await connection.one(derived)), {"twice": 10, "next": 101})
             else:
                 # 18 refuses a virtual column a new expression while its table has a CHECK.
-                virtual.insert(0, s.set_expression(table, "next", p.col("id") + 100))
+                virtual.insert(0, s.alter_table(table).set_expression("next", p.col("id") + 100))
             for refused_action in virtual:
                 with self.assertRaises(p.DatabaseError) as refused_virtual:
                     await connection.execute(refused_action)
                 self.assertEqual(refused_virtual.exception.sqlstate, "0A000")
-            await connection.execute(s.drop_expression(table, "twice"))
-            await connection.execute(s.drop_expression(table, "twice", if_exists=True))
+            await connection.execute(s.alter_table(table).drop_expression("twice"))
+            await connection.execute(s.alter_table(table).drop_expression("twice", if_exists=True))
             with self.assertRaises(p.DatabaseError) as plain:
-                await connection.execute(s.drop_expression(table, "twice"))
+                await connection.execute(s.alter_table(table).drop_expression("twice"))
             self.assertEqual(plain.exception.sqlstate, "55000")
             await connection.execute(s.rename_column(table, "extra", 'renamed "x"'))
-            await connection.execute(s.drop_column(table, 'renamed "x"'))
+            await connection.execute(s.alter_table(table).drop_column('renamed "x"'))
             await connection.execute(s.drop_index(table, 'idx "雪"'))
             await connection.execute(s.drop_index(table, 'idx "雪"', if_exists=True))
             await connection.execute(s.truncate_table(table))
@@ -213,18 +223,18 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             [quoted],
         )
         async with self.pool.connection() as connection:
-            await connection.execute(s.add_not_null(table, "note", name="note present", not_valid=True))
+            await connection.execute(s.alter_table(table).add_not_null("note", name="note present", not_valid=True))
             rows = [dict(row) for row in await connection.query(catalog)]
             self.assertEqual(rows, [
                 {"name": 'id "present"', "valid": True, "no_inherit": False},
                 {"name": "note present", "valid": False, "no_inherit": False},
             ])
             with self.assertRaises(p.DatabaseError) as refused:
-                await connection.execute(s.validate_constraint(table, "note present"))
+                await connection.execute(s.alter_table(table).validate_constraint("note present"))
             self.assertEqual(refused.exception.sqlstate, "23502")
             await connection.execute(p.RawSQL(f"UPDATE {quoted} SET note = ''"))
-            await connection.execute(s.validate_constraint(table, "note present"))
-            await connection.execute(s.alter_constraint(table, 'id "present"', "no_inherit"))
+            await connection.execute(s.alter_table(table).validate_constraint("note present"))
+            await connection.execute(s.alter_table(table).alter_constraint('id "present"', "no_inherit"))
             rows = [dict(row) for row in await connection.query(catalog)]
             self.assertEqual(rows, [
                 {"name": 'id "present"', "valid": True, "no_inherit": True},
@@ -249,10 +259,10 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
                 await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
             self.assertEqual(refused.exception.sqlstate, "23514")
             with self.assertRaises(p.DatabaseError) as refused:
-                await connection.execute(s.drop_constraint(table, 'positive "x"'))
+                await connection.execute(s.alter_table(table).drop_constraint('positive "x"'))
             self.assertEqual(refused.exception.sqlstate, "42704")
-            await connection.execute(s.drop_constraint(table, 'positive "x"', if_exists=True))
-            await connection.execute(s.drop_constraint(table, "above zero", cascade=True))
+            await connection.execute(s.alter_table(table).drop_constraint('positive "x"', if_exists=True))
+            await connection.execute(s.alter_table(table).drop_constraint("above zero", behavior="cascade"))
             self.assertEqual(await connection.query(catalog), [])
             await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1)"))
 
@@ -269,9 +279,9 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         )
         async with self.pool.connection() as connection:
             with self.assertRaises(p.DatabaseError) as refused:
-                await connection.execute(s.add_check(table, p.col("n") > 0, name="positive"))
+                await connection.execute(s.alter_table(table).add_check(p.col("n") > 0, name="positive"))
             self.assertEqual(refused.exception.sqlstate, "23514")
-            await connection.execute(s.add_check(table, p.col("n") > 0, name="positive", no_inherit=True, not_valid=True))
+            await connection.execute(s.alter_table(table).add_check(p.col("n") > 0, name="positive", no_inherit=True, not_valid=True))
             self.assertEqual([dict(row) for row in await connection.query(catalog)], [
                 {"name": "positive", "valid": False, "no_inherit": True},
             ])
@@ -279,7 +289,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
                 await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-2)"))
             self.assertEqual(refused.exception.sqlstate, "23514")
             await connection.execute(p.RawSQL(f"UPDATE {quoted} SET n = 1"))
-            await connection.execute(s.validate_constraint(table, "positive"))
+            await connection.execute(s.alter_table(table).validate_constraint("positive"))
             self.assertEqual([dict(row) for row in await connection.query(catalog)], [
                 {"name": "positive", "valid": True, "no_inherit": True},
             ])
@@ -292,7 +302,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         ddl = s.create_table(table).column(s.ColumnDef("room", "integer"))
         ddl = ddl.column(s.ColumnDef("during", p.TypeName("daterange")))
         await self.pool.execute(ddl.primary_key("room", without_overlaps="during"))
-        await self.pool.execute(s.add_unique(table, "room", name="room period", nulls_not_distinct=True, without_overlaps="during"))
+        await self.pool.execute(s.alter_table(table).add_unique("room", name="room period", nulls_not_distinct=True, without_overlaps="during"))
         catalog = p.RawSQL(
             "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint "
             "WHERE conrelid = $1::text::regclass AND conperiod ORDER BY conname",
@@ -312,7 +322,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
     async def test_not_enforced_constraints(self):
         table = p.Table('checked "x"', schema=self.namespace)
         quoted = f'{self.quoted}."checked ""x"""'
-        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").check(p.col("id") > 0, name="positive", not_enforced=True))
+        ddl = s.create_table(table).column(s.ColumnDef("id", "integer").check(p.col("id") > 0, name="positive", enforcement="not_enforced"))
         await self.pool.execute(ddl.column(s.ColumnDef("parent", "integer")).check(p.col("id") < 100, name="small"))
         catalog = p.RawSQL(
             "SELECT conname::text AS name, conenforced AS enforced, convalidated AS valid "
@@ -321,18 +331,18 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         )
         async with self.pool.connection() as connection:
             await connection.execute(p.RawSQL(f"INSERT INTO {quoted} VALUES (-1, 5)"))
-            await connection.execute(s.add_check(table, p.col("parent") < 0, name="negative parent", not_enforced=True))
+            await connection.execute(s.alter_table(table).add_check(p.col("parent") < 0, name="negative parent", enforcement="not_enforced"))
             await connection.execute(p.RawSQL(f"CREATE UNIQUE INDEX ON {quoted} (id)"))
             await connection.execute(p.RawSQL(
                 f"ALTER TABLE {quoted} ADD CONSTRAINT parent_key FOREIGN KEY (parent) REFERENCES {quoted} (id) NOT ENFORCED"
             ))
             with self.assertRaises(p.DatabaseError) as orphan:
-                await connection.execute(s.alter_constraint(table, "parent_key", "enforced"))
+                await connection.execute(s.alter_table(table).alter_constraint("parent_key", "enforced"))
             self.assertEqual(orphan.exception.sqlstate, "23503")
             # 19 enforces a CHECK as it does a foreign key, and the row already
             # there breaks it; 18 cannot alter a CHECK's enforcement.
             with self.assertRaises(p.DatabaseError) as check:
-                await connection.execute(s.alter_constraint(table, "positive", "enforced"))
+                await connection.execute(s.alter_table(table).alter_constraint("positive", "enforced"))
             self.assertEqual(check.exception.sqlstate, "23514" if PG_19 else "42809")
             rows = [dict(row) for row in await connection.query(catalog)]
             self.assertEqual(rows, [
@@ -348,10 +358,10 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         shadow_name = 'Mood shadow ' + uuid4().hex[:8]
         shadow = p.TypeName(shadow_name, schema="public")
         kind = p.TypeName(shadow_name, schema=self.namespace)
-        await self.pool.execute(s.create_enum(shadow, ["wrong"]))
+        await self.pool.execute(s.create_type(shadow).values(["wrong"]))
         try:
             values = ["", "O'Brien \\ 雪", "busy"]
-            await self.pool.execute(s.create_enum(kind, values))
+            await self.pool.execute(s.create_type(kind).values(values))
             table = p.Table('enum "items"', schema=self.namespace)
             ddl = s.create_table(table).column(s.ColumnDef("mood", kind).default(p.Value(values[1], kind)))
             ddl = ddl.column(s.ColumnDef("moods", s.DataType(kind).array()))
@@ -362,26 +372,26 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(row["moods"], ["", None, "busy"])
             self.assertEqual(row.tagged("mood").type_name, kind)
             self.assertEqual(row.tagged("moods").element_type, kind)
-            await self.pool.execute(s.add_enum_value(kind, "first", before=""))
-            await self.pool.execute(s.add_enum_value(kind, "last", after="busy"))
-            await self.pool.execute(s.rename_enum_value(kind, "busy", "calm"))
+            await self.pool.execute(s.alter_type(kind).add_value("first", before=""))
+            await self.pool.execute(s.alter_type(kind).add_value("last", after="busy"))
+            await self.pool.execute(s.alter_type(kind).rename_value("busy", "calm"))
             # Rust's driver caches type metadata on physical connections.
             # A schema migration finishes before application pools restart.
             await self.pool.close()
             self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
             changed = await self.pool.one(p.select(p.col("moods")).from_(table))
             self.assertEqual(changed["moods"], ["", None, "calm"])
-            await self.pool.execute(s.rename_enum(kind, 'Renamed "雪"'))
+            await self.pool.execute(s.alter_type(kind).rename_to('Renamed "雪"'))
             await self.pool.close()
             self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
             renamed = p.TypeName('Renamed "雪"', schema=self.namespace)
             row = await self.pool.one(p.select(p.col("mood")).from_(table))
             self.assertEqual(row.tagged("mood").type_name, renamed)
             await self.pool.execute(s.drop_table(table))
-            await self.pool.execute(s.drop_enum(renamed))
-            await self.pool.execute(s.drop_enum(renamed, if_exists=True))
+            await self.pool.execute(s.drop_type(renamed))
+            await self.pool.execute(s.drop_type(renamed, if_exists=True))
         finally:
-            await self.pool.execute(s.drop_enum(shadow, if_exists=True, cascade=True))
+            await self.pool.execute(s.drop_type(shadow, if_exists=True, behavior="cascade"))
 
     # [spec:pgorm:req:bindings.collations/test]    a column created under "C" compares and sorts
     # bytewise, a retype changes its collation, and the server refuses what it cannot apply
@@ -396,8 +406,8 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row["word"] for row in await self.pool.query(ordered)], ["A", "B", "a", "b"])
         below = p.select(p.col("word")).from_(table).where(p.col("word") < "a").order_by(p.col("id").asc())
         self.assertEqual([row["word"] for row in await self.pool.query(below)], ["B", "A"])
-        await self.pool.execute(s.add_column(table, s.ColumnDef("note", "text").collate("C")))
-        await self.pool.execute(s.modify_column(table, s.ColumnDef("note", "varchar").collate("POSIX", schema="pg_catalog")))
+        await self.pool.execute(s.alter_table(table).add_column(s.ColumnDef("note", "text").collate("C")))
+        await self.pool.execute(s.alter_table(table).modify_column(s.ColumnDef("note", "varchar").collate("POSIX", schema="pg_catalog")))
         catalog = p.RawSQL(
             "SELECT attname::text AS column, collname::text AS collation FROM pg_attribute "
             "JOIN pg_collation c ON c.oid = attcollation "
@@ -411,7 +421,7 @@ class SchemaDatabase(unittest.IsolatedAsyncioTestCase):
             (s.ColumnDef("n", "integer").collate("C"), "42804"),
         ):
             with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
-                await self.pool.execute(s.add_column(table, column))
+                await self.pool.execute(s.alter_table(table).add_column(column))
             self.assertEqual(refused.exception.sqlstate, sqlstate)
 
 
