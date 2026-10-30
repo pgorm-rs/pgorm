@@ -207,8 +207,7 @@ test("numeric reads as an exact Decimal that keeps its scale", async () => {
 
 // [spec:pgorm:req:napi.values+1/test]
 test("a Decimal is made only from exact text or a bigint, and never becomes a number implicitly", () => {
-  // deno-lint-ignore no-explicit-any
-  throwsConstruction(() => new Decimal(1.5 as any), /never a number/);
+  throwsConstruction(() => new Decimal(1.5 as never), /never a number/);
   for (const text of ["1e5", "1.", ".5", "", "1.2.3", "79228162514264337593543950336", "0.00000000000000000000000000001"]) {
     throwsConstruction(() => new Decimal(text));
   }
@@ -258,10 +257,9 @@ test("a plain object binds as JSON, and anything JSON cannot hold is refused", a
   await refused(roundTrip("jsonb", { a: NaN }), /NaN/);
   await refused(roundTrip("jsonb", { a: new Decimal("1") } as unknown as Param), /JSON holds only/);
   await refused(roundTrip("jsonb", { a: 2n ** 64n }), /64 bits/);
-  // deno-lint-ignore no-explicit-any
-  const cycle: any = {};
+  const cycle: Record<string, unknown> = {};
   cycle.self = cycle;
-  await refused(roundTrip("jsonb", cycle), /cycle/);
+  await refused(roundTrip("jsonb", cycle as never), /cycle/);
   await refused(roundTrip("text", { a: 1 }), /cannot bind a `Json` value to Postgres type `text`/);
 });
 

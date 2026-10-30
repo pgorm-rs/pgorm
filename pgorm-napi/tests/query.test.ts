@@ -218,10 +218,7 @@ test("a result the binding cannot decode exactly rejects with a DecodeError", as
 
 // [spec:pgorm:req:napi.argument-errors+2/test]
 test("an argument of the wrong JavaScript type rejects with a TypeError", async () => {
-  // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool.query(42 as any), TypeError);
-  // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool.query("SELECT 1", [], { tagged: "yes" as any }), TypeError);
-  // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool.query("SELECT 1", 1 as any), TypeError);
+  await assert.rejects(pool.query(42 as never), TypeError);
+  await assert.rejects(pool.query("SELECT 1", [], { tagged: "yes" as never }), TypeError);
+  await assert.rejects(pool.query("SELECT 1", 1 as never), TypeError);
 });
