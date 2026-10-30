@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-10-30T13:25:32.058307Z
+last_sync_at 2026-10-30T13:42:29.080898Z
 
 rule_versions (
     {id bindings.api, version 0}
@@ -452,7 +452,8 @@ derived_priorities (
     {id api-doc-honesty, priority 0, derived_at 2026-09-20T16:56:53.160541Z}
     {id between-render-parens, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id big-unsigned-binding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
-    {id binding-renames, priority 1, derived_at 2026-10-30T13:25:32.058307Z}
+    {id binding-coverage-per-impl, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
+    {id binding-renames, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
     {id binding-spec-consolidation, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
     {id binding-variant-coverage, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
     {id bindings-array-subquery, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
@@ -642,7 +643,7 @@ derived_priorities (
     {id migration-test-database-gate, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id minimal-feature-build, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id napi-addon-size, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
-    {id napi-binding-decisions, priority 1, derived_at 2026-10-30T13:25:32.058307Z}
+    {id napi-binding-decisions, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
     {id napi-codegen, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-connections, priority 2, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-domain-entity-test, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
@@ -741,7 +742,7 @@ derived_priorities (
     {id public-enums-non-exhaustive, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
     {id python-acceptance-emcc-probe, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-application-check-names, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
-    {id python-binding-decisions, priority 2, derived_at 2026-10-30T13:25:32.058307Z}
+    {id python-binding-decisions, priority 2, derived_at 2026-10-30T13:42:29.080898Z}
     {id python-campaign-entity-key-attributes, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-campaign-write-versions, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-case-expressions, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
@@ -935,6 +936,7 @@ assertions (
     {id api-doc-honesty, kind @complete, author "brendan@necessary.nu", at 2026-09-21T18:16:04.02923Z}
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
+    {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
     {id bindings-expression-gaps, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:15:31.190363Z}
@@ -1328,12 +1330,14 @@ impl_evidence (
     {id binding-spec-consolidation, covered_rules (
         bindings.api
         bindings.cancellation
+        bindings.case
         bindings.codegen
         bindings.collations
         bindings.connections
         bindings.copy
         bindings.copy-rows
         bindings.created-ranges
+        bindings.cursors
         bindings.delegation
         bindings.entities
         bindings.entity-graphs
@@ -1342,20 +1346,39 @@ impl_evidence (
         bindings.entity-writes
         bindings.errors
         bindings.expressions
+        bindings.from-subqueries
+        bindings.graphs
         bindings.identifiers
         bindings.listen
+        bindings.merge
+        bindings.model-columns
+        bindings.model-reads
+        bindings.model-records
+        bindings.model-writes
+        bindings.models
         bindings.optional
+        bindings.pagination
         bindings.pipeline
         bindings.pipeline-binder
         bindings.pipeline-expressions
         bindings.pipeline-sources
         bindings.ranges
+        bindings.registered-pools
+        bindings.relation-conditions
+        bindings.relations
         bindings.results
+        bindings.row-locks
         bindings.rows
         bindings.runtime
         bindings.schema
+        bindings.schema-alter
         bindings.schema-domains
+        bindings.schema-from-entity
+        bindings.schema-indexes
         bindings.schema-schemas
+        bindings.schema-sequences
+        bindings.schema-tables
+        bindings.schema-types
         bindings.schema-views
         bindings.select
         bindings.sql-json
@@ -1366,6 +1389,8 @@ impl_evidence (
         bindings.value-tags
         bindings.values
         bindings.windows
+        bindings.with
+        bindings.writes
         napi.application
         napi.argument-errors
         napi.cancellation
@@ -1404,92 +1429,160 @@ impl_evidence (
         python.value-tags
         python.values
     ), covered_claims (
-        {impl_name main, rule bindings.api}
-        {impl_name main, rule bindings.cancellation}
-        {impl_name main, rule bindings.codegen}
-        {impl_name main, rule bindings.collations}
+        {impl_name javascript, rule bindings.api}
+        {impl_name javascript, rule bindings.cancellation}
+        {impl_name javascript, rule bindings.case}
+        {impl_name javascript, rule bindings.codegen}
+        {impl_name javascript, rule bindings.collations}
+        {impl_name javascript, rule bindings.connections}
+        {impl_name javascript, rule bindings.copy}
+        {impl_name javascript, rule bindings.copy-rows}
+        {impl_name javascript, rule bindings.created-ranges}
+        {impl_name javascript, rule bindings.cursors}
+        {impl_name javascript, rule bindings.delegation}
+        {impl_name javascript, rule bindings.entities}
+        {impl_name javascript, rule bindings.entity-graphs}
+        {impl_name javascript, rule bindings.entity-reads}
+        {impl_name javascript, rule bindings.entity-versions}
+        {impl_name javascript, rule bindings.entity-writes}
+        {impl_name javascript, rule bindings.errors}
+        {impl_name javascript, rule bindings.expressions}
+        {impl_name javascript, rule bindings.from-subqueries}
+        {impl_name javascript, rule bindings.graphs}
+        {impl_name javascript, rule bindings.identifiers}
+        {impl_name javascript, rule bindings.listen}
+        {impl_name javascript, rule bindings.merge}
+        {impl_name javascript, rule bindings.model-columns}
+        {impl_name javascript, rule bindings.model-reads}
+        {impl_name javascript, rule bindings.model-records}
+        {impl_name javascript, rule bindings.model-writes}
+        {impl_name javascript, rule bindings.models}
+        {impl_name javascript, rule bindings.optional}
+        {impl_name javascript, rule bindings.pagination}
+        {impl_name javascript, rule bindings.pipeline}
+        {impl_name javascript, rule bindings.pipeline-binder}
+        {impl_name javascript, rule bindings.pipeline-expressions}
+        {impl_name javascript, rule bindings.pipeline-sources}
+        {impl_name javascript, rule bindings.ranges}
+        {impl_name javascript, rule bindings.registered-pools}
+        {impl_name javascript, rule bindings.relations}
+        {impl_name javascript, rule bindings.results}
+        {impl_name javascript, rule bindings.row-locks}
+        {impl_name javascript, rule bindings.rows}
+        {impl_name javascript, rule bindings.runtime}
+        {impl_name javascript, rule bindings.schema}
+        {impl_name javascript, rule bindings.schema-alter}
+        {impl_name javascript, rule bindings.schema-domains}
+        {impl_name javascript, rule bindings.schema-indexes}
+        {impl_name javascript, rule bindings.schema-schemas}
+        {impl_name javascript, rule bindings.schema-sequences}
+        {impl_name javascript, rule bindings.schema-tables}
+        {impl_name javascript, rule bindings.schema-types}
+        {impl_name javascript, rule bindings.schema-views}
+        {impl_name javascript, rule bindings.select}
+        {impl_name javascript, rule bindings.sql-json}
+        {impl_name javascript, rule bindings.statements}
+        {impl_name javascript, rule bindings.streams}
+        {impl_name javascript, rule bindings.surface}
+        {impl_name javascript, rule bindings.transactions}
+        {impl_name javascript, rule bindings.value-tags}
+        {impl_name javascript, rule bindings.values}
+        {impl_name javascript, rule bindings.windows}
+        {impl_name javascript, rule bindings.with}
+        {impl_name javascript, rule bindings.writes}
+        {impl_name javascript, rule napi.application}
+        {impl_name javascript, rule napi.argument-errors}
+        {impl_name javascript, rule napi.cancellation}
+        {impl_name javascript, rule napi.codegen}
+        {impl_name javascript, rule napi.errors}
+        {impl_name javascript, rule napi.lifecycle}
+        {impl_name javascript, rule napi.naming}
+        {impl_name javascript, rule napi.pipeline-operands}
+        {impl_name javascript, rule napi.raw}
+        {impl_name javascript, rule napi.records}
+        {impl_name javascript, rule napi.row-count}
+        {impl_name javascript, rule napi.runtime}
+        {impl_name javascript, rule napi.schema-api}
+        {impl_name javascript, rule napi.temporal}
+        {impl_name javascript, rule napi.transactions}
+        {impl_name javascript, rule napi.typing}
+        {impl_name javascript, rule napi.update-many-guard}
+        {impl_name javascript, rule napi.values}
         {impl_name main, rule bindings.connections}
-        {impl_name main, rule bindings.copy}
-        {impl_name main, rule bindings.copy-rows}
-        {impl_name main, rule bindings.created-ranges}
-        {impl_name main, rule bindings.delegation}
-        {impl_name main, rule bindings.entities}
-        {impl_name main, rule bindings.entity-graphs}
-        {impl_name main, rule bindings.entity-reads}
-        {impl_name main, rule bindings.entity-versions}
-        {impl_name main, rule bindings.entity-writes}
-        {impl_name main, rule bindings.errors}
-        {impl_name main, rule bindings.expressions}
-        {impl_name main, rule bindings.identifiers}
-        {impl_name main, rule bindings.listen}
-        {impl_name main, rule bindings.optional}
         {impl_name main, rule bindings.pipeline}
-        {impl_name main, rule bindings.pipeline-binder}
         {impl_name main, rule bindings.pipeline-expressions}
-        {impl_name main, rule bindings.pipeline-sources}
-        {impl_name main, rule bindings.ranges}
-        {impl_name main, rule bindings.results}
-        {impl_name main, rule bindings.rows}
-        {impl_name main, rule bindings.runtime}
-        {impl_name main, rule bindings.schema}
-        {impl_name main, rule bindings.schema-domains}
-        {impl_name main, rule bindings.schema-schemas}
-        {impl_name main, rule bindings.schema-views}
-        {impl_name main, rule bindings.select}
-        {impl_name main, rule bindings.sql-json}
-        {impl_name main, rule bindings.statements}
-        {impl_name main, rule bindings.streams}
-        {impl_name main, rule bindings.surface}
-        {impl_name main, rule bindings.transactions}
-        {impl_name main, rule bindings.value-tags}
-        {impl_name main, rule bindings.values}
-        {impl_name main, rule bindings.windows}
-        {impl_name main, rule napi.application}
-        {impl_name main, rule napi.argument-errors}
-        {impl_name main, rule napi.cancellation}
-        {impl_name main, rule napi.codegen}
-        {impl_name main, rule napi.errors}
-        {impl_name main, rule napi.lifecycle}
-        {impl_name main, rule napi.naming}
-        {impl_name main, rule napi.pipeline-operands}
-        {impl_name main, rule napi.raw}
-        {impl_name main, rule napi.records}
-        {impl_name main, rule napi.row-count}
-        {impl_name main, rule napi.runtime}
-        {impl_name main, rule napi.schema-api}
-        {impl_name main, rule napi.temporal}
-        {impl_name main, rule napi.transactions}
-        {impl_name main, rule napi.typing}
-        {impl_name main, rule napi.update-many-guard}
-        {impl_name main, rule napi.values}
-        {impl_name main, rule python.api}
-        {impl_name main, rule python.argument-errors}
-        {impl_name main, rule python.cancellation}
-        {impl_name main, rule python.capabilities}
-        {impl_name main, rule python.codegen}
-        {impl_name main, rule python.expressions}
-        {impl_name main, rule python.input-boundaries}
-        {impl_name main, rule python.lifecycle}
-        {impl_name main, rule python.naming}
-        {impl_name main, rule python.pipeline-operands}
-        {impl_name main, rule python.records}
-        {impl_name main, rule python.row-count}
-        {impl_name main, rule python.runtime}
-        {impl_name main, rule python.schema-api}
-        {impl_name main, rule python.transactions}
-        {impl_name main, rule python.truth-testing}
-        {impl_name main, rule python.typing}
-        {impl_name main, rule python.value-tags}
-        {impl_name main, rule python.values}
+        {impl_name python, rule bindings.api}
+        {impl_name python, rule bindings.cancellation}
+        {impl_name python, rule bindings.codegen}
+        {impl_name python, rule bindings.collations}
+        {impl_name python, rule bindings.connections}
+        {impl_name python, rule bindings.copy}
+        {impl_name python, rule bindings.copy-rows}
+        {impl_name python, rule bindings.created-ranges}
+        {impl_name python, rule bindings.delegation}
+        {impl_name python, rule bindings.entities}
+        {impl_name python, rule bindings.entity-graphs}
+        {impl_name python, rule bindings.entity-reads}
+        {impl_name python, rule bindings.entity-versions}
+        {impl_name python, rule bindings.entity-writes}
+        {impl_name python, rule bindings.errors}
+        {impl_name python, rule bindings.expressions}
+        {impl_name python, rule bindings.identifiers}
+        {impl_name python, rule bindings.listen}
+        {impl_name python, rule bindings.optional}
+        {impl_name python, rule bindings.pipeline}
+        {impl_name python, rule bindings.pipeline-binder}
+        {impl_name python, rule bindings.pipeline-expressions}
+        {impl_name python, rule bindings.pipeline-sources}
+        {impl_name python, rule bindings.ranges}
+        {impl_name python, rule bindings.relation-conditions}
+        {impl_name python, rule bindings.results}
+        {impl_name python, rule bindings.rows}
+        {impl_name python, rule bindings.runtime}
+        {impl_name python, rule bindings.schema}
+        {impl_name python, rule bindings.schema-domains}
+        {impl_name python, rule bindings.schema-from-entity}
+        {impl_name python, rule bindings.schema-schemas}
+        {impl_name python, rule bindings.schema-views}
+        {impl_name python, rule bindings.select}
+        {impl_name python, rule bindings.sql-json}
+        {impl_name python, rule bindings.statements}
+        {impl_name python, rule bindings.streams}
+        {impl_name python, rule bindings.surface}
+        {impl_name python, rule bindings.transactions}
+        {impl_name python, rule bindings.value-tags}
+        {impl_name python, rule bindings.values}
+        {impl_name python, rule bindings.windows}
+        {impl_name python, rule python.api}
+        {impl_name python, rule python.argument-errors}
+        {impl_name python, rule python.cancellation}
+        {impl_name python, rule python.capabilities}
+        {impl_name python, rule python.codegen}
+        {impl_name python, rule python.expressions}
+        {impl_name python, rule python.input-boundaries}
+        {impl_name python, rule python.lifecycle}
+        {impl_name python, rule python.naming}
+        {impl_name python, rule python.pipeline-operands}
+        {impl_name python, rule python.records}
+        {impl_name python, rule python.row-count}
+        {impl_name python, rule python.runtime}
+        {impl_name python, rule python.schema-api}
+        {impl_name python, rule python.transactions}
+        {impl_name python, rule python.truth-testing}
+        {impl_name python, rule python.typing}
+        {impl_name python, rule python.value-tags}
+        {impl_name python, rule python.values}
     ), rule_versions_seen (
         {id bindings.api, version 0}
         {id bindings.cancellation, version 0}
+        {id bindings.case, version 0}
         {id bindings.codegen, version 0}
         {id bindings.collations, version 0}
         {id bindings.connections, version 0}
         {id bindings.copy, version 0}
         {id bindings.copy-rows, version 0}
         {id bindings.created-ranges, version 0}
+        {id bindings.cursors, version 0}
         {id bindings.delegation, version 0}
         {id bindings.entities, version 0}
         {id bindings.entity-graphs, version 0}
@@ -1498,20 +1591,39 @@ impl_evidence (
         {id bindings.entity-writes, version 0}
         {id bindings.errors, version 0}
         {id bindings.expressions, version 0}
+        {id bindings.from-subqueries, version 0}
+        {id bindings.graphs, version 0}
         {id bindings.identifiers, version 0}
         {id bindings.listen, version 0}
+        {id bindings.merge, version 0}
+        {id bindings.model-columns, version 0}
+        {id bindings.model-reads, version 0}
+        {id bindings.model-records, version 0}
+        {id bindings.model-writes, version 0}
+        {id bindings.models, version 0}
         {id bindings.optional, version 0}
+        {id bindings.pagination, version 0}
         {id bindings.pipeline, version 0}
         {id bindings.pipeline-binder, version 0}
         {id bindings.pipeline-expressions, version 0}
         {id bindings.pipeline-sources, version 0}
         {id bindings.ranges, version 0}
+        {id bindings.registered-pools, version 0}
+        {id bindings.relation-conditions, version 0}
+        {id bindings.relations, version 0}
         {id bindings.results, version 0}
+        {id bindings.row-locks, version 0}
         {id bindings.rows, version 0}
         {id bindings.runtime, version 0}
         {id bindings.schema, version 0}
+        {id bindings.schema-alter, version 0}
         {id bindings.schema-domains, version 0}
+        {id bindings.schema-from-entity, version 0}
+        {id bindings.schema-indexes, version 0}
         {id bindings.schema-schemas, version 0}
+        {id bindings.schema-sequences, version 0}
+        {id bindings.schema-tables, version 0}
+        {id bindings.schema-types, version 0}
         {id bindings.schema-views, version 0}
         {id bindings.select, version 0}
         {id bindings.sql-json, version 0}
@@ -1522,6 +1634,8 @@ impl_evidence (
         {id bindings.value-tags, version 0}
         {id bindings.values, version 0}
         {id bindings.windows, version 0}
+        {id bindings.with, version 0}
+        {id bindings.writes, version 0}
         {id napi.application, version 1}
         {id napi.argument-errors, version 0}
         {id napi.cancellation, version 1}

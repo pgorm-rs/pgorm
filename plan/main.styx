@@ -6217,7 +6217,7 @@ children (
                 title "Build the opt-in PyO3 module and expose its capability contract"
                 kind @build
                 implements {
-                    main ([spec:pgorm:req:python.package])
+                    python ([spec:pgorm:req:python.package])
                 }
                 deps (python.design)
                 sealed true
@@ -6358,7 +6358,7 @@ children (
                 title "Expose runtime SELECT/CRUD builders and explicit raw-template APIs"
                 kind @feat
                 implements {
-                    main ([spec:pgorm:req:python.raw])
+                    python ([spec:pgorm:req:python.raw])
                 }
                 deps (python.expressions orm.query)
                 sealed true
@@ -6891,7 +6891,7 @@ children (
                 title "Build and install tested wheels and source distributions across the support matrix"
                 kind @build
                 implements {
-                    main ([spec:pgorm:req:python.distribution])
+                    python ([spec:pgorm:req:python.distribution])
                 }
                 deps (python.typing)
                 sealed true
@@ -6931,7 +6931,7 @@ children (
                 title "Verify installed native Python API and direct builder execution without HTTP"
                 kind @test
                 implements {
-                    main ([spec:pgorm:req:python.acceptance])
+                    python ([spec:pgorm:req:python.acceptance])
                 }
                 deps (python.distribution python.direct-builders)
                 sealed true
@@ -7051,7 +7051,7 @@ children (
                 title "Verify installed Python builders against PostgreSQL without HTTP"
                 kind @test
                 implements {
-                    main ([spec:pgorm:req:python.direct-builders])
+                    python ([spec:pgorm:req:python.direct-builders])
                 }
                 deps (python.statements python.results)
                 sealed true
@@ -12147,11 +12147,11 @@ children (
                 title "The pgorm-napi addon loads in Deno and Node, resolves an async query as a Promise from pgorm's runtime, and lets the process exit cleanly"
                 kind @feat
                 implements {
-                    main (
+                    javascript (
                         [spec:pgorm:def:napi.api]
+                        [spec:pgorm:req:napi.exit]
                         [spec:pgorm:req:napi.loading]
                         [spec:pgorm:req:napi.promises]
-                        [spec:pgorm:req:napi.exit]
                         [spec:pgorm:req:napi.runtimes]
                     )
                 }
@@ -12192,7 +12192,7 @@ children (
                 title "Every pgorm value crosses into and out of JavaScript with a declared type, and query results decode to JS objects"
                 kind @feat
                 implements {
-                    main ([spec:pgorm:req:napi.inference])
+                    javascript ([spec:pgorm:req:napi.inference])
                 }
                 deps (napi-proof)
                 log (
@@ -12371,7 +12371,7 @@ children (
                 title "Codegen produces TypeScript for a schema's entities, as it does Python"
                 kind @feat
                 implements {
-                    main ([spec:pgorm:req:napi.codegen-types])
+                    javascript ([spec:pgorm:req:napi.codegen-types])
                 }
                 deps (napi-entities)
                 log (
@@ -12389,13 +12389,13 @@ children (
                 title "pgorm-napi ships as an npm package with prebuilt per-platform binaries, importable from Deno as npm:"
                 kind @build
                 implements {
-                    main (
+                    javascript (
+                        [spec:pgorm:req:napi.distribution]
+                        [spec:pgorm:req:napi.notices]
                         [spec:pgorm:req:napi.packages]
                         [spec:pgorm:req:napi.platform-loading]
                         [spec:pgorm:req:napi.release-builds]
-                        [spec:pgorm:req:napi.notices]
                         [spec:pgorm:req:napi.support]
-                        [spec:pgorm:req:napi.distribution]
                     )
                 }
                 deps (
@@ -14534,7 +14534,7 @@ children (
         title "Python expressions take CASE, as JavaScript's caseWhen and caseOf do"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.case])
+            python ([spec:pgorm:req:bindings.case])
         }
         deps (binding-renames)
         log (
@@ -14559,7 +14559,7 @@ children (
         title "Python's Select takes a subquery as a FROM item, lateral joins and row locks, as JavaScript's does"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.from-subqueries] [spec:pgorm:req:bindings.row-locks])
+            python ([spec:pgorm:req:bindings.from-subqueries] [spec:pgorm:req:bindings.row-locks])
         }
         deps (binding-renames)
         log (
@@ -14584,7 +14584,7 @@ children (
         title "Python's declared model columns take the operators JavaScript's do"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.model-columns])
+            python ([spec:pgorm:req:bindings.model-columns])
         }
         deps (binding-renames)
         log (
@@ -14625,7 +14625,8 @@ children (
         title "ANY and ALL follow LIKE, regex and containment operators too, as PostgreSQL allows"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.quantifiers])
+            javascript ([spec:pgorm:req:bindings.quantifiers])
+            python ([spec:pgorm:req:bindings.quantifiers])
         }
         deps (binding-renames)
         log (
@@ -14688,84 +14689,150 @@ children (
         title "The Python and JavaScript bindings answer to one shared spec, with only language differences kept per binding"
         kind @refactor
         implements {
-            main (
+            javascript (
                 [spec:pgorm:def:bindings.api]
-                [spec:pgorm:req:bindings.optional]
-                [spec:pgorm:req:bindings.delegation]
-                [spec:pgorm:req:bindings.surface]
-                [spec:pgorm:req:bindings.runtime]
-                [spec:pgorm:req:bindings.errors]
-                [spec:pgorm:req:bindings.values]
-                [spec:pgorm:req:bindings.value-tags]
-                [spec:pgorm:req:bindings.created-ranges]
-                [spec:pgorm:req:bindings.rows]
-                [spec:pgorm:req:bindings.connections]
-                [spec:pgorm:req:bindings.results]
-                [spec:pgorm:req:bindings.streams]
-                [spec:pgorm:req:bindings.transactions]
                 [spec:pgorm:req:bindings.cancellation]
+                [spec:pgorm:req:bindings.codegen]
+                [spec:pgorm:req:bindings.collations]
                 [spec:pgorm:req:bindings.copy]
                 [spec:pgorm:req:bindings.copy-rows]
-                [spec:pgorm:req:bindings.listen]
-                [spec:pgorm:req:bindings.statements]
-                [spec:pgorm:req:bindings.identifiers]
-                [spec:pgorm:req:bindings.select]
-                [spec:pgorm:req:bindings.windows]
-                [spec:pgorm:req:bindings.sql-json]
-                [spec:pgorm:req:bindings.expressions]
-                [spec:pgorm:req:bindings.ranges]
-                [spec:pgorm:req:bindings.collations]
+                [spec:pgorm:req:bindings.created-ranges]
+                [spec:pgorm:req:bindings.delegation]
                 [spec:pgorm:req:bindings.entities]
-                [spec:pgorm:req:bindings.entity-reads]
-                [spec:pgorm:req:bindings.entity-writes]
-                [spec:pgorm:req:bindings.entity-versions]
                 [spec:pgorm:req:bindings.entity-graphs]
-                [spec:pgorm:req:bindings.pipeline-sources]
-                [spec:pgorm:req:bindings.codegen]
-                [spec:pgorm:req:bindings.pipeline]
-                [spec:pgorm:req:bindings.pipeline-expressions]
+                [spec:pgorm:req:bindings.entity-reads]
+                [spec:pgorm:req:bindings.entity-versions]
+                [spec:pgorm:req:bindings.entity-writes]
+                [spec:pgorm:req:bindings.errors]
+                [spec:pgorm:req:bindings.expressions]
+                [spec:pgorm:req:bindings.identifiers]
+                [spec:pgorm:req:bindings.listen]
+                [spec:pgorm:req:bindings.optional]
                 [spec:pgorm:req:bindings.pipeline-binder]
+                [spec:pgorm:req:bindings.pipeline-sources]
+                [spec:pgorm:req:bindings.ranges]
+                [spec:pgorm:req:bindings.results]
+                [spec:pgorm:req:bindings.rows]
+                [spec:pgorm:req:bindings.runtime]
                 [spec:pgorm:req:bindings.schema]
-                [spec:pgorm:req:bindings.schema-views]
-                [spec:pgorm:req:bindings.schema-schemas]
                 [spec:pgorm:req:bindings.schema-domains]
-                [spec:pgorm:def:python.api]
-                [spec:pgorm:req:python.capabilities]
-                [spec:pgorm:req:python.values]
-                [spec:pgorm:req:python.value-tags]
-                [spec:pgorm:req:python.input-boundaries]
-                [spec:pgorm:req:python.expressions]
-                [spec:pgorm:req:python.truth-testing]
-                [spec:pgorm:req:python.runtime]
-                [spec:pgorm:req:python.transactions]
-                [spec:pgorm:req:python.cancellation]
-                [spec:pgorm:req:python.codegen]
-                [spec:pgorm:req:python.typing]
-                [spec:pgorm:req:python.naming]
-                [spec:pgorm:req:python.records]
-                [spec:pgorm:req:python.row-count]
-                [spec:pgorm:req:python.argument-errors]
-                [spec:pgorm:req:python.pipeline-operands]
-                [spec:pgorm:req:python.schema-api]
-                [spec:pgorm:req:python.lifecycle]
-                [spec:pgorm:req:napi.runtime]
-                [spec:pgorm:req:napi.errors]
-                [spec:pgorm:req:napi.values]
-                [spec:pgorm:req:napi.temporal]
-                [spec:pgorm:req:napi.transactions]
-                [spec:pgorm:req:napi.cancellation]
+                [spec:pgorm:req:bindings.schema-schemas]
+                [spec:pgorm:req:bindings.schema-views]
+                [spec:pgorm:req:bindings.select]
+                [spec:pgorm:req:bindings.sql-json]
+                [spec:pgorm:req:bindings.statements]
+                [spec:pgorm:req:bindings.streams]
+                [spec:pgorm:req:bindings.surface]
+                [spec:pgorm:req:bindings.transactions]
+                [spec:pgorm:req:bindings.value-tags]
+                [spec:pgorm:req:bindings.values]
+                [spec:pgorm:req:bindings.windows]
                 [spec:pgorm:req:napi.application]
-                [spec:pgorm:req:napi.codegen]
-                [spec:pgorm:req:napi.typing]
-                [spec:pgorm:req:napi.naming]
                 [spec:pgorm:req:napi.argument-errors]
+                [spec:pgorm:req:napi.cancellation]
+                [spec:pgorm:req:napi.codegen]
+                [spec:pgorm:req:napi.errors]
+                [spec:pgorm:req:napi.lifecycle]
+                [spec:pgorm:req:napi.naming]
+                [spec:pgorm:req:napi.pipeline-operands]
+                [spec:pgorm:req:napi.raw]
                 [spec:pgorm:req:napi.records]
                 [spec:pgorm:req:napi.row-count]
-                [spec:pgorm:req:napi.lifecycle]
-                [spec:pgorm:req:napi.raw]
-                [spec:pgorm:req:napi.pipeline-operands]
+                [spec:pgorm:req:napi.runtime]
                 [spec:pgorm:req:napi.schema-api]
+                [spec:pgorm:req:napi.temporal]
+                [spec:pgorm:req:napi.transactions]
+                [spec:pgorm:req:napi.typing]
                 [spec:pgorm:req:napi.update-many-guard]
+                [spec:pgorm:req:napi.values]
+                [spec:pgorm:req:bindings.case]
+                [spec:pgorm:req:bindings.connections]
+                [spec:pgorm:req:bindings.cursors]
+                [spec:pgorm:req:bindings.from-subqueries]
+                [spec:pgorm:req:bindings.graphs]
+                [spec:pgorm:req:bindings.merge]
+                [spec:pgorm:req:bindings.model-columns]
+                [spec:pgorm:req:bindings.model-reads]
+                [spec:pgorm:req:bindings.model-records]
+                [spec:pgorm:req:bindings.model-writes]
+                [spec:pgorm:req:bindings.models]
+                [spec:pgorm:req:bindings.pagination]
+                [spec:pgorm:req:bindings.pipeline]
+                [spec:pgorm:req:bindings.pipeline-expressions]
+                [spec:pgorm:req:bindings.registered-pools]
+                [spec:pgorm:req:bindings.relations]
+                [spec:pgorm:req:bindings.row-locks]
+                [spec:pgorm:req:bindings.schema-alter]
+                [spec:pgorm:req:bindings.schema-indexes]
+                [spec:pgorm:req:bindings.schema-sequences]
+                [spec:pgorm:req:bindings.schema-tables]
+                [spec:pgorm:req:bindings.schema-types]
+                [spec:pgorm:req:bindings.with]
+                [spec:pgorm:req:bindings.writes]
+            )
+            main ([spec:pgorm:req:bindings.connections] [spec:pgorm:req:bindings.pipeline] [spec:pgorm:req:bindings.pipeline-expressions])
+            python (
+                [spec:pgorm:def:bindings.api]
+                [spec:pgorm:req:bindings.cancellation]
+                [spec:pgorm:req:bindings.codegen]
+                [spec:pgorm:req:bindings.collations]
+                [spec:pgorm:req:bindings.copy]
+                [spec:pgorm:req:bindings.copy-rows]
+                [spec:pgorm:req:bindings.created-ranges]
+                [spec:pgorm:req:bindings.delegation]
+                [spec:pgorm:req:bindings.entities]
+                [spec:pgorm:req:bindings.entity-graphs]
+                [spec:pgorm:req:bindings.entity-reads]
+                [spec:pgorm:req:bindings.entity-versions]
+                [spec:pgorm:req:bindings.entity-writes]
+                [spec:pgorm:req:bindings.errors]
+                [spec:pgorm:req:bindings.expressions]
+                [spec:pgorm:req:bindings.identifiers]
+                [spec:pgorm:req:bindings.listen]
+                [spec:pgorm:req:bindings.optional]
+                [spec:pgorm:req:bindings.pipeline-binder]
+                [spec:pgorm:req:bindings.pipeline-sources]
+                [spec:pgorm:req:bindings.ranges]
+                [spec:pgorm:req:bindings.results]
+                [spec:pgorm:req:bindings.rows]
+                [spec:pgorm:req:bindings.runtime]
+                [spec:pgorm:req:bindings.schema]
+                [spec:pgorm:req:bindings.schema-domains]
+                [spec:pgorm:req:bindings.schema-schemas]
+                [spec:pgorm:req:bindings.schema-views]
+                [spec:pgorm:req:bindings.select]
+                [spec:pgorm:req:bindings.sql-json]
+                [spec:pgorm:req:bindings.statements]
+                [spec:pgorm:req:bindings.streams]
+                [spec:pgorm:req:bindings.surface]
+                [spec:pgorm:req:bindings.transactions]
+                [spec:pgorm:req:bindings.value-tags]
+                [spec:pgorm:req:bindings.values]
+                [spec:pgorm:req:bindings.windows]
+                [spec:pgorm:def:python.api]
+                [spec:pgorm:req:python.argument-errors]
+                [spec:pgorm:req:python.cancellation]
+                [spec:pgorm:req:python.capabilities]
+                [spec:pgorm:req:python.codegen]
+                [spec:pgorm:req:python.expressions]
+                [spec:pgorm:req:python.input-boundaries]
+                [spec:pgorm:req:python.lifecycle]
+                [spec:pgorm:req:python.naming]
+                [spec:pgorm:req:python.pipeline-operands]
+                [spec:pgorm:req:python.records]
+                [spec:pgorm:req:python.row-count]
+                [spec:pgorm:req:python.runtime]
+                [spec:pgorm:req:python.schema-api]
+                [spec:pgorm:req:python.transactions]
+                [spec:pgorm:req:python.truth-testing]
+                [spec:pgorm:req:python.typing]
+                [spec:pgorm:req:python.value-tags]
+                [spec:pgorm:req:python.values]
+                [spec:pgorm:req:bindings.connections]
+                [spec:pgorm:req:bindings.pipeline]
+                [spec:pgorm:req:bindings.pipeline-expressions]
+                [spec:pgorm:req:bindings.relation-conditions]
+                [spec:pgorm:req:bindings.schema-from-entity]
             )
         }
         log (
@@ -14791,7 +14858,7 @@ children (
         title "Python's writes, MERGE and WITH clauses take what JavaScript's do"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.writes] [spec:pgorm:req:bindings.merge] [spec:pgorm:req:bindings.with])
+            python ([spec:pgorm:req:bindings.merge] [spec:pgorm:req:bindings.with] [spec:pgorm:req:bindings.writes])
         }
         deps (binding-renames)
         log (
@@ -14817,15 +14884,15 @@ children (
         title "Python's declared models take relations, graphs, cursors, pages and the column options JavaScript's do"
         kind @feat
         implements {
-            main (
-                [spec:pgorm:req:bindings.models]
-                [spec:pgorm:req:bindings.model-records]
-                [spec:pgorm:req:bindings.model-reads]
-                [spec:pgorm:req:bindings.model-writes]
-                [spec:pgorm:req:bindings.relations]
-                [spec:pgorm:req:bindings.graphs]
+            python (
                 [spec:pgorm:req:bindings.cursors]
+                [spec:pgorm:req:bindings.graphs]
+                [spec:pgorm:req:bindings.model-reads]
+                [spec:pgorm:req:bindings.model-records]
+                [spec:pgorm:req:bindings.model-writes]
+                [spec:pgorm:req:bindings.models]
                 [spec:pgorm:req:bindings.pagination]
+                [spec:pgorm:req:bindings.relations]
             )
         }
         deps (binding-renames)
@@ -14844,12 +14911,12 @@ children (
         title "Python's DDL builds foreign keys, identity columns, multi-action ALTER TABLE, index options, composite and range types, sequences, extensions and comments"
         kind @feat
         implements {
-            main (
-                [spec:pgorm:req:bindings.schema-tables]
+            python (
                 [spec:pgorm:req:bindings.schema-alter]
                 [spec:pgorm:req:bindings.schema-indexes]
-                [spec:pgorm:req:bindings.schema-types]
                 [spec:pgorm:req:bindings.schema-sequences]
+                [spec:pgorm:req:bindings.schema-tables]
+                [spec:pgorm:req:bindings.schema-types]
             )
         }
         deps (binding-renames)
@@ -14876,7 +14943,7 @@ children (
         title "JavaScript generates a registered entity's schema, as Python's schema.from_entity does"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.schema-from-entity])
+            javascript ([spec:pgorm:req:bindings.schema-from-entity])
         }
         deps (binding-spec-consolidation)
         log (
@@ -14894,7 +14961,7 @@ children (
         title "Python's registered entities, graphs and source selections run on a pool, as JavaScript's do"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.registered-pools])
+            python ([spec:pgorm:req:bindings.registered-pools])
         }
         deps (binding-renames)
         log (
@@ -14912,7 +14979,7 @@ children (
         title "JavaScript's describe() reports each relation's condition type and on_condition, as Python's does"
         kind @feat
         implements {
-            main ([spec:pgorm:req:bindings.relation-conditions])
+            javascript ([spec:pgorm:req:bindings.relation-conditions])
         }
         deps (binding-spec-consolidation)
         log (
@@ -14975,12 +15042,27 @@ children (
         title "Each binding is its own nspec impl, so a shared rule is covered for Python only by Python's code and for JavaScript only by JavaScript's"
         kind @chore
         deps (binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-30T13:27:03.272959Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found 2026-10-30 after binding-spec-consolidation merged (8d546de9): .config/nspec/config.styx has one impl, main, over every language, so a bindings.* rule owned by a gap node counts as covered when either binding annotates it, and all ten gap nodes (python-case-expressions, python-select-gaps, python-model-column-operators, quantifier-beyond-comparisons, python-statement-gaps, python-model-gaps, python-schema-gaps, python-registered-pools, napi-schema-from-entity, napi-relation-conditions) derived done with nothing built. nplan judges coverage per impl and multi-impl claims are conjunctive (np dm.implements, inv.impl-unique), so split the impl: main keeps Rust and tooling, python takes pgorm-python, javascript takes pgorm-napi and its workflow; every bindings.* rule is claimed once under python and once under javascript, each by the node that delivers that side; every existing claim is re-keyed to the impl whose annotations cover it. Afterwards each gap node is todo until its own binding's annotations land."
+            }
+
+            {
+                at 2026-10-30T14:16:04.069831Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "As done 2026-10-30. .config/nspec/config.styx has three impls: main (the Rust crates, sqlmap and security/generative), python (pgorm-python src, python, checks; tests/**/*.rs and *.py as tests), javascript (pgorm-napi src, lib, checks, codegen and .github/workflows/napi.yml; tests/**/*.ts and *.rs as tests). Coverage needs only an implementation annotation (no verify_required policy), so claims follow implementation sites. 116 main claims re-keyed (python +88, javascript +95; main keeps 323): napi.* under javascript, python.* under python, every bindings.* rule once under each binding, the gap node holding its binding's side (a python-* node the python side, a napi-* node the javascript side, quantifier-beyond-comparisons both, since it extends both bindings) and binding-spec-consolidation the side that binding already has. main keeps bindings.connections, bindings.pipeline and bindings.pipeline-expressions, which pgorm's own code also annotates. Live per-impl coverage moves seven gap nodes to todo. python-model-column-operators, python-statement-gaps and quantifier-beyond-comparisons stay done: Python's code already annotates bindings.model-columns, writes, merge, with and quantifiers for what it has, and the quantifiers rule states only what both bindings do today. Each of the three goes open only when its rule is bumped or Python's partial annotations are re-pointed."
+            }
+
+            {
+                at 2026-10-30T14:18:38.065807Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
