@@ -11,7 +11,8 @@ installed build. The [specification](../docs/spec/python.md) defines the contrac
 the [acceptance guide](ACCEPTANCE.md) maps it to installed-package tests and
 independent Rust comparisons.
 
-Use [explicit schema builders](SCHEMA.md) for table, index and enum DDL,
+Use [explicit schema builders](SCHEMA.md) for tables, keys, indexes, types,
+sequences, domains and views,
 or to generate schema statements from a registered Rust entity.
 Use [native transactions and savepoints](TRANSACTIONS.md), each open for one
 `async with` block that commits or rolls it back, across builders and

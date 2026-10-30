@@ -1,157 +1,252 @@
-//! Views, materialized views and `CREATE TABLE AS`: a named relation over a
-//! `Select`, whose values the Rust renderer writes into the definition as
-//! literals, a definition being stored as SQL text that binds nothing.
+//! Views, recursive views and materialized views over a `Select`, the
+//! refresh and drops a materialized view takes, and `CREATE TABLE AS`. Each
+//! body is the `Select` builder's statement, written by pgorm-query with its
+//! values inlined: a definition is stored as SQL text and binds nothing.
 //!
 //! Nothing can order a query or declare its windows once it is a definition,
 //! so a tie limit or a WINDOW clause PostgreSQL would refuse is refused as
-//! the function is called. The Rust constructor runs the two checks
+//! the statement is built. The Rust constructor runs the two checks
 //! `PySelect::embedded` runs, in the same order and with the same errors, on
 //! the query it takes, so the query is handed over unchecked and the
 //! constructor's refusal is raised as the `ConstructionError` an embedded
 //! read would raise.
 
 use super::{
-    statement::{PyDDL, Statement},
-    table::table_name,
+    args::{self, columns, pick, relation, relations},
+    drops::drop_list,
+    statement::{PyDDL, Statement, ddl_class},
 };
-use crate::{
-    errors::ConstructionError,
-    identifiers::PyIdentifier,
-    statements::{PySelect, PyTable},
+use crate::{errors::ConstructionError, statements::PySelect};
+use pgorm::pgorm_query::{
+    MaterializedView, MaterializedViewCreateStatement, RecursiveViewCreateStatement, Table,
+    TableCreateAsStatement, View, ViewCheckOption, ViewCreateStatement, error::Result,
 };
-use pgorm::pgorm_query::{MaterializedView, Name, Table, View, ViewCheckOption};
 use pyo3::prelude::*;
 
-fn column_names(columns: &[Bound<'_, PyAny>]) -> PyResult<Vec<Name>> {
-    columns
-        .iter()
-        .map(|column| Ok(PyIdentifier::new(column)?.name()))
-        .collect()
+/// The statement `built` gives, or the `ConstructionError` its refusal is.
+fn construct<T>(built: Result<T>) -> PyResult<T> {
+    built.map_err(|error| ConstructionError::new_err(error.to_string()))
 }
 
-/// `"local"` or `"cascaded"`, the two check options; the bare `WITH CHECK
-/// OPTION` means `CASCADED` and so has no spelling of its own.
-fn check_option(option: &str) -> PyResult<ViewCheckOption> {
-    match option {
-        "local" => Ok(ViewCheckOption::Local),
-        "cascaded" => Ok(ViewCheckOption::Cascaded),
-        _ => Err(ConstructionError::new_err(
-            "a view's check option is \"local\" or \"cascaded\"",
-        )),
-    }
-}
+/// The options a plain view and a recursive one share, each written only
+/// when set.
+macro_rules! view_options {
+    ($class:ident) => {
+        #[pymethods]
+        impl $class {
+            /// `OR REPLACE`: the new query keeps the view's columns in place
+            /// and may add columns after them.
+            fn or_replace<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+                let mut view = Self::statement(slf)?;
+                view.or_replace();
+                Self::object(slf.py(), view)
+            }
 
-/// `CREATE [OR REPLACE] VIEW`: the check option exists only here, the
-/// recursive form having none, as PostgreSQL's grammar refuses one there.
-// [spec:pgorm:req:bindings.schema-views]
-#[pyfunction]
-#[pyo3(signature=(name, query, *, columns=Vec::new(), or_replace=false, check_option=None, security_barrier=false, security_invoker=false))]
-#[allow(clippy::too_many_arguments)]
-pub(super) fn create_view(
-    name: &PyTable,
-    query: PyRef<'_, PySelect>,
-    columns: Vec<Bound<'_, PyAny>>,
-    or_replace: bool,
-    check_option: Option<&str>,
-    security_barrier: bool,
-    security_invoker: bool,
-) -> PyResult<PyDDL> {
-    let option = check_option.map(self::check_option).transpose()?;
-    let mut inner = View::create(table_name(name)?, query.inner.clone())
-        .map_err(|error| ConstructionError::new_err(error.to_string()))?;
-    inner.columns(column_names(&columns)?);
-    if or_replace {
-        inner.or_replace();
-    }
-    if let Some(option) = option {
-        inner.check_option(option);
-    }
-    if security_barrier {
-        inner.security_barrier();
-    }
-    if security_invoker {
-        inner.security_invoker();
-    }
-    Ok(PyDDL {
-        inner: Statement::CreateView(inner),
-    })
-}
+            /// Names appended to the column list, renaming the query's leading
+            /// columns.
+            // [spec:pgorm:req:bindings.schema-views]
+            fn columns<'py>(
+                slf: &Bound<'py, Self>,
+                names: &Bound<'_, PyAny>,
+            ) -> PyResult<Bound<'py, Self>> {
+                let names = args::names(names, "columns")?;
+                let mut view = Self::statement(slf)?;
+                view.columns(names);
+                Self::object(slf.py(), view)
+            }
 
-/// `CREATE [OR REPLACE] RECURSIVE VIEW`: its column list names the rows of
-/// the `WITH RECURSIVE` query PostgreSQL defines it as, and the grammar
-/// refuses one without, so an empty list is refused here.
-// [spec:pgorm:req:bindings.schema-views]
-#[pyfunction]
-#[pyo3(signature=(name, columns, query, *, or_replace=false, security_barrier=false, security_invoker=false))]
-pub(super) fn create_recursive_view(
-    name: &PyTable,
-    columns: Vec<Bound<'_, PyAny>>,
-    query: PyRef<'_, PySelect>,
-    or_replace: bool,
-    security_barrier: bool,
-    security_invoker: bool,
-) -> PyResult<PyDDL> {
-    let mut columns = column_names(&columns)?.into_iter();
-    let Some(first) = columns.next() else {
-        return Err(ConstructionError::new_err(
-            "a recursive view names at least one column",
-        ));
+            fn security_barrier<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+                let mut view = Self::statement(slf)?;
+                view.security_barrier();
+                Self::object(slf.py(), view)
+            }
+
+            fn security_invoker<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+                let mut view = Self::statement(slf)?;
+                view.security_invoker();
+                Self::object(slf.py(), view)
+            }
+        }
     };
-    let mut inner = View::create_recursive(table_name(name)?, first, query.inner.clone())
-        .map_err(|error| ConstructionError::new_err(error.to_string()))?;
-    inner.columns(columns);
-    if or_replace {
-        inner.or_replace();
-    }
-    if security_barrier {
-        inner.security_barrier();
-    }
-    if security_invoker {
-        inner.security_invoker();
-    }
-    Ok(PyDDL {
-        inner: Statement::CreateRecursiveView(inner),
-    })
 }
 
-// [spec:pgorm:req:bindings.schema-views]
-#[pyfunction]
-#[pyo3(signature=(name, *, if_exists=false, cascade=false))]
-pub(super) fn drop_view(name: &PyTable, if_exists: bool, cascade: bool) -> PyResult<PyDDL> {
-    let mut inner = View::drop(table_name(name)?);
-    if if_exists {
-        inner.if_exists();
-    }
-    if cascade {
-        inner.cascade();
-    }
-    Ok(PyDDL {
-        inner: Statement::DropView(inner),
-    })
+/// The clauses a materialized view and `CREATE TABLE AS` share.
+macro_rules! relation_options {
+    ($class:ident) => {
+        #[pymethods]
+        impl $class {
+            /// `IF NOT EXISTS`: an existing relation of the name is left
+            /// alone, its rows with it.
+            fn if_not_exists<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+                let mut create = Self::statement(slf)?;
+                create.if_not_exists();
+                Self::object(slf.py(), create)
+            }
+
+            /// Names appended to the column list, renaming the query's leading
+            /// columns.
+            fn columns<'py>(
+                slf: &Bound<'py, Self>,
+                names: &Bound<'_, PyAny>,
+            ) -> PyResult<Bound<'py, Self>> {
+                let names = args::names(names, "columns")?;
+                let mut create = Self::statement(slf)?;
+                create.columns(names);
+                Self::object(slf.py(), create)
+            }
+
+            /// `WITH NO DATA`: the query's columns and none of its rows.
+            fn with_no_data<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+                let mut create = Self::statement(slf)?;
+                create.with_no_data();
+                Self::object(slf.py(), create)
+            }
+        }
+    };
 }
 
+/// `CREATE VIEW`; every method gives a new statement.
+#[derive(Debug)]
+#[pyclass(name = "CreateView", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateView;
+
+ddl_class!(PyCreateView, CreateView, Box<ViewCreateStatement>);
+
+#[pymethods]
+impl PyCreateView {
+    // [spec:pgorm:req:bindings.schema-views]
+    #[new]
+    fn new(
+        name: &Bound<'_, PyAny>,
+        query: PyRef<'_, PySelect>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let view = construct(View::create(relation(name)?, query.inner.clone()))?;
+        let statement = Statement::CreateView(Box::new(view));
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
+    }
+
+    /// `WITH LOCAL CHECK OPTION` or `WITH CASCADED CHECK OPTION`: a row
+    /// written through the view must be one it shows. The bare form means
+    /// `CASCADED`, so it has no spelling of its own.
+    // [spec:pgorm:req:bindings.schema-views]
+    fn check_option<'py>(slf: &Bound<'py, Self>, option: &str) -> PyResult<Bound<'py, Self>> {
+        let option = pick(
+            option,
+            "a check option",
+            &[
+                ("local", ViewCheckOption::Local),
+                ("cascaded", ViewCheckOption::Cascaded),
+            ],
+        )?;
+        let mut view = Self::statement(slf)?;
+        view.check_option(option);
+        Self::object(slf.py(), view)
+    }
+}
+
+view_options!(PyCreateView);
+
+/// `CREATE RECURSIVE VIEW`, whose query reads the view by name. It has no
+/// check option, which PostgreSQL refuses on a recursive view.
+#[derive(Debug)]
+#[pyclass(name = "CreateRecursiveView", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateRecursiveView;
+
+ddl_class!(
+    PyCreateRecursiveView,
+    CreateRecursiveView,
+    Box<RecursiveViewCreateStatement>
+);
+
+#[pymethods]
+impl PyCreateRecursiveView {
+    /// The column list is what the recursive query's rows are called, so it
+    /// is one name or a non-empty list: the grammar refuses a recursive view
+    /// without one.
+    // [spec:pgorm:req:bindings.schema-views]
+    #[new]
+    fn new(
+        name: &Bound<'_, PyAny>,
+        columns: &Bound<'_, PyAny>,
+        query: PyRef<'_, PySelect>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let name = relation(name)?;
+        let (first, rest) = self::columns(columns, "a recursive view's column list")?;
+        let mut view = construct(View::create_recursive(name, first, query.inner.clone()))?;
+        view.columns(rest);
+        let statement = Statement::CreateRecursiveView(Box::new(view));
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
+    }
+}
+
+view_options!(PyCreateRecursiveView);
+
+/// `CREATE MATERIALIZED VIEW`: the rows the query returned, held until a
+/// refresh.
+#[derive(Debug)]
+#[pyclass(name = "CreateMaterializedView", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateMaterializedView;
+
+ddl_class!(
+    PyCreateMaterializedView,
+    CreateMaterializedView,
+    Box<MaterializedViewCreateStatement>
+);
+
+#[pymethods]
+impl PyCreateMaterializedView {
+    // [spec:pgorm:req:bindings.schema-views]
+    #[new]
+    fn new(
+        name: &Bound<'_, PyAny>,
+        query: PyRef<'_, PySelect>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let create = construct(MaterializedView::create(
+            relation(name)?,
+            query.inner.clone(),
+        ))?;
+        let statement = Statement::CreateMaterializedView(Box::new(create));
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
+    }
+}
+
+relation_options!(PyCreateMaterializedView);
+
+/// `CREATE TABLE AS`: a table of the query's columns and rows, tied to it no
+/// further.
+#[derive(Debug)]
+#[pyclass(name = "CreateTableAs", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateTableAs;
+
+ddl_class!(PyCreateTableAs, CreateTableAs, Box<TableCreateAsStatement>);
+
+#[pymethods]
+impl PyCreateTableAs {
+    // [spec:pgorm:req:bindings.schema-views]
+    #[new]
+    fn new(
+        name: &Bound<'_, PyAny>,
+        query: PyRef<'_, PySelect>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let create = construct(Table::create_as(relation(name)?, query.inner.clone()))?;
+        let statement = Statement::CreateTableAs(Box::new(create));
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
+    }
+}
+
+relation_options!(PyCreateTableAs);
+
+/// `DROP VIEW` over one view or a non-empty list of them.
 // [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
-#[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
-pub(super) fn create_materialized_view(
-    name: &PyTable,
-    query: PyRef<'_, PySelect>,
-    columns: Vec<Bound<'_, PyAny>>,
-    if_not_exists: bool,
-    with_no_data: bool,
+#[pyo3(signature=(names, *, if_exists=false, behavior=None))]
+pub(super) fn drop_view(
+    names: &Bound<'_, PyAny>,
+    if_exists: bool,
+    behavior: Option<&str>,
 ) -> PyResult<PyDDL> {
-    let mut inner = MaterializedView::create(table_name(name)?, query.inner.clone())
-        .map_err(|error| ConstructionError::new_err(error.to_string()))?;
-    inner.columns(column_names(&columns)?);
-    if if_not_exists {
-        inner.if_not_exists();
-    }
-    if with_no_data {
-        inner.with_no_data();
-    }
-    Ok(PyDDL {
-        inner: Statement::CreateMaterializedView(inner),
-    })
+    let drop = drop_list(relations(names)?, if_exists, behavior)?;
+    Ok(PyDDL::new(Statement::DropView(drop)))
 }
 
 /// `REFRESH MATERIALIZED VIEW`. PostgreSQL refuses `CONCURRENTLY` beside
@@ -161,67 +256,37 @@ pub(super) fn create_materialized_view(
 #[pyfunction]
 #[pyo3(signature=(name, *, concurrently=false, with_no_data=false))]
 pub(super) fn refresh_materialized_view(
-    name: &PyTable,
+    name: &Bound<'_, PyAny>,
     concurrently: bool,
     with_no_data: bool,
 ) -> PyResult<PyDDL> {
-    if concurrently && with_no_data {
-        return Err(ConstructionError::new_err(
-            "a refresh is concurrent or with no data, never both",
-        ));
+    let mut refresh = MaterializedView::refresh(relation(name)?);
+    match (concurrently, with_no_data) {
+        (true, true) => {
+            return Err(ConstructionError::new_err(
+                "a refresh is concurrent or with no data, never both",
+            ));
+        }
+        (true, false) => {
+            refresh.concurrently();
+        }
+        (false, true) => {
+            refresh.with_no_data();
+        }
+        (false, false) => {}
     }
-    let mut inner = MaterializedView::refresh(table_name(name)?);
-    if concurrently {
-        inner.concurrently();
-    }
-    if with_no_data {
-        inner.with_no_data();
-    }
-    Ok(PyDDL {
-        inner: Statement::RefreshMaterializedView(inner),
-    })
+    Ok(PyDDL::new(Statement::RefreshMaterializedView(refresh)))
 }
 
+/// `DROP MATERIALIZED VIEW` over one view or a non-empty list of them.
 // [spec:pgorm:req:bindings.schema-views]
 #[pyfunction]
-#[pyo3(signature=(name, *, if_exists=false, cascade=false))]
+#[pyo3(signature=(names, *, if_exists=false, behavior=None))]
 pub(super) fn drop_materialized_view(
-    name: &PyTable,
+    names: &Bound<'_, PyAny>,
     if_exists: bool,
-    cascade: bool,
+    behavior: Option<&str>,
 ) -> PyResult<PyDDL> {
-    let mut inner = MaterializedView::drop(table_name(name)?);
-    if if_exists {
-        inner.if_exists();
-    }
-    if cascade {
-        inner.cascade();
-    }
-    Ok(PyDDL {
-        inner: Statement::DropMaterializedView(inner),
-    })
-}
-
-// [spec:pgorm:req:bindings.schema-views]
-#[pyfunction]
-#[pyo3(signature=(name, query, *, columns=Vec::new(), if_not_exists=false, with_no_data=false))]
-pub(super) fn create_table_as(
-    name: &PyTable,
-    query: PyRef<'_, PySelect>,
-    columns: Vec<Bound<'_, PyAny>>,
-    if_not_exists: bool,
-    with_no_data: bool,
-) -> PyResult<PyDDL> {
-    let mut inner = Table::create_as(table_name(name)?, query.inner.clone())
-        .map_err(|error| ConstructionError::new_err(error.to_string()))?;
-    inner.columns(column_names(&columns)?);
-    if if_not_exists {
-        inner.if_not_exists();
-    }
-    if with_no_data {
-        inner.with_no_data();
-    }
-    Ok(PyDDL {
-        inner: Statement::CreateTableAs(inner),
-    })
+    let drop = drop_list(relations(names)?, if_exists, behavior)?;
+    Ok(PyDDL::new(Statement::DropMaterializedView(drop)))
 }
