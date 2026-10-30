@@ -84,6 +84,7 @@ function withoutSslmode(text: string, host?: string): string {
 }
 
 // [spec:pgorm:req:bindings.connections/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("a pool sends nothing until used, and refuses an unusable option at construction", async () => {
   await using unreachable = new Pool("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable");
   assert.equal(unreachable.closed, false);
@@ -91,19 +92,30 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
     const options of [
       { maxSize: 0 },
       { maxSize: 1.5 },
-      { tls: "maybe" },
       { ca: "not a certificate" },
       { tls: "disable", ca: "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n" },
       { connectTimeout: -1 },
       { acquireTimeout: Number.NaN },
-      { recycle: "never" },
       { statementCacheChannel: "" },
       { statementCacheChannel: "c".repeat(64) },
-      { statementCacheChannel: 7 },
     ]
   ) {
     // deno-lint-ignore no-explicit-any
     assert.throws(() => new Pool(dsn(), options as any), ConstructionError, JSON.stringify(options));
+  }
+  for (
+    const options of [
+      { maxSize: "10" },
+      { tls: "maybe" },
+      { tls: true },
+      { ca: 7 },
+      { connectTimeout: "1s" },
+      { recycle: "never" },
+      { statementCacheChannel: 7 },
+    ]
+  ) {
+    // deno-lint-ignore no-explicit-any
+    assert.throws(() => new Pool(dsn(), options as any), TypeError, JSON.stringify(options));
   }
   assert.throws(() => new Pool("postgres://["), ConstructionError);
 });
@@ -238,7 +250,7 @@ test("a pool listening on statementCacheChannel clears when notified, and only t
 });
 
 // [spec:pgorm:req:bindings.connections/test]
-// [spec:pgorm:req:bindings.errors/test]
+// [spec:pgorm:req:bindings.errors+2/test]
 test("acquiring waits for a free connection within acquireTimeout, then fails with a TimeoutError", async () => {
   await using single = new Pool(scratch(), { maxSize: 1, acquireTimeout: 200 });
   await using held = await single.acquire();
@@ -286,7 +298,7 @@ test("closing a pool cancels what runs on it and releases every connection", asy
   await assert.rejects(closing.acquire(), lifecycle(/closed/));
 });
 
-// [spec:pgorm:req:napi.lifecycle/test]
+// [spec:pgorm:req:napi.lifecycle+2/test]
 test("collecting unreferenced handles never cuts work short, and rolls back and returns what is idle", async () => {
   const outcome = await runFixture("collected", 30_000, {}, { exposeGc: true });
   assert.equal(outcome.stderr, "");
@@ -583,7 +595,9 @@ test("a transaction's mode and isolation level reach the server", async () => {
   );
   await assert.rejects(pool().transaction(async () => {}, { mode: "default", isolation: "serializable" }), ConstructionError);
   // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool().transaction(async () => {}, { mode: "sometimes" as any }), ConstructionError);
+  await assert.rejects(pool().transaction(async () => {}, { mode: "sometimes" as any }), TypeError);
+  // deno-lint-ignore no-explicit-any
+  await assert.rejects(pool().transaction(async () => {}, { isolation: "eventual" as any }), TypeError);
 });
 
 // [spec:pgorm:req:napi.temporal+1/test]

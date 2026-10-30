@@ -7,7 +7,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 
 import type { OperationOptions } from "./index.d.ts";
 
@@ -34,9 +34,10 @@ export interface ListenerOptions extends OperationOptions {
  * listens on. It is an async iterator of them, one per `next()`, in the order
  * the server sent them: by commit order across transactions, and a payload a
  * transaction repeats on one channel once. Nothing reconnects it. Its
- * iteration ends once it closes — by `close()`, a `for await` loop leaving
- * early, or its pool closing — or after the failure it ends with, which the
- * pull that meets it rejects with: a {@link DatabaseError} or
+ * iteration ends once it closes — by `close()`, which ends a waiting pull as
+ * done; by a `for await` loop leaving early; or by its pool closing, which a
+ * waiting pull rejects with a {@link LifecycleError} — or after the failure
+ * it ends with, which the pull that meets it rejects with: a {@link DatabaseError} or
  * {@link ConnectionError} for a lost connection, or a {@link ConnectionError}
  * for a notification arriving while `capacity` wait unread. One pull runs at a
  * time; a second meanwhile is a {@link LifecycleError}. `listen` and
@@ -64,7 +65,7 @@ export declare class Listener implements AsyncIterableIterator<Notification>, As
   next(options?: OperationOptions): Promise<IteratorResult<Notification, undefined>>;
   /** Close the listener, as a `for await` loop leaving early does. */
   return(): Promise<IteratorResult<Notification, undefined>>;
-  /** Close the listener's connection, ending a pull in flight; resolves once it is released. */
+  /** Close the listener's connection, ending a pull in flight as done; resolves once it is released. */
   close(): Promise<void>;
   [Symbol.asyncIterator](): AsyncIterableIterator<Notification>;
   [Symbol.asyncDispose](): Promise<void>;

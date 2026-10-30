@@ -299,7 +299,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await self.account.find().filter(self.account.col("id") == 98).one_opt(connection))
 
     # [spec:pgorm:req:bindings.entity-reads/test]
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_decode_failure_does_not_become_absence(self):
         async with self.pool.connection() as connection:
             await self.active(1).insert(connection)
@@ -307,7 +307,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.DecodeError):
                 await self.account.find().one_opt(connection)
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_parameter_failure_preserves_connection(self):
         async with self.pool.connection() as connection:
             with self.assertRaises(p.ConstructionError):

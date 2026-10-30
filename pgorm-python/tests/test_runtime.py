@@ -44,7 +44,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     # [spec:pgorm:req:bindings.runtime/test]
-    # [spec:pgorm:req:python.lifecycle/test]
+    # [spec:pgorm:req:python.lifecycle+2/test]
     # [spec:pgorm:req:bindings.connections/test]
     async def test_connection_reuse_and_context_cleanup(self):
         self.assertTrue(await self.pool.ping())
@@ -97,7 +97,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(asyncio.to_thread(foreign), 1)
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_acquisition_timeout_is_distinct_from_cancellation(self):
         async with self.pool.connection():
             with self.assertRaises(pgorm.TimeoutError):
@@ -105,7 +105,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self.pool.ping())
         self.assertIs(pgorm.CancelledError, asyncio.CancelledError)
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     # [spec:pgorm:req:bindings.connections/test]    an empty, overlong or non-string
     # statement_cache_channel is a ConstructionError
     async def test_bad_configuration_is_an_explicit_construction_error(self):
@@ -125,7 +125,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             pgorm.Pool(f"unknown-key={secret}")
         self.assertNotIn(secret, str(caught.exception))
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_sqlstate_and_credential_redaction(self):
         parts = urlsplit(self.dsn)
         password = "deliberately-invalid-private-password"
@@ -266,7 +266,7 @@ class ConstraintViolationTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(pgorm.RawSQL(f"DROP SCHEMA {self.NAMESPACE} CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_constraint_violations_raise_their_own_class(self):
         ns = self.NAMESPACE
         insert = f"INSERT INTO {ns}.gauge (id, reading, level, parent_id, span) VALUES "
@@ -313,7 +313,7 @@ class ConstraintViolationTests(unittest.IsolatedAsyncioTestCase):
                     } | names,
                 )
 
-    # [spec:pgorm:req:bindings.errors/test]
+    # [spec:pgorm:req:bindings.errors+2/test]
     async def test_other_errors_stay_plain_database_errors(self):
         with self.assertRaises(pgorm.DatabaseError) as caught:
             await self.pool.execute(pgorm.RawSQL("SELECT 1 / 0"))

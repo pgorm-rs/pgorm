@@ -39,7 +39,7 @@ impl Redactions {
     }
 }
 
-// [spec:pgorm:req:bindings.errors]
+// [spec:pgorm:req:bindings.errors+2]
 // [spec:pgorm:req:python.row-count]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
@@ -54,7 +54,7 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
     }
     match error {
         pgorm::Error::Pool(_) => ConnectionError::new_err("PostgreSQL pool acquisition failed"),
-        // [spec:pgorm:req:bindings.listen]
+        // [spec:pgorm:req:bindings.listen+2]
         pgorm::Error::Listen(pgorm::ListenError::ChannelTooLong { .. }) => {
             ConstructionError::new_err(secrets.apply(&error.to_string()))
         }
@@ -71,7 +71,7 @@ fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr 
         return client_error(error, secrets);
     };
     let message = secrets.apply(db.message());
-    // [spec:pgorm:req:bindings.errors]    the constraint classes pgorm's SqlError names
+    // [spec:pgorm:req:bindings.errors+2]    the constraint classes pgorm's SqlError names
     let exception = match db.code().code() {
         "23505" => UniqueViolationError::new_err(message.clone()),
         "23503" => ForeignKeyViolationError::new_err(message.clone()),

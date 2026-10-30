@@ -23,7 +23,7 @@ import {
   Value,
   With,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -199,6 +199,7 @@ test("a write that cannot run is refused before anything is sent", async () => {
 });
 
 // [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they are built", () => {
   assert.throws(() => insert(account).values(1), refused(/follows columns/));
   assert.throws(() => insert(account).columns("a", "a"), refused(/"a" is named twice/));
@@ -208,18 +209,18 @@ test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they 
   assert.throws(() => insert(account).columns("a", "b").select(select(col("x"))), refused(/mismatch: 2 != 1/));
   assert.throws(() => insert(account).columns("a").values(1).defaultValues(), refused(/mixes with neither/));
   assert.throws(() => insert(account).defaultValues().columns("a"), refused(/once, before any row/));
-  assert.throws(() => insert(account).overriding("always" as never), refused(/overriding/));
+  assert.throws(() => insert(account).overriding("always" as never), mistyped(/overriding/));
   assert.throws(() => update(account).set("a", 1).set("a", 2), refused(/"a" is assigned twice/));
   assert.throws(() => (Conflict.on as () => unknown)(), refused(/at least one column/));
-  assert.throws(() => Conflict.on(1 as never), refused(/column name or an index expression/));
+  assert.throws(() => Conflict.on(1 as never), mistyped(/column name or an index expression/));
   assert.throws(() => (Conflict.on("id").update as () => unknown).call(Conflict.on("id")), refused(/at least one column/));
   assert.throws(() => Conflict.onConstraint("account_pkey").where(col("x").eq(1)), refused(/ON CONSTRAINT takes no predicate/));
   assert.throws(
     () => insert(account).columns("id").values(1).onConflict(Conflict.on("id") as never),
-    refused(/needs its action/),
+    mistyped(/needs its action/),
   );
-  assert.throws(() => insert(new Table("t")).returning([1 as never]), refused(/RETURNING item/));
-  assert.throws(() => insert(col("t") as never), refused(/target is a Table/));
+  assert.throws(() => insert(new Table("t")).returning([1 as never]), mistyped(/RETURNING item/));
+  assert.throws(() => insert(col("t") as never), mistyped(/target is a Table/));
 });
 
 // [spec:pgorm:req:bindings.writes/test]

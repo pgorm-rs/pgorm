@@ -126,7 +126,7 @@ fn aliases(cx: &mut FunctionContext, factory: &dyn Factory) -> NeonResult<Vec<St
     }
     let mut names = Vec::with_capacity(slots);
     for item in list {
-        let name = read::string(cx, item)?;
+        let name = read::text(cx, item, "an alias")?;
         if name.is_empty() || name.len() > 63 || name.contains('\0') {
             return read::refuse(cx, "an alias is 1–63 UTF-8 bytes without NUL");
         }

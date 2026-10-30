@@ -202,6 +202,11 @@ export declare class CaseOperand extends Builder {
 export declare function col(name: string, options?: { readonly table?: string; readonly schema?: string }): Expr;
 /** A value bound as a parameter. */
 export declare function bind(value: BindValue): Expr;
+/**
+ * A value written into the SQL text, as pgorm-query renders a constant, read
+ * as a parameter is read; every other operand is bound.
+ */
+export declare function literal(value: BindValue): Expr;
 
 /** The functions {@link call} reaches, each taking the arguments its pgorm-query constructor does. */
 export type FunctionName =

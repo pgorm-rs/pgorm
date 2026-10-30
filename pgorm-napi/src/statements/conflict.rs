@@ -51,8 +51,7 @@ fn conflict_on(cx: &mut FunctionContext) -> NeonResult<Node> {
             let expr = match node(cx, item) {
                 Some(Node::Expr(expr)) => expr,
                 _ => {
-                    return refuse(
-                        cx,
+                    return cx.throw_type_error(
                         "a conflict target is a column name or an index expression",
                     );
                 }
@@ -98,13 +97,10 @@ fn conflict_where(cx: &mut FunctionContext) -> NeonResult<Node> {
             );
         }
         other => {
-            return refuse(
-                cx,
-                format!(
-                    "expected a conflict target or update, got {}",
-                    other.describe()
-                ),
-            );
+            return cx.throw_type_error(format!(
+                "expected a conflict target or update, got {}",
+                other.describe()
+            ));
         }
     };
     Ok(node)
@@ -113,10 +109,10 @@ fn conflict_where(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn arbiter<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<Arbiter> {
     match this(cx, 0)? {
         Node::Arbiter(arbiter) => Ok(arbiter),
-        other => refuse(
-            cx,
-            format!("expected a conflict arbiter, got {}", other.describe()),
-        ),
+        other => cx.throw_type_error(format!(
+            "expected a conflict arbiter, got {}",
+            other.describe()
+        )),
     }
 }
 
@@ -141,13 +137,10 @@ fn conflict_set(cx: &mut FunctionContext) -> NeonResult<Node> {
         Node::Arbiter(Arbiter::Constraint(constraint)) => constraint.value(column, value),
         Node::ConflictUpdate(update) => update.value(column, value),
         other => {
-            return refuse(
-                cx,
-                format!(
-                    "expected a conflict arbiter or update, got {}",
-                    other.describe()
-                ),
-            );
+            return cx.throw_type_error(format!(
+                "expected a conflict arbiter or update, got {}",
+                other.describe()
+            ));
         }
     };
     Ok(Node::ConflictUpdate(update))
@@ -168,13 +161,10 @@ fn conflict_update(cx: &mut FunctionContext) -> NeonResult<Node> {
             Node::Arbiter(Arbiter::Constraint(constraint)) => constraint.update_column(column),
             Node::ConflictUpdate(update) => update.update_column(column),
             other => {
-                return refuse(
-                    cx,
-                    format!(
-                        "expected a conflict arbiter or update, got {}",
-                        other.describe()
-                    ),
-                );
+                return cx.throw_type_error(format!(
+                    "expected a conflict arbiter or update, got {}",
+                    other.describe()
+                ));
             }
         };
         node = Node::ConflictUpdate(update);
@@ -191,10 +181,9 @@ pub(super) fn clause<'cx>(
     match node(cx, value) {
         Some(Node::Conflict(conflict)) => Ok(conflict),
         Some(Node::ConflictUpdate(update)) => Ok(update.into()),
-        Some(Node::Arbiter(_)) => refuse(
-            cx,
+        Some(Node::Arbiter(_)) => cx.throw_type_error(
             "a conflict target needs its action: doNothing(), update(..) or set(..)",
         ),
-        _ => refuse(cx, "onConflict takes a Conflict action"),
+        _ => cx.throw_type_error("onConflict takes a Conflict action"),
     }
 }

@@ -51,9 +51,8 @@ const MADE = Symbol("pgorm-napi cursor");
  * @param {string} what
  */
 function rowCount(rows, what) {
-  if (typeof rows !== "number" || !Number.isSafeInteger(rows) || rows < 0) {
-    throw new ConstructionError(`${what} is a non-negative integer`);
-  }
+  if (typeof rows !== "number") throw new TypeError(`${what} is a number`);
+  if (!Number.isSafeInteger(rows) || rows < 0) throw new ConstructionError(`${what} is a non-negative integer`);
   return rows;
 }
 

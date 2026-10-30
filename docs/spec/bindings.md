@@ -93,7 +93,7 @@ option.
 > the runtime: an operation that does I/O is awaited in the language's own
 > asynchronous form (`python.runtime`, `napi.promises`).
 
-> [spec:pgorm:req:bindings.errors]
+> [spec:pgorm:req:bindings.errors+2]
 > Each binding MUST report a failure as an instance of its own error classes,
 > all derived from one base class of the binding and from the language's own
 > base error:
@@ -123,7 +123,11 @@ option.
 > An argument a call cannot use is refused before anything is sent: with a
 > `ConstructionError` when it cannot become what pgorm sends, and otherwise
 > with the error class each binding's rule names (`python.argument-errors`,
-> `napi.argument-errors`). A cancelled operation is reported in the
+> `napi.argument-errors`). Where a rule in this chapter names a
+> `ConstructionError` for an argument, it names it for the argument's value:
+> one of a type the call does not take, an options object holding a key the
+> call does not know among them, is refused with the class the binding's own
+> rule names for that. A cancelled operation is reported in the
 > language's own way (`python.cancellation`, `napi.cancellation`). An error
 > from PostgreSQL anywhere in a failure's cause chain makes the failure a
 > `DatabaseError`, so a refusal during connection carries its SQLSTATE too.
@@ -409,7 +413,7 @@ closed, and a transaction by the block or callback it was opened for ending.
 > discarding its connection. Its end and its closing behave as `copy_out`'s
 > stream does.
 
-> [spec:pgorm:req:bindings.listen]
+> [spec:pgorm:req:bindings.listen+2]
 > `listener(capacity)` on a pool MUST open a `Listener` through pgorm's
 > `DatabasePool::listener` (`conn.listen`): a connection of its own, opened
 > with the pool's configuration and TLS, never one the pool lends, holding at
@@ -440,9 +444,8 @@ closed, and a transaction by the block or callback it was opened for ending.
 > pull past the waiting ones MUST fail with a `ConnectionError`. Either closes
 > the listener, and iteration then ends. A pull pending when its pool closes
 > fails with a `LifecycleError`, and one pending when the listener itself
-> closes ends as each binding's lifecycle rule says (`python.lifecycle`,
-> `napi.lifecycle`). `listen` and `unlisten` on a closed listener are a
-> `LifecycleError`.
+> closes ends the iteration, as a pull made after it closed does. `listen`
+> and `unlisten` on a closed listener are a `LifecycleError`.
 >
 > `notify(channel, payload)` on a pool, a connection and a transaction MUST
 > run pgorm's `notify`, `SELECT pg_notify($1, $2)` with both bound, as a

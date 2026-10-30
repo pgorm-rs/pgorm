@@ -35,7 +35,7 @@ import {
   TypeName,
   Value,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -198,25 +198,29 @@ test("JSON_TABLE reads rows out of a document, each kind of column its own way, 
 });
 
 // [spec:pgorm:req:bindings.sql-json/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("a behaviour, type or shape a SQL/JSON function cannot take is refused as it is built", () => {
   assert.throws(() => jsonValue(doc, "$.a", { returning: "jsonb" }), refused(/JSON_VALUE cannot return json or jsonb/));
   assert.throws(() => jsonValue(doc, "$.a", { returning: "json" }), refused(/bug #19695/));
-  assert.throws(() => jsonValue(doc, "$.a", { onEmpty: "emptyArray" as never }), refused(/JSON_VALUE's behaviour/));
-  assert.throws(() => jsonExists(doc, "$.a", { onError: "null" as never }), refused(/JSON_EXISTS's behaviour/));
-  assert.throws(() => jsonExists(doc, "$.a", { onError: jsonDefault(1) as never }), refused(/JSON_EXISTS's behaviour/));
-  assert.throws(() => jsonQuery(doc, "$.a", { shaping: "wrapped" as never }), refused(/shaping/));
+  assert.throws(() => jsonValue(doc, "$.a", { onEmpty: "emptyArray" as never }), mistyped(/JSON_VALUE's behaviour/));
+  assert.throws(() => jsonExists(doc, "$.a", { onError: "null" as never }), mistyped(/JSON_EXISTS's behaviour/));
+  assert.throws(() => jsonExists(doc, "$.a", { onError: jsonDefault(1) as never }), mistyped(/JSON_EXISTS's behaviour/));
+  assert.throws(() => jsonQuery(doc, "$.a", { shaping: "wrapped" as never }), mistyped(/shaping/));
   assert.throws(() => jsonDefault(new Value("calm", new TypeName("mood"))), refused(/cannot carry an enum's/));
   assert.throws(() => jsonDefault(null as never), refused(/null has no kind/));
   assert.throws(() => jsonArrayAgg(col("v"), { orderBy: [col("v").asc({ nulls: "first" })] }), refused(/takes no NULLS FIRST/));
-  assert.throws(() => jsonValue(doc, 1 as never), refused(/path is a string/));
+  assert.throws(() => jsonValue(doc, 1 as never), mistyped(/path is a string/));
   assert.throws(() => jsonExists(doc, "$.a", { passing: { "": 1 } }), refused(/identifier/));
-  assert.throws(() => select(formatJson(col("x")) as never), refused(/not a FORMAT JSON input/));
+  assert.throws(() => select(formatJson(col("x")) as never), mistyped(/not a FORMAT JSON input/));
   assert.throws(() => jsonTable(doc, "$", [] as never, { alias: "t" }), refused(/at least one column/));
-  assert.throws(() => jsonTable(doc, "$", [C.ordinality("i")], {} as never), refused(/needs its alias/));
-  assert.throws(() => jsonTable(doc, "$", [C.ordinality("i")], { alias: "t", onError: "null" as never }), refused(/JSON_TABLE's behaviour/));
-  assert.throws(() => C.exists("e", "boolean", { onError: jsonDefault(true) as never }), refused(/EXISTS column's behaviour/));
+  assert.throws(() => jsonTable(doc, "$", [col("x")] as never, { alias: "t" }), mistyped(/JsonTableColumn/));
+  assert.throws(() => jsonTable(doc, "$", [C.ordinality("i")], {} as never), mistyped(/needs its alias/));
+  assert.throws(() => jsonTable(doc, "$", [C.ordinality("i")], { alias: "t", onError: "null" as never }), mistyped(/JSON_TABLE's behaviour/));
+  assert.throws(() => C.exists("e", "boolean", { onError: jsonDefault(true) as never }), mistyped(/EXISTS column's behaviour/));
   assert.throws(() => new DataType("integer", { length: 4 }), refused(/integer takes no length/));
   assert.throws(() => new DataType("numeric", { precision: 0 }), refused(/whole number of at least 1/));
+  assert.throws(() => new DataType("numeric", { precision: "8" as never }), mistyped(/precision is a number/));
+  assert.throws(() => new DataType(7 as never), mistyped(/a kind is/));
   assert.throws(() => new DataType("text", { precision: 3 }), refused(/belong to numeric/));
   assert.throws(() => new DataType("varbit"), refused(/varbit takes a length/));
   assert.throws(() => new DataType("serial" as never), refused(/no built-in type/));

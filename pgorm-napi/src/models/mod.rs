@@ -142,6 +142,6 @@ fn count(mut cx: FunctionContext) -> JsResult<JsBox<Node>> {
     let value = cx.argument::<JsValue>(0)?;
     match statements::node(&mut cx, value) {
         Some(Node::Select(select)) => Ok(cx.boxed(Node::Select(counted(select)))),
-        _ => read::refuse(&mut cx, "only a Select's rows are counted"),
+        _ => cx.throw_type_error("only a Select's rows are counted"),
     }
 }

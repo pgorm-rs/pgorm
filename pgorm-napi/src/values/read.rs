@@ -37,6 +37,21 @@ pub(crate) fn refuse<'cx, T>(cx: &mut Cx<'cx>, message: impl Into<String>) -> Ne
     cx.throw(error)
 }
 
+/// The string an argument that is text must be, `what` naming it in the
+/// `TypeError` anything else is. A value to bind has no wrong type, since any
+/// value may be a parameter; one that cannot be bound is `refuse`d.
+// [spec:pgorm:req:napi.argument-errors+2]
+pub(crate) fn text<'cx>(
+    cx: &mut Cx<'cx>,
+    data: Handle<'cx, JsValue>,
+    what: &str,
+) -> NeonResult<String> {
+    if !data.is_a::<JsString, _>(cx) {
+        return cx.throw_type_error(format!("{what} is a string"));
+    }
+    string(cx, data)
+}
+
 /// A JavaScript string as UTF-8. A lone surrogate has no UTF-8 form, and is
 /// refused rather than replaced with U+FFFD as Node-API's own conversion
 /// would.
@@ -129,10 +144,23 @@ pub(crate) fn kind<'cx>(
                 multirange,
             }))
         }
-        _ => refuse(
-            cx,
+        _ => cx.throw_type_error(
             "a kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange",
         ),
+    }
+}
+
+/// The type a `TypeName` names, or `None` for anything else.
+pub(crate) fn named_type<'cx>(
+    cx: &mut Cx<'cx>,
+    codec: Codec<'cx>,
+    data: Handle<'cx, JsValue>,
+) -> NeonResult<Option<TypeName>> {
+    match describe(cx, codec, data)? {
+        Some(description) if description.tag == "typename" => {
+            type_name(cx, &description, 0).map(Some)
+        }
+        _ => Ok(None),
     }
 }
 

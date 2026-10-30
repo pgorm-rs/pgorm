@@ -95,7 +95,7 @@ impl Windowed {
 fn window(cx: &mut FunctionContext) -> NeonResult<WindowStatement> {
     match this(cx, 0)? {
         Node::Window(window) => Ok(window),
-        other => refuse(cx, format!("expected a Window, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected a Window, got {}", other.describe())),
     }
 }
 
@@ -134,10 +134,9 @@ fn frame_at(cx: &mut FunctionContext, index: usize) -> NeonResult<FrameClause> {
             cx,
             "a following start needs an end: andFollowing(..) or andUnboundedFollowing()",
         ),
-        _ => refuse(
-            cx,
-            "a window's frame is a Frame, or a preceding or current-row start",
-        ),
+        _ => {
+            cx.throw_type_error("a window's frame is a Frame, or a preceding or current-row start")
+        }
     }
 }
 
@@ -152,10 +151,10 @@ fn window_frame(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn extended_window(cx: &mut FunctionContext) -> NeonResult<ExtendedWindow> {
     match this(cx, 0)? {
         Node::ExtendedWindow(window) => Ok(window),
-        other => refuse(
-            cx,
-            format!("expected an ExtendedWindow, got {}", other.describe()),
-        ),
+        other => cx.throw_type_error(format!(
+            "expected an ExtendedWindow, got {}",
+            other.describe()
+        )),
     }
 }
 
@@ -194,7 +193,7 @@ pub(super) fn definition_at(
     match node(cx, window) {
         Some(Node::Window(window)) => Ok(window.into()),
         Some(Node::ExtendedWindow(window)) => Ok(window.into()),
-        _ => refuse(cx, "a named window is a Window or an ExtendedWindow"),
+        _ => cx.throw_type_error("a named window is a Window or an ExtendedWindow"),
     }
 }
 
@@ -227,7 +226,7 @@ fn frame_start(cx: &mut FunctionContext) -> NeonResult<Node> {
 // [spec:pgorm:req:bindings.windows]
 fn frame_end(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::FrameStart(start) = this(cx, 0)? else {
-        return refuse(cx, "a frame's end follows its start");
+        return cx.throw_type_error("a frame's end follows its start");
     };
     let end = choice(
         cx,
@@ -274,12 +273,10 @@ fn frame_exclude(cx: &mut FunctionContext) -> NeonResult<Node> {
         Node::Frame(frame) => frame.exclude(exclusion),
         Node::FrameStart(Start::Preceding(start)) => start.exclude(exclusion),
         Node::FrameStart(Start::CurrentRow(start)) => start.exclude(exclusion),
-        _ => {
-            return refuse(
-                cx,
-                "EXCLUDE belongs to a frame; a following start needs its end first",
-            );
+        Node::FrameStart(Start::Following(_)) => {
+            return refuse(cx, "a following start needs its end before EXCLUDE");
         }
+        _ => return cx.throw_type_error("EXCLUDE belongs to a frame"),
     };
     Ok(Node::Frame(frame))
 }
@@ -318,10 +315,9 @@ fn expr_over(cx: &mut FunctionContext) -> NeonResult<Node> {
         Some(Node::ExtendedWindow(window)) => Over::Inline(window.into()),
         Some(other) => {
             let what = other.describe();
-            return refuse(
-                cx,
-                format!("OVER takes a Window, an ExtendedWindow or a window's name, not {what}"),
-            );
+            return cx.throw_type_error(format!(
+                "OVER takes a Window, an ExtendedWindow or a window's name, not {what}"
+            ));
         }
         None => Over::Named(name(cx, window)?),
     };
@@ -334,7 +330,7 @@ fn expr_over(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 fn windowed_alias(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Windowed(windowed) = this(cx, 0)? else {
-        return refuse(cx, "expected a windowed call");
+        return cx.throw_type_error("expected a windowed call");
     };
     let alias = super::args::name_at(cx, 1)?;
     Ok(Node::Windowed(Windowed {
@@ -349,11 +345,7 @@ fn windowed_alias(cx: &mut FunctionContext) -> NeonResult<Node> {
 // [spec:pgorm:req:bindings.windows]
 fn window_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
-    let name = if name.is_a::<JsString, _>(cx) {
-        read::string(cx, name)?
-    } else {
-        return refuse(cx, "a window function's name is a string");
-    };
+    let name = read::text(cx, name, "a window function's name")?;
     let arguments = operands_at(cx, 1)?;
     let accepted = match name.as_str() {
         "row_number" | "rank" | "dense_rank" | "percent_rank" | "cume_dist" => Some(0..=0),

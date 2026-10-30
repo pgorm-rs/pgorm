@@ -47,7 +47,7 @@ pub(super) fn expression<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> 
 /// An operand: a pipeline expression, or a value the stage that takes it
 /// binds. A statement builder's expression is no pipeline expression.
 // [spec:pgorm:req:bindings.pipeline-expressions]
-// [spec:pgorm:req:napi.pipeline-operands]
+// [spec:pgorm:req:napi.pipeline-operands+2]
 pub(super) fn operand<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<PlExpr> {
     if let Some(expr) = expression(cx, value) {
         return Ok(expr);
@@ -165,14 +165,15 @@ fn literal(cx: &mut FunctionContext) -> NeonResult<Node> {
     } else if value.is_a::<JsString, _>(cx) {
         Some(Literal::Text(read::sql(cx, value)?))
     } else {
-        None
+        return cx.throw_type_error(
+            "a literal is null, a boolean, a number, a bigint or a string; bind any other value",
+        );
     };
     match literal {
         Some(literal) => compose(cx, Recipe::Literal(literal), &[]),
         None => refuse(
             cx,
-            "a literal is null, a boolean, an integer within bigint, a finite number or a \
-             string; bind any other value",
+            "a literal number is finite, and a literal bigint within PostgreSQL's bigint",
         ),
     }
 }
@@ -242,20 +243,17 @@ const CASTS: &[(&str, pl::CastType)] = &[
 fn cast(cx: &mut FunctionContext) -> NeonResult<Node> {
     let inner = operand_at(cx, 0)?;
     let kind = arg(cx, 1);
-    let spelled = if kind.is_a::<JsString, _>(cx) {
-        Some(read::string(cx, kind)?)
-    } else {
-        None
+    let names = || {
+        let names: Vec<&str> = CASTS.iter().map(|(name, _)| *name).collect();
+        format!("a pipeline casts to one of {}", names.join(", "))
     };
-    match spelled.and_then(|spelled| CASTS.iter().find(|(name, _)| *name == spelled)) {
+    if !kind.is_a::<JsString, _>(cx) {
+        return cx.throw_type_error(names());
+    }
+    let spelled = read::string(cx, kind)?;
+    match CASTS.iter().find(|(name, _)| *name == spelled) {
         Some((_, kind)) => compose(cx, Recipe::Cast(inner.recipe.clone(), *kind), &[&inner]),
-        None => {
-            let names: Vec<&str> = CASTS.iter().map(|(name, _)| *name).collect();
-            refuse(
-                cx,
-                format!("a pipeline casts to one of {}", names.join(", ")),
-            )
-        }
+        None => refuse(cx, names()),
     }
 }
 
@@ -280,16 +278,15 @@ fn membership(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// An offset for `lag` or `lead`: a safe integer.
 fn offset(cx: &mut FunctionContext, index: usize) -> NeonResult<i64> {
     let value = arg(cx, index);
-    let offset = value
-        .downcast::<JsNumber, _>(cx)
-        .ok()
-        .map(|number| number.value(cx));
-    match offset {
+    let Ok(offset) = value.downcast::<JsNumber, _>(cx) else {
+        return cx.throw_type_error("an offset is a number");
+    };
+    let offset = offset.value(cx);
+    if offset.fract() == 0.0 && offset.abs() <= 9_007_199_254_740_991.0 {
         #[allow(clippy::cast_possible_truncation)]
-        Some(offset) if offset.fract() == 0.0 && offset.abs() <= 9_007_199_254_740_991.0 => {
-            Ok(offset as i64)
-        }
-        _ => refuse(cx, "an offset is a whole number"),
+        Ok(offset as i64)
+    } else {
+        refuse(cx, "an offset is a whole number")
     }
 }
 

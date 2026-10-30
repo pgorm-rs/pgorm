@@ -241,9 +241,9 @@ fn pipeline_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<p
     match node(cx, value) {
         Some(Node::Pipeline(part)) => match *part {
             Part::Pipeline(pipeline) => Ok(pipeline),
-            other => refuse(cx, format!("expected a Pipeline, got {}", other.describe())),
+            other => cx.throw_type_error(format!("expected a Pipeline, got {}", other.describe())),
         },
-        _ => refuse(cx, "expected a Pipeline"),
+        _ => cx.throw_type_error("expected a Pipeline"),
     }
 }
 
@@ -277,18 +277,14 @@ fn relation<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<So
                 alias: None,
             }),
             Part::Source(source) => Ok(source),
-            other => refuse(
-                cx,
-                format!(
-                    "a pipeline reads a Table, a Pipeline or a Source, not {}",
-                    other.describe()
-                ),
-            ),
+            other => cx.throw_type_error(format!(
+                "a pipeline reads a Table, a Pipeline or a Source, not {}",
+                other.describe()
+            )),
         },
-        _ => refuse(
-            cx,
-            "a pipeline reads a Table, a table's name, a Pipeline or a Source",
-        ),
+        _ => {
+            cx.throw_type_error("a pipeline reads a Table, a table's name, a Pipeline or a Source")
+        }
     }
 }
 
@@ -427,17 +423,17 @@ fn aggregate(cx: &mut FunctionContext) -> NeonResult<Node> {
         Node::Pipeline(part) => match *part {
             Part::Grouped(grouped) => grouped,
             other => {
-                return refuse(
-                    cx,
-                    format!("expected a grouped pipeline, got {}", other.describe()),
-                );
+                return cx.throw_type_error(format!(
+                    "expected a grouped pipeline, got {}",
+                    other.describe()
+                ));
             }
         },
         other => {
-            return refuse(
-                cx,
-                format!("expected a grouped pipeline, got {}", other.describe()),
-            );
+            return cx.throw_type_error(format!(
+                "expected a grouped pipeline, got {}",
+                other.describe()
+            ));
         }
     };
     let plan = plan_at(cx, 1)?;
@@ -537,9 +533,9 @@ fn over_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<pl::O
     match node(cx, value) {
         Some(Node::Pipeline(part)) => match *part {
             Part::Over(over) => Ok(over),
-            other => refuse(cx, format!("expected a window, got {}", other.describe())),
+            other => cx.throw_type_error(format!("expected a window, got {}", other.describe())),
         },
-        _ => refuse(cx, "expected a window from over()"),
+        _ => cx.throw_type_error("expected a window from over()"),
     }
 }
 

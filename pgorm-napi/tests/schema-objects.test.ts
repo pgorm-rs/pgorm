@@ -29,7 +29,7 @@ import {
   TypeName,
   Value,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -243,14 +243,14 @@ test("labels, types and sequence clauses PostgreSQL cannot take are refused as t
   assert.throws(() => createType("t").values("abc" as never), TypeError);
   assert.throws(() => alterType("t").addValue("x", { before: "a", after: "b" } as never), refused(/not both/));
   assert.throws(() => createType("t").asRange("double", { canonical: "f" } as never), TypeError);
-  assert.throws(() => createType(42 as never), refused(/string or a TypeName/));
+  assert.throws(() => createType(42 as never), mistyped(/string or a TypeName/));
   assert.throws(() => alterSequence("s").options({}), refused(/at least one option/));
   assert.throws(() => alterSequence("s").options({ cache: 2n ** 63n }), refused(/cache/));
-  assert.throws(() => createSequence("s").asType("numeric" as never), refused(/"smallint", "integer", "bigint"/));
-  assert.throws(() => createSequence("s").ownedBy(undefined as never, "id"), refused(/string or a Table/));
-  assert.throws(() => createIndex("t", { on: "a", order: "up" } as never), refused(/order/));
+  assert.throws(() => createSequence("s").asType("numeric" as never), mistyped(/"smallint", "integer", "bigint"/));
+  assert.throws(() => createSequence("s").ownedBy(undefined as never, "id"), mistyped(/string or a Table/));
+  assert.throws(() => createIndex("t", { on: "a", order: "up" } as never), mistyped(/order/));
   assert.throws(() => createIndex("t", { on: "a", nulls: "last" } as never), TypeError);
-  assert.throws(() => createIndex("t", new Table("x") as never), refused(/column's name or an expression/));
+  assert.throws(() => createIndex("t", new Table("x") as never), mistyped(/column's name or an expression/));
   assert.throws(() => createExtension("e", { version: "1\0" }), refused(/NUL/));
   const pending = alterSequence("s");
   assert.equal("inspect" in pending, false);

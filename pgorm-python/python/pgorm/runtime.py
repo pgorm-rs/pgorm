@@ -30,7 +30,7 @@ class PoolStatus(NamedTuple):
 # [spec:pgorm:req:python.runtime+1]
 # [spec:pgorm:req:bindings.runtime]
 # [spec:pgorm:req:bindings.connections]
-# [spec:pgorm:req:python.lifecycle]
+# [spec:pgorm:req:python.lifecycle+2]
 class Pool:
     """A pool owned by the asyncio loop running at construction.
 

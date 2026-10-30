@@ -9,7 +9,7 @@ use pgorm::pgorm_query::{Check, ColumnDef, GeneratedKind, IdentityGeneration};
 use super::{
     super::{
         Node,
-        args::{absent, arg, expression, name_at, operand_at, refuse},
+        args::{absent, arg, expression, name_at, operand_at},
         data_type::column_type,
     },
     Part,
@@ -32,16 +32,12 @@ pub(super) fn column<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> Neon
     match super::super::args::node(cx, value) {
         Some(Node::Schema(part)) => match *part {
             Part::Column(column) => Ok(column),
-            other => refuse(
-                cx,
-                format!("expected a ColumnDef, got {}", other.describe()),
-            ),
+            other => cx.throw_type_error(format!("expected a ColumnDef, got {}", other.describe())),
         },
-        Some(other) => refuse(
-            cx,
-            format!("expected a ColumnDef, got {}", other.describe()),
-        ),
-        None => refuse(cx, "expected a ColumnDef"),
+        Some(other) => {
+            cx.throw_type_error(format!("expected a ColumnDef, got {}", other.describe()))
+        }
+        None => cx.throw_type_error("expected a ColumnDef"),
     }
 }
 

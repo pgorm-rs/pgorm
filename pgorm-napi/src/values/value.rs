@@ -214,7 +214,7 @@ fn value_get(mut cx: FunctionContext) -> JsResult<JsValue> {
 fn value_items(mut cx: FunctionContext) -> JsResult<JsValue> {
     let value = tagged(&mut cx, 0)?;
     let Tag::Array(element) = &value.tag else {
-        return refuse(&mut cx, "items() needs an array value");
+        return cx.throw_type_error("items() needs an array value");
     };
     let element = element.as_ref().clone();
     let items: Option<Vec<Tagged>> = match &value.datum {
@@ -227,7 +227,7 @@ fn value_items(mut cx: FunctionContext) -> JsResult<JsValue> {
                 })
                 .collect()
         }),
-        _ => return refuse(&mut cx, "items() needs an array value"),
+        _ => return cx.throw_type_error("items() needs an array value"),
     };
     let Some(items) = items else {
         return Ok(cx.null().upcast());

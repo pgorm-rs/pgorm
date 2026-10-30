@@ -27,13 +27,11 @@ pub(super) fn element<'cx>(
         Some(Node::Expr(expr)) => Ok(GroupingElement::set([expr])),
         Some(other) => {
             let what = other.describe();
-            refuse(
-                cx,
-                format!("a grouping item is an expression or a grouping element, not {what}"),
-            )
+            cx.throw_type_error(format!(
+                "a grouping item is an expression or a grouping element, not {what}"
+            ))
         }
-        None => refuse(
-            cx,
+        None => cx.throw_type_error(
             "a grouping item is an expression or a grouping element, never a bound value",
         ),
     }

@@ -19,7 +19,7 @@ import {
   TypeName,
   Value,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -88,7 +88,7 @@ test("a pipeline's stages run as any statement does, through each terminal", asy
 });
 
 // [spec:pgorm:req:bindings.pipeline-expressions/test]
-// [spec:pgorm:req:napi.pipeline-operands/test]
+// [spec:pgorm:req:napi.pipeline-operands+2/test]
 test("a value an operand is given is bound; only literal() writes one into the SQL", async () => {
   const awkward = "O'Brien; -- \\";
   const bound = base.filter(category.eq(awkward)).select(id);
@@ -140,7 +140,7 @@ test("a column whose domain is over an enum compares as the enum it is named as"
   };
   await assert.rejects(ids(lines.filter(mood.eq("glad"))), undefinedOperator);
   await assert.rejects(pool().query(lines.derive(mood.as(m)).filter(m.eq("glad"))), undefinedOperator);
-  assert.throws(() => mood.comparesAs(5 as unknown as string), construction(/a TypeName/));
+  assert.throws(() => mood.comparesAs(5 as unknown as string), mistyped(/a TypeName/));
 });
 
 // [spec:pgorm:req:bindings.pipeline-expressions/test]
@@ -271,7 +271,7 @@ test("a placeholder used outside the stage its binder's function returns it to i
 });
 
 // [spec:pgorm:req:bindings.pipeline-binder/test]
-// [spec:pgorm:req:napi.argument-errors/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);
@@ -279,16 +279,19 @@ test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filter(null as never), construction(/null has no kind/));
   assert.throws(() => base.filter(category.eq(new Value("calm", new TypeName("mood")))), construction(/enum/));
   assert.throws(() => base.filter(statementCol("id") as never), construction(/expected a pipeline expression/));
-  assert.throws(() => pl.literal(Number.NaN), construction(/a literal is/));
-  assert.throws(() => pl.literal({} as never), construction(/a literal is/));
-  assert.throws(() => pl.literal(2n ** 63n), construction(/a literal is/));
+  assert.throws(() => pl.literal(Number.NaN), construction(/a literal number is finite/));
+  assert.throws(() => pl.literal({} as never), mistyped(/a literal is/));
+  assert.throws(() => pl.literal(2n ** 63n), construction(/within PostgreSQL's bigint/));
   assert.throws(() => amount.cast("money" as never), construction(/casts to one of/));
+  assert.throws(() => amount.cast(7 as never), mistyped(/casts to one of/));
   assert.throws(() => pl.over().by(amount.add(1)), construction(/take no value/));
   assert.throws(() => base.take(1.5), construction(/row count/));
-  assert.throws(() => pl.from({} as never), construction(/a pipeline reads/));
-  assert.throws(() => base.join(items, id, { kind: "outer" as never }), construction(/join's kind/));
+  assert.throws(() => pl.from({} as never), mistyped(/a pipeline reads/));
+  assert.throws(() => base.join(items, id, { kind: "outer" as never }), mistyped(/join's kind/));
   assert.throws(() => pl.col("", "id"), construction(/1–63/));
+  assert.throws(() => pl.col("items", 7 as never), mistyped(/an identifier is a string/));
   assert.throws(() => pl.lag(1.5, amount), construction(/offset/));
+  assert.throws(() => pl.lag("1" as never, amount), mistyped(/offset is a number/));
 });
 
 // [spec:pgorm:req:bindings.pipeline/test]
@@ -298,6 +301,6 @@ test("what pgorm's compile step judges is a ConstructionError before anything is
   const grouped = base.group(category);
   assert.equal("inspect" in grouped, false);
   await assert.rejects(pool().query(grouped as never), construction(/needs aggregate/));
-  await assert.rejects(pool().query(pl.over() as never), construction(/window is not a statement/));
-  await assert.rejects(pool().execute(id as never), construction(/pipeline expression is not a statement/));
+  await assert.rejects(pool().query(pl.over() as never), mistyped(/window is not a statement/));
+  await assert.rejects(pool().execute(id as never), mistyped(/pipeline expression is not a statement/));
 });

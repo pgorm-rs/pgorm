@@ -254,7 +254,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > other unsupported cross-owner use, MUST raise `LifecycleError` rather than
 > deadlock or panic.
 
-> [spec:pgorm:req:python.lifecycle]
+> [spec:pgorm:req:python.lifecycle+2]
 > `Pool(dsn, *, tls, cafile, max_size, connect_timeout, acquire_timeout,
 > statement_cache_size, recycle, statement_cache_channel)` builds a pool,
 > `cafile` naming a PEM file to trust and the timeouts given in seconds, and
@@ -262,8 +262,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > connection and every stream MUST be closable by `await close()` (`aclose()`
 > on a stream or listener) and MUST be asynchronous context managers that
 > close on exit; `pool.connection()` lends a connection for an `async with`
-> block and `await pool.acquire()` lends one to close explicitly. Closing a
-> listener ends its iteration, a pull pending on it included.
+> block and `await pool.acquire()` lends one to close explicitly.
 
 > [spec:pgorm:req:python.transactions+3]
 > A transaction MUST be an `async with` block: `pool.transaction()` and

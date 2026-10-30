@@ -47,7 +47,7 @@ fn table_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 fn table_alias(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Table(table) = this(cx, 0)? else {
-        return refuse(cx, "expected a Table");
+        return cx.throw_type_error("expected a Table");
     };
     let alias = name_at(cx, 1)?;
     Ok(Node::Table(table.alias(alias)))
@@ -80,7 +80,7 @@ fn table_col(cx: &mut FunctionContext) -> NeonResult<Node> {
     let column = name_at(cx, 1)?;
     match qualified(&item, Some(column)) {
         Some(column) => Ok(Node::Expr(Expr::col(column).into())),
-        None => refuse(cx, "expected a Table or a FROM item"),
+        None => cx.throw_type_error("expected a Table or a FROM item"),
     }
 }
 
@@ -89,7 +89,7 @@ fn table_star(cx: &mut FunctionContext) -> NeonResult<Node> {
     let item = this(cx, 0)?;
     match qualified(&item, None) {
         Some(column) => Ok(Node::Expr(Expr::col(column).into())),
-        None => refuse(cx, "expected a Table or a FROM item"),
+        None => cx.throw_type_error("expected a Table or a FROM item"),
     }
 }
 
@@ -107,7 +107,7 @@ fn sample_number(cx: &mut FunctionContext, index: usize, what: &str) -> NeonResu
     let value = arg(cx, index);
     match value.downcast::<JsNumber, _>(cx) {
         Ok(number) => Ok(number.value(cx)),
-        Err(_) => refuse(cx, format!("a sample's {what} is a number")),
+        Err(_) => cx.throw_type_error(format!("a sample's {what} is a number")),
     }
 }
 
@@ -118,7 +118,7 @@ fn sample_number(cx: &mut FunctionContext, index: usize, what: &str) -> NeonResu
 // [spec:pgorm:req:bindings.select]
 fn table_sample(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Table(table) = this(cx, 0)? else {
-        return refuse(cx, "only a Table is sampled");
+        return cx.throw_type_error("only a Table is sampled");
     };
     let method = match choice(cx, 1, "a sampling method", &["bernoulli", "system"])? {
         "bernoulli" => SampleMethod::Bernoulli,
@@ -138,14 +138,17 @@ fn table_sample(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn table_call<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<FunctionCall> {
     match super::args::node(cx, value) {
         Some(Node::Expr(SimpleExpr::FunctionCall(call))) => Ok(call),
+        Some(Node::Expr(_)) => refuse(
+            cx,
+            "a table function reads a function call, not an expression",
+        ),
         Some(other) => {
             let what = other.describe();
-            refuse(
-                cx,
-                format!("a table function reads a function call, not {what}"),
-            )
+            cx.throw_type_error(format!(
+                "a table function reads a function call, not {what}"
+            ))
         }
-        None => refuse(cx, "a table function reads a function call: call(name, ..)"),
+        None => cx.throw_type_error("a table function reads a function call: call(name, ..)"),
     }
 }
 
@@ -161,7 +164,7 @@ fn column_definitions<'cx>(
     for column in items(cx, value)? {
         let pair = items(cx, column)?;
         let [column_name, column_type] = pair.as_slice() else {
-            return refuse(cx, "a column definition is a [name, type] pair");
+            return cx.throw_type_error("a column definition is a [name, type] pair");
         };
         let column_name = name(cx, *column_name)?;
         definitions.push((
@@ -203,8 +206,7 @@ fn table_function(cx: &mut FunctionContext) -> NeonResult<Node> {
     };
     let alias = arg(cx, 1);
     if absent(cx, alias) {
-        return refuse(
-            cx,
+        return cx.throw_type_error(
             "a table function needs its alias, as every FROM item that is not a table does",
         );
     }
@@ -247,11 +249,8 @@ pub(super) fn from_item<'cx>(
         Some(Node::FromItem(item)) => Ok(item),
         Some(other) => {
             let what = other.describe();
-            refuse(
-                cx,
-                format!("a FROM item is a Table or a FromItem, not {what}"),
-            )
+            cx.throw_type_error(format!("a FROM item is a Table or a FromItem, not {what}"))
         }
-        None => refuse(cx, "a FROM item is a Table or a FromItem"),
+        None => cx.throw_type_error("a FROM item is a Table or a FromItem"),
     }
 }
