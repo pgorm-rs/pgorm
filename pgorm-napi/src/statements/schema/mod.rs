@@ -46,10 +46,7 @@ use pgorm::pgorm_query::{
 
 use neon::prelude::*;
 
-use super::{
-    Node,
-    args::{refuse, this},
-};
+use super::{Node, args::this};
 
 /// Every schema builder export, by module.
 pub(super) const EXPORTS: &[&[(&str, super::Build)]] = &[
@@ -234,5 +231,5 @@ pub(super) fn receiver<T>(
         },
         other => other.describe(),
     };
-    refuse(cx, format!("expected {what}, got {found}"))
+    cx.throw_type_error(format!("expected {what}, got {found}"))
 }

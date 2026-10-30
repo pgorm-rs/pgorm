@@ -374,3 +374,16 @@ export async function holdTransaction(
     },
   };
 }
+
+/**
+ * A check for `assert.throws` and `assert.rejects` that the call was refused
+ * with a `TypeError`, an argument of a type it does not take, whose message
+ * matches `pattern`.
+ */
+export function mistyped(pattern: RegExp): (error: unknown) => true {
+  return (error: unknown) => {
+    assert.ok(error instanceof TypeError, `expected a TypeError, got ${error}`);
+    assert.match(error.message, pattern);
+    return true;
+  };
+}

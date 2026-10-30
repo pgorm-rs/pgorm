@@ -40,7 +40,7 @@ const encoder = new TextEncoder();
  */
 function namePart(part, what) {
   if (typeof part !== "string") {
-    throw new ConstructionError(`a type's ${what} is a string`);
+    throw new TypeError(`a type's ${what} is a string`);
   }
   const length = encoder.encode(part).length;
   if (length === 0 || length > 63 || part.includes("\0")) {
@@ -93,7 +93,8 @@ const SUBTYPES = new Set([
  * @returns {string}
  */
 function subtypeKind(subtype) {
-  if (typeof subtype !== "string" || !SUBTYPES.has(subtype)) {
+  if (typeof subtype !== "string") throw new TypeError("a created range's subtype is a kind name");
+  if (!SUBTYPES.has(subtype)) {
     throw new ConstructionError(
       "a created range's subtype is one of i16, i32, i64, f32, f64, decimal, text, date, time, datetime, datetime_utc or uuid",
     );

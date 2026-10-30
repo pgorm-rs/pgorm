@@ -66,7 +66,7 @@ pub(super) fn variables(
     for pair in items(cx, value)? {
         let pair = items(cx, pair)?;
         let (Some(variable), Some(value)) = (pair.first().copied(), pair.get(1).copied()) else {
-            return refuse(cx, "a PASSING variable is a name and a value");
+            return cx.throw_type_error("a PASSING variable is a name and a value");
         };
         let variable = name(cx, variable)?;
         passing.push((input(cx, value)?, variable));
@@ -77,10 +77,7 @@ pub(super) fn variables(
 /// The path at `index`: a string, which pgorm-query binds.
 pub(super) fn path(cx: &mut FunctionContext, index: usize) -> NeonResult<String> {
     let value = arg(cx, index);
-    if !value.is_a::<JsString, _>(cx) {
-        return refuse(cx, "a JSON path is a string");
-    }
-    read::string(cx, value)
+    read::text(cx, value, "a JSON path")
 }
 
 fn returning(
@@ -319,7 +316,7 @@ fn json_object(cx: &mut FunctionContext) -> NeonResult<Node> {
     for entry in items(cx, entries)? {
         let pair = items(cx, entry)?;
         let (Some(key), Some(value)) = (pair.first().copied(), pair.get(1).copied()) else {
-            return refuse(cx, "a JSON object's entry is a key and a value");
+            return cx.throw_type_error("a JSON object's entry is a key and a value");
         };
         let key = operand(cx, key)?;
         json = json.entry(key, input(cx, value)?);

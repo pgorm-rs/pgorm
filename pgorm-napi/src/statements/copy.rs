@@ -156,7 +156,7 @@ fn statement_at(cx: &mut FunctionContext, index: usize) -> NeonResult<CopyStatem
 fn receiver(cx: &mut FunctionContext) -> NeonResult<CopyStatement> {
     match this(cx, 0)? {
         Node::Copy(copy) => Ok(*copy),
-        other => refuse(cx, format!("expected a COPY, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected a COPY, got {}", other.describe())),
     }
 }
 
@@ -291,12 +291,9 @@ fn source<'cx>(
         }
         other => {
             let what = other.describe();
-            return refuse(
-                cx,
-                format!(
-                    "a COPY TO reads a table, or a Select, Insert, Update, Delete or Merge, not {what}"
-                ),
-            );
+            return cx.throw_type_error(format!(
+                "a COPY TO reads a table, or a Select, Insert, Update, Delete or Merge, not {what}"
+            ));
         }
     };
     match write {

@@ -700,8 +700,7 @@ fn mode(cx: &mut FunctionContext, at: usize) -> NeonResult<TransactionMode> {
             "repeatableRead" => IsolationLevel::RepeatableRead,
             "serializable" => IsolationLevel::Serializable,
             _ => {
-                return crate::values::read::refuse(
-                    cx,
+                return cx.throw_type_error(
                     "isolation is \"readUncommitted\", \"readCommitted\", \"repeatableRead\" or \
                      \"serializable\"",
                 );
@@ -717,10 +716,8 @@ fn mode(cx: &mut FunctionContext, at: usize) -> NeonResult<TransactionMode> {
             cx,
             "the default and deferrable modes take no isolation level: choose readWrite or readOnly",
         ),
-        _ => crate::values::read::refuse(
-            cx,
-            "mode is \"default\", \"readWrite\", \"readOnly\" or \"deferrable\"",
-        ),
+        _ => cx
+            .throw_type_error("mode is \"default\", \"readWrite\", \"readOnly\" or \"deferrable\""),
     }
 }
 

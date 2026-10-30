@@ -32,7 +32,7 @@ function fieldsOf(columns) {
     throw new TypeError("a model's columns are an object of column() declarations");
   }
   const fields = Object.entries(columns).map(([field, column]) => {
-    if (!(column instanceof Column)) throw new ConstructionError(`${field} is no column() declaration`);
+    if (!(column instanceof Column)) throw new TypeError(`${field} is no column() declaration`);
     if (field === "") throw new ConstructionError("a field has a name");
     return { field, sql: column.name ?? field, column };
   });
@@ -137,7 +137,7 @@ export class Model {
     const given = Object.keys(values);
     const wanted = shape.primaryKey.map((field) => field.field);
     if (given.length !== wanted.length || !wanted.every((name) => Object.hasOwn(values, name))) {
-      throw new ConstructionError(`a key of ${shape.name} gives ${wanted.join(", ")}, and nothing else`);
+      throw new TypeError(`a key of ${shape.name} gives ${wanted.join(", ")}, and nothing else`);
     }
     return Condition.all(...shape.primaryKey.map((field) =>
       qualified(field, shape.qualifier).eq(/** @type {Record<string, unknown>} */ (values)[field.field])
@@ -273,7 +273,7 @@ export function model(name, declaration) {
     throw new TypeError("a model's declaration is { columns, schema? }");
   }
   for (const key of Object.keys(declaration)) {
-    if (key !== "columns" && key !== "schema") throw new ConstructionError(`${JSON.stringify(key)} is no model option`);
+    if (key !== "columns" && key !== "schema") throw new TypeError(`${JSON.stringify(key)} is no model option`);
   }
   const { columns, schema = null } = /** @type {{ columns?: unknown, schema?: unknown }} */ (declaration);
   if (schema !== null && typeof schema !== "string") throw new TypeError("a model's schema is a string");

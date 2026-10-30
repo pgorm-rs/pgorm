@@ -146,14 +146,14 @@ test("an option a COPY's format or direction does not take is a ConstructionErro
   assert.throws(() => copyFrom("items", "csv").quote(""), ConstructionError);
   assert.throws(() => copyFrom("items", "text").onErrorIgnore({ rejectLimit: 0 }), ConstructionError);
   // @ts-expect-error a log verbosity PostgreSQL does not name
-  assert.throws(() => copyFrom("items", "text").onErrorIgnore({ logVerbosity: "loud" }), ConstructionError);
+  assert.throws(() => copyFrom("items", "text").onErrorIgnore({ logVerbosity: "loud" }), TypeError);
   // @ts-expect-error a misspelt option is refused, never left out
   assert.throws(() => copyFrom("items", "text").onErrorIgnore({ limit: 1 }), TypeError);
   // @ts-expect-error JSON is no COPY format
-  assert.throws(() => copyFrom("items", "json"), /format is one of "text", "csv", "binary"/);
+  assert.throws(() => copyFrom("items", "json"), TypeError, /format is one of "text", "csv", "binary"/);
   assert.throws(() => copyFrom(new Table("items", { alias: "i" }), "csv"), ConstructionError);
   // @ts-expect-error an expression is no COPY source
-  assert.throws(() => copyTo(col("id"), "csv"), ConstructionError);
+  assert.throws(() => copyTo(col("id"), "csv"), TypeError);
   // The same builders, used as their types allow, are untouched by a refused call.
   assert.equal(
     text.delimiter("|").inspect().sql,
@@ -166,7 +166,7 @@ test("an option a COPY's format or direction does not take is a ConstructionErro
 
 // [spec:pgorm:req:bindings.copy/test]    a statement terminal refuses a COPY, and copyIn and copyOut refuse what is no COPY
 test("a COPY runs through copyIn and copyOut alone, and a source of the wrong shape is a TypeError", async () => {
-  await assert.rejects(pool().execute(copyFrom("items", "text")), ConstructionError);
+  await assert.rejects(pool().execute(copyFrom("items", "text")), TypeError);
   await assert.rejects(pool().query(copyTo("items", "text")), /runs through copyIn\(\.\.\) or copyOut\(\.\.\)/);
   // deno-lint-ignore no-explicit-any
   const loose = pool() as any;

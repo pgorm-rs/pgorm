@@ -55,7 +55,7 @@ impl PoolState {
 
     /// Record `listener` so that closing the pool closes it; a listener
     /// opened while the pool closed is closed here instead.
-    // [spec:pgorm:req:bindings.listen]
+    // [spec:pgorm:req:bindings.listen+2]
     pub(crate) fn register_listener(&self, listener: &Arc<ListenerState>) -> PyResult<()> {
         let mut registry = self
             .listeners

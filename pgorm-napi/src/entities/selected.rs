@@ -96,7 +96,7 @@ fn qualifiers(cx: &mut FunctionContext, factory: &dyn SourcesFactory) -> NeonRes
     }
     let mut names = Vec::with_capacity(list.len());
     for item in list {
-        let name = read::string(cx, item)?;
+        let name = read::text(cx, item, "a qualifier")?;
         if name.is_empty() || name.len() > 63 || name.contains('\0') {
             return read::refuse(cx, "a qualifier is 1–63 UTF-8 bytes without NUL");
         }
@@ -117,13 +117,11 @@ fn sources_select(mut cx: FunctionContext) -> JsResult<JsValue> {
             Part::Pipeline(pipeline) => pipeline,
             other => {
                 let what = other.describe();
-                return read::refuse(
-                    &mut cx,
-                    format!("sources are selected from a Pipeline, not {what}"),
-                );
+                return cx
+                    .throw_type_error(format!("sources are selected from a Pipeline, not {what}"));
             }
         },
-        _ => return read::refuse(&mut cx, "sources are selected from a Pipeline"),
+        _ => return cx.throw_type_error("sources are selected from a Pipeline"),
     };
     let qualifiers = qualifiers(&mut cx, factory.as_ref())?;
     Ok(cx

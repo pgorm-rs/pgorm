@@ -27,18 +27,18 @@ fn size(cx: &mut FunctionContext, index: usize, what: &str, floor: f64) -> NeonR
     if absent(cx, value) {
         return Ok(None);
     }
-    let number = value
-        .downcast::<JsNumber, _>(cx)
-        .map(|number| number.value(cx));
-    match number {
+    let Ok(number) = value.downcast::<JsNumber, _>(cx) else {
+        return cx.throw_type_error(format!("a type's {what} is a number"));
+    };
+    let number = number.value(cx);
+    if number.fract() == 0.0 && (floor..=10_000_000.0).contains(&number) {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        Ok(number) if number.fract() == 0.0 && (floor..=10_000_000.0).contains(&number) => {
-            Ok(Some(number as u32))
-        }
-        _ => refuse(
+        Ok(Some(number as u32))
+    } else {
+        refuse(
             cx,
             format!("a type's {what} is a whole number of at least {floor}"),
-        ),
+        )
     }
 }
 
@@ -155,8 +155,7 @@ fn named<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Colum
             }
         }
         _ => {
-            return refuse(
-                cx,
+            return cx.throw_type_error(
                 "a DataType names a built-in type, a TypeName or a CreatedRange",
             );
         }
@@ -188,7 +187,7 @@ fn data_type_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn data_type_array(cx: &mut FunctionContext) -> NeonResult<Node> {
     match this(cx, 0)? {
         Node::DataType(column) => Ok(Node::DataType(ColumnType::Array(Arc::new(column)))),
-        other => refuse(cx, format!("expected a DataType, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected a DataType, got {}", other.describe())),
     }
 }
 

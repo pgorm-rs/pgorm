@@ -47,6 +47,10 @@
     "sql": "SELECT $1 + $2, CAST($3::text AS app.mood), CAST($4::text[] AS mood[]), $5, $6, $7, $8, $9, $10",
     "values": [["i16","7"], ["i64","3"], ["text","calm"], ["array","[calm,glad]"], ["decimal","19.9900"], ["uuid","0190a7a6-8c8e-7000-8000-000000000001"], ["date","2026-10-09"], ["datetime_utc","2026-10-09T12:00:00Z"], ["bool","true"], ["array","[1,2,3]"]]
   },
+  "literals": {
+    "sql": "SELECT 7 + $1, E'O\\'Brien', CAST('calm' AS app.mood), CAST(ARRAY ['calm','glad'] AS mood[]), 19.9900, '0190a7a6-8c8e-7000-8000-000000000001', '2026-10-09', TRUE, ARRAY [1,2,3], NULL FROM \"t\" WHERE \"name\" = 'x' AND \"id\" > $2",
+    "values": [["i64","3"], ["i64","2"]]
+  },
   "functions": {
     "sql": "SELECT LOWER(\"a\"), UPPER(\"a\"), ABS(\"b\"), CHAR_LENGTH(\"a\"), COUNT(DISTINCT \"a\"), SUM(\"b\"), AVG(\"b\"), MIN(\"b\"), MAX(\"b\"), ROUND(\"b\"), ROUND(\"b\", $1), COALESCE(\"a\", $2), RANDOM(), GEN_RANDOM_UUID(), UUIDV4(), UUIDV7(), UUIDV7(CAST($3::text AS interval)), UUID_EXTRACT_TIMESTAMP(\"u\"), UUID_EXTRACT_VERSION(\"u\")",
     "values": [["i32","2"], ["text","none"], ["text","-1 hour"]]

@@ -419,7 +419,7 @@ export declare class Value {
   toString(): string;
 }
 
-// [spec:pgorm:req:napi.lifecycle]
+// [spec:pgorm:req:napi.lifecycle+2]
 /** How a {@link Pool} connects. Durations are in milliseconds. */
 export interface PoolOptions {
   /**
@@ -559,7 +559,7 @@ export declare abstract class Queryable {
    * decoded by its column's type as a result column of that type is.
    */
   copyOutRows(statement: CopyTo<"binary">, options?: OperationOptions): Promise<CopyRowStream>;
-  // [spec:pgorm:req:bindings.listen]
+  // [spec:pgorm:req:bindings.listen+2]
   /**
    * Send `payload` on `channel` through `SELECT pg_notify($1, $2)`, both
    * bound; the channel is exact, as {@link Listener.listen} names it. In a

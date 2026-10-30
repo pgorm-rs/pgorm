@@ -116,7 +116,7 @@ fn listener(cx: &mut FunctionContext) -> NeonResult<Arc<ListenerState>> {
 /// `poolListener(pool, capacity, abort)`: a listener on a connection of its
 /// own, opened with the pool's configuration, holding at most `capacity`
 /// notifications unread.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 fn pool_listener(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let capacity = cx.argument::<JsNumber>(1)?.value(&mut cx);
@@ -177,7 +177,7 @@ enum Verb {
 /// `listenerSend(listener, verb, channel, abort)`: `LISTEN`, `UNLISTEN` or
 /// `UNLISTEN *`. An abort closes the listener: the statement may have
 /// reached the server, leaving the channels it listens on unknown.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 // [spec:pgorm:req:bindings.cancellation]
 fn listener_send(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
@@ -220,12 +220,13 @@ struct Received {
     process_id: i32,
 }
 
-/// The next notification, or `None` if the listener had closed before the
-/// pull was made; one that closes while the pull waits — or before the
-/// runtime starts it — fails it. A failure the stream ends with — the
-/// connection lost, or its capacity overrun — closes the listener; an abort
-/// does not, since the notification it was waiting for stays queued for the
-/// next pull.
+/// The next notification, or `None` once the listener has closed: before the
+/// pull was made, while it waits, or before the runtime starts it. A pool
+/// that closes under a waiting pull fails it. A failure the stream ends with
+/// — the connection lost, or its capacity overrun — closes the listener; an
+/// abort does not, since the notification it was waiting for stays queued
+/// for the next pull.
+// [spec:pgorm:req:bindings.listen+2]
 async fn next(
     state: Arc<ListenerState>,
     abort: Abort,
@@ -234,19 +235,31 @@ async fn next(
     if closed_before {
         return Ok(None);
     }
-    let closed = || Failure::Lifecycle("the listener closed while it waited".to_owned());
+    let ended = |state: &ListenerState| {
+        if state.pool.closed.is_cancelled() {
+            Err(Failure::Lifecycle(
+                "the pool closed while the listener waited".to_owned(),
+            ))
+        } else {
+            Ok(None)
+        }
+    };
     let mut slot = state.notifications.clone().try_lock_owned().map_err(|_| {
         Failure::Lifecycle("the listener is busy: one notification is pulled at a time".to_owned())
     })?;
     let Some(notifications) = slot.as_mut() else {
-        return Err(closed());
+        return ended(&state);
     };
     let item = tokio::select! {
         biased;
         () = abort.token().cancelled() => return Err(Failure::Cancelled),
-        () = state.closing() => {
+        () = state.pool.closed.cancelled() => {
             drop(slot.take());
-            return Err(closed());
+            return ended(&state);
+        }
+        () = state.closed.cancelled() => {
+            drop(slot.take());
+            return ended(&state);
         }
         item = notifications.next() => item,
     };
@@ -271,7 +284,7 @@ async fn next(
 
 /// `listenerNext(listener, abort)`: `[channel, payload, processId]`, or
 /// `null` once the listener is closed.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 fn listener_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
@@ -297,7 +310,7 @@ fn listener_next(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 /// `listenerClose(listener)`: close the listener's connection, ending a pull
 /// in flight, and resolve once it is released.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 fn listener_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = listener(&mut cx)?;
     state.closed.cancel();
@@ -327,7 +340,7 @@ impl Settled for Notified {
 
 /// `notifyJob(channel, payload)`: pgorm's `notify` as a job, which the pool,
 /// connection or transaction it runs on runs as it runs a statement.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 fn notify_job(mut cx: FunctionContext) -> JsResult<JsBox<JobHandle>> {
     let channel = cx.argument::<JsString>(0)?.value(&mut cx);
     let payload = cx.argument::<JsString>(1)?.value(&mut cx);

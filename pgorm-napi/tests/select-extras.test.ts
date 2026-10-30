@@ -26,7 +26,7 @@ import {
   Value,
   With,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -104,8 +104,11 @@ test("a tie limit keeps every row tied with the last one counted, in LIMIT's slo
   assert.deepStrictEqual(field(await pool().query(tied.offset(1)), "score"), [9, 9]);
   const waiting = tied.lock("update", { wait: "nowait" });
   assert.deepStrictEqual(field(await pool().query(waiting), "score"), [10, 9, 9]);
-  for (const count of [-1, 1.5, null, "2"]) {
+  for (const count of [-1, 1.5]) {
     assert.throws(() => ranked.limitWithTies(count as never), refused(/row count/));
+  }
+  for (const count of [null, "2"]) {
+    assert.throws(() => ranked.limitWithTies(count as never), mistyped(/row count/));
   }
 });
 
@@ -191,14 +194,14 @@ test("GROUP BY DISTINCT groups each grouping set its elements reach once", async
   assert.deepStrictEqual(await pool().query(grouped(plain.groupByDistinct())), await pool().query(grouped(plain)));
   for (
     const [build, reason] of [
-      [() => (groupingSets as () => unknown)(), /GROUPING SETS takes at least one element/],
       [() => totals.groupBy(1 as never), /grouping item is an expression or a grouping element/],
       [() => groupingSets(score as never), /grouping item is an expression or a grouping element, not a Table/],
       [() => rollup("a" as never), /expected an expression/],
     ] as const
   ) {
-    assert.throws(build, refused(reason));
+    assert.throws(build, mistyped(reason));
   }
+  assert.throws(() => (groupingSets as () => unknown)(), refused(/GROUPING SETS takes at least one element/));
 });
 
 // [spec:pgorm:req:bindings.expressions/test]
@@ -217,7 +220,8 @@ test("SIMILAR TO matches a whole string against its pattern, the pattern bound a
   assert.equal(sql, 'SELECT "word"."w" SIMILAR TO $1');
   assert.deepStrictEqual(values.map((value) => value.value), ["x' OR '1'='1"]);
   assert.throws(() => word.col("w").similarTo("a", { escape: "!!" }), refused(/one character/));
-  assert.throws(() => word.col("w").notSimilarTo(1 as never), refused(/pattern is a string/));
+  assert.throws(() => word.col("w").notSimilarTo(1 as never), mistyped(/pattern is a string/));
+  assert.throws(() => word.col("w").similarTo("a", { escape: 1 as never }), mistyped(/escape is a string/));
 });
 
 // [spec:pgorm:req:bindings.select/test]
@@ -269,13 +273,15 @@ test("ROWS FROM reads its calls side by side, padding the shorter with NULL", as
     const [build, reason] of [
       [() => tableFunction(col("x"), { alias: "t" }), /reads a function call, not an expression/],
       [() => tableFunction([] as never, { alias: "t" }), /at least one call/],
-      [() => tableFunction(call("generate_series", int8(1), int8(2)), {} as never), /needs its alias/],
       [() => call("generate_series", 1), /no "generate_series" taking 1 argument/],
       [() => call("unnest"), /no "unnest" taking 0 argument/],
     ] as const
   ) {
     assert.throws(build, refused(reason));
   }
+  assert.throws(() => tableFunction(call("generate_series", int8(1), int8(2)), {} as never), mistyped(/needs its alias/));
+  assert.throws(() => tableFunction(1 as never, { alias: "t" }), mistyped(/reads a function call/));
+  assert.throws(() => call(7 as never), mistyped(/a function's name is a string/));
 });
 
 // [spec:pgorm:req:bindings.select/test]
@@ -322,16 +328,16 @@ test("a call returning record reads through its column definitions, alone or ins
   for (
     const [build, reason] of [
       [() => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [] as never }, { alias: "t" }), /at least one column/],
-      [
-        () => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [["a"] as never] }, { alias: "t" }),
-        /\[name, type\] pair/,
-      ],
       [() => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [["", "text"]] }, { alias: "t" }), /identifier/],
       [() => call("json_to_record"), /no "json_to_record" taking 0 argument/],
     ] as const
   ) {
     assert.throws(build, refused(reason));
   }
+  assert.throws(
+    () => tableFunction({ call: call("json_to_record", col("d")), columnDefinitions: [["a"] as never] }, { alias: "t" }),
+    mistyped(/\[name, type\] pair/),
+  );
 });
 
 // [spec:pgorm:req:bindings.select/test]
@@ -349,7 +355,7 @@ test("TABLESAMPLE draws a bound share of a table's rows, the same sample again f
   const bound = select().from(seeded).inspect().values;
   assert.deepStrictEqual(bound.map((value) => [value.kind, value.value]), [["f64", 50], ["f64", 7]]);
   await assert.rejects(pool().query(select().from(draw.tablesample("bernoulli", 150))), sqlstate("2202H"));
-  assert.throws(() => draw.tablesample("random" as never, 10), refused(/bernoulli/));
-  assert.throws(() => draw.tablesample("system", "10" as never), refused(/percentage is a number/));
-  assert.throws(() => draw.tablesample("system", 10, { repeatable: "1" as never }), refused(/seed is a number/));
+  assert.throws(() => draw.tablesample("random" as never, 10), mistyped(/bernoulli/));
+  assert.throws(() => draw.tablesample("system", "10" as never), mistyped(/percentage is a number/));
+  assert.throws(() => draw.tablesample("system", 10, { repeatable: "1" as never }), mistyped(/seed is a number/));
 });

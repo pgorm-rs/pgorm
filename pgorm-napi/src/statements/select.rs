@@ -35,7 +35,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 fn receiver<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<SelectStatement> {
     match this(cx, 0)? {
         Node::Select(select) => Ok(select),
-        other => refuse(cx, format!("expected a Select, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected a Select, got {}", other.describe())),
     }
 }
 
@@ -57,11 +57,10 @@ fn project<'cx>(
             Some(Node::Windowed(windowed)) => windowed.project(select),
             Some(other) => {
                 let what = other.describe();
-                return refuse(cx, format!("a projection is an expression, not {what}"));
+                return cx.throw_type_error(format!("a projection is an expression, not {what}"));
             }
             None => {
-                return refuse(
-                    cx,
+                return cx.throw_type_error(
                     "a projection is an expression: bind a value with bind(value)",
                 );
             }

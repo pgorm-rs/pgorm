@@ -26,9 +26,8 @@ let partsOf;
  */
 function keyFields(shape, names, side) {
   const list = typeof names === "string" ? [names] : names;
-  if (!Array.isArray(list) || list.length === 0) {
-    throw new ConstructionError(`a relation's ${side} is a field or a non-empty list of fields`);
-  }
+  if (!Array.isArray(list)) throw new TypeError(`a relation's ${side} is a field or a list of fields`);
+  if (list.length === 0) throw new ConstructionError(`a relation's ${side} names at least one field`);
   const fields = list.map((name) => fieldOf(shape, name));
   if (new Set(fields).size !== fields.length) throw new ConstructionError(`a relation's ${side} names each field once`);
   return fields;

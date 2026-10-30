@@ -287,6 +287,37 @@ fn values() -> SelectStatement {
         .to_owned()
 }
 
+fn literals() -> SelectStatement {
+    let constant = |value: Value| SimpleExpr::Constant(value);
+    let moods = Value::Array(
+        ArrayType::String,
+        Some(Box::new(vec!["calm".into(), "glad".into()])),
+    );
+    let decimal = rust_decimal::Decimal::from_str("19.9900").expect("a decimal");
+    let uuid = uuid::Uuid::parse_str("0190a7a6-8c8e-7000-8000-000000000001").expect("a uuid");
+    Query::select()
+        .expr(constant(7i64.into()).binary(BinOper::Add, 3i64))
+        .expr(constant("O'Brien".into()))
+        .expr(constant("calm".into()).cast_as_type(TypeName::new(n("mood")).schema(n("app"))))
+        .expr(constant(moods).cast_as_type(TypeName::new(n("mood")).array()))
+        .expr(constant(decimal.into()))
+        .expr(constant(uuid.into()))
+        .expr(constant(jiff::civil::date(2026, 10, 9).into()))
+        .expr(constant(true.into()))
+        .expr(constant(Value::Array(
+            ArrayType::BigInt,
+            Some(Box::new(vec![1i64.into(), 2i64.into(), 3i64.into()])),
+        )))
+        .expr(constant(Value::Int(None)))
+        .from(table!("t"))
+        .cond_where(
+            col!("name")
+                .binary(BinOper::Equal, constant("x".into()))
+                .and(col!("id").binary(BinOper::GreaterThan, 2i64)),
+        )
+        .to_owned()
+}
+
 fn functions() -> SelectStatement {
     let shift = SimpleExpr::from("-1 hour").cast_as_type(TypeName::new(n("interval")));
     Query::select()
@@ -603,6 +634,7 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("casts-collations-subscripts", casts().build()),
         ("case", case().build()),
         ("values", values().build()),
+        ("literals", literals().build()),
         ("functions", functions().build()),
         ("subqueries", subqueries().build()),
         ("from-subquery", from_subquery().build()),

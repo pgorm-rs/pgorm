@@ -65,7 +65,8 @@ export function shapeOf(model) {
  * @returns {Field}
  */
 export function fieldOf(shape, name) {
-  const field = typeof name === "string" ? shape.byField.get(name) : undefined;
+  if (typeof name !== "string") throw new TypeError("a field is named by a string");
+  const field = shape.byField.get(name);
   if (!field) throw new ConstructionError(`${shape.name} has no field ${JSON.stringify(name)}`);
   return field;
 }

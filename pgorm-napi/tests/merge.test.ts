@@ -18,7 +18,7 @@ import {
   Table,
   With,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -119,6 +119,7 @@ test("a MERGE with no WHEN arm has nothing to inspect, and every terminal refuse
 });
 
 // [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("an arm takes only an action its kind of row can take", () => {
   const pending = merge(target, source, on);
   const statement = pending.whenMatched(MergeAction.delete());
@@ -128,11 +129,11 @@ test("an arm takes only an action its kind of row can take", () => {
     assert.throws(() => built.whenMatched(MergeAction.insert("id", 1) as never), refused(/target row updates, deletes or does nothing, not an insert/));
     assert.throws(() => built.whenMatched(MergeAction.insertDefaults() as never), refused(/not an insert of defaults/));
     assert.throws(() => built.whenNotMatchedBySource(MergeAction.insert("id", 1) as never), refused(/not an insert/));
-    assert.throws(() => built.whenMatched(col("x") as never), refused(/takes a MergeAction/));
+    assert.throws(() => built.whenMatched(col("x") as never), mistyped(/takes a MergeAction/));
   }
   assert.throws(() => MergeAction.update("name", null as never), refused(/null has no kind/));
-  assert.throws(() => MergeAction.insert("id", 1).overriding("never" as never), refused(/overriding/));
-  assert.throws(() => merge(col("t") as never, source, on), refused(/target is a Table/));
+  assert.throws(() => MergeAction.insert("id", 1).overriding("never" as never), mistyped(/overriding/));
+  assert.throws(() => merge(col("t") as never, source, on), mistyped(/target is a Table/));
   assert.throws(
     () => statement.with(With.recursive("r", select(col("n")).from(new Table("r")))),
     refused(/no WITH RECURSIVE before a MERGE/),

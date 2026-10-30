@@ -10,21 +10,29 @@ use tokio_postgres_rustls::MakeRustlsConnect;
 
 use crate::{
     errors::{Failure, Redactions},
-    values::read::{refuse, string},
+    statements::pick,
+    values::read::{refuse, string, text},
 };
 
 /// What a pool is built from.
 #[derive(Debug)]
 pub(crate) struct PoolConfig {
     pub(crate) dsn: String,
-    pub(crate) tls: Option<String>,
+    pub(crate) tls: Option<Tls>,
     pub(crate) ca: Option<Vec<u8>>,
     pub(crate) max_size: usize,
     pub(crate) connect_timeout: Duration,
     pub(crate) acquire_timeout: Duration,
     pub(crate) statement_cache_size: usize,
-    pub(crate) recycle: String,
+    pub(crate) recycle: pgorm::RecyclingMethod,
     pub(crate) statement_cache_channel: Option<String>,
+}
+
+/// The `tls` option: verify the server, or connect in plaintext.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Tls {
+    VerifyFull,
+    Disable,
 }
 
 /// A built pool, the secrets its errors redact, and how long acquiring a
@@ -60,7 +68,7 @@ fn count<'cx>(
     };
     let number = match value.downcast::<JsNumber, _>(cx) {
         Ok(number) => number.value(cx),
-        Err(_) => return refuse(cx, format!("{name} is a number")),
+        Err(_) => return cx.throw_type_error(format!("{name} is a number")),
     };
     if number.fract() != 0.0 || !(0.0..=9_007_199_254_740_991.0).contains(&number) {
         return refuse(cx, format!("{name} is a non-negative integer"));
@@ -81,7 +89,7 @@ fn milliseconds<'cx>(
     };
     let number = match value.downcast::<JsNumber, _>(cx) {
         Ok(number) => number.value(cx),
-        Err(_) => return refuse(cx, format!("{name} is a number of milliseconds")),
+        Err(_) => return cx.throw_type_error(format!("{name} is a number of milliseconds")),
     };
     match Duration::try_from_secs_f64(number / 1000.0) {
         Ok(duration) if number > 0.0 => Ok(duration),
@@ -95,15 +103,20 @@ fn milliseconds<'cx>(
 impl PoolConfig {
     /// `dsn` and the pool options object, as JavaScript passes them.
     // [spec:pgorm:req:bindings.connections]
-    // [spec:pgorm:req:napi.lifecycle]
+    // [spec:pgorm:req:napi.lifecycle+2]
     pub(crate) fn read<'cx>(
         cx: &mut Cx<'cx>,
         dsn: Handle<'cx, JsValue>,
         options: Handle<'cx, JsObject>,
     ) -> NeonResult<Self> {
-        let dsn = string(cx, dsn)?;
+        let dsn = text(cx, dsn, "a connection string")?;
         let tls = match option(cx, options, "tls")? {
-            Some(tls) => Some(string(cx, tls)?),
+            Some(tls) => Some(pick(
+                cx,
+                tls,
+                "tls",
+                &[("verify-full", Tls::VerifyFull), ("disable", Tls::Disable)],
+            )?),
             None => None,
         };
         let ca = match option(cx, options, "ca")? {
@@ -114,15 +127,25 @@ impl PoolConfig {
                     use neon::types::buffer::TypedArray;
                     Some(bytes.as_slice(cx).to_vec())
                 }
-                Err(_) => return refuse(cx, "ca is PEM text, as a string or a Uint8Array"),
+                Err(_) => {
+                    return cx.throw_type_error("ca is PEM text, as a string or a Uint8Array");
+                }
             },
         };
         let recycle = match option(cx, options, "recycle")? {
-            Some(recycle) => string(cx, recycle)?,
-            None => "verified".to_owned(),
+            Some(recycle) => pick(
+                cx,
+                recycle,
+                "recycle",
+                &[
+                    ("verified", pgorm::RecyclingMethod::Verified),
+                    ("fast", pgorm::RecyclingMethod::Fast),
+                ],
+            )?,
+            None => pgorm::RecyclingMethod::Verified,
         };
         let statement_cache_channel = match option(cx, options, "statementCacheChannel")? {
-            Some(channel) => Some(string(cx, channel)?),
+            Some(channel) => Some(text(cx, channel, "statementCacheChannel")?),
             None => None,
         };
         Ok(Self {
@@ -156,16 +179,12 @@ impl PoolConfig {
         }
         config.connect_timeout(self.connect_timeout);
         let secrets = Redactions::from_config(&config);
-        let mode = match self.tls.as_deref() {
+        let mode = match self.tls {
             Some(mode) => mode,
-            None if config.get_ssl_mode() == SslMode::Disable => "disable",
-            None => "verify-full",
+            None if config.get_ssl_mode() == SslMode::Disable => Tls::Disable,
+            None => Tls::VerifyFull,
         };
-        let recycling_method = match self.recycle.as_str() {
-            "verified" => pgorm::RecyclingMethod::Verified,
-            "fast" => pgorm::RecyclingMethod::Fast,
-            _ => return Err(invalid("recycle is \"verified\" or \"fast\"")),
-        };
+        let recycling_method = self.recycle;
         // [spec:pgorm:req:conn.pool.statement-cache.listen+1]    refused here, by name, rather than
         // as connect_with's anonymous invalid configuration
         if self
@@ -188,7 +207,7 @@ impl PoolConfig {
         };
         let max_size = self.max_size;
         let pool = match mode {
-            "disable" => {
+            Tls::Disable => {
                 if self.ca.is_some() || config.get_ssl_mode() == SslMode::Require {
                     return Err(invalid(
                         "a CA or sslmode=require conflicts with tls \"disable\"",
@@ -199,14 +218,13 @@ impl PoolConfig {
                     builder.max_size(max_size)
                 })
             }
-            "verify-full" => {
+            Tls::VerifyFull => {
                 config.ssl_mode(SslMode::Require);
                 let connector = tls_connector(self.ca.as_deref())?;
                 pgorm::connect_with(config, connector, manager, |builder| {
                     builder.max_size(max_size)
                 })
             }
-            _ => return Err(invalid("tls is \"verify-full\" or \"disable\"")),
         }
         .map_err(|_| invalid("invalid PostgreSQL pool configuration"))?;
         Ok(Built {
